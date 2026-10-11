@@ -41,7 +41,7 @@ Pages and request cards check again every 5 seconds while something is downloadi
 
 ### Live progress from the download client
 
-An admin can link SABnzbd and qBittorrent in **Settings → Services → Download Clients**. Seerr AI then shows progress every few seconds, plus the client's own steps (getting details, checking, verifying, repairing, unpacking, moving, running a script, no peers), instead of Radarr's and Sonarr's once-a-minute view. It only reads from the clients; Radarr and Sonarr still send the downloads.
+An admin can link SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent in **Settings → Services → Download Clients**. Seerr AI then shows progress every few seconds, plus the client's own steps (getting details, checking, verifying, repairing, unpacking, moving, running a script, no peers), instead of Radarr's and Sonarr's once-a-minute view. It only reads from the clients; Radarr and Sonarr still send the downloads.
 
 ## Series: single episodes and new seasons
 

@@ -1,7 +1,7 @@
 import { downloadClientFor } from '@server/api/downloadclients';
 import downloadTracker from '@server/lib/downloadtracker';
 import type { DownloadClientSettings } from '@server/lib/settings';
-import { getSettings } from '@server/lib/settings';
+import { DOWNLOAD_CLIENT_TYPES, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -10,7 +10,7 @@ import { z } from 'zod';
  * Download clients Seerr reads directly, managed like Maintainerr: a list,
  * added and edited through a dialog, each tested before it is saved.
  *
- * The SABnzbd API key and the qBittorrent password are never sent back.
+ * API keys and passwords are never sent back.
  * Each client says only whether one is saved, and a blank one on saving or
  * testing means "keep the saved one".
  */
@@ -19,7 +19,7 @@ const downloadClientRoutes = Router();
 const clientBody = z.object({
   id: z.number().int().optional(),
   name: z.string().trim().min(1),
-  type: z.enum(['sabnzbd', 'qbittorrent']),
+  type: z.enum(DOWNLOAD_CLIENT_TYPES),
   // Just the host: no scheme, path, port or spaces.
   hostname: z
     .string()
@@ -44,6 +44,9 @@ const shown = (client: DownloadClientSettings) => ({
   hasPassword: !!client.password,
 });
 
+/** Every client but SABnzbd, which uses an API key. */
+const signsIn = (type: DownloadClientSettings['type']) => type !== 'sabnzbd';
+
 /** The client as it will be saved, keeping a saved secret left blank. */
 const withSecrets = (
   body: ClientBody,
@@ -58,9 +61,14 @@ const withSecrets = (
   useSsl: body.useSsl,
   urlBase: body.urlBase,
   apiKey: body.type === 'sabnzbd' ? body.apiKey || saved?.apiKey || '' : '',
-  username: body.type === 'qbittorrent' ? body.username : '',
-  password:
-    body.type === 'qbittorrent' ? body.password || saved?.password || '' : '',
+  // Deluge's Web UI has a password and no username.
+  username: signsIn(body.type) && body.type !== 'deluge' ? body.username : '',
+  password: signsIn(body.type)
+    ? body.password ||
+      // A saved password is kept only for the same client at the same place.
+      (saved?.type === body.type ? saved.password : '') ||
+      ''
+    : '',
 });
 
 const connectionFailed = (client: DownloadClientSettings, e: unknown) => {
@@ -74,9 +82,12 @@ const connectionFailed = (client: DownloadClientSettings, e: unknown) => {
   // password); otherwise that it couldn't be reached.
   return {
     status: 400,
-    message: /SABnzbd:|qBittorrent did not accept/.test(message)
-      ? message
-      : `Could not reach ${client.name || 'the download client'}.`,
+    message:
+      /SABnzbd:|did not accept|NZBGet:|Deluge:|Transmission:|rTorrent:/.test(
+        message
+      )
+        ? message
+        : `Could not reach ${client.name || 'the download client'}.`,
   };
 };
 

@@ -17,18 +17,28 @@ const messages = defineMessages('components.Settings.DownloadClientModal', {
   add: 'Add Client',
   type: 'Client',
   sabnzbd: 'SABnzbd',
+  nzbget: 'NZBGet',
   qbittorrent: 'qBittorrent',
+  transmission: 'Transmission',
+  deluge: 'Deluge',
+  rtorrent: 'rTorrent / ruTorrent',
+  usenet: 'Usenet',
+  torrents: 'Torrents',
   name: 'Name',
   hostname: 'Hostname or IP Address',
   port: 'Port',
   ssl: 'Use SSL',
   urlBase: 'URL Base',
+  urlBaseTransmission: 'Usually /transmission/, as in Sonarr.',
+  urlBaseRtorrent:
+    'Where its XML-RPC is, as in Sonarr: usually RPC2, or plugins/httprpc/action.php through ruTorrent.',
   apiKey: 'API Key',
   apiKeyTip: 'In SABnzbd: Config → General → Security.',
   username: 'Username',
   usernameTip:
-    'Leave blank if qBittorrent lets this address in without signing in.',
+    'Leave blank if {client} lets this address in without signing in.',
   password: 'Password',
+  passwordTipDeluge: 'Deluge’s Web UI password.',
   savedSecret: 'Saved. Leave blank to keep it.',
   toastTestSuccess: 'Connected to {name}.',
   toastTestFailure: 'Could not connect: {reason}',
@@ -56,8 +66,15 @@ type FormValues = Omit<DownloadClientSettings, 'id'>;
 
 const DEFAULT_PORTS: Record<FormValues['type'], number> = {
   sabnzbd: 8080,
+  nzbget: 6789,
   qbittorrent: 8080,
+  transmission: 9091,
+  deluge: 8112,
+  rtorrent: 8080,
 };
+
+const USENET = ['sabnzbd', 'nzbget'] as const;
+const TORRENTS = ['qbittorrent', 'transmission', 'deluge', 'rtorrent'] as const;
 
 const DownloadClientModal = ({
   client,
@@ -105,8 +122,12 @@ const DownloadClientModal = ({
     useSsl: values.useSsl,
     urlBase: values.urlBase.trim(),
     apiKey: values.type === 'sabnzbd' ? values.apiKey : '',
-    username: values.type === 'qbittorrent' ? values.username.trim() : '',
-    password: values.type === 'qbittorrent' ? values.password : '',
+    // Deluge's Web UI has a password and no username; SABnzbd a key instead.
+    username:
+      values.type === 'sabnzbd' || values.type === 'deluge'
+        ? ''
+        : values.username.trim(),
+    password: values.type === 'sabnzbd' ? '' : values.password,
   });
 
   const reasonOf = (e: unknown) =>
@@ -254,12 +275,20 @@ const DownloadClientModal = ({
                         }
                       }}
                     >
-                      <option value="sabnzbd">
-                        {intl.formatMessage(messages.sabnzbd)}
-                      </option>
-                      <option value="qbittorrent">
-                        {intl.formatMessage(messages.qbittorrent)}
-                      </option>
+                      <optgroup label={intl.formatMessage(messages.usenet)}>
+                        {USENET.map((type) => (
+                          <option key={type} value={type}>
+                            {intl.formatMessage(messages[type])}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label={intl.formatMessage(messages.torrents)}>
+                        {TORRENTS.map((type) => (
+                          <option key={type} value={type}>
+                            {intl.formatMessage(messages[type])}
+                          </option>
+                        ))}
+                      </optgroup>
                     </Field>
                   </div>
                 </div>
@@ -356,6 +385,16 @@ const DownloadClientModal = ({
               <div className="form-row">
                 <label htmlFor="urlBase" className="text-label">
                   {intl.formatMessage(messages.urlBase)}
+                  {(values.type === 'transmission' ||
+                    values.type === 'rtorrent') && (
+                    <span className="label-tip">
+                      {intl.formatMessage(
+                        values.type === 'transmission'
+                          ? messages.urlBaseTransmission
+                          : messages.urlBaseRtorrent
+                      )}
+                    </span>
+                  )}
                 </label>
                 <div className="form-input-area">
                   <div className="form-input-field">
@@ -411,42 +450,54 @@ const DownloadClientModal = ({
                 </div>
               ) : (
                 <>
-                  <div className="form-row">
-                    <label htmlFor="username" className="text-label">
-                      {intl.formatMessage(messages.username)}
-                      <span className="label-tip">
-                        {intl.formatMessage(messages.usernameTip)}
-                      </span>
-                    </label>
-                    <div className="form-input-area">
-                      <div className="form-input-field">
-                        <Field
-                          id="username"
-                          name="username"
-                          type="text"
-                          autoComplete="off"
-                          data-form-type="other"
-                          data-1pignore="true"
-                          data-lpignore="true"
-                          data-bwignore="true"
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            connectionField(
-                              setFieldValue,
-                              'username',
-                              e.target.value
-                            )
-                          }
-                        />
+                  {values.type !== 'deluge' && (
+                    <div className="form-row">
+                      <label htmlFor="username" className="text-label">
+                        {intl.formatMessage(messages.username)}
+                        <span className="label-tip">
+                          {intl.formatMessage(messages.usernameTip, {
+                            client: intl.formatMessage(messages[values.type]),
+                          })}
+                        </span>
+                      </label>
+                      <div className="form-input-area">
+                        <div className="form-input-field">
+                          <Field
+                            id="username"
+                            name="username"
+                            type="text"
+                            autoComplete="off"
+                            data-form-type="other"
+                            data-1pignore="true"
+                            data-lpignore="true"
+                            data-bwignore="true"
+                            onChange={(
+                              e: React.ChangeEvent<HTMLInputElement>
+                            ) =>
+                              connectionField(
+                                setFieldValue,
+                                'username',
+                                e.target.value
+                              )
+                            }
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                   <div className="form-row">
                     <label htmlFor="password" className="text-label">
                       {intl.formatMessage(messages.password)}
-                      {client?.hasPassword && (
+                      {client?.hasPassword && client.type === values.type ? (
                         <span className="label-tip">
                           {intl.formatMessage(messages.savedSecret)}
                         </span>
+                      ) : (
+                        values.type === 'deluge' && (
+                          <span className="label-tip">
+                            {intl.formatMessage(messages.passwordTipDeluge)}
+                          </span>
+                        )
                       )}
                     </label>
                     <div className="form-input-area">

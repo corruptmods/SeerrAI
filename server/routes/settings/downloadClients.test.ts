@@ -18,6 +18,7 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 setupTestDb();
 
 let sabPort = 0;
+let nzbgetPort = 0;
 let port = 0;
 const servers: Server[] = [];
 
@@ -42,6 +43,20 @@ before(async () => {
       );
     }
     res.end(JSON.stringify({ queue: { slots: [] } }));
+  });
+
+  // NZBGet behind basic auth, answering its version.
+  nzbgetPort = await listen((req, res) => {
+    const auth = Buffer.from(
+      String(req.headers.authorization ?? '').replace(/^Basic /, ''),
+      'base64'
+    ).toString();
+    if (auth !== 'nzbget:pw') {
+      res.statusCode = 401;
+      return res.end();
+    }
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ result: '24.3', id: 1 }));
   });
 
   const app = express();
@@ -158,6 +173,32 @@ describe('download clients in settings', () => {
     assert.equal(removed.status, 200);
     assert.equal(getSettings().downloadClients.length, 0);
     assert.equal((await call('DELETE', `/${added.body.id}`)).status, 404);
+  });
+
+  it('adds NZBGet with its sign-in, and keeps the password left blank', async () => {
+    const nzbget = (password: string) => ({
+      name: 'NZBGet',
+      type: 'nzbget',
+      hostname: '127.0.0.1',
+      port: nzbgetPort,
+      useSsl: false,
+      urlBase: '',
+      username: 'nzbget',
+      password,
+    });
+    const wrong = await call('POST', '', nzbget('nope'));
+    assert.deepEqual(
+      [wrong.status, wrong.body.message],
+      [400, 'NZBGet did not accept the username or password.']
+    );
+
+    const added = await call('POST', '', nzbget('pw'));
+    assert.equal(added.status, 201);
+    assert.deepEqual([added.body.password, added.body.hasPassword], ['', true]);
+
+    const kept = await call('PUT', `/${added.body.id}`, nzbget(''));
+    assert.equal(kept.status, 200);
+    assert.equal(getSettings().downloadClients[0].password, 'pw');
   });
 
   it('refuses an address with a scheme or path in the host', async () => {

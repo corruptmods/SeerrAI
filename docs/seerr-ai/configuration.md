@@ -11,7 +11,7 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | **Settings → General** | **Image Cache Size Limit**, with Enable Image Caching: posters and backdrops are also kept as AVIF and WebP at three sizes; the least recently viewed go first past the limit. | 2048 MB (at least 256) |
 | **Settings → Users** | **Auto-Import Plex Users**: an account for everyone the Plex server is shared with, hourly. Only adds; someone deleted isn't brought back. | Off |
 | **Settings → Features** | Turns optional features off for everyone. See [Feature switches](#feature-switches). | All on |
-| **Settings → Services → Download Clients** | SABnzbd and qBittorrent, read for live progress and used by Backfill. Keys and passwords are never sent back to the browser. | None |
+| **Settings → Services → Download Clients** | SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent, read for live progress; Backfill downloads with SABnzbd and qBittorrent. Keys and passwords are never sent back to the browser. | None |
 | **Settings → Services → Bazarr** | Subtitles and transcription. | Port 6767 |
 | **Settings → Services → Tautulli** | Watch history from Plex, for Suggested for You, "up next" on lists, Who Watched, Pick for the Room and Catch Me Up. Plex only; moved here from Settings → Plex. Its API key is never sent back to the browser. | Port 8181 |
 | **Settings → Services → Maintainerr** | One or more servers. Per server: show Deleting Soon badges, include in the Deleting Soon row, allow Keep for everyone, days Keep adds (0 restarts the rule's grace period), what counts as "soon". | Port 6246; badges, row and Keep on; 0 days; 14 days |

@@ -27,7 +27,7 @@ Every addition can be switched off for everyone, or by each person for themselve
 | Area | Seerr | Seerr AI |
 |---|---|---|
 | Stuck titles | Wait for Radarr or Sonarr to find them | **Backfill** searches Prowlarr under every name, checks each file, imports only what is approved; the **admin agent** looks further |
-| Download status | "Processing" | **What it is doing**: waiting on a delay profile (and for how long), queued, stalled, verifying, unpacking, importing, adding to Plex; live progress from SABnzbd and qBittorrent |
+| Download status | "Processing" | **What it is doing**: waiting on a delay profile (and for how long), queued, stalled, verifying, unpacking, importing, adding to Plex; live progress from SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent |
 | When it arrives | — | **Arrival estimates** on requests, title pages and approval notifications |
 | Problems | Find them yourself | **Health page** for every connected service, with **alerts**; nightly **Plex Match Check** for folders Plex matched to the wrong title |
 | AI | — | AI Search (text or photo), Pick for the Room, Catch Me Up, Review Deletions, Suggest Issue Fixes, Explain Logs, Backfill second opinion, admin agent |

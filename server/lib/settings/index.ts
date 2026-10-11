@@ -69,17 +69,32 @@ export interface JellyfinSettings {
  * send the downloads; Seerr only reads them, matched by the download id
  * Radarr and Sonarr record.
  */
+/** Usenet clients, then torrent clients. */
+export const DOWNLOAD_CLIENT_TYPES = [
+  'sabnzbd',
+  'nzbget',
+  'qbittorrent',
+  'transmission',
+  'deluge',
+  'rtorrent',
+] as const;
+export type DownloadClientType = (typeof DOWNLOAD_CLIENT_TYPES)[number];
+
 export interface DownloadClientSettings {
   id: number;
   name: string;
-  type: 'sabnzbd' | 'qbittorrent';
+  type: DownloadClientType;
   hostname: string;
   port: number;
   useSsl: boolean;
   urlBase: string;
   /** SABnzbd's API key. */
   apiKey: string;
-  /** qBittorrent's Web UI sign-in; empty when it lets this address in. */
+  /**
+   * The client's sign-in, empty when it lets this address in: qBittorrent's
+   * Web UI, Transmission's RPC, NZBGet's and rTorrent's basic auth. Deluge
+   * signs in with its Web UI password alone.
+   */
   username: string;
   password: string;
 }

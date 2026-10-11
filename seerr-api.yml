@@ -896,7 +896,7 @@ components:
           type: string
         type:
           type: string
-          enum: [sabnzbd, qbittorrent]
+          enum: [sabnzbd, nzbget, qbittorrent, transmission, deluge, rtorrent]
         hostname:
           type: string
         port:
@@ -910,10 +910,10 @@ components:
           description: SABnzbd's API key. Never returned; blank on saving keeps the saved one.
         username:
           type: string
-          description: qBittorrent's Web UI username; blank when it lets Seerr in without one.
+          description: The client's sign-in username (not SABnzbd or Deluge); blank when it lets Seerr AI in without one.
         password:
           type: string
-          description: qBittorrent's Web UI password. Never returned; blank on saving keeps the saved one.
+          description: The client's password (Deluge's Web UI password). Never returned; blank on saving keeps the saved one.
         hasApiKey:
           type: boolean
           readOnly: true

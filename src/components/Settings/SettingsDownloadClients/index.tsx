@@ -18,11 +18,15 @@ import useSWR from 'swr';
 const messages = defineMessages('components.Settings.SettingsDownloadClients', {
   title: 'Download Clients',
   description:
-    'Link SABnzbd or qBittorrent so download progress updates every few seconds, with what the client is doing (repairing, unpacking, running its script, no one to download from). Radarr and Sonarr still send the downloads; Seerr AI only reads them.',
+    'Link your download clients so download progress updates every few seconds, with what the client is doing (repairing, unpacking, running its script, no one to download from): SABnzbd, NZBGet, qBittorrent, Transmission, Deluge or rTorrent. Radarr and Sonarr still send the downloads; Seerr AI only reads them. Backfill downloads with SABnzbd and qBittorrent.',
   addClient: 'Add Download Client',
   client: 'Client',
   sabnzbd: 'SABnzbd',
+  nzbget: 'NZBGet',
   qbittorrent: 'qBittorrent',
+  transmission: 'Transmission',
+  deluge: 'Deluge',
+  rtorrent: 'rTorrent',
   deleteClient: 'Delete Download Client',
   deleteClientConfirm: 'Are you sure you want to delete this download client?',
   deleteFailed: 'Could not delete the download client.',

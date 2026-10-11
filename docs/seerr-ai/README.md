@@ -29,7 +29,7 @@ Almost everything here is an optional feature. An admin can turn one off for eve
 |---|---|
 | **Backfill** | Searches Prowlarr for series and movies Sonarr and Radarr gave up on, checks every file in a pack with Sonarr or Radarr, and imports only what an admin approves. |
 | **Admin agent** | An AI that looks further when Backfill finds nothing, within limits you set. It never replaces a file on disk. |
-| **Status that says why** | Waiting on a delay profile (and for how long), queued, stalled, verifying, unpacking, importing, adding to Plex. Live progress from SABnzbd and qBittorrent. |
+| **Status that says why** | Waiting on a delay profile (and for how long), queued, stalled, verifying, unpacking, importing, adding to Plex. Live progress from SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent. |
 | **Arrival estimates** | "Digital release expected 3 Nov", "Released — searching, usually arrives within 2 days here", or time left while downloading. |
 | **Health** | Every connected service checked, problems listed with how to fix them, and an alert when something newly breaks. |
 | **Plex Match Check** | Nightly: folders Plex matched to a different title than Sonarr or Radarr has in them. |

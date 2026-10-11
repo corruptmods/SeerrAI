@@ -1,3 +1,4 @@
+import { isTorrentClient } from '@server/api/downloadclients';
 import ProwlarrAPI from '@server/api/prowlarr';
 import backfill from '@server/lib/backfill/engine';
 import type { BackfillSettings } from '@server/lib/settings';
@@ -83,8 +84,8 @@ const shown = (settings: BackfillSettings) => ({
     apiKey: '',
     hasApiKey: !!settings.prowlarr.apiKey,
   },
-  torrentClients: backfill.clientsFor('qbittorrent'),
-  usenetClients: backfill.clientsFor('sabnzbd'),
+  torrentClients: backfill.clientsFor('torrent'),
+  usenetClients: backfill.clientsFor('usenet'),
 });
 
 type ProwlarrBody = z.infer<typeof body>['prowlarr'];
@@ -157,16 +158,18 @@ backfillSettingsRoutes.put('/', async (req, res, next) => {
   if (
     next_.torrentClientId !== null &&
     !clients.some(
-      (c) => c.id === next_.torrentClientId && c.type === 'qbittorrent'
+      (c) => c.id === next_.torrentClientId && isTorrentClient(c.type)
     )
   ) {
-    return next({ status: 400, message: 'Choose a qBittorrent client.' });
+    return next({ status: 400, message: 'Choose a torrent client.' });
   }
   if (
     next_.usenetClientId !== null &&
-    !clients.some((c) => c.id === next_.usenetClientId && c.type === 'sabnzbd')
+    !clients.some(
+      (c) => c.id === next_.usenetClientId && !isTorrentClient(c.type)
+    )
   ) {
-    return next({ status: 400, message: 'Choose a SABnzbd client.' });
+    return next({ status: 400, message: 'Choose a Usenet client.' });
   }
   if (next_.enabled) {
     if (!next_.prowlarr.hostname || !next_.prowlarr.apiKey) {

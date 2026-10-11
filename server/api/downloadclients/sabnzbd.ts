@@ -1,6 +1,7 @@
 import type {
-  DownloadClient,
   LiveDownload,
+  UsenetClient,
+  UsenetJob,
 } from '@server/api/downloadclients/types';
 import {
   CLIENT_TIMEOUT_MS,
@@ -45,22 +46,7 @@ interface Answer {
 const MB = 1024 * 1024;
 
 /** A job as Backfill follows it. */
-export interface SabJob {
-  place: 'queue' | 'history';
-  status: string;
-  percentage: number;
-  size: number;
-  sizeLeft: number;
-  secondsLeft?: number;
-  /**
-   * Bytes a second: 0 while it waits its turn, undefined when several jobs
-   * download at once and SABnzbd's one figure cannot be split between them.
-   */
-  speed?: number;
-  /** Where the finished job's files are, in SABnzbd's own paths. */
-  storage?: string;
-  failMessage?: string;
-}
+export type SabJob = UsenetJob;
 
 /** SABnzbd's "time left": H:MM:SS, with days in front when it runs long. */
 export const sabSecondsLeft = (timeleft?: string): number | undefined => {
@@ -116,7 +102,8 @@ export const sabHistoryDownload = (slot: HistorySlot): LiveDownload => {
   return { ...base, stage: 'finishing', step: AFTER_DOWNLOAD[slot.status] };
 };
 
-class SabnzbdAPI implements DownloadClient {
+class SabnzbdAPI implements UsenetClient {
+  public readonly product = 'SABnzbd';
   private axios: AxiosInstance;
   private apiKey: string;
 
@@ -231,6 +218,10 @@ class SabnzbdAPI implements DownloadClient {
       storage: done.storage ? String(done.storage) : undefined,
       failMessage: done.fail_message ? String(done.fail_message) : undefined,
     };
+  }
+
+  public async backfillProblems(): Promise<string[]> {
+    return [];
   }
 
   public async pauseJob(nzoId: string): Promise<void> {

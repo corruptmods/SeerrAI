@@ -36,8 +36,7 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
   torrentClient: 'Torrent packs go to',
   usenetClient: 'Usenet packs go to',
   noClient: 'Not used',
-  noClients:
-    'Add qBittorrent or SABnzbd under Services → Download clients first.',
+  noClients: 'Add a download client under Services → Download clients first.',
   category: 'Category',
   categoryTip:
     'Backfill’s downloads go here, apart from Sonarr’s and Radarr’s, so neither imports them on its own.',
@@ -67,7 +66,7 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
     'Counted for torrents and Usenet apart. A download being imported does not count.',
   stallHours: 'Give up on a torrent after this many hours without progress',
   stallHoursTip:
-    'Only time it is meant to be downloading counts: paused, queued or checking in qBittorrent does not. It is then replaced or offered like any failed download. 0 waits forever.',
+    'Only time it is meant to be downloading counts: paused, queued or checking in the torrent client does not. It is then replaced or offered like any failed download. 0 waits forever.',
   minFreeSpaceGb: 'Keep free on the series’ disk (GB)',
   historyDays: 'Days to keep finished downloads',
   historyDaysTip:

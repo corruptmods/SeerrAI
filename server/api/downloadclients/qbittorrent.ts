@@ -1,6 +1,8 @@
 import type {
-  DownloadClient,
+  ClientTorrent,
   LiveDownload,
+  TorrentClient,
+  TorrentState,
 } from '@server/api/downloadclients/types';
 import {
   CLIENT_TIMEOUT_MS,
@@ -55,6 +57,52 @@ export interface QbitFile {
 /** qBittorrent's "no estimate". */
 const ETA_UNKNOWN = 8_640_000;
 
+/** qBittorrent's states; one not listed is downloading or waiting for peers. */
+const QBIT_STATES: Record<string, TorrentState> = {
+  metaDL: 'metadata',
+  forcedMetaDL: 'metadata',
+  checkingDL: 'checking',
+  checkingUP: 'checking',
+  checkingResumeData: 'checking',
+  allocating: 'checking',
+  queuedDL: 'queued',
+  pausedDL: 'paused',
+  stoppedDL: 'paused',
+  moving: 'moving',
+  uploading: 'done',
+  forcedUP: 'done',
+  stalledUP: 'done',
+  queuedUP: 'done',
+  pausedUP: 'done',
+  stoppedUP: 'done',
+  error: 'error',
+  missingFiles: 'error',
+};
+
+/** A torrent as Backfill follows it, in every client's terms. */
+export const qbitTorrent = (
+  torrent: QbitTorrentInfo & { added_on?: number }
+): ClientTorrent => {
+  const state = QBIT_STATES[torrent.state] ?? 'downloading';
+  const eta = Number(torrent.eta);
+  return {
+    hash: String(torrent.hash ?? '').toLowerCase(),
+    name: torrent.name,
+    state,
+    error:
+      state !== 'error'
+        ? undefined
+        : torrent.state === 'missingFiles'
+          ? 'its files are missing'
+          : 'qBittorrent stopped it on an error',
+    progress: Number(torrent.progress) || 0,
+    speed: Number(torrent.dlspeed) || 0,
+    secondsLeft: eta > 0 && eta < ETA_UNKNOWN ? eta : undefined,
+    savePath: torrent.save_path ?? '',
+    addedAt: torrent.added_on ? torrent.added_on * 1000 : undefined,
+  };
+};
+
 export const qbitDownload = (torrent: Torrent): LiveDownload => {
   const size = Number(torrent.size) || 0;
   const sizeLeft = Math.max(0, Number(torrent.amount_left) || 0);
@@ -107,7 +155,10 @@ export const qbitDownload = (torrent: Torrent): LiveDownload => {
 /** Signed-in sessions, by client address and user, kept between passes. */
 const sessions = new Map<string, string>();
 
-class QBittorrentAPI implements DownloadClient {
+class QBittorrentAPI implements TorrentClient {
+  public readonly product = 'qBittorrent';
+  /** Its "stop condition": a magnet stops once its file list is in. */
+  public readonly stopsAtMetadata = true;
   private axios: AxiosInstance;
   private baseUrl: string;
   private username: string;
@@ -297,6 +348,19 @@ class QBittorrentAPI implements DownloadClient {
       { category }
     );
     return Array.isArray(data) ? data : [];
+  }
+
+  public async findTorrent(hash: string): Promise<ClientTorrent | undefined> {
+    const torrent = await this.getTorrent(hash);
+    return torrent ? qbitTorrent(torrent) : undefined;
+  }
+
+  public async listCategory(category: string): Promise<ClientTorrent[]> {
+    return (await this.getCategoryTorrents(category)).map(qbitTorrent);
+  }
+
+  public async backfillProblems(): Promise<string[]> {
+    return [];
   }
 
   /** A torrent's files, in index order; empty until its metadata is in. */

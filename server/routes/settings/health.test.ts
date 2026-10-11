@@ -1,3 +1,5 @@
+import DelugeAPI from '@server/api/downloadclients/deluge';
+import NzbgetAPI from '@server/api/downloadclients/nzbget';
 import TheMovieDb from '@server/api/themoviedb';
 import {
   MediaRequestStatus,
@@ -390,6 +392,61 @@ describe('services', () => {
     );
     assert.match(prowlarr.items[0].detail!, /paused for/);
     assert.equal(byId(checks, 'downloadClient:7').status, 'error');
+  });
+
+  it('shows each download client with its version, and what keeps Backfill from using it fully', async () => {
+    const settings = getSettings();
+    const client = {
+      hostname: '127.0.0.1',
+      port: 1,
+      useSsl: false,
+      urlBase: '',
+      apiKey: '',
+      username: '',
+      password: '',
+    };
+    settings.downloadClients = [
+      { ...client, id: 8, name: 'Deluge', type: 'deluge' },
+      { ...client, id: 9, name: 'NZBGet', type: 'nzbget' },
+    ];
+    settings.backfill = {
+      ...BACKFILL_DEFAULTS,
+      enabled: true,
+      torrentClientId: 8,
+    };
+    const mocks = [
+      mock.method(DelugeAPI.prototype, 'getVersion', async () => '2.1.1'),
+      mock.method(DelugeAPI.prototype, 'backfillProblems', async () => [
+        "Deluge's Label plugin is off",
+      ]),
+      mock.method(NzbgetAPI.prototype, 'getVersion', async () => '24.3'),
+    ];
+    const problems = mock.method(
+      NzbgetAPI.prototype,
+      'backfillProblems',
+      async () => ['should not be asked']
+    );
+    mocks.push(problems);
+    try {
+      const checks = await health();
+      const deluge = byId(checks, 'downloadClient:8');
+      assert.equal(deluge.status, 'warning');
+      assert.match(deluge.detail!, /\d+ ms · Deluge 2\.1\.1/);
+      assert.deepEqual(
+        deluge.items.map((i) => [i.title, i.href]),
+        [["Deluge's Label plugin is off", '/settings/backfill']]
+      );
+      // Not one Backfill uses: only whether it answers.
+      const nzbget = byId(checks, 'downloadClient:9');
+      assert.equal(nzbget.status, 'ok');
+      assert.match(nzbget.detail!, /NZBGet 24\.3/);
+      assert.equal(problems.mock.callCount(), 0);
+
+      settings.backfill = { ...settings.backfill, enabled: false };
+      assert.equal(byId(await health(), 'downloadClient:8').status, 'ok');
+    } finally {
+      for (const m of mocks) m.mock.restore();
+    }
   });
 
   it('shows how many database connections are in use, on Postgres', async (t) => {

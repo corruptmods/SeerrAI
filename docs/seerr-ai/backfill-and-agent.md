@@ -19,7 +19,7 @@ Approval can be **Missing episodes only** (recommended), or **Missing and upgrad
 **Settings → Backfill**:
 
 - **Prowlarr**: address and API key.
-- **Downloads**: which download client takes torrent packs and which takes Usenet packs (add qBittorrent and SABnzbd under **Settings → Services → Download Clients** first), and the **category** Backfill uses, kept apart so Sonarr and Radarr don't import on their own.
+- **Downloads**: which download client takes torrent packs and which takes Usenet packs (any of the clients under **Settings → Services → Download Clients**: qBittorrent, Transmission, Deluge or rTorrent for torrents, SABnzbd or NZBGet for Usenet), and the **category** Backfill uses, kept apart so Sonarr and Radarr don't import on their own.
 - **When a title is stuck**: hours since the last search, movies too, whether files below the cutoff count as gaps.
 - **Approval**: approve some packs automatically (only ones that fill what is missing, replace nothing, score at least 700 and are no bigger than 25 GB, by default), and **Replace failed downloads** (on by default: the next good pack is taken when one fails or stalls).
 - **Advanced**: titles searched per scan, days before searching again, specials, downloads at once, space to keep free, when to give up on a stalled torrent, how long to keep history, and the agent's limits. The defaults suit most servers.
@@ -33,7 +33,22 @@ Approval can be **Missing episodes only** (recommended), or **Missing and upgrad
 
 ### Usenet posts it can't open
 
-A Usenet post packed in RAR archives, or with scrambled file names (only its PAR2 repair files named), can't be listed before it is downloaded. Backfill marks it as one it couldn't check. The admin agent can take such a post whole when its name is exactly the movie or one missing episode; once SABnzbd has it, its one video is imported.
+A Usenet post packed in RAR archives, or with scrambled file names (only its PAR2 repair files named), can't be listed before it is downloaded. Backfill marks it as one it couldn't check. The admin agent can take such a post whole when its name is exactly the movie or one missing episode; once the Usenet client has it, its one video is imported.
+
+### What each download client does
+
+Backfill adds a pack with only the chosen files picked, follows it, has Sonarr or Radarr import them, and removes the download with what is left of it. Every client does that; what differs:
+
+| Client | Category | Magnet links | Removing |
+|---|---|---|---|
+| qBittorrent | A category | Stop by themselves once their file list is in | With its files |
+| Transmission | A label (3.0 and newer) | Held at 1 KB/s until the files are chosen, seconds later | With its files |
+| Deluge | A label, when the Label plugin is on | Held at 1 KiB/s until the files are chosen, seconds later | With its files |
+| rTorrent / ruTorrent | ruTorrent's label | Watched every few seconds until the files are chosen | Its files deleted one by one, then empty folders, through rTorrent's `execute` command |
+| SABnzbd | A category | | With its files |
+| NZBGet (16 and newer) | A category | | From the queue with what it downloaded, or from the history; the finished folder's leftovers (an .nfo, a sample) stay, as the videos were moved out by the import |
+
+Without a category or label, a magnet link Backfill was reading when Seerr AI stopped is not cleared away by it. The Health page says when a client is missing something Backfill uses.
 
 ## The admin agent
 

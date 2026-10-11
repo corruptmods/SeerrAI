@@ -876,7 +876,7 @@ const releaseFiles: AgentTool = {
       const what =
         known.packed === 'archives'
           ? 'packed in archives: its files are only known once it is downloaded and unpacked'
-          : 'with scrambled file names (only its PAR2 repair files are named, which is common and fine): SABnzbd restores the real names once it is downloaded';
+          : 'with scrambled file names (only its PAR2 repair files are named, which is common and fine): the Usenet client restores the real names once it is downloaded';
       return `${known.ref} "${known.title}" (${sizeOf(known.size)}) is a Usenet post ${what}. If its name is exactly one missing episode (or the movie), grab it whole: grab with whole: true and one file entry with index 0 and the season and episode its name gives. A season pack like this cannot be used.`;
     }
     const sorted = [...files].sort((a, b) => a.index - b.index);
@@ -1005,7 +1005,7 @@ interface PreparedGrab {
 
 /**
  * A Usenet post packed in archives or with scrambled names, taken whole:
- * what is inside is only known once SABnzbd has it, so its name has to be
+ * what is inside is only known once the Usenet client has it, so its name has to be
  * the proof. Sonarr
  * (or Radarr) must read the name as exactly this one missing episode (or
  * this movie), in a language that is wanted; its one video is imported.

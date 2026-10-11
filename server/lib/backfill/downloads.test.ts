@@ -203,21 +203,45 @@ describe("a Usenet download's own speed", () => {
 });
 
 describe('what a Usenet download is doing, in words', () => {
-  it('says what SABnzbd is doing after the download, not its bare status', async () => {
-    const { sabStage } = await import('@server/lib/backfill/engine');
+  it('says what the client is doing after the download, not its bare status', async () => {
+    const { usenetStage } = await import('@server/lib/backfill/engine');
     assert.equal(
-      sabStage({ place: 'history', status: 'Running' }),
+      usenetStage({ place: 'history', status: 'Running' }, 'SABnzbd'),
       'SABnzbd is running its post-processing script'
     );
     assert.equal(
-      sabStage({ place: 'history', status: 'Extracting' }),
+      usenetStage({ place: 'history', status: 'Extracting' }, 'SABnzbd'),
       'SABnzbd is unpacking it'
     );
     assert.equal(
-      sabStage({ place: 'queue', status: 'Queued' }),
+      usenetStage({ place: 'queue', status: 'Queued' }, 'SABnzbd'),
       'Waiting its turn in SABnzbd'
     );
-    // Anything new is shown as SABnzbd names it.
-    assert.equal(sabStage({ place: 'history', status: 'Odd' }), 'Odd');
+    // NZBGet's are put in the same words.
+    assert.equal(
+      usenetStage({ place: 'history', status: 'renaming' }, 'NZBGet'),
+      'NZBGet is renaming its files'
+    );
+    // Anything new is shown as the client names it.
+    assert.equal(
+      usenetStage({ place: 'history', status: 'Odd' }, 'SABnzbd'),
+      'Odd'
+    );
+  });
+
+  it('says what a torrent is doing in the words of its own client', async () => {
+    const { torrentStage } = await import('@server/lib/backfill/engine');
+    assert.deepEqual(torrentStage({ state: 'paused', speed: 0 }, 'Deluge'), {
+      stage: 'Paused in Deluge',
+      held: true,
+    });
+    assert.deepEqual(
+      torrentStage({ state: 'checking', speed: 0 }, 'Transmission'),
+      { stage: 'Transmission is checking it', held: true }
+    );
+    assert.deepEqual(
+      torrentStage({ state: 'downloading', speed: 0 }, 'rTorrent'),
+      { stage: 'Waiting for peers', held: false }
+    );
   });
 });

@@ -21,9 +21,9 @@ const messages = defineMessages('components.Backfill.ApproveModal', {
   missingMovie: 'The missing movie',
   missingDetail: '{files} files · {size} · nothing on disk is touched',
   onlyFiles:
-    'Only these files are downloaded; qBittorrent skips the rest of the pack. Once {app} has imported them, the download is removed, with no seeding.',
+    'Only these files are downloaded; the torrent client skips the rest of the pack. Once {app} has imported them, the download is removed, with no seeding.',
   usenetWhole:
-    'SABnzbd downloads the whole NZB; only these files are imported. The job is removed from SABnzbd afterwards.',
+    'The Usenet client downloads the whole NZB; only these files are imported. The job is removed from it afterwards.',
   deleteWarning:
     '{count} {count, plural, one {file} other {files}} on disk will be permanently deleted as their replacements import ({app}’s recycle bin is off).',
   typeToConfirm: 'Type {series} to confirm',

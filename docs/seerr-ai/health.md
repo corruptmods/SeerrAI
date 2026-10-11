@@ -6,7 +6,7 @@
 
 **Settings → Health** (admins) checks everything Seerr AI depends on and lists what has quietly gone wrong, each with a link to fix it.
 
-- **Services**: whether Plex, Radarr, Sonarr, Prowlarr, each download client, Bazarr, the AI provider, Tautulli, each Maintainerr server and the PostgreSQL connection pool answer, plus what they report themselves: Radarr's and Sonarr's own health warnings and disks running low, indexers Prowlarr has paused, subtitle providers Bazarr has paused (WhisperAI included), an AI account out of credit.
+- **Services**: whether Plex, Radarr, Sonarr, Prowlarr, each download client, Bazarr, the AI provider, Tautulli, each Maintainerr server and the PostgreSQL connection pool answer, plus what they report themselves: Radarr's and Sonarr's own health warnings and disks running low, indexers Prowlarr has paused, subtitle providers Bazarr has paused (WhisperAI included), an AI account out of credit. Each download client shows which one it is and its version ("Transmission 4.0.6"), and the one Backfill sends to also lists what keeps Backfill from using it fully: Deluge's Label plugin off, rTorrent refusing to run commands, Transmission older than 3.0, NZBGet older than 16.
 - **Backfill**: titles it couldn't search, packs waiting for approval, downloads that failed this week.
 - **Requests**: failed, approved but never sent, waiting on approval for over a week, and requests no longer linked to a title (with a button to remove them).
 - **Titles**: processing for over a week (with **Search now** for each and **Search all**), series requests with no TVDB id, folders Plex matched to the wrong title, collections partly in the library.

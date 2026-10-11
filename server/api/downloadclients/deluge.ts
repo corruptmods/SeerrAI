@@ -1,6 +1,8 @@
 import type {
-  DownloadClient,
+  ClientTorrent,
+  ClientTorrentFile,
   LiveDownload,
+  TorrentClient,
 } from '@server/api/downloadclients/types';
 import {
   CLIENT_TIMEOUT_MS,
@@ -17,6 +19,12 @@ import axios from 'axios';
  * id. Deluge signs in with its Web UI password alone, into a session kept in
  * a cookie between passes and renewed when Deluge forgets it; the Web UI is
  * connected to its daemon first if it is not already, as Sonarr does.
+ *
+ * For Backfill it also adds, picks the files of, and removes torrents.
+ * Backfill's category is a label, from Deluge's Label plugin when it is on.
+ * Deluge cannot stop a magnet link once its file list is in, so until
+ * Backfill has chosen the files the torrent's download speed is held at
+ * 1 KiB/s.
  */
 
 export interface DelugeTorrent {
@@ -79,6 +87,86 @@ export const delugeDownload = (torrent: DelugeTorrent): LiveDownload => {
   }
 };
 
+/** What Backfill reads of a torrent. */
+export interface DelugeTorrentInfo {
+  name: string;
+  state: string;
+  /** 0 to 100. */
+  progress: number;
+  download_payload_rate: number;
+  eta: number;
+  save_path: string;
+  /** Seconds. */
+  time_added?: number;
+  message?: string;
+  is_finished?: boolean;
+  total_wanted: number;
+  total_done: number;
+}
+
+const INFO_FIELDS = [
+  'name',
+  'state',
+  'progress',
+  'download_payload_rate',
+  'eta',
+  'save_path',
+  'time_added',
+  'message',
+  'is_finished',
+  'total_wanted',
+  'total_done',
+];
+
+export const delugeTorrent = (
+  hash: string,
+  torrent: DelugeTorrentInfo
+): ClientTorrent => {
+  const base = {
+    hash: hash.toLowerCase(),
+    name: torrent.name,
+    progress: (Number(torrent.progress) || 0) / 100,
+    speed: Number(torrent.download_payload_rate) || 0,
+    secondsLeft: torrent.eta > 0 ? torrent.eta : undefined,
+    savePath: torrent.save_path ?? '',
+    addedAt: torrent.time_added ? torrent.time_added * 1000 : undefined,
+  };
+  const wanted = Number(torrent.total_wanted) || 0;
+  const done =
+    !!torrent.is_finished ||
+    (wanted > 0 && (Number(torrent.total_done) || 0) >= wanted);
+  switch (torrent.state) {
+    case 'Error':
+      return {
+        ...base,
+        state: 'error',
+        error:
+          torrent.message && torrent.message !== 'OK'
+            ? torrent.message
+            : 'Deluge stopped it on an error',
+      };
+    case 'Checking':
+    case 'Allocating':
+      return { ...base, state: 'checking' };
+    case 'Moving':
+      return { ...base, state: 'moving' };
+    case 'Seeding':
+      return { ...base, state: 'done' };
+    case 'Paused':
+      return { ...base, state: done ? 'done' : 'paused' };
+    case 'Queued':
+      return { ...base, state: done ? 'done' : 'queued' };
+    default:
+      // A magnet link has nothing to want until its file list is in.
+      if (!wanted) return { ...base, state: 'metadata' };
+      return { ...base, state: done ? 'done' : 'downloading' };
+  }
+};
+
+/** Deluge's labels: lower case letters, digits, "_" and "-". */
+export const delugeLabel = (category: string): string =>
+  category.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+
 interface RpcAnswer<T> {
   result: T;
   error: { message?: string; code?: number } | null;
@@ -88,7 +176,9 @@ interface RpcAnswer<T> {
 /** Signed-in sessions, by client address, kept between passes. */
 const sessions = new Map<string, string>();
 
-class DelugeAPI implements DownloadClient {
+class DelugeAPI implements TorrentClient {
+  public readonly product = 'Deluge';
+  public readonly stopsAtMetadata = false;
   private axios: AxiosInstance;
   private sessionKey: string;
   private password: string;
@@ -168,6 +258,162 @@ class DelugeAPI implements DownloadClient {
       throw new Error(`Deluge: ${answer.error.message ?? 'error'}`);
     }
     return answer.result;
+  }
+
+  private async labelsOn(): Promise<boolean> {
+    const plugins = await this.call<string[]>('core.get_enabled_plugins', []);
+    return (plugins ?? []).includes('Label');
+  }
+
+  public async addTorrent(options: {
+    torrent?: Buffer;
+    magnet?: string;
+    category: string;
+    metadataOnly?: boolean;
+  }): Promise<void> {
+    const settings = {
+      // A paused magnet never fetches its file list.
+      add_paused: !!options.torrent,
+      stop_at_ratio: true,
+      stop_ratio: 0,
+      max_download_speed: options.metadataOnly ? 1 : -1,
+    };
+    let hash: string | null;
+    if (options.torrent) {
+      hash = await this.call<string | null>('core.add_torrent_file', [
+        'backfill.torrent',
+        options.torrent.toString('base64'),
+        settings,
+      ]);
+    } else if (options.magnet) {
+      hash = await this.call<string | null>('core.add_torrent_magnet', [
+        options.magnet,
+        settings,
+      ]);
+    } else {
+      throw new Error('A torrent file or magnet link is needed.');
+    }
+    if (!hash) {
+      throw new Error('Deluge would not add the torrent.');
+    }
+    if (await this.labelsOn()) {
+      await this.call('label.set_torrent', [
+        hash,
+        delugeLabel(options.category),
+      ]);
+    }
+  }
+
+  public async ensureCategory(category: string): Promise<void> {
+    if (!(await this.labelsOn())) return;
+    const label = delugeLabel(category);
+    const labels = await this.call<string[]>('label.get_labels', []);
+    if (!(labels ?? []).includes(label)) {
+      await this.call('label.add', [label]);
+    }
+  }
+
+  public async findTorrent(hash: string): Promise<ClientTorrent | undefined> {
+    let torrent: DelugeTorrentInfo | Record<string, never>;
+    try {
+      torrent = await this.call('core.get_torrent_status', [
+        hash.toLowerCase(),
+        INFO_FIELDS,
+      ]);
+    } catch (e) {
+      // Deluge 1.3 answers an unknown hash with an error.
+      if (/KeyError|InvalidTorrent/i.test(String((e as Error).message))) {
+        return undefined;
+      }
+      throw e;
+    }
+    // Deluge 2 answers it with no fields at all.
+    return torrent && 'state' in torrent
+      ? delugeTorrent(hash, torrent as DelugeTorrentInfo)
+      : undefined;
+  }
+
+  public async listCategory(category: string): Promise<ClientTorrent[]> {
+    if (!(await this.labelsOn())) return [];
+    const torrents = await this.call<Record<string, DelugeTorrentInfo>>(
+      'core.get_torrents_status',
+      [{ label: delugeLabel(category) }, INFO_FIELDS]
+    );
+    return Object.entries(torrents ?? {}).map(([hash, torrent]) =>
+      delugeTorrent(hash, torrent)
+    );
+  }
+
+  public async getFiles(hash: string): Promise<ClientTorrentFile[]> {
+    const status = await this.call<{
+      files?: { index: number; path: string; size: number }[];
+      file_progress?: number[];
+    }>('core.get_torrent_status', [
+      hash.toLowerCase(),
+      ['files', 'file_progress'],
+    ]);
+    return (status?.files ?? []).map((file, position) => {
+      const index = Number.isInteger(file.index) ? file.index : position;
+      return {
+        index,
+        name: file.path,
+        size: Number(file.size) || 0,
+        progress: Number(status?.file_progress?.[index]) || 0,
+      };
+    });
+  }
+
+  public async setFilePriority(
+    hash: string,
+    indexes: number[],
+    priority: 0 | 1
+  ): Promise<void> {
+    if (!indexes.length) return;
+    const id = hash.toLowerCase();
+    const status = await this.call<{ file_priorities?: number[] }>(
+      'core.get_torrent_status',
+      [id, ['file_priorities']]
+    );
+    const priorities = [...(status?.file_priorities ?? [])];
+    // Deluge 2's "normal" is 4; Deluge 1.3's is 1.
+    const normal = (await this.getVersion()).startsWith('1.') ? 1 : 4;
+    for (const index of indexes) {
+      if (index < priorities.length) priorities[index] = priority ? normal : 0;
+    }
+    try {
+      await this.call('core.set_torrent_options', [
+        [id],
+        { file_priorities: priorities },
+      ]);
+    } catch {
+      await this.call('core.set_torrent_file_priorities', [id, priorities]);
+    }
+  }
+
+  /** Starts it, at full speed again if it was added to fetch its files. */
+  public async startTorrent(hash: string): Promise<void> {
+    const id = hash.toLowerCase();
+    await this.call('core.set_torrent_options', [
+      [id],
+      { max_download_speed: -1 },
+    ]);
+    await this.call('core.resume_torrent', [[id]]);
+  }
+
+  public async stopTorrent(hash: string): Promise<void> {
+    await this.call('core.pause_torrent', [[hash.toLowerCase()]]);
+  }
+
+  public async deleteTorrent(hash: string): Promise<void> {
+    await this.call('core.remove_torrent', [hash.toLowerCase(), true]);
+  }
+
+  public async backfillProblems(): Promise<string[]> {
+    return (await this.labelsOn())
+      ? []
+      : [
+          "Deluge's Label plugin is off, so Backfill's downloads carry no label, and a magnet link Backfill was reading when Seerr AI stopped is not cleared away by it. Turn it on under Preferences → Plugins.",
+        ];
   }
 
   public async getVersion(): Promise<string> {

@@ -76,12 +76,13 @@ export class BackfillJob {
 
   /**
    * Where a running job is within its status, in words: "Waiting for the
-   * torrent's file list", SABnzbd's "Repairing", Sonarr importing.
+   * torrent's file list", "NZBGet is repairing the download", Sonarr
+   * importing.
    */
   @Column({ type: 'varchar', nullable: true })
   public stage: string | null;
 
-  /** The torrent's hash or SABnzbd's job id, once added. */
+  /** The torrent's hash or the Usenet client's job id, once added. */
   @Column({ type: 'varchar', nullable: true })
   public downloadId: string | null;
 

@@ -1,5 +1,8 @@
 import BazarrAPI from '@server/api/bazarr';
-import { downloadClientFor } from '@server/api/downloadclients';
+import {
+  CLIENT_PRODUCTS,
+  downloadClientFor,
+} from '@server/api/downloadclients';
 import MaintainerrAPI from '@server/api/maintainerr';
 import PlexAPI from '@server/api/plexapi';
 import ProwlarrAPI from '@server/api/prowlarr';
@@ -24,6 +27,7 @@ import { getCollectionGaps } from '@server/lib/collectionGaps';
 import { getMaintainerrStatus } from '@server/lib/deletingSoon';
 import type { PlexMatchProblem } from '@server/lib/plexMatchCheck';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
+import type { DownloadClientSettings } from '@server/lib/settings';
 import { aiReady, getSettings } from '@server/lib/settings';
 import { mainId, sameName } from '@server/utils/plexMatch';
 import { In, IsNull, LessThan, MoreThanOrEqual, Not } from 'typeorm';
@@ -350,6 +354,47 @@ const bazarrCheck = async (api: BazarrAPI): Promise<HealthCheck> => {
 };
 
 /**
+ * A download client: answering, which one and which version, and, for one
+ * Backfill sends downloads to, what keeps Backfill from using it fully
+ * (Deluge's Label plugin off, rTorrent refusing to delete files, an NZBGet
+ * too old to add to).
+ */
+const downloadClientCheck = async (
+  client: DownloadClientSettings
+): Promise<HealthCheck> => {
+  const id = `downloadClient:${client.id}`;
+  const api = downloadClientFor(client);
+  const started = Date.now();
+  let version: string;
+  try {
+    version = await withTimeout(api.getVersion(), SERVICE_TIMEOUT_MS);
+  } catch (e) {
+    return serviceDown(id, client.name, e);
+  }
+  const ms = Date.now() - started;
+  const { backfill } = getSettings();
+  const backfillUses =
+    backfill.enabled &&
+    (client.id === backfill.torrentClientId ||
+      client.id === backfill.usenetClientId);
+  const problems = backfillUses
+    ? await withTimeout(api.backfillProblems(), SERVICE_TIMEOUT_MS).catch(
+        () => []
+      )
+    : [];
+  return reported(
+    id,
+    client.name,
+    ms,
+    problems.map((problem) => ({
+      status: 'warning' as HealthStatus,
+      item: { title: problem, detail: 'Backfill', href: '/settings/backfill' },
+    })),
+    `${CLIENT_PRODUCTS[client.type]} ${String(version).replace(/^v/i, '')}`
+  );
+};
+
+/**
  * The AI model: the key still works (listing models costs nothing), and
  * the account has not run out of credit.
  */
@@ -497,11 +542,7 @@ export const serviceChecks = async (): Promise<HealthCheck[]> => {
   }
 
   for (const client of settings.downloadClients) {
-    pending.push(
-      serviceCheck(`downloadClient:${client.id}`, client.name, () =>
-        downloadClientFor(client).getVersion()
-      )
-    );
+    pending.push(downloadClientCheck(client));
   }
 
   if (settings.bazarr.hostname && settings.bazarr.apiKey) {

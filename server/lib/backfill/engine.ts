@@ -1,6 +1,12 @@
-import { downloadClientFor } from '@server/api/downloadclients';
-import QBittorrentAPI from '@server/api/downloadclients/qbittorrent';
-import SabnzbdAPI from '@server/api/downloadclients/sabnzbd';
+import type { TorrentClient, TorrentState } from '@server/api/downloadclients';
+import {
+  CLIENT_PRODUCTS,
+  TORRENT_CLIENT_TYPES,
+  downloadClientFor,
+  isTorrentClient,
+  torrentClientFor,
+  usenetClientFor,
+} from '@server/api/downloadclients';
 import type { FetchedRelease, ProwlarrRelease } from '@server/api/prowlarr';
 import ProwlarrAPI, {
   MOVIE_CATEGORIES,
@@ -186,62 +192,63 @@ const OPEN_AT_ONCE = 3;
 /** How long a magnet link gets to produce its file list. */
 const METADATA_WAIT_MS = 60_000;
 /**
- * What a Usenet download is doing, in words: SABnzbd's own status names
+ * What a Usenet download is doing, in words: the client's own status names
  * ("Running", "Extracting") mean little on their own, and after the
  * download its post-processing can take a while.
  */
-export const sabStage = (sabJob: { place: string; status: string }): string => {
-  const status = sabJob.status.toLowerCase();
+export const usenetStage = (
+  job: { place: string; status: string },
+  product: string
+): string => {
+  const status = job.status.toLowerCase();
   const words: Record<string, string> =
-    sabJob.place === 'queue'
+    job.place === 'queue'
       ? {
           downloading: 'Downloading',
-          queued: 'Waiting its turn in SABnzbd',
-          paused: 'Paused in SABnzbd',
-          grabbing: 'SABnzbd is fetching the NZB',
-          fetching: 'SABnzbd is fetching the NZB',
+          queued: `Waiting its turn in ${product}`,
+          paused: `Paused in ${product}`,
+          grabbing: `${product} is fetching the NZB`,
+          fetching: `${product} is fetching the NZB`,
           propagating: 'Waiting for the post to reach your Usenet server',
-          checking: 'SABnzbd is checking the post',
+          checking: `${product} is checking the post`,
         }
       : {
-          queued: 'Downloaded; waiting for SABnzbd to unpack it',
-          verifying: 'SABnzbd is checking the download',
-          quickcheck: 'SABnzbd is checking the download',
-          repairing: 'SABnzbd is repairing the download',
-          fetching: 'SABnzbd is fetching repair blocks',
-          extracting: 'SABnzbd is unpacking it',
-          moving: 'SABnzbd is moving it to its folder',
-          running: 'SABnzbd is running its post-processing script',
+          queued: `Downloaded; waiting for ${product} to unpack it`,
+          verifying: `${product} is checking the download`,
+          quickcheck: `${product} is checking the download`,
+          repairing: `${product} is repairing the download`,
+          fetching: `${product} is fetching repair blocks`,
+          renaming: `${product} is renaming its files`,
+          extracting: `${product} is unpacking it`,
+          moving: `${product} is moving it to its folder`,
+          running: `${product} is running its post-processing script`,
           completed: 'Downloaded',
-          failed: 'SABnzbd could not finish it',
+          failed: `${product} could not finish it`,
         };
-  return words[status] ?? sabJob.status;
+  return words[status] ?? job.status;
 };
 
 /**
- * What a torrent is doing, in words, and whether qBittorrent is holding it
+ * What a torrent is doing, in words, and whether the client is holding it
  * back (paused, queued behind its own download limit, or checking): time
  * held back is not time without progress.
  */
-export const torrentStage = (torrent: {
-  state: string;
-  dlspeed: number;
-}): { stage: string; held: boolean } => {
+export const torrentStage = (
+  torrent: { state: TorrentState; speed: number },
+  product: string
+): { stage: string; held: boolean } => {
   switch (torrent.state) {
-    case 'pausedDL':
-    case 'stoppedDL':
-      return { stage: 'Paused in qBittorrent', held: true };
-    case 'queuedDL':
-      return { stage: 'Queued in qBittorrent', held: true };
-    case 'checkingDL':
-    case 'checkingResumeData':
-    case 'allocating':
-      return { stage: 'qBittorrent is checking it', held: true };
+    case 'paused':
+      return { stage: `Paused in ${product}`, held: true };
+    case 'queued':
+      return { stage: `Queued in ${product}`, held: true };
+    case 'checking':
+      return { stage: `${product} is checking it`, held: true };
     case 'moving':
-      return { stage: 'qBittorrent is moving it', held: true };
+      return { stage: `${product} is moving it`, held: true };
     default:
       return {
-        stage: torrent.dlspeed > 0 ? 'Downloading' : 'Waiting for peers',
+        stage: torrent.speed > 0 ? 'Downloading' : 'Waiting for peers',
         held: false,
       };
   }
@@ -251,15 +258,20 @@ export const torrentStage = (torrent: {
 const TORRENT_STAGES = new Set([
   'Downloading',
   'Waiting for peers',
-  'Paused in qBittorrent',
-  'Queued in qBittorrent',
-  'qBittorrent is checking it',
-  'qBittorrent is moving it',
+  ...TORRENT_CLIENT_TYPES.flatMap((type) => {
+    const product = CLIENT_PRODUCTS[type];
+    return [
+      `Paused in ${product}`,
+      `Queued in ${product}`,
+      `${product} is checking it`,
+      `${product} is moving it`,
+    ];
+  }),
 ]);
 
 /** The least time between two readings a Usenet job's speed is taken from. */
 const PACE_MIN_MS = 5_000;
-/** How often qBittorrent is checked for magnet probes left behind. */
+/** How often the torrent client is checked for magnet probes left behind. */
 const PROBE_SWEEP_EVERY_MS = 10 * 60_000;
 /** A probe this old is no one's: they are read within a minute. */
 const PROBE_LEFT_AFTER_MS = 10 * 60_000;
@@ -403,37 +415,41 @@ export interface Progress {
 /** A torrent's progress over the chosen files only, not the whole pack. */
 const measureTorrent = (
   job: BackfillJob,
-  torrent: { dlspeed: number; eta: number },
+  torrent: { speed: number; secondsLeft?: number },
   files: { index: number; size: number; progress: number }[]
 ): Progress & { have: number; complete: boolean } => {
   const wanted = new Set(job.files.map((f) => f.index));
   const chosen = files.filter((f) => wanted.has(f.index));
   const size = chosen.reduce((n, f) => n + f.size, 0);
   const have = chosen.reduce((n, f) => n + f.size * f.progress, 0);
+  const sizeLeft = Math.max(0, Math.round(size - have));
+  const speed = torrent.speed ?? 0;
   return {
     have,
     complete: chosen.length > 0 && chosen.every((f) => f.progress >= 1),
     size,
-    sizeLeft: Math.max(0, Math.round(size - have)),
+    sizeLeft,
     progress: size ? Math.floor((have / size) * 100) : 0,
-    speed: torrent.dlspeed ?? 0,
+    speed,
+    // The client's own estimate, else what is left at today's speed.
     secondsLeft:
-      torrent.eta > 0 && torrent.eta < 8_640_000 ? torrent.eta : null,
+      torrent.secondsLeft ??
+      (speed > 0 && sizeLeft > 0 ? Math.round(sizeLeft / speed) : null),
   };
 };
 
-const measureNzb = (sabJob: {
+const measureNzb = (nzbJob: {
   size: number;
   sizeLeft: number;
   percentage: number;
   secondsLeft?: number;
   speed?: number;
 }): Progress => ({
-  size: sabJob.size,
-  sizeLeft: sabJob.sizeLeft,
-  progress: Math.floor(sabJob.percentage),
-  speed: sabJob.speed ?? 0,
-  secondsLeft: sabJob.secondsLeft ?? null,
+  size: nzbJob.size,
+  sizeLeft: nzbJob.sizeLeft,
+  progress: Math.floor(nzbJob.percentage),
+  speed: nzbJob.speed ?? 0,
+  secondsLeft: nzbJob.secondsLeft ?? null,
 });
 
 /** A date from a raw query: SQLite gives UTC text with no zone on it. */
@@ -588,7 +604,7 @@ class Backfill {
   private kickedAt = 0;
   /**
    * What each Usenet download had left, and when, to work out its own
-   * speed when SABnzbd's (one figure for its whole queue) is not its own.
+   * speed when the client's (one figure for its whole queue) is not its own.
    */
   private nzbPace = new Map<
     number,
@@ -628,10 +644,10 @@ class Backfill {
   private async readProgress(job: BackfillJob): Promise<Progress | null> {
     const client = this.clientById(job.clientId);
     if (job.protocol === 'torrent') {
-      const qbit = new QBittorrentAPI(client);
+      const torrents = torrentClientFor(client);
       const [torrent, files] = await Promise.all([
-        qbit.getTorrent(job.downloadId!),
-        qbit.getFiles(job.downloadId!),
+        torrents.findTorrent(job.downloadId!),
+        torrents.getFiles(job.downloadId!),
       ]);
       if (!torrent || !files.length) return null;
       const measured = measureTorrent(job, torrent, files);
@@ -646,32 +662,33 @@ class Backfill {
         secondsLeft: measured.secondsLeft,
         stage:
           moving && !measured.complete
-            ? torrentStage(torrent).stage
+            ? torrentStage(torrent, torrents.product).stage
             : (job.stage ?? undefined),
       };
     }
-    const sabJob = await new SabnzbdAPI(client).getJob(job.downloadId!);
-    if (sabJob?.place === 'history') this.tickSoon();
-    if (sabJob?.place === 'queue') {
+    const usenet = usenetClientFor(client);
+    const nzbJob = await usenet.getJob(job.downloadId!);
+    if (nzbJob?.place === 'history') this.tickSoon();
+    if (nzbJob?.place === 'queue') {
       return {
-        ...this.paced(job.id, measureNzb(sabJob), sabJob.speed),
-        size: sabJob.size || job.size,
-        stage: sabStage(sabJob),
+        ...this.paced(job.id, measureNzb(nzbJob), nzbJob.speed),
+        size: nzbJob.size || job.size,
+        stage: usenetStage(nzbJob, usenet.product),
       };
     }
-    // Downloaded, and SABnzbd still unpacking or running its script.
-    if (sabJob && !/^(completed|failed)$/i.test(sabJob.status)) {
+    // Downloaded, and the client still unpacking or running its script.
+    if (nzbJob && !/^(completed|failed)$/i.test(nzbJob.status)) {
       return {
-        ...measureNzb(sabJob),
-        size: sabJob.size || job.size,
-        stage: sabStage(sabJob),
+        ...measureNzb(nzbJob),
+        size: nzbJob.size || job.size,
+        stage: usenetStage(nzbJob, usenet.product),
       };
     }
     return null;
   }
 
   /**
-   * A Usenet download's speed: SABnzbd's own when it is this job's, and
+   * A Usenet download's speed: the client's own when it is this job's, and
    * otherwise what it gained since the last reading, at least a few
    * seconds back. Until there is one to compare with, the last known.
    */
@@ -910,10 +927,10 @@ class Backfill {
     const backfill = settings.backfill;
     const clients = settings.downloadClients;
     const torrent = clients.find(
-      (c) => c.id === backfill.torrentClientId && c.type === 'qbittorrent'
+      (c) => c.id === backfill.torrentClientId && isTorrentClient(c.type)
     );
     const usenet = clients.find(
-      (c) => c.id === backfill.usenetClientId && c.type === 'sabnzbd'
+      (c) => c.id === backfill.usenetClientId && !isTorrentClient(c.type)
     );
     const prowlarr = !!(backfill.prowlarr.hostname && backfill.prowlarr.apiKey);
     const problem = !backfill.enabled
@@ -949,9 +966,7 @@ class Backfill {
         ? settings.backfill.torrentClientId
         : settings.backfill.usenetClientId;
     return settings.downloadClients.find(
-      (c) =>
-        c.id === id &&
-        c.type === (protocol === 'torrent' ? 'qbittorrent' : 'sabnzbd')
+      (c) => c.id === id && isTorrentClient(c.type) === (protocol === 'torrent')
     );
   }
 
@@ -1720,7 +1735,7 @@ class Backfill {
       return { files, infoHash: candidate.infoHash };
     } catch (e) {
       // A Usenet post in RAR parts, or with scrambled names: its files
-      // are only known once SABnzbd has downloaded and unpacked it.
+      // are only known once the client has downloaded and unpacked it.
       if (e instanceof PackedRelease) {
         return { files: [], infoHash: null, packed: e.packing };
       }
@@ -1770,9 +1785,10 @@ class Backfill {
   }
 
   /**
-   * A magnet link carries no file list. qBittorrent fetches it from the
-   * swarm and stops there, downloading nothing; the torrent is removed again
-   * once the list is read.
+   * A magnet link carries no file list. The torrent client fetches it from
+   * the swarm (qBittorrent stops there by itself; the others are held to a
+   * crawl, where they allow it, and removed within seconds of having it),
+   * and the torrent is removed again once the list is read.
    */
   private async probeMagnet(
     uri: string,
@@ -1781,38 +1797,44 @@ class Backfill {
   ): Promise<PackFile[]> {
     const client = this.clientFor('torrent');
     if (!client) throw new Error('No torrent client is chosen');
-    const qbit = new QBittorrentAPI(client);
+    const torrents = torrentClientFor(client);
     const category = getSettings().backfill.category;
-    const already = await qbit.getTorrent(hash);
+    const already = await torrents.findTorrent(hash);
     this.probing.add(hash);
     if (!already) {
-      await qbit.ensureCategory(category);
-      await qbit.addTorrent({ magnet: uri, category, metadataOnly: true });
+      await torrents.ensureCategory(category);
+      await torrents.addTorrent({ magnet: uri, category, metadataOnly: true });
     }
     try {
-      const until = Date.now() + METADATA_WAIT_MS;
-      while (Date.now() < until) {
-        const files = await qbit.getFiles(hash);
-        if (files.length) {
-          return files.map((f) => ({
-            index: f.index,
-            path: f.name,
-            size: f.size,
-          }));
-        }
-        await sleep(3000);
+      const files = await this.fileListOf(torrents, hash);
+      if (files.length) {
+        return files.map((f) => ({
+          index: f.index,
+          path: f.name,
+          size: f.size,
+        }));
       }
       throw new Error(
         `Only a magnet link, and the swarm did not send its file list within a minute (${title})`
       );
     } finally {
       this.probing.delete(hash);
-      if (!already) await qbit.deleteTorrent(hash).catch(() => undefined);
+      if (!already) await torrents.deleteTorrent(hash).catch(() => undefined);
+    }
+  }
+
+  /** A magnet's file list, once the swarm sends it; empty after a minute. */
+  private async fileListOf(torrents: TorrentClient, hash: string) {
+    const until = Date.now() + METADATA_WAIT_MS;
+    for (;;) {
+      const files = await torrents.getFiles(hash);
+      if (files.length || Date.now() >= until) return files;
+      await sleep(3000);
     }
   }
 
   /**
-   * Magnet probes left behind in qBittorrent: one under way when Seerr
+   * Magnet probes left behind in the torrent client: one under way when Seerr
    * stopped is never removed by it. Only Backfill's own category, only
    * torrents that downloaded nothing, belong to no download and are not
    * being read now, and only once they are old enough to be no one's.
@@ -1825,10 +1847,8 @@ class Backfill {
     this.sweptAt = now;
     const client = this.clientFor('torrent');
     if (!client) return 0;
-    const qbit = new QBittorrentAPI(client);
-    const torrents = await qbit.getCategoryTorrents(
-      getSettings().backfill.category
-    );
+    const api = torrentClientFor(client);
+    const torrents = await api.listCategory(getSettings().backfill.category);
     const owned = new Set(
       (
         await getRepository(BackfillJob).find({
@@ -1844,15 +1864,17 @@ class Backfill {
         owned.has(hash) ||
         this.probing.has(hash) ||
         t.progress > 0 ||
-        now - t.added_on * 1000 < PROBE_LEFT_AFTER_MS
+        // When it was added unknown: never taken for a probe.
+        t.addedAt === undefined ||
+        now - t.addedAt < PROBE_LEFT_AFTER_MS
       ) {
         continue;
       }
-      await qbit.deleteTorrent(hash).catch(() => undefined);
+      await api.deleteTorrent(hash).catch(() => undefined);
       removed += 1;
     }
     if (removed) {
-      logger.info(`Removed ${removed} magnet probes left in qBittorrent`, {
+      logger.info(`Removed ${removed} magnet probes left in ${client.name}`, {
         label: LABEL,
       });
     }
@@ -1916,13 +1938,13 @@ class Backfill {
         job.stage !== 'Choosing files' &&
         job.stage !== "Waiting for the torrent's file list"
       ) {
-        const qbit = new QBittorrentAPI(this.clientById(job.clientId));
-        await qbit.setFilePriority(
+        const torrents = torrentClientFor(this.clientById(job.clientId));
+        await torrents.setFilePriority(
           job.downloadId,
           added.map((e) => e.index),
           1
         );
-        await qbit.startTorrent(job.downloadId);
+        await torrents.startTorrent(job.downloadId);
       }
       return job;
     } finally {
@@ -2192,9 +2214,10 @@ class Backfill {
     });
     const client = this.clientById(job.clientId);
     const fetched = await this.fetch(candidate);
+    let torrents: TorrentClient | undefined;
     if (job.protocol === 'torrent') {
-      const qbit = new QBittorrentAPI(client);
-      await qbit.ensureCategory(settings.category);
+      torrents = torrentClientFor(client);
+      await torrents.ensureCategory(settings.category);
       if (fetched.kind === 'nzb') {
         throw new Error('Expected a torrent, got an NZB.');
       }
@@ -2205,10 +2228,10 @@ class Backfill {
       if (!hash) throw new Error('The torrent has no info hash.');
       // A torrent already there is someone else's: removing it at the end
       // would take their files.
-      if (await qbit.getTorrent(hash)) {
+      if (await torrents.findTorrent(hash)) {
         throw new Error(`The torrent is already in ${client.name}.`);
       }
-      await qbit.addTorrent(
+      await torrents.addTorrent(
         fetched.kind === 'torrent'
           ? { torrent: fetched.data, category: settings.category }
           : // A magnet must reach the swarm to get its file list, then stops.
@@ -2223,27 +2246,32 @@ class Backfill {
       this.note(job, 'info', `Added to ${client.name}`);
     } else {
       if (fetched.kind !== 'nzb') throw new Error('Expected an NZB.');
-      const sab = new SabnzbdAPI(client);
-      job.downloadId = await sab.addNzb(
+      const usenet = usenetClientFor(client);
+      job.downloadId = await usenet.addNzb(
         fetched.data,
         candidate.title,
         settings.category
       );
-      job.stage = 'Queued in SABnzbd';
+      job.stage = `Queued in ${usenet.product}`;
       this.note(job, 'info', `Added to ${client.name}`);
     }
     job.status = 'downloading';
     job.startedAt = new Date();
     await jobs.save(job);
-    if (job.protocol === 'torrent') {
+    if (torrents) {
+      // A client that does not stop a magnet once it has its file list is
+      // watched for it now, so its files are chosen within seconds.
+      if (fetched.kind === 'magnet' && !torrents.stopsAtMetadata) {
+        await this.fileListOf(torrents, job.downloadId!);
+      }
       await this.pickFiles(job);
     }
   }
 
   /** Skips every file but the chosen ones, then starts the torrent. */
   private async pickFiles(job: BackfillJob): Promise<boolean> {
-    const qbit = new QBittorrentAPI(this.clientById(job.clientId));
-    const files = await qbit.getFiles(job.downloadId!);
+    const torrents = torrentClientFor(this.clientById(job.clientId));
+    const files = await torrents.getFiles(job.downloadId!);
     if (!files.length) {
       job.stage = "Waiting for the torrent's file list";
       await getRepository(BackfillJob).save(job);
@@ -2259,13 +2287,13 @@ class Backfill {
         `The torrent's files are not the ones checked (${baseName(mismatch.path)}).`
       );
     }
-    await qbit.setFilePriority(
+    await torrents.setFilePriority(
       job.downloadId!,
       files.filter((f) => !wanted.has(f.index)).map((f) => f.index),
       0
     );
-    await qbit.setFilePriority(job.downloadId!, [...wanted], 1);
-    await qbit.startTorrent(job.downloadId!);
+    await torrents.setFilePriority(job.downloadId!, [...wanted], 1);
+    await torrents.startTorrent(job.downloadId!);
     job.stage = 'Downloading';
     this.note(
       job,
@@ -2302,7 +2330,7 @@ class Backfill {
       }
       await this.sweepProbes().catch((e) =>
         logger.warn(
-          'Could not check qBittorrent for magnet probes left behind',
+          'Could not check the torrent client for magnet probes left behind',
           {
             label: LABEL,
             errorMessage: message(e),
@@ -2375,10 +2403,10 @@ class Backfill {
   }
 
   private async followTorrent(job: BackfillJob): Promise<boolean> {
-    const qbit = new QBittorrentAPI(this.clientById(job.clientId));
-    const torrent = await qbit.getTorrent(job.downloadId!);
+    const torrents = torrentClientFor(this.clientById(job.clientId));
+    const torrent = await torrents.findTorrent(job.downloadId!);
     if (!torrent) {
-      throw new Error('The torrent is no longer in qBittorrent.');
+      throw new Error(`The torrent is no longer in ${torrents.product}.`);
     }
     if (
       job.stage === "Waiting for the torrent's file list" ||
@@ -2394,13 +2422,15 @@ class Backfill {
         return false;
       }
     }
-    if (['error', 'missingFiles'].includes(torrent.state)) {
-      throw new Error(`qBittorrent reports the torrent as ${torrent.state}.`);
+    if (torrent.state === 'error') {
+      throw new Error(
+        `${torrents.product} reports a problem with the torrent: ${torrent.error ?? 'an error'}.`
+      );
     }
     const { have, complete, ...measured } = measureTorrent(
       job,
       torrent,
-      await qbit.getFiles(job.downloadId!)
+      await torrents.getFiles(job.downloadId!)
     );
     Object.assign(job, measured, { size: measured.size || job.size });
     if (complete && torrent.state === 'moving') {
@@ -2410,15 +2440,15 @@ class Backfill {
       return false;
     }
     if (complete) {
-      await qbit.stopTorrent(job.downloadId!).catch(() => undefined);
+      await torrents.stopTorrent(job.downloadId!).catch(() => undefined);
       job.progress = 100;
       job.sizeLeft = 0;
       this.lastGain.delete(job.id);
     } else {
-      const { stage, held } = torrentStage(torrent);
+      const { stage, held } = torrentStage(torrent, torrents.product);
       job.stage = stage;
       const seen = this.lastGain.get(job.id);
-      // Paused, queued or being checked in qBittorrent is not stalling:
+      // Paused, queued or being checked in the client is not stalling:
       // the clock only runs while it is meant to be downloading.
       if (!seen || have > seen.have || held) {
         this.lastGain.set(job.id, { have, at: Date.now() });
@@ -2438,30 +2468,32 @@ class Backfill {
     return complete;
   }
 
-  /** SABnzbd's folder for the finished job, once it is finished. */
+  /** The Usenet client's folder for the finished job, once it is finished. */
   private async followNzb(job: BackfillJob): Promise<string | false> {
-    const sab = new SabnzbdAPI(this.clientById(job.clientId));
-    const sabJob = await sab.getJob(job.downloadId!);
-    if (!sabJob) throw new Error('The job is no longer in SABnzbd.');
-    Object.assign(job, this.paced(job.id, measureNzb(sabJob), sabJob.speed), {
-      size: sabJob.size || job.size,
+    const usenet = usenetClientFor(this.clientById(job.clientId));
+    const nzbJob = await usenet.getJob(job.downloadId!);
+    if (!nzbJob) throw new Error(`The job is no longer in ${usenet.product}.`);
+    Object.assign(job, this.paced(job.id, measureNzb(nzbJob), nzbJob.speed), {
+      size: nzbJob.size || job.size,
     });
-    job.stage = sabStage(sabJob);
-    if (sabJob.place === 'history') this.nzbPace.delete(job.id);
-    if (sabJob.place === 'history') {
-      if (/^failed$/i.test(sabJob.status)) {
+    job.stage = usenetStage(nzbJob, usenet.product);
+    if (nzbJob.place === 'history') this.nzbPace.delete(job.id);
+    if (nzbJob.place === 'history') {
+      if (/^failed$/i.test(nzbJob.status)) {
         await this.fail(
           job,
-          `SABnzbd could not finish it: ${sabJob.failMessage ?? 'failed'}`
+          `${usenet.product} could not finish it: ${nzbJob.failMessage ?? 'failed'}`
         );
         return false;
       }
-      if (/^completed$/i.test(sabJob.status)) {
-        if (!sabJob.storage) {
-          throw new Error('SABnzbd did not say where it put the files.');
+      if (/^completed$/i.test(nzbJob.status)) {
+        if (!nzbJob.storage) {
+          throw new Error(
+            `${usenet.product} did not say where it put the files.`
+          );
         }
         await getRepository(BackfillJob).save(job);
-        return sabJob.storage;
+        return nzbJob.storage;
       }
     }
     await getRepository(BackfillJob).save(job);
@@ -2500,10 +2532,10 @@ class Backfill {
 
     const paths = new Map<number, string>();
     if (job.protocol === 'torrent') {
-      const qbit = new QBittorrentAPI(client);
-      const torrent = await qbit.getTorrent(job.downloadId!);
-      const files = await qbit.getFiles(job.downloadId!);
-      const save = (torrent?.save_path ?? '').replace(/[\\/]+$/, '');
+      const torrents = torrentClientFor(client);
+      const torrent = await torrents.findTorrent(job.downloadId!);
+      const files = await torrents.getFiles(job.downloadId!);
+      const save = (torrent?.savePath ?? '').replace(/[\\/]+$/, '');
       const sep = save.includes('\\') ? '\\' : '/';
       for (const file of job.files) {
         const there = files.find((f) => f.index === file.index);
@@ -2882,9 +2914,9 @@ class Backfill {
     if (!job.downloadId) return;
     const client = this.clientById(job.clientId);
     if (job.protocol === 'torrent') {
-      await new QBittorrentAPI(client).deleteTorrent(job.downloadId);
+      await torrentClientFor(client).deleteTorrent(job.downloadId);
     } else {
-      await new SabnzbdAPI(client).deleteJob(job.downloadId);
+      await usenetClientFor(client).deleteJob(job.downloadId);
     }
   }
 
@@ -2896,9 +2928,9 @@ class Backfill {
     }
     const client = this.clientById(job.clientId);
     if (job.protocol === 'torrent') {
-      await new QBittorrentAPI(client).stopTorrent(job.downloadId!);
+      await torrentClientFor(client).stopTorrent(job.downloadId!);
     } else {
-      await new SabnzbdAPI(client).pauseJob(job.downloadId!);
+      await usenetClientFor(client).pauseJob(job.downloadId!);
     }
     job.status = 'paused';
     job.speed = 0;
@@ -2913,9 +2945,9 @@ class Backfill {
     if (job.status !== 'paused') throw new Error('The job is not paused.');
     const client = this.clientById(job.clientId);
     if (job.protocol === 'torrent') {
-      await new QBittorrentAPI(client).startTorrent(job.downloadId!);
+      await torrentClientFor(client).startTorrent(job.downloadId!);
     } else {
-      await new SabnzbdAPI(client).resumeJob(job.downloadId!);
+      await usenetClientFor(client).resumeJob(job.downloadId!);
     }
     job.status = 'downloading';
     this.lastGain.delete(job.id);
@@ -2994,10 +3026,17 @@ class Backfill {
   }
 
   /** Download clients Backfill can use, for the settings page. */
-  public clientsFor(type: 'qbittorrent' | 'sabnzbd') {
+  public clientsFor(protocol: 'torrent' | 'usenet') {
     return getSettings()
-      .downloadClients.filter((c) => c.type === type)
+      .downloadClients.filter(
+        (c) => isTorrentClient(c.type) === (protocol === 'torrent')
+      )
       .map((c) => ({ id: c.id, name: c.name }));
+  }
+
+  /** What keeps a client chosen in Backfill from working fully, if anything. */
+  public clientProblems(client: DownloadClientSettings): Promise<string[]> {
+    return downloadClientFor(client).backfillProblems();
   }
 
   /** Whether the settings' client still answers, for the settings test. */

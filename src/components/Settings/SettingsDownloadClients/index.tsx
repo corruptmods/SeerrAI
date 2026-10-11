@@ -18,7 +18,7 @@ import useSWR from 'swr';
 const messages = defineMessages('components.Settings.SettingsDownloadClients', {
   title: 'Download Clients',
   description:
-    'Link your download clients so download progress updates every few seconds, with what the client is doing (repairing, unpacking, running its script, no one to download from): SABnzbd, NZBGet, qBittorrent, Transmission, Deluge or rTorrent. Radarr and Sonarr still send the downloads; Seerr AI only reads them. Backfill downloads with SABnzbd and qBittorrent.',
+    'Link your download clients so download progress updates every few seconds, with what the client is doing (repairing, unpacking, running its script, no one to download from): SABnzbd, NZBGet, qBittorrent, Transmission, Deluge or rTorrent. Radarr and Sonarr still send the downloads; Seerr AI only reads them. Backfill can send what it finds to any of them.',
   addClient: 'Add Download Client',
   client: 'Client',
   sabnzbd: 'SABnzbd',

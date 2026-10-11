@@ -110,7 +110,7 @@ The fork's features find what they need on their own once these are connected; n
 | Connect | For |
 |---|---|
 | **Tautulli** (Settings → Services) | Suggested for You, "up next" on lists, Who Watched, Pick for the Room, Catch Me Up's stopping point |
-| **Your download clients** (Settings → Services → Download Clients): SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent | Live download progress; Backfill downloads with SABnzbd and qBittorrent |
+| **Your download clients** (Settings → Services → Download Clients): SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent | Live download progress, and Backfill's downloads |
 | **Prowlarr** (Settings → Backfill) | Backfill |
 | **Bazarr** (Settings → Services) | Subtitles and transcription |
 | **Maintainerr** (Settings → Services) | Deleting Soon and Keep |

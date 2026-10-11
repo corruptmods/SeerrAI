@@ -95,8 +95,8 @@ const SIDECAR = /\.(par2|nfo|sfv|srr|nzb|txt|jpe?g|png|srt|sub|idx|ass|ssa)$/i;
  * Why an NZB's videos can't be listed before it is downloaded, if they
  * can't: they are inside archives, or their names are scrambled (most of
  * the post is files with no name, or none a video or archive would have,
- * and only its PAR2 repair files are named; SABnzbd puts the real names
- * back from those). Undefined when it names its videos.
+ * and only its PAR2 repair files are named; the Usenet client puts the
+ * real names back from those). Undefined when it names its videos.
  */
 export const packingOf = ({
   files,

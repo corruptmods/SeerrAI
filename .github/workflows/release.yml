@@ -134,10 +134,14 @@ jobs:
           FLAGS=""
           [[ "${PRERELEASE}" == "true" ]] && FLAGS="--prerelease"
           # The title must contain the version: Settings → About compares it.
-          # A release cut again (the tag moved) keeps its page, retitled.
+          # A release cut again (the tag moved) keeps its page, retitled. GitHub
+          # turns a release back into a draft when its tag is deleted, so it is
+          # published again here, and made the latest unless a pre-release.
           if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            EDIT="--prerelease=false --latest"
+            [[ "${PRERELEASE}" == "true" ]] && EDIT="--prerelease"
             gh release edit "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" \
-              --title "Seerr AI ${VERSION}" ${FLAGS}
+              --title "Seerr AI ${VERSION}" --draft=false ${EDIT}
           else
             gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" \
               --title "Seerr AI ${VERSION}" --generate-notes ${FLAGS}

@@ -147,7 +147,7 @@ The **Seerr AI Release** workflow (`.github/workflows/release.yml`) builds the i
 - **A release:** `git tag ai-v1.2.3 && git push origin ai-v1.2.3` publishes `:1.2.3`, `:1.2` and `:latest`, and creates the GitHub release that **Settings → About** checks for updates against. A version with a hyphen (`ai-v1.3.0-beta.1`) is a pre-release and leaves `:latest` alone.
 - **Why `ai-v`:** Seerr's own tags (`v1.0.0` to `v3.x`) arrive in a copy that fetches Seerr as `upstream`, so Seerr AI's releases are tagged apart from them. Push one tag at a time; `git push --tags` would send Seerr's too.
 - **`:develop`:** pushing to `dev` publishes nothing. When `dev` is ready to share: Actions → Seerr AI Release → Run workflow, with **Use workflow from** set to `dev`. Started from any other branch, it stops without publishing.
-- **Cutting a release again:** move the tag (`git tag -f ai-v1.2.3 && git push -f origin ai-v1.2.3`); the images are rebuilt and the existing release page is kept.
+- **Cutting a release again:** move the tag (`git tag -f ai-v1.2.3 && git push -f origin ai-v1.2.3`); the images are rebuilt, and the existing release page is kept and published again (GitHub turns it into a draft while its tag is gone).
 
 Each build takes about half an hour, because arm64 is built under emulation. While the repository is private, that comes out of its limited Actions minutes.
 

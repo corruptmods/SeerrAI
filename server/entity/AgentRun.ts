@@ -1,0 +1,146 @@
+import { DbAwareColumn, resolveDbType } from '@server/utils/DbColumnHelper';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+
+/** Asked by an admin; on its own for a requested title; or for a missing
+ * title someone reported. */
+export type AgentTrigger = 'ask' | 'auto' | 'report';
+
+/**
+ * Held: for a report, until Sonarr's or Radarr's search and Backfill's are
+ * over, and only then if nothing was found. Waiting: it asked an admin
+ * something and goes on once answered. A finished run goes on too when an
+ * admin replies to it.
+ */
+export type AgentRunStatus =
+  | 'held'
+  | 'queued'
+  | 'running'
+  | 'waiting'
+  | 'done'
+  | 'failed';
+
+/**
+ * One line of what the agent did: what it said, each tool it used and what
+ * that showed, and anything it changed.
+ */
+export interface AgentStep {
+  at: string;
+  kind:
+    | 'say'
+    | 'tool'
+    | 'result'
+    | 'error'
+    | 'action'
+    /** It asked an admin. */
+    | 'ask'
+    /** An admin's answer, correction or follow-up. */
+    | 'reply';
+  tool?: string;
+  text: string;
+}
+
+/** Something the agent changed: a download started, a title requested. */
+export interface AgentAction {
+  at: string;
+  type: 'grab' | 'request' | 'stop' | 'relink';
+  title: string;
+  detail: string;
+  jobId?: number;
+  requestId?: number;
+  /** The episodes or movie it is for, to keep caps and repeats in check. */
+  episodeIds?: number[];
+  release?: string;
+}
+
+/** One piece of work by the admin agent, with everything it did. */
+@Entity()
+export class AgentRun {
+  @PrimaryGeneratedColumn()
+  public id: number;
+
+  @Column({ type: 'varchar' })
+  public trigger: AgentTrigger;
+
+  @Index()
+  @Column({ type: 'varchar', default: 'queued' })
+  public status: AgentRunStatus;
+
+  /** What an admin first asked, in their words. */
+  @Column({ type: 'text', nullable: true })
+  public ask: string | null;
+
+  /** The title it was about, once known: series or movie, and where. */
+  @Column({ type: 'varchar', nullable: true })
+  public kind: 'series' | 'movie' | null;
+
+  @Column({ type: 'integer', nullable: true })
+  public serverId: number | null;
+
+  @Index()
+  @Column({ type: 'integer', nullable: true })
+  public arrId: number | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  public title: string | null;
+
+  /** Its closing words: what it found and did. */
+  @Column({ type: 'text', nullable: true })
+  public summary: string | null;
+
+  @Column({ type: 'simple-json', default: '[]' })
+  public steps: AgentStep[];
+
+  @Column({ type: 'simple-json', default: '[]' })
+  public actions: AgentAction[];
+
+  @Column({ type: 'text', nullable: true })
+  public error: string | null;
+
+  /** What it asked, while it waits for an answer. */
+  @Column({ type: 'text', nullable: true })
+  public question: string | null;
+
+  /**
+   * The conversation with the model, so it can go on after an answer or a
+   * follow-up, and the releases it had found.
+   */
+  @Column({ type: 'simple-json', default: '[]' })
+  public conversation: unknown[];
+
+  @Column({ type: 'simple-json', default: '{}' })
+  public memory: Record<string, unknown>;
+
+  @Column({ type: 'integer', nullable: true })
+  public requestedById: number | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  public requestedByName: string | null;
+
+  @Column({ type: 'integer', default: 0 })
+  public inputTokens: number;
+
+  @Column({ type: 'integer', default: 0 })
+  public outputTokens: number;
+
+  @Index()
+  @CreateDateColumn({ type: resolveDbType('datetime') })
+  public createdAt: Date;
+
+  @DbAwareColumn({ type: 'datetime', nullable: true })
+  public startedAt: Date | null;
+
+  @DbAwareColumn({ type: 'datetime', nullable: true })
+  public finishedAt: Date | null;
+
+  constructor(init?: Partial<AgentRun>) {
+    Object.assign(this, init);
+  }
+}
+
+export default AgentRun;

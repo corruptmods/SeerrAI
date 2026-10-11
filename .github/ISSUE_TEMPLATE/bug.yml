@@ -1,0 +1,68 @@
+name: 🐛 Bug report
+description: Something in Seerr AI doesn't work as it should
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting it. Please report Seerr AI problems here, not to the Seerr project: they can't help with this fork.
+
+        Before sending logs or screenshots, remove anything private: API keys, addresses, email addresses, names of people.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Settings → About → Version (for example 1.0.0, or develop-abc1234).
+    validations:
+      required: true
+  - type: textarea
+    id: repro-steps
+    attributes:
+      label: How to make it happen
+      placeholder: |
+        1. Go to [...]
+        2. Click on [...]
+        3. See [...]
+    validations:
+      required: true
+  - type: dropdown
+    id: media-server
+    attributes:
+      label: Media server
+      options:
+        - Plex
+        - Jellyfin
+        - Emby
+    validations:
+      required: true
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      options:
+        - SQLite (default)
+        - PostgreSQL
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      description: For example "iPhone, installed app" or "Windows, Chrome".
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Settings → Logs, around when it happened. Pasted as is; no backticks needed.
+      render: shell
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots

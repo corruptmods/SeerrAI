@@ -1,0 +1,209 @@
+---
+title: Troubleshooting
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+## [TMDB] failed to retrieve/fetch XXX
+
+### Option 1: Change your DNS servers
+
+This error often comes from your Internet Service Provider (ISP) blocking TMDB API. The ISP may block the DNS resolution to the TMDB API hostname.
+
+To fix this, you can change your DNS servers to a public DNS service like Google's DNS or Cloudflare's DNS:
+
+<Tabs groupId="methods" queryString>
+  <TabItem value="docker-cli" label="Docker CLI">
+
+Add the following to your `docker run` command to use Google's DNS:
+```bash
+--dns=8.8.8.8
+```
+or for Cloudflare's DNS:
+```bash
+--dns=1.1.1.1
+```
+or for Quad9 DNS:
+```bash
+--dns=9.9.9.9
+```
+
+You can try them all and see which one works for your network.
+
+  </TabItem>
+
+  <TabItem value="docker-compose" label="Docker Compose">
+
+Add the following to your `compose.yaml` to use Google's DNS:
+```yaml
+---
+services:
+  seerr:
+    dns:
+      - 8.8.8.8
+```
+or for Cloudflare's DNS:
+```yaml
+---
+services:
+  seerr:
+    dns:
+      - 1.1.1.1
+```
+or for Quad9's DNS:
+```yaml
+---
+services:
+  seerr:
+    dns:
+      - 9.9.9.9
+```
+
+You can try them all and see which one works for your network.
+
+  </TabItem>
+
+  <TabItem value="windows" label="Windows">
+
+1. Open the Control Panel.
+2. Click on Network and Internet.
+3. Click on Network and Sharing Center.
+4. Click on Change adapter settings.
+5. Right-click the network interface connected to the internet and select Properties.
+6. Select Internet Protocol Version 4 (TCP/IPv4) and click Properties.
+7. Select Use the following DNS server addresses and enter `8.8.8.8` for Google's DNS or `1.1.1.1` for Cloudflare's DNS or `9.9.9.9` for Quad9's DNS.
+
+  </TabItem>
+
+  <TabItem value="linux" label="Linux">
+
+1. Open a terminal.
+2. Edit the `/etc/resolv.conf` file with your favorite text editor.
+3. Add the following line to use Google's DNS:
+    ```bash
+    nameserver 8.8.8.8
+    ```
+    or for Cloudflare's DNS:
+
+    ```bash
+    nameserver 1.1.1.1
+    ```
+    or for Quad9's DNS:
+    ```bash
+    nameserver 9.9.9.9
+    ```
+
+  </TabItem>
+</Tabs>
+
+### Option 2: Use Seerr through a proxy
+
+If you can't change your DNS servers or force IPV4 resolution, you can use Seerr through a proxy.
+
+In some places (like China), the ISP blocks not only the DNS resolution but also the connection to the TMDB API.
+
+You can configure Seerr to use a proxy with the [HTTP(S) Proxy](/using-seerr/settings/network#enable-proxy-support) setting.
+
+### Option 3: Force IPV4 resolution first
+
+Sometimes there are configuration issues with IPV6 that prevent the hostname resolution from working correctly.
+
+You can try to force the resolution to use IPV4 first by going to `Settings > Networking > Advanced Networking` and enabling `Force IPv4 Resolution First` setting and restarting Seerr.
+
+### Option 4: Check that your server can reach TMDB API
+
+Make sure that your server can reach the TMDB API by running the following command:
+
+<Tabs groupId="methods" queryString>
+  <TabItem value="docker-cli" label="Docker CLI">
+
+```bash
+docker exec -it seerr sh -c "apk update && apk add curl && curl -L https://api.themoviedb.org"
+```
+
+  </TabItem>
+
+  <TabItem value="docker-compose" label="Docker Compose">
+
+```bash
+docker compose exec seerr sh -c "apk update && apk add curl && curl -L https://api.themoviedb.org"
+```
+
+  </TabItem>
+  <TabItem value="linux" label="Linux">
+
+In a terminal:
+```bash
+curl -L https://api.themoviedb.org
+```
+
+  </TabItem>
+  <TabItem value="windows" label="Windows">
+
+In a PowerShell window:
+```powershell
+(Invoke-WebRequest -Uri "https://api.themoviedb.org" -Method Get).Content
+```
+
+  </TabItem>
+
+</Tabs>
+
+If you can't get a response, then your server can't reach the TMDB API.
+This is usually due to a network configuration issue or a firewall blocking the connection.
+
+## Account does not have admin privileges
+
+If your admin account no longer has admin privileges, this is typically because your Jellyfin/Emby user ID has changed on the server side.
+
+This can happen if you have a new installation of Jellyfin/Emby or if you have changed the user ID of your admin account.
+
+### Solution: Reset admin access
+
+1. Back up your `settings.json` file (located in your Seerr data directory)
+2. Stop the Seerr container/service
+3. Delete the `settings.json` file
+4. Start Seerr again
+5. This will force the setup page to appear
+6. Go through the setup process with the same login details
+7. You can skip the services setup
+8. Once you reach the discover page, stop Seerr
+9. Restore your backed-up `settings.json` file
+10. Start Seerr again
+
+This process should restore your admin privileges while preserving your settings.
+
+## Failed to enable web push notifications
+
+### Option 1: You are using Pi-hole
+
+When using Pi-hole, you need to whitelist the proper domains in order for the queries to not be intercepted and blocked by Pi-hole.
+If you are using a chromium based browser (eg: Chrome, Brave, Edge...), the domain you need to whitelist is `fcm.googleapis.com`
+If you are using Firefox, the domain you need to whitelist is `push.services.mozilla.com`
+
+1. Log into your Pi-hole through the admin interface, then click on Domains situated under GROUP MANAGEMENT.
+2. Add the domain corresponding to your browser in the `Domain to be added` field and then click on Add to allowed domains.
+3. Now in order for those changes to be used you need to flush your current dns cache.
+4. You can do so by using this command line in your Pi-hole terminal:
+    ```bash
+    pihole restartdns
+    ```
+If this command fails (which is unlikely), use this equivalent:
+    ```bash
+    pihole -f && pihole restartdns
+    ```
+5. Then restart your Seerr instance and try to enable the web push notifications again.
+
+
+### Option 2: You are using Brave browser
+
+Brave is a "De-Googled" browser. So by default or if you refused a prompt in the past, it cuts the access to the FCM (Firebase Cloud Messaging) service, which is mandatory for the web push notifications on Chromium based browsers.
+
+1. Open Brave and paste this address in the url bar: `brave://settings/privacy`
+2. Look for the option: "Use Google services for push messaging"
+3. Activate this option
+4. Relaunch Brave completely
+5. You should now see the notifications prompt appearing instead of an error message.
+
+If you still encounter issues, please reach out on our support channels.

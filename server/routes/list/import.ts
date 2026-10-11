@@ -1,0 +1,347 @@
+/**
+ * Turning a pasted written list into titles, and committing the confirmed
+ * matches onto a list.
+ */
+import TheMovieDb from '@server/api/themoviedb';
+import {
+  CANDIDATES_PER_LINE,
+  IMPORT_LINE_LIMIT,
+  REQUEST_BATCH_LIMIT,
+} from '@server/constants/lists';
+import { getRepository } from '@server/datasource';
+import { MediaList, MediaListItem } from '@server/entity/MediaList';
+import type { User } from '@server/entity/User';
+import { loadAccessibleList } from '@server/lib/listAccess';
+import { requestMissing } from '@server/lib/requestMissing';
+import logger from '@server/logger';
+import { isAuthenticated } from '@server/middleware/auth';
+import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
+import { parseTitleList } from '@server/utils/parseTitleList';
+import { tmdbImagePath } from '@server/utils/tmdbImagePath';
+import { Router } from 'express';
+import { In } from 'typeorm';
+
+const listRoutes = Router();
+
+listRoutes.post('/import/search', isAuthenticated(), async (req, res, next) => {
+  try {
+    const text = String(req.body.text ?? '');
+
+    if (!text.trim()) {
+      return next({ status: 400, message: 'Nothing to import.' });
+    }
+
+    const lines = parseTitleList(text).slice(0, IMPORT_LINE_LIMIT);
+
+    if (!lines.length) {
+      return res.status(200).json({ results: [], truncated: false });
+    }
+
+    const tmdb = new TheMovieDb();
+
+    const results = await mapWithConcurrency(lines, 4, async (line) => {
+      const search = await tmdb.searchMulti({ query: line.title });
+
+      const candidates = search.results
+        .filter(
+          (
+            result
+          ): result is typeof result & {
+            media_type: 'movie' | 'tv' | 'collection';
+          } =>
+            result.media_type === 'movie' ||
+            result.media_type === 'tv' ||
+            result.media_type === 'collection'
+        )
+        .map((result) => {
+          const isMovie = result.media_type === 'movie';
+          const isCollection = result.media_type === 'collection';
+          const date = isMovie
+            ? (result as { release_date?: string }).release_date
+            : (result as { first_air_date?: string }).first_air_date;
+
+          return {
+            tmdbId: result.id,
+            mediaType: result.media_type,
+            title: isCollection
+              ? ((result as { title?: string; name?: string }).title ??
+                (result as { name?: string }).name)
+              : isMovie
+                ? (result as { title?: string }).title
+                : (result as { name?: string }).name,
+            year: date ? Number(date.slice(0, 4)) : undefined,
+            posterPath: (result as { poster_path?: string | null }).poster_path,
+            popularity: (result as { popularity?: number }).popularity ?? 0,
+          };
+        });
+
+      // A year in the pasted line is a strong signal; prefer an exact match
+      // on it, then fall back to whatever TMDB thought was most popular.
+      let ranked = line.year
+        ? [
+            ...candidates.filter((c) => c.year === line.year),
+            ...candidates.filter((c) => c.year !== line.year),
+          ]
+        : candidates;
+
+      // "Pitch Perfect series" probably means the set — but "White Noise
+      // series" means a TV show, so a collection is only promoted to the top,
+      // never forced. Both readings stay in the list.
+      if (line.collectionHint) {
+        ranked = [
+          ...ranked.filter((c) => c.mediaType === 'collection'),
+          ...ranked.filter((c) => c.mediaType !== 'collection'),
+        ];
+      }
+
+      const shortlist = ranked.slice(0, CANDIDATES_PER_LINE);
+
+      // Tell the user how many films a collection would add, so "Add" is not
+      // a surprise.
+      const withCounts = await mapWithConcurrency(shortlist, 2, async (c) => {
+        if (c.mediaType !== 'collection') {
+          return c;
+        }
+
+        try {
+          const collection = await tmdb.getCollection({
+            collectionId: c.tmdbId,
+          });
+
+          return { ...c, partCount: (collection.parts ?? []).length };
+        } catch (e) {
+          logger.debug('Could not read a collection while importing', {
+            label: 'API',
+            collectionId: c.tmdbId,
+            errorMessage: e instanceof Error ? e.message : String(e),
+          });
+
+          return { ...c, partCount: 0 };
+        }
+      });
+
+      return {
+        raw: line.raw,
+        query: line.title,
+        year: line.year,
+        collectionHint: line.collectionHint,
+        candidates: withCounts,
+      };
+    });
+
+    return res.status(200).json({
+      results,
+      truncated: parseTitleList(text).length > IMPORT_LINE_LIMIT,
+    });
+  } catch (e) {
+    logger.error('Failed to search imported titles', {
+      label: 'API',
+      errorMessage: e.message,
+    });
+    next({ status: 500, message: 'Failed to read that list.' });
+  }
+});
+
+listRoutes.post<{ listId: string }>(
+  '/:listId/import',
+  isAuthenticated(),
+  async (req, res, next) => {
+    try {
+      const access = await loadAccessibleList(
+        Number(req.params.listId),
+        req.user?.id as number
+      );
+
+      if (!access) {
+        return next({ status: 404, message: 'List not found.' });
+      }
+
+      type ImportEntry = {
+        tmdbId?: number | string;
+        mediaType?: string;
+        posterPath?: string | null;
+      };
+
+      const items: ImportEntry[] = Array.isArray(req.body.items)
+        ? (req.body.items as ImportEntry[])
+        : [];
+      const alsoRequest = req.body.request === true;
+
+      if (!items.length) {
+        return next({ status: 400, message: 'No titles selected.' });
+      }
+
+      const itemRepository = getRepository(MediaListItem);
+      const tmdb = new TheMovieDb();
+      let added = 0;
+      let skipped = 0;
+      let requested = 0;
+      let requestFailed = 0;
+      let notRequested = 0;
+
+      /**
+       * Resolve everything to a flat list of titles first, so the writes can
+       * be batched. Previously each entry cost an existence check, an insert
+       * and an optional request in sequence — a sixty-title import was a
+       * hundred and eighty round trips in a row.
+       */
+      const resolved: {
+        tmdbId: number;
+        mediaType: 'movie' | 'tv';
+        posterPath: string | null;
+      }[] = [];
+
+      const collections = items
+        .slice(0, IMPORT_LINE_LIMIT)
+        .filter((entry) => entry.mediaType === 'collection');
+      const plain = items
+        .slice(0, IMPORT_LINE_LIMIT)
+        .filter((entry) => entry.mediaType !== 'collection');
+
+      for (const entry of plain) {
+        const tmdbId = Number(entry.tmdbId);
+
+        if (!Number.isFinite(tmdbId)) {
+          skipped++;
+          continue;
+        }
+
+        resolved.push({
+          tmdbId,
+          mediaType: entry.mediaType === 'tv' ? 'tv' : 'movie',
+          // Shown to everyone on the list; only a real TMDB path is kept.
+          posterPath: tmdbImagePath(entry.posterPath),
+        });
+      }
+
+      // A collection stands for its films; expand so the list holds real
+      // titles rather than a reference to a set.
+      await mapWithConcurrency(collections, 3, async (entry) => {
+        const tmdbId = Number(entry.tmdbId);
+
+        if (!Number.isFinite(tmdbId)) {
+          skipped++;
+          return;
+        }
+
+        try {
+          const collection = await tmdb.getCollection({ collectionId: tmdbId });
+
+          for (const part of collection.parts ?? []) {
+            resolved.push({
+              tmdbId: part.id,
+              mediaType: 'movie',
+              posterPath: part.poster_path ?? null,
+            });
+          }
+        } catch (e) {
+          // Counted as skipped so the import still reports honestly, but
+          // without this the user cannot tell which collection failed.
+          logger.warn('Could not expand a collection on import', {
+            label: 'API',
+            collectionId: tmdbId,
+            errorMessage: e instanceof Error ? e.message : String(e),
+          });
+          skipped++;
+        }
+      });
+
+      // One query for what is already there, rather than one per title.
+      const alreadyOnList = resolved.length
+        ? await itemRepository.find({
+            select: { tmdbId: true, mediaType: true },
+            where: {
+              listId: access.list.id,
+              tmdbId: In(resolved.map((entry) => entry.tmdbId)),
+            },
+          })
+        : [];
+
+      const present = new Set(
+        alreadyOnList.map((item) => `${item.mediaType}:${item.tmdbId}`)
+      );
+      const seen = new Set<string>();
+      const toInsert: typeof resolved = [];
+
+      for (const entry of resolved) {
+        const key = `${entry.mediaType}:${entry.tmdbId}`;
+
+        // Already on the list, or listed twice in the same import.
+        if (present.has(key) || seen.has(key)) {
+          skipped++;
+          continue;
+        }
+
+        seen.add(key);
+        toInsert.push(entry);
+      }
+
+      if (toInsert.length) {
+        await itemRepository.save(
+          toInsert.map(
+            (entry) =>
+              new MediaListItem({
+                listId: access.list.id,
+                tmdbId: entry.tmdbId,
+                mediaType: entry.mediaType,
+                posterPath: entry.posterPath,
+                addedById: req.user?.id,
+              })
+          )
+        );
+
+        added = toInsert.length;
+
+        /*
+         * One at a time. Each request reads and writes several rows and then
+         * dispatches to Radarr or Sonarr, so running them in parallel meant
+         * concurrent queries on a shared connection — the thing pg warns
+         * about — for no real gain, since the dispatch is the slow part and
+         * the *arr instances are happier fed steadily anyway.
+         */
+        // Bounded like "request what's missing": a pasted list of a hundred
+        // titles, or a collection or two, would otherwise send a hundred
+        // requests to Radarr and Sonarr from one click. The rest stay on the
+        // list, where they can be requested in turn.
+        const toRequest = alsoRequest
+          ? toInsert.slice(0, REQUEST_BATCH_LIMIT)
+          : [];
+        notRequested = alsoRequest ? toInsert.length - toRequest.length : 0;
+
+        for (const entry of toRequest) {
+          const { outcome } = await requestMissing(
+            entry.tmdbId,
+            entry.mediaType,
+            req.user as User
+          );
+          if (outcome === 'requested') {
+            requested++;
+          } else if (outcome === 'failed') {
+            requestFailed++;
+          }
+        }
+      }
+
+      if (added) {
+        // Touch the list so recency ordering reflects the import. Saving the
+        // loaded entity would also re-persist whatever relations came with
+        // it, which is how sharing broke; only the timestamp needs writing.
+        await getRepository(MediaList).update(access.list.id, {
+          updatedAt: new Date(),
+        });
+      }
+
+      return res
+        .status(200)
+        .json({ added, skipped, requested, requestFailed, notRequested });
+    } catch (e) {
+      logger.error('Failed to import titles', {
+        label: 'API',
+        errorMessage: e.message,
+      });
+      next({ status: 500, message: 'Failed to import titles.' });
+    }
+  }
+);
+
+export default listRoutes;

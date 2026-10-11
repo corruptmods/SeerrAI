@@ -1,0 +1,1280 @@
+import BazarrAPI from '@server/api/bazarr';
+import { downloadClientFor } from '@server/api/downloadclients';
+import MaintainerrAPI from '@server/api/maintainerr';
+import PlexAPI from '@server/api/plexapi';
+import ProwlarrAPI from '@server/api/prowlarr';
+import RadarrAPI from '@server/api/servarr/radarr';
+import SonarrAPI from '@server/api/servarr/sonarr';
+import TautulliAPI from '@server/api/tautulli';
+import TheMovieDb from '@server/api/themoviedb';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
+import { MediaServerType } from '@server/constants/server';
+import dataSource, { getRepository } from '@server/datasource';
+import BackfillJob from '@server/entity/BackfillJob';
+import BackfillSeries from '@server/entity/BackfillSeries';
+import Media from '@server/entity/Media';
+import { MediaRequest } from '@server/entity/MediaRequest';
+import { User } from '@server/entity/User';
+import { listModels } from '@server/lib/ai/providers';
+import { getCollectionGaps } from '@server/lib/collectionGaps';
+import { getMaintainerrStatus } from '@server/lib/deletingSoon';
+import type { PlexMatchProblem } from '@server/lib/plexMatchCheck';
+import plexMatchCheck from '@server/lib/plexMatchCheck';
+import { aiReady, getSettings } from '@server/lib/settings';
+import { mainId, sameName } from '@server/utils/plexMatch';
+import { In, IsNull, LessThan, MoreThanOrEqual, Not } from 'typeorm';
+
+/*
+ * What the admin health page shows: whether each connected service answers,
+ * and what has quietly gone wrong with requests, titles and users. Each check
+ * says ok, warning or error, and lists up to ITEM_LIMIT of what it found.
+ *
+ * TMDB is deliberately not checked: its responses are cached, so a check
+ * would report healthy from the cache during an outage.
+ */
+
+export type HealthStatus = 'ok' | 'warning' | 'error';
+
+export interface HealthItem {
+  title: string;
+  detail?: string;
+  href?: string;
+  /** A title Radarr or Sonarr has, that can be searched for from here. */
+  searchable?: { mediaId: number; is4k: boolean; mediaType: MediaType };
+}
+
+export interface HealthCheck {
+  id: string;
+  group: 'services' | 'backfill' | 'requests' | 'media' | 'users';
+  /**
+   * For a service: it answered, so a problem is what it reported, not that
+   * it is down.
+   */
+  reachable?: boolean;
+  /** Service checks carry the server's own name; the rest are named by id. */
+  name?: string;
+  status: HealthStatus;
+  count: number;
+  detail?: string;
+  items: HealthItem[];
+}
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const ITEM_LIMIT = 10;
+
+/** Which slice of a check's list to return: the page shows ten at a time. */
+interface Page {
+  skip: number;
+  take: number;
+}
+const FIRST_PAGE: Page = { skip: 0, take: ITEM_LIMIT };
+/** Everything, for Search all, which needs every title but no names. */
+const EVERYTHING: Page = { skip: 0, take: 100_000 };
+/** Name lookups at once, so a long list does not flood TMDB. */
+const LOOKUP_CONCURRENCY = 8;
+
+/** Like Promise.all over a map, with at most `limit` running at once. */
+const mapLimit = async <T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> => {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index]);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => worker())
+  );
+  return results;
+};
+const SERVICE_TIMEOUT_MS = 8_000;
+
+const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`No answer within ${ms / 1000} seconds`)),
+      ms
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+
+/** Times one "are you up?" call. */
+const serviceCheck = async (
+  id: string,
+  name: string,
+  ping: () => Promise<unknown>
+): Promise<HealthCheck> => {
+  const started = Date.now();
+  try {
+    await withTimeout(ping(), SERVICE_TIMEOUT_MS);
+    return {
+      id,
+      group: 'services',
+      name,
+      status: 'ok',
+      count: 0,
+      detail: `${Date.now() - started} ms`,
+      items: [],
+    };
+  } catch (e) {
+    return {
+      id,
+      group: 'services',
+      name,
+      status: 'error',
+      count: 1,
+      detail: e.message,
+      items: [],
+    };
+  }
+};
+
+const GB = 1024 ** 3;
+/** Free space below these shares of a disk is a warning, then a problem. */
+const DISK_WARNING_SHARE = 0.1;
+const DISK_ERROR_SHARE = 0.03;
+
+/** A list a service sent, or nothing if it sent something else. */
+const listOf = <T>(value: T[]): T[] => (Array.isArray(value) ? value : []);
+
+const worst = (statuses: HealthStatus[]): HealthStatus =>
+  statuses.includes('error')
+    ? 'error'
+    : statuses.includes('warning')
+      ? 'warning'
+      : 'ok';
+
+const size = (bytes: number) =>
+  bytes >= 1024 * GB
+    ? `${(bytes / (1024 * GB)).toFixed(1)} TB`
+    : `${Math.round(bytes / GB)} GB`;
+
+/** A reachable service with things of its own to report. */
+const reported = (
+  id: string,
+  name: string,
+  ms: number,
+  found: { status: HealthStatus; item: HealthItem }[],
+  summary?: string
+): HealthCheck => ({
+  id,
+  group: 'services',
+  name,
+  reachable: true,
+  status: worst(found.map((f) => f.status)),
+  count: found.filter((f) => f.status !== 'ok').length,
+  detail: [`${ms} ms`, summary].filter(Boolean).join(' · '),
+  items: found.filter((f) => f.status !== 'ok').map((f) => f.item),
+});
+
+/**
+ * Radarr or Sonarr: whether it answers, what its own health page says is
+ * wrong (indexers or a download client it cannot reach, a missing root
+ * folder, failed imports), and how full its disks are.
+ */
+const arrCheck = async (
+  id: string,
+  name: string,
+  api: RadarrAPI | SonarrAPI
+): Promise<HealthCheck> => {
+  const started = Date.now();
+  try {
+    await withTimeout(api.getSystemStatus(), SERVICE_TIMEOUT_MS);
+  } catch (e) {
+    return serviceDown(id, name, e);
+  }
+  const ms = Date.now() - started;
+  const [issues, folders] = await Promise.all([
+    withTimeout(api.getHealth(), SERVICE_TIMEOUT_MS)
+      .then(listOf)
+      .catch(() => []),
+    withTimeout(api.getRootFolderSpace(), SERVICE_TIMEOUT_MS)
+      .then(listOf)
+      .catch(() => []),
+  ]);
+  const found: { status: HealthStatus; item: HealthItem }[] = [
+    ...issues
+      .filter((issue) => issue.type === 'warning' || issue.type === 'error')
+      .map((issue) => ({
+        status: issue.type as HealthStatus,
+        item: { title: issue.message, detail: issue.source },
+      })),
+    ...folders.map((folder) => {
+      const share = folder.totalSpace
+        ? folder.freeSpace / folder.totalSpace
+        : 1;
+      return {
+        status: (share < DISK_ERROR_SHARE
+          ? 'error'
+          : share < DISK_WARNING_SHARE
+            ? 'warning'
+            : 'ok') as HealthStatus,
+        item: {
+          title: `Low on space: ${folder.path}`,
+          detail: `${size(folder.freeSpace)} free of ${size(folder.totalSpace)} (${Math.round(share * 100)}%)`,
+        },
+      };
+    }),
+  ];
+  const leastFree = folders.length
+    ? Math.min(...folders.map((f) => f.freeSpace))
+    : undefined;
+  return reported(
+    id,
+    name,
+    ms,
+    found,
+    leastFree !== undefined ? `${size(leastFree)} free` : undefined
+  );
+};
+
+/** Prowlarr: answering, its own health page, and indexers it has paused. */
+const prowlarrCheck = async (api: ProwlarrAPI): Promise<HealthCheck> => {
+  const started = Date.now();
+  try {
+    await withTimeout(api.getVersion(), SERVICE_TIMEOUT_MS);
+  } catch (e) {
+    return serviceDown('prowlarr', 'Prowlarr', e);
+  }
+  const ms = Date.now() - started;
+  const [issues, failing] = await Promise.all([
+    withTimeout(api.getHealth(), SERVICE_TIMEOUT_MS)
+      .then(listOf)
+      .catch(() => []),
+    withTimeout(api.getFailingIndexers(), SERVICE_TIMEOUT_MS).catch(() => []),
+  ]);
+  const now = Date.now();
+  const found: { status: HealthStatus; item: HealthItem }[] = [
+    ...failing
+      // Prowlarr keeps a status for every indexer that ever failed; only
+      // one still paused, or failing in the last day, matters.
+      .filter(
+        (indexer) =>
+          (indexer.disabledTill &&
+            new Date(indexer.disabledTill).getTime() > now) ||
+          (indexer.failedAt &&
+            now - new Date(indexer.failedAt).getTime() < DAY_MS)
+      )
+      .map((indexer) => ({
+        status: 'warning' as HealthStatus,
+        item: {
+          title: indexer.name,
+          detail: [
+            indexer.failedAt ? `failed ${ago(new Date(indexer.failedAt))}` : '',
+            indexer.disabledTill &&
+            new Date(indexer.disabledTill).getTime() > now
+              ? `paused for ${until(new Date(indexer.disabledTill))}`
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        },
+      })),
+    ...issues
+      .filter((issue) => issue.type === 'warning' || issue.type === 'error')
+      // Each failing indexer is listed above already.
+      .filter((issue) => !/^Indexer/i.test(issue.source) || !failing.length)
+      .map((issue) => ({
+        status: issue.type as HealthStatus,
+        item: { title: issue.message, detail: issue.source },
+      })),
+  ];
+  return reported('prowlarr', 'Prowlarr', ms, found);
+};
+
+/**
+ * Bazarr: answering, what its own status page lists, and subtitle providers
+ * it has paused after an error. A paused WhisperAI is why "Transcribe" can
+ * do nothing for a while, which was otherwise only found by asking.
+ */
+const bazarrCheck = async (api: BazarrAPI): Promise<HealthCheck> => {
+  const started = Date.now();
+  try {
+    await withTimeout(api.getVersion(), SERVICE_TIMEOUT_MS);
+  } catch (e) {
+    return serviceDown('bazarr', 'Bazarr', e);
+  }
+  const ms = Date.now() - started;
+  const [issues, providers] = await Promise.all([
+    withTimeout(api.getHealth(), SERVICE_TIMEOUT_MS).catch(() => []),
+    withTimeout(api.getProviderStatus(), SERVICE_TIMEOUT_MS).catch(() => []),
+  ]);
+  const found: { status: HealthStatus; item: HealthItem }[] = [
+    ...providers
+      .filter((p) => p.status && p.status !== 'Good')
+      .map((p) => ({
+        status: 'warning' as HealthStatus,
+        item: {
+          title: `${p.name} is paused`,
+          detail: [
+            `after an error (${p.status})`,
+            p.retry && p.retry !== '-' ? `tries again ${p.retry}` : '',
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        },
+      })),
+    ...issues
+      .filter((issue) => issue.issue)
+      .map((issue) => ({
+        status: 'warning' as HealthStatus,
+        item: { title: issue.issue!, detail: issue.object },
+      })),
+  ];
+  return reported(
+    'bazarr',
+    'Bazarr',
+    ms,
+    found,
+    `${providers.length} provider${providers.length === 1 ? '' : 's'}`
+  );
+};
+
+/**
+ * The AI model: the key still works (listing models costs nothing), and
+ * the account has not run out of credit.
+ */
+const aiCheck = async (): Promise<HealthCheck> => {
+  const settings = getSettings();
+  const started = Date.now();
+  try {
+    await withTimeout(listModels(settings.ai), SERVICE_TIMEOUT_MS);
+  } catch (e) {
+    return serviceDown('ai', 'AI', e);
+  }
+  const ms = Date.now() - started;
+  const outAt = settings.aiCredit.outOfCreditAt;
+  return reported(
+    'ai',
+    'AI',
+    ms,
+    outAt
+      ? [
+          {
+            status: 'error',
+            item: {
+              title: 'The account is out of credit',
+              detail: `since ${ago(new Date(outAt))}; AI features answer again once more is added`,
+              href: '/settings/ai',
+            },
+          },
+        ]
+      : [],
+    settings.ai.model
+  );
+};
+
+/**
+ * Postgres connections in use against its limit. Running out stops every
+ * page and sign-in at once, so it is worth seeing coming.
+ */
+const databaseCheck = async (): Promise<HealthCheck> => {
+  const started = Date.now();
+  let used: number;
+  let max: number;
+  try {
+    const [row] = await withTimeout(
+      dataSource.query(
+        "SELECT count(*)::int AS used, current_setting('max_connections')::int AS max FROM pg_stat_activity"
+      ) as Promise<{ used: number; max: number }[]>,
+      SERVICE_TIMEOUT_MS
+    );
+    used = Number(row.used);
+    max = Number(row.max);
+  } catch (e) {
+    return serviceDown('database', 'Database', e);
+  }
+  const share = max ? used / max : 0;
+  return reported(
+    'database',
+    'Database',
+    Date.now() - started,
+    [
+      {
+        status: share > 0.9 ? 'error' : share > 0.7 ? 'warning' : 'ok',
+        item: {
+          title: 'Close to its connection limit',
+          detail: `${used} of ${max} connections in use`,
+        },
+      },
+    ],
+    `${used} of ${max} connections`
+  );
+};
+
+/** How long until a time to come, in words. */
+const until = (date: Date) => {
+  const minutes = Math.max(
+    1,
+    Math.round((date.getTime() - Date.now()) / 60_000)
+  );
+  return minutes < 90
+    ? `${minutes} more min`
+    : `${Math.round(minutes / 60)} more hours`;
+};
+
+const serviceDown = (id: string, name: string, e: unknown): HealthCheck => ({
+  id,
+  group: 'services',
+  name,
+  status: 'error',
+  count: 1,
+  detail: e instanceof Error ? e.message : String(e),
+  items: [],
+});
+
+export const serviceChecks = async (): Promise<HealthCheck[]> => {
+  const settings = getSettings();
+  const pending: Promise<HealthCheck>[] = [];
+
+  if (
+    settings.main.mediaServerType === MediaServerType.PLEX &&
+    settings.plex.ip
+  ) {
+    pending.push(
+      serviceCheck('plex', 'Plex', async () => {
+        const admin = await getRepository(User).findOne({
+          select: { id: true, plexToken: true },
+          where: { id: 1 },
+        });
+        return new PlexAPI({
+          plexToken: admin?.plexToken,
+          plexSettings: settings.plex,
+          timeout: SERVICE_TIMEOUT_MS,
+        }).getStatus();
+      })
+    );
+  }
+
+  for (const radarr of settings.radarr) {
+    pending.push(
+      arrCheck(
+        `radarr:${radarr.id}`,
+        radarr.name,
+        new RadarrAPI({
+          apiKey: radarr.apiKey,
+          url: RadarrAPI.buildUrl(radarr, '/api/v3'),
+        })
+      )
+    );
+  }
+
+  for (const sonarr of settings.sonarr) {
+    pending.push(
+      arrCheck(
+        `sonarr:${sonarr.id}`,
+        sonarr.name,
+        new SonarrAPI({
+          apiKey: sonarr.apiKey,
+          url: SonarrAPI.buildUrl(sonarr, '/api/v3'),
+        })
+      )
+    );
+  }
+
+  const { prowlarr } = settings.backfill;
+  if (prowlarr.hostname && prowlarr.apiKey) {
+    pending.push(prowlarrCheck(new ProwlarrAPI(prowlarr)));
+  }
+
+  for (const client of settings.downloadClients) {
+    pending.push(
+      serviceCheck(`downloadClient:${client.id}`, client.name, () =>
+        downloadClientFor(client).getVersion()
+      )
+    );
+  }
+
+  if (settings.bazarr.hostname && settings.bazarr.apiKey) {
+    pending.push(bazarrCheck(new BazarrAPI(settings.bazarr)));
+  }
+
+  if (aiReady(settings.ai)) {
+    pending.push(aiCheck());
+  }
+
+  if (dataSource.options.type === 'postgres') {
+    pending.push(databaseCheck());
+  }
+
+  if (settings.tautulli.hostname) {
+    pending.push(
+      serviceCheck('tautulli', 'Tautulli', () =>
+        new TautulliAPI(settings.tautulli).getInfo()
+      )
+    );
+  }
+
+  const scheduleErrors = new Map(
+    getMaintainerrStatus().map((status) => [status.id, status.lastError])
+  );
+  for (const server of settings.maintainerr) {
+    pending.push(
+      serviceCheck(`maintainerr:${server.id}`, server.name, async () => {
+        await new MaintainerrAPI(server).getVersion();
+        // Answering is not enough if reading its schedule keeps failing.
+        const lastError = scheduleErrors.get(server.id);
+        if (lastError) {
+          throw new Error(`Answers, but its schedule: ${lastError.message}`);
+        }
+      })
+    );
+  }
+
+  return Promise.all(pending);
+};
+
+/** Names for titles, so items read as names rather than ids. */
+const titleOf = async (media: Pick<Media, 'tmdbId' | 'mediaType'>) => {
+  try {
+    const tmdb = new TheMovieDb();
+    const found =
+      media.mediaType === MediaType.MOVIE
+        ? (await withTimeout(tmdb.getMovie({ movieId: media.tmdbId }), 5_000))
+            .title
+        : (await withTimeout(tmdb.getTvShow({ tvId: media.tmdbId }), 5_000))
+            .name;
+    return found || `TMDB ${media.tmdbId}`;
+  } catch {
+    return `TMDB ${media?.tmdbId}`;
+  }
+};
+
+const mediaHref = (media: Pick<Media, 'tmdbId' | 'mediaType'>) =>
+  `/${media.mediaType === MediaType.MOVIE ? 'movie' : 'tv'}/${media.tmdbId}`;
+
+const ago = (date: Date) => {
+  const days = Math.floor((Date.now() - new Date(date).getTime()) / DAY_MS);
+  if (days >= 1) return `${days} day${days === 1 ? '' : 's'} ago`;
+  const hours = Math.floor((Date.now() - new Date(date).getTime()) / HOUR_MS);
+  return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+};
+
+const fromRequests = async (
+  id: string,
+  status: HealthStatus,
+  [requests, count]: [MediaRequest[], number],
+  detail: (request: MediaRequest) => string
+): Promise<HealthCheck> => ({
+  id,
+  group: 'requests',
+  status: count > 0 ? status : 'ok',
+  count,
+  items: await mapLimit(requests, LOOKUP_CONCURRENCY, async (request) =>
+    // A request can outlive its title's link — leftovers of the old
+    // duplicate-request bug, for one. Listed as what it is, rather than
+    // taking the page down.
+    request.media
+      ? {
+          title: await titleOf(request.media),
+          detail: detail(request),
+          href: mediaHref(request.media),
+        }
+      : {
+          title: `Request #${request.id}`,
+          detail: [detail(request), 'no longer linked to a title']
+            .filter(Boolean)
+            .join(' · '),
+        }
+  ),
+});
+
+const fromMedia = async (
+  id: string,
+  status: HealthStatus,
+  [media, count]: [Media[], number],
+  detail: (media: Media) => string
+): Promise<HealthCheck> => ({
+  id,
+  group: 'media',
+  status: count > 0 ? status : 'ok',
+  count,
+  items: await mapLimit(media, LOOKUP_CONCURRENCY, async (item) => ({
+    title: await titleOf(item),
+    detail: detail(item),
+    href: mediaHref(item),
+  })),
+});
+
+const requestChecks = async (
+  page: Page = FIRST_PAGE
+): Promise<HealthCheck[]> => {
+  const requests = getRepository(MediaRequest);
+  const now = Date.now();
+
+  return Promise.all([
+    // Radarr or Sonarr refused it, or it could not be sent at all.
+    requests
+      .findAndCount({
+        where: {
+          status: MediaRequestStatus.FAILED,
+          media: { id: Not(IsNull()) },
+        },
+        relations: { media: true, requestedBy: true },
+        order: { updatedAt: 'DESC' },
+        skip: page.skip,
+        take: page.take,
+      })
+      .then((found) =>
+        fromRequests('failedRequests', 'error', found, (r) =>
+          [r.requestedBy?.displayName, ago(r.updatedAt)]
+            .filter(Boolean)
+            .join(' · ')
+        )
+      ),
+    // Approved over an hour ago, yet Radarr or Sonarr never gave the title
+    // an id: the request did not reach them. (Approval marks the title
+    // Processing straight away, so its status cannot tell; the id is only
+    // stored once it has actually been added.)
+    requests
+      .findAndCount({
+        where: [
+          {
+            status: MediaRequestStatus.APPROVED,
+            is4k: false,
+            updatedAt: LessThan(new Date(now - HOUR_MS)),
+            media: { id: Not(IsNull()), externalServiceId: IsNull() },
+          },
+          {
+            status: MediaRequestStatus.APPROVED,
+            is4k: true,
+            updatedAt: LessThan(new Date(now - HOUR_MS)),
+            media: { id: Not(IsNull()), externalServiceId4k: IsNull() },
+          },
+        ],
+        relations: { media: true, requestedBy: true },
+        order: { updatedAt: 'ASC' },
+        skip: page.skip,
+        take: page.take,
+      })
+      .then((found) =>
+        fromRequests('neverSent', 'error', found, (r) =>
+          [r.requestedBy?.displayName, `approved ${ago(r.updatedAt)}`]
+            .filter(Boolean)
+            .join(' · ')
+        )
+      ),
+    requests
+      .findAndCount({
+        where: {
+          status: MediaRequestStatus.PENDING,
+          createdAt: LessThan(new Date(now - 7 * DAY_MS)),
+        },
+        relations: { media: true, requestedBy: true },
+        order: { createdAt: 'ASC' },
+        skip: page.skip,
+        take: page.take,
+      })
+      .then((found) =>
+        fromRequests('awaitingApproval', 'warning', found, (r) =>
+          [r.requestedBy?.displayName, `requested ${ago(r.createdAt)}`]
+            .filter(Boolean)
+            .join(' · ')
+        )
+      ),
+    // Requests whose title link is gone. They cannot be sent, shown or
+    // fulfilled; listed on their own rather than mixed into the checks
+    // above, where they looked like failed or unsent requests.
+    requests
+      .createQueryBuilder('request')
+      .leftJoinAndSelect('request.requestedBy', 'requestedBy')
+      .where('request.mediaId IS NULL')
+      .orderBy('request.createdAt', 'DESC')
+      .skip(page.skip)
+      .take(page.take)
+      .getManyAndCount()
+      .then(([found, count]) => ({
+        id: 'unlinkedRequests',
+        group: 'requests' as const,
+        status: (count > 0 ? 'warning' : 'ok') as HealthStatus,
+        count,
+        items: found.map((r) => ({
+          title: `Request #${r.id}`,
+          detail: [
+            r.requestedBy?.displayName,
+            STATUS_NAMES[r.status],
+            `made ${ago(r.createdAt)}`,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        })),
+      })),
+  ]);
+};
+
+const STATUS_NAMES: Record<number, string> = {
+  [MediaRequestStatus.PENDING]: 'pending',
+  [MediaRequestStatus.APPROVED]: 'approved',
+  [MediaRequestStatus.DECLINED]: 'declined',
+  [MediaRequestStatus.FAILED]: 'failed',
+  [MediaRequestStatus.COMPLETED]: 'completed',
+};
+
+/*
+ * "Processing for over a week", counting only titles that should have
+ * arrived by now. Seerr keeps a requested title Processing until it is out,
+ * so on its own this flagged every unreleased film and every series waiting
+ * on its next episode. Radarr and Sonarr know better than a release date:
+ * Radarr says whether a film has reached the minimum availability set for
+ * it — cinemas, digital or physical — and Sonarr counts monitored episodes
+ * that have aired against the files it has.
+ *
+ * A title Radarr or Sonarr cannot be asked about stays listed, saying so,
+ * rather than quietly dropping out.
+ */
+type Verdict = { stuck: boolean; why: string; searchable?: boolean };
+
+const stuckProcessing = async (
+  weekAgo: Date,
+  page: Page = FIRST_PAGE,
+  lookupTitles = true
+): Promise<HealthCheck> => {
+  const settings = getSettings();
+  const candidates = await getRepository(Media).find({
+    where: [
+      { status: MediaStatus.PROCESSING, updatedAt: LessThan(weekAgo) },
+      { status4k: MediaStatus.PROCESSING, updatedAt: LessThan(weekAgo) },
+    ],
+    order: { updatedAt: 'ASC' },
+  });
+
+  // Each server's catalogue, fetched once and only if needed.
+  const catalogues = new Map<string, Promise<Map<number, unknown> | null>>();
+  const catalogue = (kind: 'radarr' | 'sonarr', serverId: number) => {
+    const key = `${kind}:${serverId}`;
+    if (!catalogues.has(key)) {
+      catalogues.set(
+        key,
+        (async () => {
+          try {
+            if (kind === 'radarr') {
+              const server = settings.radarr.find((r) => r.id === serverId);
+              if (!server) return null;
+              const movies = await withTimeout(
+                new RadarrAPI({
+                  apiKey: server.apiKey,
+                  url: RadarrAPI.buildUrl(server, '/api/v3'),
+                }).getMovies(),
+                SERVICE_TIMEOUT_MS * 2
+              );
+              return new Map(
+                movies
+                  .filter((m) => m.id != null)
+                  .map((m) => [m.id as number, m as unknown])
+              );
+            }
+            const server = settings.sonarr.find((s) => s.id === serverId);
+            if (!server) return null;
+            const series = await withTimeout(
+              new SonarrAPI({
+                apiKey: server.apiKey,
+                url: SonarrAPI.buildUrl(server, '/api/v3'),
+              }).getSeries(),
+              SERVICE_TIMEOUT_MS * 2
+            );
+            return new Map(
+              series
+                .filter((s) => s.id != null)
+                .map((s) => [s.id as number, s as unknown])
+            );
+          } catch {
+            return null;
+          }
+        })()
+      );
+    }
+    return catalogues.get(key)!;
+  };
+
+  const judge = async (media: Media, is4k: boolean): Promise<Verdict> => {
+    const serverId = is4k ? media.serviceId4k : media.serviceId;
+    const externalId = is4k
+      ? media.externalServiceId4k
+      : media.externalServiceId;
+    const service = media.mediaType === MediaType.MOVIE ? 'Radarr' : 'Sonarr';
+
+    if (serverId == null || externalId == null) {
+      return { stuck: true, why: `Not linked to ${service}` };
+    }
+
+    const found = await catalogue(
+      media.mediaType === MediaType.MOVIE ? 'radarr' : 'sonarr',
+      serverId
+    );
+    if (!found) {
+      return { stuck: true, why: `Could not check ${service}` };
+    }
+
+    const item = found.get(externalId) as
+      | {
+          isAvailable?: boolean;
+          hasFile?: boolean;
+          statistics?: { episodeCount: number; episodeFileCount: number };
+        }
+      | undefined;
+    if (!item) {
+      return { stuck: true, why: `No longer in ${service}` };
+    }
+
+    if (media.mediaType === MediaType.MOVIE) {
+      return item.isAvailable && !item.hasFile
+        ? { stuck: true, why: 'Released, not downloaded', searchable: true }
+        : { stuck: false, why: 'Not released yet' };
+    }
+
+    const missing =
+      (item.statistics?.episodeCount ?? 0) -
+      (item.statistics?.episodeFileCount ?? 0);
+    return missing > 0
+      ? {
+          stuck: true,
+          why: `${missing} aired ${missing === 1 ? 'episode' : 'episodes'} missing`,
+          searchable: true,
+        }
+      : { stuck: false, why: 'Waiting for new episodes' };
+  };
+
+  const stuck: { media: Media; verdict: Verdict; is4k: boolean }[] = [];
+  for (const media of candidates) {
+    const flags = [false, true].filter((is4k) =>
+      is4k
+        ? media.status4k === MediaStatus.PROCESSING
+        : media.status === MediaStatus.PROCESSING
+    );
+    const verdicts = await Promise.all(
+      flags.map(async (is4k) => ({ is4k, verdict: await judge(media, is4k) }))
+    );
+    const bad = verdicts.find((v) => v.verdict.stuck);
+    if (bad) {
+      stuck.push({ media, verdict: bad.verdict, is4k: bad.is4k });
+    }
+  }
+
+  return {
+    id: 'stuckProcessing',
+    group: 'media',
+    status: stuck.length > 0 ? 'warning' : 'ok',
+    count: stuck.length,
+    items: await mapLimit(
+      stuck.slice(page.skip, page.skip + page.take),
+      LOOKUP_CONCURRENCY,
+      async ({ media, verdict, is4k }) => ({
+        title: lookupTitles ? await titleOf(media) : `TMDB ${media.tmdbId}`,
+        detail: `${verdict.why} · last changed ${ago(media.updatedAt)}`,
+        href: mediaHref(media),
+        searchable: verdict.searchable
+          ? { mediaId: media.id, is4k, mediaType: media.mediaType }
+          : undefined,
+      })
+    ),
+  };
+};
+
+const mediaChecks = async (page: Page = FIRST_PAGE): Promise<HealthCheck[]> => {
+  const media = getRepository(Media);
+  const weekAgo = new Date(Date.now() - 7 * DAY_MS);
+
+  return Promise.all([
+    stuckProcessing(weekAgo, page),
+    // Sonarr needs a TVDB id; without one a series request cannot be sent.
+    media
+      .findAndCount({
+        where: {
+          mediaType: MediaType.TV,
+          tvdbId: IsNull(),
+          requests: { id: Not(IsNull()) },
+        },
+        order: { updatedAt: 'DESC' },
+        skip: page.skip,
+        take: page.take,
+      })
+      .then((found) =>
+        fromMedia(
+          'missingTvdb',
+          'warning',
+          found,
+          () => 'Sonarr cannot add it without one'
+        )
+      ),
+    Promise.resolve(collectionGapsCheck(page)),
+    plexMatchesCheck(page),
+  ]);
+};
+
+const titled = (t: { title: string; year?: number }) =>
+  t.year ? `${t.title} (${t.year})` : t.title;
+
+/**
+ * One Plex Match Check problem in words. The ids are shown because names
+ * can't tell two films apart: two can share a name and a year.
+ */
+export const plexMatchText = (
+  p: PlexMatchProblem
+): { title: string; detail: string } => {
+  const want = mainId(p.kind, p.expected);
+  const got = mainId(p.kind, p.plex);
+  const label = (m: { name: string; id: number }) =>
+    `${m.name.toUpperCase()} ${m.id}`;
+  // Plex's Fix Match finds a title by its id typed as "tmdb-123".
+  const fix = want
+    ? `Fix Match in Plex, searching ${want.name}-${want.id}`
+    : 'Fix Match in Plex';
+  const ids = [
+    want && `${p.expected.server}: ${label(want)}`,
+    got && `Plex: ${label(got)}`,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  if (p.reason === 'unmatched') {
+    return {
+      title: `Plex has not matched "${p.folder}"`,
+      detail: `${p.expected.server} has ${titled(p.expected)} there · ${fix}`,
+    };
+  }
+  if (p.reason === 'differentId') {
+    return {
+      title: `Plex and ${p.expected.server} use different entries for ${titled(p.expected)}`,
+      detail: `The same title by ${p.plex.imdbId && p.plex.imdbId === p.expected.imdbId ? `IMDb (${p.plex.imdbId})` : 'another id'}, but ${ids}, so Seerr's Plex scan marks Plex's entry as in the library rather than the one requested · ${fix}; if Plex finds nothing, ${p.expected.server}'s entry may be the outdated one`,
+    };
+  }
+  return {
+    title: sameName(p.plex, p.expected)
+      ? `Plex matched "${p.folder}" to a different ${p.kind === 'movie' ? 'film' : 'series'} named ${titled(p.plex)}`
+      : `Plex matched "${p.folder}" to ${titled(p.plex)}`,
+    detail: `${p.expected.server} has ${titled(p.expected)} there${ids ? ` (${ids})` : ''} · ${fix}`,
+  };
+};
+
+/**
+ * Folders Plex matched to another title than Sonarr or Radarr has in them,
+ * from the nightly Plex Match Check. Each opens the title Sonarr or Radarr
+ * has, whose page says the same.
+ */
+const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
+  const report = await plexMatchCheck.lastReport();
+  const items = report.problems.slice(page.skip, page.skip + page.take);
+  // Sonarr may not know a series' TMDB id; Seerr's own row for it does.
+  const byTvdb = new Map(
+    (
+      await getRepository(Media).find({
+        select: { tvdbId: true, tmdbId: true },
+        where: {
+          mediaType: MediaType.TV,
+          tvdbId: In(
+            items.flatMap((p) =>
+              !p.expected.tmdbId && p.expected.tvdbId ? [p.expected.tvdbId] : []
+            )
+          ),
+        },
+      })
+    ).map((m) => [m.tvdbId, m.tmdbId])
+  );
+  return {
+    id: 'plexMatches',
+    group: 'media',
+    status: report.error
+      ? 'warning'
+      : report.problems.length
+        ? 'warning'
+        : 'ok',
+    count: report.problems.length,
+    detail: report.error
+      ? `The last check could not finish: ${report.error}`
+      : report.finishedAt
+        ? [
+            `${report.checked} checked ${ago(new Date(report.finishedAt))}`,
+            report.notChecked
+              ? `${report.notChecked} could not be compared (no folder, or no id both sides have)`
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        : 'Runs nightly (Settings → Jobs → Plex Match Check)',
+    items: items.map((p) => ({
+      ...plexMatchText(p),
+      href: (() => {
+        const tmdbId =
+          p.expected.tmdbId ??
+          (p.expected.tvdbId ? byTvdb.get(p.expected.tvdbId) : undefined);
+        return tmdbId
+          ? `/${p.kind === 'movie' ? 'movie' : 'tv'}/${tmdbId}`
+          : undefined;
+      })(),
+    })),
+  };
+};
+
+/**
+ * Collections the library has part of. Not a problem, so never a warning:
+ * listed for finishing a series of films off. The list is built in the
+ * background; until the first one is ready, the row says so.
+ */
+const collectionGapsCheck = (page: Page): HealthCheck => {
+  const gaps = getCollectionGaps();
+  if (!gaps) {
+    return {
+      id: 'collectionGaps',
+      group: 'media',
+      name: 'Collections partly in your library — checking your library, look again shortly',
+      status: 'ok',
+      count: 0,
+      items: [],
+    };
+  }
+  return {
+    id: 'collectionGaps',
+    group: 'media',
+    status: 'ok',
+    count: gaps.length,
+    items: gaps.slice(page.skip, page.skip + page.take).map((gap) => ({
+      title: gap.name,
+      detail: [
+        `${gap.inLibrary} of ${gap.total} in your library`,
+        gap.requested ? `${gap.requested} requested` : undefined,
+        `${gap.missing} missing`,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      href: `/collection/${gap.id}`,
+    })),
+  };
+};
+
+/**
+ * Backfill: titles it could not search, packs waiting on an admin, and
+ * downloads that failed this week. Only when Backfill is on.
+ */
+const backfillChecks = async (
+  page: Page = FIRST_PAGE
+): Promise<HealthCheck[]> => {
+  if (!getSettings().backfill.enabled) {
+    return [];
+  }
+  const series = getRepository(BackfillSeries);
+  const seriesHref = (row: BackfillSeries) => `/backfill/series/${row.id}`;
+  const [errored, waiting, failed] = await Promise.all([
+    series.findAndCount({
+      where: {
+        status: In(['stuck', 'none']),
+        searchError: Not(IsNull()),
+      },
+      order: { lastSearchedAt: 'DESC' },
+      skip: page.skip,
+      take: page.take,
+    }),
+    series.findAndCount({
+      where: { status: 'found' },
+      order: { lastSearchedAt: 'ASC' },
+      skip: page.skip,
+      take: page.take,
+    }),
+    getRepository(BackfillJob).findAndCount({
+      where: {
+        status: 'failed',
+        finishedAt: MoreThanOrEqual(new Date(Date.now() - 7 * DAY_MS)),
+      },
+      order: { finishedAt: 'DESC' },
+      skip: page.skip,
+      take: page.take,
+    }),
+  ]);
+  const titles = new Map(
+    (
+      await series.find({
+        where: { id: In(failed[0].map((job) => job.seriesId)) },
+      })
+    ).map((row) => [row.id, row.title])
+  );
+  return [
+    {
+      id: 'backfillSearchErrors',
+      group: 'backfill',
+      status: errored[1] > 0 ? 'warning' : 'ok',
+      count: errored[1],
+      items: errored[0].map((row) => ({
+        title: row.title,
+        detail: [
+          row.searchError,
+          row.lastSearchedAt ? `tried ${ago(row.lastSearchedAt)}` : '',
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        href: seriesHref(row),
+      })),
+    },
+    {
+      id: 'backfillAwaiting',
+      group: 'backfill',
+      status: waiting[1] > 0 ? 'warning' : 'ok',
+      count: waiting[1],
+      items: waiting[0].map((row) => ({
+        title: row.title,
+        detail: row.lastSearchedAt
+          ? `found ${ago(row.lastSearchedAt)}`
+          : undefined,
+        href: seriesHref(row),
+      })),
+    },
+    {
+      id: 'backfillFailed',
+      group: 'backfill',
+      status: failed[1] > 0 ? 'warning' : 'ok',
+      count: failed[1],
+      items: failed[0].map((job) => ({
+        title: titles.get(job.seriesId) ?? job.title,
+        detail: [job.error, job.finishedAt ? ago(job.finishedAt) : '']
+          .filter(Boolean)
+          .join(' · '),
+        href: `/backfill/jobs/${job.id}`,
+      })),
+    },
+  ];
+};
+
+const userChecks = async (page: Page = FIRST_PAGE): Promise<HealthCheck[]> => {
+  const [users, count] = await getRepository(User).findAndCount({
+    where: { plexTokenExpiredAt: Not(IsNull()) },
+    order: { plexTokenExpiredAt: 'DESC' },
+    skip: page.skip,
+    take: page.take,
+  });
+
+  return [
+    {
+      id: 'plexSignIn',
+      group: 'users',
+      status: count > 0 ? 'warning' : 'ok',
+      count,
+      items: users.map((user) => ({
+        title: user.displayName,
+        detail: user.plexTokenExpiredAt
+          ? `expired ${ago(user.plexTokenExpiredAt)}`
+          : undefined,
+        href: `/users/${user.id}`,
+      })),
+    },
+  ];
+};
+
+/**
+ * A group that throws becomes one row saying so, rather than failing the
+ * whole page: the other checks still say what they found.
+ */
+const guarded = async (
+  group: HealthCheck['group'],
+  run: () => Promise<HealthCheck[]>
+): Promise<HealthCheck[]> => {
+  try {
+    return await run();
+  } catch (e) {
+    return [
+      {
+        id: `${group}Unavailable`,
+        group,
+        name: 'Could not run these checks',
+        status: 'error',
+        count: 1,
+        detail: e.message,
+        items: [],
+      },
+    ];
+  }
+};
+
+export const runHealthChecks = async (): Promise<{
+  checkedAt: Date;
+  checks: HealthCheck[];
+}> => {
+  const groups = await Promise.all([
+    guarded('services', serviceChecks),
+    guarded('backfill', backfillChecks),
+    guarded('requests', requestChecks),
+    guarded('media', mediaChecks),
+    guarded('users', userChecks),
+  ]);
+
+  return { checkedAt: new Date(), checks: groups.flat() };
+};
+
+const WEEK_MS = 7 * DAY_MS;
+
+/** One page of one check's list: the page shows ten at a time. */
+export const runHealthCheck = async (
+  id: string,
+  pageNumber: number
+): Promise<HealthCheck | undefined> => {
+  const group = {
+    failedRequests: requestChecks,
+    neverSent: requestChecks,
+    awaitingApproval: requestChecks,
+    unlinkedRequests: requestChecks,
+    stuckProcessing: mediaChecks,
+    missingTvdb: mediaChecks,
+    collectionGaps: mediaChecks,
+    plexMatches: mediaChecks,
+    plexSignIn: userChecks,
+    backfillSearchErrors: backfillChecks,
+    backfillAwaiting: backfillChecks,
+    backfillFailed: backfillChecks,
+  }[id];
+
+  if (!group) {
+    return undefined;
+  }
+
+  const page: Page = {
+    skip: (Math.max(1, Math.floor(pageNumber)) - 1) * ITEM_LIMIT,
+    take: ITEM_LIMIT,
+  };
+
+  if (id === 'stuckProcessing') {
+    return stuckProcessing(new Date(Date.now() - WEEK_MS), page);
+  }
+
+  return (await group(page)).find((check) => check.id === id);
+};
+
+/** Every title "Search all" would search: stuck, and Radarr or Sonarr has it. */
+export const searchableStuckTitles = async (): Promise<
+  { media: Media; is4k: boolean }[]
+> => {
+  const check = await stuckProcessing(
+    new Date(Date.now() - WEEK_MS),
+    EVERYTHING,
+    false
+  );
+  const wanted = check.items.flatMap((item) =>
+    item.searchable ? [item.searchable] : []
+  );
+  if (!wanted.length) {
+    return [];
+  }
+
+  const media = await getRepository(Media).find({
+    where: { id: In(wanted.map((w) => w.mediaId)) },
+  });
+  const byId = new Map(media.map((m) => [m.id, m]));
+  return wanted.flatMap((w) => {
+    const found = byId.get(w.mediaId);
+    return found ? [{ media: found, is4k: w.is4k }] : [];
+  });
+};

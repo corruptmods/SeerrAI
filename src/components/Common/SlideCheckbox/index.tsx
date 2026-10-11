@@ -1,0 +1,46 @@
+type SlideCheckboxProps = {
+  onClick: () => void;
+  checked?: boolean;
+  /** What it turns on, for screen readers. */
+  label?: string;
+};
+
+const SlideCheckbox = ({
+  onClick,
+  checked = false,
+  label,
+}: SlideCheckboxProps) => {
+  return (
+    <span
+      role="checkbox"
+      tabIndex={0}
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => {
+        onClick();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer items-center justify-center rounded-full pt-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500`}
+    >
+      <span
+        aria-hidden="true"
+        className={`${
+          checked ? 'bg-indigo-500' : 'bg-gray-700'
+        } absolute mx-auto h-4 w-9 rounded-full transition-colors duration-200 ease-in-out`}
+      />
+      <span
+        aria-hidden="true"
+        className={`${
+          checked ? 'translate-x-5' : 'translate-x-0'
+        } absolute left-0 inline-block h-5 w-5 rounded-full border border-gray-200 bg-white shadow transition-transform duration-200 ease-in-out group-focus:border-blue-300 group-focus:ring`}
+      />
+    </span>
+  );
+};
+
+export default SlideCheckbox;

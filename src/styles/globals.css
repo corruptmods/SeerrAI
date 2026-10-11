@@ -1,0 +1,787 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /*
+   * Room for the scrollbar is kept while a window is open and the page
+   * cannot scroll, so the page does not widen under it and reflow.
+   */
+  html {
+    scrollbar-gutter: stable;
+    min-height: calc(100% + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+      calc(4rem + env(safe-area-inset-bottom)) env(safe-area-inset-left);
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #1f2937;
+  }
+
+  html:hover {
+    scrollbar-color: #6b7280 #1f2937;
+  }
+
+  /* WebKit scrollbar styles */
+  html::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  html::-webkit-scrollbar-track {
+    background: #1f2937;
+  }
+
+  html::-webkit-scrollbar-thumb {
+    background-color: #4b5563;
+  }
+
+  html:hover::-webkit-scrollbar-thumb {
+    background-color: #6b7280;
+  }
+
+  @media (min-width: 640px) {
+    html {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+
+  body {
+    @apply bg-gray-900;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  code {
+    @apply rounded-md bg-gray-800 px-2 py-1;
+  }
+
+  input[type='search']::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+  }
+}
+
+@layer components {
+  .searchbar {
+    padding-top: max(env(safe-area-inset-top), 0.75rem);
+    height: calc(4rem + max(env(safe-area-inset-top), 0.75rem));
+  }
+
+  @media all and (display-mode: standalone) {
+    .searchbar {
+      padding-top: calc(env(safe-area-inset-top) + 0.75rem);
+      height: calc(4rem + env(safe-area-inset-top) + 0.75rem);
+    }
+  }
+
+  .sidebar {
+    @apply border-r border-gray-700;
+    padding-top: calc(0.75rem + env(safe-area-inset-top));
+    padding-left: env(safe-area-inset-left);
+    background: linear-gradient(180deg, rgba(31, 41, 55, 1) 0%, #131928 100%);
+  }
+
+  .slideover {
+    padding-top: calc(0.75rem + env(safe-area-inset-top)) !important;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-top)) !important;
+  }
+
+  .sidebar-close-button {
+    top: calc(0.75rem + env(safe-area-inset-top));
+  }
+
+  .server-type-button {
+    @apply rounded-md border border-gray-500 bg-gray-700 px-4 py-2 text-white transition duration-150 ease-in-out hover:bg-gray-500;
+  }
+  .jellyfin-server svg {
+    @apply h-6 w-6;
+  }
+  .emby-server svg {
+    @apply h-7 w-7;
+  }
+
+  ul.cards-vertical,
+  ul.cards-horizontal {
+    @apply grid gap-4;
+  }
+
+  ul.cards-vertical {
+    grid-template-columns: repeat(auto-fill, minmax(9.375rem, 1fr));
+  }
+
+  ul.cards-horizontal {
+    grid-template-columns: repeat(auto-fill, minmax(16.5rem, 1fr));
+  }
+
+  .provider-icons {
+    grid-template-columns: repeat(auto-fill, minmax(3.5rem, 1fr));
+  }
+
+  .slider-header {
+    @apply relative mb-4 mt-6 flex;
+  }
+
+  .service-error-banner {
+    @apply mb-2 flex items-center gap-2 rounded-md border border-yellow-500 bg-yellow-500/20 px-3 py-2 text-sm text-yellow-200;
+  }
+
+  .slider-title {
+    @apply inline-flex items-center text-xl font-bold leading-7 text-gray-300 sm:truncate sm:text-2xl sm:leading-9;
+  }
+
+  a.slider-title {
+    @apply transition duration-300 hover:text-white;
+  }
+
+  a.slider-title svg {
+    @apply ml-2 h-6 w-6;
+  }
+
+  /* Poster mosaic on list cards: up to three tiles, each turning over its
+   * own share of the list's posters on its own schedule (see ListCard).
+   * Only opacity and transform animate, which the compositor handles off
+   * the main thread. */
+  .list-mosaic {
+    @apply absolute inset-0 grid;
+    grid-template-columns: repeat(var(--list-tiles, 3), minmax(0, 1fr));
+    gap: 2px;
+  }
+
+  /* Behind every tile, so a poster that has not loaded shows the card's own
+   * background rather than a hole. */
+  .list-mosaic-tile {
+    @apply bg-gray-800;
+  }
+
+  .list-mosaic-tile {
+    @apply relative overflow-hidden;
+  }
+
+  /* Each poster drifts from a slight zoom back to rest while it is shown; a
+   * new one also fades in over the last, which stays underneath until it is
+   * covered, so a tile is never empty. The first poster of each tile is
+   * there at once, with no fade, part way through its drift. */
+  .list-poster-slide {
+    @apply absolute inset-0 h-full w-full bg-cover bg-center;
+    animation-name: none, list-poster-drift;
+    animation-timing-function: ease-in-out, linear;
+    animation-fill-mode: both, forwards;
+    will-change: transform;
+  }
+
+  .list-poster-slide.entering {
+    animation-name: list-poster-in, list-poster-drift;
+    will-change: opacity, transform;
+  }
+
+  @keyframes list-poster-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes list-poster-drift {
+    from {
+      transform: scale(1.06);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .list-poster-slide,
+    .list-poster-slide.entering {
+      animation: none;
+    }
+  }
+
+  .list-card-gradient {
+    background: linear-gradient(
+      to top,
+      rgba(17, 24, 39, 0.97) 0%,
+      rgba(17, 24, 39, 0.72) 38%,
+      rgba(17, 24, 39, 0.08) 75%,
+      rgba(17, 24, 39, 0) 100%
+    );
+  }
+
+  .media-page {
+    @apply relative -mx-4 bg-cover bg-center px-4;
+    margin-top: calc(-4rem - max(env(safe-area-inset-top), 0.75rem));
+    padding-top: calc(4rem + max(env(safe-area-inset-top), 0.75rem));
+  }
+
+  @media all and (display-mode: standalone) {
+    .media-page {
+      margin-top: calc(-4rem - env(safe-area-inset-top) - 0.75rem);
+      padding-top: calc(4rem + env(safe-area-inset-top) + 0.75rem);
+    }
+  }
+
+  .media-page-bg-image {
+    @apply absolute inset-0 h-full w-full;
+    z-index: -10;
+  }
+
+  .media-header {
+    @apply flex flex-col items-center pt-4 2xl:flex-row 2xl:items-end;
+  }
+
+  .media-poster {
+    @apply w-32 overflow-hidden rounded shadow md:w-44 md:rounded-lg md:shadow-2xl xl:w-52 2xl:mr-4;
+  }
+
+  /*
+   * A flex row, so badges line up by their boxes. As inline text they lined
+   * up by baseline, and a badge with an icon sat higher than one without.
+   * Centred with the title, left-aligned with it once the title sits beside
+   * the poster.
+   */
+  .media-status {
+    @apply mb-2 flex flex-wrap items-center justify-center gap-2 2xl:justify-start;
+  }
+
+  /*
+   * Poster, title and buttons sit side by side only on the widest screens:
+   * with every button a title page can have, anything narrower left the
+   * buttons three rows deep beside a squeezed title. Beside them, the title
+   * keeps room to be read.
+   */
+  .media-title {
+    @apply mt-4 flex flex-1 flex-col text-center text-white 2xl:mr-4 2xl:mt-0 2xl:min-w-[18rem] 2xl:text-left;
+  }
+
+  .media-title > h1 {
+    @apply text-2xl font-bold xl:text-4xl;
+  }
+
+  h1 .media-year {
+    @apply text-2xl;
+  }
+
+  .media-attributes {
+    @apply mt-1 flex flex-wrap items-center justify-center space-x-1 text-xs text-gray-300 sm:text-sm xl:text-base 2xl:mt-0 2xl:justify-start;
+  }
+
+  .media-attributes a {
+    @apply transition duration-300 hover:text-white hover:underline;
+  }
+
+  /*
+   * Spaced by the row, not by each button. Buttons used to carry their own
+   * margins, some on the right and some on the left, so where the row wrapped
+   * two of them doubled up and a trailing one pushed the row off-centre. It
+   * wraps at every width: kept to one line, a title with every button
+   * (play, list, keep, new seasons, catch up, request, report, manage) made
+   * the page wider than the screen on tablets and laptops.
+   */
+  .media-actions {
+    @apply relative mt-4 flex min-w-0 flex-wrap items-center justify-center gap-x-2 gap-y-3 2xl:mt-0 2xl:justify-end;
+  }
+
+  /*
+   * A button that has nothing to show leaves no gap behind, and neither
+   * does the empty marker a request or catch-up window leaves in place when
+   * it opens: counted as part of the row, it moved the buttons and made the
+   * page below them jump.
+   */
+  .media-actions > :empty,
+  .media-actions > * > :empty {
+    display: none;
+  }
+
+  /*
+   * On a phone the row wraps, and buttons sized by their labels made ragged
+   * rows that moved whenever a label changed ("Get New Seasons" to "Getting
+   * New Seasons"). Instead: the icon-only buttons on one line, then the
+   * labelled ones two to a line in equal halves, a pair's buttons the same
+   * height, one left on its own taking the whole line, and the split buttons
+   * (play, request) always the whole line. A long label wraps inside its
+   * button rather than moving the others.
+   */
+  @media (max-width: 639px) {
+    .media-actions {
+      @apply w-full items-stretch gap-2;
+    }
+
+    /* The line break between the icons and the rest. */
+    .media-actions::before {
+      content: '';
+      order: -1;
+      flex-basis: 100%;
+      height: 0;
+      margin-bottom: -0.5rem;
+    }
+
+    .media-actions > .media-action-icon {
+      order: -2;
+      flex: none;
+    }
+
+    .media-actions > :not(.media-action-icon) {
+      flex: 1 1 calc(50% - 0.25rem);
+      min-width: 0;
+    }
+
+    .media-actions > .media-action-wide {
+      flex-basis: 100%;
+    }
+
+    /*
+     * Each fills the space it is given: a wrapper passes it on to what it
+     * holds, and a split button gives it to its main part, the arrow keeping
+     * its own width.
+     */
+    .media-actions > div:not(.media-action-icon):not(:empty),
+    .media-actions > :not(.media-action-icon) > div:not(:empty) {
+      display: flex;
+    }
+
+    /*
+     * Every part, not the first: a request or catch-up window opens as the
+     * first element of its button's wrapper, and the button, no longer
+     * first, shrank to half its width until the window closed. (Windows are
+     * fixed in place, so taking a share of the width costs them nothing.)
+     * Not a label, which is a span: a split button's arrow keeps its width.
+     */
+    .media-actions > :not(.media-action-icon) > :not(span),
+    .media-actions > :not(.media-action-icon) > div > :first-child {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .media-actions a,
+    .media-actions button {
+      justify-content: center;
+    }
+
+    .media-actions > :not(.media-action-icon) a,
+    .media-actions > :not(.media-action-icon) button {
+      white-space: normal;
+      text-align: center;
+    }
+
+    .media-actions svg {
+      flex-shrink: 0;
+    }
+
+    .media-actions a > span,
+    .media-actions button > span {
+      justify-content: center;
+    }
+  }
+
+  .media-overview {
+    @apply flex flex-col pb-4 pt-8 text-white lg:flex-row;
+  }
+
+  .media-overview-left {
+    @apply flex-1 lg:mr-8;
+  }
+
+  .tagline {
+    @apply mb-4 text-xl italic text-gray-400 lg:text-2xl;
+  }
+
+  .media-overview h2 {
+    @apply text-xl font-bold text-gray-300 sm:text-2xl;
+  }
+
+  .media-overview p {
+    @apply pt-2 text-sm text-gray-400 sm:text-base;
+  }
+
+  ul.media-crew {
+    @apply mt-6 grid grid-cols-2 gap-6 sm:grid-cols-3;
+  }
+
+  ul.media-crew > li {
+    @apply col-span-1 flex flex-col font-bold text-gray-300;
+  }
+
+  a.crew-name,
+  .media-fact-value a,
+  .media-fact-value button {
+    @apply font-normal text-gray-400 transition duration-300 hover:text-gray-100 hover:underline;
+  }
+
+  .media-overview-right {
+    @apply mt-8 w-full lg:mt-0 lg:w-80;
+  }
+
+  .media-facts {
+    @apply rounded-lg border border-gray-700 bg-gray-900 text-sm font-bold text-gray-300 shadow;
+  }
+
+  .media-fact {
+    @apply flex justify-between border-b border-gray-700 px-4 py-2 last:border-b-0;
+  }
+
+  .media-fact-value {
+    @apply ml-2 text-right text-sm font-normal text-gray-400;
+  }
+
+  .media-ratings {
+    @apply flex items-center justify-center space-x-5 border-b border-gray-700 px-4 py-2 font-medium last:border-b-0;
+  }
+
+  .media-rating {
+    @apply flex items-center space-x-1;
+  }
+
+  .error-message {
+    @apply relative bottom-0 left-0 right-0 top-0 flex h-screen flex-col items-center justify-center text-center text-gray-300;
+  }
+
+  .heading {
+    @apply text-2xl font-bold leading-8 text-gray-100;
+  }
+
+  .description {
+    @apply mt-1 max-w-4xl text-sm leading-5 text-gray-400;
+  }
+
+  img.avatar-sm {
+    @apply mr-1 h-5 w-5 scale-100 transform-gpu rounded-full transition duration-300 group-hover:scale-105;
+  }
+
+  .card-field {
+    @apply flex items-center truncate py-0.5 text-sm sm:py-1;
+  }
+
+  .card-field-name {
+    @apply mr-2 font-bold;
+  }
+
+  .card-field a {
+    @apply transition duration-300 hover:text-white hover:underline;
+  }
+
+  .section {
+    @apply mb-10 mt-6 text-white;
+  }
+
+  .form-row {
+    @apply mt-6 max-w-6xl sm:mt-5 sm:grid sm:grid-cols-3 sm:items-start sm:gap-4;
+  }
+
+  .form-input-area {
+    @apply text-sm text-white sm:col-span-2;
+  }
+
+  .form-input-field {
+    @apply flex max-w-xl rounded-md shadow-sm;
+  }
+
+  .actions {
+    @apply mt-8 border-t border-gray-700 pt-5 text-white;
+  }
+
+  label,
+  .group-label {
+    @apply mb-1 block text-sm font-bold leading-5 text-gray-400;
+  }
+
+  label.checkbox-label {
+    @apply sm:mt-1;
+  }
+
+  label.text-label {
+    @apply sm:mt-2;
+  }
+
+  label a {
+    @apply text-gray-100 transition duration-300 hover:text-white hover:underline;
+  }
+
+  .label-required {
+    @apply ml-1 text-red-500;
+  }
+
+  .label-tip {
+    @apply block font-medium text-gray-500;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    @apply disabled:cursor-not-allowed;
+  }
+
+  input[type='checkbox'] {
+    @apply h-6 w-6 rounded-md text-indigo-600 transition duration-150 ease-in-out;
+  }
+
+  input[type='text'],
+  input[type='password'],
+  select,
+  textarea {
+    @apply block w-full min-w-0 flex-1 rounded-md border border-gray-500 bg-gray-700 text-white transition duration-150 ease-in-out sm:text-sm sm:leading-5;
+  }
+
+  input.rounded-l-only,
+  select.rounded-l-only,
+  textarea.rounded-l-only {
+    @apply rounded-r-none;
+  }
+
+  input.rounded-r-only,
+  select.rounded-r-only,
+  textarea.rounded-r-only {
+    @apply rounded-l-none;
+  }
+
+  input.short {
+    @apply w-20;
+  }
+
+  select.short {
+    @apply w-min;
+  }
+
+  button > span {
+    @apply whitespace-nowrap;
+  }
+
+  button.input-action {
+    @apply relative -ml-px inline-flex items-center border border-gray-500 bg-indigo-600/80 px-3 py-2 text-sm font-medium leading-5 text-white last:rounded-r-md sm:px-3.5;
+  }
+
+  button.input-action[disabled] {
+    filter: grayscale(100%);
+  }
+
+  button.input-action:not([disabled]) {
+    @apply transition duration-150 ease-in-out hover:bg-indigo-600 active:bg-gray-100 active:text-gray-700;
+  }
+
+  .button-md :where(svg),
+  button.input-action svg {
+    @apply ml-2 mr-2 h-5 w-5 first:ml-0 last:mr-0;
+  }
+
+  .button-sm svg {
+    @apply ml-1.5 mr-1.5 h-4 w-4 first:ml-0 last:mr-0;
+  }
+
+  svg.icon-md {
+    @apply h-5 w-5;
+  }
+
+  svg.icon-sm {
+    @apply h-4 w-4;
+  }
+
+  .protocol {
+    @apply inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-600 px-3 text-gray-100 sm:text-sm;
+  }
+
+  .error {
+    @apply mt-2 text-sm text-red-500;
+  }
+
+  .warning {
+    @apply mt-2 text-sm text-yellow-500;
+  }
+
+  .form-group {
+    @apply mt-6 text-white;
+  }
+
+  .toast {
+    width: 360px;
+  }
+
+  .react-select-container {
+    @apply w-full;
+  }
+
+  .react-select-container:has(+ .input-action) .react-select__control {
+    @apply rounded-r-none border border-gray-500 bg-gray-700 text-white hover:border-gray-500;
+  }
+
+  .react-select-container .react-select__control {
+    @apply rounded-md border border-gray-500 bg-gray-700 text-white hover:border-gray-500;
+  }
+
+  .react-select-container-dark .react-select__control {
+    @apply border border-gray-700 bg-gray-800;
+  }
+
+  .react-select-container .react-select__control--is-focused {
+    @apply rounded-md border border-gray-500 bg-gray-700 text-white shadow;
+  }
+
+  .react-select-container-dark .react-select__control--is-focused {
+    @apply border-gray-600 bg-gray-800;
+  }
+
+  .react-select-container .react-select__menu {
+    @apply bg-gray-700 text-gray-300;
+  }
+
+  .react-select-container-dark .react-select__menu {
+    @apply bg-gray-800;
+  }
+
+  .react-select-container .react-select__option--is-focused {
+    @apply bg-gray-600 text-white;
+  }
+
+  .react-select-container-dark .react-select__option--is-focused {
+    @apply bg-gray-700;
+  }
+
+  .react-select-container .react-select__indicator-separator {
+    @apply bg-gray-500;
+  }
+
+  .react-select-container .react-select__indicator {
+    @apply text-gray-500;
+  }
+
+  .react-select-container .react-select__placeholder {
+    @apply text-gray-400;
+  }
+
+  .react-select-container .react-select__multi-value {
+    @apply rounded-md border border-gray-500 bg-gray-800;
+  }
+
+  .react-select-container .react-select__multi-value__label {
+    @apply text-white;
+  }
+
+  .react-select-container .react-select__multi-value__remove {
+    @apply cursor-pointer rounded-r-md hover:bg-red-700 hover:text-red-100;
+  }
+
+  .react-select-container .react-select__input {
+    @apply border-none text-base shadow-sm ring-0;
+  }
+
+  .react-select-container .react-select__input input:focus {
+    @apply border-none;
+    box-shadow: none;
+  }
+
+  .react-select-container .react-select__input-container {
+    @apply text-white;
+  }
+
+  .react-select-container .react-select__single-value {
+    @apply text-sm text-gray-100;
+  }
+
+  .react-select-container .react-select__placeholder {
+    @apply text-sm text-gray-500;
+  }
+
+  .datepicker-wrapper > button {
+    @apply top-0;
+  }
+
+  .datepicker-wrapper > div {
+    @apply fixed left-0 right-0 w-full px-4 md:w-auto;
+  }
+
+  .datepicker-wrapper > div > div:nth-child(2) > div {
+    @apply !flex-col;
+  }
+
+  .datepicker-wrapper > div > div:nth-child(2) > div > div > div {
+    @apply !w-full !min-w-full;
+  }
+
+  .datepicker-wrapper > div > div:first-child {
+    @apply hidden;
+  }
+
+  input[type='range']::-webkit-slider-thumb {
+    @apply rounded-full border-0 bg-indigo-500;
+    pointer-events: all;
+    width: 16px;
+    height: 16px;
+    -webkit-appearance: none;
+  }
+
+  input[type='range']::-moz-range-thumb {
+    @apply rounded-full border-0 bg-indigo-500;
+    pointer-events: all;
+    width: 16px;
+    height: 16px;
+    -webkit-appearance: none;
+  }
+}
+
+@layer utilities {
+  .absolute-top-shift {
+    top: calc(-4rem - env(safe-area-inset-top));
+  }
+
+  .absolute-bottom-shift {
+    bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  .safe-shift-edit-menu {
+    bottom: calc(54px + env(safe-area-inset-bottom));
+  }
+
+  .padding-bottom-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .min-h-screen-shift {
+    min-height: calc(100vh + env(safe-area-inset-top));
+  }
+
+  /* Used for animating height */
+  .extra-max-height {
+    max-height: 100rem;
+  }
+
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .hide-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .text-overseerr {
+    @apply bg-gradient-to-br from-indigo-400 to-purple-400 bg-clip-text text-transparent;
+  }
+
+  @media all and (display-mode: browser) {
+    .pwa-only {
+      @apply hidden;
+    }
+  }
+
+  .extra-bottom-space {
+    height: calc(4rem + env(safe-area-inset-bottom));
+  }
+}
+
+.ptr--ptr {
+  box-shadow: initial !important;
+  position: absolute !important;
+  z-index: 30 !important;
+}
+
+.ptr--refresh {
+  overflow: visible !important;
+  z-index: 30 !important;
+}
+
+.ptr--pull {
+  z-index: 30 !important;
+}
+
+.ptr--box {
+  margin-bottom: -13px !important;
+}

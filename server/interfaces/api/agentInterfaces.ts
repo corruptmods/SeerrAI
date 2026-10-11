@@ -1,0 +1,42 @@
+import type {
+  AgentAction,
+  AgentRunStatus,
+  AgentStep,
+  AgentTrigger,
+} from '@server/entity/AgentRun';
+
+/** A run as the list shows it. */
+export interface AgentRunSummary {
+  id: number;
+  trigger: AgentTrigger;
+  status: AgentRunStatus;
+  ask: string | null;
+  title: string | null;
+  kind: 'series' | 'movie' | null;
+  summary: string | null;
+  error: string | null;
+  /** What it asked an admin, while it waits. */
+  question: string | null;
+  actions: AgentAction[];
+  steps: number;
+  requestedByName: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface AgentRunDetail extends Omit<AgentRunSummary, 'steps'> {
+  steps: AgentStep[];
+  /** The Backfill row for its title, for a link, once known. */
+  backfillId: number | null;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface AgentOverview {
+  /** Why the agent cannot run, or null when it can. */
+  problem: string | null;
+  autoRun: boolean;
+  busy: boolean;
+  runs: AgentRunSummary[];
+  total: number;
+}

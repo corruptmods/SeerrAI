@@ -1,0 +1,268 @@
+import ExternalAPI from '@server/api/externalapi';
+import { ApiErrorCode } from '@server/constants/error';
+import type { Library, PlexSettings } from '@server/lib/settings';
+import { getSettings } from '@server/lib/settings';
+import logger from '@server/logger';
+import { ApiError } from '@server/types/error';
+
+interface PlexStatusResponse {
+  MediaContainer: {
+    machineIdentifier: string;
+    friendlyName: string;
+  };
+}
+
+export interface PlexLibraryItem {
+  ratingKey: string;
+  parentRatingKey?: string;
+  grandparentRatingKey?: string;
+  title: string;
+  year?: number;
+  /** An episode's show. */
+  grandparentTitle?: string;
+  guid: string;
+  parentGuid?: string;
+  grandparentGuid?: string;
+  addedAt: number;
+  updatedAt: number;
+  Guid?: {
+    id: string;
+  }[];
+  type: 'movie' | 'show' | 'season' | 'episode';
+  Media: Media[];
+  /** A show's folders on disk. */
+  Location?: { path: string }[];
+}
+
+interface PlexLibraryResponse {
+  MediaContainer: {
+    totalSize: number;
+    Metadata: PlexLibraryItem[];
+  };
+}
+
+export interface PlexLibrary {
+  type: 'show' | 'movie';
+  key: string;
+  title: string;
+  agent: string;
+}
+
+interface PlexLibrariesResponse {
+  MediaContainer: {
+    Directory: PlexLibrary[];
+  };
+}
+
+export interface PlexMetadata {
+  ratingKey: string;
+  parentRatingKey?: string;
+  guid: string;
+  type: 'movie' | 'show' | 'season';
+  title: string;
+  Guid: {
+    id: string;
+  }[];
+  Children?: {
+    size: 12;
+    Metadata: PlexMetadata[];
+  };
+  index: number;
+  parentIndex?: number;
+  leafCount: number;
+  viewedLeafCount: number;
+  addedAt: number;
+  updatedAt: number;
+  Media: Media[];
+}
+
+interface Media {
+  id: number;
+  duration: number;
+  bitrate: number;
+  width: number;
+  height: number;
+  aspectRatio: number;
+  audioChannels: number;
+  audioCodec: string;
+  videoCodec: string;
+  videoResolution: string;
+  container: string;
+  videoFrameRate: string;
+  videoProfile: string;
+  /** The files it is, for a movie: where it sits on disk. */
+  Part?: { file?: string }[];
+}
+
+interface PlexMetadataResponse {
+  MediaContainer: {
+    Metadata: PlexMetadata[];
+  };
+}
+
+const RECENT_PAGE_SIZE = 500;
+/** A bound on one recently added read, should a window be very wide. */
+const RECENT_MAX_ITEMS = 5000;
+
+class PlexAPI extends ExternalAPI {
+  constructor({
+    plexToken,
+    plexSettings,
+    timeout,
+  }: {
+    plexToken?: string | null;
+    plexSettings?: PlexSettings;
+    timeout?: number;
+  }) {
+    const settings = getSettings();
+    const settingsPlex = plexSettings ?? settings.plex;
+
+    const protocol = settingsPlex.useSsl ? 'https' : 'http';
+    const baseUrl = `${protocol}://${settingsPlex.ip}:${settingsPlex.port}`;
+
+    super(
+      baseUrl,
+      {},
+      {
+        timeout,
+        headers: {
+          'X-Plex-Token': plexToken ?? '',
+          'X-Plex-Client-Identifier': settings.clientId,
+          'X-Plex-Product': 'Seerr AI',
+          'X-Plex-Device-Name': 'Seerr AI',
+          'X-Plex-Platform': 'Seerr AI',
+        },
+      }
+    );
+  }
+
+  public async getStatus(): Promise<PlexStatusResponse> {
+    return await this.get('/');
+  }
+
+  public async getLibraries(): Promise<PlexLibrary[]> {
+    const response = await this.get<PlexLibrariesResponse>('/library/sections');
+
+    return response.MediaContainer.Directory;
+  }
+
+  public async syncLibraries(): Promise<void> {
+    const settings = getSettings();
+
+    try {
+      const libraries = await this.getLibraries();
+
+      const newLibraries: Library[] = libraries
+        // Remove libraries that are not movie or show
+        .filter(
+          (library) => library.type === 'movie' || library.type === 'show'
+        )
+        // Remove libraries that do not have a metadata agent set (usually personal video libraries)
+        .filter((library) => library.agent !== 'com.plexapp.agents.none')
+        .map((library) => {
+          const existing = settings.plex.libraries.find(
+            (l) => l.id === library.key
+          );
+
+          return {
+            id: library.key,
+            name: library.title,
+            enabled: existing?.enabled ?? false,
+            type: library.type,
+            lastScan: existing?.lastScan,
+          };
+        });
+
+      settings.plex.libraries = newLibraries;
+    } catch (e) {
+      logger.error('Failed to fetch Plex libraries', {
+        label: 'Plex API',
+        message: e.message,
+      });
+
+      if (!e.response) {
+        throw new ApiError(502, ApiErrorCode.ConnectionError);
+      }
+
+      throw new ApiError(e.response.status, ApiErrorCode.Unknown);
+    }
+
+    await settings.save();
+  }
+
+  public async getLibraryContents(
+    id: string,
+    { offset = 0, size = 50 }: { offset?: number; size?: number } = {}
+  ): Promise<{ totalSize: number; items: PlexLibraryItem[] }> {
+    const response = await this.get<PlexLibraryResponse>(
+      `/library/sections/${id}/all?includeGuids=1`,
+      {
+        headers: {
+          'X-Plex-Container-Start': `${offset}`,
+          'X-Plex-Container-Size': `${size}`,
+        },
+      }
+    );
+
+    return {
+      totalSize: response.MediaContainer.totalSize,
+      items: response.MediaContainer.Metadata ?? [],
+    };
+  }
+
+  public async getMetadata(
+    key: string,
+    options: { includeChildren?: boolean } = {}
+  ): Promise<PlexMetadata> {
+    const response = await this.get<PlexMetadataResponse>(
+      `/library/metadata/${key}${
+        options.includeChildren ? '?includeChildren=1' : ''
+      }`
+    );
+
+    return response.MediaContainer.Metadata[0];
+  }
+
+  public async getChildrenMetadata(key: string): Promise<PlexMetadata[]> {
+    const response = await this.get<PlexMetadataResponse>(
+      `/library/metadata/${key}/children`
+    );
+
+    return response.MediaContainer.Metadata;
+  }
+
+  /**
+   * Everything added to a library since a time, newest first. Read a page
+   * at a time, so a busy day (a whole series imported at once) is not cut
+   * off at the first page.
+   */
+  public async getRecentlyAdded(
+    id: string,
+    options: { addedAt: number } = {
+      addedAt: Date.now() - 1000 * 60 * 60,
+    },
+    mediaType: 'movie' | 'show'
+  ): Promise<PlexLibraryItem[]> {
+    const items: PlexLibraryItem[] = [];
+    for (let start = 0; start < RECENT_MAX_ITEMS; start += RECENT_PAGE_SIZE) {
+      const response = await this.get<PlexLibraryResponse>(
+        `/library/sections/${id}/all?type=${mediaType === 'show' ? '4' : '1'}${
+          // Shows are queried as episodes, whose guids the scanner never reads.
+          mediaType === 'movie' ? '&includeGuids=1' : ''
+        }&sort=addedAt%3Adesc&addedAt>>=${Math.floor(options.addedAt / 1000)}`,
+        {
+          headers: {
+            'X-Plex-Container-Start': String(start),
+            'X-Plex-Container-Size': String(RECENT_PAGE_SIZE),
+          },
+        }
+      );
+      const page = response.MediaContainer.Metadata ?? [];
+      items.push(...page);
+      if (page.length < RECENT_PAGE_SIZE) break;
+    }
+    return items;
+  }
+}
+
+export default PlexAPI;

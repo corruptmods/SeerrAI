@@ -1,0 +1,356 @@
+import csurf from '@dr.pogodin/csurf';
+import PlexAPI from '@server/api/plexapi';
+import dataSource, { getRepository } from '@server/datasource';
+import DiscoverSlider from '@server/entity/DiscoverSlider';
+import { Session } from '@server/entity/Session';
+import { User } from '@server/entity/User';
+import { initI18n } from '@server/i18n';
+import { startJobs } from '@server/job/schedule';
+import agent from '@server/lib/agent';
+import backfillNotices from '@server/lib/backfill/notices';
+import resourceMonitor from '@server/lib/containerResources';
+import notificationManager from '@server/lib/notifications';
+import DiscordAgent from '@server/lib/notifications/agents/discord';
+import EmailAgent from '@server/lib/notifications/agents/email';
+import GotifyAgent from '@server/lib/notifications/agents/gotify';
+import NtfyAgent from '@server/lib/notifications/agents/ntfy';
+import PushbulletAgent from '@server/lib/notifications/agents/pushbullet';
+import PushoverAgent from '@server/lib/notifications/agents/pushover';
+import SlackAgent from '@server/lib/notifications/agents/slack';
+import TelegramAgent from '@server/lib/notifications/agents/telegram';
+import WebhookAgent from '@server/lib/notifications/agents/webhook';
+import WebPushAgent from '@server/lib/notifications/agents/webpush';
+import checkOverseerrMerge from '@server/lib/overseerrMerge';
+import { sessionStoreFor } from '@server/lib/sessionStore';
+import { getSettings } from '@server/lib/settings';
+import logger from '@server/logger';
+import clearCookies from '@server/middleware/clearcookies';
+import warmPosters from '@server/middleware/warmPosters';
+import routes from '@server/routes';
+import avatarproxy from '@server/routes/avatarproxy';
+import flags from '@server/routes/flags';
+import imageproxy, { useSessionForImages } from '@server/routes/imageproxy';
+import { swPrecacheHandler } from '@server/routes/swPrecache';
+import { appDataPermissions } from '@server/utils/appDataVolume';
+import { getAppVersion } from '@server/utils/appVersion';
+import createCustomProxyAgent, {
+  setForceIpv4First,
+} from '@server/utils/customProxyAgent';
+import { isPgsql } from '@server/utils/dbType';
+import { initializeDnsCache } from '@server/utils/dnsCache';
+import restartFlag from '@server/utils/restartFlag';
+import '@server/utils/userAgent';
+import { getClientIp } from '@supercharge/request-ip';
+import compression from 'compression';
+import cookieParser from 'cookie-parser';
+import type { NextFunction, Request, Response } from 'express';
+import express from 'express';
+import * as OpenApiValidator from 'express-openapi-validator';
+import session from 'express-session';
+import fs from 'fs/promises';
+import yaml from 'js-yaml';
+import next from 'next';
+import path from 'path';
+import swaggerUi from 'swagger-ui-express';
+import zlib from 'zlib';
+
+const API_SPEC_PATH = path.join(__dirname, '../seerr-api.yml');
+
+logger.info(`Starting Seerr AI version ${getAppVersion()}`);
+const dev = process.env.NODE_ENV !== 'production';
+const app = next({ dev });
+const handle = app.getRequestHandler();
+
+if (!appDataPermissions()) {
+  logger.error(
+    'Something went wrong while checking config folder! Please ensure the config folder is set up properly.\nhttps://docs.seerr.dev/getting-started'
+  );
+}
+
+app
+  .prepare()
+  .then(async () => {
+    // Run Overseerr to Seerr migration
+    await checkOverseerrMerge();
+
+    const dbConnection = dataSource.isInitialized
+      ? dataSource
+      : await dataSource.initialize();
+
+    // Run migrations in production
+    if (process.env.NODE_ENV === 'production') {
+      if (isPgsql) {
+        await dbConnection.runMigrations();
+      } else {
+        await dbConnection.query('PRAGMA foreign_keys=OFF');
+        await dbConnection.runMigrations();
+        await dbConnection.query('PRAGMA foreign_keys=ON');
+      }
+    }
+
+    // Load Settings
+    const settings = await getSettings().load();
+    restartFlag.initializeSettings(settings);
+
+    initI18n();
+
+    setForceIpv4First(settings.network.forceIpv4First);
+
+    // Add DNS caching
+    if (settings.network.dnsCache?.enabled) {
+      initializeDnsCache({
+        forceMinTtl: settings.network.dnsCache.forceMinTtl,
+        forceMaxTtl: settings.network.dnsCache.forceMaxTtl,
+      });
+    }
+
+    // Register HTTP proxy
+    if (settings.network.proxy.enabled) {
+      await createCustomProxyAgent(
+        settings.network.proxy,
+        settings.network.forceIpv4First
+      );
+    }
+
+    // Migrate library types
+    if (
+      settings.plex.libraries.length > 1 &&
+      !settings.plex.libraries[0].type
+    ) {
+      const userRepository = getRepository(User);
+      const admin = await userRepository.findOne({
+        select: { id: true, plexToken: true },
+        where: { id: 1 },
+      });
+
+      if (admin) {
+        logger.info('Migrating Plex libraries to include media type', {
+          label: 'Settings',
+        });
+
+        const plexapi = new PlexAPI({ plexToken: admin.plexToken });
+
+        try {
+          await plexapi.syncLibraries();
+        } catch {
+          // Leave the existing libraries untouched so the migration retries on
+          // the next startup instead of discarding the user's configuration
+          logger.warn(
+            'Failed to migrate Plex libraries; will retry on next startup',
+            { label: 'Settings' }
+          );
+        }
+      }
+    }
+
+    // Register Notification Agents
+    notificationManager.registerAgents([
+      new DiscordAgent(),
+      new EmailAgent(),
+      new GotifyAgent(),
+      new NtfyAgent(),
+      new PushbulletAgent(),
+      new PushoverAgent(),
+      new SlackAgent(),
+      new TelegramAgent(),
+      new WebhookAgent(),
+      new WebPushAgent(),
+    ]);
+
+    // Notifications held to be sent together go out before the server
+    // stops, rather than being lost with it; a moment is left for them.
+    for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+      process.once(signal, () => {
+        // Backfill's gathered news first, so it joins the rest.
+        backfillNotices.flush();
+        notificationManager.flush();
+        setTimeout(() => process.exit(0), 3000).unref();
+      });
+    }
+
+    // Seerr's own CPU and memory, for the health page's graphs.
+    resourceMonitor.start();
+
+    const userRepository = getRepository(User);
+    const totalUsers = await userRepository.count();
+    if (totalUsers > 0) {
+      startJobs();
+      // The admin agent picks up its queue and hears of empty searches.
+      agent.init().catch((e) =>
+        logger.error('The admin agent could not start', {
+          label: 'Agent',
+          errorMessage: e instanceof Error ? e.message : String(e),
+        })
+      );
+    } else {
+      logger.info(
+        `Skipping starting the scheduled jobs as we have no Plex/Jellyfin/Emby servers setup yet`,
+        {
+          label: 'Server',
+        }
+      );
+    }
+
+    // Bootstrap Discovery Sliders
+    await DiscoverSlider.bootstrapSliders();
+
+    const server = express();
+    if (settings.network.trustProxy) {
+      server.enable('trust proxy');
+    }
+    // Compress every text response: pages, scripts and styles, and the API's
+    // JSON, which nothing compressed before. Brotli where the browser takes
+    // it (all current ones do): level 5 is about as quick as gzip and a good
+    // deal smaller, while the top levels are far too slow to run per request.
+    // Images are already compressed and are passed through untouched.
+    server.use(
+      compression({
+        brotli: { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } },
+      })
+    );
+    server.use(cookieParser());
+    // A photo sent to AI Search is bigger than any other request body; the
+    // route checks its size and type.
+    server.use('/api/v1/ai/chat', express.json({ limit: '8mb' }));
+    server.use(express.json());
+    server.use(express.urlencoded({ extended: true }));
+    server.use((req, _res, next) => {
+      try {
+        const descriptor = Object.getOwnPropertyDescriptor(req, 'ip');
+        if (descriptor?.writable === true) {
+          Object.defineProperty(req, 'ip', {
+            ...descriptor,
+            value: getClientIp(req) ?? '',
+          });
+        }
+      } catch (e) {
+        logger.error('Failed to attach the ip to the request', {
+          label: 'Middleware',
+          message: (e as Error).message,
+        });
+      } finally {
+        next();
+      }
+    });
+    if (settings.network.csrfProtection) {
+      server.use(
+        csurf({
+          cookie: {
+            httpOnly: true,
+            sameSite: true,
+            secure: !dev,
+            key: '_csrf',
+            path: '/',
+          },
+        })
+      );
+      server.use((req, res, next) => {
+        res.cookie('XSRF-TOKEN', req.csrfToken(), {
+          sameSite: true,
+          secure: !dev,
+        });
+        next();
+      });
+    }
+
+    // Set up sessions
+    const sessionRespository = getRepository(Session);
+    const sessionStore = sessionStoreFor(sessionRespository);
+    const sessions = session({
+      secret: settings.sessionSecret,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        maxAge: 1000 * 60 * 60 * 24 * 30,
+        httpOnly: true,
+        sameSite: settings.network.csrfProtection ? 'strict' : 'lax',
+        secure: 'auto',
+      },
+      store: sessionStore,
+    });
+    server.use('/api', sessions);
+    // The image cache only takes new images for someone signed in.
+    useSessionForImages({
+      store: sessionStore,
+      secret: settings.sessionSecret,
+    });
+    const apiSpecContent = await fs.readFile(API_SPEC_PATH, 'utf-8');
+    const apiDocs = yaml.load(apiSpecContent) as Record<string, unknown>;
+    server.use('/api-docs', swaggerUi.serve, swaggerUi.setup(apiDocs));
+    server.use(
+      OpenApiValidator.middleware({
+        apiSpec: API_SPEC_PATH,
+        validateRequests: true,
+      })
+    );
+    /**
+     * This is a workaround to convert dates to strings before they are validated by
+     * OpenAPI validator. Otherwise, they are treated as objects instead of strings
+     * and response validation will fail
+     */
+    server.use((_req, res, next) => {
+      const original = res.json;
+      res.json = function jsonp(json) {
+        return original.call(this, JSON.parse(JSON.stringify(json)));
+      };
+      next();
+    });
+    // Pages of titles start their posters into the image cache as they go.
+    server.use('/api/v1', warmPosters, routes);
+
+    // Do not set cookies so CDNs can cache them
+    server.use('/imageproxy', clearCookies, imageproxy);
+    server.use('/avatarproxy', clearCookies, avatarproxy);
+    server.use('/flags', clearCookies, flags);
+
+    // Chunk list for the service worker to precache on install. Registered
+    // before the Next.js catch-all so it is answered here.
+    server.get('/sw-precache.json', swPrecacheHandler);
+
+    server.get('*path', (req, res) => handle(req, res));
+    server.use(
+      (
+        err: { status: number; message: string; errors: string[] },
+        _req: Request,
+        res: Response,
+        next: NextFunction
+      ) => {
+        if (res.headersSent) {
+          return next(err);
+        }
+        // format error
+        res.status(err.status || 500).json({
+          message: err.message,
+          errors: err.errors,
+        });
+      }
+    );
+
+    const port = Number(process.env.PORT) || 5055;
+    const host = process.env.HOST;
+    let httpServer;
+    if (host) {
+      httpServer = server.listen(port, host, () => {
+        logger.info(`Server ready on ${host} port ${port}`, {
+          label: 'Server',
+        });
+      });
+    } else {
+      httpServer = server.listen(port, () => {
+        logger.info(`Server ready on port ${port}`, {
+          label: 'Server',
+        });
+      });
+    }
+    httpServer.on('error', (err) => {
+      logger.error('Failed to start server', {
+        label: 'Server',
+        message: err.message,
+      });
+      process.exit(1);
+    });
+  })
+  .catch((err) => {
+    logger.error(err.stack);
+    process.exit(1);
+  });

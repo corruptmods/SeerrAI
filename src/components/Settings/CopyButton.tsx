@@ -1,0 +1,63 @@
+import Tooltip from '@app/components/Common/Tooltip';
+import useToasts from '@app/hooks/useToasts';
+import defineMessages from '@app/utils/defineMessages';
+import { ClipboardDocumentIcon } from '@heroicons/react/24/solid';
+import React, { useEffect } from 'react';
+import { useIntl } from 'react-intl';
+import type { Config } from 'react-popper-tooltip';
+import useClipboard from 'react-use-clipboard';
+
+const messages = defineMessages('components.Settings.CopyButton', {
+  copy: 'Copy to Clipboard',
+});
+
+type CopyButtonProps = {
+  textToCopy: string;
+  disabled?: boolean;
+  toastMessage?: string;
+
+  tooltipContent?: React.ReactNode;
+  tooltipConfig?: Partial<Config>;
+};
+
+const CopyButton = ({
+  textToCopy,
+  disabled,
+  toastMessage,
+  tooltipContent,
+  tooltipConfig,
+}: CopyButtonProps) => {
+  const [isCopied, setCopied] = useClipboard(textToCopy, {
+    successDuration: 1000,
+  });
+  const intl = useIntl();
+  const { addToast } = useToasts();
+
+  useEffect(() => {
+    if (isCopied && toastMessage) {
+      addToast(toastMessage, {
+        appearance: 'info',
+        autoDismiss: true,
+      });
+    }
+  }, [isCopied, addToast, toastMessage]);
+
+  return (
+    <Tooltip content={tooltipContent} tooltipConfig={tooltipConfig}>
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          setCopied();
+        }}
+        className="input-action"
+        type="button"
+        disabled={disabled}
+        aria-label={intl.formatMessage(messages.copy)}
+      >
+        <ClipboardDocumentIcon />
+      </button>
+    </Tooltip>
+  );
+};
+
+export default CopyButton;

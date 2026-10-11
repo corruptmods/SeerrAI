@@ -1,0 +1,975 @@
+import TheMovieDb from '@server/api/themoviedb';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
+import { getRepository } from '@server/datasource';
+import Media from '@server/entity/Media';
+import MediaRequest from '@server/entity/MediaRequest';
+import Season from '@server/entity/Season';
+import downloadTracker from '@server/lib/downloadtracker';
+import { getSettings } from '@server/lib/settings';
+import logger from '@server/logger';
+import AsyncLock from '@server/utils/asyncLock';
+import { randomUUID } from 'crypto';
+
+// Default scan rates (can be overidden)
+const BUNDLE_SIZE = 20;
+const UPDATE_RATE = 4 * 1000;
+
+export type StatusBase = {
+  running: boolean;
+  progress: number;
+  total: number;
+};
+
+export interface RunnableScanner<T> {
+  run: () => Promise<void>;
+  status: () => T & StatusBase;
+}
+
+export interface MediaIds {
+  tmdbId: number;
+  imdbId?: string;
+  tvdbId?: number;
+  isHama?: boolean;
+}
+
+interface ProcessOptions {
+  is4k?: boolean;
+  mediaAddedAt?: Date;
+  ratingKey?: string;
+  jellyfinMediaId?: string;
+  imdbId?: string;
+  serviceId?: number;
+  externalServiceId?: number;
+  externalServiceSlug?: string;
+  title?: string;
+  processing?: boolean;
+  hasFile?: boolean;
+}
+
+export interface ProcessableSeason {
+  seasonNumber: number;
+  totalEpisodes: number;
+  episodes: number;
+  episodes4k: number;
+  is4kOverride?: boolean;
+  processing?: boolean;
+}
+
+/**
+ * A blocklisted title is left exactly as it is.
+ *
+ * Blocklisting removes it from Radarr or Sonarr and deletes its files, but
+ * Plex can keep listing a deleted file until its trash is emptied. Without
+ * this, the next scan would find that file and mark the title available again,
+ * silently undoing the blocklist.
+ */
+const isBlocklisted = (media: Media): boolean =>
+  media.status === MediaStatus.BLOCKLISTED ||
+  media.status4k === MediaStatus.BLOCKLISTED;
+
+class BaseScanner<T> {
+  private bundleSize;
+  private updateRate;
+  protected progress = 0;
+  protected items: T[] = [];
+  protected totalSize?: number = 0;
+  protected scannerName: string;
+  protected enable4kMovie = false;
+  protected enable4kShow = false;
+  protected sessionId: string;
+  protected running = false;
+  // Only the *arr scanners know whether a title is still being pursued.
+  protected declineRequestsOnStatusReset = false;
+  private statusResetCandidates = new Map<
+    string,
+    { mediaId: number; is4k: boolean }
+  >();
+  readonly asyncLock = new AsyncLock();
+  readonly tmdb = new TheMovieDb();
+
+  protected constructor(
+    scannerName: string,
+    {
+      updateRate,
+      bundleSize,
+    }: {
+      updateRate?: number;
+      bundleSize?: number;
+    } = {}
+  ) {
+    this.scannerName = scannerName;
+    this.bundleSize = bundleSize ?? BUNDLE_SIZE;
+    this.updateRate = updateRate ?? UPDATE_RATE;
+  }
+
+  private async getExisting(tmdbId: number, mediaType: MediaType) {
+    const mediaRepository = getRepository(Media);
+
+    const existing = await mediaRepository.findOne({
+      where: { tmdbId: tmdbId, mediaType },
+    });
+
+    return existing;
+  }
+
+  protected async processMovie(
+    tmdbId: number,
+    {
+      is4k = false,
+      mediaAddedAt,
+      ratingKey,
+      jellyfinMediaId,
+      imdbId,
+      serviceId,
+      externalServiceId,
+      externalServiceSlug,
+      processing = false,
+      title = 'Unknown Title',
+      hasFile = true,
+    }: ProcessOptions = {}
+  ): Promise<void> {
+    const mediaRepository = getRepository(Media);
+
+    await this.asyncLock.dispatch(tmdbId, async () => {
+      const existing = await this.getExisting(tmdbId, MediaType.MOVIE);
+
+      if (existing && isBlocklisted(existing)) {
+        return;
+      }
+      this.listed(existing, 'movie', is4k, !!(ratingKey || jellyfinMediaId));
+
+      if (existing) {
+        let changedExisting = false;
+        const statusField = is4k ? 'status4k' : 'status';
+        const previousStatus = existing[statusField];
+        const abandonedEntry = !processing && !hasFile;
+        // One server cannot speak for the others; settled after the whole run.
+        const deferredReset =
+          this.declineRequestsOnStatusReset &&
+          abandonedEntry &&
+          previousStatus === MediaStatus.PROCESSING;
+
+        if (deferredReset) {
+          this.recordStatusReset(existing.id, is4k);
+        }
+
+        if (previousStatus !== MediaStatus.AVAILABLE && !deferredReset) {
+          existing[statusField] =
+            !processing && hasFile
+              ? MediaStatus.AVAILABLE
+              : abandonedEntry && previousStatus === MediaStatus.PROCESSING
+                ? MediaStatus.UNKNOWN
+                : processing
+                  ? previousStatus === MediaStatus.DELETED
+                    ? MediaStatus.DELETED
+                    : MediaStatus.PROCESSING
+                  : previousStatus;
+
+          if (existing[statusField] !== previousStatus) {
+            if (mediaAddedAt) {
+              existing.mediaAddedAt = mediaAddedAt;
+            }
+            changedExisting = true;
+          }
+        }
+
+        if (!changedExisting && !existing.mediaAddedAt && mediaAddedAt) {
+          existing.mediaAddedAt = mediaAddedAt;
+          changedExisting = true;
+        }
+
+        if (
+          ratingKey &&
+          existing[is4k ? 'ratingKey4k' : 'ratingKey'] !== ratingKey
+        ) {
+          existing[is4k ? 'ratingKey4k' : 'ratingKey'] = ratingKey;
+          changedExisting = true;
+        }
+
+        if (
+          jellyfinMediaId &&
+          existing[is4k ? 'jellyfinMediaId4k' : 'jellyfinMediaId'] !==
+            jellyfinMediaId
+        ) {
+          existing[is4k ? 'jellyfinMediaId4k' : 'jellyfinMediaId'] =
+            jellyfinMediaId;
+          changedExisting = true;
+        }
+
+        if (imdbId && !existing.imdbId) {
+          existing.imdbId = imdbId;
+          changedExisting = true;
+        }
+
+        // Letting an abandoned entry claim these would make them scan-order dependent.
+        if (!deferredReset) {
+          if (
+            serviceId !== undefined &&
+            existing[is4k ? 'serviceId4k' : 'serviceId'] !== serviceId
+          ) {
+            existing[is4k ? 'serviceId4k' : 'serviceId'] = serviceId;
+            changedExisting = true;
+          }
+
+          if (
+            externalServiceId !== undefined &&
+            existing[is4k ? 'externalServiceId4k' : 'externalServiceId'] !==
+              externalServiceId
+          ) {
+            existing[is4k ? 'externalServiceId4k' : 'externalServiceId'] =
+              externalServiceId;
+            changedExisting = true;
+          }
+
+          if (
+            externalServiceSlug !== undefined &&
+            existing[is4k ? 'externalServiceSlug4k' : 'externalServiceSlug'] !==
+              externalServiceSlug
+          ) {
+            existing[is4k ? 'externalServiceSlug4k' : 'externalServiceSlug'] =
+              externalServiceSlug;
+            changedExisting = true;
+          }
+        }
+
+        if (changedExisting) {
+          await mediaRepository.save(existing);
+          await this.releaseElsewhere(existing, is4k);
+          this.log(
+            `Media for ${title} exists. Changes were detected and the title will be updated.`,
+            'info'
+          );
+        } else {
+          this.log(`Title already exists and no changes detected for ${title}`);
+        }
+      } else {
+        if (!processing && !hasFile) {
+          return;
+        }
+
+        const newMedia = new Media();
+        newMedia.tmdbId = tmdbId;
+        newMedia.imdbId = imdbId;
+
+        newMedia.status =
+          !is4k && !processing
+            ? MediaStatus.AVAILABLE
+            : !is4k && processing
+              ? MediaStatus.PROCESSING
+              : MediaStatus.UNKNOWN;
+        newMedia.status4k =
+          is4k && this.enable4kMovie && !processing
+            ? MediaStatus.AVAILABLE
+            : is4k && this.enable4kMovie && processing
+              ? MediaStatus.PROCESSING
+              : MediaStatus.UNKNOWN;
+        newMedia.mediaType = MediaType.MOVIE;
+        newMedia.serviceId = !is4k ? serviceId : undefined;
+        newMedia.serviceId4k = is4k ? serviceId : undefined;
+        newMedia.externalServiceId = !is4k ? externalServiceId : undefined;
+        newMedia.externalServiceId4k = is4k ? externalServiceId : undefined;
+        newMedia.externalServiceSlug = !is4k ? externalServiceSlug : undefined;
+        newMedia.externalServiceSlug4k = is4k ? externalServiceSlug : undefined;
+
+        if (mediaAddedAt) {
+          newMedia.mediaAddedAt = mediaAddedAt;
+        }
+
+        if (ratingKey) {
+          newMedia.ratingKey = !is4k ? ratingKey : undefined;
+          newMedia.ratingKey4k =
+            is4k && this.enable4kMovie ? ratingKey : undefined;
+        }
+
+        if (jellyfinMediaId) {
+          newMedia.jellyfinMediaId = !is4k ? jellyfinMediaId : undefined;
+          newMedia.jellyfinMediaId4k =
+            is4k && this.enable4kMovie ? jellyfinMediaId : undefined;
+        }
+
+        await mediaRepository.save(newMedia);
+        await this.releaseElsewhere(newMedia, is4k);
+        this.log(`Saved new media: ${title}`);
+      }
+    });
+  }
+
+  /**
+   * processShow takes a TMDB ID and an array of ProcessableSeasons, which
+   * should include the total episodes a sesaon has + the total available
+   * episodes that each season currently has. Unlike processMovie, this method
+   * does not take an `is4k` option. We handle both the 4k _and_ non 4k status
+   * in one method.
+   *
+   * Note: If 4k is not enable, ProcessableSeasons should combine their episode counts
+   * into the normal episodes properties and avoid using the 4k properties.
+   */
+  protected async processShow(
+    tmdbId: number,
+    tvdbId: number | undefined,
+    seasons: ProcessableSeason[],
+    {
+      mediaAddedAt,
+      ratingKey,
+      jellyfinMediaId,
+      serviceId,
+      externalServiceId,
+      externalServiceSlug,
+      is4k = false,
+      title = 'Unknown Title',
+    }: ProcessOptions = {}
+  ): Promise<void> {
+    const mediaRepository = getRepository(Media);
+
+    await this.asyncLock.dispatch(tmdbId, async () => {
+      const media = await this.getExisting(tmdbId, MediaType.TV);
+
+      if (media && isBlocklisted(media)) {
+        return;
+      }
+      this.listed(media, 'series', is4k, !!(ratingKey || jellyfinMediaId));
+
+      const newSeasons: Season[] = [];
+
+      const currentStandardSeasonsAvailable = (
+        media?.seasons.filter(
+          (season) => season.status === MediaStatus.AVAILABLE
+        ) ?? []
+      ).length;
+
+      const current4kSeasonsAvailable = (
+        media?.seasons.filter(
+          (season) => season.status4k === MediaStatus.AVAILABLE
+        ) ?? []
+      ).length;
+
+      for (const rawSeason of seasons) {
+        // Files can't promote a season the provider reports as empty.
+        // Zeroing the counts leaves any existing status for availabilitySync to judge.
+        const season =
+          rawSeason.totalEpisodes > 0
+            ? rawSeason
+            : { ...rawSeason, episodes: 0, episodes4k: 0 };
+
+        const existingSeason = media?.seasons.find(
+          (es) => es.seasonNumber === season.seasonNumber
+        );
+
+        // We update the rating keys and jellyfinMediaId in the seasons loop because we need episode counts
+        if (media && season.episodes > 0 && media.ratingKey !== ratingKey) {
+          media.ratingKey = ratingKey;
+        }
+
+        if (
+          media &&
+          season.episodes4k > 0 &&
+          this.enable4kShow &&
+          media.ratingKey4k !== ratingKey
+        ) {
+          media.ratingKey4k = ratingKey;
+        }
+
+        if (
+          media &&
+          season.episodes > 0 &&
+          media.jellyfinMediaId !== jellyfinMediaId
+        ) {
+          media.jellyfinMediaId = jellyfinMediaId;
+        }
+
+        if (
+          media &&
+          season.episodes4k > 0 &&
+          this.enable4kShow &&
+          media.jellyfinMediaId4k !== jellyfinMediaId
+        ) {
+          media.jellyfinMediaId4k = jellyfinMediaId;
+        }
+
+        if (existingSeason) {
+          // Here we update seasons if they already exist.
+          // If the season is already marked as available, we
+          // force it to stay available (to avoid competing scanners)
+          existingSeason.status =
+            (season.totalEpisodes === season.episodes && season.episodes > 0) ||
+            existingSeason.status === MediaStatus.AVAILABLE
+              ? MediaStatus.AVAILABLE
+              : season.episodes > 0
+                ? MediaStatus.PARTIALLY_AVAILABLE
+                : !season.is4kOverride &&
+                    season.processing &&
+                    existingSeason.status !== MediaStatus.DELETED
+                  ? MediaStatus.PROCESSING
+                  : !season.is4kOverride &&
+                      !season.processing &&
+                      season.episodes === 0 &&
+                      existingSeason.status === MediaStatus.PROCESSING
+                    ? MediaStatus.UNKNOWN
+                    : existingSeason.status;
+
+          // Same thing here, except we only do updates if 4k is enabled
+          existingSeason.status4k =
+            (this.enable4kShow &&
+              season.episodes4k === season.totalEpisodes &&
+              season.episodes4k > 0) ||
+            existingSeason.status4k === MediaStatus.AVAILABLE
+              ? MediaStatus.AVAILABLE
+              : this.enable4kShow && season.episodes4k > 0
+                ? MediaStatus.PARTIALLY_AVAILABLE
+                : season.is4kOverride &&
+                    season.processing &&
+                    existingSeason.status4k !== MediaStatus.DELETED
+                  ? MediaStatus.PROCESSING
+                  : season.is4kOverride &&
+                      !season.processing &&
+                      season.episodes4k === 0 &&
+                      existingSeason.status4k === MediaStatus.PROCESSING
+                    ? MediaStatus.UNKNOWN
+                    : existingSeason.status4k;
+        } else {
+          newSeasons.push(
+            new Season({
+              seasonNumber: season.seasonNumber,
+              status:
+                season.totalEpisodes === season.episodes && season.episodes > 0
+                  ? MediaStatus.AVAILABLE
+                  : season.episodes > 0
+                    ? MediaStatus.PARTIALLY_AVAILABLE
+                    : !season.is4kOverride && season.processing
+                      ? MediaStatus.PROCESSING
+                      : MediaStatus.UNKNOWN,
+              status4k:
+                this.enable4kShow &&
+                season.totalEpisodes === season.episodes4k &&
+                season.episodes4k > 0
+                  ? MediaStatus.AVAILABLE
+                  : this.enable4kShow && season.episodes4k > 0
+                    ? MediaStatus.PARTIALLY_AVAILABLE
+                    : season.is4kOverride && season.processing
+                      ? MediaStatus.PROCESSING
+                      : MediaStatus.UNKNOWN,
+            })
+          );
+        }
+      }
+
+      if (media) {
+        media.seasons = [...media.seasons, ...newSeasons];
+
+        const newStandardSeasonsAvailable = (
+          media.seasons.filter(
+            (season) => season.status === MediaStatus.AVAILABLE
+          ) ?? []
+        ).length;
+
+        const new4kSeasonsAvailable = (
+          media.seasons.filter(
+            (season) => season.status4k === MediaStatus.AVAILABLE
+          ) ?? []
+        ).length;
+
+        // If at least one new season has become available, update
+        // the lastSeasonChange field so we can trigger notifications
+        if (newStandardSeasonsAvailable > currentStandardSeasonsAvailable) {
+          this.log(
+            `Detected ${
+              newStandardSeasonsAvailable - currentStandardSeasonsAvailable
+            } new standard season(s) for ${title}`,
+            'debug'
+          );
+          media.lastSeasonChange = new Date();
+
+          if (mediaAddedAt) {
+            media.mediaAddedAt = mediaAddedAt;
+          }
+        }
+
+        if (new4kSeasonsAvailable > current4kSeasonsAvailable) {
+          this.log(
+            `Detected ${
+              new4kSeasonsAvailable - current4kSeasonsAvailable
+            } new 4K season(s) for ${title}`,
+            'debug'
+          );
+          media.lastSeasonChange = new Date();
+        }
+
+        if (!media.mediaAddedAt && mediaAddedAt) {
+          media.mediaAddedAt = mediaAddedAt;
+        }
+
+        if (serviceId !== undefined) {
+          media[is4k ? 'serviceId4k' : 'serviceId'] = serviceId;
+        }
+
+        if (externalServiceId !== undefined) {
+          media[is4k ? 'externalServiceId4k' : 'externalServiceId'] =
+            externalServiceId;
+        }
+
+        if (externalServiceSlug !== undefined) {
+          media[is4k ? 'externalServiceSlug4k' : 'externalServiceSlug'] =
+            externalServiceSlug;
+        }
+
+        const nonSpecialSeasons = media.seasons.filter(
+          (s) => s.seasonNumber !== 0
+        );
+
+        // DB-only seasons block the rollup unless UNKNOWN (orphan placeholders
+        // can never be revisited by a scan and would pin the show forever).
+        const countsTowardsRollup = (
+          s: Season,
+          statusKey: 'status' | 'status4k'
+        ): boolean => {
+          const scannedSeason = seasons.find(
+            (season) => season.seasonNumber === s.seasonNumber
+          );
+
+          if (scannedSeason) {
+            return scannedSeason.totalEpisodes > 0;
+          }
+
+          return s[statusKey] !== MediaStatus.UNKNOWN;
+        };
+
+        const standardSeasonsForRollup = nonSpecialSeasons.filter((s) =>
+          countsTowardsRollup(s, 'status')
+        );
+        const isAllStandardSeasonsAvailable =
+          standardSeasonsForRollup.length > 0 &&
+          standardSeasonsForRollup.every(
+            (s) => s.status === MediaStatus.AVAILABLE
+          );
+
+        const seasons4kForRollup = nonSpecialSeasons.filter((s) =>
+          countsTowardsRollup(s, 'status4k')
+        );
+        const isAll4kSeasonsAvailable =
+          seasons4kForRollup.length > 0 &&
+          seasons4kForRollup.every((s) => s.status4k === MediaStatus.AVAILABLE);
+
+        const previousStatus = media.status;
+        const previousStatus4k = media.status4k;
+
+        media.status = isAllStandardSeasonsAvailable
+          ? MediaStatus.AVAILABLE
+          : media.seasons.some(
+                (season) =>
+                  season.status === MediaStatus.PARTIALLY_AVAILABLE ||
+                  season.status === MediaStatus.AVAILABLE
+              )
+            ? MediaStatus.PARTIALLY_AVAILABLE
+            : (!seasons.length && media.status !== MediaStatus.DELETED) ||
+                media.seasons.some(
+                  (season) => season.status === MediaStatus.PROCESSING
+                )
+              ? MediaStatus.PROCESSING
+              : media.status === MediaStatus.DELETED
+                ? MediaStatus.DELETED
+                : MediaStatus.UNKNOWN;
+        media.status4k =
+          isAll4kSeasonsAvailable && this.enable4kShow
+            ? MediaStatus.AVAILABLE
+            : this.enable4kShow &&
+                media.seasons.some(
+                  (season) =>
+                    season.status4k === MediaStatus.PARTIALLY_AVAILABLE ||
+                    season.status4k === MediaStatus.AVAILABLE
+                )
+              ? MediaStatus.PARTIALLY_AVAILABLE
+              : (!seasons.length && media.status4k !== MediaStatus.DELETED) ||
+                  media.seasons.some(
+                    (season) => season.status4k === MediaStatus.PROCESSING
+                  )
+                ? MediaStatus.PROCESSING
+                : media.status4k === MediaStatus.DELETED
+                  ? MediaStatus.DELETED
+                  : MediaStatus.UNKNOWN;
+        await mediaRepository.save(media);
+        await this.releaseElsewhere(media, is4k);
+        this.log(`Updating existing title: ${title}`);
+
+        if (
+          previousStatus === MediaStatus.PROCESSING &&
+          media.status === MediaStatus.UNKNOWN
+        ) {
+          this.recordStatusReset(media.id, false);
+        }
+
+        if (
+          previousStatus4k === MediaStatus.PROCESSING &&
+          media.status4k === MediaStatus.UNKNOWN
+        ) {
+          this.recordStatusReset(media.id, true);
+        }
+      } else {
+        // For new media, check actual newSeasons objects instead of scanner
+        // input to determine overall availability status
+        const nonSpecialNewSeasons = newSeasons.filter(
+          (s) => s.seasonNumber !== 0
+        );
+
+        const newSeasonsForRollup = nonSpecialNewSeasons.filter(
+          (s) =>
+            (seasons.find((season) => season.seasonNumber === s.seasonNumber)
+              ?.totalEpisodes ?? 0) > 0
+        );
+        const isAllStandardSeasonsAvailable =
+          newSeasonsForRollup.length > 0 &&
+          newSeasonsForRollup.every((s) => s.status === MediaStatus.AVAILABLE);
+
+        const isAll4kSeasonsAvailable =
+          newSeasonsForRollup.length > 0 &&
+          newSeasonsForRollup.every(
+            (s) => s.status4k === MediaStatus.AVAILABLE
+          );
+
+        const newMedia = new Media({
+          mediaType: MediaType.TV,
+          seasons: newSeasons,
+          tmdbId,
+          tvdbId,
+          mediaAddedAt,
+          serviceId: !is4k ? serviceId : undefined,
+          serviceId4k: is4k ? serviceId : undefined,
+          externalServiceId: !is4k ? externalServiceId : undefined,
+          externalServiceId4k: is4k ? externalServiceId : undefined,
+          externalServiceSlug: !is4k ? externalServiceSlug : undefined,
+          externalServiceSlug4k: is4k ? externalServiceSlug : undefined,
+          ratingKey: newSeasons.some(
+            (sn) =>
+              sn.status === MediaStatus.PARTIALLY_AVAILABLE ||
+              sn.status === MediaStatus.AVAILABLE
+          )
+            ? ratingKey
+            : undefined,
+          ratingKey4k:
+            this.enable4kShow &&
+            newSeasons.some(
+              (sn) =>
+                sn.status4k === MediaStatus.PARTIALLY_AVAILABLE ||
+                sn.status4k === MediaStatus.AVAILABLE
+            )
+              ? ratingKey
+              : undefined,
+          jellyfinMediaId: newSeasons.some(
+            (sn) =>
+              sn.status === MediaStatus.PARTIALLY_AVAILABLE ||
+              sn.status === MediaStatus.AVAILABLE
+          )
+            ? jellyfinMediaId
+            : undefined,
+          jellyfinMediaId4k:
+            this.enable4kShow &&
+            newSeasons.some(
+              (sn) =>
+                sn.status4k === MediaStatus.PARTIALLY_AVAILABLE ||
+                sn.status4k === MediaStatus.AVAILABLE
+            )
+              ? jellyfinMediaId
+              : undefined,
+          status: isAllStandardSeasonsAvailable
+            ? MediaStatus.AVAILABLE
+            : newSeasons.some(
+                  (season) =>
+                    season.status === MediaStatus.PARTIALLY_AVAILABLE ||
+                    season.status === MediaStatus.AVAILABLE
+                )
+              ? MediaStatus.PARTIALLY_AVAILABLE
+              : newSeasons.some(
+                    (season) => season.status === MediaStatus.PROCESSING
+                  )
+                ? MediaStatus.PROCESSING
+                : MediaStatus.UNKNOWN,
+          status4k:
+            isAll4kSeasonsAvailable && this.enable4kShow
+              ? MediaStatus.AVAILABLE
+              : this.enable4kShow &&
+                  newSeasons.some(
+                    (season) =>
+                      season.status4k === MediaStatus.PARTIALLY_AVAILABLE ||
+                      season.status4k === MediaStatus.AVAILABLE
+                  )
+                ? MediaStatus.PARTIALLY_AVAILABLE
+                : newSeasons.some(
+                      (season) => season.status4k === MediaStatus.PROCESSING
+                    )
+                  ? MediaStatus.PROCESSING
+                  : MediaStatus.UNKNOWN,
+        });
+        await mediaRepository.save(newMedia);
+        await this.releaseElsewhere(newMedia, is4k);
+        this.log(`Saved ${title}`);
+      }
+    });
+  }
+
+  /**
+   * Declines APPROVED requests bound to media that has been orphaned before completion.
+   * DECLINED clears the duplicate-request guard so the user can re-request it.
+   * Callers must load the requests relation on the media.
+   */
+  protected async declineOrphanedRequests(
+    media: Media,
+    is4k: boolean,
+    reason = 'not found in any Sonarr/Radarr server'
+  ): Promise<void> {
+    if (media.requests === undefined) {
+      throw new Error(
+        `declineOrphanedRequests called for media ${media.id} without the 'requests' relation loaded`
+      );
+    }
+
+    const requestRepository = getRepository(MediaRequest);
+
+    const orphanedRequests = (media.requests ?? []).filter(
+      (request) =>
+        request.is4k === is4k && request.status === MediaRequestStatus.APPROVED
+    );
+
+    for (const request of orphanedRequests) {
+      request.status = MediaRequestStatus.DECLINED;
+      // Ensure that the media relation is set so the AfterUpdate
+      // notification hook can resolve it
+      request.media = media;
+      await requestRepository.save(request);
+      this.log(
+        `Declined orphaned ${
+          media.mediaType === MediaType.MOVIE ? 'movie' : 'series'
+        } request ${request.id} for ${media.tmdbId} ${reason}.`,
+        'info'
+      );
+    }
+  }
+
+  private recordStatusReset(mediaId: number, is4k: boolean): void {
+    if (!this.declineRequestsOnStatusReset) {
+      return;
+    }
+
+    this.statusResetCandidates.set(`${mediaId}:${is4k}`, { mediaId, is4k });
+  }
+
+  // Runs once the caller can answer for every server, not just the current one.
+  protected async resolveStatusResets(
+    isAbandoned: (media: Media, is4k: boolean) => boolean
+  ): Promise<void> {
+    const mediaRepository = getRepository(Media);
+
+    for (const { mediaId, is4k } of this.statusResetCandidates.values()) {
+      const media = await mediaRepository.findOne({
+        where: { id: mediaId },
+        relations: { requests: true },
+      });
+
+      if (!media || !isAbandoned(media, is4k)) {
+        continue;
+      }
+
+      const statusField = is4k ? 'status4k' : 'status';
+
+      if (media[statusField] === MediaStatus.PROCESSING) {
+        media[statusField] = MediaStatus.UNKNOWN;
+        await mediaRepository.save(media);
+      } else if (media[statusField] !== MediaStatus.UNKNOWN) {
+        // Something finished or deleted it mid-run; it is no longer ours to reset.
+        continue;
+      }
+
+      await this.declineOrphanedRequests(
+        media,
+        is4k,
+        'reset to UNKNOWN after the Sonarr/Radarr entry went unmonitored with nothing downloaded'
+      );
+    }
+  }
+
+  /**
+   * Call startRun from child class whenever a run is starting to
+   * ensure required values are set
+   *
+   * Returns the session ID which is requried for the cleanup method
+   */
+  /**
+   * The media server lists this title: downloads Radarr or Sonarr imported
+   * for it before this scan began are no longer shown as on their way.
+   */
+  private listed(
+    media: Media | null | undefined,
+    kind: 'movie' | 'series',
+    is4k: boolean,
+    fromMediaServer: boolean
+  ) {
+    if (!media || !fromMediaServer) return;
+    const serverId = is4k ? media.serviceId4k : media.serviceId;
+    const externalId = is4k
+      ? media.externalServiceId4k
+      : media.externalServiceId;
+    if (serverId == null || externalId == null) return;
+    downloadTracker.forgetImported(
+      kind,
+      serverId,
+      externalId,
+      this.runStartedAt || Date.now()
+    );
+  }
+
+  private runStartedAt = 0;
+
+  /**
+   * A media server item belongs to one title. When the media server matches
+   * a file to another title than before (Plex first took a new show
+   * "Carrie" for "The Carrie Diaries", then was corrected), the title it
+   * left no longer has it: without this, both showed as available, and
+   * the wrong one stayed so. A title the item leaves that Sonarr or Radarr
+   * never had goes back to unknown; one they have keeps its status for the
+   * availability sync to judge from them.
+   */
+  private async releaseElsewhere(media: Media, is4k: boolean) {
+    const plexKey = is4k ? 'ratingKey4k' : 'ratingKey';
+    const jellyfinKey = is4k ? 'jellyfinMediaId4k' : 'jellyfinMediaId';
+    const statusKey = is4k ? 'status4k' : 'status';
+    const serviceKey = is4k ? 'serviceId4k' : 'serviceId';
+    const repository = getRepository(Media);
+    for (const key of [plexKey, jellyfinKey] as const) {
+      const id = media[key];
+      if (!id) continue;
+      const others = await repository.find({
+        where: { mediaType: media.mediaType, [key]: id },
+        relations: { seasons: true },
+      });
+      for (const other of others) {
+        if (other.id === media.id || other.tmdbId === media.tmdbId) continue;
+        other[key] = null as never;
+        if (other[serviceKey] == null) {
+          other[statusKey] = MediaStatus.UNKNOWN;
+          for (const season of other.seasons ?? []) {
+            season[statusKey] = MediaStatus.UNKNOWN;
+          }
+        }
+        await repository.save(other);
+        this.log(
+          `The media server's item ${id} is now TMDB ${media.tmdbId}, no longer TMDB ${other.tmdbId}`,
+          'info'
+        );
+      }
+    }
+  }
+
+  protected startRun(): string {
+    const settings = getSettings();
+    const sessionId = randomUUID();
+    this.sessionId = sessionId;
+    this.runStartedAt = Date.now();
+    this.statusResetCandidates.clear();
+
+    this.log('Scan starting', 'info', { sessionId });
+
+    this.enable4kMovie = settings.radarr.some((radarr) => radarr.is4k);
+    if (this.enable4kMovie) {
+      this.log(
+        'At least one 4K Radarr server was detected. 4K movie detection is now enabled',
+        'info'
+      );
+    }
+
+    this.enable4kShow = settings.sonarr.some((sonarr) => sonarr.is4k);
+    if (this.enable4kShow) {
+      this.log(
+        'At least one 4K Sonarr server was detected. 4K series detection is now enabled',
+        'info'
+      );
+    }
+
+    this.running = true;
+
+    return sessionId;
+  }
+
+  /**
+   * Call at end of run loop to perform cleanup
+   */
+  protected endRun(sessionId: string): void {
+    if (this.sessionId === sessionId) {
+      this.running = false;
+    }
+  }
+
+  public cancel(): void {
+    this.running = false;
+  }
+
+  protected async loop(
+    processFn: (item: T) => Promise<void>,
+    {
+      start = 0,
+      end = this.bundleSize,
+      sessionId,
+    }: {
+      start?: number;
+      end?: number;
+      sessionId?: string;
+    } = {}
+  ): Promise<void> {
+    const slicedItems = this.items.slice(start, end);
+
+    if (!this.running) {
+      throw new Error('Sync was aborted.');
+    }
+
+    if (this.sessionId !== sessionId) {
+      throw new Error('New session was started. Old session aborted.');
+    }
+
+    if (start < this.items.length) {
+      this.progress = start;
+      await this.processItems(processFn, slicedItems);
+
+      await new Promise<void>((resolve, reject) =>
+        setTimeout(() => {
+          this.loop(processFn, {
+            start: start + this.bundleSize,
+            end: end + this.bundleSize,
+            sessionId,
+          })
+            .then(() => resolve())
+            .catch((e) => reject(new Error(e.message)));
+        }, this.updateRate)
+      );
+    }
+  }
+
+  private async processItems(
+    processFn: (items: T) => Promise<void>,
+    items: T[]
+  ) {
+    await Promise.all(
+      items.map(async (item) => {
+        await processFn(item);
+      })
+    );
+  }
+
+  protected log(
+    message: string,
+    level: 'info' | 'error' | 'debug' | 'warn' = 'debug',
+    optional?: Record<string, unknown>
+  ): void {
+    logger[level](message, { label: this.scannerName, ...optional });
+  }
+
+  get protectedUpdateRate(): number {
+    return this.updateRate;
+  }
+
+  get protectedBundleSize(): number {
+    return this.bundleSize;
+  }
+}
+
+export default BaseScanner;

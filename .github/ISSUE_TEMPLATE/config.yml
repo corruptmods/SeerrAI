@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Seerr AI guide
+    url: https://github.com/corruptmods/SeerrAI/blob/main/docs/seerr-ai/README.md
+    about: What every feature does, where to find it, and how to turn it off
+  - name: 📖 Seerr's documentation
+    url: https://docs.seerr.dev
+    about: Everything Seerr AI shares with Seerr (setup, Plex, Jellyfin, Emby, Radarr, Sonarr)

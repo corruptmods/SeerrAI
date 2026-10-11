@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#111827" />
+    <title>Seerr AI is unreachable</title>
+    <!--
+      Shown by the service worker when Seerr cannot be reached: no connection,
+      the server down behind Cloudflare, or a request that hangs. Everything is
+      inline because nothing else can load while this is showing.
+    -->
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: flex; align-items: center; justify-content: center;
+        background: #111827; color: #f3f4f6;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        padding: max(1.5rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-right))
+          max(1.5rem, env(safe-area-inset-bottom)) max(1.5rem, env(safe-area-inset-left));
+        text-align: center;
+      }
+      main { max-width: 24rem; }
+      .logo { width: 5rem; height: 5rem; margin: 0 auto 1.5rem; display: block; opacity: 0.9; }
+      h1 { margin: 0 0 0.5rem; font-size: 1.5rem; font-weight: 700; line-height: 2rem; }
+      p { margin: 0; color: #9ca3af; font-size: 0.9375rem; line-height: 1.5rem; }
+      button {
+        display: block; margin: 1.75rem auto 0; padding: 0.5rem 1.25rem; border: 1px solid #6366f1; border-radius: 0.375rem;
+        background: #4f46e5; color: #fff; font: inherit; font-size: 0.875rem; font-weight: 500;
+        cursor: pointer; transition: background-color 150ms ease;
+      }
+      button:hover, button:focus-visible { background: #6366f1; outline: none; }
+      button:disabled { opacity: 0.6; cursor: default; }
+      .reason { margin-top: 1rem; padding: 0.625rem 0.75rem; border-radius: 0.375rem;
+        background: #1f2937; color: #d1d5db; font-size: 0.8125rem; line-height: 1.25rem; text-align: left; }
+      .reason[hidden] { display: none; }
+      .reason strong { color: #f3f4f6; font-weight: 600; }
+      .status { margin-top: 1rem; font-size: 0.8125rem; color: #6b7280;
+        display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+      .dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; background: #6366f1;
+        animation: pulse 1.6s ease-in-out infinite; }
+      @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <svg class="logo" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 96 96"><path fill="url(#offline-grad-0)" fill-rule="evenodd" d="M48 96C74.5097 96 96 74.5097 96 48C96 21.4903 74.5097 0 48 0C21.4903 0 0 21.4903 0 48C0 74.5097 21.4903 96 48 96ZM80.0001 52C80.0001 67.464 67.4641 80 52.0001 80C36.5361 80 24.0001 67.464 24.0001 52C24.0001 49.1303 24.4318 46.3615 25.2338 43.7548C27.4288 48.6165 32.3194 52 38.0001 52C45.7321 52 52.0001 45.732 52.0001 38C52.0001 32.3192 48.6166 27.4287 43.755 25.2337C46.3616 24.4317 49.1304 24 52.0001 24C67.4641 24 80.0001 36.536 80.0001 52Z" clip-rule="evenodd"/><path fill="#131928" fill-rule="evenodd" d="M80.0002 52C80.0002 67.464 67.4642 80 52.0002 80C36.864 80 24.5329 67.9897 24.017 52.9791C24.0057 53.318 24 53.6583 24 54C24 70.5685 37.4315 84 54 84C70.5685 84 84 70.5685 84 54C84 37.4315 70.5685 24 54 24C53.6597 24 53.3207 24.0057 52.9831 24.0169C67.9919 24.5347 80.0002 36.865 80.0002 52Z" clip-rule="evenodd" opacity=".2"/><path fill="url(#offline-grad-1)" fill-rule="evenodd" d="M48 12C28.1177 12 12 28.1177 12 48C12 50.2091 10.2091 52 8 52C5.79086 52 4 50.2091 4 48C4 23.6995 23.6995 4 48 4C50.2091 4 52 5.79086 52 8C52 10.2091 50.2091 12 48 12Z" clip-rule="evenodd"/><defs><linearGradient id="offline-grad-0" x1="48" x2="117.5" y1="0" y2="69.5" gradientUnits="userSpaceOnUse"><stop stop-color="#C395FC"/><stop offset="1" stop-color="#4F65F5"/></linearGradient><linearGradient id="offline-grad-1" x1="28" x2="28" y1="8" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#fff" stop-opacity=".4"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs></svg>
+      <h1 id="title">Can’t reach Seerr AI</h1>
+      <p id="detail">The server isn’t responding. It may be restarting — this page will reconnect on its own.</p>
+      <p id="reason" class="reason" hidden></p>
+      <button id="retry" type="button">Try again</button>
+      <div class="status" role="status" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="status">Checking again automatically</span>
+      </div>
+    </main>
+    <script>
+      const title = document.getElementById('title');
+      const detail = document.getElementById('detail');
+      const status = document.getElementById('status');
+      const retry = document.getElementById('retry');
+      const reason = document.getElementById('reason');
+
+      // What actually went wrong, so whoever looks knows where to look:
+      // this device's connection, Cloudflare, the proxy, or Seerr itself.
+      const CLOUDFLARE = {
+        520: 'Cloudflare got an answer from the server it didn’t understand.',
+        521: 'Cloudflare reached the network, but nothing answered on the server.',
+        522: 'Cloudflare couldn’t connect to the server in time.',
+        523: 'Cloudflare couldn’t find a route to the server.',
+        524: 'Cloudflare connected, but the server took too long to answer.',
+        525: 'Cloudflare couldn’t set up a secure connection to the server.',
+        526: 'Cloudflare didn’t accept the server’s certificate.',
+        527: 'Cloudflare couldn’t reach the server through its tunnel.',
+        530: 'Cloudflare couldn’t reach the server.',
+      };
+      const explain = (why) => {
+        if (!why) return '';
+        if (why === 'network') {
+          return 'Your browser couldn’t connect at all. That points at the connection between this device and the server (DNS, Wi-Fi, a VPN), not at Seerr AI.';
+        }
+        if (why === 'timeout') {
+          return 'The address answered nothing in time. The server, or something on the way to it, is not answering.';
+        }
+        const code = Number(String(why).replace('status:', ''));
+        if (CLOUDFLARE[code]) return `${CLOUDFLARE[code]} (${code})`;
+        if (code >= 502 && code <= 504) {
+          return `The proxy in front of Seerr AI couldn’t get an answer from it. (${code})`;
+        }
+        return code ? `The server answered with an error. (${code})` : '';
+      };
+      const showReason = (why) => {
+        const text = explain(why);
+        reason.hidden = !text;
+        if (text) {
+          reason.innerHTML = '';
+          const label = document.createElement('strong');
+          label.textContent = 'What happened: ';
+          reason.append(label, text, ` · ${new Date().toLocaleTimeString()}`);
+        }
+      };
+
+      // Say which problem it is: this device offline, or the server down.
+      const describe = () => {
+        if (navigator.onLine === false) {
+          title.textContent = 'You’re offline';
+          detail.textContent =
+            'Check your connection. Seerr AI will reload as soon as you’re back online.';
+        } else {
+          title.textContent = 'Can’t reach Seerr AI';
+          detail.textContent =
+            'The server isn’t responding. It may be restarting — this page will reconnect on its own.';
+        }
+      };
+
+      // A small public endpoint rather than the page itself: asking for the
+      // page made a recovering server render it every couple of seconds.
+      const serverIsUp = async () => {
+        const controller = new AbortController();
+        const giveUp = window.setTimeout(() => controller.abort(), 10000);
+        try {
+          const response = await fetch('/api/v1/status', {
+            cache: 'no-store',
+            signal: controller.signal,
+          });
+          if (!response.ok) showReason(`status:${response.status}`);
+          return response.ok;
+        } catch (error) {
+          showReason(error && error.name === 'AbortError' ? 'timeout' : 'network');
+          return false;
+        } finally {
+          window.clearTimeout(giveUp);
+        }
+      };
+
+      let delay = 3000;
+      let timer;
+
+      const check = async () => {
+        window.clearTimeout(timer);
+        if (await serverIsUp()) {
+          status.textContent = 'Reconnected — loading';
+          window.location.reload();
+          return;
+        }
+        // Back off gently, up to every 15 seconds, so a long outage is not a
+        // steady stream of requests.
+        delay = Math.min(delay * 1.5, 15000);
+        timer = window.setTimeout(check, delay);
+      };
+
+      retry.addEventListener('click', async () => {
+        retry.disabled = true;
+        status.textContent = 'Checking…';
+        delay = 3000;
+        await check();
+        retry.disabled = false;
+        status.textContent = 'Checking again automatically';
+      });
+
+      window.addEventListener('online', () => { describe(); check(); });
+      window.addEventListener('offline', describe);
+
+      describe();
+      showReason(document.documentElement.dataset.reason);
+      timer = window.setTimeout(check, delay);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,318 @@
+---
+title: Build From Source (Advanced)
+description: Install Seerr by building from source
+sidebar_position: 2
+---
+# Build from Source (Advanced)
+:::warning
+This method is not recommended for most users. It is intended for advanced users who are familiar with managing their own server infrastructure.
+
+Refer to [Configuring Databases](/extending-seerr/database-config#postgresql-options) for details on how to configure your database.
+:::
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+### Prerequisites
+    - [Node.js 22.x](https://nodejs.org/en/download/)
+    - [Pnpm 10.x](https://pnpm.io/installation)
+    - [Git](https://git-scm.com/downloads)
+
+## Unix (Linux, macOS)
+### Installation
+1. Assuming you want the working directory to be `/opt/seerr`, create the directory and navigate to it:
+```bash
+sudo mkdir -p /opt/seerr && cd /opt/seerr
+```
+2. Clone the Seerr repository and checkout the main branch:
+```bash
+git clone https://github.com/seerr-team/seerr.git .
+git checkout main
+```
+3. Install the dependencies:
+```bash
+CYPRESS_INSTALL_BINARY=0 pnpm install --frozen-lockfile
+```
+4. Build the project:
+```bash
+pnpm build
+```
+5. Start Seerr:
+```bash
+pnpm start
+```
+
+:::info
+You can now access Seerr by visiting `http://localhost:5055` in your web browser.
+:::
+
+#### Extending the installation
+<Tabs groupId="unix-extensions" queryString>
+  <TabItem value="linux" label="Linux">
+To run seerr as a systemd service:
+1. create the environment file at `/etc/seerr/seerr.conf`:
+```bash
+## Seerr's default port is 5055, if you want to use both, change this.
+## specify on which port to listen
+PORT=5055
+
+## specify on which interface to listen, by default seerr listens on all interfaces
+#HOST=127.0.0.1
+
+## Uncomment if you want to force Node.js to resolve IPv4 before IPv6 (advanced users only)
+# FORCE_IPV4_FIRST=true
+```
+2. Then run the following commands:
+```bash
+which node
+```
+Copy the path to node, it should be something like `/usr/bin/node`.
+
+3. Create the systemd service file at `/etc/systemd/system/seerr.service`, using either `sudo systemctl edit seerr` or `sudo nano /etc/systemd/system/seerr.service`:
+```bash
+[Unit]
+Description=Seerr Service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+EnvironmentFile=/etc/seerr/seerr.conf
+Environment=NODE_ENV=production
+Type=exec
+Restart=on-failure
+WorkingDirectory=/opt/seerr
+ExecStart=/usr/bin/node dist/index.js
+
+[Install]
+WantedBy=multi-user.target
+```
+:::note
+If you are using a different path to node, replace `/usr/bin/node` with the path to node.
+:::
+
+4. Enable and start the service:
+```bash
+sudo systemctl enable seerr
+sudo systemctl start seerr
+```
+  </TabItem>
+  <TabItem value="macos" label="macOS">
+To run seerr as a launchd service:
+1. Find the path to node:
+```bash
+which node
+```
+Copy the path to node, it should be something like `/usr/local/bin/node`.
+
+2. Create a launchd plist file at `~/Library/LaunchAgents/com.seerr.plist`:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.seerr</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/opt/seerr/dist/index.js</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/opt/seerr</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NODE_ENV</key>
+    <string>production</string>
+    <key>PORT</key>
+    <string>5055</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+</dict>
+</plist>
+```
+:::note
+If you are using a different path to node, replace `/usr/local/bin/node` with the path to node.
+:::
+3. Load the service:
+```bash
+sudo launchctl load ~/Library/LaunchAgents/com.seerr.plist
+```
+3. Start the service:
+```bash
+sudo launchctl start com.seerr
+```
+4. To ensure the service starts on boot, run the following command:
+```bash
+sudo lauchctl load
+```
+  </TabItem>
+  <TabItem value="pm2" label="PM2">
+To run seerr as a PM2 service:
+1. Install PM2:
+```bash
+npm install -g pm2
+```
+2. Start seerr with PM2:
+```bash
+NODE_ENV=production pm2 start dist/index.js --name seerr
+```
+3. Save the process list:
+```bash
+pm2 save
+```
+4. Ensure PM2 starts on boot:
+```bash
+pm2 startup
+```
+**Managing the service**
+- To start the service:
+```powershell
+pm2 start seerr
+```
+- To stop the service:
+```powershell
+pm2 stop seerr
+```
+- To restart the service:
+```powershell
+pm2 restart seerr
+```
+- To view the logs:
+```powershell
+pm2 logs seerr
+```
+- To view the status:
+```powershell
+pm2 status seerr
+```
+  </TabItem>
+</Tabs>
+
+## Windows
+### Installation
+1. Assuming you want the working directory to be `C:\seerr`, create the directory and navigate to it:
+```powershell
+mkdir C:\seerr
+cd C:\seerr
+```
+2. Clone the Seerr repository and checkout the main branch:
+```powershell
+git clone https://github.com/seerr-team/seerr.git .
+git checkout main
+```
+3. Install the dependencies:
+```powershell
+npm install -g win-node-env
+$env:CYPRESS_INSTALL_BINARY = 0; pnpm install --frozen-lockfile
+```
+4. Build the project:
+```powershell
+pnpm build
+```
+5. Start Seerr:
+```powershell
+pnpm start
+```
+
+:::tip
+You can add the environment variables to a `.env` file in the Seerr directory.
+:::
+
+:::info
+You can now access Seerr by visiting `http://localhost:5055` in your web browser.
+:::
+
+#### Extending the installation
+<Tabs groupId="windows-extensions" queryString>
+  <TabItem value="task-scheduler" label="Task Scheduler">
+To run seerr as a bat script:
+1. Create a file named `start-seerr.bat` in the seerr directory:
+```batch
+@echo off
+set PORT=5055
+set NODE_ENV=production
+node dist/index.js
+```
+2. Create a task in Task Scheduler:
+- Open Task Scheduler
+- Click on "Create Basic Task"
+- Name the task "Seerr"
+- Set the trigger to "When the computer starts"
+- Set the action to "Start a program"
+- Set the program/script to the path of the `start-seerr.bat` file
+- Set the "Start in" to the seerr directory.
+- Click "Finish"
+
+Now, Seerr will start when the computer boots up in the background.
+  </TabItem>
+
+  <TabItem value="nssm" label="NSSM">
+To run seerr as a service:
+1. Download the [Non-Sucking Service Manager](https://nssm.cc/download)
+2. Install NSSM:
+```powershell
+nssm install Seerr "C:\Program Files\nodejs\node.exe" "C:\seerr\dist\index.js"
+nssm set Seerr AppDirectory "C:\seerr"
+nssm set Seerr AppEnvironmentExtra NODE_ENV=production
+```
+3. Start the service:
+```powershell
+nssm start Seerr
+```
+4. To ensure the service starts on boot, run the following command:
+```powershell
+nssm set Seerr Start SERVICE_AUTO_START
+```
+  </TabItem>
+  <TabItem value="pm2" label="PM2">
+To run seerr as a PM2 service:
+1. Install PM2:
+```powershell
+npm install -g pm2
+```
+2. Start seerr with PM2:
+```powershell
+$env:NODE_ENV = "production"; pm2 start dist/index.js --name seerr
+```
+3. Save the process list:
+```powershell
+pm2 save
+```
+4. Ensure PM2 starts on boot:
+```powershell
+pm2 startup
+```
+##### Managing the service
+- To start the service:
+```powershell
+pm2 start seerr
+```
+- To stop the service:
+```powershell
+pm2 stop seerr
+```
+- To restart the service:
+```powershell
+pm2 restart seerr
+```
+- To view the logs:
+```powershell
+pm2 logs seerr
+```
+- To view the status:
+```powershell
+pm2 status seerr
+```
+  </TabItem>
+</Tabs>
+
+### Updating
+To update Seerr, navigate to the Seerr directory and run the following commands:
+```bash
+git pull
+```
+Then, follow the steps in the installation section to rebuild and restart Seerr.
+

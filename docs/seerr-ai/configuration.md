@@ -13,6 +13,7 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | **Settings → Features** | Turns optional features off for everyone. See [Feature switches](#feature-switches). | All on |
 | **Settings → Services → Download Clients** | SABnzbd and qBittorrent, read for live progress and used by Backfill. Keys and passwords are never sent back to the browser. | None |
 | **Settings → Services → Bazarr** | Subtitles and transcription. | Port 6767 |
+| **Settings → Services → Tautulli** | Watch history from Plex, for Suggested for You, "up next" on lists, Who Watched, Pick for the Room and Catch Me Up. Plex only; moved here from Settings → Plex. Its API key is never sent back to the browser. | Port 8181 |
 | **Settings → Services → Maintainerr** | One or more servers. Per server: show Deleting Soon badges, include in the Deleting Soon row, allow Keep for everyone, days Keep adds (0 restarts the rule's grace period), what counts as "soon". | Port 6246; badges, row and Keep on; 0 days; 14 days |
 | **Settings → Services → Radarr** | **Anime Quality Profile**, **Anime Root Folder**, **Anime Tags** for anime movies. | Unset (anime movies use the regular ones) |
 | **Settings → Services → Override Rules** | Sonarr rules can set **Series Type**; Radarr rules can set **Anime**. | Left to detection |

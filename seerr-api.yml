@@ -1160,9 +1160,16 @@ components:
         useSsl:
           type: boolean
           nullable: true
+        urlBase:
+          type: string
+          nullable: true
         apiKey:
           type: string
           nullable: true
+          description: Never sent back. Blank when saving or testing keeps the saved one.
+        hasApiKey:
+          type: boolean
+          readOnly: true
         externalUrl:
           type: string
           nullable: true
@@ -5061,8 +5068,7 @@ paths:
                 $ref: '#/components/schemas/AiCreditReport'
   /settings/tautulli:
     get:
-      summary: Get Tautulli settings
-      description: Retrieves current Tautulli settings.
+      summary: Tautulli's address, without its API key
       tags:
         - settings
       responses:
@@ -5073,8 +5079,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/TautulliSettings'
     post:
-      summary: Update Tautulli settings
-      description: Updates Tautulli settings with the provided values.
+      summary: Set up Tautulli
+      description: Tests the connection first (Tautulli 2.9 or later); refuses to save one that fails.
       tags:
         - settings
       requestBody:
@@ -5085,11 +5091,40 @@ paths:
               $ref: '#/components/schemas/TautulliSettings'
       responses:
         '200':
-          description: 'Values were successfully updated'
+          description: Saved
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/TautulliSettings'
+    delete:
+      summary: Disconnect Tautulli
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Removed
+  /settings/tautulli/test:
+    post:
+      summary: Test the Tautulli connection
+      description: A blank API key uses the saved one.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TautulliSettings'
+      responses:
+        '200':
+          description: Reachable, new enough, and the key works
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
   /settings/radarr:
     get:
       summary: Get Radarr settings

@@ -2,7 +2,6 @@ import type { JellyfinLibrary } from '@server/api/jellyfin';
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexAPI from '@server/api/plexapi';
 import PlexTvAPI from '@server/api/plextv';
-import TautulliAPI from '@server/api/tautulli';
 import { ApiErrorCode } from '@server/constants/error';
 import { MIN_IMAGE_CACHE_MAX_MB } from '@server/constants/images';
 import { getRepository } from '@server/datasource';
@@ -50,7 +49,6 @@ import fs from 'fs';
 import { escapeRegExp, merge, omit, set, sortBy } from 'lodash';
 import { rescheduleJob } from 'node-schedule';
 import path from 'path';
-import semver from 'semver';
 import { URL } from 'url';
 import { z } from 'zod';
 import aiSettingsRoutes from './ai';
@@ -62,6 +60,7 @@ import metadataRoutes from './metadata';
 import notificationRoutes from './notifications';
 import radarrRoutes from './radarr';
 import sonarrRoutes from './sonarr';
+import tautulliSettingsRoutes from './tautulli';
 
 const settingsRoutes = Router();
 
@@ -69,6 +68,7 @@ settingsRoutes.use('/notifications', notificationRoutes);
 settingsRoutes.use('/radarr', radarrRoutes);
 settingsRoutes.use('/maintainerr', maintainerrSettingsRoutes);
 settingsRoutes.use('/bazarr', bazarrSettingsRoutes);
+settingsRoutes.use('/tautulli', tautulliSettingsRoutes);
 settingsRoutes.use('/backfill', backfillSettingsRoutes);
 settingsRoutes.use('/download-clients', downloadClientRoutes);
 settingsRoutes.use('/ai', aiSettingsRoutes);
@@ -666,43 +666,6 @@ settingsRoutes.delete('/health/unlinked-requests', async (req, res, next) => {
   } catch (e) {
     return next({ status: 500, message: e.message });
   }
-});
-
-settingsRoutes.get('/tautulli', (_req, res) => {
-  const settings = getSettings();
-
-  res.status(200).json(settings.tautulli);
-});
-
-settingsRoutes.post('/tautulli', async (req, res, next) => {
-  const settings = getSettings();
-
-  Object.assign(settings.tautulli, req.body);
-
-  if (settings.tautulli.hostname) {
-    try {
-      const tautulliClient = new TautulliAPI(settings.tautulli);
-
-      const result = await tautulliClient.getInfo();
-
-      if (!semver.gte(semver.coerce(result?.tautulli_version) ?? '', '2.9.0')) {
-        throw new Error('Tautulli version not supported');
-      }
-
-      await settings.save();
-    } catch (e) {
-      logger.error('Something went wrong testing Tautulli connection', {
-        label: 'API',
-        errorMessage: e.message,
-      });
-      return next({
-        status: 500,
-        message: 'Unable to connect to Tautulli.',
-      });
-    }
-  }
-
-  return res.status(200).json(settings.tautulli);
 });
 
 settingsRoutes.get(

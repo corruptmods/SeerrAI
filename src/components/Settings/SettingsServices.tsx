@@ -11,11 +11,14 @@ import ServerInstance from '@app/components/Settings/ServerInstance';
 import SettingsBazarr from '@app/components/Settings/SettingsBazarr';
 import SettingsDownloadClients from '@app/components/Settings/SettingsDownloadClients';
 import SettingsMaintainerr from '@app/components/Settings/SettingsMaintainerr';
+import SettingsTautulli from '@app/components/Settings/SettingsTautulli';
 import SonarrModal from '@app/components/Settings/SonarrModal';
+import useSettings from '@app/hooks/useSettings';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
 import { PlusIcon } from '@heroicons/react/24/solid';
+import { MediaServerType } from '@server/constants/server';
 import type OverrideRule from '@server/entity/OverrideRule';
 import type { OverrideRuleResultsResponse } from '@server/interfaces/api/overrideRuleInterfaces';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
@@ -83,6 +86,7 @@ export type SonarrTestResponse = DVRTestResponse & {
 
 const SettingsServices = () => {
   const intl = useIntl();
+  const settings = useSettings();
   const {
     data: radarrData,
     error: radarrError,
@@ -435,6 +439,10 @@ const SettingsServices = () => {
       <SettingsMaintainerr />
       <SettingsDownloadClients />
       <SettingsBazarr />
+      {/* Tautulli reads Plex's watch history, so it is only offered with Plex. */}
+      {settings.currentSettings.mediaServerType === MediaServerType.PLEX && (
+        <SettingsTautulli />
+      )}
     </>
   );
 };

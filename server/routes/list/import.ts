@@ -3,23 +3,122 @@
  * matches onto a list.
  */
 import TheMovieDb from '@server/api/themoviedb';
+import TraktAPI, { parseTraktUrl, TraktError } from '@server/api/trakt';
 import {
   CANDIDATES_PER_LINE,
+  IMPORT_ITEM_LIMIT,
   IMPORT_LINE_LIMIT,
   REQUEST_BATCH_LIMIT,
+  RESOLVE_BATCH_LIMIT,
 } from '@server/constants/lists';
 import { getRepository } from '@server/datasource';
 import { MediaList, MediaListItem } from '@server/entity/MediaList';
 import type { User } from '@server/entity/User';
 import { loadAccessibleList } from '@server/lib/listAccess';
 import { requestMissing } from '@server/lib/requestMissing';
+import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
+import type { ParsedLine } from '@server/utils/parseTitleList';
 import { parseTitleList } from '@server/utils/parseTitleList';
 import { tmdbImagePath } from '@server/utils/tmdbImagePath';
 import { Router } from 'express';
 import { In } from 'typeorm';
+
+/**
+ * The TMDB titles a written line may mean, best first: a year in the line
+ * decides between namesakes, and "… series" puts collections first.
+ */
+const candidatesFor = async (tmdb: TheMovieDb, line: ParsedLine) => {
+  const search = await tmdb.searchMulti({ query: line.title });
+
+  const candidates = search.results
+    .filter(
+      (
+        result
+      ): result is typeof result & {
+        media_type: 'movie' | 'tv' | 'collection';
+      } =>
+        result.media_type === 'movie' ||
+        result.media_type === 'tv' ||
+        result.media_type === 'collection'
+    )
+    .map((result) => {
+      const isMovie = result.media_type === 'movie';
+      const isCollection = result.media_type === 'collection';
+      const date = isMovie
+        ? (result as { release_date?: string }).release_date
+        : (result as { first_air_date?: string }).first_air_date;
+
+      return {
+        tmdbId: result.id,
+        mediaType: result.media_type,
+        title: isCollection
+          ? ((result as { title?: string; name?: string }).title ??
+            (result as { name?: string }).name)
+          : isMovie
+            ? (result as { title?: string }).title
+            : (result as { name?: string }).name,
+        year: date ? Number(date.slice(0, 4)) : undefined,
+        posterPath: (result as { poster_path?: string | null }).poster_path,
+        popularity: (result as { popularity?: number }).popularity ?? 0,
+      };
+    });
+
+  // A year in the pasted line is a strong signal; prefer an exact match
+  // on it, then fall back to whatever TMDB thought was most popular.
+  let ranked = line.year
+    ? [
+        ...candidates.filter((c) => c.year === line.year),
+        ...candidates.filter((c) => c.year !== line.year),
+      ]
+    : candidates;
+
+  // "Pitch Perfect series" probably means the set — but "White Noise
+  // series" means a TV show, so a collection is only promoted to the top,
+  // never forced. Both readings stay in the list.
+  if (line.collectionHint) {
+    ranked = [
+      ...ranked.filter((c) => c.mediaType === 'collection'),
+      ...ranked.filter((c) => c.mediaType !== 'collection'),
+    ];
+  }
+
+  const shortlist = ranked.slice(0, CANDIDATES_PER_LINE);
+
+  // Tell the user how many films a collection would add, so "Add" is not
+  // a surprise.
+  const withCounts = await mapWithConcurrency(shortlist, 2, async (c) => {
+    if (c.mediaType !== 'collection') {
+      return c;
+    }
+
+    try {
+      const collection = await tmdb.getCollection({
+        collectionId: c.tmdbId,
+      });
+
+      return { ...c, partCount: (collection.parts ?? []).length };
+    } catch (e) {
+      logger.debug('Could not read a collection while importing', {
+        label: 'API',
+        collectionId: c.tmdbId,
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+
+      return { ...c, partCount: 0 };
+    }
+  });
+
+  return {
+    raw: line.raw,
+    query: line.title,
+    year: line.year,
+    collectionHint: line.collectionHint,
+    candidates: withCounts,
+  };
+};
 
 const listRoutes = Router();
 
@@ -39,95 +138,9 @@ listRoutes.post('/import/search', isAuthenticated(), async (req, res, next) => {
 
     const tmdb = new TheMovieDb();
 
-    const results = await mapWithConcurrency(lines, 4, async (line) => {
-      const search = await tmdb.searchMulti({ query: line.title });
-
-      const candidates = search.results
-        .filter(
-          (
-            result
-          ): result is typeof result & {
-            media_type: 'movie' | 'tv' | 'collection';
-          } =>
-            result.media_type === 'movie' ||
-            result.media_type === 'tv' ||
-            result.media_type === 'collection'
-        )
-        .map((result) => {
-          const isMovie = result.media_type === 'movie';
-          const isCollection = result.media_type === 'collection';
-          const date = isMovie
-            ? (result as { release_date?: string }).release_date
-            : (result as { first_air_date?: string }).first_air_date;
-
-          return {
-            tmdbId: result.id,
-            mediaType: result.media_type,
-            title: isCollection
-              ? ((result as { title?: string; name?: string }).title ??
-                (result as { name?: string }).name)
-              : isMovie
-                ? (result as { title?: string }).title
-                : (result as { name?: string }).name,
-            year: date ? Number(date.slice(0, 4)) : undefined,
-            posterPath: (result as { poster_path?: string | null }).poster_path,
-            popularity: (result as { popularity?: number }).popularity ?? 0,
-          };
-        });
-
-      // A year in the pasted line is a strong signal; prefer an exact match
-      // on it, then fall back to whatever TMDB thought was most popular.
-      let ranked = line.year
-        ? [
-            ...candidates.filter((c) => c.year === line.year),
-            ...candidates.filter((c) => c.year !== line.year),
-          ]
-        : candidates;
-
-      // "Pitch Perfect series" probably means the set — but "White Noise
-      // series" means a TV show, so a collection is only promoted to the top,
-      // never forced. Both readings stay in the list.
-      if (line.collectionHint) {
-        ranked = [
-          ...ranked.filter((c) => c.mediaType === 'collection'),
-          ...ranked.filter((c) => c.mediaType !== 'collection'),
-        ];
-      }
-
-      const shortlist = ranked.slice(0, CANDIDATES_PER_LINE);
-
-      // Tell the user how many films a collection would add, so "Add" is not
-      // a surprise.
-      const withCounts = await mapWithConcurrency(shortlist, 2, async (c) => {
-        if (c.mediaType !== 'collection') {
-          return c;
-        }
-
-        try {
-          const collection = await tmdb.getCollection({
-            collectionId: c.tmdbId,
-          });
-
-          return { ...c, partCount: (collection.parts ?? []).length };
-        } catch (e) {
-          logger.debug('Could not read a collection while importing', {
-            label: 'API',
-            collectionId: c.tmdbId,
-            errorMessage: e instanceof Error ? e.message : String(e),
-          });
-
-          return { ...c, partCount: 0 };
-        }
-      });
-
-      return {
-        raw: line.raw,
-        query: line.title,
-        year: line.year,
-        collectionHint: line.collectionHint,
-        candidates: withCounts,
-      };
-    });
+    const results = await mapWithConcurrency(lines, 4, (line) =>
+      candidatesFor(tmdb, line)
+    );
 
     return res.status(200).json({
       results,
@@ -141,6 +154,122 @@ listRoutes.post('/import/search', isAuthenticated(), async (req, res, next) => {
     next({ status: 500, message: 'Failed to read that list.' });
   }
 });
+
+/**
+ * The films and series on a public Trakt list or watchlist, from a pasted
+ * link. Trakt gives TMDB's id for nearly all of them; /import/resolve turns
+ * them into matches to review, a batch at a time.
+ */
+listRoutes.post('/import/trakt', isAuthenticated(), async (req, res) => {
+  const source = parseTraktUrl(String(req.body.url ?? ''));
+  if (!source) {
+    return res.status(400).json({
+      message: 'That is not a link to a Trakt list or watchlist.',
+      problem: 'notTrakt',
+    });
+  }
+  const clientId = getSettings().trakt.clientId;
+  if (!clientId) {
+    return res.status(400).json({
+      message: 'Trakt is not set up. An admin adds it in Settings → Services.',
+      problem: 'notSetUp',
+    });
+  }
+  try {
+    const titles = await new TraktAPI(clientId).titles(source);
+    return res.status(200).json({
+      titles: titles.slice(0, IMPORT_ITEM_LIMIT).map((title) => ({
+        mediaType: title.type === 'show' ? 'tv' : 'movie',
+        tmdbId: title.tmdbId,
+        title: title.title,
+        year: title.year,
+      })),
+      truncated: titles.length > IMPORT_ITEM_LIMIT,
+    });
+  } catch (e) {
+    if (e instanceof TraktError) {
+      return res.status(400).json({ message: e.message, problem: e.problem });
+    }
+    logger.error('Failed to read a Trakt list', {
+      label: 'Trakt',
+      errorMessage: e instanceof Error ? e.message : String(e),
+    });
+    return res
+      .status(500)
+      .json({ message: 'Failed to read that list.', problem: 'unreachable' });
+  }
+});
+
+/**
+ * Titles known by TMDB id (from Trakt) as matches to review, like a written
+ * list's lines: each with its poster, and a search by name for the odd one
+ * with no id, or an id TMDB no longer has.
+ */
+listRoutes.post(
+  '/import/resolve',
+  isAuthenticated(),
+  async (req, res, next) => {
+    type Entry = {
+      tmdbId?: number;
+      mediaType?: string;
+      title?: string;
+      year?: number;
+    };
+    const entries: Entry[] = Array.isArray(req.body.items)
+      ? (req.body.items as Entry[]).slice(0, RESOLVE_BATCH_LIMIT)
+      : [];
+    try {
+      const tmdb = new TheMovieDb();
+      const results = await mapWithConcurrency(entries, 4, async (entry) => {
+        const title = String(entry.title ?? '').trim();
+        const year = Number.isInteger(entry.year) ? entry.year : undefined;
+        const raw = year ? `${title} (${year})` : title;
+        const tmdbId = Number(entry.tmdbId);
+        if (Number.isInteger(tmdbId) && tmdbId > 0) {
+          try {
+            const candidate =
+              entry.mediaType === 'tv'
+                ? await tmdb.getTvShow({ tvId: tmdbId }).then((tv) => ({
+                    tmdbId,
+                    mediaType: 'tv' as const,
+                    title: tv.name,
+                    year: tv.first_air_date
+                      ? Number(tv.first_air_date.slice(0, 4))
+                      : undefined,
+                    posterPath: tv.poster_path ?? null,
+                  }))
+                : await tmdb.getMovie({ movieId: tmdbId }).then((movie) => ({
+                    tmdbId,
+                    mediaType: 'movie' as const,
+                    title: movie.title,
+                    year: movie.release_date
+                      ? Number(movie.release_date.slice(0, 4))
+                      : undefined,
+                    posterPath: movie.poster_path ?? null,
+                  }));
+            return { raw, query: title, year, candidates: [candidate] };
+          } catch (e) {
+            logger.debug('A Trakt title is not on TMDB under its id', {
+              label: 'Trakt',
+              tmdbId,
+              errorMessage: e instanceof Error ? e.message : String(e),
+            });
+          }
+        }
+        return title
+          ? candidatesFor(tmdb, { raw, title, year })
+          : { raw, query: title, year, candidates: [] };
+      });
+      return res.status(200).json({ results });
+    } catch (e) {
+      logger.error('Failed to match Trakt titles', {
+        label: 'Trakt',
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+      next({ status: 500, message: 'Failed to read that list.' });
+    }
+  }
+);
 
 listRoutes.post<{ listId: string }>(
   '/:listId/import',
@@ -192,10 +321,10 @@ listRoutes.post<{ listId: string }>(
       }[] = [];
 
       const collections = items
-        .slice(0, IMPORT_LINE_LIMIT)
+        .slice(0, IMPORT_ITEM_LIMIT)
         .filter((entry) => entry.mediaType === 'collection');
       const plain = items
-        .slice(0, IMPORT_LINE_LIMIT)
+        .slice(0, IMPORT_ITEM_LIMIT)
         .filter((entry) => entry.mediaType !== 'collection');
 
       for (const entry of plain) {

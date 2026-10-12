@@ -14,6 +14,7 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | **Settings → Services → Download Clients** | SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent, read for live progress, and for Backfill to send what it finds to. Keys and passwords are never sent back to the browser. | None |
 | **Settings → Services → Bazarr** | Subtitles and transcription. | Port 6767 |
 | **Settings → Services → Tautulli** | Watch history from Plex, for Suggested for You, "up next" on lists, Who Watched, Pick for the Room and Catch Me Up. Plex only; moved here from Settings → Plex. Its API key is never sent back to the browser. With Jellyfin or Emby there is nothing to set up: Seerr AI reads watch history from the server itself, with the API key in Settings → Jellyfin/Emby. | Port 8181 |
+| **Settings → Services → Trakt** | The Client ID of your own Trakt app, so people can import public Trakt lists and have their public Trakt watchlist requested. Make the app at [developer.trakt.tv/apps](https://developer.trakt.tv/apps) (Trakt asks for a verified GitHub account); nobody signs in to Trakt. Trakt deletes apps unused for 30 days, which regular watchlist syncing prevents. Never sent back to the browser. | |
 | **Settings → Services → Maintainerr** | One or more servers. Per server: show Deleting Soon badges, include in the Deleting Soon row, allow Keep for everyone, days Keep adds (0 restarts the rule's grace period), what counts as "soon". | Port 6246; badges, row and Keep on; 0 days; 14 days |
 | **Settings → Services → Radarr** | **Anime Quality Profile**, **Anime Root Folder**, **Anime Tags** for anime movies. | Unset (anime movies use the regular ones) |
 | **Settings → Services → Override Rules** | Sonarr rules can set **Series Type**; Radarr rules can set **Anime**. | Left to detection |
@@ -59,6 +60,7 @@ Seerr AI works with all three, as Seerr does. Its own features work with all thr
 | Passkeys | Refused once the server owner stops sharing with the account | Refused once the account is deleted or switched off on the server |
 | Your default subtitle on the Subtitles card | Yes | No: Jellyfin and Emby choose subtitles by language preference rather than per title |
 | Plex watchlist sync, Plex user import, expired Plex sign-ins on Health | Yes | Not applicable |
+| Trakt watchlist sync and Trakt list import | Yes | Yes |
 
 Jellyfin and Emby keep the latest play of each film or episode rather than a log of every play, so a rewatch moves a title forward instead of adding another play.
 
@@ -113,6 +115,7 @@ The AI switches only appear once AI is set up.
 |---|---|
 | Profile → Settings → Features | Turn features off for yourself |
 | Profile → Settings → Passkeys | Add, rename and remove passkeys |
+| Profile → Settings → General → Trakt Username | Your public Trakt watchlist is requested for you, with **Auto-Request Movies** and **Auto-Request Series** (once an admin has set up Trakt) |
 | Discover → pencil button | Rows to show on your home page |
 | Profile → Settings → Notifications → Web Push | Which notifications reach your devices |
 

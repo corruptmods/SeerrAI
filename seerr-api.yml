@@ -525,6 +525,11 @@ components:
           nullable: true
           description: 'Enable watchlist sync for TV'
           example: false
+        traktUsername:
+          type: string
+          nullable: true
+          description: 'Trakt username whose public watchlist is synced, as the Plex watchlist is'
+          example: 'someone'
     MainSettings:
       type: object
       properties:
@@ -1161,6 +1166,18 @@ components:
                 type: string
               title:
                 type: string
+    TraktSettingsShown:
+      type: object
+      properties:
+        hasClientId:
+          type: boolean
+    TraktSettingsBody:
+      type: object
+      required:
+        - clientId
+      properties:
+        clientId:
+          type: string
     TautulliSettings:
       type: object
       properties:
@@ -5243,6 +5260,61 @@ paths:
                 properties:
                   version:
                     type: string
+  /settings/trakt:
+    get:
+      summary: Whether a Trakt Client ID is set (never the ID itself)
+      tags:
+        - settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraktSettingsShown'
+    post:
+      summary: Set the Trakt Client ID
+      description: Tests it with Trakt first and refuses to save one Trakt does not accept.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TraktSettingsBody'
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraktSettingsShown'
+        '400':
+          description: Trakt did not accept it; `problem` says why
+    delete:
+      summary: Remove the Trakt Client ID
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Removed
+  /settings/trakt/test:
+    post:
+      summary: Test a Trakt Client ID
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TraktSettingsBody'
+      responses:
+        '200':
+          description: Trakt accepts it
+        '400':
+          description: Trakt did not accept it; `problem` says why
   /settings/radarr:
     get:
       summary: Get Radarr settings
@@ -7975,6 +8047,85 @@ paths:
       responses:
         '200':
           description: Candidates per line
+          content:
+            application/json:
+              schema:
+                type: object
+  /list/import/trakt:
+    post:
+      summary: Read the titles on a public Trakt list or watchlist
+      description: Needs a Trakt Client ID in Settings. Adds nothing; the titles go through /list/import/resolve for review.
+      tags:
+        - list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  example: https://trakt.tv/users/someone/lists/favourites
+      responses:
+        '200':
+          description: The titles, in list order, up to 500
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  titles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        mediaType:
+                          type: string
+                          enum: [movie, tv]
+                        tmdbId:
+                          type: number
+                        title:
+                          type: string
+                        year:
+                          type: number
+                  truncated:
+                    type: boolean
+        '400':
+          description: Not a Trakt link, Trakt not set up, or Trakt refused; `problem` says which
+  /list/import/resolve:
+    post:
+      summary: Turn titles known by TMDB id into matches for review
+      description: Up to 25 at a time. A title without an id, or with one TMDB no longer has, is searched for by name.
+      tags:
+        - list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - items
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      tmdbId:
+                        type: number
+                      mediaType:
+                        type: string
+                      title:
+                        type: string
+                      year:
+                        type: number
+      responses:
+        '200':
+          description: Candidates per title, as /list/import/search gives them
           content:
             application/json:
               schema:

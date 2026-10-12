@@ -94,27 +94,6 @@ export const startJobs = (): void => {
         refreshToken.run();
       }),
     });
-
-    // Watchlist Sync
-    scheduledJobs.push({
-      id: 'plex-watchlist-sync',
-      name: 'Plex Watchlist Sync',
-      type: 'process',
-      interval: 'seconds',
-      cronSchedule: jobs['plex-watchlist-sync'].schedule,
-      job: schedule.scheduleJob(jobs['plex-watchlist-sync'].schedule, () => {
-        logger.info('Starting scheduled job: Plex Watchlist Sync', {
-          label: 'Jobs',
-        });
-        watchlistSync.syncWatchlist().catch((e) => {
-          logger.error('Failed to sync watchlists', {
-            label: 'Plex Watchlist Sync',
-            errorMessage: e.message,
-          });
-        });
-      }),
-      running: () => watchlistSync.running,
-    });
   } else if (
     mediaServerType === MediaServerType.JELLYFIN ||
     mediaServerType === MediaServerType.EMBY
@@ -156,6 +135,28 @@ export const startJobs = (): void => {
       cancelFn: () => jellyfinFullScanner.cancel(),
     });
   }
+
+  // Watchlist sync: Plex watchlists, and public Trakt watchlists on any
+  // media server. The id stays as it was, so saved schedules carry over.
+  scheduledJobs.push({
+    id: 'plex-watchlist-sync',
+    name: 'Watchlist Sync',
+    type: 'process',
+    interval: 'seconds',
+    cronSchedule: jobs['plex-watchlist-sync'].schedule,
+    job: schedule.scheduleJob(jobs['plex-watchlist-sync'].schedule, () => {
+      logger.info('Starting scheduled job: Watchlist Sync', {
+        label: 'Jobs',
+      });
+      watchlistSync.syncWatchlist().catch((e) => {
+        logger.error('Failed to sync watchlists', {
+          label: 'Watchlist Sync',
+          errorMessage: e.message,
+        });
+      });
+    }),
+    running: () => watchlistSync.running,
+  });
 
   // Run full radarr scan every 24 hours
   scheduledJobs.push({

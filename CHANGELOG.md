@@ -4,6 +4,10 @@ The newest changes are at the top. **Coming next** is what's on the `dev` branch
 
 ## Coming next
 
+### Trakt lists and watchlists
+
+Paste a link to a public Trakt list into a list's **Import** and its titles come straight in for you to check, no title-by-title matching. And if you keep a Trakt watchlist, add your Trakt username in your profile settings: what you put on it gets requested for you, just like a Plex watchlist, on Plex, Jellyfin or Emby alike. An admin turns this on once in **Settings → Services → Trakt**.
+
 ### Ready for Sonarr v5
 
 The Sonarr v5 beta works with Seerr AI. Backfill and the admin agent understand how v5 describes season packs and releases with no season in the name, so a pack of several seasons is no longer left out of a search for one of them. When a series is shown under a translated title in Sonarr, Backfill also looks for it under its original title. Sonarr v4 works just as before.

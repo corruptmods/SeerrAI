@@ -37,6 +37,7 @@ const defaultSettings = {
   plexClientIdentifier: '',
   aiReady: false,
   subtitlesReady: false,
+  traktReady: false,
 };
 
 export const SettingsContext = React.createContext<SettingsContextProps>({

@@ -56,6 +56,8 @@ export interface PublicSettingsResponse {
   aiReady: boolean;
   /** Bazarr is set up, so title pages can show their subtitles. */
   subtitlesReady: boolean;
+  /** A Trakt Client ID is set: Trakt links and watchlists can be read. */
+  traktReady: boolean;
 }
 
 export interface CacheItem {

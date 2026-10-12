@@ -26,6 +26,10 @@ Use the pencil button on Discover. See [Discover and lists](./discover-and-lists
 - **On your phone** (web push): when a title is available or failed, list activity, a Plex sign-in that expired, and for admins, Backfill and Health.
 - **When it should arrive**: approval notifications say when the title is expected.
 
+## Trakt watchlist
+
+Once an admin has set up Trakt, anyone allowed to auto-request can enter their Trakt username in **Profile → Settings → General**. What they add to their public Trakt watchlist is then requested for them, every few minutes, with **Auto-Request Movies** and **Auto-Request Series**, the same way a Plex watchlist is. It works on Plex, Jellyfin and Emby. Only the 20 most recently added titles are looked at, so turning it on doesn't request a whole long-kept watchlist at once. Taking a title off the watchlist and adding it back requests it again; something you deleted isn't requested again just because it is still on the watchlist.
+
 ## Plex sign-in
 
 If Plex stops accepting your sign-in, your Plex watchlist stops syncing. You get one notification and a banner saying so; signing out and back in with Plex fixes it.

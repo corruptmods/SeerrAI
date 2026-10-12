@@ -1,6 +1,7 @@
 import Modal from '@app/components/Common/Modal';
 import PosterBackground from '@app/components/Common/PosterBackground';
-import { SEARCH_BATCH_SIZE } from '@app/constants/lists';
+import { RESOLVE_BATCH_SIZE, SEARCH_BATCH_SIZE } from '@app/constants/lists';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
@@ -30,7 +31,28 @@ const messages = defineMessages('components.MediaLists.ImportListModal', {
   matching: 'Matching titles…',
   collection:
     ' — Collection, {count} {count, plural, one {film} other {films}}',
+  series: ' — Series',
+  movie: ' — Movie',
+  instructionsTrakt:
+    'Paste your list below, one title per line (bullets, numbering and years are fine), or a link to a public Trakt list or watchlist.',
+  readingTrakt: 'Reading the Trakt list…',
+  truncatedTrakt: 'Only the first 500 titles were read.',
+  traktNotSetUp:
+    'Trakt is not set up here yet. An admin can add it in Settings → Services.',
+  traktPrivate:
+    'That Trakt list or watchlist is private. Make it public on Trakt, then try again.',
+  traktNotFound: 'Trakt has no such user or list. Check the link.',
+  traktBadKey:
+    'Trakt did not accept this server’s Client ID. An admin can check it in Settings → Services.',
+  traktLimited:
+    'Trakt is limiting requests just now. Try again in a few minutes.',
+  traktUnreachable: 'Could not reach Trakt. Try again in a while.',
+  notTrakt:
+    'That is not a link to a Trakt list or watchlist. Use the link to a public list, or to someone’s watchlist.',
 });
+
+/** Whether the pasted text is a link to Trakt, rather than a written list. */
+const TRAKT_LINK = /^(https?:\/\/)?(www\.|app\.)?trakt\.tv\/\S*$/i;
 
 interface Candidate {
   tmdbId: number;
@@ -62,7 +84,9 @@ const ImportListModal = ({
 }: ImportListModalProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
+  const { currentSettings } = useSettings();
   const [text, setText] = useState('');
+  const [fromTrakt, setFromTrakt] = useState(false);
   const [results, setResults] = useState<LineResult[] | null>(null);
   const [truncated, setTruncated] = useState(false);
   const [chosen, setChosen] = useState<Record<number, number>>({});
@@ -75,6 +99,82 @@ const ImportListModal = ({
   const describe = (e: unknown) =>
     (axios.isAxiosError(e) && e.response?.data?.message) ||
     (e instanceof Error ? e.message : String(e));
+
+  /** What went wrong with Trakt, in the reader's language. */
+  const traktProblem = (e: unknown): string => {
+    const problem = axios.isAxiosError(e)
+      ? e.response?.data?.problem
+      : undefined;
+    const known: Record<string, keyof typeof messages> = {
+      notSetUp: 'traktNotSetUp',
+      private: 'traktPrivate',
+      notFound: 'traktNotFound',
+      badKey: 'traktBadKey',
+      rateLimited: 'traktLimited',
+      unreachable: 'traktUnreachable',
+      notTrakt: 'notTrakt',
+    };
+    return problem && known[problem]
+      ? intl.formatMessage(messages[known[problem]])
+      : describe(e);
+  };
+
+  /**
+   * A Trakt link: the list's titles come with TMDB's ids, so each is looked
+   * up rather than searched for, in batches as a written list is.
+   */
+  const importTrakt = async (url: string) => {
+    let titles: {
+      tmdbId?: number;
+      mediaType: 'movie' | 'tv';
+      title: string;
+      year?: number;
+    }[];
+    let wasTruncated: boolean;
+    try {
+      const { data } = await axios.post<{
+        titles: typeof titles;
+        truncated: boolean;
+      }>('/api/v1/list/import/trakt', { url });
+      titles = data.titles;
+      wasTruncated = data.truncated;
+    } catch (e) {
+      setError(traktProblem(e));
+      return;
+    }
+
+    const batches: (typeof titles)[] = [];
+    for (let i = 0; i < titles.length; i += RESOLVE_BATCH_SIZE) {
+      batches.push(titles.slice(i, i + RESOLVE_BATCH_SIZE));
+    }
+    setProgress({ done: 0, total: batches.length });
+
+    const collected: LineResult[] = [];
+    for (const [index, batch] of batches.entries()) {
+      const { data } = await axios.post<{ results: LineResult[] }>(
+        '/api/v1/list/import/resolve',
+        { items: batch }
+      );
+      collected.push(...data.results);
+      setProgress({ done: index + 1, total: batches.length });
+    }
+    showResults(collected, wasTruncated, true);
+  };
+
+  const showResults = (
+    collected: LineResult[],
+    wasTruncated: boolean,
+    trakt: boolean
+  ) => {
+    setResults(collected);
+    setTruncated(wasTruncated);
+    setFromTrakt(trakt);
+    setChosen(
+      Object.fromEntries(
+        collected.map((line, index) => [index, line.candidates.length ? 0 : -1])
+      )
+    );
+  };
 
   /**
    * Searches in batches so progress can be reported honestly. Sending the
@@ -90,6 +190,17 @@ const ImportListModal = ({
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter(Boolean);
+
+    if (lines.length === 1 && TRAKT_LINK.test(lines[0])) {
+      try {
+        await importTrakt(lines[0]);
+      } catch (e) {
+        setError(describe(e));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
 
     const batches: string[][] = [];
 
@@ -114,16 +225,7 @@ const ImportListModal = ({
         setProgress({ done: index + 1, total: batches.length });
       }
 
-      setResults(collected);
-      setTruncated(wasTruncated);
-      setChosen(
-        Object.fromEntries(
-          collected.map((line, index) => [
-            index,
-            line.candidates.length ? 0 : -1,
-          ])
-        )
-      );
+      showResults(collected, wasTruncated, false);
     } catch (e) {
       setError(describe(e));
     } finally {
@@ -253,7 +355,11 @@ const ImportListModal = ({
         {!results ? (
           <>
             <p className="mb-2 text-sm text-gray-300">
-              {intl.formatMessage(messages.instructions)}
+              {intl.formatMessage(
+                currentSettings.traktReady
+                  ? messages.instructionsTrakt
+                  : messages.instructions
+              )}
             </p>
             <textarea
               className="h-48 w-full rounded border-gray-600 bg-gray-700 p-3 font-mono text-sm text-white"
@@ -277,7 +383,13 @@ const ImportListModal = ({
             {isBusy && progress.total > 0 && (
               <div className="mt-3">
                 <div className="mb-1 flex justify-between text-xs text-gray-400">
-                  <span>{intl.formatMessage(messages.matching)}</span>
+                  <span>
+                    {intl.formatMessage(
+                      TRAKT_LINK.test(text.trim())
+                        ? messages.readingTrakt
+                        : messages.matching
+                    )}
+                  </span>
                   <span>
                     {Math.round((progress.done / progress.total) * 100)}%
                   </span>
@@ -297,7 +409,11 @@ const ImportListModal = ({
           <>
             <p className="mb-2 text-sm text-gray-300">
               {intl.formatMessage(messages.review)}
-              {truncated ? ` ${intl.formatMessage(messages.truncated)}` : ''}
+              {truncated
+                ? ` ${intl.formatMessage(
+                    fromTrakt ? messages.truncatedTrakt : messages.truncated
+                  )}`
+                : ''}
             </p>
 
             {!results.length ? (
@@ -345,9 +461,11 @@ const ImportListModal = ({
                                   ? intl.formatMessage(messages.collection, {
                                       count: candidate.partCount ?? 0,
                                     })
-                                  : candidate.mediaType === 'tv'
-                                    ? ' — Series'
-                                    : ' — Movie'}
+                                  : intl.formatMessage(
+                                      candidate.mediaType === 'tv'
+                                        ? messages.series
+                                        : messages.movie
+                                    )}
                               </option>
                             ))}
                             <option value={-1}>

@@ -333,6 +333,7 @@ CoreApp.getInitialProps = async (initialProps) => {
     plexClientIdentifier: '',
     aiReady: false,
     subtitlesReady: false,
+    traktReady: false,
   };
 
   if (ctx.res) {

@@ -17,3 +17,6 @@ export const LIST_POSTER_SIZE = 'w342';
 
 /** Lines searched per request when matching a pasted import. */
 export const SEARCH_BATCH_SIZE = 8;
+
+/** Trakt titles matched by TMDB id per request, when importing a Trakt list. */
+export const RESOLVE_BATCH_SIZE = 25;

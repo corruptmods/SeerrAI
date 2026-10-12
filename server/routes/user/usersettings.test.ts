@@ -420,3 +420,68 @@ describe('a person’s own Networks row', () => {
     );
   });
 });
+
+describe('a person’s Trakt username', () => {
+  it('is kept, checked, shown on /auth/me, and cleared when blank', async () => {
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    const save = (traktUsername: string) =>
+      agent
+        .post(`/user/${userId}/settings/main`)
+        .send({ username: 'friend', traktUsername });
+
+    const saved = await save(' some.one_2 ');
+    assert.strictEqual(saved.status, 200);
+    assert.strictEqual(saved.body.traktUsername, 'some.one_2');
+    assert.strictEqual(
+      (await agent.get(`/user/${userId}/settings/main`)).body.traktUsername,
+      'some.one_2'
+    );
+    assert.strictEqual(
+      (await agent.get('/auth/me')).body.settings.traktUsername,
+      'some.one_2'
+    );
+
+    const bad = await save('not a name!');
+    assert.strictEqual(bad.status, 400);
+    assert.strictEqual(
+      (await agent.get(`/user/${userId}/settings/main`)).body.traktUsername,
+      'some.one_2'
+    );
+
+    assert.strictEqual((await save('')).body.traktUsername, null);
+  });
+});
+
+describe('settings an admin saves for someone else', () => {
+  it('belong to that person, even when they had none yet', async () => {
+    const users = getRepository(User);
+    const fresh = await users.save(
+      new User({
+        email: 'fresh@seerr.dev',
+        username: 'fresh',
+        permissions: Permission.REQUEST,
+        avatar: '',
+        userType: UserType.LOCAL,
+      })
+    );
+    const { agent } = await loginAs('admin@seerr.dev', 'test1234');
+
+    const saved = await agent
+      .post(`/user/${fresh.id}/settings/main`)
+      .send({ username: 'fresh', locale: 'de', traktUsername: 'fresh-one' });
+    assert.strictEqual(saved.status, 200);
+
+    const reloaded = await users.findOneOrFail({
+      where: { id: fresh.id },
+      relations: { settings: true },
+    });
+    assert.strictEqual(reloaded.settings?.locale, 'de');
+    assert.strictEqual(reloaded.settings?.traktUsername, 'fresh-one');
+
+    const admin = await users.findOneOrFail({
+      where: { id: 1 },
+      relations: { settings: true },
+    });
+    assert.notStrictEqual(admin.settings?.traktUsername, 'fresh-one');
+  });
+});

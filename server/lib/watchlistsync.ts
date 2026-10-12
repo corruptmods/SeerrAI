@@ -1,7 +1,8 @@
-import type { PlexWatchlistItem } from '@server/api/plextv';
 import PlexTvAPI from '@server/api/plextv';
 import TheMovieDb from '@server/api/themoviedb';
+import TraktAPI, { TraktError } from '@server/api/trakt';
 import { MediaStatus, MediaType } from '@server/constants/media';
+import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import {
@@ -13,6 +14,7 @@ import {
   RequestPermissionError,
 } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
+import type { WatchlistSource } from '@server/entity/WatchlistSyncEntry';
 import { WatchlistSyncEntry } from '@server/entity/WatchlistSyncEntry';
 import { WatchlistSyncEntrySeason } from '@server/entity/WatchlistSyncEntrySeason';
 import { getDeletionTimes } from '@server/lib/mediaDeletions';
@@ -20,6 +22,7 @@ import {
   clearPlexTokenRejected,
   markPlexTokenRejected,
 } from '@server/lib/plexReauth';
+import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 import { In } from 'typeorm';
@@ -42,8 +45,40 @@ import { Permission } from './permissions';
 /** A request made just before Plex's timestamp still counts as acting on it. */
 const CLOCK_SKEW_SECONDS = 300;
 
-const mediaTypeOf = (item: PlexWatchlistItem) =>
+/**
+ * A title on someone's watchlist: their Plex watchlist, their public Trakt
+ * watchlist, or both.
+ */
+export interface WatchItem {
+  tmdbId: number;
+  tvdbId?: number;
+  type: 'movie' | 'show';
+  title: string;
+  /** Plex's id for it, to ask Plex when it was added. */
+  plexRatingKey?: string;
+  /** When Plex says it was added, if it said (see syncWithoutTimestamp). */
+  addedAt?: Date;
+  /** When it went on the Trakt watchlist, in seconds since 1970. */
+  traktListedAt?: number;
+}
+
+const mediaTypeOf = (item: WatchItem) =>
   item.type === 'show' ? MediaType.TV : MediaType.MOVIE;
+
+const keyOf = (item: WatchItem) => `${mediaTypeOf(item)}:${item.tmdbId}`;
+
+/** Which watchlist a title's time comes from: Trakt's, when it is on it. */
+const sourceOf = (item: WatchItem): WatchlistSource =>
+  item.traktListedAt !== undefined ? 'trakt' : 'plex';
+
+/**
+ * Plex watchlists are read on a Plex server only: someone signed in with
+ * Plex on a Jellyfin or Emby server once is not synced from Plex for it.
+ */
+const onPlex = () => {
+  const type = getSettings().main.mediaServerType;
+  return type !== MediaServerType.JELLYFIN && type !== MediaServerType.EMBY;
+};
 
 /**
  * How often a user whose Plex sign-in has expired is tried again. They have
@@ -57,6 +92,8 @@ class WatchlistSync {
   public running = false;
   /** When each user with an expired sign-in was last tried. */
   private expiredTriedAt = new Map<number, number>();
+  /** When each user whose Trakt watchlist cannot be read was last told of. */
+  private traktWarnedAt = new Map<number, number>();
 
   public async syncWatchlist() {
     if (this.running) {
@@ -71,12 +108,24 @@ class WatchlistSync {
     try {
       const userRepository = getRepository(User);
 
-      // Get users who actually have plex tokens
+      // People with a Plex sign-in (on a Plex server), or a Trakt watchlist
+      // to read.
+      const sources = [
+        ...(onPlex() ? ["user.plexToken != ''"] : []),
+        ...(getSettings().trakt.clientId
+          ? [
+              "(settings.traktUsername IS NOT NULL AND settings.traktUsername != '')",
+            ]
+          : []),
+      ];
+      if (!sources.length) {
+        return;
+      }
       const users = await userRepository
         .createQueryBuilder('user')
         .addSelect('user.plexToken')
         .leftJoinAndSelect('user.settings', 'settings')
-        .where("user.plexToken != ''")
+        .where(sources.join(' OR '))
         .getMany();
 
       // One user's failure must not cost everyone after them their sync.
@@ -100,7 +149,7 @@ class WatchlistSync {
    * Whether the user has auto-requests and watchlist sync on for this kind
    * of title.
    */
-  private syncsType(user: User, item: PlexWatchlistItem): boolean {
+  private syncsType(user: User, item: WatchItem): boolean {
     return item.type === 'movie'
       ? user.hasPermission(
           [Permission.AUTO_REQUEST, Permission.AUTO_REQUEST_MOVIE],
@@ -115,14 +164,6 @@ class WatchlistSync {
   }
 
   private async syncUserWatchlist(user: User) {
-    if (!user.plexToken) {
-      logger.warn('Skipping user watchlist sync for user without plex token', {
-        label: 'Plex Watchlist Sync',
-        user: user.displayName,
-      });
-      return;
-    }
-
     if (
       !user.hasPermission(
         [
@@ -144,35 +185,12 @@ class WatchlistSync {
       return;
     }
 
-    if (user.plexTokenExpiredAt) {
-      const last = this.expiredTriedAt.get(user.id) ?? 0;
-      if (Date.now() - last < EXPIRED_RETRY_MS) {
-        return;
-      }
-      this.expiredTriedAt.set(user.id, Date.now());
-    } else {
-      this.expiredTriedAt.delete(user.id);
-    }
-
-    const plexTvApi = new PlexTvAPI(user.plexToken);
-
-    const response = await plexTvApi.getWatchlist({ size: 20 });
-
-    // A rejected token means nothing here will sync until the user signs in
-    // again, so tell them rather than failing quietly every few minutes.
-    if (response.authFailed) {
-      await markPlexTokenRejected(user);
+    const watchlist = await this.watchlistOf(user);
+    if (!watchlist) {
       return;
     }
-
-    // Plex down or slow: nothing learnt about the token, and nothing to
-    // sync. Clearing the rejected mark here would let an outage between two
-    // rejections send the "sign in again" notice twice.
-    if (response.failed) {
-      return;
-    }
-
-    await clearPlexTokenRejected(user);
+    const { plexTvApi } = watchlist;
+    const response = watchlist;
 
     // Strict: a database it cannot read must stop the sync, not read as
     // "nothing here yet" and request the whole watchlist again.
@@ -282,6 +300,9 @@ class WatchlistSync {
     // When each title went on the watchlist, looked up five at a time
     // rather than one after another: Plex sometimes takes its full timeout
     // per title, and one slow user held up everyone synced after them.
+    // A title on the Trakt watchlist goes by Trakt's time, which is always
+    // there and stays put whatever Plex does; only a Plex-only title asks
+    // Plex.
     const watchlistedAtByKey = new Map<string, number | null>();
     await mapWithConcurrency(
       unavailableItems.filter(
@@ -291,8 +312,11 @@ class WatchlistSync {
       5,
       async (item) => {
         watchlistedAtByKey.set(
-          item.ratingKey,
-          await plexTvApi.getWatchlistedAt(item.ratingKey)
+          keyOf(item),
+          item.traktListedAt ??
+            (item.plexRatingKey && plexTvApi
+              ? await plexTvApi.getWatchlistedAt(item.plexRatingKey)
+              : null)
         );
       }
     );
@@ -302,12 +326,15 @@ class WatchlistSync {
       const key = `${mediaType}:${mediaItem.tmdbId}`;
 
       let entryStamp: number | null = null;
+      const source = sourceOf(mediaItem);
       let handledSeasons: number[] = [];
       let candidateSeasons: number[] = [];
 
       try {
+        // Sonarr finds a series by its TVDB id; without one the request
+        // could not go anywhere.
         if (mediaItem.type === 'show' && !mediaItem.tvdbId) {
-          throw new Error('Missing TVDB ID from Plex Metadata');
+          throw new Error('Missing TVDB ID from the watchlist');
         }
 
         // Check if they have auto-request permissons and watchlist sync
@@ -320,11 +347,7 @@ class WatchlistSync {
         const deleted = deletionTimes.has(key) || markedDeleted.has(key);
         const deletedAt: Date | undefined =
           deletionTimes.get(key) ?? markedDeleted.get(key) ?? undefined;
-        const watchlistedAt =
-          watchlistedAtByKey.get(mediaItem.ratingKey) ??
-          (watchlistedAtByKey.has(mediaItem.ratingKey)
-            ? null
-            : await plexTvApi.getWatchlistedAt(mediaItem.ratingKey));
+        const watchlistedAt = watchlistedAtByKey.get(key) ?? null;
 
         if (!watchlistedAt) {
           await this.syncWithoutTimestamp(user, mediaItem, mediaType, {
@@ -338,7 +361,20 @@ class WatchlistSync {
 
         entryStamp = watchlistedAt;
 
-        const rearmed = !!entry && entry.watchlistedAt !== watchlistedAt;
+        // Times from the two watchlists never match, so a title whose time
+        // now comes from the other one (Trakt could not be read this time, or
+        // a Trakt username was just added) is the same entry, not a re-add:
+        // its new time is noted and nothing is requested again for it.
+        const sameSource =
+          !entry || (entry.watchlistedFrom ?? 'plex') === source;
+        if (entry && !sameSource) {
+          await getRepository(WatchlistSyncEntry).update(entry.id, {
+            watchlistedAt,
+            watchlistedFrom: source,
+          });
+        }
+        const rearmed =
+          !!entry && sameSource && entry.watchlistedAt !== watchlistedAt;
         let handledPreviously = false;
         let deletedSinceAdded = false;
 
@@ -403,10 +439,11 @@ class WatchlistSync {
 
           await this.saveEntry(user, mediaItem, mediaType, watchlistedAt, []);
 
-          logger.info("Created media request from user's Plex Watchlist", {
+          logger.info("Created media request from user's watchlist", {
             label: 'Watchlist Sync',
             userId: user.id,
             mediaTitle: mediaItem.title,
+            from: mediaItem.traktListedAt ? 'Trakt' : 'Plex',
           });
 
           continue;
@@ -464,10 +501,11 @@ class WatchlistSync {
           this.mergeSeasons(handledSeasons, candidateSeasons)
         );
 
-        logger.info("Created media request from user's Plex Watchlist", {
+        logger.info("Created media request from user's watchlist", {
           label: 'Watchlist Sync',
           userId: user.id,
           mediaTitle: mediaItem.title,
+          from: mediaItem.traktListedAt ? 'Trakt' : 'Plex',
         });
       } catch (e) {
         if (!(e instanceof Error)) {
@@ -537,7 +575,7 @@ class WatchlistSync {
    */
   private async syncWithoutTimestamp(
     user: User,
-    mediaItem: PlexWatchlistItem,
+    mediaItem: WatchItem,
     mediaType: MediaType,
     known: {
       hasEntry: boolean;
@@ -573,11 +611,148 @@ class WatchlistSync {
       { isAutoRequest: true }
     );
 
-    logger.info("Created media request from user's Plex Watchlist", {
+    logger.info("Created media request from user's watchlist", {
       label: 'Watchlist Sync',
       userId: user.id,
       mediaTitle: mediaItem.title,
+      from: 'Plex',
     });
+  }
+
+  /**
+   * Everything on someone's watchlists, Plex's and Trakt's, one entry per
+   * title. Undefined when there is nothing to go on this time.
+   *
+   * Either source may fail on its own and the other still syncs: a title on
+   * both goes by Trakt's time, so Plex being down changes nothing for it.
+   * Trakt being briefly unreachable holds the whole sync until next time
+   * instead, as a title on both would otherwise go by Plex's time once and
+   * look newly added.
+   */
+  private async watchlistOf(
+    user: User
+  ): Promise<{ items: WatchItem[]; plexTvApi?: PlexTvAPI } | undefined> {
+    const trakt = await this.traktWatchlist(user);
+    if (trakt === 'later') {
+      return undefined;
+    }
+    const plex = await this.plexWatchlist(user);
+    if (!plex && !trakt) {
+      return undefined;
+    }
+
+    const byKey = new Map<string, WatchItem>();
+    for (const item of plex?.items ?? []) {
+      byKey.set(keyOf(item), item);
+    }
+    for (const item of trakt ?? []) {
+      const onPlex = byKey.get(keyOf(item));
+      byKey.set(
+        keyOf(item),
+        onPlex
+          ? {
+              ...onPlex,
+              tvdbId: onPlex.tvdbId ?? item.tvdbId,
+              traktListedAt: item.traktListedAt,
+            }
+          : item
+      );
+    }
+    return { items: [...byKey.values()], plexTvApi: plex?.api };
+  }
+
+  /** The newest titles on someone's Plex watchlist, if Plex answers. */
+  private async plexWatchlist(
+    user: User
+  ): Promise<{ api: PlexTvAPI; items: WatchItem[] } | undefined> {
+    if (!user.plexToken || !onPlex()) {
+      return undefined;
+    }
+
+    if (user.plexTokenExpiredAt) {
+      const last = this.expiredTriedAt.get(user.id) ?? 0;
+      if (Date.now() - last < EXPIRED_RETRY_MS) {
+        return undefined;
+      }
+      this.expiredTriedAt.set(user.id, Date.now());
+    } else {
+      this.expiredTriedAt.delete(user.id);
+    }
+
+    const api = new PlexTvAPI(user.plexToken);
+    const response = await api.getWatchlist({ size: 20 });
+
+    // A rejected token means nothing here will sync until the user signs in
+    // again, so tell them rather than failing quietly every few minutes.
+    if (response.authFailed) {
+      await markPlexTokenRejected(user);
+      return undefined;
+    }
+
+    // Plex down or slow: nothing learnt about the token, and nothing to
+    // sync. Clearing the rejected mark here would let an outage between two
+    // rejections send the "sign in again" notice twice.
+    if (response.failed) {
+      return undefined;
+    }
+
+    await clearPlexTokenRejected(user);
+
+    return {
+      api,
+      items: response.items.map((item) => ({
+        tmdbId: item.tmdbId,
+        tvdbId: item.tvdbId,
+        type: item.type,
+        title: item.title,
+        plexRatingKey: item.ratingKey,
+        addedAt: item.addedAt,
+      })),
+    };
+  }
+
+  /**
+   * The newest titles on someone's public Trakt watchlist; undefined when
+   * they have none to read, 'later' when Trakt could not be asked just now.
+   */
+  private async traktWatchlist(
+    user: User
+  ): Promise<WatchItem[] | 'later' | undefined> {
+    const clientId = getSettings().trakt.clientId;
+    const username = user.settings?.traktUsername;
+    if (!clientId || !username) {
+      return undefined;
+    }
+    try {
+      const titles = await new TraktAPI(clientId).recentWatchlist(username);
+      this.traktWarnedAt.delete(user.id);
+      return titles
+        .filter((title) => !!title.tmdbId)
+        .map((title) => ({
+          tmdbId: title.tmdbId as number,
+          tvdbId: title.tvdbId,
+          type: title.type,
+          title: title.title,
+          traktListedAt: title.listedAt,
+        }));
+    } catch (e) {
+      const problem = e instanceof TraktError ? e.problem : 'unreachable';
+      if (problem === 'unreachable' || problem === 'rateLimited') {
+        return 'later';
+      }
+      // A private watchlist or a wrong name stays so until someone fixes
+      // it: said once an hour, not on every sync.
+      const last = this.traktWarnedAt.get(user.id) ?? 0;
+      if (Date.now() - last >= EXPIRED_RETRY_MS) {
+        this.traktWarnedAt.set(user.id, Date.now());
+        logger.warn('Could not read a Trakt watchlist', {
+          label: 'Watchlist Sync',
+          userId: user.id,
+          errorMessage: e instanceof Error ? e.message : String(e),
+        });
+      }
+      return undefined;
+    }
   }
 
   /**
@@ -617,7 +792,7 @@ class WatchlistSync {
 
   private async saveEntry(
     user: User,
-    mediaItem: PlexWatchlistItem,
+    mediaItem: WatchItem,
     mediaType: MediaType,
     watchlistedAt: number,
     seasons: number[]
@@ -644,6 +819,7 @@ class WatchlistSync {
       const existingSeasons = entry.seasons ?? [];
 
       entry.watchlistedAt = watchlistedAt;
+      entry.watchlistedFrom = sourceOf(mediaItem);
       entry.seasons = seasons.map(
         (seasonNumber) =>
           existingSeasons.find((s) => s.seasonNumber === seasonNumber) ??

@@ -69,6 +69,19 @@ const messages = defineMessages(
     plexwatchlistsyncseries: 'Auto-Request Series',
     plexwatchlistsyncseriestip:
       'Automatically request series on your <PlexWatchlistSupportLink>Plex Watchlist</PlexWatchlistSupportLink>',
+    traktusername: 'Trakt Username',
+    traktusernametip:
+      'What is on your public Trakt watchlist is requested for you, with the switches below.',
+    validationtraktusername:
+      'A Trakt username is letters, numbers, dots, dashes and underscores',
+    traktwatchlistsyncmoviestip:
+      'Automatically request movies on your public Trakt watchlist',
+    traktwatchlistsyncseriestip:
+      'Automatically request series on your public Trakt watchlist',
+    bothwatchlistsyncmoviestip:
+      'Automatically request movies on your <PlexWatchlistSupportLink>Plex Watchlist</PlexWatchlistSupportLink> and your public Trakt watchlist',
+    bothwatchlistsyncseriestip:
+      'Automatically request series on your <PlexWatchlistSupportLink>Plex Watchlist</PlexWatchlistSupportLink> and your public Trakt watchlist',
   }
 );
 
@@ -97,6 +110,12 @@ const UserGeneralSettings = () => {
   );
 
   const UserGeneralSettingsSchema = Yup.object().shape({
+    traktUsername: Yup.string()
+      .trim()
+      .matches(
+        /^[\w.-]{0,64}$/,
+        intl.formatMessage(messages.validationtraktusername)
+      ),
     email:
       // email is required for everybody except non-admin jellyfin users
       user?.id === 1 ||
@@ -114,6 +133,16 @@ const UserGeneralSettings = () => {
             (value) => !value || isEmail(value, { require_tld: false })
           ),
   });
+
+  // The watchlists their switches below apply to.
+  const plexWatchlist = user?.userType === UserType.PLEX;
+  const traktWatchlist = !!currentSettings.traktReady;
+  const syncTip = <T,>(plexOnly: T, traktOnly: T, both: T): T =>
+    plexWatchlist && traktWatchlist
+      ? both
+      : traktWatchlist
+        ? traktOnly
+        : plexOnly;
 
   useEffect(() => {
     setMovieQuotaEnabled(
@@ -159,6 +188,7 @@ const UserGeneralSettings = () => {
           tvQuotaDays: data?.tvQuotaDays,
           watchlistSyncMovies: data?.watchlistSyncMovies,
           watchlistSyncTv: data?.watchlistSyncTv,
+          traktUsername: data?.traktUsername ?? '',
         }}
         validationSchema={UserGeneralSettingsSchema}
         enableReinitialize
@@ -180,6 +210,9 @@ const UserGeneralSettings = () => {
               tvQuotaDays: tvQuotaEnabled ? values.tvQuotaDays : null,
               watchlistSyncMovies: values.watchlistSyncMovies,
               watchlistSyncTv: values.watchlistSyncTv,
+              ...(currentSettings.traktReady
+                ? { traktUsername: values.traktUsername.trim() }
+                : {}),
             });
 
             if (currentUser?.id === user?.id && setLocale) {
@@ -509,11 +542,44 @@ const UserGeneralSettings = () => {
                     </div>
                   </>
                 )}
+              {traktWatchlist &&
+                hasPermission(
+                  [
+                    Permission.AUTO_REQUEST,
+                    Permission.AUTO_REQUEST_MOVIE,
+                    Permission.AUTO_REQUEST_TV,
+                  ],
+                  { type: 'or' }
+                ) && (
+                  <div className="form-row">
+                    <label htmlFor="traktUsername" className="text-label">
+                      <span>{intl.formatMessage(messages.traktusername)}</span>
+                      <span className="label-tip">
+                        {intl.formatMessage(messages.traktusernametip)}
+                      </span>
+                    </label>
+                    <div className="form-input-area">
+                      <div className="form-input-field">
+                        <Field
+                          id="traktUsername"
+                          name="traktUsername"
+                          type="text"
+                          autoComplete="off"
+                        />
+                      </div>
+                      {errors.traktUsername &&
+                        touched.traktUsername &&
+                        typeof errors.traktUsername === 'string' && (
+                          <div className="error">{errors.traktUsername}</div>
+                        )}
+                    </div>
+                  </div>
+                )}
               {hasPermission(
                 [Permission.AUTO_REQUEST, Permission.AUTO_REQUEST_MOVIE],
                 { type: 'or' }
               ) &&
-                user?.userType === UserType.PLEX && (
+                (plexWatchlist || traktWatchlist) && (
                   <div className="form-row">
                     <label
                       htmlFor="watchlistSyncMovies"
@@ -524,7 +590,11 @@ const UserGeneralSettings = () => {
                       </span>
                       <span className="label-tip">
                         {intl.formatMessage(
-                          messages.plexwatchlistsyncmoviestip,
+                          syncTip(
+                            messages.plexwatchlistsyncmoviestip,
+                            messages.traktwatchlistsyncmoviestip,
+                            messages.bothwatchlistsyncmoviestip
+                          ),
                           {
                             PlexWatchlistSupportLink: (
                               msg: React.ReactNode
@@ -561,7 +631,7 @@ const UserGeneralSettings = () => {
                 [Permission.AUTO_REQUEST, Permission.AUTO_REQUEST_TV],
                 { type: 'or' }
               ) &&
-                user?.userType === UserType.PLEX && (
+                (plexWatchlist || traktWatchlist) && (
                   <div className="form-row">
                     <label htmlFor="watchlistSyncTv" className="checkbox-label">
                       <span>
@@ -569,7 +639,11 @@ const UserGeneralSettings = () => {
                       </span>
                       <span className="label-tip">
                         {intl.formatMessage(
-                          messages.plexwatchlistsyncseriestip,
+                          syncTip(
+                            messages.plexwatchlistsyncseriestip,
+                            messages.traktwatchlistsyncseriestip,
+                            messages.bothwatchlistsyncseriestip
+                          ),
                           {
                             PlexWatchlistSupportLink: (
                               msg: React.ReactNode

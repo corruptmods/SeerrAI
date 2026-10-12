@@ -270,6 +270,14 @@ export interface TautulliSettings {
   externalUrl?: string;
 }
 
+/**
+ * Trakt, for public lists and watchlists. Only the Client ID of the admin's
+ * own Trakt app: Seerr AI reads public data and nobody signs in to Trakt.
+ */
+export interface TraktSettings {
+  clientId?: string;
+}
+
 export interface DVRSettings {
   id: number;
   name: string;
@@ -493,6 +501,8 @@ interface FullPublicSettings extends PublicSettings {
   aiReady: boolean;
   /** Bazarr is set up, so title pages can show their subtitles. */
   subtitlesReady: boolean;
+  /** A Trakt Client ID is set: Trakt links and watchlists can be read. */
+  traktReady: boolean;
 }
 
 export interface NotificationAgentConfig {
@@ -667,6 +677,7 @@ export interface AllSettings {
   plex: PlexSettings;
   jellyfin: JellyfinSettings;
   tautulli: TautulliSettings;
+  trakt: TraktSettings;
   maintainerr: MaintainerrSettings[];
   downloadClients: DownloadClientSettings[];
   bazarr: BazarrSettings;
@@ -750,6 +761,7 @@ class Settings {
         apiKey: '',
       },
       tautulli: {},
+      trakt: {},
       maintainerr: [],
       downloadClients: [],
       bazarr: {
@@ -1081,6 +1093,14 @@ class Settings {
     this.data.tautulli = mergeSettings(this.data.tautulli, data);
   }
 
+  get trakt(): TraktSettings {
+    return this.data.trakt;
+  }
+
+  set trakt(data: TraktSettings) {
+    this.data.trakt = data;
+  }
+
   get ai(): AiSettings {
     return this.data.ai;
   }
@@ -1172,6 +1192,7 @@ class Settings {
       subtitlesReady: !!(
         this.data.bazarr?.hostname && this.data.bazarr?.apiKey
       ),
+      traktReady: !!this.data.trakt?.clientId,
     };
   }
 

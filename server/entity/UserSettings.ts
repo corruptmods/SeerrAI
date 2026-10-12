@@ -114,6 +114,13 @@ export class UserSettings {
   @Column({ type: 'text', nullable: true })
   public discoverNetworks?: string | null;
 
+  /**
+   * Their Trakt username, for requesting what is on their public Trakt
+   * watchlist (with watchlistSyncMovies / watchlistSyncTv, as for Plex).
+   */
+  @Column({ type: 'text', nullable: true })
+  public traktUsername?: string | null;
+
   @Column({ nullable: true })
   public watchlistSyncMovies?: boolean;
 

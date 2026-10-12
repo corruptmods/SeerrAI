@@ -61,12 +61,14 @@ import notificationRoutes from './notifications';
 import radarrRoutes from './radarr';
 import sonarrRoutes from './sonarr';
 import tautulliSettingsRoutes from './tautulli';
+import traktSettingsRoutes from './trakt';
 
 const settingsRoutes = Router();
 
 settingsRoutes.use('/notifications', notificationRoutes);
 settingsRoutes.use('/radarr', radarrRoutes);
 settingsRoutes.use('/maintainerr', maintainerrSettingsRoutes);
+settingsRoutes.use('/trakt', traktSettingsRoutes);
 settingsRoutes.use('/bazarr', bazarrSettingsRoutes);
 settingsRoutes.use('/tautulli', tautulliSettingsRoutes);
 settingsRoutes.use('/backfill', backfillSettingsRoutes);

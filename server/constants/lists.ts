@@ -12,6 +12,15 @@ export const POSTER_BACKFILL_LIMIT = 60;
 export const IMPORT_LINE_LIMIT = 100;
 
 /**
+ * Titles one import may add to a list: a Trakt list, or what a written list
+ * matched. Written lists stop at IMPORT_LINE_LIMIT lines before this.
+ */
+export const IMPORT_ITEM_LIMIT = 500;
+
+/** Titles resolved to TMDB matches in one call, for a Trakt import. */
+export const RESOLVE_BATCH_LIMIT = 25;
+
+/**
  * Titles one action may send to Radarr and Sonarr: a "request what's
  * missing" call, or the requests that ride along with an import.
  */

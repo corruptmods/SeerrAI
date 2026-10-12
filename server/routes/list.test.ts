@@ -1,4 +1,6 @@
 import TheMovieDb from '@server/api/themoviedb';
+import type { TraktSource, TraktTitle } from '@server/api/trakt';
+import TraktAPI, { TraktError } from '@server/api/trakt';
 import {
   MediaRequestStatus,
   MediaStatus,
@@ -16,6 +18,7 @@ import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
 import { User } from '@server/entity/User';
 import notificationManager from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
+import { getSettings } from '@server/lib/settings';
 import listRoutes from '@server/routes/list';
 import { setupTestDb } from '@server/test/db';
 import express from 'express';
@@ -399,6 +402,155 @@ describe('watch lists', () => {
   });
 
   describe('import', () => {
+    describe('from Trakt', () => {
+      let traktTitles: TraktTitle[] | TraktError = [];
+      let asked: TraktSource[] = [];
+
+      beforeEach(() => {
+        getSettings().trakt = { clientId: 'client-id' };
+        traktTitles = [];
+        asked = [];
+        Object.defineProperty(TraktAPI.prototype, 'titles', {
+          configurable: true,
+          writable: true,
+          value: async (source: TraktSource) => {
+            asked.push(source);
+            if (traktTitles instanceof TraktError) throw traktTitles;
+            return traktTitles;
+          },
+        });
+      });
+
+      after(() => {
+        getSettings().trakt = {};
+      });
+
+      it('reads the titles on a pasted Trakt list', async () => {
+        traktTitles = [
+          { type: 'movie', title: 'The Matrix', year: 1999, tmdbId: 603 },
+          { type: 'show', title: 'Severance', year: 2022, tmdbId: 95396 },
+          { type: 'movie', title: 'Unmatched', year: 2001 },
+        ];
+        const { status, body } = await call<{
+          titles: { mediaType: string; tmdbId?: number; title: string }[];
+          truncated: boolean;
+        }>('POST', '/api/v1/list/import/trakt', {
+          url: 'https://trakt.tv/users/someone/lists/favourites',
+        });
+        assert.equal(status, 200);
+        assert.deepEqual(asked, [
+          { kind: 'list', user: 'someone', list: 'favourites' },
+        ]);
+        assert.deepEqual(
+          body.titles.map((t) => [t.mediaType, t.tmdbId ?? null, t.title]),
+          [
+            ['movie', 603, 'The Matrix'],
+            ['tv', 95396, 'Severance'],
+            ['movie', null, 'Unmatched'],
+          ]
+        );
+        assert.equal(body.truncated, false);
+      });
+
+      it('stops at 500 titles, and says so', async () => {
+        traktTitles = Array.from({ length: 520 }, (_, i) => ({
+          type: 'movie' as const,
+          title: `Film ${i}`,
+          tmdbId: i + 1,
+        }));
+        const { body } = await call<{ titles: unknown[]; truncated: boolean }>(
+          'POST',
+          '/api/v1/list/import/trakt',
+          { url: 'https://trakt.tv/users/someone/watchlist' }
+        );
+        assert.equal(body.titles.length, 500);
+        assert.equal(body.truncated, true);
+      });
+
+      it('says why it cannot, in a way the page can word', async () => {
+        const notTrakt = await call<{ problem: string }>(
+          'POST',
+          '/api/v1/list/import/trakt',
+          { url: 'https://example.com/list' }
+        );
+        assert.equal(notTrakt.status, 400);
+        assert.equal(notTrakt.body.problem, 'notTrakt');
+
+        traktTitles = new TraktError('private', 'That list is private.');
+        const hidden = await call<{ problem: string; message: string }>(
+          'POST',
+          '/api/v1/list/import/trakt',
+          { url: 'https://trakt.tv/users/someone/lists/secret' }
+        );
+        assert.equal(hidden.status, 400);
+        assert.equal(hidden.body.problem, 'private');
+
+        getSettings().trakt = {};
+        const unset = await call<{ problem: string }>(
+          'POST',
+          '/api/v1/list/import/trakt',
+          { url: 'https://trakt.tv/users/someone/watchlist' }
+        );
+        assert.equal(unset.body.problem, 'notSetUp');
+        assert.equal(asked.length, 1, 'Trakt is not asked without a Client ID');
+      });
+
+      it('matches titles by TMDB id with their posters, and searches for the rest', async () => {
+        const { body } = await call<{
+          results: {
+            raw: string;
+            candidates: {
+              tmdbId: number;
+              mediaType: string;
+              posterPath?: string | null;
+            }[];
+          }[];
+        }>('POST', '/api/v1/list/import/resolve', {
+          items: [
+            {
+              tmdbId: 603,
+              mediaType: 'movie',
+              title: 'The Matrix',
+              year: 1999,
+            },
+            { tmdbId: 95396, mediaType: 'tv', title: 'Severance' },
+            { mediaType: 'movie', title: 'Unmatched', year: 2001 },
+          ],
+        });
+        assert.deepEqual(
+          body.results[0].candidates.map((c) => [
+            c.tmdbId,
+            c.mediaType,
+            c.posterPath,
+          ]),
+          [[603, 'movie', '/m603.jpg']]
+        );
+        assert.equal(body.results[0].raw, 'The Matrix (1999)');
+        assert.deepEqual(
+          body.results[1].candidates.map((c) => [c.tmdbId, c.mediaType]),
+          [[95396, 'tv']]
+        );
+        // No id: searched by name, as a written line is.
+        assert.equal(body.results[2].candidates[0].tmdbId, 7001);
+      });
+
+      it('adds a whole Trakt list of up to 500 titles at once', async () => {
+        const id = await createList();
+        const { body } = await call<{ added: number }>(
+          'POST',
+          `/api/v1/list/${id}/import`,
+          {
+            items: Array.from({ length: 150 }, (_, i) => ({
+              tmdbId: 10_000 + i,
+              mediaType: 'movie',
+            })),
+            request: false,
+          }
+        );
+        assert.equal(body.added, 150);
+      });
+    });
+
     it('parses a messy list and drops headings and duplicates', async () => {
       const { body } = await call<{ results: { raw: string }[] }>(
         'POST',

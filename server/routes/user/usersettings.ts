@@ -35,6 +35,9 @@ import net from 'net';
 import { Not } from 'typeorm';
 import { canMakePermissionsChange } from '.';
 
+/** Trakt usernames: letters, digits, dots, dashes and underscores. */
+const TRAKT_USERNAME = /^[\w.-]{1,64}$/;
+
 const userSettingsRoutes = Router({ mergeParams: true });
 
 userSettingsRoutes.get<{ id: string }, UserSettingsGeneralResponse>(
@@ -72,6 +75,7 @@ userSettingsRoutes.get<{ id: string }, UserSettingsGeneralResponse>(
         globalTvQuotaLimit: defaultQuotas.tv.quotaLimit,
         watchlistSyncMovies: user.settings?.watchlistSyncMovies,
         watchlistSyncTv: user.settings?.watchlistSyncTv,
+        traktUsername: user.settings?.traktUsername ?? null,
       });
     } catch (e) {
       next({ status: 500, message: e.message });
@@ -128,6 +132,18 @@ userSettingsRoutes.post<
       user.tvQuotaLimit = req.body.tvQuotaLimit;
     }
 
+    // A Trakt username as Trakt writes them; blank clears it.
+    const traktUsername =
+      typeof req.body.traktUsername === 'string'
+        ? req.body.traktUsername.trim()
+        : undefined;
+    if (traktUsername && !TRAKT_USERNAME.test(traktUsername)) {
+      return next({
+        status: 400,
+        message: 'That is not a Trakt username.',
+      });
+    }
+
     if (!user.settings) {
       user.settings = new UserSettings({
         user: req.user,
@@ -137,6 +153,7 @@ userSettingsRoutes.post<
         originalLanguage: req.body.originalLanguage,
         watchlistSyncMovies: req.body.watchlistSyncMovies,
         watchlistSyncTv: req.body.watchlistSyncTv,
+        traktUsername: traktUsername || null,
       });
     } else {
       user.settings.locale = req.body.locale;
@@ -145,6 +162,9 @@ userSettingsRoutes.post<
       user.settings.originalLanguage = req.body.originalLanguage;
       user.settings.watchlistSyncMovies = req.body.watchlistSyncMovies;
       user.settings.watchlistSyncTv = req.body.watchlistSyncTv;
+      if (traktUsername !== undefined) {
+        user.settings.traktUsername = traktUsername || null;
+      }
     }
 
     const savedUser = await userRepository.save(user);
@@ -157,6 +177,7 @@ userSettingsRoutes.post<
       originalLanguage: savedUser.settings?.originalLanguage,
       watchlistSyncMovies: savedUser.settings?.watchlistSyncMovies,
       watchlistSyncTv: savedUser.settings?.watchlistSyncTv,
+      traktUsername: savedUser.settings?.traktUsername ?? null,
       email: savedUser.email,
     });
   } catch (e) {

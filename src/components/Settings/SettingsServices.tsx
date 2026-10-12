@@ -12,6 +12,7 @@ import SettingsBazarr from '@app/components/Settings/SettingsBazarr';
 import SettingsDownloadClients from '@app/components/Settings/SettingsDownloadClients';
 import SettingsMaintainerr from '@app/components/Settings/SettingsMaintainerr';
 import SettingsTautulli from '@app/components/Settings/SettingsTautulli';
+import SettingsTrakt from '@app/components/Settings/SettingsTrakt';
 import SonarrModal from '@app/components/Settings/SonarrModal';
 import useSettings from '@app/hooks/useSettings';
 import globalMessages from '@app/i18n/globalMessages';
@@ -439,6 +440,7 @@ const SettingsServices = () => {
       <SettingsMaintainerr />
       <SettingsDownloadClients />
       <SettingsBazarr />
+      <SettingsTrakt />
       {/* Tautulli reads Plex's watch history, so it is only offered with Plex. */}
       {settings.currentSettings.mediaServerType === MediaServerType.PLEX && (
         <SettingsTautulli />

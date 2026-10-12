@@ -79,6 +79,7 @@ authRoutes.get('/me', isAuthenticated(), async (req, res) => {
       notificationTypes: user.settings.notificationTypes,
       watchlistSyncMovies: user.settings.watchlistSyncMovies,
       watchlistSyncTv: user.settings.watchlistSyncTv,
+      traktUsername: user.settings.traktUsername ?? null,
       disabledFeatures: user.settings.disabledFeatures,
       hiddenSliders: user.settings.hiddenSliders,
       discoverNetworks: user.settings.discoverNetworks ?? null,

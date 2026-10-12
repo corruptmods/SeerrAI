@@ -4,6 +4,10 @@ The newest changes are at the top. **Coming next** is what's on the `dev` branch
 
 ## Coming next
 
+### Ready for Sonarr v5
+
+The Sonarr v5 beta works with Seerr AI. Backfill and the admin agent understand how v5 describes season packs and releases with no season in the name, so a pack of several seasons is no longer left out of a search for one of them. When a series is shown under a translated title in Sonarr, Backfill also looks for it under its original title. Sonarr v4 works just as before.
+
 ### Seerr AI in your language
 
 Every screen, button and notification is now translated into 40 languages, including everything Seerr AI added on top of Seerr. Basque, Kabyle, Slovak and Slovenian join the language picker, and notifications in Chinese now actually arrive in Chinese. Some older translations also had small mistakes, like showing "Plex" to Jellyfin users or an old app name instead of Seerr AI, and those are fixed too. Spot something that reads oddly in your language? Open an issue and we'll fix it.

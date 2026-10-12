@@ -50,7 +50,10 @@ export interface SonarrParseResult {
   parsedEpisodeInfo?: {
     seriesTitle?: string;
     quality?: SonarrQuality;
+    /** Undefined when the name has no season (see `seasonOrNone`). */
     seasonNumber?: number;
+    /** Sonarr v5: every season a pack covers. */
+    seasonNumbers?: number[];
     episodeNumbers?: number[];
     absoluteEpisodeNumbers?: number[];
     releaseGroup?: string;
@@ -142,12 +145,23 @@ export interface ArrSearchRelease {
   approved?: boolean;
   rejections?: (string | { reason?: string })[];
   fullSeason?: boolean;
+  /** Undefined when the name has no season (see `seasonOrNone`). */
   seasonNumber?: number;
+  /** Sonarr v5: every season a pack covers, "S01-S03" as [1, 2, 3]. */
+  seasonNumbers?: number[];
   mappedEpisodeNumbers?: number[];
   mappedSeasonNumber?: number;
   quality?: { quality: { id: number; name: string } };
   languages?: SonarrLanguage[];
 }
+
+/**
+ * A season number as Sonarr reads it from a name, or undefined when the name
+ * has none. Sonarr v5 says -1 for that where v4 said 0, in a parse and in
+ * search results alike; 0 stays as it was, as v4 also uses it for specials.
+ */
+export const seasonOrNone = (season?: number | null): number | undefined =>
+  season === undefined || season === null || season < 0 ? undefined : season;
 
 /**
  * An indexer search can take a while across many indexers; an anime season
@@ -165,6 +179,11 @@ export interface SonarrSeriesDetail {
   qualityProfileId: number;
   path: string;
   alternateTitles?: { title: string; seasonNumber?: number }[];
+  /**
+   * Sonarr v5: the title in its original language. `title` is then in the
+   * language chosen for the series, which need not be the one releases use.
+   */
+  originalTitle?: string;
   originalLanguage?: { id: number; name: string };
   images?: { coverType: string; remoteUrl?: string; url?: string }[];
   statistics?: { episodeFileCount: number; episodeCount: number };
@@ -197,6 +216,11 @@ class BackfillSonarr extends SonarrAPI {
     const { data } = await this.axios.get<SonarrParseResult>('/parse', {
       params: { title },
     });
+    if (data?.parsedEpisodeInfo) {
+      data.parsedEpisodeInfo.seasonNumber = seasonOrNone(
+        data.parsedEpisodeInfo.seasonNumber
+      );
+    }
     return data;
   }
 
@@ -280,7 +304,12 @@ class BackfillSonarr extends SonarrAPI {
       params,
       timeout: RELEASE_SEARCH_TIMEOUT_MS,
     });
-    return Array.isArray(data) ? data : [];
+    return Array.isArray(data)
+      ? data.map((release) => ({
+          ...release,
+          seasonNumber: seasonOrNone(release.seasonNumber),
+        }))
+      : [];
   }
 
   public async getSeriesQueueCount(seriesId: number): Promise<number> {

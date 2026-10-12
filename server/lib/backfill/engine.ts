@@ -1336,6 +1336,11 @@ class Backfill {
         [
           titleWithoutYear(series.title),
           series.title,
+          // Sonarr v5 can show a series under a translated title; releases
+          // usually carry the original one, when it is in Latin letters.
+          ...(series.originalTitle && /[a-z]/i.test(series.originalTitle)
+            ? [series.originalTitle]
+            : []),
           ...(series.alternateTitles ?? []).map((alt) => alt.title),
           ...(row.searchTerms ?? []),
         ]

@@ -67,6 +67,9 @@ const pad = (n: number) => String(n).padStart(2, '0');
 export const episodeLabel = (season: number, episode: number) =>
   `S${pad(season)}E${pad(episode)}`;
 
+/** "S06". */
+export const seasonLabel = (season: number) => `S${pad(season)}`;
+
 /** "S06E01", or "S06E01-E02" for a file holding several episodes. */
 export const rangeLabel = (season: number, episodes: number[]) =>
   episodes.length > 1

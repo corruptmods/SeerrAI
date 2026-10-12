@@ -1472,6 +1472,46 @@ describe('the admin agent', () => {
     assert.equal((await waitForRun(run.id)).status, 'done');
   });
 
+  it('keeps a pack of several seasons that covers the one searched (Sonarr v5)', async () => {
+    // Sonarr v5 lists the seasons a pack covers, and maps it to the first.
+    const pack = (title: string, seasons: number[]) => ({
+      guid: title,
+      title,
+      indexerId: 1,
+      indexer: 'NZBgeek',
+      protocol: 'usenet',
+      size: 30_000 * MB,
+      approved: true,
+      fullSeason: true,
+      seasonNumber: seasons[0],
+      seasonNumbers: seasons,
+      mappedSeasonNumber: seasons[0],
+      mappedEpisodeNumbers: [1, 2, 3],
+    });
+    mock.method(BackfillSonarr.prototype, 'getReleases', async () => [
+      pack('Casper S01-S03 1080p', [1, 2, 3]),
+      pack('Casper S04-S05 1080p', [4, 5]),
+      pack('Casper S02 1080p', [2]),
+    ]);
+    script = [
+      () => toolUse('search_releases', { title: 'series:0:1283', season: 2 }),
+      (body) => {
+        const found = lastResult(body).content;
+        assert.match(
+          found,
+          /^2 results \(1 more for other seasons left out\):/
+        );
+        assert.match(found, /Casper S01-S03 1080p/);
+        assert.match(found, /S01–S03 pack/);
+        assert.match(found, /S02 pack/);
+        assert.ok(!found.includes('S04-S05'));
+        return say('Season 2 is in two packs.');
+      },
+    ];
+    const run = await agent.ask('Find Casper season 2', await admin());
+    assert.equal((await waitForRun(run.id)).status, 'done');
+  });
+
   it('starts on its own only for requested titles, once in a while', async () => {
     const row = await getRepository(BackfillSeries).save(
       new BackfillSeries({

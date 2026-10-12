@@ -26,6 +26,7 @@ import {
   namesEpisode,
   numberedAs,
   rangeLabel,
+  seasonLabel,
   sizeOf,
 } from '@server/lib/agent/rules';
 import type { ConverseTool } from '@server/lib/ai/providers';
@@ -733,18 +734,25 @@ const searchReleases: AgentTool = {
       } for its results, and use search_indexers meanwhile.`;
     }
     // A season's search brings back other seasons too (a long-running show
-    // fills the list with its newest): only this season's, and releases
-    // Sonarr could not place, which may be packs or collections.
+    // fills the list with its newest): only this season's, packs that cover
+    // it, and releases Sonarr could not place, which may be collections.
     const placedElsewhere = (r: ArrSearchRelease) => {
-      const placed = r.mappedSeasonNumber ?? r.seasonNumber;
-      return (
-        title.kind === 'series' &&
-        episode === undefined &&
-        season !== undefined &&
-        placed !== undefined &&
-        placed !== null &&
-        placed !== season
-      );
+      if (
+        title.kind !== 'series' ||
+        episode !== undefined ||
+        season === undefined
+      ) {
+        return false;
+      }
+      // Sonarr v5 lists every season a pack covers; the season it maps a
+      // pack to is only the first of them.
+      if (r.seasonNumbers && r.seasonNumbers.length > 1) {
+        return !r.seasonNumbers.includes(season);
+      }
+      if (r.mappedSeasonNumber !== undefined && r.mappedSeasonNumber !== null) {
+        return r.mappedSeasonNumber !== season;
+      }
+      return r.seasonNumber !== undefined && r.seasonNumber !== season;
     };
     const results = found.results.filter((r) => !placedElsewhere(r));
     const elsewhere = found.results.length - results.length;
@@ -775,15 +783,17 @@ const searchReleases: AgentTool = {
       const what =
         title.kind === 'movie'
           ? undefined
-          : result.fullSeason
-            ? `S${String(result.seasonNumber ?? result.mappedSeasonNumber ?? season).padStart(2, '0')} pack`
-            : result.mappedEpisodeNumbers?.length
-              ? result.mappedEpisodeNumbers
-                  .map((n) =>
-                    episodeLabel(result.mappedSeasonNumber ?? season ?? 0, n)
-                  )
-                  .join(',')
-              : 'unmapped';
+          : result.seasonNumbers && result.seasonNumbers.length > 1
+            ? `${seasonLabel(Math.min(...result.seasonNumbers))}–${seasonLabel(Math.max(...result.seasonNumbers))} pack`
+            : result.fullSeason
+              ? `${seasonLabel(result.seasonNumber ?? result.mappedSeasonNumber ?? season ?? 0)} pack`
+              : result.mappedEpisodeNumbers?.length
+                ? result.mappedEpisodeNumbers
+                    .map((n) =>
+                      episodeLabel(result.mappedSeasonNumber ?? season ?? 0, n)
+                    )
+                    .join(',')
+                : 'unmapped';
       lines.push(
         releaseLine(known, {
           what,

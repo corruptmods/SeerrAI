@@ -52,6 +52,8 @@ The container runs as user and group 1000, so the `config` folder must be writab
 
 Open port 5055 and follow the setup: sign in with Plex, Jellyfin or Emby, then connect Radarr and Sonarr. Seerr's own [getting started](https://docs.seerr.dev/getting-started/) describes the setup screens, which are the same.
 
+Sonarr v4 and the Sonarr v5 beta both work. On v5, a series you set to another language in Sonarr shows there under its translated title; Backfill also searches under its original title, which is what most releases use. If you switch a series to another episode order in Sonarr v5 (DVD order, say), its season numbers no longer match TMDB's, so requests for single seasons of that series may pick the wrong season.
+
 ### Coming from Seerr
 
 Point Seerr AI at the same `config` folder (or the same PostgreSQL database) and start it: it adds its own tables and columns. **Back the database up first**, since going back to Seerr afterwards isn't supported.

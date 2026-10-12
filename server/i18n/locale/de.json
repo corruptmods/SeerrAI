@@ -53,5 +53,11 @@
   "notifications.common.viewIssue": "Problem in {applicationTitle} anzeigen",
   "notifications.common.viewMedia": "Medieninhalt in {applicationTitle} anzeigen",
   "notifications.test.message": "Test, Test, 1, 2, 3. Kommt alles klar an?",
-  "notifications.test.subject": "Testbenachrichtigung"
+  "notifications.test.subject": "Testbenachrichtigung",
+  "notifications.agents.webpush.downloadedBody": "{title} ist bereit zum Abspielen.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Film heruntergeladen",
+  "notifications.agents.webpush.downloadedTitleTv": "Serie heruntergeladen",
+  "notifications.agents.webpush.failedBody": "{title} konnte nicht heruntergeladen werden.",
+  "notifications.agents.webpush.failedTitleMovie": "Filmanfrage fehlgeschlagen",
+  "notifications.agents.webpush.failedTitleTv": "Serienanfrage fehlgeschlagen"
 }

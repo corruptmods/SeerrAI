@@ -53,5 +53,11 @@
   "notifications.agents.webpush.pending": "Se requiere aprobación para una nueva solicitud de {mediaType} {quality} de {userName}.",
   "notifications.agents.webpush.viewIssue": "Ver incidencia",
   "notifications.agents.webpush.viewMedia": "Ver contenido",
-  "notifications.common.issueTypeName": "Incidencia de {type}"
+  "notifications.common.issueTypeName": "Incidencia de {type}",
+  "notifications.agents.webpush.downloadedBody": "{title} ya se puede ver.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Película descargada",
+  "notifications.agents.webpush.downloadedTitleTv": "Serie descargada",
+  "notifications.agents.webpush.failedBody": "No se ha podido descargar {title}.",
+  "notifications.agents.webpush.failedTitleMovie": "Ha fallado la petición de la película",
+  "notifications.agents.webpush.failedTitleTv": "Ha fallado la petición de la serie"
 }

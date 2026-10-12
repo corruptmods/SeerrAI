@@ -53,5 +53,11 @@
   "notifications.common.viewMedia": "Просмотреть медиа в {applicationTitle}",
   "notifications.test.message": "Проверка связи, раз, два, три. Как слышно?",
   "notifications.test.subject": "Тестовое уведомление",
-  "notifications.agents.webpush.autoApproved": "Автоматически одобрен новый запрос на {quality}{mediaType} от {userName}."
+  "notifications.agents.webpush.autoApproved": "Автоматически одобрен новый запрос на {quality}{mediaType} от {userName}.",
+  "notifications.agents.webpush.downloadedBody": "{title} можно смотреть.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Фильм загружен",
+  "notifications.agents.webpush.downloadedTitleTv": "Сериал загружен",
+  "notifications.agents.webpush.failedBody": "Не удалось загрузить {title}.",
+  "notifications.agents.webpush.failedTitleMovie": "Запрос фильма не выполнен",
+  "notifications.agents.webpush.failedTitleTv": "Запрос сериала не выполнен"
 }

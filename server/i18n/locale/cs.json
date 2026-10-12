@@ -53,5 +53,11 @@
   "notifications.common.viewIssue": "Zobrazit problém v {applicationTitle}",
   "notifications.common.viewMedia": "Zobrazit médium v {applicationTitle}",
   "notifications.test.message": "Kontrola, kontrola, 1, 2, 3. Jak nás slyšíte?",
-  "notifications.test.subject": "Testovací oznámení"
+  "notifications.test.subject": "Testovací oznámení",
+  "notifications.agents.webpush.downloadedBody": "{title} je připraveno k přehrání.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Film stažen",
+  "notifications.agents.webpush.downloadedTitleTv": "Seriál stažen",
+  "notifications.agents.webpush.failedBody": "{title} se nepodařilo stáhnout.",
+  "notifications.agents.webpush.failedTitleMovie": "Žádost o film selhala",
+  "notifications.agents.webpush.failedTitleTv": "Žádost o seriál selhala"
 }

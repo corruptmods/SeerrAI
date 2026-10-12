@@ -43,6 +43,10 @@ export const availableLanguages: AvailableLanguageObject = {
     code: 'et',
     display: 'Eesti',
   },
+  eu: {
+    code: 'eu',
+    display: 'Euskara',
+  },
   fi: {
     code: 'fi',
     display: 'Finnish',
@@ -103,9 +107,21 @@ export const availableLanguages: AvailableLanguageObject = {
     code: 'sq',
     display: 'Shqip',
   },
+  sk: {
+    code: 'sk',
+    display: 'Slovenčina',
+  },
+  sl: {
+    code: 'sl',
+    display: 'Slovenščina',
+  },
   sv: {
     code: 'sv',
     display: 'Svenska',
+  },
+  kab: {
+    code: 'kab',
+    display: 'Taqbaylit',
   },
   el: {
     code: 'el',
@@ -121,7 +137,7 @@ export const availableLanguages: AvailableLanguageObject = {
   },
   sr: {
     code: 'sr',
-    display: 'српски језик',
+    display: 'Srpski',
   },
   tr: {
     code: 'tr',

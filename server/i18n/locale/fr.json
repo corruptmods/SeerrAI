@@ -53,5 +53,11 @@
   "notifications.common.resolved": "Résolu",
   "notifications.common.series": "série",
   "notifications.common.viewIssue": "Voir le problème dans {applicationTitle}",
-  "notifications.common.viewMedia": "Voir le média dans {applicationTitle}"
+  "notifications.common.viewMedia": "Voir le média dans {applicationTitle}",
+  "notifications.agents.webpush.downloadedBody": "{title} est prêt à être lu.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Film téléchargé",
+  "notifications.agents.webpush.downloadedTitleTv": "Série téléchargée",
+  "notifications.agents.webpush.failedBody": "{title} n’a pas pu être téléchargé.",
+  "notifications.agents.webpush.failedTitleMovie": "Échec de la demande de film",
+  "notifications.agents.webpush.failedTitleTv": "Échec de la demande de série"
 }

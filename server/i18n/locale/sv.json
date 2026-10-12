@@ -53,5 +53,11 @@
   "notifications.common.viewMedia": "Visa media i {applicationTitle}",
   "notifications.test.message": "Test, test, 1, 2, 3. Funkar det här?",
   "notifications.test.subject": "Testmeddelande",
-  "notifications.common.processing": "Bearbetas"
+  "notifications.common.processing": "Bearbetas",
+  "notifications.agents.webpush.downloadedBody": "{title} är redo att spelas.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Film nedladdad",
+  "notifications.agents.webpush.downloadedTitleTv": "Serie nedladdad",
+  "notifications.agents.webpush.failedBody": "{title} kunde inte laddas ned.",
+  "notifications.agents.webpush.failedTitleMovie": "Filmförfrågan misslyckades",
+  "notifications.agents.webpush.failedTitleTv": "Serieförfrågan misslyckades"
 }

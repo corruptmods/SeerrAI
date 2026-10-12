@@ -53,5 +53,11 @@
   "notifications.common.viewIssue": "Vaata probleemi rakenduses {applicationTitle}",
   "notifications.common.viewMedia": "Vaata meediat rakenduses {applicationTitle}",
   "notifications.test.message": "Kõik toimib — võid edasi lasta.",
-  "notifications.test.subject": "Testteavitus"
+  "notifications.test.subject": "Testteavitus",
+  "notifications.agents.webpush.downloadedBody": "{title} on valmis esitamiseks.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Film alla laaditud",
+  "notifications.agents.webpush.downloadedTitleTv": "Sari alla laaditud",
+  "notifications.agents.webpush.failedBody": "Teost {title} ei õnnestunud alla laadida.",
+  "notifications.agents.webpush.failedTitleMovie": "Filmi taotlus ebaõnnestus",
+  "notifications.agents.webpush.failedTitleTv": "Sarja taotlus ebaõnnestus"
 }

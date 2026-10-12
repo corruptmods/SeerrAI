@@ -53,5 +53,11 @@
   "notifications.common.viewIssue": "{applicationTitle} uygulamasında sorunu görüntüle",
   "notifications.common.viewMedia": "{applicationTitle} uygulamasında medyayı görüntüle",
   "notifications.test.message": "Ses testi, 1, 2, 3. Bizi duyuyor musunuz?",
-  "notifications.test.subject": "Test Bildirimi"
+  "notifications.test.subject": "Test Bildirimi",
+  "notifications.agents.webpush.downloadedBody": "{title} oynatılmaya hazır.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Film İndirildi",
+  "notifications.agents.webpush.downloadedTitleTv": "Dizi İndirildi",
+  "notifications.agents.webpush.failedBody": "{title} indirilemedi.",
+  "notifications.agents.webpush.failedTitleMovie": "Film Talebi Başarısız",
+  "notifications.agents.webpush.failedTitleTv": "Dizi Talebi Başarısız"
 }

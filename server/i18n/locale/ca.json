@@ -53,5 +53,11 @@
   "notifications.common.viewIssue": "Veure incidència a {applicationTitle}",
   "notifications.common.viewMedia": "Veure contingut multimèdia a {applicationTitle}",
   "notifications.test.message": "Provant, 1, 2, 3. Es rep alt i clar?",
-  "notifications.test.subject": "Notificació de prova"
+  "notifications.test.subject": "Notificació de prova",
+  "notifications.agents.webpush.downloadedBody": "{title} ja es pot reproduir.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Pel·lícula baixada",
+  "notifications.agents.webpush.downloadedTitleTv": "Sèrie baixada",
+  "notifications.agents.webpush.failedBody": "No s'ha pogut baixar {title}.",
+  "notifications.agents.webpush.failedTitleMovie": "Ha fallat la sol·licitud de la pel·lícula",
+  "notifications.agents.webpush.failedTitleTv": "Ha fallat la sol·licitud de la sèrie"
 }

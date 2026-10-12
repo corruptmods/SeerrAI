@@ -53,5 +53,11 @@
   "notifications.common.viewIssue": "Se problem i {applicationTitle}",
   "notifications.common.viewMedia": "Vis medie i {applicationTitle}",
   "notifications.test.message": "Test, test, 1, 2, 3. Går vi klart igennem?",
-  "notifications.test.subject": "Testnotifikation"
+  "notifications.test.subject": "Testnotifikation",
+  "notifications.agents.webpush.downloadedBody": "{title} er klar til afspilning.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Film downloadet",
+  "notifications.agents.webpush.downloadedTitleTv": "Serie downloadet",
+  "notifications.agents.webpush.failedBody": "{title} kunne ikke downloades.",
+  "notifications.agents.webpush.failedTitleMovie": "Filmanmodning mislykkedes",
+  "notifications.agents.webpush.failedTitleTv": "Serieanmodning mislykkedes"
 }

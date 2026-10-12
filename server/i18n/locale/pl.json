@@ -53,5 +53,11 @@
   "notifications.common.processing": "Przetwarzanie",
   "notifications.common.reportedBy": "Zgłoszone przez",
   "notifications.test.message": "Próba, próba, 1, 2, 3. Czy wszystko słychać wyraźnie?",
-  "notifications.test.subject": "Powiadomienie testowe"
+  "notifications.test.subject": "Powiadomienie testowe",
+  "notifications.agents.webpush.downloadedBody": "Można już odtwarzać: {title}.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Pobrano film",
+  "notifications.agents.webpush.downloadedTitleTv": "Pobrano serial",
+  "notifications.agents.webpush.failedBody": "Nie udało się pobrać: {title}.",
+  "notifications.agents.webpush.failedTitleMovie": "Prośba o film nie powiodła się",
+  "notifications.agents.webpush.failedTitleTv": "Prośba o serial nie powiodła się"
 }

@@ -53,5 +53,11 @@
   "notifications.common.viewIssue": "Ver problema en {applicationTitle}",
   "notifications.common.viewMedia": "Ver contenido en {applicationTitle}",
   "notifications.test.message": "Probando, probando, 1, 2, 3. ¿Se escucha bien?",
-  "notifications.test.subject": "Notificación de prueba"
+  "notifications.test.subject": "Notificación de prueba",
+  "notifications.agents.webpush.downloadedBody": "{title} ya se puede reproducir.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Película descargada",
+  "notifications.agents.webpush.downloadedTitleTv": "Serie descargada",
+  "notifications.agents.webpush.failedBody": "No se pudo descargar {title}.",
+  "notifications.agents.webpush.failedTitleMovie": "Falló la petición de película",
+  "notifications.agents.webpush.failedTitleTv": "Falló la petición de serie"
 }

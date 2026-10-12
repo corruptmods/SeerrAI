@@ -4,6 +4,10 @@ The newest changes are at the top. **Coming next** is what's on the `dev` branch
 
 ## Coming next
 
+### Seerr AI in your language
+
+Every screen, button and notification is now translated into 40 languages, including everything Seerr AI added on top of Seerr. Basque, Kabyle, Slovak and Slovenian join the language picker, and notifications in Chinese now actually arrive in Chinese. Some older translations also had small mistakes, like showing "Plex" to Jellyfin users or an old app name instead of Seerr AI, and those are fixed too. Spot something that reads oddly in your language? Open an issue and we'll fix it.
+
 ### Jellyfin and Emby get the full experience
 
 Suggested for You, Who Watched, Pick for the Room, Catch Me Up, "up next" on your lists and AI Search knowing what you've watched now work on Jellyfin and Emby too, straight from your server, with nothing extra to set up. Health shows your Jellyfin or Emby server and its version, and the nightly Match Check now spots titles Jellyfin or Emby matched wrongly and tells you exactly what to enter in **Identify**.

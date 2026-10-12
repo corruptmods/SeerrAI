@@ -167,6 +167,7 @@ const TMDB_TO_TVDB_MAPPING: Record<string, string> & {
   en: 'eng', // English
   es: 'spa', // Spanish
   et: 'est', // Estonian
+  eu: 'eus', // Basque
   fi: 'fin', // Finnish
   fr: 'fra', // French
   he: 'heb', // Hebrew
@@ -175,6 +176,7 @@ const TMDB_TO_TVDB_MAPPING: Record<string, string> & {
   hu: 'hun', // Hungarian
   it: 'ita', // Italian
   ja: 'jpn', // Japanese
+  kab: 'eng', // Kabyle: TheTVDB has no Kabyle, so English
   ko: 'kor', // Korean
   lb: 'ltz', // Luxembourgish
   lt: 'lit', // Lithuanian
@@ -182,6 +184,8 @@ const TMDB_TO_TVDB_MAPPING: Record<string, string> & {
   pl: 'pol', // Polish
   ro: 'ron', // Romanian
   ru: 'rus', // Russian
+  sk: 'slk', // Slovak
+  sl: 'slv', // Slovenian
   sq: 'sqi', // Albanian
   sr: 'srp', // Serbian
   sv: 'swe', // Swedish

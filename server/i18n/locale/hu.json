@@ -53,5 +53,11 @@
   "notifications.common.viewIssue": "Probléma megnyitása a {applicationTitle}-ban",
   "notifications.common.viewMedia": "Média megtekintése {applicationTitle}-ban",
   "notifications.test.message": "Próba, 1, 2, 3. Jól jön át a hang?",
-  "notifications.test.subject": "Teszt értesítés"
+  "notifications.test.subject": "Teszt értesítés",
+  "notifications.agents.webpush.downloadedBody": "A(z) {title} lejátszható.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Film letöltve",
+  "notifications.agents.webpush.downloadedTitleTv": "Sorozat letöltve",
+  "notifications.agents.webpush.failedBody": "A(z) {title} nem tölthető le.",
+  "notifications.agents.webpush.failedTitleMovie": "Sikertelen filmkérés",
+  "notifications.agents.webpush.failedTitleTv": "Sikertelen sorozatkérés"
 }

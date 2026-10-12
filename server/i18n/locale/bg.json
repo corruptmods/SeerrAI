@@ -53,5 +53,11 @@
   "notifications.common.viewIssue": "Преглед на проблема в {applicationTitle}",
   "notifications.common.viewMedia": "Преглед на медията в {applicationTitle}",
   "notifications.test.message": "Проба, проба, 1, 2, 3. Чуваме ли се ясно?",
-  "notifications.test.subject": "Тестово известие"
+  "notifications.test.subject": "Тестово известие",
+  "notifications.agents.webpush.downloadedBody": "{title} е готов за гледане.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Филмът е изтеглен",
+  "notifications.agents.webpush.downloadedTitleTv": "Сериалът е изтеглен",
+  "notifications.agents.webpush.failedBody": "{title} не можа да бъде изтеглен.",
+  "notifications.agents.webpush.failedTitleMovie": "Неуспешна заявка за филм",
+  "notifications.agents.webpush.failedTitleTv": "Неуспешна заявка за сериал"
 }

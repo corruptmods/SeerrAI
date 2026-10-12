@@ -53,5 +53,11 @@
   "notifications.common.viewIssue": "Probleem bekijken in {applicationTitle}",
   "notifications.common.viewMedia": "Media bekijken in {applicationTitle}",
   "notifications.test.message": "Test test, 1, 2, 3. Komen we goed door?",
-  "notifications.test.subject": "Testmelding"
+  "notifications.test.subject": "Testmelding",
+  "notifications.agents.webpush.downloadedBody": "{title} is klaar om af te spelen.",
+  "notifications.agents.webpush.downloadedTitleMovie": "Film gedownload",
+  "notifications.agents.webpush.downloadedTitleTv": "Serie gedownload",
+  "notifications.agents.webpush.failedBody": "{title} kon niet worden gedownload.",
+  "notifications.agents.webpush.failedTitleMovie": "Filmaanvraag mislukt",
+  "notifications.agents.webpush.failedTitleTv": "Serie-aanvraag mislukt"
 }

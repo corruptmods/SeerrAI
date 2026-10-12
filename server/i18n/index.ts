@@ -10,9 +10,21 @@ type IntlInstance = ReturnType<typeof createIntl>;
 const cache = createIntlCache();
 const intls = new Map<string, IntlInstance>();
 
+/**
+ * The file each locale's messages are in, where it is not named after the
+ * locale: Chinese is kept by script, as the web app keeps it.
+ */
+const FILE_NAMES: Partial<Record<AvailableLocale, string>> = {
+  'zh-CN': 'zh-Hans',
+  'zh-TW': 'zh-Hant',
+};
+
 export function initI18n(): void {
   for (const locale of availableLocales) {
-    const filePath = path.join(__dirname, `locale/${locale}.json`);
+    const filePath = path.join(
+      __dirname,
+      `locale/${FILE_NAMES[locale] ?? locale}.json`
+    );
 
     if (!fs.existsSync(filePath)) continue;
 

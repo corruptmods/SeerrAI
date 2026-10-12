@@ -1,4 +1,3 @@
-import TautulliAPI from '@server/api/tautulli';
 import TheMovieDb from '@server/api/themoviedb';
 import type {
   TmdbMovieResult,
@@ -10,8 +9,8 @@ import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
 import { warmTmdbImages } from '@server/lib/imageproxy';
-import { isCompletedPlay } from '@server/lib/listWatchRules';
 import { getSettings } from '@server/lib/settings';
+import { isCompletedPlay, watchSource } from '@server/lib/watchHistory';
 import logger from '@server/logger';
 import { mapMovieResult, mapTvResult } from '@server/models/Search';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
@@ -37,7 +36,8 @@ export interface Activity {
 
 /**
  * What someone has been watching lately, newest first, as "Title (year)" for
- * films and "Title (series)" for shows: from Tautulli, counting a show they
+ * films and "Title (series)" for shows: from the server's watch history
+ * (Tautulli for Plex, the server itself for Jellyfin and Emby), counting a show they
  * are part-way through. Failing that, what they requested, marked as such so
  * it is never passed off as watched. Names only: nothing else about them
  * leaves the server.
@@ -49,25 +49,21 @@ export const recentActivity = async (user: User): Promise<Activity> => {
   }
 
   const watched = new Map<string, number>();
-  const tautulli = getSettings().tautulli;
-  if (user.plexId && tautulli.hostname && tautulli.apiKey) {
+  const source = watchSource();
+  if (source?.viewerOf(user)) {
     try {
-      const history = await new TautulliAPI(tautulli).getUserHistory(user, 300);
-      for (const record of history) {
-        if (
-          !isCompletedPlay(record) &&
-          record.percent_complete < STARTED_PERCENT
-        ) {
+      const history = await source.history(user, 300);
+      for (const play of history) {
+        if (!isCompletedPlay(play) && play.percent < STARTED_PERCENT) {
           continue;
         }
         const name =
-          record.media_type === 'movie'
-            ? `${record.title}${record.year ? ` (${record.year})` : ''}`
-            : `${record.grandparent_title} (series)`;
-        // Newest first from Tautulli, so the first play of a title is its
-        // latest.
+          play.kind === 'movie'
+            ? `${play.title}${play.year ? ` (${play.year})` : ''}`
+            : `${play.title} (series)`;
+        // Newest first, so the first play of a title is its latest.
         if (!watched.has(name)) {
-          watched.set(name, record.date);
+          watched.set(name, play.at);
         }
         if (watched.size >= 20) {
           break;

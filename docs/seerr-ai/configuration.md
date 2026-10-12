@@ -13,7 +13,7 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | **Settings → Features** | Turns optional features off for everyone. See [Feature switches](#feature-switches). | All on |
 | **Settings → Services → Download Clients** | SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent, read for live progress, and for Backfill to send what it finds to. Keys and passwords are never sent back to the browser. | None |
 | **Settings → Services → Bazarr** | Subtitles and transcription. | Port 6767 |
-| **Settings → Services → Tautulli** | Watch history from Plex, for Suggested for You, "up next" on lists, Who Watched, Pick for the Room and Catch Me Up. Plex only; moved here from Settings → Plex. Its API key is never sent back to the browser. | Port 8181 |
+| **Settings → Services → Tautulli** | Watch history from Plex, for Suggested for You, "up next" on lists, Who Watched, Pick for the Room and Catch Me Up. Plex only; moved here from Settings → Plex. Its API key is never sent back to the browser. With Jellyfin or Emby there is nothing to set up: Seerr AI reads watch history from the server itself, with the API key in Settings → Jellyfin/Emby. | Port 8181 |
 | **Settings → Services → Maintainerr** | One or more servers. Per server: show Deleting Soon badges, include in the Deleting Soon row, allow Keep for everyone, days Keep adds (0 restarts the rule's grace period), what counts as "soon". | Port 6246; badges, row and Keep on; 0 days; 14 days |
 | **Settings → Services → Radarr** | **Anime Quality Profile**, **Anime Root Folder**, **Anime Tags** for anime movies. | Unset (anime movies use the regular ones) |
 | **Settings → Services → Override Rules** | Sonarr rules can set **Series Type**; Radarr rules can set **Anime**. | Left to detection |
@@ -47,6 +47,21 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | *Advanced:* agent steps per go / times it carries on by itself | 30 / 3 |
 | *Advanced:* days to keep finished agent conversations | 30 (0 forever) |
 
+## Plex, Jellyfin and Emby
+
+Seerr AI works with all three, as Seerr does. Its own features work with all three too, with a few exceptions:
+
+| Feature | Plex | Jellyfin and Emby |
+|---|---|---|
+| Suggested for You, Who Watched, Pick for the Room, Catch Me Up, "up next" and watch sync on lists, AI Search knowing what you watched | Needs Tautulli | Read from the server itself; nothing to set up |
+| Match Check (wrong matches on Health and title pages) | Yes, fixed with **Fix Match** | Yes, fixed with **Identify** |
+| Health: the media server answering, and its version | Yes | Yes |
+| Passkeys | Refused once the server owner stops sharing with the account | Refused once the account is deleted or switched off on the server |
+| Your default subtitle on the Subtitles card | Yes | No: Jellyfin and Emby choose subtitles by language preference rather than per title |
+| Plex watchlist sync, Plex user import, expired Plex sign-ins on Health | Yes | Not applicable |
+
+Jellyfin and Emby keep the latest play of each film or episode rather than a log of every play, so a rewatch moves a title forward instead of adding another play.
+
 ## Jobs
 
 Seerr AI adds these to **Settings → Jobs & Cache**, where each can be rescheduled or run now. Times are the server's.
@@ -61,7 +76,7 @@ Seerr AI adds these to **Settings → Jobs & Cache**, where each can be reschedu
 | Backfill Downloads | every minute | Moves approved Backfill downloads along: picks files, imports, cleans up. |
 | Health Alerts | every 10 minutes | Tells admins when a connected service newly has a problem. |
 | Anime Check | daily, 04:15 | Report: series and movies in the wrong anime folder, type or profile. |
-| Plex Match Check | daily, 04:20 | Report: folders Plex matched to another title. Plex only. |
+| Match Check | daily, 04:20 | Report: folders your media server (Plex, Jellyfin or Emby) matched to another title. |
 | Database Maintenance | daily, 03:45 | Clears rows nothing reads any more, then compacts the database. |
 
 ## Feature switches

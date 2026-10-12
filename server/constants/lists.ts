@@ -20,5 +20,5 @@ export const REQUEST_BATCH_LIMIT = 20;
 /** Matches offered per imported line. */
 export const CANDIDATES_PER_LINE = 5;
 
-/** How long between re-checking a list against Tautulli watch history. */
+/** How long between re-checking a list against the server's watch history. */
 export const WATCH_CHECK_INTERVAL_MS = 30 * 60 * 1000;

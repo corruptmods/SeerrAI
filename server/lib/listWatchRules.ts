@@ -1,13 +1,7 @@
-import type { TautulliHistoryRecord } from '@server/api/tautulli';
+import type { Play } from '@server/lib/watchHistory';
+import { isCompletedPlay } from '@server/lib/watchHistory';
 
-/**
- * A play counts as finished when Tautulli marked it watched. Some records
- * carry only a completion percentage, so fall back to that.
- */
-const COMPLETE_PERCENT = 85;
-
-export const isCompletedPlay = (record: TautulliHistoryRecord): boolean =>
-  record.watched_status >= 1 || record.percent_complete >= COMPLETE_PERCENT;
+export { isCompletedPlay };
 
 /**
  * Whether a movie counts as watched: any completed play after the title was
@@ -15,14 +9,11 @@ export const isCompletedPlay = (record: TautulliHistoryRecord): boolean =>
  * — adding something you watched years ago means you intend to watch it
  * again, so it should only clear once you actually do.
  */
-export const hasWatchedMovie = (
-  plays: TautulliHistoryRecord[],
-  addedAt: Date
-): boolean => {
+export const hasWatchedMovie = (plays: Play[], addedAt: Date): boolean => {
   const cutoff = Math.floor(addedAt.getTime() / 1000);
 
   return plays.some(
-    (play) => play.date > cutoff && play.media_type === 'movie' && isCompletedPlay(play)
+    (play) => play.at > cutoff && play.kind === 'movie' && isCompletedPlay(play)
   );
 };
 
@@ -35,7 +26,7 @@ export const hasWatchedMovie = (
  * has not aired yet would clear itself the moment it was added.
  */
 export const hasWatchedSeries = (
-  plays: TautulliHistoryRecord[],
+  plays: Play[],
   addedAt: Date,
   available: Set<string>
 ): boolean => {
@@ -47,15 +38,15 @@ export const hasWatchedSeries = (
   const watched = new Set<string>();
 
   for (const play of plays) {
-    if (play.date <= cutoff || !isCompletedPlay(play)) {
+    if (play.at <= cutoff || !isCompletedPlay(play)) {
       continue;
     }
 
-    if (play.media_type !== 'episode') {
+    if (play.kind !== 'episode') {
       continue;
     }
 
-    watched.add(`${play.parent_media_index}:${play.media_index}`);
+    watched.add(`${play.season}:${play.episode}`);
   }
 
   for (const episode of available) {

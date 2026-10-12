@@ -70,7 +70,7 @@ const messages = defineMessages('components.Settings.SettingsHealth', {
   stuckProcessing: 'Processing for over a week',
   missingTvdb: 'Requested series with no TVDB id',
   collectionGaps: 'Collections partly in your library',
-  plexMatches: 'Folders Plex matched to another title',
+  plexMatches: 'Folders matched to another title',
   plexSignIn: 'Expired Plex sign-ins',
   backfill: 'Backfill',
   backfillSearchErrors: 'Titles Backfill could not search',

@@ -1,4 +1,3 @@
-import TautulliAPI from '@server/api/tautulli';
 import TheMovieDb from '@server/api/themoviedb';
 import type {
   TmdbMovieResult,
@@ -8,17 +7,18 @@ import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import type { User } from '@server/entity/User';
-import { getSettings } from '@server/lib/settings';
+import { watchSource } from '@server/lib/watchHistory';
 import logger from '@server/logger';
 import { In } from 'typeorm';
 
 /*
  * "Suggested for you": titles like the ones someone has been watching.
  *
- * Their recent finished plays come from Tautulli. Each of the latest few
- * titles asks TMDB for its recommendations, and a title several of them point
- * to ranks above one only a single show suggested, with more recent watching
- * counting for more. Anything they have already started is left out.
+ * Their recent finished plays come from the server's watch history:
+ * Tautulli for Plex, the server itself for Jellyfin and Emby. Each of the
+ * latest few titles asks TMDB for its recommendations, and a title several
+ * of them point to ranks above one only a single show suggested, with more
+ * recent watching counting for more. Anything they have already started is left out.
  *
  * That is a TMDB lookup per title, so the list is built once a day per person
  * and kept in memory; statuses are read fresh on every request.
@@ -28,6 +28,8 @@ export type SuggestionResult =
   | (TmdbMovieResult & { media_type: 'movie' })
   | (TmdbTvResult & { media_type: 'tv' });
 
+/** Plays read: enough to reach well back past the latest few titles. */
+const HISTORY_LENGTH = 3000;
 /** Titles whose recommendations are asked for. */
 const SEEDS = 15;
 /** How many suggestions are kept: enough to fill the full page. */
@@ -37,7 +39,7 @@ const REBUILD_MS = 24 * 60 * 60 * 1000;
 const CONCURRENCY = 4;
 
 /**
- * Keyed on the Plex account as well as the user: history belongs to the
+ * Keyed on the server account as well as the user: history belongs to the
  * account, so relinking a different one starts afresh.
  */
 const built = new Map<
@@ -47,20 +49,6 @@ const built = new Map<
 
 const keyOf = (mediaType: MediaType, tmdbId: number) =>
   `${mediaType}:${tmdbId}`;
-
-/** The Plex rating key a play belongs to: the film, or the episode's show. */
-const titleKeyOf = (record: {
-  media_type: string;
-  rating_key: number;
-  grandparent_rating_key: number;
-}) => ({
-  mediaType: record.media_type === 'movie' ? MediaType.MOVIE : MediaType.TV,
-  ratingKey: String(
-    record.media_type === 'movie'
-      ? record.rating_key
-      : record.grandparent_rating_key
-  ),
-});
 
 const eachLimited = async <T>(
   items: T[],
@@ -78,55 +66,42 @@ const eachLimited = async <T>(
 };
 
 const build = async (user: User): Promise<SuggestionResult[]> => {
-  const settings = getSettings().tautulli;
-  if (!settings.hostname || !settings.port || !settings.apiKey) {
+  const source = watchSource();
+  if (!source || !source.viewerOf(user)) {
     return [];
   }
 
-  const history = await new TautulliAPI(settings).getUserHistory(user);
+  const history = await source.history(user, HISTORY_LENGTH);
   if (!history.length) {
     return [];
   }
 
   // Every title they have started, and the ones they finished, newest first.
-  const startedKeys = new Set<string>();
+  const startedIds = new Set<string>();
   // A Set keeps insertion order, so this stays newest first.
   const finishedOrder = new Set<string>();
-  for (const record of history) {
-    const { mediaType, ratingKey } = titleKeyOf(record);
-    startedKeys.add(`${mediaType}:${ratingKey}`);
-    if (record.watched_status === 1) {
-      finishedOrder.add(`${mediaType}:${ratingKey}`);
+  for (const play of history) {
+    if (!play.titleId) continue;
+    startedIds.add(play.titleId);
+    if (play.finished) {
+      finishedOrder.add(play.titleId);
     }
   }
 
-  // Plex rating keys to TMDB ids, through the library Seerr already knows.
-  const ratingKeys = [
-    ...new Set([...startedKeys].map((key) => key.split(':')[1])),
-  ];
-  const known = await getRepository(Media).find({
-    where: [{ ratingKey: In(ratingKeys) }, { ratingKey4k: In(ratingKeys) }],
-  });
-  const byRatingKey = new Map<string, Media>();
-  for (const media of known) {
-    for (const key of [media.ratingKey, media.ratingKey4k]) {
-      if (key) {
-        byRatingKey.set(`${media.mediaType}:${key}`, media);
-      }
-    }
-  }
+  // The server's ids to TMDB ids, through the library Seerr already knows.
+  const byTitleId = await source.mediaFor([...startedIds]);
 
   const started = new Set<string>();
-  for (const key of startedKeys) {
-    const media = byRatingKey.get(key);
+  for (const id of startedIds) {
+    const media = byTitleId.get(id);
     if (media) {
       started.add(keyOf(media.mediaType, media.tmdbId));
     }
   }
 
   const seeds: Media[] = [];
-  for (const key of finishedOrder) {
-    const media = byRatingKey.get(key);
+  for (const id of finishedOrder) {
+    const media = byTitleId.get(id);
     if (media && !seeds.some((seed) => seed.id === media.id)) {
       seeds.push(media);
     }
@@ -221,8 +196,9 @@ const build = async (user: User): Promise<SuggestionResult[]> => {
 };
 
 /**
- * Suggestions for one person, best first. Empty when Tautulli is not set up,
- * they have no Plex account, or they have not finished anything yet.
+ * Suggestions for one person, best first. Empty when there is no watch
+ * history to read (Plex without Tautulli), they have no account on the
+ * media server, or they have not finished anything yet.
  */
 export const getSuggestions = (user: User): Promise<SuggestionResult[]> => {
   const now = Date.now();
@@ -232,7 +208,7 @@ export const getSuggestions = (user: User): Promise<SuggestionResult[]> => {
     }
   }
 
-  const key = `${user.id}:${user.plexId ?? ''}`;
+  const key = `${user.id}:${watchSource()?.viewerOf(user) ?? ''}`;
   const hit = built.get(key);
   if (hit) {
     return hit.value;

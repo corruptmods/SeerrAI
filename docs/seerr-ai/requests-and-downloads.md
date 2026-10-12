@@ -66,7 +66,7 @@ From a title's page, people who can manage the blocklist can blocklist a title n
 ## Other additions
 
 - **History:** a title's Manage panel lists everything that happened to it: requested, approved, declined, failed to send, available, removed, files deleted, blocklisted, kept from deletion, searched, and what Backfill and the admin agent did. It survives the title being deleted. For request managers and admins.
-- **Who watched:** admins see who has watched a title, and how far, on its page (needs Tautulli). Switch: `whoWatched`.
+- **Who watched:** admins see who has watched a title, and how far, on its page (with Plex this needs Tautulli; Jellyfin and Emby keep it themselves). Switch: `whoWatched`.
 - **Collections:** a collection page says how much of it you have and offers **Request the missing N**.
 - **Notify me when available:** for a title someone else requested.
 - **Failed sends can be retried:** a request Radarr or Sonarr wouldn't take is marked **Failed** instead of sitting at Processing, and request managers can retry it.

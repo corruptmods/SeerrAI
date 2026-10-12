@@ -15,7 +15,7 @@ Resetting the rows to default clears what everyone hid, because the rows are cre
 ### Rows Seerr AI adds
 
 - **Deleting Soon** (first by default): what Maintainerr is about to delete, soonest first, each with a **Keep** button. Hidden when nothing is due. Switch: `deletingSoon`.
-- **Suggested for You**: built from what you finished watching recently (from Tautulli) and TMDB's recommendations, with recent watching counting more. Leaves out what you have started or what is blocklisted, and has its own page. Hidden when there is nothing to go on (no Tautulli, no linked Plex account, no history). Switch: `suggestedForYou`.
+- **Suggested for You**: built from what you finished watching recently (from Tautulli with Plex, or straight from Jellyfin or Emby) and TMDB's recommendations, with recent watching counting more. Leaves out what you have started or what is blocklisted, and has its own page. Hidden when there is nothing to go on (Plex without Tautulli, no linked media server account, no history). Switch: `suggestedForYou`.
 
 ## Filter any page of posters
 
@@ -31,7 +31,7 @@ Every grid of posters (Discover pages, search, watchlists, recommendations, Sugg
 
 - **Sharing:** the owner shares a list with people, who can then add, remove and mark watched, or leave it. Only the owner renames, shares, deletes or imports. A list is seen only by its owner and the people it is shared with.
 - **Sections:** **To watch** (here now), **Not Available Yet**, and **Watched**.
-- **Where you are in each series:** series show "Up next S2E4 · 6 to catch up", "Not started" or "Caught up", from your own Plex history (needs Tautulli and a linked Plex account).
+- **Where you are in each series:** series show "Up next S2E4 · 6 to catch up", "Not started" or "Caught up", from your own watch history (with Plex this needs Tautulli and a linked Plex account; with Jellyfin or Emby, a linked account on the server).
 - **Sorting:** recently added, oldest added, title, newest or oldest release. Remembered on each device.
 - **Activity:** people on a list are notified when someone adds, removes or marks something watched (the **List Activity** notification). Private lists send nothing.
 - **Import:** the owner can paste a list of titles, one per line. Each line is matched to TMDB and **you review every match** before anything is added; nothing is added on a guess. A collection adds all its films. Optionally, anything not already in the library is requested (at most 20 per import, with your usual permissions).

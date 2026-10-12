@@ -31,14 +31,14 @@ export class MediaList {
   public ownerId: number;
 
   /**
-   * When on, a scheduled job checks Tautulli and suggests removing titles
+   * When on, a scheduled job checks the watch history and suggests removing titles
    * everyone on the list has finished. Off by default: watching people's
    * viewing history is opt-in per list.
    */
   @Column({ default: false })
   public watchedSync: boolean;
 
-  /** Throttles the Tautulli check so it does not run on every page load. */
+  /** Throttles the watch-history check so it does not run on every page load. */
   @DbAwareColumn({ type: 'datetime', nullable: true })
   public lastWatchCheck?: Date | null;
 

@@ -1,3 +1,4 @@
+import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
@@ -15,6 +16,7 @@ import { getSettings } from '@server/lib/settings';
 import { startSession } from '@server/lib/signIn';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
+import { getHostname } from '@server/utils/getHostname';
 import type {
   AuthenticationResponseJSON,
   RegistrationResponseJSON,
@@ -232,8 +234,10 @@ passkeyRoutes.post('/login/options', async (req, res, next) => {
 
 /**
  * Whether this person may still sign in. The same rules as signing in with
- * Plex or a password: a Plex account the server owner has stopped sharing
- * with is refused, and so is a way of signing in the admin has turned off.
+ * the media server or a password: a Plex account the server owner has
+ * stopped sharing with is refused, so is a Jellyfin or Emby account that
+ * has been deleted or switched off there, and so is a way of signing in
+ * the admin has turned off.
  */
 const maySignIn = async (user: User): Promise<boolean> => {
   const settings = getSettings();
@@ -262,8 +266,22 @@ const maySignIn = async (user: User): Promise<boolean> => {
     return settings.main.localLogin !== false || user.id === 1;
   }
 
-  // Jellyfin and Emby accounts sign in with their own server's rules.
-  return settings.main.mediaServerLogin !== false;
+  if (settings.main.mediaServerLogin === false) {
+    return false;
+  }
+  if (user.id === 1) {
+    return true;
+  }
+  // A Jellyfin or Emby account must still exist there, and not be switched
+  // off: a passkey is no way around the server's own decision.
+  if (!user.jellyfinUserId || !settings.jellyfin.apiKey) {
+    return false;
+  }
+  const account = await new JellyfinAPI(
+    getHostname(),
+    settings.jellyfin.apiKey
+  ).getAccount(user.jellyfinUserId);
+  return !!account && !account.Policy?.IsDisabled;
 };
 
 passkeyRoutes.post('/login', async (req, res, next) => {

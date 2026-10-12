@@ -41,9 +41,9 @@ const sinceLastWatched = (
 };
 
 /**
- * Who has watched this title and when last, from Tautulli, as a row in the
- * title's facts. Admins only, like the watch data behind the manage panel.
- * Nothing when Tautulli is not set up.
+ * Who has watched this title and when last, from the server's watch
+ * history (Tautulli for Plex, Jellyfin or Emby themselves), as a row in the
+ * title's facts. Admins only. Nothing when there is no watch history.
  */
 const WatchedBy = ({
   mediaId,
@@ -76,7 +76,11 @@ const WatchedBy = ({
         {data.people.length === 0
           ? intl.formatMessage(messages.nobody)
           : shown.map((person) => {
-              const { value, unit } = sinceLastWatched(person.lastWatched);
+              // Emby keeps no date for something marked watched by hand.
+              const since = person.lastWatched
+                ? sinceLastWatched(person.lastWatched)
+                : undefined;
+              const counted = person.count > 1 || isShow || !since;
               return (
                 <span
                   key={`watched-by-${person.user?.id ?? person.name}`}
@@ -84,17 +88,19 @@ const WatchedBy = ({
                 >
                   <span className="block text-gray-200">{person.name}</span>
                   <span className="block text-xs text-gray-400">
-                    {person.count > 1 || isShow
-                      ? `${intl.formatMessage(
-                          isShow ? messages.episodes : messages.plays,
-                          { count: person.count }
-                        )} · `
-                      : ''}
-                    <FormattedRelativeTime
-                      value={value}
-                      unit={unit}
-                      numeric="auto"
-                    />
+                    {counted &&
+                      intl.formatMessage(
+                        isShow ? messages.episodes : messages.plays,
+                        { count: person.count }
+                      )}
+                    {counted && since && ' · '}
+                    {since && (
+                      <FormattedRelativeTime
+                        value={since.value}
+                        unit={since.unit}
+                        numeric="auto"
+                      />
+                    )}
                   </span>
                 </span>
               );

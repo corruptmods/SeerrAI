@@ -144,12 +144,13 @@ listRoutes.get('/contains', isAuthenticated(), async (req, res, next) => {
 });
 
 // Pending removal suggestions for the caller's own lists. Fetched when the
-// app loads, which is also when the Tautulli check runs (throttled), so the
-// prompt is ready rather than computed while the user waits.
+// app loads, which is also when the watch-history check runs (throttled),
+// so the prompt is ready rather than computed while the user waits.
 
 /*
- * Where the viewer is in each series on a list, from their Plex watch history
- * in Tautulli. Each person sees their own position on a shared list.
+ * Where the viewer is in each series on a list, from the server's watch
+ * history (Tautulli for Plex, Jellyfin or Emby themselves). Each person sees
+ * their own position on a shared list.
  */
 listRoutes.get<{ listId: string }>(
   '/:listId/progress',
@@ -189,11 +190,11 @@ listRoutes.get<{ listId: string }>(
 
 listRoutes.get('/suggestions', isAuthenticated(), async (req, res, next) => {
   try {
-    // Turned off: no Tautulli check, and nothing suggested.
+    // Turned off: no watch-history check, and nothing suggested.
     if (!featureEnabled('watchSuggestions', req.user)) {
       return res.status(200).json([]);
     }
-    // A Tautulli that is unreachable should cost the user this refresh, not
+    // A watch history that is unreachable should cost the user this refresh, not
     // the suggestions already stored from previous checks.
     try {
       await refreshWatchSuggestions(req.user as User);

@@ -99,7 +99,7 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     'backfill-scan': 'Backfill Scan',
     'backfill-monitor': 'Backfill Downloads',
     'health-watch': 'Health Alerts',
-    'plex-match-check': 'Plex Match Check',
+    'plex-match-check': 'Match Check',
     'database-maintenance': 'Database Maintenance',
     editJobSchedule: 'Modify Job',
     jobScheduleEditSaved: 'Job edited successfully!',

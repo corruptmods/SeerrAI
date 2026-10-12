@@ -94,14 +94,18 @@ components:
               type: string
             server:
               type: string
-        plex:
+        mediaServer:
+          type: string
+          enum: [Plex, Jellyfin, Emby]
+        matched:
           type: object
+          description: What the media server matched the folder to, and its id for the item.
           properties:
             title:
               type: string
             year:
               type: number
-            ratingKey:
+            key:
               type: string
             tmdbId:
               type: number
@@ -5562,7 +5566,7 @@ paths:
                 $ref: '#/components/schemas/PlexMatchReport'
   /settings/plex-match-check/title:
     get:
-      summary: What the last Plex Match Check found for one title
+      summary: What the last Match Check found for one title
       tags:
         - settings
       parameters:
@@ -5581,7 +5585,8 @@ paths:
           schema:
             type: string
         - in: query
-          name: ratingKey
+          name: key
+          description: The media server's id for the title (Plex rating key, or Jellyfin/Emby item id)
           schema:
             type: string
       responses:

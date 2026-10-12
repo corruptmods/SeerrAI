@@ -3,6 +3,7 @@ import {
   CLIENT_PRODUCTS,
   downloadClientFor,
 } from '@server/api/downloadclients';
+import JellyfinAPI from '@server/api/jellyfin';
 import MaintainerrAPI from '@server/api/maintainerr';
 import PlexAPI from '@server/api/plexapi';
 import ProwlarrAPI from '@server/api/prowlarr';
@@ -29,6 +30,7 @@ import type { PlexMatchProblem } from '@server/lib/plexMatchCheck';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import type { DownloadClientSettings } from '@server/lib/settings';
 import { aiReady, getSettings } from '@server/lib/settings';
+import { getHostname } from '@server/utils/getHostname';
 import { mainId, sameName } from '@server/utils/plexMatch';
 import { In, IsNull, LessThan, MoreThanOrEqual, Not } from 'typeorm';
 
@@ -487,6 +489,60 @@ const serviceDown = (id: string, name: string, e: unknown): HealthCheck => ({
   items: [],
 });
 
+/**
+ * Jellyfin or Emby: answering, with its version, or why not in words. The
+ * API key is what Seerr uses for scans and watch history, so it is the one
+ * checked.
+ */
+export const mediaServerCheck = async (
+  kind: 'jellyfin' | 'emby',
+  api: Pick<JellyfinAPI, 'getSystemInfo'>
+): Promise<HealthCheck> => {
+  const name = kind === 'emby' ? 'Emby' : 'Jellyfin';
+  const started = Date.now();
+  try {
+    const info = (await withTimeout(
+      api.getSystemInfo(),
+      SERVICE_TIMEOUT_MS
+    )) as {
+      Version?: string;
+      ServerName?: string;
+    };
+    return {
+      id: kind,
+      group: 'services',
+      name,
+      status: 'ok',
+      count: 0,
+      detail: [
+        info?.Version ? `${name} ${info.Version}` : undefined,
+        `${Date.now() - started} ms`,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      items: [],
+    };
+  } catch (e) {
+    const status = (e as { statusCode?: number }).statusCode;
+    return {
+      id: kind,
+      group: 'services',
+      name,
+      status: 'error',
+      count: 1,
+      detail:
+        status === 401 || status === 403
+          ? `${name} did not accept the API key (Settings → ${name}).`
+          : status === 502 || status === undefined
+            ? `Could not reach ${name}${
+                e instanceof Error && e.message ? ` (${e.message})` : ''
+              }.`
+            : `${name} answered with an error (${status}).`,
+      items: [],
+    };
+  }
+};
+
 export const serviceChecks = async (): Promise<HealthCheck[]> => {
   const settings = getSettings();
   const pending: Promise<HealthCheck>[] = [];
@@ -507,6 +563,22 @@ export const serviceChecks = async (): Promise<HealthCheck[]> => {
           timeout: SERVICE_TIMEOUT_MS,
         }).getStatus();
       })
+    );
+  }
+
+  if (
+    (settings.main.mediaServerType === MediaServerType.JELLYFIN ||
+      settings.main.mediaServerType === MediaServerType.EMBY) &&
+    settings.jellyfin.ip &&
+    settings.jellyfin.apiKey
+  ) {
+    pending.push(
+      mediaServerCheck(
+        settings.main.mediaServerType === MediaServerType.EMBY
+          ? 'emby'
+          : 'jellyfin',
+        new JellyfinAPI(getHostname(), settings.jellyfin.apiKey)
+      )
     );
   }
 
@@ -965,49 +1037,64 @@ const titled = (t: { title: string; year?: number }) =>
   t.year ? `${t.title} (${t.year})` : t.title;
 
 /**
- * One Plex Match Check problem in words. The ids are shown because names
- * can't tell two films apart: two can share a name and a year.
+ * How to fix a match on this server: Plex's "Fix Match" finds a title by
+ * its id typed as "tmdb-123"; Jellyfin's and Emby's "Identify" has a box
+ * for each id.
+ */
+export const fixMatchText = (
+  server: string,
+  want?: { name: 'tmdb' | 'tvdb'; id: number }
+): string =>
+  server === 'Plex'
+    ? want
+      ? `Fix Match in Plex, searching ${want.name}-${want.id}`
+      : 'Fix Match in Plex'
+    : want
+      ? `Identify in ${server}, entering ${want.name.toUpperCase()} id ${want.id}`
+      : `Identify in ${server}`;
+
+/**
+ * One Match Check problem in words. The ids are shown because names can't
+ * tell two films apart: two can share a name and a year.
  */
 export const plexMatchText = (
   p: PlexMatchProblem
 ): { title: string; detail: string } => {
+  const server = p.mediaServer ?? 'Plex';
   const want = mainId(p.kind, p.expected);
-  const got = mainId(p.kind, p.plex);
+  const got = mainId(p.kind, p.matched);
   const label = (m: { name: string; id: number }) =>
     `${m.name.toUpperCase()} ${m.id}`;
-  // Plex's Fix Match finds a title by its id typed as "tmdb-123".
-  const fix = want
-    ? `Fix Match in Plex, searching ${want.name}-${want.id}`
-    : 'Fix Match in Plex';
+  const fix = fixMatchText(server, want);
   const ids = [
     want && `${p.expected.server}: ${label(want)}`,
-    got && `Plex: ${label(got)}`,
+    got && `${server}: ${label(got)}`,
   ]
     .filter(Boolean)
     .join(', ');
   if (p.reason === 'unmatched') {
     return {
-      title: `Plex has not matched "${p.folder}"`,
+      title: `${server} has not matched "${p.folder}"`,
       detail: `${p.expected.server} has ${titled(p.expected)} there · ${fix}`,
     };
   }
   if (p.reason === 'differentId') {
     return {
-      title: `Plex and ${p.expected.server} use different entries for ${titled(p.expected)}`,
-      detail: `The same title by ${p.plex.imdbId && p.plex.imdbId === p.expected.imdbId ? `IMDb (${p.plex.imdbId})` : 'another id'}, but ${ids}, so Seerr's Plex scan marks Plex's entry as in the library rather than the one requested · ${fix}; if Plex finds nothing, ${p.expected.server}'s entry may be the outdated one`,
+      title: `${server} and ${p.expected.server} use different entries for ${titled(p.expected)}`,
+      detail: `The same title by ${p.matched.imdbId && p.matched.imdbId === p.expected.imdbId ? `IMDb (${p.matched.imdbId})` : 'another id'}, but ${ids}, so Seerr's ${server} scan marks ${server}'s entry as in the library rather than the one requested · ${fix}; if ${server} finds nothing, ${p.expected.server}'s entry may be the outdated one`,
     };
   }
   return {
-    title: sameName(p.plex, p.expected)
-      ? `Plex matched "${p.folder}" to a different ${p.kind === 'movie' ? 'film' : 'series'} named ${titled(p.plex)}`
-      : `Plex matched "${p.folder}" to ${titled(p.plex)}`,
+    title: sameName(p.matched, p.expected)
+      ? `${server} matched "${p.folder}" to a different ${p.kind === 'movie' ? 'film' : 'series'} named ${titled(p.matched)}`
+      : `${server} matched "${p.folder}" to ${titled(p.matched)}`,
     detail: `${p.expected.server} has ${titled(p.expected)} there${ids ? ` (${ids})` : ''} · ${fix}`,
   };
 };
 
 /**
- * Folders Plex matched to another title than Sonarr or Radarr has in them,
- * from the nightly Plex Match Check. Each opens the title Sonarr or Radarr
+ * Folders the media server matched to another title than Sonarr or Radarr
+ * has in them, from the nightly Match Check. Each opens the title Sonarr or Radarr
  * has, whose page says the same.
  */
 const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
@@ -1049,7 +1136,7 @@ const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
           ]
             .filter(Boolean)
             .join(' · ')
-        : 'Runs nightly (Settings → Jobs → Plex Match Check)',
+        : 'Runs nightly (Settings → Jobs → Match Check)',
     items: items.map((p) => ({
       ...plexMatchText(p),
       href: (() => {

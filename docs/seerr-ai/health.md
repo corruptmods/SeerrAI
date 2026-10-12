@@ -6,7 +6,7 @@
 
 **Settings → Health** (admins) checks everything Seerr AI depends on and lists what has quietly gone wrong, each with a link to fix it.
 
-- **Services**: whether Plex, Radarr, Sonarr, Prowlarr, each download client, Bazarr, the AI provider, Tautulli, each Maintainerr server and the PostgreSQL connection pool answer, plus what they report themselves: Radarr's and Sonarr's own health warnings and disks running low, indexers Prowlarr has paused, subtitle providers Bazarr has paused (WhisperAI included), an AI account out of credit. Each download client shows which one it is and its version ("Transmission 4.0.6"), and the one Backfill sends to also lists what keeps Backfill from using it fully: Deluge's Label plugin off, rTorrent refusing to run commands, Transmission older than 3.0, NZBGet older than 16.
+- **Services**: whether Plex (or Jellyfin or Emby, with its version), Radarr, Sonarr, Prowlarr, each download client, Bazarr, the AI provider, Tautulli, each Maintainerr server and the PostgreSQL connection pool answer, plus what they report themselves: Radarr's and Sonarr's own health warnings and disks running low, indexers Prowlarr has paused, subtitle providers Bazarr has paused (WhisperAI included), an AI account out of credit. Each download client shows which one it is and its version ("Transmission 4.0.6"), and the one Backfill sends to also lists what keeps Backfill from using it fully: Deluge's Label plugin off, rTorrent refusing to run commands, Transmission older than 3.0, NZBGet older than 16.
 - **Backfill**: titles it couldn't search, packs waiting for approval, downloads that failed this week.
 - **Requests**: failed, approved but never sent, waiting on approval for over a week, and requests no longer linked to a title (with a button to remove them).
 - **Titles**: processing for over a week (with **Search now** for each and **Search all**), series requests with no TVDB id, folders Plex matched to the wrong title, collections partly in the library.
@@ -21,7 +21,7 @@ Every 10 minutes (the **Health Alerts** job) the service checks run, and admins 
 
 Plex matches files to titles by their names; Sonarr and Radarr by their own ids. When the two disagree, nothing says so, and the wrong title shows as available while the right one shows nothing. For example, a new show called "Carrie" can be matched to "The Carrie Diaries".
 
-Every night (04:20, the **Plex Match Check** job, Plex only), Seerr AI reads each Plex library, finds each item's folder in Sonarr or Radarr, and compares their ids, not their names. Folders matched to another title, or to none, are listed on the Health page with both sides' ids, and the title's page warns admins what Plex matched it to and what to pick. The next check clears it once they agree. To check now, use **Run now** on Settings → Jobs & Cache.
+Every night (04:20, the **Match Check** job), Seerr AI reads each library on your media server (Plex, Jellyfin or Emby), finds each item's folder in Sonarr or Radarr, and compares their ids, not their names. Folders matched to another title, or to none, are listed on the Health page with both sides' ids, and the title's page warns admins what the server matched it to and how to fix it: **Fix Match** in Plex, or **Identify** in Jellyfin and Emby, with the id to enter. The next check clears it once they agree. To check now, use **Run now** on Settings → Jobs & Cache.
 
 What a row can say:
 

@@ -1,11 +1,9 @@
-import TautulliAPI from '@server/api/tautulli';
 import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Episode from '@server/entity/Episode';
 import Media from '@server/entity/Media';
 import type { User } from '@server/entity/User';
-import { isCompletedPlay } from '@server/lib/listWatchRules';
-import { getSettings } from '@server/lib/settings';
+import { isCompletedPlay, watchSource } from '@server/lib/watchHistory';
 import logger from '@server/logger';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 import { In } from 'typeorm';
@@ -26,7 +24,7 @@ export interface SeriesProgress {
   furthest?: EpisodeRef;
 }
 
-/** How long a viewer's position is reused before asking Tautulli again. */
+/** How long a viewer's position is reused before asking the server again. */
 const CACHE_MS = 10 * 60 * 1000;
 const cache = new Map<string, { at: number; value: SeriesProgress | null }>();
 
@@ -81,22 +79,19 @@ export const workOutProgress = (
 /**
  * Progress through each series on a list, for one viewer.
  *
- * Returns nothing for a series it cannot answer honestly — no Plex account for
- * the viewer, Tautulli not configured or not responding, or nothing of the
- * series in the library — rather than a misleading "not started".
+ * Returns nothing for a series it cannot answer honestly — the viewer has
+ * no account on the media server, there is no watch history to ask (no
+ * Tautulli for Plex) or it is not answering, or nothing of the series is in
+ * the library — rather than a misleading "not started".
  */
 export const getSeriesProgress = async (
   viewer: User,
   tmdbIds: number[]
 ): Promise<Record<number, SeriesProgress>> => {
-  const settings = getSettings();
+  const source = watchSource();
+  const viewerId = source?.viewerOf(viewer);
 
-  if (
-    !tmdbIds.length ||
-    !viewer.plexId ||
-    !settings.tautulli.hostname ||
-    !settings.tautulli.apiKey
-  ) {
+  if (!tmdbIds.length || !source || !viewerId) {
     return {};
   }
 
@@ -105,17 +100,17 @@ export const getSeriesProgress = async (
     relations: { seasons: true },
   });
 
-  const tautulli = new TautulliAPI(settings.tautulli);
   const result: Record<number, SeriesProgress> = {};
 
   await mapWithConcurrency(media, 3, async (series) => {
-    if (!series.ratingKey) {
+    const ids = source.titleIdsOf(series);
+    if (!ids.length) {
       return;
     }
 
-    // Keyed on Plex's own id for the series, which is what Tautulli is asked
-    // about, so a re-added title never inherits another's cached position.
-    const key = `${viewer.id}:${series.ratingKey}`;
+    // Keyed on the server's own ids for the viewer and the series, so a
+    // re-added title or a relinked account never inherits a cached position.
+    const key = `${viewer.id}:${viewerId}:${ids.join(',')}`;
     const cached = cache.get(key);
 
     if (cached && Date.now() - cached.at < CACHE_MS) {
@@ -137,24 +132,18 @@ export const getSeriesProgress = async (
     let finished: EpisodeRef[];
 
     try {
-      const plays = await tautulli.getUserPlaysSince(viewer, {
-        grandparentRatingKey: series.ratingKey,
-        after: new Date(0),
-        strict: true,
-      });
+      const plays = await source.playsSince(viewer, series, new Date(0));
 
       finished = plays
-        .filter(
-          (play) => play.media_type === 'episode' && isCompletedPlay(play)
-        )
+        .filter((play) => play.kind === 'episode' && isCompletedPlay(play))
         .map((play) => ({
-          season: Number(play.parent_media_index),
-          episode: Number(play.media_index),
+          season: Number(play.season),
+          episode: Number(play.episode),
         }));
     } catch (e) {
       // Leave this series out rather than claim it was never watched. Not
       // cached, so the next load asks again.
-      logger.debug('Could not read watch progress from Tautulli', {
+      logger.debug(`Could not read watch progress from ${source.label}`, {
         label: 'Watch Progress',
         tmdbId: series.tmdbId,
         errorMessage: e instanceof Error ? e.message : String(e),

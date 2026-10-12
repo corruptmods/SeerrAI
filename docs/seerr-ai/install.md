@@ -109,7 +109,7 @@ The fork's features find what they need on their own once these are connected; n
 
 | Connect | For |
 |---|---|
-| **Tautulli** (Settings → Services) | Suggested for You, "up next" on lists, Who Watched, Pick for the Room, Catch Me Up's stopping point |
+| **Tautulli** (Settings → Services, Plex only) | Suggested for You, "up next" on lists, Who Watched, Pick for the Room, Catch Me Up's stopping point. Jellyfin and Emby need nothing extra: their own watch history is used. |
 | **Your download clients** (Settings → Services → Download Clients): SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent | Live download progress, and Backfill's downloads |
 | **Prowlarr** (Settings → Backfill) | Backfill |
 | **Bazarr** (Settings → Services) | Subtitles and transcription |

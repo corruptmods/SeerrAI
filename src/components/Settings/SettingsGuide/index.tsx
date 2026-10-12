@@ -15,9 +15,9 @@ const messages = defineMessages('components.Settings.SettingsGuide', {
   flow3:
     'When the download finishes, Radarr or Sonarr import it into the library folder, renamed their way.',
   flow4:
-    'A minute after an import, Seerr AI asks Plex what it has added, and again each minute a few times until Plex lists it. Otherwise Plex is asked every 5 minutes, and the whole library is read at 3am.',
+    'A minute after an import, Seerr AI asks the media server (Plex, Jellyfin or Emby) what it has added, and again each minute a few times until it lists it. Otherwise the server is asked every 5 minutes, and the whole library is read at 3am.',
   flow5:
-    'Once Plex lists it, the title is Available and the requester is told, by web push or whatever they have turned on.',
+    'Once the media server lists it, the title is Available and the requester is told, by web push or whatever they have turned on.',
 
   pillsTitle: 'What the status pills mean',
   pillPending: 'Waiting for an admin to approve it.',
@@ -33,13 +33,13 @@ const messages = defineMessages('components.Settings.SettingsGuide', {
     'Downloaded; the client is verifying, repairing, unpacking or moving it.',
   pillImporting: 'Radarr or Sonarr are adding it to the library folder.',
   pillAdding:
-    'In the library folder; Plex has not listed it yet. Usually a minute or two.',
+    'In the library folder; the media server has not listed it yet. Usually a minute or two.',
   pillAttention:
     'Held up in Radarr or Sonarr, usually an import it would not make on its own. Open it there to see why.',
   pillFailed: 'The download failed; Radarr or Sonarr look for another.',
   pillPartial:
-    'Some of it is in Plex: some episodes of a series, or one season of several.',
-  pillAvailable: 'In Plex and ready to watch.',
+    'Some of it is in the library: some episodes of a series, or one season of several.',
+  pillAvailable: 'In the library and ready to watch.',
   pillDeleted: 'Removed from the library, by Maintainerr or by hand.',
 
   stuckTitle: 'When a title gets stuck',
@@ -58,7 +58,7 @@ const messages = defineMessages('components.Settings.SettingsGuide', {
   lookHealth:
     'Health: every connected service and whether it answers, what Radarr, Sonarr, Prowlarr and Bazarr report as wrong, disks running low, and stuck requests and titles. Admins are sent a Health notification when something newly goes wrong.',
   lookMatch:
-    'Plex Match Check (nightly, on Health): folders Plex matched to a different title than Sonarr or Radarr have in them. A wrong match makes the wrong title show as available. Fix it with Fix Match in Plex.',
+    'Match Check (nightly, on Health): folders your media server matched to a different title than Sonarr or Radarr have in them. A wrong match makes the wrong title show as available. Fix it with Fix Match in Plex, or Identify in Jellyfin and Emby.',
   lookBackfill:
     'Backfill: what it found, what waits for approval, and its downloads.',
   lookJobs: 'Jobs & Cache: when each job runs, and Run now.',
@@ -182,7 +182,7 @@ const SettingsGuide = () => {
           <Pill label="Importing" tone="green">
             {t('pillImporting')}
           </Pill>
-          <Pill label="Adding to Plex" tone="green">
+          <Pill label="Adding to library" tone="green">
             {t('pillAdding')}
           </Pill>
           <Pill label="Needs attention" tone="yellow">

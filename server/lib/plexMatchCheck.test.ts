@@ -103,7 +103,7 @@ describe('Plex Match Check, one item at a time', () => {
     assert.equal(checked, true);
     assert.equal(problem?.reason, 'other');
     assert.equal(problem?.folder, 'Carrie');
-    assert.equal(problem?.plex.ratingKey, '126741');
+    assert.equal(problem?.matched.key, '126741');
     assert.equal(problem?.expected.tvdbId, 455755);
   });
 
@@ -286,7 +286,7 @@ describe('Plex Match Check, the whole library', () => {
     assert.deepEqual(asked, ['1@0', '1@200', '2@0']);
     assert.equal(report.checked, 251);
     assert.deepEqual(
-      report.problems.map((p) => [p.expected.title, p.plex.title]),
+      report.problems.map((p) => [p.expected.title, p.matched.title]),
       [['Carrie', 'The Carrie Diaries']]
     );
     assert.equal(
@@ -294,7 +294,7 @@ describe('Plex Match Check, the whole library', () => {
       'Carrie'
     );
     assert.equal(
-      (await plexMatchCheck.problemFor('series', { ratingKey: '126741' }))
+      (await plexMatchCheck.problemFor('series', { key: '126741' }))
         ?.reason,
       'other',
       'found from the side Plex matched it to'

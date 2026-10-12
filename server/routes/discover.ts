@@ -1007,7 +1007,7 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
 );
 
 /**
- * Titles like the ones this person has been watching, from their Tautulli
+ * Titles like the ones this person has been watching, from their watch
  * history. Empty, rather than an error, when there is nothing to go on, so
  * the row simply does not show.
  */

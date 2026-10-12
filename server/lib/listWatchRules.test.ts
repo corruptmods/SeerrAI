@@ -1,53 +1,45 @@
-import type { TautulliHistoryRecord } from '@server/api/tautulli';
 import {
   everyoneHasWatched,
   hasWatchedMovie,
   hasWatchedSeries,
   isCompletedPlay,
 } from '@server/lib/listWatchRules';
+import type { Play } from '@server/lib/watchHistory';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 const ADDED_AT = new Date('2026-06-01T00:00:00Z');
 const seconds = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
-const play = (
-  overrides: Partial<TautulliHistoryRecord> = {}
-): TautulliHistoryRecord =>
-  ({
-    watched_status: 1,
-    percent_complete: 100,
-    media_type: 'movie',
-    date: seconds('2026-07-01T00:00:00Z'),
-    parent_media_index: 1,
-    media_index: 1,
-    ...overrides,
-  }) as TautulliHistoryRecord;
+const play = (overrides: Partial<Play> = {}): Play => ({
+  at: seconds('2026-07-01T00:00:00Z'),
+  kind: 'movie',
+  itemId: '1',
+  titleId: '1',
+  title: 'A film',
+  finished: true,
+  percent: 100,
+  viewerId: '1',
+  viewerName: 'someone',
+  ...overrides,
+});
 
 const episode = (season: number, number: number, iso: string) =>
-  play({
-    media_type: 'episode',
-    parent_media_index: season,
-    media_index: number,
-    date: seconds(iso),
-  });
+  play({ kind: 'episode', season, episode: number, at: seconds(iso) });
 
 describe('listWatchRules', () => {
   describe('isCompletedPlay', () => {
-    it('accepts a play Tautulli marked watched', () => {
-      assert.equal(
-        isCompletedPlay(play({ watched_status: 1, percent_complete: 0 })),
-        true
-      );
+    it('accepts a play the server marked watched', () => {
+      assert.equal(isCompletedPlay(play({ finished: true, percent: 0 })), true);
     });
 
     it('falls back to completion percentage', () => {
       assert.equal(
-        isCompletedPlay(play({ watched_status: 0, percent_complete: 90 })),
+        isCompletedPlay(play({ finished: false, percent: 90 })),
         true
       );
       assert.equal(
-        isCompletedPlay(play({ watched_status: 0, percent_complete: 40 })),
+        isCompletedPlay(play({ finished: false, percent: 40 })),
         false
       );
     });
@@ -61,13 +53,13 @@ describe('listWatchRules', () => {
     it('ignores a viewing from before it was added', () => {
       // Adding something you watched years ago means you intend to watch it
       // again, so it should only clear once you actually do.
-      const old = play({ date: seconds('2025-01-01T00:00:00Z') });
+      const old = play({ at: seconds('2025-01-01T00:00:00Z') });
 
       assert.equal(hasWatchedMovie([old], ADDED_AT), false);
     });
 
     it('ignores an unfinished play', () => {
-      const abandoned = play({ watched_status: 0, percent_complete: 12 });
+      const abandoned = play({ finished: false, percent: 12 });
 
       assert.equal(hasWatchedMovie([abandoned], ADDED_AT), false);
     });

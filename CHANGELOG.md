@@ -4,6 +4,10 @@ The newest changes are at the top. **Coming next** is what's on the `dev` branch
 
 ## Coming next
 
+### Jellyfin and Emby get the full experience
+
+Suggested for You, Who Watched, Pick for the Room, Catch Me Up, "up next" on your lists and AI Search knowing what you've watched now work on Jellyfin and Emby too, straight from your server, with nothing extra to set up. Health shows your Jellyfin or Emby server and its version, and the nightly Match Check now spots titles Jellyfin or Emby matched wrongly and tells you exactly what to enter in **Identify**.
+
 ### Ask the agent to fix what's already there
 
 The admin agent can now replace a bad copy, block a release group, mark a download as failed, delete files, switch a title to another quality profile, or look for a better release. Just ask it, in its chat or in AI Search. It shows you exactly what it would do and waits for your **Approve**, so nothing changes behind your back. A replaced file stays playable until the new one is in.

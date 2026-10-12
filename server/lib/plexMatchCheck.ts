@@ -1,3 +1,5 @@
+import type { JellyfinUserItem } from '@server/api/jellyfin';
+import JellyfinAPI from '@server/api/jellyfin';
 import type { PlexLibraryItem } from '@server/api/plexapi';
 import PlexAPI from '@server/api/plexapi';
 import RadarrAPI from '@server/api/servarr/radarr';
@@ -7,21 +9,25 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import { getHostname } from '@server/utils/getHostname';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 /*
- * Plex Match Check: which folders Plex has matched to a different title
- * than Sonarr or Radarr has in them, or not matched at all.
+ * Match Check: which folders the media server (Plex, Jellyfin or Emby) has
+ * matched to a different title than Sonarr or Radarr has in them, or not
+ * matched at all.
  *
- * Plex matches by folder and file names, Sonarr and Radarr by their own
- * ids, and when the two disagree nothing says so: "Carrie" (2026) matched
- * to "The Carrie Diaries" made the wrong title available in Seerr, left
- * the right one without check marks, and showed the other show's
- * subtitles. Each Plex item's folder is looked up in Sonarr or Radarr by
- * its name, and their ids compared. Report only: nothing is changed; the
- * fix is "Fix Match" on the title in Plex.
+ * The media server matches by folder and file names, Sonarr and Radarr by
+ * their own ids, and when the two disagree nothing says so: "Carrie" (2026)
+ * matched to "The Carrie Diaries" made the wrong title available in Seerr,
+ * left the right one without check marks, and showed the other show's
+ * subtitles. Each item's folder is looked up in Sonarr or Radarr by its
+ * name, and their ids compared. Report only: nothing is changed; the fix
+ * is "Fix Match" in Plex, or "Identify" in Jellyfin and Emby.
  */
+
+export type MediaServerName = 'Plex' | 'Jellyfin' | 'Emby';
 
 export interface PlexMatchProblem {
   kind: 'movie' | 'series';
@@ -36,11 +42,13 @@ export interface PlexMatchProblem {
     imdbId?: string;
     server: string;
   };
-  /** What Plex matched it to. */
-  plex: {
+  /** The media server it was checked on. */
+  mediaServer: MediaServerName;
+  /** What the media server matched it to, and its id for the item. */
+  matched: {
     title: string;
     year?: number;
-    ratingKey: string;
+    key: string;
     tmdbId?: number;
     tvdbId?: number;
     imdbId?: string;
@@ -48,9 +56,10 @@ export interface PlexMatchProblem {
   /**
    * - other: matched to another title (whatever its name: two films can
    *   share a name and a year).
-   * - differentId: the same title by another id (IMDb), but Plex and
-   *   Sonarr or Radarr use different TMDB or TVDB entries for it, so Seerr
-   *   marks Plex's entry available and not the one that was requested.
+   * - differentId: the same title by another id (IMDb), but the media
+   *   server and Sonarr or Radarr use different TMDB or TVDB entries for
+   *   it, so Seerr marks the server's entry available and not the one that
+   *   was requested.
    * - unmatched: not matched to anything.
    */
   reason: 'other' | 'differentId' | 'unmatched';
@@ -59,9 +68,9 @@ export interface PlexMatchProblem {
 export interface PlexMatchReport {
   finishedAt: string | null;
   running: boolean;
-  /** Plex items whose folder Sonarr or Radarr has. */
+  /** Items whose folder Sonarr or Radarr has. */
   checked: number;
-  /** Plex items that could not be compared: no folder, or no shared id. */
+  /** Items that could not be compared: no folder, or no shared id. */
   notChecked: number;
   problems: PlexMatchProblem[];
   error?: string;
@@ -71,7 +80,7 @@ export const REPORT_PATH = process.env.CONFIG_DIRECTORY
   ? `${process.env.CONFIG_DIRECTORY}/plex-match-check.json`
   : path.join(__dirname, '../../config/plex-match-check.json');
 
-/** Items read from Plex at a time. */
+/** Items read from the media server at a time. */
 const PAGE_SIZE = 200;
 
 /** The last part of a path, whichever way its slashes lean. */
@@ -111,8 +120,26 @@ export const plexIds = (item: PlexLibraryItem): Ids => {
   return ids;
 };
 
+/** The ids Jellyfin or Emby gives an item. */
+export const jellyfinIds = (item: JellyfinUserItem): Ids => {
+  const ids: Ids = {};
+  const providers = (item.ProviderIds ?? {}) as Record<string, string>;
+  // Keys differ in case between servers and versions: "Tmdb", "TMDB".
+  const read = (name: string) =>
+    Object.entries(providers).find(
+      ([key, value]) => key.toLowerCase() === name && !!value
+    )?.[1];
+  const tmdb = Number(read('tmdb') ?? read('themoviedb'));
+  const tvdb = Number(read('tvdb'));
+  const imdb = read('imdb');
+  if (Number.isInteger(tmdb) && tmdb > 0) ids.tmdbId = tmdb;
+  if (Number.isInteger(tvdb) && tvdb > 0) ids.tvdbId = tvdb;
+  if (imdb && /^tt\d+$/.test(imdb)) ids.imdbId = imdb;
+  return ids;
+};
+
 /**
- * Whether Plex's ids say the same title as Sonarr's or Radarr's: by the
+ * Whether the server's ids say the same title as Sonarr's or Radarr's: by the
  * id each side names first (TVDB for series, TMDB for movies), then the
  * others. Undefined when they share no id to compare.
  */
@@ -143,23 +170,68 @@ interface Expected extends Ids {
   server: string;
 }
 
+/** One item on the media server, as the check needs it. */
+export interface MatchItem {
+  title: string;
+  year?: number;
+  /** The server's id for it. */
+  key: string;
+  /** The folders it is in: a series' own, a movie's file's. */
+  folders: string[];
+  ids: Ids;
+}
+
+/** A Plex item, for the check. */
+export const plexMatchItem = (
+  kind: 'movie' | 'series',
+  item: PlexLibraryItem
+): MatchItem => ({
+  title: item.title,
+  year: item.year,
+  key: item.ratingKey,
+  folders:
+    kind === 'series'
+      ? (item.Location ?? []).map((l) => folderName(l.path))
+      : (item.Media ?? []).flatMap((m) =>
+          (m.Part ?? []).flatMap((p) => (p.file ? [parentFolder(p.file)] : []))
+        ),
+  ids: plexIds(item),
+});
+
+/** A Jellyfin or Emby item, for the check. */
+export const jellyfinMatchItem = (
+  kind: 'movie' | 'series',
+  item: JellyfinUserItem
+): MatchItem => ({
+  title: item.Name,
+  year: item.ProductionYear,
+  key: item.Id,
+  folders: item.Path
+    ? [kind === 'series' ? folderName(item.Path) : parentFolder(item.Path)]
+    : [],
+  ids: jellyfinIds(item),
+});
+
 /** Compares one Plex item with what Sonarr or Radarr has in its folders. */
 export const compareItem = (
   kind: 'movie' | 'series',
   item: PlexLibraryItem,
   byFolder: Map<string, Expected[]>
+): { checked: boolean; problem?: PlexMatchProblem } =>
+  compareMatch(kind, plexMatchItem(kind, item), byFolder, 'Plex');
+
+/** Compares one server item with what Sonarr or Radarr has in its folders. */
+export const compareMatch = (
+  kind: 'movie' | 'series',
+  item: MatchItem,
+  byFolder: Map<string, Expected[]>,
+  mediaServer: MediaServerName
 ): { checked: boolean; problem?: PlexMatchProblem } => {
-  const folders =
-    kind === 'series'
-      ? (item.Location ?? []).map((l) => folderName(l.path))
-      : (item.Media ?? []).flatMap((m) =>
-          (m.Part ?? []).flatMap((p) => (p.file ? [parentFolder(p.file)] : []))
-        );
-  const ids = plexIds(item);
-  const plex = {
+  const { folders, ids } = item;
+  const matched = {
     title: item.title,
     year: item.year,
-    ratingKey: item.ratingKey,
+    key: item.key,
     ...ids,
   };
   let checked = false;
@@ -174,7 +246,8 @@ export const compareItem = (
           kind,
           folder,
           expected: candidates[0],
-          plex,
+          mediaServer,
+          matched,
           reason: 'unmatched',
         },
       };
@@ -189,7 +262,8 @@ export const compareItem = (
           kind,
           folder,
           expected: sameFilm ?? candidates[0],
-          plex,
+          mediaServer,
+          matched,
           reason: sameFilm ? 'differentId' : 'other',
         },
       };
@@ -216,7 +290,26 @@ class PlexMatchCheck {
   public async lastReport(): Promise<PlexMatchReport> {
     if (!this.report) {
       try {
-        this.report = JSON.parse(await fs.readFile(REPORT_PATH, 'utf-8'));
+        const kept = JSON.parse(
+          await fs.readFile(REPORT_PATH, 'utf-8')
+        ) as PlexMatchReport;
+        // Reports kept before Jellyfin and Emby were checked name Plex's
+        // side "plex", with its id as "ratingKey".
+        kept.problems = (kept.problems ?? []).map((p) => {
+          const old = p as PlexMatchProblem & {
+            plex?: Omit<PlexMatchProblem['matched'], 'key'> & {
+              ratingKey: string;
+            };
+          };
+          if (old.matched || !old.plex) return p;
+          const { ratingKey, ...rest } = old.plex;
+          return {
+            ...p,
+            mediaServer: 'Plex',
+            matched: { ...rest, key: ratingKey },
+          };
+        });
+        this.report = kept;
       } catch {
         this.report = {
           finishedAt: null,
@@ -233,17 +326,17 @@ class PlexMatchCheck {
   /** The problem for one title, if the last report found one. */
   public async problemFor(
     kind: 'movie' | 'series',
-    ids: { tmdbId?: number; tvdbId?: number; ratingKey?: string | null }
+    ids: { tmdbId?: number; tvdbId?: number; key?: string | null }
   ): Promise<PlexMatchProblem | undefined> {
     const report = await this.lastReport();
     return report.problems.find(
       (p) =>
         p.kind === kind &&
-        // The title Sonarr or Radarr has, which Plex matched wrongly...
+        // The title Sonarr or Radarr has, which the server matched wrongly...
         ((ids.tmdbId && p.expected.tmdbId === ids.tmdbId) ||
           (ids.tvdbId && p.expected.tvdbId === ids.tvdbId) ||
-          // ...or the title Plex matched it to, wrongly shown as available.
-          (ids.ratingKey && p.plex.ratingKey === ids.ratingKey))
+          // ...or the title it matched it to, wrongly shown as available.
+          (ids.key && p.matched.key === ids.key))
     );
   }
 
@@ -290,6 +383,85 @@ class PlexMatchCheck {
     return { series, movies };
   }
 
+  private async checkPlex(
+    report: PlexMatchReport,
+    expected: {
+      series: Map<string, Expected[]>;
+      movies: Map<string, Expected[]>;
+    }
+  ): Promise<void> {
+    const settings = getSettings();
+    const admin = await getRepository(User).findOne({
+      select: { id: true, plexToken: true },
+      where: { id: 1 },
+    });
+    const plex = new PlexAPI({ plexToken: admin?.plexToken });
+    for (const library of settings.plex.libraries) {
+      if (!library.enabled || this.cancelled) continue;
+      const kind = library.type === 'show' ? 'series' : 'movie';
+      const byFolder = kind === 'series' ? expected.series : expected.movies;
+      for (let offset = 0; !this.cancelled; offset += PAGE_SIZE) {
+        const { items, totalSize } = await plex.getLibraryContents(library.id, {
+          offset,
+          size: PAGE_SIZE,
+        });
+        for (const item of items) {
+          this.tally(report, compareItem(kind, item, byFolder));
+        }
+        if (!items.length || offset + PAGE_SIZE >= totalSize) break;
+      }
+    }
+  }
+
+  private async checkJellyfin(
+    report: PlexMatchReport,
+    mediaServer: 'Jellyfin' | 'Emby',
+    expected: {
+      series: Map<string, Expected[]>;
+      movies: Map<string, Expected[]>;
+    }
+  ): Promise<void> {
+    const settings = getSettings();
+    if (!settings.jellyfin.apiKey) {
+      throw new Error(`${mediaServer} has no API key set.`);
+    }
+    const api = new JellyfinAPI(getHostname(), settings.jellyfin.apiKey);
+    for (const library of settings.jellyfin.libraries) {
+      if (!library.enabled || this.cancelled) continue;
+      const kind = library.type === 'show' ? 'series' : 'movie';
+      const byFolder = kind === 'series' ? expected.series : expected.movies;
+      for (let start = 0; !this.cancelled; start += PAGE_SIZE) {
+        const { Items, TotalRecordCount } = await api.getLibraryPage(
+          library.id,
+          kind === 'series' ? 'Series' : 'Movie',
+          start,
+          PAGE_SIZE
+        );
+        for (const item of Items) {
+          this.tally(
+            report,
+            compareMatch(
+              kind,
+              jellyfinMatchItem(kind, item),
+              byFolder,
+              mediaServer
+            )
+          );
+        }
+        if (!Items.length || start + PAGE_SIZE >= TotalRecordCount) break;
+      }
+    }
+  }
+
+  private tally(
+    report: PlexMatchReport,
+    { checked, problem }: { checked: boolean; problem?: PlexMatchProblem }
+  ): void {
+    if (checked) report.checked += 1;
+    else report.notChecked += 1;
+    if (problem) report.problems.push(problem);
+  }
+
   public async run(): Promise<void> {
     if (this.running) return;
     this.running = true;
@@ -303,45 +475,30 @@ class PlexMatchCheck {
     };
     try {
       const settings = getSettings();
-      if (settings.main.mediaServerType !== MediaServerType.PLEX) {
-        throw new Error('Only Plex is checked.');
-      }
-      const admin = await getRepository(User).findOne({
-        select: { id: true, plexToken: true },
-        where: { id: 1 },
-      });
-      const plex = new PlexAPI({ plexToken: admin?.plexToken });
+      const type = settings.main.mediaServerType;
       const { series, movies } = await this.expectedFolders();
-
-      for (const library of settings.plex.libraries) {
-        if (!library.enabled || this.cancelled) continue;
-        const kind = library.type === 'show' ? 'series' : 'movie';
-        const byFolder = kind === 'series' ? series : movies;
-        for (let offset = 0; !this.cancelled; offset += PAGE_SIZE) {
-          const { items, totalSize } = await plex.getLibraryContents(
-            library.id,
-            { offset, size: PAGE_SIZE }
-          );
-          for (const item of items) {
-            const { checked, problem } = compareItem(kind, item, byFolder);
-            if (checked) report.checked += 1;
-            else report.notChecked += 1;
-            if (problem) report.problems.push(problem);
-          }
-          if (!items.length || offset + PAGE_SIZE >= totalSize) break;
-        }
+      if (type === MediaServerType.JELLYFIN || type === MediaServerType.EMBY) {
+        await this.checkJellyfin(
+          report,
+          type === MediaServerType.EMBY ? 'Emby' : 'Jellyfin',
+          { series, movies }
+        );
+      } else if (type === MediaServerType.PLEX) {
+        await this.checkPlex(report, { series, movies });
+      } else {
+        throw new Error('No media server is set up.');
       }
       report.problems.sort((a, b) =>
         a.expected.title.localeCompare(b.expected.title)
       );
       logger.info(
-        `Plex Match Check: ${report.problems.length} folder(s) matched to another title or none, of ${report.checked} checked`,
-        { label: 'Plex Match Check', notChecked: report.notChecked }
+        `Match Check: ${report.problems.length} folder(s) matched to another title or none, of ${report.checked} checked`,
+        { label: 'Match Check', notChecked: report.notChecked }
       );
     } catch (e) {
       report.error = e instanceof Error ? e.message : String(e);
-      logger.warn('Plex Match Check could not finish', {
-        label: 'Plex Match Check',
+      logger.warn('Match Check could not finish', {
+        label: 'Match Check',
         errorMessage: report.error,
       });
     } finally {
@@ -349,8 +506,8 @@ class PlexMatchCheck {
       this.report = report;
       this.running = false;
       await fs.writeFile(REPORT_PATH, JSON.stringify(report)).catch((e) =>
-        logger.warn('Could not keep the Plex Match Check report', {
-          label: 'Plex Match Check',
+        logger.warn('Could not keep the Match Check report', {
+          label: 'Match Check',
           errorMessage: e.message,
         })
       );

@@ -37,7 +37,7 @@ const WatchSuggestions = () => {
   const [isClosed, setClosed] = useState(false);
 
   // Only fetched once a user is present; the request also triggers the
-  // throttled Tautulli check on the server.
+  // throttled watch-history check on the server.
   const on = useFeature('watchSuggestions');
   const { data: suggestions, mutate } = useSWR<Suggestion[]>(
     on && user?.id ? '/api/v1/list/suggestions' : null,

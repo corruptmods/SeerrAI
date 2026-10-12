@@ -784,12 +784,15 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
         </div>
         <div className="media-overview-right">
           {hasPermission(Permission.ADMIN) &&
-            settings.currentSettings.mediaServerType === MediaServerType.PLEX &&
+            settings.currentSettings.mediaServerType !==
+              MediaServerType.NOT_CONFIGURED &&
             data.mediaInfo && (
               <PlexMatchWarning
                 mediaType="movie"
                 tmdbId={data.id}
-                ratingKey={data.mediaInfo.ratingKey}
+                itemKey={
+                  data.mediaInfo.ratingKey ?? data.mediaInfo.jellyfinMediaId
+                }
               />
             )}
           {hasPermission(Permission.ADMIN) &&

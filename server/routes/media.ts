@@ -21,12 +21,13 @@ import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
 import { Permission } from '@server/lib/permissions';
 import { defaultRegion, estimateTitle } from '@server/lib/requestEta';
 import {
-  NotInServiceError,
   NothingMissingError,
+  NotInServiceError,
   searchMissing,
 } from '@server/lib/searchMissing';
 import { getSettings } from '@server/lib/settings';
 import { getWatchedBy } from '@server/lib/watchedBy';
+import { watchSource } from '@server/lib/watchHistory';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { pageOf } from '@server/utils/pagination';
@@ -412,7 +413,8 @@ mediaRoutes.get<{ id: string }>('/:id/eta', async (req, res, next) => {
 });
 
 /**
- * Who has watched a title, and when last, from Tautulli — for the title page.
+ * Who has watched a title, and when last, from the server's watch history
+ * (Tautulli for Plex, Jellyfin or Emby themselves) — for the title page.
  * Admins only, as the watch data behind the manage panel is.
  */
 mediaRoutes.get<{ id: string }>(
@@ -420,7 +422,7 @@ mediaRoutes.get<{ id: string }>(
   isAuthenticated(Permission.ADMIN),
   async (req, res, next) => {
     try {
-      // Turned off: Tautulli is not asked who watched anything.
+      // Turned off: nobody is asked who watched anything.
       if (!featureEnabled('whoWatched', req.user)) {
         return res.status(200).json({ configured: false, people: [] });
       }
@@ -437,7 +439,9 @@ mediaRoutes.get<{ id: string }>(
     } catch (e) {
       return next({
         status: 502,
-        message: `Could not read Tautulli: ${e.message}`,
+        message: `Could not read the watch history (${
+          watchSource()?.label ?? 'none set up'
+        }): ${e.message}`,
       });
     }
   }

@@ -1397,10 +1397,11 @@ describe('requests, titles and users', () => {
             tvdbId: 455755,
             server: 'Sonarr',
           },
-          plex: {
+          mediaServer: 'Plex',
+          matched: {
             title: 'The Carrie Diaries',
             year: 2013,
-            ratingKey: '126741',
+            key: '126741',
           },
         },
       ],

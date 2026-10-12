@@ -78,7 +78,8 @@ const ListDetail = () => {
     rouletteCandidates,
   } = useListDetail(router.query.listId as string);
 
-  // Each viewer's own position in the series here, from Tautulli. Absent
+  // Each viewer's own position in the series here, from the server's watch
+  // history (Tautulli for Plex, Jellyfin or Emby themselves). Absent
   // entries simply show nothing, so a slow or missing answer costs nothing.
   const { data: progress } = useSWR<Record<number, SeriesProgress>>(
     router.query.listId ? `/api/v1/list/${router.query.listId}/progress` : null

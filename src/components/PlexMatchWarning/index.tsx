@@ -6,22 +6,28 @@ import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
 const messages = defineMessages('components.PlexMatchWarning', {
-  title: 'Plex’s match needs fixing',
+  title: '{mediaServer}’s match needs fixing',
   other:
-    'Plex matched the folder “{folder}”, where {server} has {expected}, to {plex}. Until the match is fixed, Seerr AI can show the wrong title as available, and episodes and subtitles can be wrong.',
+    '{mediaServer} matched the folder “{folder}”, where {server} has {expected}, to {plex}. Until the match is fixed, Seerr AI can show the wrong title as available, and episodes and subtitles can be wrong.',
   otherSameName:
-    'Plex matched the folder “{folder}”, where {server} has {expected}, to a different title with the same name ({ids}). Until the match is fixed, Seerr AI can show the wrong title as available, and episodes and subtitles can be wrong.',
+    '{mediaServer} matched the folder “{folder}”, where {server} has {expected}, to a different title with the same name ({ids}). Until the match is fixed, Seerr AI can show the wrong title as available, and episodes and subtitles can be wrong.',
   differentId:
-    'Plex and {server} have the same title in the folder “{folder}”, but use different entries for it ({ids}), so Seerr AI marks Plex’s entry as in the library rather than this one.',
+    '{mediaServer} and {server} have the same title in the folder “{folder}”, but use different entries for it ({ids}), so Seerr AI marks {mediaServer}’s entry as in the library rather than this one.',
   unmatched:
-    'Plex has not matched the folder “{folder}”, where {server} has {expected}, to any title, so Seerr AI cannot see it in the library.',
+    '{mediaServer} has not matched the folder “{folder}”, where {server} has {expected}, to any title, so Seerr AI cannot see it in the library.',
   thisOne:
-    'Plex matched the folder “{folder}” to this title, but {server} has {expected} there. This title may show as available when it is not.',
-  fix: 'In Plex, open it, choose Fix Match and pick {expected}. The nightly Plex Match Check clears this once it agrees.',
+    '{mediaServer} matched the folder “{folder}” to this title, but {server} has {expected} there. This title may show as available when it is not.',
+  fix: 'In Plex, open it, choose Fix Match and pick {expected}. The nightly Match Check clears this once it agrees.',
   fixById:
-    'In Plex, open it, choose Fix Match and search for {search} to find exactly this title. The nightly Plex Match Check clears this once it agrees.',
+    'In Plex, open it, choose Fix Match and search for {search} to find exactly this title. The nightly Match Check clears this once it agrees.',
   fixDifferentId:
-    'In Plex, open it, choose Fix Match and search for {search}. If Plex finds nothing, {server}’s entry may be the outdated one. The nightly Plex Match Check clears this once they agree.',
+    'In Plex, open it, choose Fix Match and search for {search}. If Plex finds nothing, {server}’s entry may be the outdated one. The nightly Match Check clears this once they agree.',
+  identify:
+    'In {mediaServer}, open it, choose Identify and pick {expected}. The nightly Match Check clears this once it agrees.',
+  identifyById:
+    'In {mediaServer}, open it, choose Identify and enter {idName} id {id} to find exactly this title. The nightly Match Check clears this once it agrees.',
+  identifyDifferentId:
+    'In {mediaServer}, open it, choose Identify and enter {idName} id {id}. If {mediaServer} finds nothing, {server}’s entry may be the outdated one. The nightly Match Check clears this once they agree.',
 });
 
 const named = (t: { title: string; year?: number }) =>
@@ -31,72 +37,85 @@ const label = (m?: { name: string; id: number }) =>
   m ? `${m.name.toUpperCase()} ${m.id}` : undefined;
 
 /**
- * On a title's page, for admins: the last Plex Match Check found that
- * Plex's match for this title's folder disagrees with Sonarr's or Radarr's.
+ * On a title's page, for admins: the last Match Check found that the media
+ * server's match for this title's folder disagrees with Sonarr's or
+ * Radarr's.
  */
 const PlexMatchWarning = ({
   mediaType,
   tmdbId,
   tvdbId,
-  ratingKey,
+  itemKey,
 }: {
   mediaType: 'movie' | 'tv';
   tmdbId: number;
   tvdbId?: number | null;
-  ratingKey?: string | null;
+  /** The media server's id for this title. */
+  itemKey?: string | null;
 }) => {
   const intl = useIntl();
   const query = new URLSearchParams({ mediaType, tmdbId: String(tmdbId) });
   if (tvdbId) query.set('tvdbId', String(tvdbId));
-  if (ratingKey) query.set('ratingKey', ratingKey);
+  if (itemKey) query.set('key', itemKey);
   const { data } = useSWR<{ problem: PlexMatchProblem | null }>(
     `/api/v1/settings/plex-match-check/title?${query}`
   );
   const problem = data?.problem;
   if (!problem) return null;
 
-  // This page is the title Plex wrongly matched the folder to, rather than
-  // the one Sonarr or Radarr has in it.
-  const isPlexSide =
-    !!ratingKey &&
-    problem.plex.ratingKey === ratingKey &&
+  const mediaServer = problem.mediaServer ?? 'Plex';
+  // This page is the title the server wrongly matched the folder to, rather
+  // than the one Sonarr or Radarr has in it.
+  const isServerSide =
+    !!itemKey &&
+    problem.matched.key === itemKey &&
     problem.expected.tmdbId !== tmdbId &&
     (!tvdbId || problem.expected.tvdbId !== tvdbId);
   const want = mainId(problem.kind, problem.expected);
-  const got = mainId(problem.kind, problem.plex);
+  const got = mainId(problem.kind, problem.matched);
   const values = {
     folder: problem.folder,
     server: problem.expected.server,
     expected: named(problem.expected),
-    plex: named(problem.plex),
+    plex: named(problem.matched),
+    mediaServer,
+    idName: want?.name.toUpperCase() ?? '',
+    id: want?.id ?? '',
     ids: [
       want && `${problem.expected.server}: ${label(want)}`,
-      got && `Plex: ${label(got)}`,
+      got && `${mediaServer}: ${label(got)}`,
     ]
       .filter(Boolean)
       .join(', '),
     search: want ? `${want.name}-${want.id}` : '',
   };
-  const text = isPlexSide
+  const text = isServerSide
     ? messages.thisOne
     : problem.reason === 'unmatched'
       ? messages.unmatched
       : problem.reason === 'differentId'
         ? messages.differentId
-        : sameName(problem.plex, problem.expected)
+        : sameName(problem.matched, problem.expected)
           ? messages.otherSameName
           : messages.other;
+  const plex = mediaServer === 'Plex';
   const fix = !want
-    ? messages.fix
+    ? plex
+      ? messages.fix
+      : messages.identify
     : problem.reason === 'differentId'
-      ? messages.fixDifferentId
-      : messages.fixById;
+      ? plex
+        ? messages.fixDifferentId
+        : messages.identifyDifferentId
+      : plex
+        ? messages.fixById
+        : messages.identifyById;
 
   return (
     <section className="mb-6 rounded-lg bg-yellow-900/30 p-4 ring-1 ring-yellow-600/60">
       <h3 className="flex items-center gap-2 font-semibold text-yellow-200">
         <ExclamationTriangleIcon className="h-5 w-5 flex-none" />
-        {intl.formatMessage(messages.title)}
+        {intl.formatMessage(messages.title, { mediaServer })}
       </h3>
       <p className="mt-2 text-sm text-yellow-100/90">
         {intl.formatMessage(text, values)}

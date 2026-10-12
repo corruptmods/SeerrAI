@@ -1,4 +1,3 @@
-import TautulliAPI from '@server/api/tautulli';
 import { WATCH_CHECK_INTERVAL_MS } from '@server/constants/lists';
 import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
@@ -16,18 +15,13 @@ import {
   hasWatchedMovie,
   hasWatchedSeries,
 } from '@server/lib/listWatchRules';
-import { getSettings } from '@server/lib/settings';
+import type { WatchSource } from '@server/lib/watchHistory';
+import { watchSource } from '@server/lib/watchHistory';
 import logger from '@server/logger';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 import { In } from 'typeorm';
 
-/**
- * How long a list's result is trusted before Tautulli is asked again. The
- * check runs when the owner opens Seerr, so without this it would run on
- * every page load.
- */
-
-/** Tautulli is local, but a shared list still means one query per person. */
+/** The server is local, but a shared list still means one query per person. */
 const ITEM_CONCURRENCY = 3;
 
 const episodeKey = (season: number, episode: number) => `${season}:${episode}`;
@@ -39,9 +33,9 @@ const episodeKey = (season: number, episode: number) => `${season}:${episode}`;
  * Nothing is removed here — the owner is prompted and decides.
  */
 export const refreshWatchSuggestions = async (owner: User): Promise<void> => {
-  const settings = getSettings();
+  const source = watchSource();
 
-  if (!settings.tautulli.hostname || !settings.tautulli.apiKey) {
+  if (!source) {
     return;
   }
 
@@ -55,7 +49,6 @@ export const refreshWatchSuggestions = async (owner: User): Promise<void> => {
     return;
   }
 
-  const tautulli = new TautulliAPI(settings.tautulli);
   const cutoff = new Date(Date.now() - WATCH_CHECK_INTERVAL_MS);
 
   for (const list of lists) {
@@ -64,7 +57,7 @@ export const refreshWatchSuggestions = async (owner: User): Promise<void> => {
     }
 
     try {
-      await checkList(list, owner, tautulli);
+      await checkList(list, owner, source);
     } catch (e) {
       logger.error('Failed to check watch suggestions for list', {
         label: 'Watch Sync',
@@ -81,7 +74,7 @@ export const refreshWatchSuggestions = async (owner: User): Promise<void> => {
 const checkList = async (
   list: MediaList,
   owner: User,
-  tautulli: TautulliAPI
+  source: WatchSource
 ): Promise<void> => {
   const members = await getRepository(MediaListMember).find({
     where: { listId: list.id },
@@ -91,7 +84,7 @@ const checkList = async (
   // Everyone who can see the list has to have finished it — one person
   // watching does not mean the household is done with it.
   const viewers = [owner, ...members.map((m) => m.user)].filter(
-    (user): user is User => !!user && !!user.plexId
+    (user): user is User => !!user && !!source.viewerOf(user)
   );
 
   if (!viewers.length) {
@@ -130,7 +123,7 @@ const checkList = async (
     });
 
     // Not in the library means nobody can have watched it here.
-    if (!media?.ratingKey) {
+    if (!media || !source.titleIdsOf(media).length) {
       return;
     }
 
@@ -175,12 +168,10 @@ const checkList = async (
       viewers,
       ITEM_CONCURRENCY,
       async (viewer) => {
-        const plays = await tautulli.getUserPlaysSince(viewer, {
-          ...(isSeries
-            ? { grandparentRatingKey: media.ratingKey as string }
-            : { ratingKey: media.ratingKey as string }),
-          after: item.createdAt,
-        });
+        // Could not ask is not watched: no suggestion this time.
+        const plays = await source
+          .playsSince(viewer, media, item.createdAt)
+          .catch(() => []);
 
         return isSeries
           ? hasWatchedSeries(plays, item.createdAt, available as Set<string>)

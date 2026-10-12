@@ -685,7 +685,7 @@ export interface Position {
 
 /**
  * Where a recap should stop: just before the next episode this person has
- * not seen, from their Tautulli history. Null when there is no telling.
+ * not seen, from their watch history. Null when there is no telling.
  */
 export const recapPosition = async (
   user: User,
@@ -826,7 +826,11 @@ export const reviewDeletions = async (user: User) => {
               .slice(0, 4)
               .map(
                 (w) =>
-                  `${w.count} ${item.mediaType === MediaType.TV ? 'eps' : 'plays'}, last ${days(new Date(w.lastWatched))}d ago`
+                  `${w.count} ${item.mediaType === MediaType.TV ? 'eps' : 'plays'}${
+                    w.lastWatched
+                      ? `, last ${days(new Date(w.lastWatched))}d ago`
+                      : ''
+                  }`
               )
               .join('; ')})`
           : 'never watched',

@@ -140,6 +140,41 @@ export interface JellyfinItemsReponse {
   StartIndex: number;
 }
 
+/**
+ * Longest to wait on the server for watch history: asked while someone
+ * waits on a page, so a server that is down must fail rather than hang.
+ */
+const WATCH_TIMEOUT_MS = 15_000;
+
+/** What a person has done with an item: played, how far, and when last. */
+export interface JellyfinUserData {
+  Played?: boolean;
+  PlayCount?: number;
+  PlayedPercentage?: number | null;
+  PlaybackPositionTicks?: number;
+  LastPlayedDate?: string | null;
+}
+
+/** An item as one person sees it, with their own play state. */
+export interface JellyfinUserItem extends JellyfinLibraryItem {
+  ProductionYear?: number;
+  UserData?: JellyfinUserData;
+  ProviderIds?: JellyfinLibraryItemExtended['ProviderIds'];
+  Path?: string;
+}
+
+export interface JellyfinUserItemsResponse {
+  Items: JellyfinUserItem[];
+  TotalRecordCount: number;
+}
+
+/** One account on the server, with whether it is switched off. */
+export interface JellyfinAccount {
+  Name: string;
+  Id: string;
+  Policy?: { IsAdministrator?: boolean; IsDisabled?: boolean };
+}
+
 class JellyfinAPI extends ExternalAPI {
   private userId?: string;
   private mediaServerType: MediaServerType;
@@ -580,6 +615,76 @@ class JellyfinAPI extends ExternalAPI {
       }
 
       throw new ApiError(e.response.status, ApiErrorCode.InvalidAuthToken);
+    }
+  }
+
+  /**
+   * Items as one person sees them, with their own play state. Both
+   * Jellyfin and Emby answer /Items with a UserId, so one call serves both;
+   * errors are left to the caller, which knows whether "no answer" may be
+   * read as "nothing".
+   */
+  public async getUserItems(
+    userId: string,
+    params: Record<string, string | number | boolean>
+  ): Promise<JellyfinUserItemsResponse> {
+    const response = await this.get<JellyfinUserItemsResponse>('/Items', {
+      params: { UserId: userId, EnableUserData: true, ...params },
+      timeout: WATCH_TIMEOUT_MS,
+    });
+    return {
+      Items: response?.Items ?? [],
+      TotalRecordCount: response?.TotalRecordCount ?? 0,
+    };
+  }
+
+  /**
+   * One page of a library's movies or series, with their paths and the ids
+   * the server matched them to.
+   */
+  public async getLibraryPage(
+    libraryId: string,
+    type: 'Movie' | 'Series',
+    start: number,
+    limit: number
+  ): Promise<JellyfinUserItemsResponse> {
+    const response = await this.get<JellyfinUserItemsResponse>('/Items', {
+      params: {
+        ParentId: libraryId,
+        Recursive: true,
+        IncludeItemTypes: type,
+        Fields: 'Path,ProviderIds,ProductionYear',
+        SortBy: 'SortName',
+        StartIndex: start,
+        Limit: limit,
+      },
+    });
+    return {
+      Items: response?.Items ?? [],
+      TotalRecordCount: response?.TotalRecordCount ?? 0,
+    };
+  }
+
+  /** Every account on the server, the switched-off ones included. */
+  public async getAccounts(): Promise<JellyfinAccount[]> {
+    const accounts = await this.get<JellyfinAccount[]>('/Users', {
+      timeout: WATCH_TIMEOUT_MS,
+    });
+    return Array.isArray(accounts) ? accounts : [];
+  }
+
+  /** One account, or undefined when the server no longer has it. */
+  public async getAccount(id: string): Promise<JellyfinAccount | undefined> {
+    try {
+      return await this.get<JellyfinAccount>(
+        `/Users/${encodeURIComponent(id)}`,
+        { timeout: WATCH_TIMEOUT_MS }
+      );
+    } catch (e) {
+      if (e.response?.status === 404 || e.response?.status === 400) {
+        return undefined;
+      }
+      throw e;
     }
   }
 

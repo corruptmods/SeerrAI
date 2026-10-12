@@ -853,12 +853,12 @@ settingsRoutes.get(
   }
 );
 
-/** The last Plex Match Check: folders Plex matched to another title. */
+/** The last Match Check: folders the media server matched to another title. */
 settingsRoutes.get('/plex-match-check', async (_req, res) => {
   return res.status(200).json(await plexMatchCheck.lastReport());
 });
 
-/** What the last Plex Match Check found for one title, if anything. */
+/** What the last Match Check found for one title, if anything. */
 settingsRoutes.get<
   never,
   unknown,
@@ -867,7 +867,7 @@ settingsRoutes.get<
     mediaType: 'movie' | 'tv';
     tmdbId?: string;
     tvdbId?: string;
-    ratingKey?: string;
+    key?: string;
   }
 >('/plex-match-check/title', async (req, res) => {
   const problem = await plexMatchCheck.problemFor(
@@ -875,7 +875,7 @@ settingsRoutes.get<
     {
       tmdbId: req.query.tmdbId ? Number(req.query.tmdbId) : undefined,
       tvdbId: req.query.tvdbId ? Number(req.query.tvdbId) : undefined,
-      ratingKey: req.query.ratingKey,
+      key: req.query.key,
     }
   );
   return res.status(200).json({ problem: problem ?? null });

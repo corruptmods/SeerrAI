@@ -46,6 +46,7 @@ The full list, with where to find each thing and how to turn it off, is in **[do
 ## Documentation
 
 - **[Seerr AI guide](./docs/seerr-ai/README.md)**: every feature this fork adds, for people using it and for admins.
+- **[What's new](./CHANGELOG.md)**: what changed in each release, and what's coming next.
 - **[Installing and updating](./docs/seerr-ai/install.md)**: building the image, applying updates, database migrations and backups.
 - **[Developer notes](./docs/FORK.md)**: how the fork is built and tested, and the rules learned the hard way.
 - Everything Seerr already does is documented at [docs.seerr.dev](https://docs.seerr.dev).

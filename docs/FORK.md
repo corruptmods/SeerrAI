@@ -166,6 +166,16 @@ Each of these came from a bug that reached a running server.
     turning a feature off: every route a switch covers checks
     `featureEnabled()` too.
 
+## What's new
+
+[CHANGELOG.md](../CHANGELOG.md) is written for the people running Seerr AI,
+not for developers. A change they would notice adds a few friendly
+sentences under **Coming next**: what they can now do, where to find it, and
+anything they have to switch on. No code names, file names or jargon.
+Changes nobody would notice (tests, refactors, the build) are left out. A
+release renames **Coming next** to its version and date, and starts a new,
+empty one.
+
 ## Layout of the fork's own code
 
 | Path | What |

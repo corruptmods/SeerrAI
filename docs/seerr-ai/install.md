@@ -130,6 +130,8 @@ Building outside Docker, running the tests (SQLite and PostgreSQL), writing migr
 
 Day to day, stay on `dev` (`git switch dev`): `build.sh` pulls and builds whichever branch is checked out.
 
+What `dev` has that the last release doesn't is listed under **Coming next** in [What's new](../../CHANGELOG.md).
+
 ## Publishing a release (maintainers)
 
 Bring `main` up to `dev`, then tag it:

@@ -2,6 +2,7 @@ import Spinner from '@app/assets/spinner.svg';
 import Badge from '@app/components/Common/Badge';
 import Tooltip from '@app/components/Common/Tooltip';
 import DownloadBlock from '@app/components/DownloadBlock';
+import { useIsTouch } from '@app/hooks/useIsTouch';
 import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -16,6 +17,7 @@ import {
 import { MediaStatus } from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
+import Link from 'next/link';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.StatusBadge', {
@@ -46,6 +48,7 @@ const messages = defineMessages('components.StatusBadge', {
   needsAttention: 'Needs attention',
   failed: 'Download failed',
   imported: 'Adding to {mediaServerName}',
+  showDownload: '{status}: show the download',
 });
 
 interface StatusBadgeProps {
@@ -76,6 +79,10 @@ const StatusBadge = ({
   const intl = useIntl();
   const { hasPermission } = useUser();
   const settings = useSettings();
+  // On a touchscreen there is no hover to show a download's details, so a
+  // pill that is downloading opens them when tapped, rather than following
+  // its link (to Plex, or the manage panel); the link is then inside.
+  const isTouch = useIsTouch();
 
   let mediaLink: string | undefined;
   let mediaLinkDescription: string | undefined;
@@ -215,140 +222,127 @@ const StatusBadge = ({
     />
   );
 
+  /** Where the details' link goes, as a row at their foot. */
+  const detailsLink =
+    mediaLink && mediaLinkDescription ? (
+      <div className="border-t border-gray-700 py-2 text-right">
+        {mediaLink.includes('://') ? (
+          <a
+            href={mediaLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-indigo-400 hover:text-indigo-300"
+          >
+            {mediaLinkDescription}
+          </a>
+        ) : (
+          <Link
+            href={mediaLink}
+            className="font-semibold text-indigo-400 hover:text-indigo-300"
+          >
+            {mediaLinkDescription}
+          </Link>
+        )}
+      </div>
+    ) : null;
+
+  /**
+   * A pill that shows a download's progress while there is one: its
+   * details on hover (or on a tap, on a touchscreen), and otherwise the
+   * status it stands for.
+   */
+  const progressBadge = (
+    badgeType: 'success' | 'primary' | 'danger',
+    idleLabel: string
+  ) => {
+    const tapForDetails = inProgress && isTouch;
+    const badge = (
+      <Badge
+        badgeType={badgeType}
+        href={tapForDetails ? undefined : mediaLink}
+        className={`${
+          inProgress && 'relative !bg-gray-700/80 !px-0 hover:!bg-gray-700'
+        } overflow-hidden`}
+      >
+        {inProgress && badgeDownloadProgress}
+        <div
+          className={`relative z-20 flex items-center ${inProgress && 'px-2'}`}
+        >
+          <span>
+            {intl.formatMessage(is4k ? messages.status4k : messages.status, {
+              status: inProgress ? downloadLabel : idleLabel,
+            })}
+          </span>
+          {inProgress && (
+            <>
+              {episodeLabel && <span className="ml-1">{episodeLabel}</span>}
+              {downloadBusy && <Spinner className="ml-1 h-3 w-3" />}
+            </>
+          )}
+        </div>
+      </Badge>
+    );
+    return (
+      <Tooltip
+        content={
+          inProgress ? (
+            <>
+              {tooltipContent}
+              {tapForDetails && detailsLink}
+            </>
+          ) : (
+            mediaLinkDescription
+          )
+        }
+        className={
+          inProgress
+            ? 'max-h-96 w-96 max-w-[calc(100vw-1rem)] overflow-y-auto'
+            : undefined
+        }
+        tooltipConfig={{
+          ...(inProgress && { interactive: true, delayHide: 100 }),
+          ...(tapForDetails && {
+            trigger: 'click',
+            followCursor: false,
+            placement: 'bottom',
+            offset: [0, 8],
+          }),
+        }}
+      >
+        {tapForDetails ? (
+          <button
+            type="button"
+            className="rounded-full"
+            aria-label={intl.formatMessage(messages.showDownload, {
+              status: downloadLabel,
+            })}
+          >
+            {badge}
+          </button>
+        ) : (
+          badge
+        )}
+      </Tooltip>
+    );
+  };
+
   switch (status) {
     case MediaStatus.AVAILABLE:
-      return (
-        <Tooltip
-          content={inProgress ? tooltipContent : mediaLinkDescription}
-          className={`${
-            inProgress && 'hidden max-h-96 w-96 overflow-y-auto sm:block'
-          }`}
-          tooltipConfig={{
-            ...(inProgress && { interactive: true, delayHide: 100 }),
-          }}
-        >
-          <Badge
-            badgeType="success"
-            href={mediaLink}
-            className={`${
-              inProgress && 'relative !bg-gray-700/80 !px-0 hover:!bg-gray-700'
-            } overflow-hidden`}
-          >
-            {inProgress && badgeDownloadProgress}
-            <div
-              className={`relative z-20 flex items-center ${
-                inProgress && 'px-2'
-              }`}
-            >
-              <span>
-                {intl.formatMessage(
-                  is4k ? messages.status4k : messages.status,
-                  {
-                    status: inProgress
-                      ? downloadLabel
-                      : intl.formatMessage(globalMessages.available),
-                  }
-                )}
-              </span>
-              {inProgress && (
-                <>
-                  {episodeLabel && <span className="ml-1">{episodeLabel}</span>}
-                  {downloadBusy && <Spinner className="ml-1 h-3 w-3" />}
-                </>
-              )}
-            </div>
-          </Badge>
-        </Tooltip>
+      return progressBadge(
+        'success',
+        intl.formatMessage(globalMessages.available)
       );
 
     case MediaStatus.PARTIALLY_AVAILABLE:
-      return (
-        <Tooltip
-          content={inProgress ? tooltipContent : mediaLinkDescription}
-          className={`${
-            inProgress && 'hidden max-h-96 w-96 overflow-y-auto sm:block'
-          }`}
-          tooltipConfig={{
-            ...(inProgress && { interactive: true, delayHide: 100 }),
-          }}
-        >
-          <Badge
-            badgeType="success"
-            href={mediaLink}
-            className={`${
-              inProgress && 'relative !bg-gray-700/80 !px-0 hover:!bg-gray-700'
-            } overflow-hidden`}
-          >
-            {inProgress && badgeDownloadProgress}
-            <div
-              className={`relative z-20 flex items-center ${
-                inProgress && 'px-2'
-              }`}
-            >
-              <span>
-                {intl.formatMessage(
-                  is4k ? messages.status4k : messages.status,
-                  {
-                    status: inProgress
-                      ? downloadLabel
-                      : intl.formatMessage(globalMessages.partiallyavailable),
-                  }
-                )}
-              </span>
-              {inProgress && (
-                <>
-                  {episodeLabel && <span className="ml-1">{episodeLabel}</span>}
-                  {downloadBusy && <Spinner className="ml-1 h-3 w-3" />}
-                </>
-              )}
-            </div>
-          </Badge>
-        </Tooltip>
+      return progressBadge(
+        'success',
+        intl.formatMessage(globalMessages.partiallyavailable)
       );
 
     case MediaStatus.PROCESSING:
-      return (
-        <Tooltip
-          content={inProgress ? tooltipContent : mediaLinkDescription}
-          className={`${
-            inProgress && 'hidden max-h-96 w-96 overflow-y-auto sm:block'
-          }`}
-          tooltipConfig={{
-            ...(inProgress && { interactive: true, delayHide: 100 }),
-          }}
-        >
-          <Badge
-            badgeType="primary"
-            href={mediaLink}
-            className={`${
-              inProgress && 'relative !bg-gray-700/80 !px-0 hover:!bg-gray-700'
-            } overflow-hidden`}
-          >
-            {inProgress && badgeDownloadProgress}
-            <div
-              className={`relative z-20 flex items-center ${
-                inProgress && 'px-2'
-              }`}
-            >
-              <span>
-                {intl.formatMessage(
-                  is4k ? messages.status4k : messages.status,
-                  {
-                    status: inProgress
-                      ? downloadLabel
-                      : intl.formatMessage(globalMessages.requested),
-                  }
-                )}
-              </span>
-              {inProgress && (
-                <>
-                  {episodeLabel && <span className="ml-1">{episodeLabel}</span>}
-                  {downloadBusy && <Spinner className="ml-1 h-3 w-3" />}
-                </>
-              )}
-            </div>
-          </Badge>
-        </Tooltip>
+      return progressBadge(
+        'primary',
+        intl.formatMessage(globalMessages.requested)
       );
 
     case MediaStatus.PENDING:
@@ -376,48 +370,9 @@ const StatusBadge = ({
       );
 
     case MediaStatus.DELETED:
-      return (
-        <Tooltip
-          content={inProgress ? tooltipContent : mediaLinkDescription}
-          className={`${
-            inProgress && 'hidden max-h-96 w-96 overflow-y-auto sm:block'
-          }`}
-          tooltipConfig={{
-            ...(inProgress && { interactive: true, delayHide: 100 }),
-          }}
-        >
-          <Badge
-            badgeType="danger"
-            href={mediaLink}
-            className={`${
-              inProgress && 'relative !bg-gray-700/80 !px-0 hover:!bg-gray-700'
-            } overflow-hidden`}
-          >
-            {inProgress && badgeDownloadProgress}
-            <div
-              className={`relative z-20 flex items-center ${
-                inProgress && 'px-2'
-              }`}
-            >
-              <span>
-                {intl.formatMessage(
-                  is4k ? messages.status4k : messages.status,
-                  {
-                    status: inProgress
-                      ? downloadLabel
-                      : intl.formatMessage(globalMessages.deleted),
-                  }
-                )}
-              </span>
-              {inProgress && (
-                <>
-                  {episodeLabel && <span className="ml-1">{episodeLabel}</span>}
-                  {downloadBusy && <Spinner className="ml-1 h-3 w-3" />}
-                </>
-              )}
-            </div>
-          </Badge>
-        </Tooltip>
+      return progressBadge(
+        'danger',
+        intl.formatMessage(globalMessages.deleted)
       );
 
     default:

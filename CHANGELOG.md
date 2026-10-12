@@ -23,6 +23,10 @@ A few clients need one thing switched on first:
 
 The Health page now shows which client each one is and what version it's running. If the one Backfill uses is missing something from the list above, Health tells you what to switch on.
 
+### Tap a download to see it
+
+On a phone, tapping a title's download pill now shows what's downloading (progress, time left, what it's doing) instead of jumping straight to Plex. The Play on Plex link is right there in the details.
+
 ### Real logos
 
 Your download clients, Bazarr and Tautulli now show their own logos in **Settings → Services**, just like Radarr, Sonarr and Maintainerr, so it's easy to see which is which at a glance.

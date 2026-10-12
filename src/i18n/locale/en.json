@@ -2628,6 +2628,7 @@
   "components.StatusBadge.seasonepisodenumber": "S{seasonNumber}E{episodeNumber}",
   "components.StatusBadge.seasonnumber": "S{seasonNumber}",
   "components.StatusBadge.seasonrange": "S{first}–S{last}",
+  "components.StatusBadge.showDownload": "{status}: show the download",
   "components.StatusBadge.stalled": "Stalled",
   "components.StatusBadge.status": "{status}",
   "components.StatusBadge.status4k": "4K {status}",

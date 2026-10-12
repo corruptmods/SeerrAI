@@ -1,3 +1,4 @@
+import TheMovieDb from '@server/api/themoviedb';
 import {
   MediaRequestStatus,
   MediaStatus,
@@ -12,7 +13,6 @@ import { Permission } from '@server/lib/permissions';
 import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
-import TheMovieDb from '@server/api/themoviedb';
 
 const stubTmdb = () => {
   const stub = (name: string, value: unknown) =>

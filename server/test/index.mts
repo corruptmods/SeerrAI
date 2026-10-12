@@ -38,6 +38,11 @@ program
     '--coverage, --experimental-test-coverage',
     'Enable code coverage collection'
   )
+  .option(
+    '--concurrency <n>',
+    'How many test files run at once (1 for a shared database, as Postgres is)',
+    (v) => Number(v)
+  )
   // ignore additional options passed by vscode test runner
   .addOption(new Option('--test').hideHelp())
   .parse();
@@ -48,6 +53,7 @@ const opts = program.opts<{
   testReporter: string[];
   testReporterDestination: string[];
   experimentalTestCoverage: boolean;
+  concurrency?: number;
 }>();
 
 let files: string[];
@@ -88,6 +94,13 @@ const stream = run({
     join(BASE_DIR, 'server/migration/**'),
   ],
   testNamePatterns: opts.testNamePattern,
+  ...(opts.concurrency ? { concurrency: opts.concurrency } : {}),
+});
+
+// run() reports failures but leaves the exit code alone: without this a run
+// with failing tests exits 0, and CI would pass it.
+stream.on('test:fail', () => {
+  process.exitCode = 1;
 });
 
 // In CI, write a JUnit report to a file for use by GitHub

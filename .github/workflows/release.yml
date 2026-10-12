@@ -16,8 +16,8 @@
 #
 # Pushing to dev publishes nothing: :develop is built when you choose to
 # (Actions → Seerr AI Release → Run workflow, from dev). A build takes about
-# half an hour (arm64 is built under emulation) of a private repository's
-# limited Actions minutes.
+# half an hour (arm64 is built under emulation). Tests and checks run
+# separately, in ci.yml.
 name: Seerr AI Release
 
 on:

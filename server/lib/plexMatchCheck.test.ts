@@ -294,8 +294,7 @@ describe('Plex Match Check, the whole library', () => {
       'Carrie'
     );
     assert.equal(
-      (await plexMatchCheck.problemFor('series', { key: '126741' }))
-        ?.reason,
+      (await plexMatchCheck.problemFor('series', { key: '126741' }))?.reason,
       'other',
       'found from the side Plex matched it to'
     );

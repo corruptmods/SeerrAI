@@ -12,6 +12,26 @@ async function getFiles(dir: string): Promise<string[]> {
   return Array.prototype.concat(...files);
 }
 
+/**
+ * The inside of a single-quoted JavaScript string as the inside of a JSON
+ * one: the same escapes mean the same thing (`\n` stays a line break), `\'`
+ * becomes a plain quote and a bare `"` is escaped.
+ */
+const jsonEscapes = (js: string): string => {
+  let out = '';
+  for (let i = 0; i < js.length; i++) {
+    const ch = js[i];
+    if (ch === '\\' && i + 1 < js.length) {
+      const next = js[++i];
+      out +=
+        next === "'" ? "'" : 'nrtbfu"\\/'.includes(next) ? `\\${next}` : next;
+    } else {
+      out += ch === '"' ? '\\"' : ch;
+    }
+  }
+  return out;
+};
+
 async function extractMessages(
   filePath: string
 ): Promise<{ namespace: string; messages: Record<string, string> } | null> {
@@ -27,9 +47,7 @@ async function extractMessages(
         .replace(/^"[a-zA-Z0-9_-]+":'.*',?$/gm, (match) => {
           const parts = /^("[a-zA-Z0-9_-]+":)'(.*)',?$/.exec(match);
           if (!parts) return match;
-          return `${parts[1]}"${parts[2]
-            .replace(/\\/g, '\\\\')
-            .replace(/"/g, '\\"')}",`;
+          return `${parts[1]}"${jsonEscapes(parts[2])}",`;
         })
         .replace(/,$/, '');
       const messagesJson = JSON.parse(`{${formattedMessages}}`);

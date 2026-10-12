@@ -77,7 +77,16 @@ NODE_ENV=test node server/test/index.mts server/routes/list.test.ts
 ```
 
 Tests run on `node:test` with an in-memory SQLite database. Outbound network
-is blocked, so any API client a test touches has to be stubbed.
+is blocked, so any API client a test touches has to be stubbed. A run with
+any failing test exits with 1.
+
+### On GitHub
+
+`.github/workflows/ci.yml` runs on every push and pull request to `dev` and
+`main`: lint, formatting, types, translations in sync with the code
+(`node bin/check-i18n.js`), a build, and the whole suite on SQLite. On
+pushes it also runs the suite on Postgres, one file at a time, which takes
+about an hour. A red cross on a commit links to the log of what failed.
 
 ### Against Postgres
 
@@ -89,12 +98,15 @@ Postgres before deploying anything that touches entities, transactions or
 subscribers:
 
 ```bash
-docker run -d --name seerr-test-pg -e POSTGRES_USER=plex \
-  -e POSTGRES_PASSWORD=plex -e POSTGRES_DB=seerr_test -p 5433:5432 postgres:16
+docker run -d --name seerr-test-pg -e POSTGRES_USER=seerr \
+  -e POSTGRES_PASSWORD=seerr -e POSTGRES_DB=seerr_test -p 5433:5432 postgres:16
 
 NODE_ENV=test DB_TYPE=postgres DB_HOST=127.0.0.1 DB_PORT=5433 \
-  DB_USER=seerr DB_PASS=seerr DB_NAME=seerr_test pnpm test
+  DB_USER=seerr DB_PASS=seerr DB_NAME=seerr_test pnpm test --concurrency 1
 ```
+
+`--concurrency 1` runs one test file at a time: they all share the one
+database, and two at once reset it under each other.
 
 Use a throwaway database. The schema is dropped on every run — never point
 this at your real database.

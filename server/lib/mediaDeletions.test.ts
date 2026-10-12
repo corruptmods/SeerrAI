@@ -32,7 +32,9 @@ describe('media deletion records', () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
     await recordMediaDeletion(550, MediaType.MOVIE);
 
-    const second = (await getDeletionTimes([550])).get(`${MediaType.MOVIE}:550`);
+    const second = (await getDeletionTimes([550])).get(
+      `${MediaType.MOVIE}:550`
+    );
 
     assert.ok(
       (second as Date).getTime() >= (first as Date).getTime(),

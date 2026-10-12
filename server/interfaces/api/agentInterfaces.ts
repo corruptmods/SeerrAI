@@ -5,6 +5,17 @@ import type {
   AgentTrigger,
 } from '@server/entity/AgentRun';
 
+/** Changes the agent proposed, as an admin sees them to decide on. */
+export interface AgentProposal {
+  id: string;
+  at: string;
+  changes: {
+    kind: string;
+    headline: string;
+    details: string[];
+  }[];
+}
+
 /** A run as the list shows it. */
 export interface AgentRunSummary {
   id: number;
@@ -26,6 +37,8 @@ export interface AgentRunSummary {
 
 export interface AgentRunDetail extends Omit<AgentRunSummary, 'steps'> {
   steps: AgentStep[];
+  /** Changes it proposed, waiting for an admin to approve or decline. */
+  proposal: AgentProposal | null;
   /** The Backfill row for its title, for a link, once known. */
   backfillId: number | null;
   inputTokens: number;

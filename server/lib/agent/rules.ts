@@ -105,6 +105,13 @@ export const checkMapping = (
     importFailed?: Map<number, number>;
     isVideo: (path: string) => boolean;
     now?: number;
+    /**
+     * Episodes with a file may be mapped too, their files to be replaced
+     * once the new ones import: only with an admin's approval.
+     */
+    replace?: boolean;
+    /** An admin is in the conversation, so replacing can be proposed. */
+    canReplace?: boolean;
   }
 ): {
   ok: { file: FileInPack; episode: EpisodeOnDisk; episodes: EpisodeOnDisk[] }[];
@@ -158,13 +165,16 @@ export const checkMapping = (
         problems.push(`${one} is not an episode of this series.`);
         continue;
       }
-      if (episode.hasFile) {
+      if (episode.hasFile && !options.replace) {
         problems.push(
-          `${one} already has a file; existing files are never replaced.`
+          options.canReplace
+            ? `${one} already has a file. To replace it, call grab again with replace: true; the admin is asked to approve first.`
+            : `${one} already has a file; existing files are never replaced.`
         );
         continue;
       }
-      if (!episode.monitored) {
+      // A file being replaced is wanted whatever the monitoring says.
+      if (!episode.monitored && !(options.replace && episode.hasFile)) {
         problems.push(`${one} is not monitored, so it is not wanted.`);
         continue;
       }

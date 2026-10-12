@@ -156,6 +156,13 @@ export interface BackfillSettings {
    */
   historyDays: number;
   /**
+   * Release groups an admin blocked: Backfill and the agent pass over them,
+   * and Radarr and Sonarr are given a custom format that rejects them (see
+   * lib/blockedGroups.ts). Changed only through their own route, never by
+   * saving the rest of these settings.
+   */
+  blockedGroups: string[];
+  /**
    * The admin agent: an AI that looks further when Backfill finds nothing
    * for a requested title, and that admins can ask to find something.
    */
@@ -206,6 +213,7 @@ export const BACKFILL_DEFAULTS: BackfillSettings = {
   stallHours: 12,
   replaceFailed: true,
   historyDays: 90,
+  blockedGroups: [],
   agent: {
     autoRun: true,
     maxAutoRunsPerDay: 12,

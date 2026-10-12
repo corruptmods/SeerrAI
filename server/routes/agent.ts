@@ -6,9 +6,10 @@ import type {
   AgentRunDetail,
   AgentRunSummary,
 } from '@server/interfaces/api/agentInterfaces';
-import agent from '@server/lib/agent';
+import agent, { proposalOf } from '@server/lib/agent';
 import backfill from '@server/lib/backfill/engine';
 import { getSettings } from '@server/lib/settings';
+import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 
@@ -80,6 +81,20 @@ agentRoutes.get<{ id: string }>('/:id', async (req, res, next) => {
   const body: AgentRunDetail = {
     ...summaryOf(run),
     steps: run.steps,
+    proposal: (() => {
+      const proposal = run.status === 'waiting' ? proposalOf(run) : undefined;
+      return proposal
+        ? {
+            id: proposal.id,
+            at: proposal.at,
+            changes: proposal.changes.map(({ kind, headline, details }) => ({
+              kind,
+              headline,
+              details,
+            })),
+          }
+        : null;
+    })(),
     backfillId: row?.id ?? null,
     inputTokens: run.inputTokens,
     outputTokens: run.outputTokens,
@@ -163,6 +178,32 @@ agentRoutes.post<{ id: string }>('/:id/reply', async (req, res, next) => {
     });
   }
 });
+
+/** Approving or declining what a run proposed, by the proposal's id. */
+const decision =
+  (approve: boolean) =>
+  async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
+    const body = z.object({ proposal: z.string().uuid() }).safeParse(req.body);
+    if (!body.success) {
+      return next({ status: 400, message: 'Say which changes.' });
+    }
+    if (!req.user) return next({ status: 403, message: 'Sign in first.' });
+    try {
+      const id = Number(req.params.id) || 0;
+      const run = approve
+        ? await agent.approve(id, body.data.proposal, req.user)
+        : await agent.decline(id, body.data.proposal, req.user);
+      return res.status(202).json(summaryOf(run));
+    } catch (e) {
+      return next({
+        status: 409,
+        message: e instanceof Error ? e.message : 'It cannot be decided now.',
+      });
+    }
+  };
+
+agentRoutes.post<{ id: string }>('/:id/approve', decision(true));
+agentRoutes.post<{ id: string }>('/:id/decline', decision(false));
 
 agentRoutes.post('/clear', async (_req, res) => {
   const deleted = await agent.clearFinished();

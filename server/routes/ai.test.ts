@@ -1,10 +1,12 @@
 import TautulliAPI from '@server/api/tautulli';
 import TheMovieDb from '@server/api/themoviedb';
 import { getRepository } from '@server/datasource';
+import type AgentRun from '@server/entity/AgentRun';
 import AiUsage from '@server/entity/AiUsage';
 import { MediaList, MediaListMember } from '@server/entity/MediaList';
 import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
+import agent from '@server/lib/agent';
 import { clearAiCache, today } from '@server/lib/ai';
 import { forgetSpendReports } from '@server/lib/ai/credit';
 import { redact } from '@server/lib/ai/features';
@@ -608,6 +610,54 @@ describe('the AI chat', () => {
       body.results.map((r) => r.id),
       [137]
     );
+  });
+
+  it('hands an admin’s change to the admin agent, to propose for approval', async () => {
+    const asked: string[] = [];
+    const ask = mock.method(agent, 'ask', async (text: string) => {
+      asked.push(text);
+      return { id: 42 } as AgentRun;
+    });
+    actingAs = admin;
+    answers = [
+      '{"r":"The admin agent is on it; nothing changes until you approve.","titles":[{"t":"Groundhog Day","y":1993,"k":"movie"}],"do":"admin"}',
+    ];
+    const { status, body } = await call<{
+      reply: string;
+      results: unknown[];
+      fix?: { kind: string; ok: boolean; link?: string };
+    }>('POST', '/api/v1/ai/chat', {
+      message: 'the copy of this one is bad, delete it and block the group',
+    });
+    assert.equal(status, 200);
+    assert.match(calls[0].system, /They are an admin\./);
+    assert.deepEqual(body.fix, {
+      kind: 'agent',
+      ok: true,
+      link: '/backfill/agent/42',
+    });
+    assert.deepEqual(body.results, []);
+    assert.deepEqual(asked, [
+      'the copy of this one is bad, delete it and block the group (The title: Groundhog Day (1993), a movie.)',
+    ]);
+    ask.mock.restore();
+  });
+
+  it('never offers the admin agent to someone who is not an admin', async () => {
+    const ask = mock.method(agent, 'ask', async () => ({ id: 1 }) as AgentRun);
+    answers = [
+      '{"r":"Sure.","titles":[{"t":"Groundhog Day","y":1993,"k":"movie"}],"do":"admin"}',
+    ];
+    const { status, body } = await call<{ fix?: unknown }>(
+      'POST',
+      '/api/v1/ai/chat',
+      { message: 'delete this file' }
+    );
+    assert.equal(status, 200);
+    assert.doesNotMatch(calls[0].system, /They are an admin/);
+    assert.equal(body.fix, undefined);
+    assert.equal(ask.mock.callCount(), 0);
+    ask.mock.restore();
   });
 
   it('ignores an action it does not know', async () => {

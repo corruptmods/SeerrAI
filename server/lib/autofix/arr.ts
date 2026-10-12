@@ -1,6 +1,7 @@
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
+import type { AxiosInstance } from 'axios';
 
 /*
  * The few Sonarr and Radarr calls fixing a reported problem needs: what
@@ -79,6 +80,81 @@ export interface SonarrParse {
   episodes?: { id: number }[];
 }
 
+/** A custom format, as Sonarr (v4) and Radarr keep them. */
+export interface ArrCustomFormat {
+  id?: number;
+  name: string;
+  includeCustomFormatWhenRenaming?: boolean;
+  specifications: {
+    name: string;
+    implementation: string;
+    negate: boolean;
+    required: boolean;
+    fields: { name: string; value: unknown }[];
+  }[];
+}
+
+/** A quality profile, whole: it is sent back whole when changed. */
+export interface ArrQualityProfile {
+  id: number;
+  name: string;
+  minFormatScore?: number;
+  formatItems?: { format: number; name?: string; score: number }[];
+  [field: string]: unknown;
+}
+
+/**
+ * What an admin's changes need of Sonarr and Radarr alike: custom formats
+ * and the scores profiles give them, the queue, marking a grab failed, and
+ * where deleted files go.
+ */
+const extrasOf = (http: AxiosInstance) => ({
+  customFormats: async (): Promise<ArrCustomFormat[]> => {
+    const { data } = await http.get<ArrCustomFormat[]>('/customformat');
+    return Array.isArray(data) ? data : [];
+  },
+  saveCustomFormat: async (
+    format: ArrCustomFormat
+  ): Promise<ArrCustomFormat> =>
+    format.id
+      ? (await http.put<ArrCustomFormat>(`/customformat/${format.id}`, format))
+          .data
+      : (await http.post<ArrCustomFormat>('/customformat', format)).data,
+  deleteCustomFormat: async (id: number): Promise<void> => {
+    await http.delete(`/customformat/${id}`);
+  },
+  qualityProfiles: async (): Promise<ArrQualityProfile[]> => {
+    const { data } = await http.get<ArrQualityProfile[]>('/qualityprofile');
+    return Array.isArray(data) ? data : [];
+  },
+  saveQualityProfile: async (profile: ArrQualityProfile): Promise<void> => {
+    await http.put(`/qualityprofile/${profile.id}`, profile);
+  },
+  /** Takes it out of the queue and the download client, blocklisting it. */
+  removeFromQueue: async (id: number): Promise<void> => {
+    await http.delete(`/queue/${id}`, {
+      params: {
+        removeFromClient: true,
+        blocklist: true,
+        skipRedownload: false,
+      },
+    });
+  },
+  /** Marks a grab failed: its release is blocklisted and searched again. */
+  markFailed: async (historyId: number): Promise<void> => {
+    await http.post(`/history/failed/${historyId}`);
+  },
+  /** Where deleted files go; empty when they are deleted for good. */
+  recycleBin: async (): Promise<string> => {
+    const { data } = await http.get<{ recycleBin?: string }>(
+      '/config/mediamanagement'
+    );
+    return data?.recycleBin ?? '';
+  },
+});
+
+export type ArrExtras = ReturnType<typeof extrasOf>;
+
 const records = (data: unknown): ArrHistoryRecord[] =>
   Array.isArray(data)
     ? (data as ArrHistoryRecord[])
@@ -90,6 +166,20 @@ export class FixSonarr extends SonarrAPI {
       apiKey: server.apiKey,
       url: SonarrAPI.buildUrl(server, '/api/v3'),
     });
+  }
+
+  public get extras(): ArrExtras {
+    return extrasOf(this.axios);
+  }
+
+  /** The series' newest events, newest first. */
+  public async seriesHistory(seriesId: number): Promise<ArrHistoryRecord[]> {
+    const { data } = await this.axios.get('/history/series', {
+      params: { seriesId },
+    });
+    return records(data).sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
   }
 
   public async episodes(seriesId: number): Promise<ArrEpisode[]> {
@@ -153,6 +243,8 @@ export interface RadarrMovieDetail {
   title: string;
   runtime?: number;
   hasFile: boolean;
+  monitored?: boolean;
+  qualityProfileId?: number;
   movieFile?: ArrFile;
 }
 
@@ -162,6 +254,15 @@ export class FixRadarr extends RadarrAPI {
       apiKey: server.apiKey,
       url: RadarrAPI.buildUrl(server, '/api/v3'),
     });
+  }
+
+  public get extras(): ArrExtras {
+    return extrasOf(this.axios);
+  }
+
+  /** Whether Radarr looks for the movie. */
+  public async setMonitored(movieId: number, monitored: boolean) {
+    await this.axios.put('/movie/editor', { movieIds: [movieId], monitored });
   }
 
   public async movieDetail(id: number): Promise<RadarrMovieDetail> {

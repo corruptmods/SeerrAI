@@ -40,15 +40,24 @@ export interface AgentStep {
     /** It asked an admin. */
     | 'ask'
     /** An admin's answer, correction or follow-up. */
-    | 'reply';
+    | 'reply'
+    /** It proposed changes only an admin can approve. */
+    | 'propose';
   tool?: string;
   text: string;
 }
 
-/** Something the agent changed: a download started, a title requested. */
+/**
+ * Something the agent changed: a download started, a title requested, or a
+ * change an admin approved (a group blocked, a file deleted…).
+ */
 export interface AgentAction {
   at: string;
-  type: 'grab' | 'request' | 'stop' | 'relink';
+  type: 'grab' | 'request' | 'stop' | 'relink' | 'change';
+  /** For a change: which kind. */
+  change?: string;
+  /** For a change: the admin who approved it. */
+  approvedBy?: string;
   title: string;
   detail: string;
   jobId?: number;

@@ -1,6 +1,7 @@
 import { isTorrentClient } from '@server/api/downloadclients';
 import ProwlarrAPI from '@server/api/prowlarr';
 import backfill from '@server/lib/backfill/engine';
+import { GROUP_NAME, setGroupBlocked } from '@server/lib/blockedGroups';
 import type { BackfillSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -104,6 +105,8 @@ const keyFor = (prowlarr: ProwlarrBody): string => {
 const withKey = (data: z.infer<typeof body>): BackfillSettings => ({
   ...data,
   prowlarr: { ...data.prowlarr, apiKey: keyFor(data.prowlarr) },
+  // Changed only through /blocked-groups.
+  blockedGroups: getSettings().backfill.blockedGroups,
 });
 
 const prowlarrFailed = (e: unknown) => {
@@ -188,6 +191,32 @@ backfillSettingsRoutes.put('/', async (req, res, next) => {
   settings.backfill = next_;
   await settings.save();
   return res.status(200).json(shown(next_));
+});
+
+/**
+ * Blocks a release group, or unblocks one: saved, and Radarr and Sonarr
+ * brought in line. Answers the list, and what could not be updated.
+ */
+backfillSettingsRoutes.post('/blocked-groups', async (req, res, next) => {
+  const parsed = z
+    .object({
+      group: z.string().trim().regex(GROUP_NAME),
+      blocked: z.boolean(),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) {
+    return next({ status: 400, message: 'Name a release group.' });
+  }
+  try {
+    return res
+      .status(200)
+      .json(await setGroupBlocked(parsed.data.group, parsed.data.blocked));
+  } catch (e) {
+    return next({
+      status: 400,
+      message: e instanceof Error ? e.message : String(e),
+    });
+  }
 });
 
 export default backfillSettingsRoutes;

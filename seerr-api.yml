@@ -187,6 +187,12 @@ components:
           type: boolean
         historyDays:
           type: number
+        blockedGroups:
+          type: array
+          readOnly: true
+          description: Release groups never taken. Changed only through /settings/backfill/blocked-groups; ignored here.
+          items:
+            type: string
     BackfillAnswer:
       type: object
       additionalProperties: true
@@ -3747,6 +3753,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BackfillAnswer'
+  /settings/backfill/blocked-groups:
+    post:
+      summary: 'Block or unblock a release group'
+      description: 'Saved, and Radarr and Sonarr updated: a custom format matching the blocked groups, scored in every quality profile so low that nothing carrying it is accepted. Answers the list and anything that could not be updated.'
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - group
+                - blocked
+              properties:
+                group:
+                  type: string
+                  example: rothebehap
+                blocked:
+                  type: boolean
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  groups:
+                    type: array
+                    items:
+                      type: string
+                  problems:
+                    type: array
+                    items:
+                      type: string
   /backfill:
     get:
       summary: "Backfill's overview"
@@ -3997,6 +4040,72 @@ paths:
             application/json:
               schema:
                 type: object
+  /agent/{id}/approve:
+    post:
+      summary: 'Approve the changes the admin agent proposed'
+      description: 'Only the proposal shown (by its id), and only once. The run goes on and makes each change, checked again first.'
+      tags:
+        - backfill
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - proposal
+              properties:
+                proposal:
+                  type: string
+                  format: uuid
+      responses:
+        '202':
+          description: It goes on
+          content:
+            application/json:
+              schema:
+                type: object
+        '409':
+          description: The changes are no longer waiting
+  /agent/{id}/decline:
+    post:
+      summary: 'Decline the changes the admin agent proposed'
+      description: 'Nothing is changed, and the conversation is over until someone replies.'
+      tags:
+        - backfill
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - proposal
+              properties:
+                proposal:
+                  type: string
+                  format: uuid
+      responses:
+        '202':
+          description: Declined
+          content:
+            application/json:
+              schema:
+                type: object
+        '409':
+          description: The changes are no longer waiting
   /agent/{id}:
     get:
       summary: 'One run of the admin agent, step by step'

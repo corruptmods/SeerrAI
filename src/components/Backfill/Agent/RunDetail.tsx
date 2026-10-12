@@ -1,3 +1,4 @@
+import ProposalCard from '@app/components/Backfill/Agent/ProposalCard';
 import {
   RunMeta,
   RunStatusBadge,
@@ -13,7 +14,9 @@ import defineMessages from '@app/utils/defineMessages';
 import {
   ArrowDownIcon,
   ArrowDownTrayIcon,
+  CheckBadgeIcon,
   ExclamationTriangleIcon,
+  HandRaisedIcon,
   LinkIcon,
   NoSymbolIcon,
   PaperAirplaneIcon,
@@ -58,11 +61,20 @@ const runMessages = defineMessages('components.Backfill.Agent.Run', {
   confirmDelete: 'Delete it?',
   deleteFailed: 'It could not be deleted.',
   agent: 'Agent',
+  proposed: 'It needs your approval',
+  decideFailed: 'That could not be done.',
+  proposalPlaceholder: 'Or tell it something else instead…',
 });
 
 type Entry =
   | { type: 'admin'; at: string; text: string; who?: string }
-  | { type: 'agent'; at: string; text: string; question?: boolean }
+  | {
+      type: 'agent';
+      at: string;
+      text: string;
+      question?: boolean;
+      proposal?: boolean;
+    }
   | { type: 'work'; at: string; steps: AgentStep[] }
   | { type: 'action'; at: string; text: string };
 
@@ -99,6 +111,14 @@ const conversationOf = (run: AgentRunDetail): Entry[] => {
           at: step.at,
           text: step.text,
           question: true,
+        });
+        break;
+      case 'propose':
+        entries.push({
+          type: 'agent',
+          at: step.at,
+          text: step.text,
+          proposal: true,
         });
         break;
       case 'action':
@@ -186,20 +206,26 @@ const EntryView = ({ entry }: { entry: Entry }) => {
       <div className="flex justify-start">
         <div
           className={`max-w-[85%] rounded-2xl rounded-bl-sm px-4 py-2.5 shadow ring-1 ${
-            entry.question
+            entry.question || entry.proposal
               ? 'bg-yellow-500/10 ring-yellow-500/60'
               : 'bg-gray-700 ring-gray-600'
           }`}
         >
           <div className="mb-0.5 flex items-center justify-between gap-3 text-[11px] text-gray-400">
             <span className="flex items-center gap-1">
-              {entry.question ? (
+              {entry.proposal ? (
+                <HandRaisedIcon className="h-3.5 w-3.5 text-yellow-300" />
+              ) : entry.question ? (
                 <QuestionMarkCircleIcon className="h-3.5 w-3.5 text-yellow-300" />
               ) : (
                 <SparklesIcon className="h-3.5 w-3.5 text-indigo-300" />
               )}
               {intl.formatMessage(
-                entry.question ? runMessages.question : runMessages.agent
+                entry.proposal
+                  ? runMessages.proposed
+                  : entry.question
+                    ? runMessages.question
+                    : runMessages.agent
               )}
             </span>
             <Time at={entry.at} />
@@ -320,6 +346,29 @@ const RunDetail = () => {
     }
   };
 
+  const decide = async (approve: boolean) => {
+    if (!data.proposal || sending) return;
+    setSending(true);
+    setFailed(undefined);
+    try {
+      await axios.post(
+        `/api/v1/agent/${data.id}/${approve ? 'approve' : 'decline'}`,
+        { proposal: data.proposal.id }
+      );
+      pinned.current = true;
+    } catch (err) {
+      setFailed(
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : intl.formatMessage(runMessages.decideFailed)
+      );
+    } finally {
+      // Whatever happened, show where it stands now.
+      await mutate();
+      setSending(false);
+    }
+  };
+
   const remove = async () => {
     try {
       await axios.delete(`/api/v1/agent/${data.id}`);
@@ -412,6 +461,8 @@ const RunDetail = () => {
                 >
                   {action.type === 'grab' ? (
                     <ArrowDownTrayIcon className="mt-0.5 h-4 w-4 flex-none" />
+                  ) : action.type === 'change' ? (
+                    <CheckBadgeIcon className="mt-0.5 h-4 w-4 flex-none" />
                   ) : action.type === 'stop' ? (
                     <NoSymbolIcon className="mt-0.5 h-4 w-4 flex-none" />
                   ) : action.type === 'relink' ? (
@@ -436,6 +487,14 @@ const RunDetail = () => {
             ))}
           </ul>
         </section>
+      )}
+
+      {data.proposal && (
+        <ProposalCard
+          proposal={data.proposal}
+          busy={sending}
+          onDecide={(approve) => void decide(approve)}
+        />
       )}
 
       <section className="mt-4 rounded-lg bg-gray-800 ring-1 ring-gray-700">
@@ -496,9 +555,11 @@ const RunDetail = () => {
                 }
               }}
               placeholder={intl.formatMessage(
-                data.status === 'waiting'
-                  ? runMessages.answerPlaceholder
-                  : runMessages.replyPlaceholder
+                data.proposal
+                  ? runMessages.proposalPlaceholder
+                  : data.status === 'waiting'
+                    ? runMessages.answerPlaceholder
+                    : runMessages.replyPlaceholder
               )}
               className="min-h-[44px] min-w-0 flex-1 resize-y rounded-md border border-gray-500 bg-gray-700 px-3 py-2 text-sm text-white placeholder:text-gray-400 disabled:opacity-60"
             />

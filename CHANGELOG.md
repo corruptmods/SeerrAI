@@ -4,6 +4,14 @@ The newest changes are at the top. **Coming next** is what's on the `dev` branch
 
 ## Coming next
 
+### Ask the agent to fix what's already there
+
+The admin agent can now replace a bad copy, block a release group, mark a download as failed, delete files, switch a title to another quality profile, or look for a better release. Just ask it, in its chat or in AI Search. It shows you exactly what it would do and waits for your **Approve**, so nothing changes behind your back. A replaced file stays playable until the new one is in.
+
+### Block release groups
+
+Got a group that keeps uploading fakes? Add it under **Settings → Backfill → Blocked release groups**. Backfill, the agent, Radarr and Sonarr will all skip its releases from then on, and anything you already have from it gets swapped out for the next good release.
+
 ### More download clients
 
 Seerr AI now works with NZBGet, Transmission, Deluge and rTorrent (ruTorrent too), as well as SABnzbd and qBittorrent. Add them under **Settings → Services → Download Clients**. Downloads then update every few seconds, and you can see what the client is actually doing: checking, repairing, unpacking, or waiting for someone to download from.

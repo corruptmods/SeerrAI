@@ -3,6 +3,7 @@ import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import AdvancedSection from '@app/components/Settings/AdvancedSection';
+import BlockedGroups from '@app/components/Settings/SettingsBackfill/BlockedGroups';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -76,7 +77,7 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
   openBackfill: 'Open Backfill',
   agent: 'Admin agent',
   agentTip:
-    'An AI that looks further when Backfill finds nothing usable for a requested title: it reads why releases were turned down, searches other ways, opens packs to check their files and downloads only what is missing. It never replaces a file on disk. It needs AI set up, with Admin Agent on.',
+    'An AI that looks further when Backfill finds nothing usable for a requested title: it reads why releases were turned down, searches other ways, opens packs to check their files and downloads only what is missing. On its own it never replaces a file on disk; replacing files, blocking a release group or deleting files happens only when an admin asks and then approves it. It needs AI set up, with Admin Agent on.',
   agentAutoRun: 'Step in on its own',
   agentAutoRunTip:
     'When Backfill finds nothing for a requested title, and when someone reports a title missing and Sonarr, Radarr and Backfill find nothing. Off: it only works when an admin asks.',
@@ -706,6 +707,7 @@ const SettingsBackfill = () => {
           );
         }}
       </Formik>
+      <BlockedGroups initial={data.blockedGroups ?? []} />
     </>
   );
 };

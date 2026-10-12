@@ -56,7 +56,7 @@ An AI with tools that looks further when Backfill finds nothing usable for a req
 
 **It can:** find a title and see what it has; run Sonarr's or Radarr's own search; search Prowlarr with any words; list a release's files and check its language; download what is missing; relink a file that holds two episodes; ask you a question; stop its own download; request a title that isn't in the library yet.
 
-**It can't:** replace or touch a file already on disk; download a language other than English or the title's original language; go past its size or daily limits.
+**It can't, on its own:** replace or touch a file already on disk; download a language other than English or the title's original language; go past its size or daily limits.
 
 - **On its own** (on by default; **Step in on its own** in Settings → Backfill): when Backfill finds nothing for a requested title, or someone reports a title missing and nothing is found. Once per title.
 - **When asked:** from **Backfill → Agent**, or **Get it with AI** on a title's Backfill page.
@@ -65,3 +65,29 @@ An AI with tools that looks further when Backfill finds nothing usable for a req
 - Every conversation is kept, step by step, with what it cost; you can reply to it or answer its questions. Finished ones are removed after 30 days.
 
 What it does shows in each title's history and in Backfill notifications.
+
+### Changes you approve
+
+When you ask it to, the agent can also change what's already there. It never does any of these by itself: it works out exactly what would happen, shows you, and waits. Nothing changes until you press **Approve** on the conversation's page.
+
+- **Replace a file** with a release it found (a better copy, or the right one). The old file stays, and keeps playing, until the new one has imported.
+- **Search for a better release**: Radarr or Sonarr searches and takes one only if your quality profile prefers it. (This one just runs; it's what they'd do anyway.)
+- **Block or unblock a release group** (see below).
+- **Mark a download as failed**: it's removed from the download client and blocklisted, and Radarr or Sonarr looks for another.
+- **Delete a title's files**: a movie's file, or a series' files (all, a season, or some episodes), and optionally stop them being downloaded again. If Radarr or Sonarr has no recycle bin set, the card says the file is gone for good, and Approve takes a second click.
+- **Move a title to another quality profile**, and search again if you like.
+
+Each change is checked again when you approve it. If things have moved on (a new file arrived, the download already finished), it's left alone and the agent tells you. You'll get a notification when something is waiting for you. Answering in the chat instead of approving drops the proposal; declining ends the conversation without changing anything.
+
+Admins can ask for all of this from **AI Search** too ("this copy of The Odyssey is a cam, delete it and block the group"). AI Search hands it to the agent and links you to the conversation. Nobody else can.
+
+### Blocked release groups
+
+**Settings → Backfill → Blocked release groups.** Releases from a blocked group are never taken:
+
+- Backfill and the agent pass over them.
+- Radarr and Sonarr get a custom format called **Seerr AI: blocked release groups**. It matches the group by name (and in the release title, for torrents that only mention it there), and every quality profile scores it low enough that nothing carrying it can be grabbed.
+- A file already in your library from a blocked group then counts as not good enough, so the next acceptable release replaces it, once it has imported.
+
+Changes apply straight away. Seerr AI only ever touches that one format; your own custom formats are left as they are. If a server can't be reached, the list is still saved and you're told which server to check; it's brought in line the next time the list changes. Unblocking the last group removes the format.
+

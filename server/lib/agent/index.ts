@@ -8,12 +8,20 @@ import Issue from '@server/entity/Issue';
 import IssueComment from '@server/entity/IssueComment';
 import { MediaEventType } from '@server/entity/MediaEvent';
 import { User } from '@server/entity/User';
+import type { Proposal, ProposedChange } from '@server/lib/agent/changes';
+import { applyChange } from '@server/lib/agent/changes';
 import type {
   AgentState,
   KnownRelease,
   TitleRef,
 } from '@server/lib/agent/tools';
-import { TOOLS, runTool, titleRef } from '@server/lib/agent/tools';
+import {
+  TOOLS,
+  adminPresent,
+  runTool,
+  startApprovedGrab,
+  titleRef,
+} from '@server/lib/agent/tools';
 import { aiFeatureOn, modelFor } from '@server/lib/ai';
 import { countAnswer, noteFailure } from '@server/lib/ai/credit';
 import type { ConverseMessage, ToolResult } from '@server/lib/ai/providers';
@@ -26,6 +34,7 @@ import { owner } from '@server/lib/owner';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import { randomUUID } from 'node:crypto';
 import type { FindOptionsWhere } from 'typeorm';
 import { In, LessThan, MoreThan } from 'typeorm';
 
@@ -36,9 +45,12 @@ import { In, LessThan, MoreThan } from 'typeorm';
  * it something. One run at a time; each is kept with every step it took,
  * and any download it starts is told to admins.
  *
- * It decides what to try. What it may change is decided by the tools: only
- * missing episodes, never a file on disk, within a size and a daily limit,
- * in English or the title's own language.
+ * It decides what to try. What it may change is decided by the tools: on
+ * its own, only missing episodes, within a size and a daily limit, in
+ * English or the title's own language. Anything more an admin asks for
+ * (replacing a file, blocking a release group, deleting files, marking a
+ * download failed, changing a profile) it only proposes: the run waits,
+ * and nothing happens until an admin approves.
  */
 
 const LABEL = 'Agent';
@@ -69,6 +81,15 @@ const SEARCH_COMMANDS = new Set([
   'MissingEpisodeSearch',
   'MoviesSearch',
 ]);
+
+/** An admin's answer to a proposal, carried out when the run goes on. */
+interface Decision {
+  by: string;
+  changes: ProposedChange[];
+}
+
+export const proposalOf = (run: AgentRun): Proposal | undefined =>
+  (run.memory as { proposal?: Proposal } | null)?.proposal;
 
 /** Where a report's run was asked from, kept with it. */
 interface ReportMemory {
@@ -145,6 +166,7 @@ How to work:
 4. Be certain before you grab. Check the language with check_language when there is any question. Grab only files for missing episodes. One file per episode is preferred: take a release whose files each hold several episodes (S06E01-02, "Title A + Title B") only when no release has those episodes one per file, and then give each such file every episode it holds (episodes: [1, 2]), so Sonarr names it S06E01-E02. Weigh it in this order: the right content; English or the title's original language; covering as much as possible; quality; size. When nothing meets the quality profile, a lower quality is fine as a stopgap, since Sonarr and Radarr keep looking for upgrades. Prefer a well-seeded torrent or usenet.
 5. Turn down dubs in other languages (TRUEFRENCH, iTALiAN, GERMAN and so on, unless that is the original language), fakes (sizes far too small, torrents of archives or executables only), samples, and other shows. A Usenet post packed in archives, or with scrambled file names (only its PAR2 repair files named), is normal but cannot be opened: when its name is exactly one missing episode, or the movie, grab it whole (whole: true); a season pack like that cannot be used.
 6. If the admin says something you started is wrong, stop it with stop_download and fix it. A file already imported that holds several episodes but is linked to only one (title_status shows the others missing, the file's name or length says it holds them) is fixed with relink_file; nothing is downloaded. If nothing usable exists, say so and what you tried. Only ask the admin (ask_admin) when you truly cannot decide yourself.
+7. When the admin asks you to change what is already there, propose it; the admin approves or declines, and nothing happens before that. A bad or wrong file: find a good release and grab it with replace: true (the old file goes only once the new one has imported), or search_upgrade to let Radarr or Sonarr find something better by its profile. A release group they do not want: propose_change blockGroup. A download that is wrong or broken: propose_change markFailed. Files to remove: propose_change deleteFiles. Another quality profile: propose_change changeProfile. Propose only what was asked for, then stop and wait; the next message says what was decided and what came of it.
 
 Reply in short plain text, no headings or markdown: what was missing, what you found, what you started downloading (with its Backfill job number), and what is still missing and why.`;
 
@@ -537,9 +559,23 @@ class Agent {
       kind: 'reply',
       text: `${user.displayName}: ${said}`,
     });
+    // Answering instead of approving leaves the proposal undone.
+    const pending = proposalOf(run);
+    const { proposal: _dropped, ...memory } = (run.memory ?? {}) as {
+      proposal?: Proposal;
+    };
+    void _dropped;
+    run.memory = memory;
     run.conversation = [
       ...run.conversation,
-      { role: 'user', text: `${user.displayName} (admin) says: ${said}` },
+      {
+        role: 'user',
+        text: `${user.displayName} (admin) says: ${said}${
+          pending
+            ? '\n(What you proposed was not approved and nothing of it was done; propose again if it is still wanted.)'
+            : ''
+        }`,
+      },
     ];
     run.status = 'queued';
     run.question = null;
@@ -551,6 +587,143 @@ class Agent {
     this.queue.push(run.id);
     void this.pump();
     return run;
+  }
+
+  /**
+   * An admin approves what a run proposed: it goes on, carrying the changes
+   * out first, each checked again against how things are now. Only the
+   * proposal shown to them, and only once.
+   */
+  public async approve(
+    id: number,
+    proposalId: string,
+    user: User
+  ): Promise<AgentRun> {
+    return this.decide(id, proposalId, user, true);
+  }
+
+  /** An admin declines it: nothing is changed, and the run is over. */
+  public async decline(
+    id: number,
+    proposalId: string,
+    user: User
+  ): Promise<AgentRun> {
+    return this.decide(id, proposalId, user, false);
+  }
+
+  private deciding = new Set<number>();
+
+  private async decide(
+    id: number,
+    proposalId: string,
+    user: User,
+    approved: boolean
+  ): Promise<AgentRun> {
+    if (!user.hasPermission(Permission.ADMIN)) {
+      throw new Error('Only an admin can decide on these changes.');
+    }
+    if (approved) {
+      const problem = this.problem(user);
+      if (problem) throw new Error(problem);
+    }
+    if (this.deciding.has(id)) {
+      throw new Error('This is being decided on already.');
+    }
+    this.deciding.add(id);
+    try {
+      const runs = getRepository(AgentRun);
+      const run = await runs.findOne({ where: { id } });
+      if (!run) throw new Error('There is no such conversation.');
+      const proposal = proposalOf(run);
+      if (run.status !== 'waiting' || !proposal || proposal.id !== proposalId) {
+        throw new Error(
+          'These changes are no longer waiting; reload to see where it stands.'
+        );
+      }
+      const headlines = proposal.changes.map((c) => c.headline).join('; ');
+      const { proposal: _taken, ...memory } = run.memory as {
+        proposal?: Proposal;
+      };
+      void _taken;
+      run.question = null;
+      run.error = null;
+      run.steps.push({
+        at: new Date().toISOString(),
+        kind: 'reply',
+        text: `${user.displayName} ${approved ? 'approved' : 'declined'}: ${headlines}`,
+      });
+      if (approved) {
+        const decision: Decision = {
+          by: user.displayName,
+          changes: proposal.changes,
+        };
+        run.memory = { ...memory, decision };
+        run.status = 'queued';
+        // It carries on as the admin who approved.
+        run.requestedById = user.id;
+        await runs.save(run);
+        this.queue.push(run.id);
+        void this.pump();
+        return run;
+      }
+      run.memory = memory;
+      run.conversation = [
+        ...run.conversation,
+        {
+          role: 'user',
+          text: `${user.displayName} (admin) declined: ${headlines}. None of it was done.`,
+        },
+      ];
+      run.status = 'done';
+      run.summary = `${user.displayName} declined: ${headlines}. Nothing was changed.`;
+      run.finishedAt = new Date();
+      await runs.save(run);
+      return run;
+    } finally {
+      this.deciding.delete(id);
+    }
+  }
+
+  /** Carries out approved changes, one by one; what came of each. */
+  private async carryOut(
+    decision: Decision,
+    state: AgentState
+  ): Promise<string> {
+    const lines: string[] = [];
+    for (const change of decision.changes) {
+      try {
+        if (change.kind === 'replace') {
+          // The grab records itself, as any download it starts.
+          const said = await startApprovedGrab(
+            state,
+            change.params.grab,
+            `AI agent, approved by ${decision.by}`
+          );
+          lines.push(`Done: ${change.headline}. ${said}`);
+          continue;
+        }
+        const said = await applyChange(change);
+        state.act({
+          at: new Date().toISOString(),
+          type: 'change',
+          change: change.kind,
+          approvedBy: decision.by,
+          title: state.run.title ?? change.headline,
+          detail: `${change.headline} (approved by ${decision.by}): ${said}`,
+        });
+        lines.push(`Done: ${change.headline}. ${said}`);
+      } catch (e) {
+        const why = e instanceof Error ? e.message : String(e);
+        logger.warn('Could not make an approved change', {
+          label: LABEL,
+          runId: state.run.id,
+          change: change.kind,
+          errorMessage: why,
+        });
+        lines.push(`Not done: ${change.headline}. ${why}`);
+      }
+    }
+    return lines.join('\n');
   }
 
   /**
@@ -685,6 +858,7 @@ class Agent {
     };
 
     let asked: string | null = null;
+    const proposed: ProposedChange[] = [];
     try {
       const problem = this.problem(user);
       if (problem || !user) {
@@ -729,6 +903,9 @@ class Agent {
         ask: (question) => {
           asked = question;
         },
+        propose: (change) => {
+          proposed.push(change);
+        },
       };
       const keep = (messages: ConverseMessage[]) => {
         run.conversation = messages;
@@ -741,7 +918,7 @@ class Agent {
       const ai = settings.ai;
       const model = modelFor('aiAgent');
       const tools = TOOLS.filter(
-        (tool) => !tool.askOnly || run.trigger === 'ask'
+        (tool) => !tool.askOnly || adminPresent(run)
       ).map(({ name, description, parameters }) => ({
         name,
         description,
@@ -754,6 +931,21 @@ class Agent {
       const messages: ConverseMessage[] = run.conversation.length
         ? compact(run.conversation as ConverseMessage[])
         : [{ role: 'user', text: this.firstMessage(run) }];
+      const decision = (run.memory as { decision?: Decision }).decision;
+      if (decision) {
+        // Taken off first: whatever happens, an approval is carried out once.
+        const { decision: _done, ...rest } = run.memory as {
+          decision?: Decision;
+        };
+        void _done;
+        run.memory = rest;
+        await runs.save(run);
+        const outcome = await this.carryOut(decision, state);
+        messages.push({
+          role: 'user',
+          text: `${decision.by} (admin) approved. What came of it:\n${outcome}\nTell the admin in a line or two; carry on only with what is still left of their ask.`,
+        });
+      }
       const maxSteps = settings.backfill.agent.maxSteps;
       // A go that runs out of steps mid-task carries on by itself, while it
       // is getting somewhere: the first time always, after that only when
@@ -856,7 +1048,7 @@ class Agent {
         messages.push({ role: 'tool', results });
         keep(messages);
         await runs.save(run);
-        if (asked) break;
+        if (asked || proposed.length) break;
         if (used >= maxSteps) {
           const progressed = run.actions.length > actionsAtGo;
           if (goes < extraGoes && (goes === 0 || progressed)) {
@@ -882,7 +1074,20 @@ class Agent {
       }
 
       keep(messages);
-      if (asked) {
+      if (proposed.length) {
+        const proposal: Proposal = {
+          id: randomUUID(),
+          at: new Date().toISOString(),
+          changes: proposed,
+        };
+        run.memory = { ...run.memory, proposal };
+        run.status = 'waiting';
+        const headlines = proposed.map((c) => c.headline).join('; ');
+        run.question = asked
+          ? `${asked}\n\nWaiting for approval: ${headlines}.`
+          : `Waiting for approval: ${headlines}.`;
+        step('propose', headlines);
+      } else if (asked) {
         run.status = 'waiting';
         run.question = asked;
         step('ask', asked);
@@ -948,6 +1153,11 @@ class Agent {
         [count('stop'), 'stopped a download', 'stopped {n} downloads'],
         [count('relink'), 'relinked a file', 'relinked {n} files'],
         [count('request'), 'requested it', 'requested {n} titles'],
+        [
+          count('change'),
+          'made an approved change',
+          'made {n} approved changes',
+        ],
       ]
         .filter(([n]) => n)
         .map(([n, one, many]) =>
@@ -1014,14 +1224,17 @@ class Agent {
     if (!actions.length && run.status !== 'waiting') return;
     const name = run.title ?? 'Admin agent';
     if (run.status === 'waiting') {
+      const proposal = proposalOf(run);
       notificationManager.sendNotification(Notification.BACKFILL, {
         event: 'Admin agent',
         notifyAdmin: true,
         notifySystem: true,
-        subject: `${name}: the admin agent has a question`,
+        subject: proposal
+          ? `${name}: the admin agent needs your approval`
+          : `${name}: the admin agent has a question`,
         message: run.question ?? '',
         actionUrl: `/backfill/agent/${run.id}`,
-        actionUrlTitle: 'Answer',
+        actionUrlTitle: proposal ? 'Review' : 'Answer',
       });
       return;
     }
@@ -1032,6 +1245,7 @@ class Agent {
       [count('stop'), 'download stopped', 'downloads stopped'],
       [count('relink'), 'file relinked', 'files relinked'],
       [count('request'), 'title requested', 'titles requested'],
+      [count('change'), 'approved change made', 'approved changes made'],
     ]
       .filter(([n]) => n)
       .map(([n, one, many]) => `${n} ${n === 1 ? one : many}`)

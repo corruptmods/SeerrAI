@@ -11,6 +11,7 @@ import {
 } from '@server/entity/MediaList';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
+import agent from '@server/lib/agent';
 import { AiError, askAi, askAiJson, cacheKey } from '@server/lib/ai';
 import type { Activity, NamedTitle } from '@server/lib/ai/context';
 import {
@@ -137,9 +138,11 @@ const chatReply = z
     titles: z.array(namedTitle).max(CHAT_TITLES_MAX).default([]),
     /**
      * Put the titles on a list, or request them: offered, never done. Or
-     * fix something about a title on the server: done at once.
+     * fix something about a title on the server: done at once. Or, for an
+     * admin, hand a change to the admin agent, which proposes it for them
+     * to approve.
      */
-    do: z.enum(['list', 'request', 'fix']).nullish().catch(null),
+    do: z.enum(['list', 'request', 'fix', 'admin']).nullish().catch(null),
     /** For "fix": what to fix, where, and the subtitle language. */
     fx: z.enum(FIX_KINDS).nullish().catch(null),
     se: z.coerce.number().int().min(0).max(500).nullish().catch(null),
@@ -215,6 +218,47 @@ const PICTURE_NOTE =
   'Read the names from the picture as written and give the year when it shows one. If you cannot tell what it is, say so in "r" and give no titles; never guess a title the picture does not support. ' +
   'With no message, or a message such as "this" or "what is this", they want the titles found; "request this" or "add this to a list" sets "do" as usual. ';
 
+/**
+ * What an admin's AI Search may hand to the admin agent: changes to what is
+ * on the server, which the agent works out and proposes, and which happen
+ * only once the admin approves them on the agent's page.
+ */
+const ADMIN_NOTE =
+  'They are an admin. If they ask to change what is on the server beyond the fixes below (replace a file with a better or different release, block or unblock a release group, mark a download as failed, delete a title\'s files, move a title to another quality profile, search for a better release), add "do":"admin" with the one title in "titles" (none when it is only about a release group). Say in "r" that the admin agent is on it and that nothing changes until they approve. ';
+
+/** An admin's change, handed to the admin agent; where to follow it. */
+const toAgent = async (
+  user: User,
+  message: string,
+  said: string,
+  titles: NamedTitle[]
+) => {
+  const named = titles[0];
+  const about = named
+    ? ` (The title: ${named.t}${named.y ? ` (${named.y})` : ''}${
+        named.k ? `, a ${named.k === 'tv' ? 'series' : 'movie'}` : ''
+      }.)`
+    : '';
+  try {
+    const run = await agent.ask(`${clip(message.trim(), 900)}${about}`, user);
+    return {
+      reply:
+        said ||
+        'The admin agent is on it. It will show you what it would change, and nothing changes until you approve.',
+      results: [],
+      fix: { kind: 'agent', ok: true, link: `/backfill/agent/${run.id}` },
+    };
+  } catch (e) {
+    return {
+      reply: `The admin agent cannot take this now: ${
+        e instanceof Error ? e.message : String(e)
+      }`,
+      results: [],
+      fix: { kind: 'agent', ok: false },
+    };
+  }
+};
+
 export const chat = async (
   user: User,
   message: string,
@@ -255,6 +299,7 @@ export const chat = async (
     .filter(Boolean)
     .join('\n\n');
 
+  const admin = user.hasPermission(Permission.ADMIN);
   const answer = await askAiJson(chatReply, {
     feature: 'aiChat',
     user,
@@ -269,6 +314,7 @@ export const chat = async (
       'Only if there is no watch history and they refer to it, say so and ask what it was. ' +
       'If they want titles put on a list (a new one to make, or one of theirs they name), add "do":"list" and the list\'s name in "n" (for a new list, a short name that fits). If they want titles requested or downloaded, add "do":"request". When that is about titles already offered ("those", "all of them"), leave "titles" empty; if they pick only some, list just those. You only set this up: they confirm it themselves. ' +
       'For a whole set, do not list titles: name the set and every title is read from TMDB. Use "set": "series" for a film series (Harry Potter, John Wick), "universe" for a shared universe or theme (Marvel Cinematic Universe), "studio" for a studio\'s films (Pixar, A24), "director" or "actor" for someone\'s films; "of": the name to search for; "m": "movie", "tv" or "any". For example, "request all of Nolan\'s films" is {"r":"Christopher Nolan\'s films as director.","titles":[],"do":"request","set":"director","of":"Christopher Nolan","m":"movie"}. ' +
+      (admin ? ADMIN_NOTE : '') +
       'If they report a problem with a title on the server or ask for something done to it, add "do":"fix" with "fx": "subtitles" (get or replace subtitles), "transcribe" (make subtitles from the audio), "missing" (find missing or lost episodes, or a movie that never arrived), "broken" (will not play, corrupt, no sound, bad quality) or "wrongEpisode" (an episode is the wrong one, or episodes are mixed up); the one title in "titles"; "se" and "ep" for the season and episode when given; "lang" as a two-letter code for a subtitle language. "This episode" or "it" means the title just discussed. Say in "r" what will be done. ' +
       'Reply with JSON only: {"r":"one or two short sentences","titles":[{"t":"title","y":first release year or null,"k":"movie" or "tv"}]}, plus "do", "n", "set", "of" and "m" when they apply. Up to 6 titles, best first; up to 20 when they ask for a list.',
     prompt,
@@ -285,6 +331,10 @@ export const chat = async (
       ms: HOUR,
     },
   });
+
+  if (answer.do === 'admin' && admin) {
+    return toAgent(user, message, answer.r, answer.titles as NamedTitle[]);
+  }
 
   if (answer.do === 'fix') {
     if (!answer.fx) {

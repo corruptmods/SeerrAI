@@ -27,13 +27,21 @@ import {
   fileNumbers,
   languageProblem,
 } from '@server/lib/agent/rules';
+import type { AgentState } from '@server/lib/agent/tools';
 import {
   forgetSearches,
   lookups,
+  runTool,
   searchTiming,
   titleMatches,
 } from '@server/lib/agent/tools';
 import { ANTHROPIC_URL } from '@server/lib/ai/providers';
+import type {
+  ArrCustomFormat,
+  ArrExtras,
+  ArrQualityProfile,
+} from '@server/lib/autofix/arr';
+import { FixSonarr } from '@server/lib/autofix/arr';
 import backfill from '@server/lib/backfill/engine';
 import { isVideo } from '@server/lib/backfill/naming';
 import backfillNotices from '@server/lib/backfill/notices';
@@ -2364,5 +2372,286 @@ describe('the admin agent and movies', () => {
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.deepEqual(done.actions, []);
+  });
+});
+
+describe('changes the admin agent proposes', () => {
+  /** What the run was paused with, for an admin to decide on. */
+  const proposalOf = (run: AgentRun) =>
+    (
+      run.memory as {
+        proposal?: {
+          id: string;
+          changes: { kind: string; headline: string; details: string[] }[];
+        };
+      }
+    ).proposal;
+
+  it('replaces a file only once an admin approves, and only once', async () => {
+    script = [
+      () => toolUse('search_indexers', { query: 'Casper', kind: 'series' }),
+      () => toolUse('release_files', { release: 'r1' }),
+      () =>
+        toolUse('grab', {
+          title: 'series:0:1283',
+          release: 'r1',
+          files: [{ index: 3, season: 1, episode: 3 }],
+          reason: 'The file there is a 480p web rip; this is the DVD.',
+          replace: true,
+        }),
+    ];
+    const run = await agent.ask(
+      'Replace Boo Hoo Baby in Casper with a better copy',
+      await admin()
+    );
+    const waiting = await waitForRun(run.id, ['waiting']);
+    // The model is not asked again until the admin decides.
+    assert.equal(script.length, 0);
+    const proposal = proposalOf(waiting);
+    assert.ok(proposal);
+    assert.equal(proposal.changes.length, 1);
+    assert.equal(proposal.changes[0].kind, 'replace');
+    assert.equal(
+      proposal.changes[0].headline,
+      'Replace a file of Casper the Friendly Ghost'
+    );
+    assert.match(proposal.changes[0].details.join('\n'), /S01E03 Boo Hoo Baby/);
+    assert.match(
+      proposal.changes[0].details.join('\n'),
+      /until it has, the old file stays/
+    );
+    assert.match(waiting.question ?? '', /^Waiting for approval: Replace/);
+    assert.equal(waiting.steps[waiting.steps.length - 1].kind, 'propose');
+    // Nothing was started.
+    assert.equal(await getRepository(BackfillJob).count(), 0);
+    assert.equal(waiting.actions.length, 0);
+    assert.match(sent[0]?.subject ?? '', /needs your approval/);
+
+    script = [
+      (body) => {
+        const messages = body.messages as { role: string; content: unknown }[];
+        const said = String(messages[messages.length - 1].content);
+        assert.match(said, /approved\. What came of it:/);
+        assert.match(
+          said,
+          /Done: Replace a file of .*Started Backfill job #\d+/
+        );
+        assert.match(said, /replaced only once its new one has imported/);
+        return say('Replacing S01E03 with the DVD copy.');
+      },
+    ];
+    const me = await admin();
+    await agent.approve(run.id, proposal.id, me);
+    // Deciding twice does nothing more.
+    await assert.rejects(
+      agent.approve(run.id, proposal.id, me),
+      /no longer waiting/
+    );
+    const done = await waitForRun(run.id);
+    assert.equal(done.status, 'done', done.error ?? '');
+    assert.equal(proposalOf(done), undefined);
+    assert.deepEqual(
+      done.actions.map((a) => a.type),
+      ['grab']
+    );
+    const job = await getRepository(BackfillJob).findOneOrFail({
+      where: { id: done.actions[0].jobId },
+    });
+    assert.equal(job.mode, 'all');
+    assert.equal(job.approvedByName, `AI agent, approved by ${me.displayName}`);
+    assert.deepEqual(
+      job.files.map((f) => [f.index, f.episodeIds, f.action, f.replaces]),
+      [[3, [503], 'upgrade', 1]]
+    );
+    await assert.rejects(
+      agent.approve(run.id, proposal.id, me),
+      /no longer waiting/
+    );
+  });
+
+  it('changes nothing when an admin declines, or answers instead', async () => {
+    const settings = getSettings();
+    mock.method(settings, 'save', async () => undefined);
+    script = [
+      () =>
+        toolUse('propose_change', {
+          kind: 'blockGroup',
+          group: 'rothebehap',
+          reason: 'Their releases have been fakes.',
+        }),
+    ];
+    const run = await agent.ask('Block rothebehap', await admin());
+    const waiting = await waitForRun(run.id, ['waiting']);
+    const proposal = proposalOf(waiting);
+    assert.equal(
+      proposal?.changes[0].headline,
+      'Block the release group rothebehap'
+    );
+    const declined = await agent.decline(run.id, proposal!.id, await admin());
+    assert.equal(declined.status, 'done');
+    assert.match(
+      declined.summary ?? '',
+      /declined: Block the release group rothebehap/
+    );
+    assert.deepEqual(settings.backfill.blockedGroups ?? [], []);
+    await assert.rejects(
+      agent.approve(run.id, proposal!.id, await admin()),
+      /no longer waiting/
+    );
+
+    // Answering instead of approving: the proposal is dropped, and the
+    // model is told nothing of it was done.
+    script = [
+      () =>
+        toolUse('propose_change', {
+          kind: 'blockGroup',
+          group: 'rothebehap',
+          reason: 'Asked again.',
+        }),
+    ];
+    await agent.reply(run.id, 'Actually, block it', await admin());
+    const again = await waitForRun(run.id, ['waiting']);
+    const second = proposalOf(again);
+    assert.ok(second && second.id !== proposal!.id);
+    script = [
+      (body) => {
+        const messages = body.messages as { role: string; content: unknown }[];
+        assert.match(
+          String(messages[messages.length - 1].content),
+          /not approved and nothing of it was done/
+        );
+        return say('Understood, leaving it.');
+      },
+    ];
+    await agent.reply(run.id, 'Never mind', await admin());
+    const left = await waitForRun(run.id);
+    assert.equal(proposalOf(left), undefined);
+    await assert.rejects(
+      agent.approve(run.id, second!.id, await admin()),
+      /no longer waiting/
+    );
+    assert.deepEqual(settings.backfill.blockedGroups ?? [], []);
+  });
+
+  it('blocks a release group in Seerr AI and Sonarr once approved', async () => {
+    const settings = getSettings();
+    mock.method(settings, 'save', async () => undefined);
+    const formats: ArrCustomFormat[] = [];
+    const profiles: ArrQualityProfile[] = [
+      { id: 11, name: 'HD', minFormatScore: 0, formatItems: [] },
+    ];
+    mock.getter(
+      FixSonarr.prototype,
+      'extras',
+      () =>
+        ({
+          customFormats: async () => formats,
+          saveCustomFormat: async (f: ArrCustomFormat) => {
+            const saved = { ...f, id: f.id ?? 40 };
+            formats.splice(0, formats.length, saved);
+            return saved;
+          },
+          qualityProfiles: async () => profiles,
+          saveQualityProfile: async (p: ArrQualityProfile) => {
+            profiles[0] = p;
+          },
+        }) as unknown as ArrExtras
+    );
+    script = [
+      () =>
+        toolUse('propose_change', {
+          kind: 'blockGroup',
+          group: 'rothebehap',
+          reason: 'Their releases have been fakes.',
+        }),
+    ];
+    const run = await agent.ask('Block rothebehap everywhere', await admin());
+    const waiting = await waitForRun(run.id, ['waiting']);
+    // Proposing changed nothing.
+    assert.deepEqual(settings.backfill.blockedGroups ?? [], []);
+    assert.equal(formats.length, 0);
+    script = [
+      (body) => {
+        const messages = body.messages as { role: string; content: unknown }[];
+        assert.match(
+          String(messages[messages.length - 1].content),
+          /Done: Block the release group rothebehap\. Blocked rothebehap\. Radarr and Sonarr are updated\./
+        );
+        return say('Blocked.');
+      },
+    ];
+    await agent.approve(run.id, proposalOf(waiting)!.id, await admin());
+    const done = await waitForRun(run.id);
+    assert.equal(done.status, 'done', done.error ?? '');
+    assert.deepEqual(settings.backfill.blockedGroups, ['rothebehap']);
+    assert.equal(formats[0].name, 'Seerr AI: blocked release groups');
+    assert.deepEqual(profiles[0].formatItems, [
+      { format: 40, name: 'Seerr AI: blocked release groups', score: -1 },
+    ]);
+    assert.equal(done.actions[0].type, 'change');
+    assert.equal(done.actions[0].change, 'blockGroup');
+
+    // The agent's own searches now say so, and it cannot take one.
+    mock.method(ProwlarrAPI.prototype, 'search', async () => [
+      {
+        ...COLLECTION,
+        guid: 'https://indexer/blocked',
+        title: 'Casper.S01E01.DVDRip.x264-rothebehap',
+      },
+    ]);
+    script = [
+      () => toolUse('search_indexers', { query: 'Casper', kind: 'series' }),
+      (body) => {
+        assert.match(
+          lastResult(body).content,
+          /blocked group rothebehap: never take it/
+        );
+        return toolUse('grab', {
+          title: 'series:0:1283',
+          release: 'r1',
+          files: [{ index: 0, season: 1, episode: 1 }],
+          reason: 'try it',
+        });
+      },
+      (body) => {
+        const refused = lastResult(body);
+        assert.equal(refused.is_error, true);
+        assert.match(refused.content, /rothebehap is a blocked release group/);
+        return say('Nothing usable.');
+      },
+    ];
+    await agent.reply(run.id, 'Now get S01E01', await admin());
+    assert.equal((await waitForRun(run.id)).status, 'done');
+  });
+
+  it('never offers changes, or replaces a file, when no admin is in the conversation', async () => {
+    const state = {
+      run: { trigger: 'auto', steps: [], actions: [] },
+      releases: new Map(),
+    } as unknown as AgentState;
+    const proposed = await runTool(state, 'propose_change', {
+      kind: 'blockGroup',
+      group: 'x',
+      reason: 'no',
+    });
+    assert.equal(proposed.isError, true);
+    assert.match(proposed.text, /There is no tool called propose_change/);
+    const replaced = await runTool(state, 'grab', {
+      title: 'series:0:1283',
+      release: 'r1',
+      files: [{ index: 0, season: 1, episode: 3 }],
+      reason: 'better',
+      replace: true,
+    });
+    assert.equal(replaced.isError, true);
+    assert.match(replaced.text, /replaced only when an admin asks/);
+    // Once an admin has replied, they are.
+    (state.run.steps as { kind: string }[]).push({ kind: 'reply' });
+    const allowed = await runTool(state, 'propose_change', {
+      kind: 'unblockGroup',
+      group: 'x',
+      reason: 'test',
+    });
+    assert.match(allowed.text, /x is not blocked/);
   });
 });

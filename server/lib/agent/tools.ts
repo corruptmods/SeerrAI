@@ -13,6 +13,8 @@ import BackfillSeries from '@server/entity/BackfillSeries';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
+import type { ChangeInput, ProposedChange } from '@server/lib/agent/changes';
+import { ChangeError, describeChange } from '@server/lib/agent/changes';
 import {
   MIN_VIDEO_BYTES,
   UNKNOWN_QUALITY,
@@ -40,6 +42,7 @@ import type {
   ArrSearchRelease,
   SonarrSeriesDetail,
 } from '@server/lib/backfill/sonarr';
+import { blockedGroupOf } from '@server/lib/blockedGroups';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { In } from 'typeorm';
@@ -92,6 +95,11 @@ export interface AgentState {
   act(action: AgentAction): void;
   /** Pauses the run with a question for an admin. */
   ask(question: string): void;
+  /**
+   * Puts a change to an admin, to approve or decline: the run pauses once
+   * this turn's tools are done, with every change proposed in it.
+   */
+  propose(change: ProposedChange): void;
 }
 
 /** A refusal the model is told about, to try something else. */
@@ -106,6 +114,13 @@ export interface AgentTool extends ConverseTool {
 }
 
 // ---- titles ----------------------------------------------------------------
+
+/**
+ * Whether an admin is in the conversation: they asked, or have replied
+ * since. Only then may it propose changes or request titles.
+ */
+export const adminPresent = (run: AgentRun): boolean =>
+  run.trigger === 'ask' || run.steps.some((step) => step.kind === 'reply');
 
 export const titleRef = (title: TitleRef) =>
   `${title.kind}:${title.serverId}:${title.arrId}`;
@@ -555,8 +570,9 @@ const asRelease = (release: ArrSearchRelease): ProwlarrRelease | null => {
 const releaseLine = (
   known: KnownRelease,
   extra: { what?: string; quality?: string; approved?: boolean; why?: string[] }
-) =>
-  [
+) => {
+  const blocked = blockedGroupOf(known.title);
+  return [
     known.ref,
     extra.what,
     sizeOf(known.size),
@@ -564,14 +580,17 @@ const releaseLine = (
     extra.quality,
     known.indexer,
     `"${known.title}"`,
-    extra.approved
-      ? 'accepted'
-      : extra.why?.length
-        ? `turned down: ${extra.why.slice(0, 3).join('; ').slice(0, 300)}`
-        : '',
+    blocked
+      ? `blocked group ${blocked}: never take it`
+      : extra.approved
+        ? 'accepted'
+        : extra.why?.length
+          ? `turned down: ${extra.why.slice(0, 3).join('; ').slice(0, 300)}`
+          : '',
   ]
     .filter(Boolean)
     .join(' | ');
+};
 
 /** How long search_releases waits on Sonarr or Radarr, and keeps results. */
 export const searchTiming = {
@@ -919,6 +938,7 @@ const grabInput = z.object({
   reason: z.string().trim().min(3).max(600),
   certain: z.boolean().optional(),
   whole: z.boolean().optional(),
+  replace: z.boolean().optional(),
 });
 
 export type GrabInput = z.infer<typeof grabInput>;
@@ -987,6 +1007,11 @@ const earlierUse = async (seriesId: number, known: KnownRelease) => {
   return { running, used: jobs.length > 0, importFailed };
 };
 
+const hasFileRefusal = (state: AgentState) =>
+  adminPresent(state.run)
+    ? 'The movie already has a file. To replace it, call grab again with replace: true; the admin is asked to approve first, and the old file goes only once the new one has imported.'
+    : 'The movie already has a file; it is never replaced.';
+
 /** A download checked against every rule, not yet started. */
 interface PreparedGrab {
   title: TitleRef;
@@ -1047,10 +1072,8 @@ const prepareWhole = async (
     const movieCtx = await backfill.movieContext(row);
     const movie = movieCtx.movie;
     name = movie.title;
-    if (movie.hasFile) {
-      throw new ToolError(
-        'The movie already has a file; it is never replaced.'
-      );
+    if (movie.hasFile && !args.replace) {
+      throw new ToolError(hasFileRefusal(state));
     }
     if (await movieCtx.radarr.getMovieQueueCount(movie.id)) {
       throw new ToolError('The movie is already downloading in Radarr.');
@@ -1073,6 +1096,7 @@ const prepareWhole = async (
       languages: parsed.languages ?? [],
       releaseGroup: parsed.parsedMovieInfo?.releaseGroup,
       score: parsed.customFormatScore ?? 0,
+      ...(movie.hasFile ? { action: 'upgrade' as const, replaces: 1 } : {}),
     });
     target = `${movie.title} (${movie.year})`;
   } else {
@@ -1127,7 +1151,13 @@ const prepareWhole = async (
       ],
       [{ index: 0, path: `${known.title}.mkv`, size: known.size }],
       seriesCtx.episodes,
-      { queued, backfilling, isVideo: () => true }
+      {
+        queued,
+        backfilling,
+        isVideo: () => true,
+        replace: args.replace,
+        canReplace: adminPresent(state.run),
+      }
     );
     if (problems.length) {
       throw new ToolError(`Nothing was started. ${problems.join(' ')}`);
@@ -1143,6 +1173,7 @@ const prepareWhole = async (
       languages: parsed.languages ?? [],
       releaseGroup: info?.releaseGroup,
       score: parsed.customFormatScore ?? 0,
+      ...(full?.hasFile ? { action: 'upgrade' as const, replaces: 1 } : {}),
     });
     target = `${episodeLabel(episode.seasonNumber, episode.episodeNumber)} ${
       full?.title ?? ''
@@ -1153,7 +1184,6 @@ const prepareWhole = async (
       `That is ${sizeOf(known.size)}, over the ${settings.agent.maxSizeGb} GB limit for one download. Choose a smaller release.`
     );
   }
-  void state;
   return {
     title,
     known,
@@ -1175,9 +1205,20 @@ const prepareGrab = async (
   state: AgentState,
   args: GrabInput
 ): Promise<PreparedGrab> => {
+  if (args.replace && !adminPresent(state.run)) {
+    throw new ToolError(
+      'Files are replaced only when an admin asks for it. Fill what is missing instead.'
+    );
+  }
   const title = readTitleRef(args.title);
   const known = releaseOf(state, args.release);
   const settings = getSettings().backfill;
+  const group = blockedGroupOf(known.title);
+  if (group) {
+    throw new ToolError(
+      `${group} is a blocked release group. Choose another release.`
+    );
+  }
   const ready = backfill.readiness();
   if (!ready.ready) throw new ToolError(ready.problem ?? 'Backfill is off.');
   if (state.grabsToday >= settings.agent.maxGrabsPerDay) {
@@ -1246,10 +1287,8 @@ const prepareGrab = async (
   if (title.kind === 'movie') {
     const ctx = await backfill.movieContext(row);
     name = ctx.movie.title;
-    if (ctx.movie.hasFile) {
-      throw new ToolError(
-        'The movie already has a file; it is never replaced.'
-      );
+    if (ctx.movie.hasFile && !args.replace) {
+      throw new ToolError(hasFileRefusal(state));
     }
     if (await ctx.radarr.getMovieQueueCount(ctx.movie.id)) {
       throw new ToolError('The movie is already downloading in Radarr.');
@@ -1290,8 +1329,8 @@ const prepareGrab = async (
       languages: parsed?.languages ?? [],
       releaseGroup: parsed?.parsedMovieInfo?.releaseGroup,
       score: parsed?.customFormatScore ?? 0,
-      action: 'fill',
-      replaces: 0,
+      action: ctx.movie.hasFile ? 'upgrade' : 'fill',
+      replaces: ctx.movie.hasFile ? 1 : 0,
       matchedBy: 'ai',
       why: args.reason,
     });
@@ -1309,6 +1348,8 @@ const prepareGrab = async (
       backfilling,
       importFailed: before.importFailed,
       isVideo,
+      replace: args.replace,
+      canReplace: adminPresent(state.run),
     });
     if (problems.length) {
       throw new ToolError(
@@ -1399,8 +1440,8 @@ const prepareGrab = async (
         languages: parsed?.languages ?? [],
         releaseGroup: parsed?.parsedEpisodeInfo?.releaseGroup,
         score: parsed?.customFormatScore ?? 0,
-        action: 'fill',
-        replaces: 0,
+        action: episodes.some((e) => e.hasFile) ? 'upgrade' : 'fill',
+        replaces: episodes.filter((e) => e.hasFile).length,
         matchedBy: 'ai',
         why: args.reason,
       });
@@ -1448,6 +1489,12 @@ const commitGrab = async (
           )
           .join(', ');
   const files = `${plan.length === 1 ? '1 file' : `${plan.length} files`} (${sizeOf(bytes)})`;
+  const replaces = plan.some((e) => e.action === 'upgrade');
+  if (prepared.extend && replaces) {
+    throw new ToolError(
+      `Backfill job #${prepared.extend.id} is downloading this release now; files can be replaced from it once that is done.`
+    );
+  }
   if (prepared.extend) {
     const job = await backfill
       .extendJob(prepared.extend.id, plan, by)
@@ -1490,7 +1537,8 @@ const commitGrab = async (
     })
   );
   const job = await backfill.approve(candidate.id, {
-    mode: 'missing',
+    // Replacing was approved by an admin before this point.
+    mode: replaces ? 'all' : 'missing',
     includeAi: true,
     by,
   });
@@ -1500,14 +1548,51 @@ const commitGrab = async (
     at: new Date().toISOString(),
     type: 'grab',
     title: name,
-    detail: `${files} from "${known.title}" for ${labels}`,
+    detail: `${files} from "${known.title}" for ${labels}${
+      replaces ? ', replacing what is there once imported' : ''
+    }`,
     jobId: job.id,
     episodeIds: plan.flatMap((e) => e.episodeIds),
     release: known.title,
   });
   return `Started Backfill job #${job.id}: ${plan.length} files, ${sizeOf(bytes)}, for ${labels}. Backfill downloads only these files and has ${
     title.kind === 'movie' ? 'Radarr' : 'Sonarr'
-  } import each as mapped.`;
+  } import each as mapped${
+    replaces
+      ? '; a file already there is replaced only once its new one has imported'
+      : ''
+  }.`;
+};
+
+/**
+ * A replacing grab, for an admin to approve: what goes and what comes. On
+ * approval it is checked again from scratch and started.
+ */
+const replaceProposal = (
+  prepared: PreparedGrab,
+  args: GrabInput
+): ProposedChange => {
+  const { title, known, name, plan, targets, bytes } = prepared;
+  const replaced = plan.filter((e) => e.action === 'upgrade');
+  const app = title.kind === 'movie' ? 'Radarr' : 'Sonarr';
+  return {
+    kind: 'replace',
+    headline:
+      title.kind === 'movie'
+        ? `Replace the file of ${name}`
+        : `Replace ${replaced.length === 1 ? 'a file' : `${replaced.length} files`} of ${name}`,
+    title,
+    details: [
+      `Downloads "${known.title}" (${sizeOf(bytes)}, ${known.indexer}) through Backfill, only the files chosen.`,
+      `For: ${targets.slice(0, 12).join('; ')}${targets.length > 12 ? ` and ${targets.length - 12} more` : ''}.`,
+      `${app} imports each new file over the one there; until it has, the old file stays and can still be played.`,
+      ...(prepared.doubts.length
+        ? [`Doubts the agent waved through: ${prepared.doubts.join(' ')}`]
+        : []),
+      `Why: ${args.reason}`,
+    ],
+    params: { grab: { ...args, certain: true } },
+  };
 };
 
 const grab: AgentTool = {
@@ -1553,6 +1638,11 @@ const grab: AgentTool = {
         description:
           'For a Usenet post packed in archives or with scrambled names (release_files says so) whose name is exactly one missing episode or the movie: takes it whole. Give one file entry, index 0, with the season and episode.',
       },
+      replace: {
+        type: 'boolean',
+        description:
+          'Only when the admin asked for a file to be replaced: lets episodes (or a movie) that have a file be mapped. Nothing starts until the admin approves; the old file goes only once the new one has imported.',
+      },
     },
     required: ['title', 'release', 'files', 'reason'],
   },
@@ -1563,6 +1653,15 @@ const grab: AgentTool = {
       throw new ToolError(
         `Not started. Look again: ${prepared.doubts.slice(0, 8).join(' ')} Check the file names against the episode titles (and the release against the show). If you are sure it is right, call grab again with certain: true; if not, choose another release, or ask the admin.`
       );
+    }
+    if (prepared.plan.some((e) => e.action === 'upgrade')) {
+      if (prepared.extend) {
+        throw new ToolError(
+          `Backfill job #${prepared.extend.id} is downloading this release now; files can be replaced from it once that is done.`
+        );
+      }
+      state.propose(replaceProposal(prepared, args));
+      return "Not started yet: replacing files needs the admin's approval, and they have been asked. Stop here; you hear what they decided next.";
     }
     return commitGrab(state, prepared, 'AI agent');
   },
@@ -1764,6 +1863,147 @@ const relinkFile: AgentTool = {
   },
 };
 
+// ---- an admin's changes --------------------------------------------------------
+
+/** A library title's name, as Sonarr or Radarr has it. */
+const nameOf = async (title: TitleRef): Promise<string> =>
+  title.kind === 'movie'
+    ? (await backfill.radarrFor(title.serverId).getMovieDetail(title.arrId))
+        .title
+    : (await backfill.sonarrFor(title.serverId).getSeriesDetail(title.arrId))
+        .title;
+
+const CHANGE_KINDS = [
+  'blockGroup',
+  'unblockGroup',
+  'markFailed',
+  'deleteFiles',
+  'changeProfile',
+] as const;
+
+const proposeChange: AgentTool = {
+  name: 'propose_change',
+  askOnly: true,
+  description:
+    "Puts a change to the admin, who approves or declines it; nothing happens until they approve. Only for what the admin asked for. blockGroup / unblockGroup: a release group (group) that Backfill, you, Radarr and Sonarr then pass over; a file already on disk from it is replaced by the next good release. markFailed: a title's current download (or a movie's last grab) is removed and blocklisted, and Radarr or Sonarr searches again. deleteFiles: a movie's file, or a series' files (all, a season, or some of its episodes); unmonitor: true also stops them being downloaded again. changeProfile: moves a title to another quality profile (profile, by name); search: true searches right after. Several changes may be proposed in one turn; the admin sees them together.",
+  parameters: {
+    type: 'object',
+    properties: {
+      kind: { type: 'string', enum: [...CHANGE_KINDS] },
+      title: {
+        type: 'string',
+        description: 'A title reference; not for blockGroup or unblockGroup.',
+      },
+      group: { type: 'string', description: 'A release group, like FLUX.' },
+      season: { type: 'integer' },
+      episodes: { type: 'array', items: { type: 'integer' } },
+      profile: { type: 'string', description: 'A quality profile, by name.' },
+      unmonitor: { type: 'boolean' },
+      search: { type: 'boolean' },
+      reason: {
+        type: 'string',
+        description: "Why, in the admin's terms: shown to them with it.",
+      },
+    },
+    required: ['kind', 'reason'],
+  },
+  async run(state, input) {
+    const args = z
+      .object({
+        kind: z.enum(CHANGE_KINDS),
+        title: z.string().optional(),
+        group: z.string().trim().max(60).optional(),
+        season: z.coerce.number().int().min(0).optional(),
+        episodes: z.array(z.coerce.number().int().min(0)).max(200).optional(),
+        profile: z.string().trim().max(100).optional(),
+        unmonitor: z.boolean().optional(),
+        search: z.boolean().optional(),
+        reason: z.string().trim().min(3).max(600),
+      })
+      .parse(input);
+    const groupChange =
+      args.kind === 'blockGroup' || args.kind === 'unblockGroup';
+    let title: TitleRef | undefined;
+    let name: string | undefined;
+    if (!groupChange) {
+      title = readTitleRef(args.title);
+      name = await nameOf(title);
+    }
+    const change: ChangeInput = { ...args, title, name };
+    const proposed = await describeChange(change).catch((e: unknown) => {
+      throw e instanceof ChangeError ? new ToolError(e.message) : e;
+    });
+    if (title && name) state.bind(title, name);
+    state.propose(proposed);
+    return `Proposed: ${proposed.headline}. The admin approves or declines it; stop here, and you hear what they decided next.`;
+  },
+};
+
+const searchUpgrade: AgentTool = {
+  name: 'search_upgrade',
+  askOnly: true,
+  description:
+    "Has Radarr or Sonarr search for a better release of a movie, or of a series' episodes (all, a season, or some episodes), and take one its quality profile prefers to what is there; the file is replaced only once the new one has imported. For when the admin asks for something better and the profile would prefer it. To take one particular release instead, grab it with replace: true.",
+  parameters: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'A title reference.' },
+      season: { type: 'integer' },
+      episodes: { type: 'array', items: { type: 'integer' } },
+      reason: { type: 'string' },
+    },
+    required: ['title', 'reason'],
+  },
+  async run(state, input) {
+    const args = z
+      .object({
+        season: z.coerce.number().int().min(0).optional(),
+        episodes: z.array(z.coerce.number().int().min(0)).max(200).optional(),
+        reason: z.string().trim().min(3).max(600),
+      })
+      .parse(input);
+    const title = readTitleRef(input.title);
+    const name = await nameOf(title);
+    if (title.kind === 'movie') {
+      await backfill.radarrFor(title.serverId).searchMovie(title.arrId);
+      state.bind(title, name);
+      return `Radarr is searching for ${name}. It takes a release only if its profile prefers it to the file there; title_status shows what is downloading in a few minutes.`;
+    }
+    if (args.episodes?.length && args.season === undefined) {
+      throw new ToolError('Give the season the episodes are in.');
+    }
+    const sonarr = backfill.sonarrFor(title.serverId);
+    const chosen = (await sonarr.getSeriesEpisodes(title.arrId)).filter(
+      (ep) =>
+        ep.monitored &&
+        (args.season === undefined
+          ? ep.seasonNumber > 0
+          : ep.seasonNumber === args.season) &&
+        (!args.episodes?.length || args.episodes.includes(ep.episodeNumber))
+    );
+    if (!chosen.length) {
+      throw new ToolError('No monitored episodes there to search for.');
+    }
+    await sonarr.searchEpisodes(chosen.map((ep) => ep.id));
+    state.bind(title, name);
+    return `Sonarr is searching for ${chosen.length === 1 ? '1 episode' : `${chosen.length} episodes`} of ${name}. It takes a release only if its profile prefers it to the file there; title_status shows what is downloading in a few minutes.`;
+  },
+};
+
+/**
+ * Starts a replacing grab an admin approved: everything is checked again
+ * as it is now, and the files taken only if it all still holds.
+ */
+export const startApprovedGrab = async (
+  state: AgentState,
+  input: unknown,
+  by: string
+): Promise<string> => {
+  const args = grabInput.parse(input);
+  const prepared = await prepareGrab(state, { ...args, replace: true });
+  return commitGrab(state, prepared, by);
+};
+
 // ---- requesting ----------------------------------------------------------------
 
 const requestTitle: AgentTool = {
@@ -1822,6 +2062,8 @@ export const TOOLS: AgentTool[] = [
   relinkFile,
   askAdmin,
   requestTitle,
+  searchUpgrade,
+  proposeChange,
 ];
 
 /** Runs one tool for the model: its answer, or why it could not. */
@@ -1831,7 +2073,7 @@ export const runTool = async (
   input: Record<string, unknown>
 ): Promise<{ text: string; isError: boolean }> => {
   const tool = TOOLS.find((t) => t.name === name);
-  if (!tool || (tool.askOnly && state.run.trigger !== 'ask')) {
+  if (!tool || (tool.askOnly && !adminPresent(state.run))) {
     return { text: `There is no tool called ${name}.`, isError: true };
   }
   try {

@@ -50,6 +50,7 @@ import type { OpinionRequest } from '@server/lib/backfill/secondOpinion';
 import { aiSecondOpinion } from '@server/lib/backfill/secondOpinion';
 import type { SonarrCommand, SonarrEpisode } from '@server/lib/backfill/sonarr';
 import BackfillSonarr, { commandFinished } from '@server/lib/backfill/sonarr';
+import { blockedGroupOf, blockedGroups } from '@server/lib/blockedGroups';
 import type {
   BackfillDownload,
   DownloadStage,
@@ -1522,10 +1523,13 @@ class Backfill {
       const passedOver = new Set(
         skipped.flatMap((c) => [c.guid, c.infoHash ?? ''].filter(Boolean))
       );
+      const blocked = blockedGroups();
       const usable = [...found.values()].filter(
         (release) =>
           !!this.clientFor(release.protocol) &&
           mentionsShow(release.title, target.names) &&
+          // A release group an admin blocked is never taken.
+          !blockedGroupOf(release.title, null, blocked) &&
           !passedOver.has(release.guid) &&
           !passedOver.has(release.infoHash?.toLowerCase() ?? '')
       );

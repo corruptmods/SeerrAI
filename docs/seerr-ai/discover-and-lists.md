@@ -8,6 +8,7 @@ Everyone has the pencil button at the bottom right of Discover.
 
 - **Everyone:** **Choose what your home page shows**. Each row has a **Show on my home page** switch. That choice is kept for you alone; **Show All Rows** undoes it.
 - **Admins:** **Customize Discover** arranges the page for everyone (order, rows on or off, new rows, reset). The switch on each row is **Shown to everyone**; the eye beside it hides that row for you only.
+- **Your networks:** while editing, the **Networks** row lets you add networks by their TMDB id, reorder or remove them (up to 50), or go back to the usual list. Each person's list is their own.
 
 Resetting the rows to default clears what everyone hid, because the rows are created again.
 

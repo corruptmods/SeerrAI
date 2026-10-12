@@ -81,6 +81,7 @@ authRoutes.get('/me', isAuthenticated(), async (req, res) => {
       watchlistSyncTv: user.settings.watchlistSyncTv,
       disabledFeatures: user.settings.disabledFeatures,
       hiddenSliders: user.settings.hiddenSliders,
+      discoverNetworks: user.settings.discoverNetworks ?? null,
     },
   });
 });

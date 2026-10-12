@@ -3,6 +3,8 @@ import { before, beforeEach, describe, it, mock } from 'node:test';
 
 import JellyfinAPI from '@server/api/jellyfin';
 import { DiscoverSliderType } from '@server/constants/discover';
+import { MAX_DISCOVER_NETWORKS } from '@server/constants/discoverNetworks';
+import { ApiErrorCode } from '@server/constants/error';
 import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
@@ -327,6 +329,93 @@ describe('the home page rows a person hides', () => {
           .post(`/user/${userId}/settings/discover`)
           .send({ hidden: ['x'] })
       ).status,
+      400
+    );
+  });
+});
+
+describe('a person’s own Networks row', () => {
+  const list = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: i + 1,
+      name: `Network ${i + 1}`,
+      logoPath: '/logo.png',
+    }));
+
+  it('is theirs alone, checked, and the usual list until they choose', async () => {
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    // The usual list to begin with.
+    assert.strictEqual(
+      (await agent.get(`/user/${userId}/settings/discover`)).body.networks,
+      null
+    );
+
+    // Their own: trimmed, a repeat dropped, anything extra left out.
+    const saved = await agent.post(`/user/${userId}/settings/discover`).send({
+      networks: JSON.stringify([
+        { id: 2697, name: ' Acorn TV ', logoPath: '/acorn.png', x: 1 },
+        { id: 2697, name: 'Again', logoPath: '/again.png' },
+      ]),
+    });
+    assert.strictEqual(saved.status, 200);
+    const mine = JSON.stringify([
+      { id: 2697, name: 'Acorn TV', logoPath: '/acorn.png' },
+    ]);
+    assert.strictEqual(saved.body.networks, mine);
+    assert.strictEqual(
+      (await agent.get('/auth/me')).body.settings.discoverNetworks,
+      mine
+    );
+
+    // Hiding rows leaves the list alone, and the list leaves hidden rows.
+    await agent.post(`/user/${userId}/settings/discover`).send({ hidden: [] });
+    assert.strictEqual(
+      (await agent.get(`/user/${userId}/settings/discover`)).body.networks,
+      mine
+    );
+
+    // Refused lists change nothing.
+    const tooMany = await agent
+      .post(`/user/${userId}/settings/discover`)
+      .send({ networks: JSON.stringify(list(MAX_DISCOVER_NETWORKS + 1)) });
+    assert.strictEqual(tooMany.status, 400);
+    assert.strictEqual(tooMany.body.message, ApiErrorCode.TooManyNetworks);
+    const bad = await agent.post(`/user/${userId}/settings/discover`).send({
+      networks: JSON.stringify([
+        { id: 1, name: 'N', logoPath: 'https://elsewhere/x.png' },
+      ]),
+    });
+    assert.strictEqual(bad.status, 400);
+    assert.strictEqual(bad.body.message, ApiErrorCode.InvalidNetworkList);
+    assert.strictEqual(
+      (await agent.get(`/user/${userId}/settings/discover`)).body.networks,
+      mine
+    );
+
+    // None at all is kept as none; null is the usual list again.
+    await agent
+      .post(`/user/${userId}/settings/discover`)
+      .send({ networks: '[]' });
+    assert.strictEqual(
+      (await agent.get('/auth/me')).body.settings.discoverNetworks,
+      '[]'
+    );
+    await agent
+      .post(`/user/${userId}/settings/discover`)
+      .send({ networks: null });
+    assert.strictEqual(
+      (await agent.get('/auth/me')).body.settings.discoverNetworks,
+      null
+    );
+
+    // Not someone else's, and not an empty request.
+    assert.strictEqual(
+      (await agent.post('/user/1/settings/discover').send({ networks: mine }))
+        .status,
+      403
+    );
+    assert.strictEqual(
+      (await agent.post(`/user/${userId}/settings/discover`).send({})).status,
       400
     );
   });

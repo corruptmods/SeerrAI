@@ -56,13 +56,18 @@ components:
   schemas:
     HiddenSliders:
       type: object
-      required:
-        - hidden
       properties:
         hidden:
           type: array
           items:
             type: integer
+        networks:
+          type: string
+          nullable: true
+          maxLength: 20000
+          description: |
+            This user's own list for the Networks row: a JSON list of `{ id, name, logoPath }` (at most
+            50), or `null` for the usual list. Left out, it is unchanged.
     PlexMatchProblem:
       type: object
       properties:
@@ -8631,7 +8636,7 @@ paths:
                 $ref: '#/components/schemas/HiddenSliders'
     post:
       summary: Hide home page rows (or show them again) for a user
-      description: Replaces the whole list; ids that are not rows are dropped. Requires `MANAGE_USERS` permission if editing other users.
+      description: Replaces the hidden rows, the Networks row's list, or both (whichever is sent); ids that are not rows are dropped. Requires `MANAGE_USERS` permission if editing other users.
       tags:
         - users
       requestBody:
@@ -8647,6 +8652,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HiddenSliders'
+        '400':
+          description: Nothing to save, or the Networks list was refused (`TOO_MANY_NETWORKS` or `INVALID_NETWORK_LIST`); nothing was saved
   /user/{userId}/settings/passkeys:
     parameters:
       - in: path

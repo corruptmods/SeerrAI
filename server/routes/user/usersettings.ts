@@ -12,6 +12,10 @@ import type {
   UserSettingsGeneralResponse,
   UserSettingsNotificationsResponse,
 } from '@server/interfaces/api/userSettingsInterfaces';
+import {
+  DiscoverNetworksError,
+  sanitizeDiscoverNetworks,
+} from '@server/lib/discoverNetworks';
 import { cleanFeatureList } from '@server/lib/features';
 import { passkeySummary } from '@server/lib/passkeys';
 import { Permission } from '@server/lib/permissions';
@@ -865,9 +869,10 @@ userSettingsRoutes.get<{ id: string }>(
       if (!user) {
         return next({ status: 404, message: 'User not found.' });
       }
-      return res
-        .status(200)
-        .json({ hidden: user.settings?.hiddenSliders ?? [] });
+      return res.status(200).json({
+        hidden: user.settings?.hiddenSliders ?? [],
+        networks: user.settings?.discoverNetworks ?? null,
+      });
     } catch (e) {
       return next({ status: 500, message: e.message });
     }
@@ -878,22 +883,48 @@ userSettingsRoutes.post<{ id: string }>(
   '/discover',
   isOwnProfileOrAdmin(),
   async (req, res, next) => {
-    const raw = (req.body as { hidden?: unknown }).hidden;
-    if (!Array.isArray(raw) || !raw.every((n) => Number.isInteger(n))) {
+    const body = req.body as { hidden?: unknown; networks?: unknown };
+    const raw = body.hidden;
+    const sentNetworks = 'networks' in body;
+    if (
+      (raw === undefined && !sentNetworks) ||
+      (raw !== undefined &&
+        (!Array.isArray(raw) || !raw.every((n) => Number.isInteger(n))))
+    ) {
       return next({
         status: 400,
-        message: 'A list of slider ids is required.',
+        message: 'A list of slider ids, or of networks, is required.',
       });
     }
+    // Their own list for the Networks row, checked and re-written; null (or
+    // empty) for the usual list.
+    let networks: string | null | undefined;
+    if (sentNetworks) {
+      try {
+        networks = sanitizeDiscoverNetworks(
+          body.networks as string | null | undefined
+        );
+      } catch (e) {
+        if (e instanceof DiscoverNetworksError) {
+          return res.status(400).json({ message: e.message });
+        }
+        throw e;
+      }
+    }
     // Only rows that exist, once each.
-    const existing = new Set(
-      (await getRepository(DiscoverSlider).find({ select: { id: true } })).map(
-        (s) => s.id
-      )
-    );
-    const hidden = [...new Set(raw as number[])].filter((id) =>
-      existing.has(id)
-    );
+    let hidden: number[] | undefined;
+    if (raw !== undefined) {
+      const existing = new Set(
+        (
+          await getRepository(DiscoverSlider).find({ select: { id: true } })
+        ).map((s) => s.id)
+      );
+      hidden = [...new Set(raw as number[])].filter((id) => existing.has(id));
+    }
+    const changes: Partial<UserSettings> = {
+      ...(hidden !== undefined && { hiddenSliders: hidden }),
+      ...(networks !== undefined && { discoverNetworks: networks }),
+    };
     try {
       const user = await getRepository(User).findOne({
         where: { id: Number(req.params.id) },
@@ -909,13 +940,17 @@ userSettingsRoutes.post<{ id: string }>(
       }
       const repository = getRepository(UserSettings);
       if (user.settings) {
-        await repository.update(user.settings.id, { hiddenSliders: hidden });
+        await repository.update(user.settings.id, changes);
       } else {
-        await repository.save(
-          new UserSettings({ user, hiddenSliders: hidden })
-        );
+        await repository.save(new UserSettings({ user, ...changes }));
       }
-      return res.status(200).json({ hidden });
+      return res.status(200).json({
+        hidden: hidden ?? user.settings?.hiddenSliders ?? [],
+        networks:
+          networks !== undefined
+            ? networks
+            : (user.settings?.discoverNetworks ?? null),
+      });
     } catch (e) {
       return next({ status: 500, message: e.message });
     }

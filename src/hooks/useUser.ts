@@ -41,6 +41,8 @@ export interface UserSettings {
   disabledFeatures?: string[];
   /** Home page rows (slider ids) this person hid for themselves. */
   hiddenSliders?: number[];
+  /** Their own Networks row, as JSON; null for the usual list. */
+  discoverNetworks?: string | null;
 }
 
 interface UserHookResponse {

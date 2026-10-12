@@ -107,6 +107,13 @@ export class UserSettings {
   })
   public hiddenSliders: number[];
 
+  /**
+   * This person's own list for the Networks row, as JSON (see
+   * server/constants/discoverNetworks.ts); null for the usual list.
+   */
+  @Column({ type: 'text', nullable: true })
+  public discoverNetworks?: string | null;
+
   @Column({ nullable: true })
   public watchlistSyncMovies?: boolean;
 

@@ -30,6 +30,8 @@ import {
   PlusIcon,
 } from '@heroicons/react/24/solid';
 import { DiscoverSliderType } from '@server/constants/discover';
+import { MAX_DISCOVER_NETWORKS } from '@server/constants/discoverNetworks';
+import { ApiErrorCode } from '@server/constants/error';
 import type DiscoverSlider from '@server/entity/DiscoverSlider';
 import axios from 'axios';
 import { useEffect, useState } from 'react';
@@ -69,8 +71,36 @@ const messages = defineMessages('components.Discover', {
   showall: 'Show All Rows',
   personalsaved: 'Your home page is saved.',
   personalfailed: 'Your home page could not be saved.',
+  toomanynetworks: 'A network list can contain at most {maxNetworks} networks.',
+  invalidnetworklist: 'The list of networks is not valid.',
   createnewslider: 'Create New Slider',
 });
+
+/**
+ * After a slider is created or deleted, the fresh list from the server
+ * merged into the one being edited, so changes not saved yet (order, which
+ * rows are on, the Networks list) are kept.
+ */
+const mergeRefreshedSliders = (
+  current: Partial<DiscoverSlider>[],
+  refreshed: DiscoverSlider[]
+): Partial<DiscoverSlider>[] => {
+  const refreshedById = new Map(refreshed.map((s) => [s.id, s]));
+  const currentIds = new Set(current.map((s) => s.id));
+  // A new slider is created at order -1, so the server lists it first.
+  const added = refreshed.filter((s) => !currentIds.has(s.id));
+  const kept = current.flatMap((slider) => {
+    const fresh = refreshedById.get(slider.id as number);
+    if (!fresh) return [];
+    // A built-in slider is only changed here, so the local copy is newer.
+    return [
+      fresh.isBuiltIn
+        ? slider
+        : { ...slider, title: fresh.title, type: fresh.type, data: fresh.data },
+    ];
+  });
+  return [...added, ...kept];
+};
 
 const Discover = () => {
   const intl = useIntl();
@@ -80,6 +110,10 @@ const Discover = () => {
   // Rows this person hid for themselves, saved, and as being edited.
   const savedHidden = user?.settings?.hiddenSliders ?? [];
   const [myHidden, setMyHidden] = useState<number[]>(savedHidden);
+  // Their own list for the Networks row (null: the usual one), saved and as
+  // being edited.
+  const savedNetworks = user?.settings?.discoverNetworks ?? null;
+  const [myNetworks, setMyNetworks] = useState<string | null>(savedNetworks);
   const { addToast } = useToasts();
   const {
     data: discoverData,
@@ -111,13 +145,27 @@ const Discover = () => {
       setMyHidden(savedHiddenKey ? savedHiddenKey.split(',').map(Number) : []);
     }
   }, [savedHiddenKey, isEditing]);
+  useEffect(() => {
+    if (!isEditing) {
+      setMyNetworks(savedNetworks);
+    }
+  }, [savedNetworks, isEditing]);
 
   const layoutChanged = () => isAdmin && !Object.is(discoverData, sliders);
-  const mineChanged = () =>
+  const hiddenChanged = () =>
     [...myHidden].sort().join(',') !== [...savedHidden].sort().join(',');
+  const networksChanged = () => myNetworks !== savedNetworks;
+  const mineChanged = () => hiddenChanged() || networksChanged();
   const hasChanged = () => layoutChanged() || mineChanged();
   const hiddenForMe = (id?: number) =>
     id !== undefined && myHidden.includes(id);
+
+  const refreshSliders = async () => {
+    const refreshed = await mutate();
+    if (refreshed) {
+      setSliders((current) => mergeRefreshedSliders(current, refreshed));
+    }
+  };
 
   const updateSliders = async () => {
     try {
@@ -127,6 +175,7 @@ const Discover = () => {
       if (mineChanged() && user) {
         await axios.post(`/api/v1/user/${user.id}/settings/discover`, {
           hidden: myHidden,
+          networks: myNetworks,
         });
         await revalidateUser();
       }
@@ -142,11 +191,22 @@ const Discover = () => {
       );
       setIsEditing(false);
       mutate();
-    } catch {
+    } catch (e) {
+      // A refused Networks list comes back as a 400 with its reason.
+      const code =
+        axios.isAxiosError(e) && e.response?.status === 400
+          ? e.response.data?.message
+          : undefined;
       addToast(
-        intl.formatMessage(
-          isAdmin ? messages.updatefailed : messages.personalfailed
-        ),
+        code === ApiErrorCode.TooManyNetworks
+          ? intl.formatMessage(messages.toomanynetworks, {
+              maxNetworks: MAX_DISCOVER_NETWORKS,
+            })
+          : code === ApiErrorCode.InvalidNetworkList
+            ? intl.formatMessage(messages.invalidnetworklist)
+            : intl.formatMessage(
+                isAdmin ? messages.updatefailed : messages.personalfailed
+              ),
         {
           appearance: 'error',
           autoDismiss: true,
@@ -197,15 +257,7 @@ const Discover = () => {
                 </span>
               </div>
               <div className="p-4">
-                <CreateSlider
-                  onCreate={async () => {
-                    const newSliders = await mutate();
-
-                    if (newSliders) {
-                      setSliders(newSliders);
-                    }
-                  }}
-                />
+                <CreateSlider onCreate={refreshSliders} />
               </div>
             </div>
           )}
@@ -393,7 +445,14 @@ const Discover = () => {
             );
             break;
           case DiscoverSliderType.NETWORKS:
-            sliderComponent = <NetworkSlider />;
+            sliderComponent = (
+              <NetworkSlider
+                // Each person's own list, or the usual one.
+                data={isEditing ? myNetworks : savedNetworks}
+                isEditing={isEditing}
+                onChange={setMyNetworks}
+              />
+            );
             break;
           case DiscoverSliderType.TMDB_MOVIE_KEYWORD:
             sliderComponent = (
@@ -529,17 +588,15 @@ const Discover = () => {
                     : [...current, id]
                 );
               }}
-              onDelete={async () => {
-                const newSliders = await mutate();
-
-                if (newSliders) {
-                  setSliders(newSliders);
-                }
-              }}
+              onDelete={refreshSliders}
               onEnable={() => {
-                const tempSliders = sliders.slice();
-                tempSliders[index].enabled = !tempSliders[index].enabled;
-                setSliders(tempSliders);
+                // A copy: the slider objects are shared with SWR's cache, and
+                // changing one in place would change the saved copy too.
+                setSliders(
+                  sliders.map((s, i) =>
+                    i === index ? { ...s, enabled: !s.enabled } : s
+                  )
+                );
               }}
               onPositionUpdate={(updatedItemId, position, hasClickedArrows) => {
                 const originalPosition = sliders.findIndex(

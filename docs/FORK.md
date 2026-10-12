@@ -17,6 +17,12 @@ done here before upstream's fix; GHSA-8j73-j6rc-q8xh (notification
 credentials in every embedded user) by `User.toJSON`. Start the next read
 from that commit.
 
+Unmerged upstream pull requests taken: #3571 (choosing the networks in the
+Networks row), reworked: each person chooses their own (kept in their user
+settings, saved with the rows they hide) where upstream has one list an
+admin sets; the page carries no validation library; the editor loads only
+while customizing.
+
 ## Building
 
 ```bash

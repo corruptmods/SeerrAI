@@ -23,6 +23,10 @@ A few clients need one thing switched on first:
 
 The Health page now shows which client each one is and what version it's running. If the one Backfill uses is missing something from the list above, Health tells you what to switch on.
 
+### Your own networks
+
+Everyone can now choose which networks their Networks row shows. Tap the pencil on the home page to customize it, then add networks by their TMDB id, put them in any order, or remove them, up to 50. It's just for you, and until you change it you get the usual list.
+
 ### Tap a download to see it
 
 On a phone, tapping a title's download pill now shows what's downloading (progress, time left, what it's doing) instead of jumping straight to Plex. The Play on Plex link is right there in the details.

@@ -1,3 +1,4 @@
+import BazarrLogo from '@app/assets/services/bazarr.svg';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
@@ -8,7 +9,6 @@ import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
-import { ChatBubbleBottomCenterTextIcon } from '@heroicons/react/24/outline';
 import { PlusIcon } from '@heroicons/react/24/solid';
 import axios from 'axios';
 import { useState } from 'react';
@@ -110,9 +110,7 @@ const SettingsBazarr = () => {
                 hostname={data.hostname}
                 port={data.port}
                 isSSL={data.useSsl}
-                logo={
-                  <ChatBubbleBottomCenterTextIcon className="h-10 w-10 flex-shrink-0 text-gray-300" />
-                }
+                logo={<BazarrLogo className="h-10 w-10 flex-shrink-0" />}
                 detail={{
                   label: intl.formatMessage(messages.subtitles),
                   value: intl.formatMessage(messages.onTitlePages),

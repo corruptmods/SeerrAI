@@ -1,3 +1,4 @@
+import TautulliLogo from '@app/assets/services/tautulli.svg';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
@@ -8,7 +9,6 @@ import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
-import { ChartBarIcon } from '@heroicons/react/24/outline';
 import { PlusIcon } from '@heroicons/react/24/solid';
 import axios from 'axios';
 import { useState } from 'react';
@@ -107,9 +107,7 @@ const SettingsTautulli = () => {
                 port={data.port ?? 8181}
                 isSSL={!!data.useSsl}
                 externalUrl={data.externalUrl || undefined}
-                logo={
-                  <ChartBarIcon className="h-10 w-10 flex-shrink-0 text-gray-300" />
-                }
+                logo={<TautulliLogo className="h-10 w-10 flex-shrink-0" />}
                 detail={{
                   label: intl.formatMessage(messages.watchHistory),
                   value: intl.formatMessage(messages.fromPlex),

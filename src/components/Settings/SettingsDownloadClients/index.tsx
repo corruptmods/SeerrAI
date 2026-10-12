@@ -1,3 +1,9 @@
+import DelugeLogo from '@app/assets/services/deluge.svg';
+import NzbgetLogo from '@app/assets/services/nzbget.svg';
+import QbittorrentLogo from '@app/assets/services/qbittorrent.svg';
+import RtorrentLogo from '@app/assets/services/rtorrent.svg';
+import SabnzbdLogo from '@app/assets/services/sabnzbd.svg';
+import TransmissionLogo from '@app/assets/services/transmission.svg';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
@@ -8,7 +14,6 @@ import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
-import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { PlusIcon } from '@heroicons/react/24/solid';
 import axios from 'axios';
 import { Fragment, useState } from 'react';
@@ -31,6 +36,19 @@ const messages = defineMessages('components.Settings.SettingsDownloadClients', {
   deleteClientConfirm: 'Are you sure you want to delete this download client?',
   deleteFailed: 'Could not delete the download client.',
 });
+
+/** Each client's own logo, as Radarr's and Sonarr's tiles show theirs. */
+const LOGOS: Record<
+  ShownDownloadClient['type'],
+  React.FC<React.SVGProps<SVGSVGElement>>
+> = {
+  sabnzbd: SabnzbdLogo,
+  nzbget: NzbgetLogo,
+  qbittorrent: QbittorrentLogo,
+  transmission: TransmissionLogo,
+  deluge: DelugeLogo,
+  rtorrent: RtorrentLogo,
+};
 
 /*
  * Download clients, laid out like the Maintainerr section: a tile per client
@@ -112,26 +130,27 @@ const SettingsDownloadClients = () => {
         {!data && !error && <LoadingSpinner />}
         {data && !error && (
           <ul className="grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-            {data.map((client) => (
-              <ServerInstance
-                key={`download-client-${client.id}`}
-                name={client.name}
-                hostname={client.hostname}
-                port={client.port}
-                isSSL={client.useSsl}
-                logo={
-                  <ArrowDownTrayIcon className="h-10 w-10 flex-shrink-0 text-gray-300" />
-                }
-                detail={{
-                  label: intl.formatMessage(messages.client),
-                  value: intl.formatMessage(messages[client.type]),
-                }}
-                onEdit={() => setEditModal({ open: true, client })}
-                onDelete={() =>
-                  setDeleteModal({ open: true, clientId: client.id })
-                }
-              />
-            ))}
+            {data.map((client) => {
+              const Logo = LOGOS[client.type];
+              return (
+                <ServerInstance
+                  key={`download-client-${client.id}`}
+                  name={client.name}
+                  hostname={client.hostname}
+                  port={client.port}
+                  isSSL={client.useSsl}
+                  logo={<Logo className="h-10 w-10 flex-shrink-0" />}
+                  detail={{
+                    label: intl.formatMessage(messages.client),
+                    value: intl.formatMessage(messages[client.type]),
+                  }}
+                  onEdit={() => setEditModal({ open: true, client })}
+                  onDelete={() =>
+                    setDeleteModal({ open: true, clientId: client.id })
+                  }
+                />
+              );
+            })}
             <li className="col-span-1 h-32 rounded-lg border-2 border-dashed border-gray-400 shadow sm:h-44">
               <div className="flex h-full w-full items-center justify-center">
                 <Button

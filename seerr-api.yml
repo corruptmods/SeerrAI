@@ -10169,6 +10169,65 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/TvResult'
+  /discover/anime:
+    get:
+      summary: Discover anime
+      description: |
+        Returns anime (animation made in Japanese) in a JSON object: the
+        series airing in a season, the series premiering in one, the most
+        popular series, or films. Seasons are calendar quarters: winter is
+        January to March, spring April to June, summer July to September,
+        fall October to December. Follows the user's Discover region but
+        not their Discover language. Titles an admin has marked as not
+        anime are left out.
+      tags:
+        - search
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: number
+            example: 1
+            default: 1
+        - in: query
+          name: show
+          description: What to list. `airing` and `premieres` are for the given season.
+          schema:
+            type: string
+            enum: [airing, premieres, popular, films]
+            default: airing
+        - in: query
+          name: season
+          description: The season for `airing` and `premieres`, as year and name. Defaults to the current one.
+          schema:
+            type: string
+            pattern: '^\d{4}-(winter|spring|summer|fall)$'
+            example: 2026-fall
+      responses:
+        '200':
+          description: Results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page:
+                    type: number
+                    example: 1
+                  totalPages:
+                    type: number
+                    example: 20
+                  totalResults:
+                    type: number
+                    example: 200
+                  results:
+                    type: array
+                    items:
+                      oneOf:
+                        - $ref: '#/components/schemas/TvResult'
+                        - $ref: '#/components/schemas/MovieResult'
+        '400':
+          description: The season is not one that can be read
   /discover/trending:
     get:
       summary: Trending movies and TV

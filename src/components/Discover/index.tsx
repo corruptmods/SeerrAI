@@ -12,6 +12,7 @@ import RecentRequestsSlider from '@app/components/Discover/RecentRequestsSlider'
 import RecentlyAddedSlider from '@app/components/Discover/RecentlyAddedSlider';
 import StudioSlider from '@app/components/Discover/StudioSlider';
 import TvGenreSlider from '@app/components/Discover/TvGenreSlider';
+import { animeQuery } from '@app/components/Discover/animeChoices';
 import { sliderTitles } from '@app/components/Discover/constants';
 import MediaSlider from '@app/components/MediaSlider';
 import { encodeURIExtraParams } from '@app/hooks/useDiscover';
@@ -238,6 +239,7 @@ const Discover = () => {
   const upcomingDate = new Date(now.getTime() - offset * 60 * 1000)
     .toISOString()
     .split('T')[0];
+  const animeThisSeason = animeQuery('this');
 
   if (!discoverData && !discoverError) {
     return <SliderRowsSkeleton />;
@@ -441,6 +443,17 @@ const Discover = () => {
                 linkUrl={`/discover/tv?firstAirDateGte=${upcomingDate}`}
                 url="/api/v1/discover/tv"
                 extraParams={`firstAirDateGte=${upcomingDate}`}
+              />
+            );
+            break;
+          case DiscoverSliderType.ANIME:
+            sliderComponent = (
+              <MediaSlider
+                sliderKey="anime"
+                title={intl.formatMessage(sliderTitles.anime)}
+                url="/api/v1/discover/anime"
+                extraParams={`show=${animeThisSeason.show}&season=${animeThisSeason.season}`}
+                linkUrl="/discover/anime"
               />
             );
             break;

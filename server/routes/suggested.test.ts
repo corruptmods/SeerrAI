@@ -383,3 +383,41 @@ describe('the Suggested for You row', () => {
     assert.equal(types[types.length - 1], DiscoverSliderType.TMDB_SEARCH);
   });
 });
+
+describe('the Anime row', () => {
+  it('keeps a number of its own, past those Seerr uses', () => {
+    // Saved in the database: a number already taken would turn existing
+    // rows into this one.
+    assert.equal(DiscoverSliderType.ANIME, 24);
+  });
+
+  it('goes after Upcoming Series when added to an existing home page', async () => {
+    const repository = getRepository(DiscoverSlider);
+    await repository.clear();
+    let order = 0;
+    for (const slider of defaultSliders) {
+      if (slider.type !== DiscoverSliderType.ANIME) {
+        await repository.save(
+          new DiscoverSlider({ ...slider, order: order++ })
+        );
+      }
+    }
+
+    await DiscoverSlider.bootstrapSliders();
+
+    const sliders = await repository.find({ order: { order: 'ASC' } });
+    const types = sliders.map((s) => s.type);
+    const at = types.indexOf(DiscoverSliderType.ANIME);
+    assert.deepEqual(types.slice(at - 1, at + 2), [
+      DiscoverSliderType.UPCOMING_TV,
+      DiscoverSliderType.ANIME,
+      DiscoverSliderType.NETWORKS,
+    ]);
+    assert.equal(sliders[at].enabled, true);
+    assert.equal(
+      new Set(sliders.map((s) => s.order)).size,
+      sliders.length,
+      'no two rows share a position'
+    );
+  });
+});

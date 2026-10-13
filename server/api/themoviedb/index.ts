@@ -122,6 +122,10 @@ interface DiscoverTvOptions {
   language?: string;
   firstAirDateGte?: string;
   firstAirDateLte?: string;
+  /** Series with an episode airing on or after this day. */
+  airDateGte?: string;
+  /** Series with an episode airing on or before this day. */
+  airDateLte?: string;
   withRuntimeGte?: string;
   withRuntimeLte?: string;
   voteAverageGte?: string;
@@ -798,6 +802,8 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
     language = this.locale,
     firstAirDateGte,
     firstAirDateLte,
+    airDateGte,
+    airDateLte,
     includeEmptyReleaseDate = false,
     originalLanguage,
     genre,
@@ -845,6 +851,8 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
             !firstAirDateLte && firstAirDateGte
               ? defaultFutureDate
               : firstAirDateLte,
+          'air_date.gte': airDateGte,
+          'air_date.lte': airDateLte,
           with_original_language:
             originalLanguage && originalLanguage !== 'all'
               ? originalLanguage

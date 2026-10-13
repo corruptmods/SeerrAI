@@ -46,3 +46,28 @@ describe('a TMDB search TMDB does not answer', () => {
     });
   }
 });
+
+describe('discovering series by when their episodes air', () => {
+  it('asks TMDB for episodes airing between two days', async () => {
+    const tmdb = new TheMovieDb();
+    let params: Record<string, unknown> = {};
+    (
+      tmdb as unknown as {
+        axios: { get: (url: string, config: { params: object }) => unknown };
+      }
+    ).axios = {
+      get: async (_url, config) => {
+        params = config.params as Record<string, unknown>;
+        return { data: { page: 1, total_pages: 1, results: [] } };
+      },
+    };
+    await tmdb.getDiscoverTv({
+      airDateGte: '2026-10-01',
+      airDateLte: '2026-12-31',
+    });
+    assert.equal(params['air_date.gte'], '2026-10-01');
+    assert.equal(params['air_date.lte'], '2026-12-31');
+    assert.equal(params['first_air_date.gte'], undefined);
+    assert.equal(params['first_air_date.lte'], undefined);
+  });
+});

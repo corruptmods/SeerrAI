@@ -168,6 +168,8 @@ const DiscoverSliderEdit = ({
         return intl.formatMessage(sliderTitles.upcomingtv);
       case DiscoverSliderType.NETWORKS:
         return intl.formatMessage(sliderTitles.networks);
+      case DiscoverSliderType.ANIME:
+        return intl.formatMessage(sliderTitles.anime);
       case DiscoverSliderType.TMDB_MOVIE_KEYWORD:
         return intl.formatMessage(sliderTitles.tmdbmoviekeyword);
       case DiscoverSliderType.TMDB_TV_KEYWORD:

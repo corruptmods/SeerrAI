@@ -3,6 +3,7 @@ import TheMovieDb, {
   MovieSortOptionsIterable,
   TvSortOptionsIterable,
 } from '@server/api/themoviedb';
+import { ANIMATION_GENRE_ID } from '@server/api/themoviedb/constants';
 import type { TmdbKeyword } from '@server/api/themoviedb/interfaces';
 import { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
@@ -27,6 +28,11 @@ import {
   mapTvResult,
 } from '@server/models/Search';
 import { mapNetwork } from '@server/models/Tv';
+import {
+  parseSeasonKey,
+  seasonDates,
+  seasonOf,
+} from '@server/utils/animeSeason';
 import { isCollection, isMovie, isPerson } from '@server/utils/typeHelpers';
 import { Router } from 'express';
 import { sortBy } from 'lodash';
@@ -726,6 +732,111 @@ discoverRoutes.get('/tv/upcoming', async (req, res, next) => {
     return next({
       status: 500,
       message: 'Unable to retrieve upcoming series.',
+    });
+  }
+});
+
+/*
+ * Anime: series airing in a season, series premiering in one, the most
+ * popular series, or films. Anime here is animation made in Japanese, the
+ * way Seerr tells anime apart everywhere else (utils/isAnime), so every
+ * title listed is one Seerr would also send to Sonarr or Radarr as anime.
+ * TMDB's anime keyword is not used to find them: it is missing from many
+ * series, new ones especially, and is also on western cartoons Seerr does
+ * not count as anime.
+ *
+ * The person's region is followed, as on every Discover page, but not their
+ * Discover Language: these are Japanese titles by definition, so a filter
+ * to any other language could only ever leave the page empty. Someone who
+ * does not want them hides the row.
+ */
+discoverRoutes.get('/anime', async (req, res, next) => {
+  const tmdb = createTmdbWithRegionLanguage(req.user);
+  const show = (req.query.show as string | undefined) ?? 'airing';
+  const season = req.query.season
+    ? parseSeasonKey(req.query.season as string)
+    : seasonOf(new Date());
+
+  if (!season) {
+    return next({ status: 400, message: 'Unknown season.' });
+  }
+
+  const { start, end } = seasonDates(season);
+  const page = Number(req.query.page) || 1;
+  const language = req.locale;
+  const anime = {
+    page,
+    language,
+    genre: String(ANIMATION_GENRE_ID),
+    originalLanguage: 'ja',
+    sortBy: 'popularity.desc' as const,
+  };
+
+  try {
+    if (show === 'films') {
+      const data = await tmdb.getDiscoverMovies(anime);
+      const media = await Media.getRelatedMedia(
+        req.user,
+        data.results.map((result) => ({
+          tmdbId: result.id,
+          mediaType: MediaType.MOVIE,
+        })),
+        { includeActiveRequest: true }
+      );
+
+      return res.status(200).json({
+        page: data.page,
+        totalPages: data.total_pages,
+        totalResults: data.total_results,
+        results: data.results.flatMap((result) => {
+          const info = media.find(
+            (med) =>
+              med.tmdbId === result.id && med.mediaType === MediaType.MOVIE
+          );
+          // An admin said on its page that this one is not anime.
+          return info?.animeSetting === false
+            ? []
+            : [mapMovieResult(result, info)];
+        }),
+      });
+    }
+
+    const data = await tmdb.getDiscoverTv({
+      ...anime,
+      ...(show === 'airing' && { airDateGte: start, airDateLte: end }),
+      ...(show === 'premieres' && {
+        firstAirDateGte: start,
+        firstAirDateLte: end,
+      }),
+    });
+    const media = await Media.getRelatedMedia(
+      req.user,
+      data.results.map((result) => ({
+        tmdbId: result.id,
+        mediaType: MediaType.TV,
+      })),
+      { includeActiveRequest: true }
+    );
+
+    return res.status(200).json({
+      page: data.page,
+      totalPages: data.total_pages,
+      totalResults: data.total_results,
+      results: data.results.flatMap((result) => {
+        const info = media.find(
+          (med) => med.tmdbId === result.id && med.mediaType === MediaType.TV
+        );
+        return info?.animeSetting === false ? [] : [mapTvResult(result, info)];
+      }),
+    });
+  } catch (e) {
+    logger.debug('Something went wrong retrieving anime', {
+      label: 'API',
+      errorMessage: e.message,
+    });
+    return next({
+      status: 500,
+      message: 'Unable to retrieve anime.',
     });
   }
 });

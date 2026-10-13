@@ -25,6 +25,8 @@ export enum DiscoverSliderType {
   SUGGESTED,
   /** What Maintainerr is about to delete; empty rows are not shown. */
   DELETING_SOON,
+  /** Anime airing this season; its own page also has other seasons. */
+  ANIME,
 }
 
 export const defaultSliders: Partial<DiscoverSlider>[] = [
@@ -108,9 +110,15 @@ export const defaultSliders: Partial<DiscoverSlider>[] = [
     order: 12,
   },
   {
-    type: DiscoverSliderType.NETWORKS,
+    type: DiscoverSliderType.ANIME,
     enabled: true,
     isBuiltIn: true,
     order: 13,
+  },
+  {
+    type: DiscoverSliderType.NETWORKS,
+    enabled: true,
+    isBuiltIn: true,
+    order: 14,
   },
 ];

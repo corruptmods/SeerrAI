@@ -79,6 +79,7 @@ export const sliderTitles = defineMessages('components.Discover', {
   tvgenres: 'Series Genres',
   studios: 'Studios',
   networks: 'Networks',
+  anime: 'Anime This Season',
   tmdbmoviekeyword: 'TMDB Movie Keyword',
   tmdbtvkeyword: 'TMDB Series Keyword',
   tmdbmoviegenre: 'TMDB Movie Genre',

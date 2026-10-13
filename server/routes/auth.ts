@@ -6,9 +6,11 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { startJobs } from '@server/job/schedule';
+import { plexAccountMayClaim } from '@server/lib/manageUser';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
-import { startSession } from '@server/lib/signIn';
+import { endSessions, maySignIn, startSession } from '@server/lib/signIn';
+import { SignInLimiter } from '@server/lib/signInLimiter';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { checkAvatarChanged } from '@server/routes/avatarproxy';
@@ -23,6 +25,10 @@ import validator from 'validator';
 import { z } from 'zod';
 
 const authRoutes = Router();
+
+const passwordLimiter = new SignInLimiter('password');
+const jellyfinLimiter = new SignInLimiter('jellyfin');
+const resetLimiter = new SignInLimiter('reset');
 
 // Signing in with a passkey, and managing your own.
 authRoutes.use('/passkey', passkeyRoutes);
@@ -111,14 +117,20 @@ authRoutes.post('/plex', async (req, res, next) => {
     const plextv = new PlexTvAPI(body.authToken);
     const account = await plextv.getUser();
 
-    // Next let's see if the user already exists
-    let user = await userRepository
-      .createQueryBuilder('user')
-      .where('user.plexId = :id', { id: account.id })
-      .orWhere('user.email = :email', {
-        email: account.email.toLowerCase(),
-      })
-      .getOne();
+    // Next let's see if the user already exists: by Plex account, or else
+    // by email, which only finds someone this Plex account may take over
+    // (see plexAccountMayClaim).
+    let user = await userRepository.findOne({
+      where: { plexId: account.id },
+    });
+    const sameEmail = user
+      ? null
+      : await userRepository
+          .createQueryBuilder('user')
+          .where('user.email = :email', {
+            email: account.email.toLowerCase(),
+          })
+          .getOne();
 
     if (!user && !(await userRepository.count())) {
       user = new User({
@@ -162,6 +174,26 @@ authRoutes.post('/plex', async (req, res, next) => {
         (account.email === mainUser.email && !mainUser.plexId) ||
         (await mainPlexTv.checkUserAccess(account.id))
       ) {
+        if (!user && sameEmail) {
+          if (!plexAccountMayClaim(sameEmail)) {
+            logger.warn(
+              'Plex sign-in refused: the email belongs to an account that is not this Plex account',
+              {
+                label: 'API',
+                ip: req.ip,
+                userId: sameEmail.id,
+                plexId: account.id,
+                plexUsername: account.username,
+              }
+            );
+            return next({
+              status: 403,
+              message: 'Access denied.',
+            });
+          }
+          user = sameEmail;
+        }
+
         if (user) {
           if (!user.plexId) {
             logger.info(
@@ -298,6 +330,10 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       .json({ error: 'Jellyfin hostname already configured' });
   } else if (settings.jellyfin.ip === '' && !body.hostname) {
     return res.status(500).json({ error: 'No hostname provided.' });
+  }
+
+  if (!jellyfinLimiter.allow(req, res, body.username)) {
+    return;
   }
 
   try {
@@ -547,6 +583,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
     if (user) {
       await startSession(req, user.id);
     }
+    jellyfinLimiter.clear(req, body.username);
 
     return res.status(200).json(user?.filter() ?? {});
   } catch (e) {
@@ -600,6 +637,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
         });
 
       case ApiErrorCode.InvalidCredentials:
+        jellyfinLimiter.count(req, body.username);
         logger.warn(
           'Failed sign-in attempt from user with incorrect Jellyfin credentials',
           {
@@ -665,6 +703,15 @@ authRoutes.post('/jellyfin/quickconnect/initiate', async (req, res, next) => {
     return next({
       status: 403,
       message: 'Quick Connect is only supported by Jellyfin.',
+    });
+  }
+
+  // With Jellyfin sign-in turned off, Quick Connect is only for someone
+  // already signed in linking their Jellyfin account.
+  if (settings.main.mediaServerLogin === false && !req.user) {
+    return next({
+      status: 403,
+      message: 'Jellyfin sign-in is disabled.',
     });
   }
 
@@ -762,6 +809,14 @@ authRoutes.post(
       return next({
         status: 403,
         message: 'Quick Connect is only supported by Jellyfin.',
+      });
+    }
+
+    // The same switch as signing in with a Jellyfin password.
+    if (settings.main.mediaServerLogin === false) {
+      return next({
+        status: 403,
+        message: 'Jellyfin sign-in is disabled.',
       });
     }
 
@@ -881,14 +936,25 @@ authRoutes.post('/local', async (req, res, next) => {
       error: 'You must provide both an email address and a password.',
     });
   }
+  if (!passwordLimiter.allow(req, res, body.email)) {
+    return;
+  }
   try {
     const user = await userRepository
       .createQueryBuilder('user')
-      .select(['user.id', 'user.email', 'user.password', 'user.plexId'])
+      .select([
+        'user.id',
+        'user.email',
+        'user.password',
+        'user.plexId',
+        'user.userType',
+        'user.jellyfinUserId',
+      ])
       .where('user.email = :email', { email: body.email.toLowerCase() })
       .getOne();
 
     if (!user || !(await user.passwordMatch(body.password))) {
+      passwordLimiter.count(req, body.email);
       logger.warn('Failed sign-in attempt using invalid Seerr password', {
         label: 'API',
         ip: req.ip,
@@ -901,12 +967,25 @@ authRoutes.post('/local', async (req, res, next) => {
       });
     }
 
-    // Set logged in session
-    if (user) {
-      await startSession(req, user.id);
+    passwordLimiter.clear(req, body.email);
+
+    // The right password, for someone the media server no longer lets in.
+    if (!(await maySignIn(user, 'password'))) {
+      logger.warn('Password sign-in by someone no longer allowed to sign in', {
+        label: 'API',
+        ip: req.ip,
+        userId: user.id,
+      });
+      return next({
+        status: 403,
+        message: 'Access denied.',
+      });
     }
 
-    return res.status(200).json(user?.filter() ?? {});
+    // Set logged in session
+    await startSession(req, user.id);
+
+    return res.status(200).json(user.filter());
   } catch (e) {
     logger.error('Something went wrong authenticating with Seerr password', {
       label: 'API',
@@ -945,6 +1024,7 @@ authRoutes.post('/logout', async (req, res, next) => {
           const baseUrl = getHostname();
           try {
             await axios.delete(`${baseUrl}/Devices`, {
+              timeout: 5000,
               params: { Id: user.jellyfinDeviceId },
               headers: {
                 Authorization: `MediaBrowser Client="Seerr", Device="Seerr", DeviceId="seerr", Version="${
@@ -1009,15 +1089,27 @@ authRoutes.post('/reset-password', async (req, res, next) => {
     });
   }
 
+  if (!resetLimiter.allow(req, res, body.email)) {
+    return;
+  }
+  // Counted whether or not the account exists, so the answer is the same.
+  resetLimiter.count(req, body.email);
+
   const user = await userRepository
     .createQueryBuilder('user')
     .where('user.email = :email', { email: body.email.toLowerCase() })
     .getOne();
 
   if (user) {
-    await user.resetPassword();
-    await userRepository.save(user);
-    logger.info('Successfully sent password reset link', {
+    user.newResetPasswordLink();
+    await userRepository.update(user.id, {
+      resetPasswordGuid: user.resetPasswordGuid,
+      recoveryLinkExpirationDate: user.recoveryLinkExpirationDate,
+    });
+    // Not waited for: how long the mail server takes would tell anyone
+    // asking whether the account exists.
+    void user.sendResetPasswordEmail();
+    logger.info('Sending password reset link', {
       label: 'API',
       ip: req.ip,
       email: body.email,
@@ -1081,7 +1173,12 @@ authRoutes.post('/reset-password/:guid', async (req, res, next) => {
   }
   user.recoveryLinkExpirationDate = null;
   await user.setPassword(req.body.password);
-  await userRepository.save(user);
+  await userRepository.update(user.id, {
+    password: user.password,
+    recoveryLinkExpirationDate: null,
+  });
+  // Whoever knew the old password is signed out.
+  await endSessions(user.id);
   logger.info('Successfully reset password', {
     label: 'API',
     ip: req.ip,

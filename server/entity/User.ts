@@ -270,17 +270,23 @@ export class User {
     }
   }
 
-  public async resetPassword(): Promise<void> {
-    const guid = randomUUID();
-    this.resetPasswordGuid = guid;
+  /**
+   * A new password reset link, good for a day. Stored by the caller, then
+   * sent with sendResetPasswordEmail.
+   */
+  public newResetPasswordLink(): void {
+    this.resetPasswordGuid = randomUUID();
 
     // 24 hours into the future
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + 1);
     this.recoveryLinkExpirationDate = targetDate;
+  }
 
+  /** Emails the reset link; never fails, a failure is logged. */
+  public async sendResetPasswordEmail(): Promise<void> {
     const { applicationTitle, applicationUrl } = getSettings().main;
-    const resetPasswordLink = `${applicationUrl}/resetpassword/${guid}`;
+    const resetPasswordLink = `${applicationUrl}/resetpassword/${this.resetPasswordGuid}`;
 
     try {
       logger.info(`Sending reset password email for ${this.email}`, {
@@ -308,10 +314,17 @@ export class User {
     }
   }
 
+  /*
+   * The name shown for someone wherever they appear, to anyone. Never their
+   * email: that is only for themselves and whoever manages users.
+   */
   @AfterLoad()
   public setDisplayName(): void {
     this.displayName =
-      this.username || this.plexUsername || this.jellyfinUsername || this.email;
+      this.username ||
+      this.plexUsername ||
+      this.jellyfinUsername ||
+      `User #${this.id}`;
   }
 
   public async getQuota(): Promise<QuotaResponse> {

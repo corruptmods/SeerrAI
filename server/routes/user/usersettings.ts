@@ -17,9 +17,11 @@ import {
   sanitizeDiscoverNetworks,
 } from '@server/lib/discoverNetworks';
 import { cleanFeatureList } from '@server/lib/features';
+import { mayEditUser, mayManageUser } from '@server/lib/manageUser';
 import { passkeySummary } from '@server/lib/passkeys';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
+import { endSessions } from '@server/lib/signIn';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { quickConnectSecret } from '@server/routes/auth';
@@ -35,8 +37,11 @@ import net from 'net';
 import { Not } from 'typeorm';
 import { canMakePermissionsChange } from '.';
 
-/** Trakt usernames: letters, digits, dots, dashes and underscores. */
-const TRAKT_USERNAME = /^[\w.-]{1,64}$/;
+/**
+ * Trakt usernames: letters, digits, dots, dashes and underscores, and not
+ * only dots ("." and ".." would change which Trakt page is read).
+ */
+const TRAKT_USERNAME = /^(?=.*[\w-])[\w.-]{1,64}$/;
 
 const userSettingsRoutes = Router({ mergeParams: true });
 
@@ -99,8 +104,9 @@ userSettingsRoutes.post<
       return next({ status: 404, message: 'User not found.' });
     }
 
-    // "Owner" user settings cannot be modified by other users
-    if (user.id === 1 && req.user?.id !== 1) {
+    // Only the owner changes the owner's settings, or another admin's: an
+    // admin's email is where their password reset link goes.
+    if (!mayEditUser(req.user, user)) {
       return next({
         status: 403,
         message: "You do not have permission to modify this user's settings.",
@@ -242,12 +248,7 @@ userSettingsRoutes.post<
       });
     }
 
-    if (
-      (user.id === 1 && req.user?.id !== 1) ||
-      (user.hasPermission(Permission.ADMIN) &&
-        user.id !== req.user?.id &&
-        req.user?.id !== 1)
-    ) {
+    if (!mayEditUser(req.user, user)) {
       return next({
         status: 403,
         message: "You do not have permission to modify this user's password.",
@@ -261,7 +262,9 @@ userSettingsRoutes.post<
       req.user?.id !== user.id
     ) {
       await user.setPassword(req.body.newPassword);
-      await userRepository.save(user);
+      await userRepository.update(user.id, { password: user.password });
+      // Signed out everywhere: the new password is the only way back in.
+      await endSessions(user.id);
       logger.debug('Password overriden by user.', {
         label: 'User Settings',
         userEmail: user.email,
@@ -270,9 +273,10 @@ userSettingsRoutes.post<
       return res.status(204).send();
     }
 
-    // If the user has a password, we need to check the currentPassword is correct
+    // If the user has a password, we need to check the currentPassword is
+    // correct. Only the copy loaded with the password has it.
     if (
-      user.password &&
+      userWithPassword.password &&
       (!req.body.currentPassword ||
         !(await userWithPassword.passwordMatch(req.body.currentPassword)))
     ) {
@@ -284,7 +288,9 @@ userSettingsRoutes.post<
     }
 
     await user.setPassword(req.body.newPassword);
-    await userRepository.save(user);
+    await userRepository.update(user.id, { password: user.password });
+    // Signed out everywhere else; this session stays.
+    await endSessions(user.id, req.sessionID);
 
     return res.status(204).send();
   } catch (e) {
@@ -369,6 +375,13 @@ userSettingsRoutes.delete<{ id: string }>(
         return res.status(400).json({
           message:
             'Cannot unlink media server accounts for the primary administrator.',
+        });
+      }
+
+      // Unlinking an admin from someone else's settings is the owner's call.
+      if (!mayEditUser(req.user, user)) {
+        return res.status(403).json({
+          message: "You do not have permission to modify this user's settings.",
         });
       }
 
@@ -527,6 +540,13 @@ userSettingsRoutes.delete<{ id: string }>(
         });
       }
 
+      // Unlinking an admin from someone else's settings is the owner's call.
+      if (!mayEditUser(req.user, user)) {
+        return res.status(403).json({
+          message: "You do not have permission to modify this user's settings.",
+        });
+      }
+
       if (!user.email || !user.password) {
         return res.status(400).json({
           message: 'User does not have a local email or password set.',
@@ -681,8 +701,8 @@ userSettingsRoutes.post<{ id: string }, UserSettingsNotificationsResponse>(
         return next({ status: 404, message: 'User not found.' });
       }
 
-      // "Owner" user settings cannot be modified by other users
-      if (user.id === 1 && req.user?.id !== 1) {
+      // Only the owner changes the owner's settings, or another admin's.
+      if (!mayEditUser(req.user, user)) {
         return next({
           status: 403,
           message: "You do not have permission to modify this user's settings.",
@@ -785,8 +805,9 @@ userSettingsRoutes.post<
         return next({ status: 404, message: 'User not found.' });
       }
 
-      // "Owner" user permissions cannot be modified, and users cannot set their own permissions
-      if (user.id === 1 || req.user?.id === user.id) {
+      // Nobody sets their own permissions or the owner's, and only the owner
+      // changes another admin's.
+      if (!mayManageUser(req.user, user)) {
         return next({
           status: 403,
           message: 'You do not have permission to modify this user',
@@ -993,12 +1014,7 @@ const passkeyManager = async (
   if (!user) {
     return { status: 404, message: 'User not found.' };
   }
-  if (
-    (user.id === 1 && req.user?.id !== 1) ||
-    (user.hasPermission(Permission.ADMIN) &&
-      user.id !== req.user?.id &&
-      req.user?.id !== 1)
-  ) {
+  if (!mayEditUser(req.user, user)) {
     return {
       status: 403,
       message: "You do not have permission to manage this user's passkeys.",
@@ -1043,6 +1059,11 @@ userSettingsRoutes.delete<{ id: string; passkeyId: string }>(
       if (!result.affected) {
         return next({ status: 404, message: 'Passkey not found.' });
       }
+      // Whoever has the device it was on is signed out with it.
+      await endSessions(
+        user.id,
+        req.user?.id === user.id ? req.sessionID : undefined
+      );
       logger.info('Passkey removed by an admin', {
         label: 'Auth',
         userId: user.id,

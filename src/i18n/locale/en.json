@@ -903,6 +903,7 @@
   "components.Login.tipEmailHasTrailingWhitespace": "The email ends with whitespace",
   "components.Login.tipUsernameHasTrailingWhitespace": "The username ends with whitespace",
   "components.Login.title": "Add Email",
+  "components.Login.toomanyattempts": "Too many sign-in attempts. Try again in a few minutes.",
   "components.Login.urlBase": "URL Base",
   "components.Login.urlBaseHelp": "If you set a Base URL in Jellyfin (Dashboard > Networking), enter it here (e.g. /jellyfin). Leave blank otherwise.",
   "components.Login.username": "Username",

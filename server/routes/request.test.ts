@@ -1694,6 +1694,9 @@ describe("GET /request/:requestId, the requester's own settings", () => {
 
   it("never carries anyone's email, Plex id or Plex sign-in state", async () => {
     const seeded = await seedRequest();
+    // Signed in first: with the owner's Plex id changed, the friend's would
+    // no longer be the owner's, and plex.tv is not there to vouch for them.
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
     const userRepo = getRepository(User);
     const admin = await userRepo.findOneByOrFail({
       email: 'admin@seerr.dev',
@@ -1703,7 +1706,6 @@ describe("GET /request/:requestId, the requester's own settings", () => {
     await userRepo.save(admin);
     await getRepository(MediaRequest).update(seeded.id, { modifiedBy: admin });
 
-    const agent = await loginAs('friend@seerr.dev', 'test1234');
     for (const path of [`/request/${seeded.id}`, '/request?take=10']) {
       const res = await agent.get(path);
       assert.strictEqual(res.status, 200, path);

@@ -18,7 +18,9 @@ import type {
   UserResultsResponse,
   UserWatchDataResponse,
 } from '@server/interfaces/api/userInterfaces';
+import { mayManageUser, plexAccountMayClaim } from '@server/lib/manageUser';
 import { Permission, hasPermission } from '@server/lib/permissions';
+import { isPushServiceEndpoint } from '@server/lib/pushEndpoint';
 import { getSettings } from '@server/lib/settings';
 import {
   attachRequestCount,
@@ -257,6 +259,11 @@ router.post<
     userAgent: string;
   }
 >('/registerPushSubscription', async (req, res, next) => {
+  // Seerr sends notifications to this address itself, so it has to be a
+  // browser's push service, not any address someone gives it.
+  if (!isPushServiceEndpoint(req.body.endpoint)) {
+    return next({ status: 400, message: 'Not a push service address.' });
+  }
   try {
     // This prevents race conditions where two requests both pass the checks
     await dataSource.transaction(
@@ -608,8 +615,6 @@ router.put<
   { ids: string[]; permissions: number }
 >('/', isAuthenticated(Permission.MANAGE_USERS), async (req, res, next) => {
   try {
-    const isOwner = req.user?.id === 1;
-
     if (!canMakePermissionsChange(req.body.permissions, req.user)) {
       return next({
         status: 403,
@@ -619,24 +624,24 @@ router.put<
 
     const userRepository = getRepository(User);
 
-    const users: User[] = await userRepository.find({
-      where: {
-        id: In(
-          isOwner ? req.body.ids : req.body.ids.filter((id) => Number(id) !== 1)
-        ),
-      },
+    // Anyone chosen whom this person may not manage (themselves, the
+    // owner, another admin unless they are the owner) is left as they are.
+    const users = (
+      await userRepository.find({ where: { id: In(req.body.ids) } })
+    ).filter((user) => mayManageUser(req.user, user));
+
+    if (users.length > 0) {
+      await userRepository.update(
+        { id: In(users.map((user) => user.id)) },
+        { permissions: req.body.permissions }
+      );
+    }
+
+    const updatedUsers = await userRepository.find({
+      where: { id: In(users.map((user) => user.id)) },
     });
 
-    const updatedUsers = await Promise.all(
-      users.map(async (user) => {
-        return userRepository.save(<User>{
-          ...user,
-          ...{ permissions: req.body.permissions },
-        });
-      })
-    );
-
-    return res.status(200).json(updatedUsers);
+    return res.status(200).json(User.filterMany(updatedUsers));
   } catch (e) {
     next({ status: 500, message: e.message });
   }
@@ -653,8 +658,9 @@ router.put<{ id: string }>(
         where: { id: Number(req.params.id) },
       });
 
-      // Only let the owner user modify themselves
-      if (user.id === 1 && req.user?.id !== 1) {
+      // Nobody changes their own permissions, and only the owner changes
+      // another admin's.
+      if (!mayManageUser(req.user, user)) {
         return next({
           status: 403,
           message: 'You do not have permission to modify this user',
@@ -673,7 +679,10 @@ router.put<{ id: string }>(
         permissions: req.body.permissions,
       });
 
-      await userRepository.save(user);
+      await userRepository.update(user.id, {
+        username: req.body.username,
+        permissions: req.body.permissions,
+      });
 
       return res.status(200).json(user.filter());
     } catch {
@@ -777,27 +786,37 @@ router.post(
         const account = rawUser.$;
 
         if (account.email) {
-          const user = await userRepository
-            .createQueryBuilder('user')
-            .where('user.plexId = :id', { id: account.id })
-            .orWhere('user.email = :email', {
-              email: account.email.toLowerCase(),
-            })
-            .getOne();
+          const linked = await userRepository.findOne({
+            where: { plexId: parseInt(account.id) },
+          });
+          const sameEmail = linked
+            ? null
+            : await userRepository
+                .createQueryBuilder('user')
+                .where('user.email = :email', {
+                  email: account.email.toLowerCase(),
+                })
+                .getOne();
+          // An account with this email that is not waiting for this Plex
+          // account (a password account, or one linked to another Plex
+          // account) is never taken over: its owner links Plex themselves.
+          const user =
+            linked ??
+            (sameEmail && plexAccountMayClaim(sameEmail) ? sameEmail : null);
 
           if (user) {
             // Update the user's avatar with their Plex thumbnail, in case it changed
-            user.avatar = account.thumb;
-            user.email = account.email;
-            user.plexUsername = account.username;
-
-            // In case the user was previously a local account
-            if (user.userType === UserType.LOCAL) {
-              user.userType = UserType.PLEX;
-              user.plexId = parseInt(account.id);
-            }
-            await userRepository.save(user);
+            await userRepository.update(user.id, {
+              avatar: account.thumb,
+              email: account.email,
+              plexUsername: account.username,
+            });
             refreshedUsers += 1;
+          } else if (sameEmail) {
+            logger.info(
+              'Plex user not imported: their email belongs to another account',
+              { label: 'API', userId: sameEmail.id, plexId: account.id }
+            );
           } else if (!body || body.plexIds.includes(account.id)) {
             if (await mainPlexTv.checkUserAccess(parseInt(account.id))) {
               const newUser = new User({

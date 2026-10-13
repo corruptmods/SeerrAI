@@ -90,15 +90,16 @@ const ResetPassword = () => {
                 }}
                 validationSchema={ResetSchema}
                 onSubmit={async (values) => {
-                  const response = await axios.post(
-                    `/api/v1/auth/reset-password`,
-                    {
+                  try {
+                    await axios.post(`/api/v1/auth/reset-password`, {
                       email: values.email,
-                    }
-                  );
-
-                  if (response.status === 200) {
+                    });
                     setSubmitted(true);
+                  } catch (e) {
+                    // Asked too often: the links already sent still work.
+                    if (axios.isAxiosError(e) && e.response?.status === 429) {
+                      setSubmitted(true);
+                    }
                   }
                 }}
               >

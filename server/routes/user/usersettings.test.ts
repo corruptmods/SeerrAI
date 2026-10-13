@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { before, beforeEach, describe, it, mock } from 'node:test';
 
 import JellyfinAPI from '@server/api/jellyfin';
+import PlexTvAPI from '@server/api/plextv';
 import { DiscoverSliderType } from '@server/constants/discover';
 import { MAX_DISCOVER_NETWORKS } from '@server/constants/discoverNetworks';
 import { ApiErrorCode } from '@server/constants/error';
@@ -38,6 +39,10 @@ const authenticateQCMock = mock.method(
   'authenticateQuickConnect',
   async () => ({ ...defaultAuthenticateResponse })
 );
+
+// Plex accounts signing in with a password are checked against the owner's
+// share list; everyone here is on it.
+mock.method(PlexTvAPI.prototype, 'checkUserAccess', async () => true);
 
 let app: Express;
 
@@ -163,7 +168,7 @@ describe('the owner and shared devices', () => {
 
   it('lets a device belong to one person at a time for push', async () => {
     const device = {
-      endpoint: 'https://push.test/device-1',
+      endpoint: 'https://fcm.googleapis.com/fcm/send/device-1',
       p256dh: 'key',
       auth: 'secret',
       userAgent: 'test',
@@ -483,5 +488,175 @@ describe('settings an admin saves for someone else', () => {
       relations: { settings: true },
     });
     assert.notStrictEqual(admin.settings?.traktUsername, 'fresh-one');
+  });
+});
+
+/*
+ * Someone who manages users, but is not an admin, and an admin who is not
+ * the owner: only the owner changes an admin's account.
+ */
+describe("another admin's account", () => {
+  const people = async () => {
+    const users = getRepository(User);
+    const friend = await users.findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+    await users.update(friend.id, {
+      permissions: Permission.MANAGE_USERS,
+      userType: UserType.LOCAL,
+    });
+    const admin = new User({
+      email: 'second-admin@seerr.dev',
+      username: 'second',
+      avatar: '',
+      permissions: Permission.ADMIN,
+      userType: UserType.PLEX,
+      plexId: 7000,
+    });
+    await admin.setPassword('test1234');
+    await users.save(admin);
+    const regular = await users.save(
+      new User({
+        email: 'regular@seerr.dev',
+        username: 'regular',
+        avatar: '',
+        permissions: Permission.REQUEST,
+        userType: UserType.LOCAL,
+      })
+    );
+    return { friend, admin, regular };
+  };
+
+  const emailOf = async (id: number) =>
+    (await getRepository(User).findOneByOrFail({ id })).email;
+
+  it('cannot have its email changed by a user manager', async () => {
+    const { admin, regular } = await people();
+    const { agent } = await loginAs('friend@seerr.dev', 'test1234');
+
+    const res = await agent
+      .post(`/user/${admin.id}/settings/main`)
+      .send({ username: 'second', email: 'taken-over@evil.test' });
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(await emailOf(admin.id), 'second-admin@seerr.dev');
+
+    // Everyone else's they still manage.
+    const ok = await agent
+      .post(`/user/${regular.id}/settings/main`)
+      .send({ username: 'regular', email: 'regular2@seerr.dev' });
+    assert.strictEqual(ok.status, 200);
+    assert.strictEqual(await emailOf(regular.id), 'regular2@seerr.dev');
+  });
+
+  it('cannot have its notifications or Plex sign-in changed by a user manager', async () => {
+    getSettings().main.mediaServerType = MediaServerType.PLEX;
+    const { admin } = await people();
+    const { agent } = await loginAs('friend@seerr.dev', 'test1234');
+
+    const notifications = await agent
+      .post(`/user/${admin.id}/settings/notifications`)
+      .send({ pgpKey: 'not theirs', notificationTypes: {} });
+    assert.strictEqual(notifications.status, 403);
+
+    const unlink = await agent.delete(
+      `/user/${admin.id}/settings/linked-accounts/plex`
+    );
+    assert.strictEqual(unlink.status, 403);
+    const after = await getRepository(User).findOneByOrFail({ id: admin.id });
+    assert.strictEqual(after.plexId, 7000);
+    assert.strictEqual(after.userType, UserType.PLEX);
+  });
+
+  it('cannot be demoted by a user manager', async () => {
+    const { admin } = await people();
+    const { agent } = await loginAs('friend@seerr.dev', 'test1234');
+
+    const res = await agent
+      .post(`/user/${admin.id}/settings/permissions`)
+      .send({ permissions: Permission.REQUEST });
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(
+      (await getRepository(User).findOneByOrFail({ id: admin.id })).permissions,
+      Permission.ADMIN
+    );
+  });
+
+  it('is changed by its owner and by the server owner', async () => {
+    const { admin } = await people();
+    // A Plex account's email is Plex's; a password account's is its own.
+    await getRepository(User).update(admin.id, { userType: UserType.LOCAL });
+    const own = await loginAs('second-admin@seerr.dev', 'test1234');
+    const mine = await own.agent
+      .post(`/user/${admin.id}/settings/main`)
+      .send({ username: 'second', email: 'second-new@seerr.dev' });
+    assert.strictEqual(mine.status, 200);
+    assert.strictEqual(await emailOf(admin.id), 'second-new@seerr.dev');
+
+    const owner = await loginAs('admin@seerr.dev', 'test1234');
+    const byOwner = await owner.agent
+      .post(`/user/${admin.id}/settings/main`)
+      .send({ username: 'second', email: 'second-again@seerr.dev' });
+    assert.strictEqual(byOwner.status, 200);
+    assert.strictEqual(await emailOf(admin.id), 'second-again@seerr.dev');
+  });
+});
+
+describe('changing your own password', () => {
+  it('takes the current one when you have one', async () => {
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    const change = (body: object) =>
+      agent.post(`/user/${userId}/settings/password`).send(body);
+
+    assert.strictEqual(
+      (await change({ newPassword: 'new-password' })).status,
+      403
+    );
+    assert.strictEqual(
+      (await change({ currentPassword: 'wrong', newPassword: 'new-password' }))
+        .status,
+      403
+    );
+    assert.strictEqual(
+      (
+        await change({
+          currentPassword: 'test1234',
+          newPassword: 'new-password',
+        })
+      ).status,
+      204
+    );
+    await loginAs('friend@seerr.dev', 'new-password');
+  });
+
+  it('sets a first one without asking for an old one', async () => {
+    const users = getRepository(User);
+    const friend = await users.findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+    // Signed in, then the password taken away (a Plex user never had one).
+    const { agent } = await loginAs('friend@seerr.dev', 'test1234');
+    await users.update(friend.id, { password: null as unknown as string });
+
+    const res = await agent
+      .post(`/user/${friend.id}/settings/password`)
+      .send({ newPassword: 'first-password' });
+    assert.strictEqual(res.status, 204);
+    await loginAs('friend@seerr.dev', 'first-password');
+  });
+});
+
+describe('a Trakt username made of dots', () => {
+  it('is refused', async () => {
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    for (const name of ['.', '..', '...']) {
+      const res = await agent
+        .post(`/user/${userId}/settings/main`)
+        .send({ username: 'friend', traktUsername: name });
+      assert.strictEqual(res.status, 400, name);
+    }
+    const ok = await agent
+      .post(`/user/${userId}/settings/main`)
+      .send({ username: 'friend', traktUsername: '.a.' });
+    assert.strictEqual(ok.status, 200);
   });
 });

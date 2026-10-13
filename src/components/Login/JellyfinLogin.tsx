@@ -24,6 +24,7 @@ const messages = defineMessages('components.Login', {
   validationusernamerequired: 'Username required',
   validationpasswordrequired: 'Password required',
   loginerror: 'Something went wrong while trying to sign in.',
+  toomanyattempts: 'Too many sign-in attempts. Try again in a few minutes.',
   adminerror: 'You must use an admin account to sign in.',
   noadminerror: 'No admin user found on the server.',
   credentialerror: 'The username or password is incorrect.',
@@ -96,6 +97,9 @@ const JellyfinLogin = ({ revalidate, serverType }: JellyfinLoginProps) => {
             });
           } catch (e) {
             let errorMessage = messages.loginerror;
+            if (e?.response?.status === 429) {
+              errorMessage = messages.toomanyattempts;
+            }
             switch (e?.response?.data?.message) {
               case ApiErrorCode.InvalidUrl:
               case ApiErrorCode.ConnectionError:

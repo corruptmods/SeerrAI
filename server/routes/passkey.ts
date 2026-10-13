@@ -1,6 +1,3 @@
-import JellyfinAPI from '@server/api/jellyfin';
-import PlexTvAPI from '@server/api/plextv';
-import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import UserPasskey from '@server/entity/UserPasskey';
@@ -12,11 +9,9 @@ import {
   rememberChallenge,
   takeChallenge,
 } from '@server/lib/passkeys';
-import { getSettings } from '@server/lib/settings';
-import { startSession } from '@server/lib/signIn';
+import { endSessions, maySignIn, startSession } from '@server/lib/signIn';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
-import { getHostname } from '@server/utils/getHostname';
 import type {
   AuthenticationResponseJSON,
   RegistrationResponseJSON,
@@ -209,6 +204,9 @@ passkeyRoutes.delete<{ id: string }>(
         userId: req.user?.id,
         passkeyId: Number(req.params.id),
       });
+      // Whoever has the device it was on is signed out with it; this
+      // session stays.
+      await endSessions(req.user?.id as number, req.sessionID);
       return res.status(204).send();
     } catch (e) {
       return next({ status: 500, message: e.message });
@@ -231,58 +229,6 @@ passkeyRoutes.post('/login/options', async (req, res, next) => {
     return next({ status: 500, message: e.message });
   }
 });
-
-/**
- * Whether this person may still sign in. The same rules as signing in with
- * the media server or a password: a Plex account the server owner has
- * stopped sharing with is refused, so is a Jellyfin or Emby account that
- * has been deleted or switched off there, and so is a way of signing in
- * the admin has turned off.
- */
-const maySignIn = async (user: User): Promise<boolean> => {
-  const settings = getSettings();
-
-  if (user.userType === UserType.PLEX) {
-    if (settings.main.mediaServerLogin === false) {
-      return false;
-    }
-    if (user.id === 1) {
-      return true;
-    }
-    const owner = await getRepository(User).findOneOrFail({
-      select: { id: true, plexToken: true, plexId: true },
-      where: { id: 1 },
-    });
-    return (
-      !!user.plexId &&
-      (user.plexId === owner.plexId ||
-        (await new PlexTvAPI(owner.plexToken ?? '').checkUserAccess(
-          user.plexId
-        )))
-    );
-  }
-
-  if (user.userType === UserType.LOCAL) {
-    return settings.main.localLogin !== false || user.id === 1;
-  }
-
-  if (settings.main.mediaServerLogin === false) {
-    return false;
-  }
-  if (user.id === 1) {
-    return true;
-  }
-  // A Jellyfin or Emby account must still exist there, and not be switched
-  // off: a passkey is no way around the server's own decision.
-  if (!user.jellyfinUserId || !settings.jellyfin.apiKey) {
-    return false;
-  }
-  const account = await new JellyfinAPI(
-    getHostname(),
-    settings.jellyfin.apiKey
-  ).getAccount(user.jellyfinUserId);
-  return !!account && !account.Policy?.IsDisabled;
-};
 
 passkeyRoutes.post('/login', async (req, res, next) => {
   const body = req.body as { response?: AuthenticationResponseJSON };
@@ -342,7 +288,7 @@ passkeyRoutes.post('/login', async (req, res, next) => {
       return next(refused);
     }
 
-    if (!(await maySignIn(passkey.user))) {
+    if (!(await maySignIn(passkey.user, 'passkey'))) {
       logger.warn('Passkey sign-in by someone no longer allowed to sign in', {
         label: 'Auth',
         ip: req.ip,

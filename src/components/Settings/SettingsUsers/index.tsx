@@ -43,6 +43,13 @@ const messages = defineMessages('components.Settings.SettingsUsers', {
   tvRequestLimitLabel: 'Global Series Request Limit',
   defaultPermissions: 'Default Permissions',
   defaultPermissionsTip: 'Initial permissions assigned to new users',
+  defaultWatchlistSync: 'Watchlist Sync for New Users',
+  defaultWatchlistSyncTip:
+    'Whether new users start with their Plex or Trakt watchlist requested automatically. Existing users keep their own choice, and anyone can change theirs in their profile. Requests are only made for users with an Auto-Request permission',
+  defaultWatchlistSyncMovies: 'Movies',
+  defaultWatchlistSyncMoviesTip: 'Request movies added to their watchlist',
+  defaultWatchlistSyncTv: 'Series',
+  defaultWatchlistSyncTvTip: 'Request series added to their watchlist',
   disabledMediaServerLoginWarning:
     'Some users may not have a {applicationTitle} password set. Disabling {mediaServerName} sign-in could lock them out. Affected users will need to set a password from their profile or via a password reset link.',
 });
@@ -119,6 +126,9 @@ const SettingsUsers = () => {
             tvQuotaLimit: data?.defaultQuotas.tv.quotaLimit ?? 0,
             tvQuotaDays: data?.defaultQuotas.tv.quotaDays ?? 7,
             defaultPermissions: data?.defaultPermissions ?? 0,
+            defaultWatchlistSyncMovies:
+              data?.defaultWatchlistSyncMovies ?? false,
+            defaultWatchlistSyncTv: data?.defaultWatchlistSyncTv ?? false,
           }}
           validationSchema={schema}
           enableReinitialize
@@ -140,6 +150,8 @@ const SettingsUsers = () => {
                   },
                 },
                 defaultPermissions: values.defaultPermissions,
+                defaultWatchlistSyncMovies: values.defaultWatchlistSyncMovies,
+                defaultWatchlistSyncTv: values.defaultWatchlistSyncTv,
               });
               mutate('/api/v1/settings/public');
 
@@ -306,6 +318,53 @@ const SettingsUsers = () => {
                       defaultDays={values.tvQuotaDays}
                       defaultLimit={values.tvQuotaLimit}
                     />
+                  </div>
+                </div>
+                <div
+                  role="group"
+                  aria-labelledby="watchlist-sync-label"
+                  className="form-group"
+                >
+                  <div className="form-row">
+                    <span id="watchlist-sync-label" className="group-label">
+                      {intl.formatMessage(messages.defaultWatchlistSync)}
+                      <span className="label-tip">
+                        {intl.formatMessage(messages.defaultWatchlistSyncTip)}
+                      </span>
+                    </span>
+                    <div className="form-input-area max-w-lg">
+                      <LabeledCheckbox
+                        id="defaultWatchlistSyncMovies"
+                        label={intl.formatMessage(
+                          messages.defaultWatchlistSyncMovies
+                        )}
+                        description={intl.formatMessage(
+                          messages.defaultWatchlistSyncMoviesTip
+                        )}
+                        onChange={() =>
+                          setFieldValue(
+                            'defaultWatchlistSyncMovies',
+                            !values.defaultWatchlistSyncMovies
+                          )
+                        }
+                      />
+                      <LabeledCheckbox
+                        id="defaultWatchlistSyncTv"
+                        className="mt-4"
+                        label={intl.formatMessage(
+                          messages.defaultWatchlistSyncTv
+                        )}
+                        description={intl.formatMessage(
+                          messages.defaultWatchlistSyncTvTip
+                        )}
+                        onChange={() =>
+                          setFieldValue(
+                            'defaultWatchlistSyncTv',
+                            !values.defaultWatchlistSyncTv
+                          )
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
                 <div

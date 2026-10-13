@@ -1,10 +1,10 @@
 import TheMovieDb from '@server/api/themoviedb';
-import { IssueType, IssueTypeName } from '@server/constants/issue';
 import { MediaType } from '@server/constants/media';
 import IssueComment from '@server/entity/IssueComment';
 import Media from '@server/entity/Media';
 import { User } from '@server/entity/User';
 import notificationManager, { Notification } from '@server/lib/notifications';
+import { issueEvent } from '@server/lib/notifications/eventTitles';
 import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
 import { sortBy } from 'lodash';
@@ -66,11 +66,7 @@ export class IssueCommentSubscriber implements EntitySubscriberInterface<IssueCo
       if (entity.id !== firstComment.id) {
         // Send notifications to all issue managers
         notificationManager.sendNotification(Notification.ISSUE_COMMENT, {
-          event: `New Comment on ${
-            issue.issueType !== IssueType.OTHER
-              ? `${IssueTypeName[issue.issueType]} `
-              : ''
-          }Issue`,
+          ...issueEvent(Notification.ISSUE_COMMENT, issue.issueType),
           subject: title,
           message: firstComment.message,
           comment: entity,

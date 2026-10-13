@@ -27,6 +27,13 @@ We went through all of Seerr AI looking for things that could go wrong, and fixe
 
 Plus many smaller fixes to the admin agent, AI Search, the job schedule, Health and Settings. Everything you set up before keeps working as it did.
 
+### New people, imports and notifications
+
+- **Watchlist sync for new people.** In **Settings → Users** you can now have new people start with their Plex or Trakt watchlist requested for them, for movies, series or both. It's off unless you turn it on, and nobody who already has an account is changed.
+- **Import Jellyfin or Emby Users** now only lists people you haven't imported yet, and each import also refreshes everyone already imported with their current name and picture, as Import Plex Users does. With nobody new to import, the button becomes **Sync**.
+- **Notification titles in your language.** Lines like "Movie Request Approved" on Discord, email, Telegram, Slack, Pushover, Pushbullet, Gotify and ntfy now follow the language of the person they go to, or the channel's or server's language for a shared channel. Webhooks still get them in English, so nothing reading them breaks.
+- **Telegram** no longer refuses a notification whose title or text has a backtick or a backslash in it.
+
 ### Trakt lists and watchlists
 
 Paste a link to a public Trakt list into a list's **Import** and its titles come straight in for you to check, no title-by-title matching. And if you keep a Trakt watchlist, add your Trakt username in your profile settings: what you put on it gets requested for you, just like a Plex watchlist, on Plex, Jellyfin or Emby alike. An admin turns this on once in **Settings → Services → Trakt**.

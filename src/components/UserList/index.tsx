@@ -681,9 +681,7 @@ const UserList = () => {
               setShowImportModal(false);
               revalidate();
             }}
-          >
-            {data.pageInfo.results}
-          </JellyfinImportModal>
+          />
         )}
       </Transition>
 

@@ -488,6 +488,39 @@ describe('POST /auth/jellyfin/quickconnect/authenticate', () => {
     assert.strictEqual(meRes.status, 200);
   });
 
+  it('starts a new user with watchlist sync as admins chose', async () => {
+    const settings = getSettings();
+    settings.main.newPlexLogin = true;
+    settings.main.defaultWatchlistSyncMovies = true;
+    settings.main.defaultWatchlistSyncTv = true;
+
+    authenticateQCMock.mock.mockImplementation(async () => ({
+      User: {
+        Id: 'jf-watchlist-user',
+        Name: 'watchlistuser',
+        ServerId: 'server-1',
+        Policy: { IsAdministrator: false },
+      },
+      AccessToken: 'watchlist-token',
+    }));
+
+    try {
+      const res = await request(app)
+        .post('/auth/jellyfin/quickconnect/authenticate')
+        .send({ secret: 'abc123def456abc123def456' });
+      assert.strictEqual(res.status, 200);
+    } finally {
+      settings.main.defaultWatchlistSyncMovies = false;
+      settings.main.defaultWatchlistSyncTv = false;
+    }
+
+    const user = await getRepository(User).findOneOrFail({
+      where: { jellyfinUserId: 'jf-watchlist-user' },
+    });
+    assert.strictEqual(user.settings?.watchlistSyncMovies, true);
+    assert.strictEqual(user.settings?.watchlistSyncTv, true);
+  });
+
   it('returns 403 when the media server is Emby', async () => {
     getSettings().main.mediaServerType = MediaServerType.EMBY;
 

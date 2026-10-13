@@ -30,6 +30,7 @@ import backfill, { requestedSince } from '@server/lib/backfill/engine';
 import backfillNotices from '@server/lib/backfill/notices';
 import { recordMediaEvent } from '@server/lib/mediaHistory';
 import notificationManager, { Notification } from '@server/lib/notifications';
+import { adminAgentEvent } from '@server/lib/notifications/eventTitles';
 import { owner } from '@server/lib/owner';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
@@ -1406,7 +1407,7 @@ class Agent {
     if (run.status === 'waiting') {
       const proposal = proposalOf(run);
       notificationManager.sendNotification(Notification.BACKFILL, {
-        event: 'Admin agent',
+        ...adminAgentEvent(),
         notifyAdmin: true,
         notifySystem: true,
         subject: proposal

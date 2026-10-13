@@ -582,6 +582,14 @@ components:
         defaultPermissions:
           type: number
           example: 32
+        defaultWatchlistSyncMovies:
+          type: boolean
+          example: false
+          description: Whether new accounts start with watchlist sync on for movies. Existing accounts keep their own choice.
+        defaultWatchlistSyncTv:
+          type: boolean
+          example: false
+          description: Whether new accounts start with watchlist sync on for series. Existing accounts keep their own choice.
         enableSpecialEpisodes:
           type: boolean
           example: false
@@ -3217,7 +3225,7 @@ paths:
   /settings/jellyfin/users:
     get:
       summary: Get Jellyfin Users
-      description: Returns a list of Jellyfin Users in a JSON array.
+      description: Returns the Jellyfin or Emby users not yet imported, sorted by name, in a JSON array.
       tags:
         - settings
         - users
@@ -7599,18 +7607,23 @@ paths:
                     type: string
       responses:
         '201':
-          description: A list of the newly created users
+          description: The newly created users, and how many people already imported were refreshed
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/User'
+                type: object
+                properties:
+                  createdUsers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  refreshedUsers:
+                    type: number
   /user/import-from-jellyfin:
     post:
       summary: Import all users from Jellyfin
       description: |
-        Fetches and imports users from the Jellyfin server.
+        Fetches and imports users from the Jellyfin or Emby server. People already imported are refreshed (their name and picture from the server). If a list of Jellyfin user IDs is provided in the request body, only those of them not yet imported are created; otherwise everyone not yet imported is.
 
         Requires the `MANAGE_USERS` permission.
       tags:
@@ -7628,13 +7641,18 @@ paths:
                     type: string
       responses:
         '201':
-          description: A list of the newly created users
+          description: The newly created users, and how many people already imported were refreshed
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/User'
+                type: object
+                properties:
+                  createdUsers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  refreshedUsers:
+                    type: number
   /user/registerPushSubscription:
     post:
       summary: Register a web push /user/registerPushSubscription

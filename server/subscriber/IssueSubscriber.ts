@@ -1,8 +1,9 @@
 import TheMovieDb from '@server/api/themoviedb';
-import { IssueStatus, IssueType, IssueTypeName } from '@server/constants/issue';
+import { IssueStatus } from '@server/constants/issue';
 import { MediaType } from '@server/constants/media';
 import Issue from '@server/entity/Issue';
 import notificationManager, { Notification } from '@server/lib/notifications';
+import { issueEvent } from '@server/lib/notifications/eventTitles';
 import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
 import { sortBy } from 'lodash';
@@ -59,24 +60,7 @@ export class IssueSubscriber implements EntitySubscriberInterface<Issue> {
       }
 
       notificationManager.sendNotification(type, {
-        event:
-          type === Notification.ISSUE_CREATED
-            ? `New ${
-                entity.issueType !== IssueType.OTHER
-                  ? `${IssueTypeName[entity.issueType]} `
-                  : ''
-              }Issue Reported`
-            : type === Notification.ISSUE_RESOLVED
-              ? `${
-                  entity.issueType !== IssueType.OTHER
-                    ? `${IssueTypeName[entity.issueType]} `
-                    : ''
-                }Issue Resolved`
-              : `${
-                  entity.issueType !== IssueType.OTHER
-                    ? `${IssueTypeName[entity.issueType]} `
-                    : ''
-                }Issue Reopened`,
+        ...issueEvent(type, entity.issueType),
         subject: title,
         message: firstComment.message,
         issue: entity,

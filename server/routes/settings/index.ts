@@ -26,6 +26,7 @@ import {
   searchableStuckTitles,
 } from '@server/lib/health';
 import ImageProxy, { imageConversionAvailable } from '@server/lib/imageproxy';
+import { linkedJellyfinUsers } from '@server/lib/jellyfinUsers';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
 import { Permission } from '@server/lib/permissions';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
@@ -43,6 +44,7 @@ import { appDataPath } from '@server/utils/appDataVolume';
 import { getAppVersion } from '@server/utils/appVersion';
 import { dnsCache } from '@server/utils/dnsCache';
 import { getHostname } from '@server/utils/getHostname';
+import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 import type { DnsEntries, DnsStats } from 'dns-caching';
 import { Router } from 'express';
 import fs from 'fs';
@@ -538,14 +540,20 @@ settingsRoutes.get('/jellyfin/users', async (req, res) => {
 
   jellyfinClient.setUserId(admin.jellyfinUserId ?? '');
   const resp = await jellyfinClient.getUsers();
-  const users = resp.users.map((user) => ({
-    username: user.Name,
-    id: user.Id,
-    thumb: `/avatarproxy/${user.Id}`,
-    email: user.Name,
-  }));
 
-  return res.status(200).json(users);
+  // People already imported are left out, as on Import Plex Users: they
+  // are refreshed on every import instead.
+  const linked = await linkedJellyfinUsers(resp.users.map((user) => user.Id));
+  const users = resp.users
+    .filter((user) => !linked.has(normalizeJellyfinGuid(user.Id) ?? ''))
+    .map((user) => ({
+      username: user.Name,
+      id: user.Id,
+      thumb: `/avatarproxy/${user.Id}`,
+      email: user.Name,
+    }));
+
+  return res.status(200).json(sortBy(users, 'username'));
 });
 
 settingsRoutes.get('/jellyfin/sync', (_req, res) => {

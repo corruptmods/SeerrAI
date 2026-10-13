@@ -16,6 +16,8 @@ import {
   releaseDelivery,
 } from '@server/lib/notificationDelivery';
 import { Notification } from '@server/lib/notifications';
+import type { NotificationEvent } from '@server/lib/notifications/eventTitles';
+import { seriesReadyToWatchEvent } from '@server/lib/notifications/eventTitles';
 import logger from '@server/logger';
 import { In } from 'typeorm';
 
@@ -55,7 +57,7 @@ const deliverSafely = async (
   media: Media,
   type: Notification,
   episodeKey = '',
-  eventOverride?: string,
+  eventOverride?: NotificationEvent,
   extraFields?: { name: string; value: string }[]
 ): Promise<void> => {
   try {
@@ -76,7 +78,7 @@ const deliver = async (
   media: Media,
   type: Notification,
   episodeKey = '',
-  eventOverride?: string,
+  eventOverride?: NotificationEvent,
   extraFields?: { name: string; value: string }[]
 ): Promise<void> => {
   const claimed = await claimDelivery(request.id, type, 0, episodeKey);
@@ -382,7 +384,7 @@ class NotificationReconciler {
         media,
         Notification.MEDIA_AVAILABLE,
         CAUGHT_UP_CLAIM_KEY,
-        'Series Ready to Watch',
+        seriesReadyToWatchEvent(),
         [
           {
             name: 'Episodes Available',

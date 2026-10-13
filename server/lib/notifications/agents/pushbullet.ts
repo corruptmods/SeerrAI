@@ -4,6 +4,7 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
+import { eventText } from '@server/lib/notifications/eventTitles';
 import type { NotificationAgentPushbullet } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -50,9 +51,8 @@ class PushbulletAgent
     locale?: AvailableLocale
   ): PushbulletPayload {
     const intl = getIntl(locale);
-    const title = payload.event
-      ? `${payload.event} - ${payload.subject}`
-      : payload.subject;
+    const event = eventText(payload, intl);
+    const title = event ? `${event} - ${payload.subject}` : payload.subject;
     let body = payload.message ?? '';
 
     if (payload.request) {

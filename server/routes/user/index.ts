@@ -18,7 +18,9 @@ import type {
   UserResultsResponse,
   UserWatchDataResponse,
 } from '@server/interfaces/api/userInterfaces';
+import { linkedJellyfinUsers } from '@server/lib/jellyfinUsers';
 import { mayManageUser, plexAccountMayClaim } from '@server/lib/manageUser';
+import { withNewUserDefaults } from '@server/lib/newUserDefaults';
 import { Permission, hasPermission } from '@server/lib/permissions';
 import { isPushServiceEndpoint } from '@server/lib/pushEndpoint';
 import { getSettings } from '@server/lib/settings';
@@ -28,6 +30,7 @@ import {
 } from '@server/lib/userRequestCounts';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
+import { checkAvatarChanged } from '@server/routes/avatarproxy';
 import { getHostname } from '@server/utils/getHostname';
 import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 import { pageOf } from '@server/utils/pagination';
@@ -225,15 +228,17 @@ router.post(
         throw new Error('Email notifications must be enabled');
       }
 
-      const user = new User({
-        email,
-        avatar: body.avatar ?? avatar,
-        username: body.username,
-        password: body.password,
-        permissions: settings.main.defaultPermissions,
-        plexToken: '',
-        userType: UserType.LOCAL,
-      });
+      const user = withNewUserDefaults(
+        new User({
+          email,
+          avatar: body.avatar ?? avatar,
+          username: body.username,
+          password: body.password,
+          permissions: settings.main.defaultPermissions,
+          plexToken: '',
+          userType: UserType.LOCAL,
+        })
+      );
 
       if (passedExplicitPassword) {
         await user?.setPassword(body.password);
@@ -819,15 +824,17 @@ router.post(
             );
           } else if (!body || body.plexIds.includes(account.id)) {
             if (await mainPlexTv.checkUserAccess(parseInt(account.id))) {
-              const newUser = new User({
-                plexUsername: account.username,
-                email: account.email,
-                permissions: settings.main.defaultPermissions,
-                plexId: parseInt(account.id),
-                plexToken: '',
-                avatar: account.thumb,
-                userType: UserType.PLEX,
-              });
+              const newUser = withNewUserDefaults(
+                new User({
+                  plexUsername: account.username,
+                  email: account.email,
+                  permissions: settings.main.defaultPermissions,
+                  plexId: parseInt(account.id),
+                  plexToken: '',
+                  avatar: account.thumb,
+                  userType: UserType.PLEX,
+                })
+              );
               await userRepository.save(newUser);
               createdUsers.push(newUser);
             }
@@ -852,7 +859,7 @@ router.post(
     try {
       const settings = getSettings();
       const userRepository = getRepository(User);
-      const body = req.body as { jellyfinUserIds: string[] };
+      const body = req.body as { jellyfinUserIds?: string[] } | undefined;
 
       // taken from auth.ts
       const admin = await userRepository.findOneOrFail({
@@ -869,53 +876,65 @@ router.post(
       );
       jellyfinClient.setUserId(admin.jellyfinUserId ?? '');
 
-      //const jellyfinUsersResponse = await jellyfinClient.getUsers();
       const createdUsers: User[] = [];
+      let refreshedUsers = 0;
 
-      jellyfinClient.setUserId(admin.jellyfinUserId ?? '');
-      const jellyfinUsers = await jellyfinClient.getUsers();
-
-      const jellyfinUsersById = new Map(
-        jellyfinUsers.users.map((user) => [
-          normalizeJellyfinGuid(user.Id),
-          user,
-        ])
+      const jellyfinUsers = (await jellyfinClient.getUsers()).users.filter(
+        (jellyfinUser) => normalizeJellyfinGuid(jellyfinUser.Id)
       );
+      const linked = await linkedJellyfinUsers(
+        jellyfinUsers.map((jellyfinUser) => jellyfinUser.Id)
+      );
+      // With no list, everyone not yet imported is, as on Import Plex Users.
+      const chosen = body?.jellyfinUserIds
+        ? new Set(body.jellyfinUserIds.map((id) => normalizeJellyfinGuid(id)))
+        : null;
 
-      for (const rawJellyfinUserId of body.jellyfinUserIds) {
-        const jellyfinUserId = normalizeJellyfinGuid(rawJellyfinUserId);
-        if (!jellyfinUserId) {
-          continue;
-        }
+      for (const jellyfinUser of jellyfinUsers) {
+        const jellyfinUserId = normalizeJellyfinGuid(jellyfinUser.Id)!;
+        const user = linked.get(jellyfinUserId);
 
-        const jellyfinUser = jellyfinUsersById.get(jellyfinUserId);
-
-        const user = await userRepository.findOne({
-          select: ['id', 'jellyfinUserId'],
-          where: { jellyfinUserId: jellyfinUserId },
-        });
-
-        if (!user) {
-          const newUser = new User({
-            jellyfinUsername: jellyfinUser?.Name,
-            jellyfinUserId: jellyfinUser?.Id,
-            jellyfinDeviceId: Buffer.from(
-              `BOT_seerr_${jellyfinUser?.Name ?? ''}`
-            ).toString('base64'),
-            email: jellyfinUser?.Name,
-            permissions: settings.main.defaultPermissions,
-            avatar: `/avatarproxy/${jellyfinUser?.Id}`,
-            userType:
-              settings.main.mediaServerType === MediaServerType.JELLYFIN
-                ? UserType.JELLYFIN
-                : UserType.EMBY,
+        if (user) {
+          // Already imported: bring what comes from Jellyfin up to date (the
+          // name, and the picture if it changed there), as Import Plex Users
+          // does. The account's own settings and permissions are left alone.
+          const { changed } = await checkAvatarChanged(user);
+          await userRepository.update(user.id, {
+            jellyfinUsername: jellyfinUser.Name,
+            ...(changed && user.avatarVersion
+              ? {
+                  avatar: `/avatarproxy/${user.jellyfinUserId}?v=${user.avatarVersion}`,
+                }
+              : {}),
           });
+          refreshedUsers += 1;
+        } else if (!chosen || chosen.has(jellyfinUserId)) {
+          const newUser = withNewUserDefaults(
+            new User({
+              jellyfinUsername: jellyfinUser.Name,
+              jellyfinUserId: jellyfinUser.Id,
+              jellyfinDeviceId: Buffer.from(
+                `BOT_seerr_${jellyfinUser.Name ?? ''}`
+              ).toString('base64'),
+              email: jellyfinUser.Name,
+              permissions: settings.main.defaultPermissions,
+              avatar: `/avatarproxy/${jellyfinUser.Id}`,
+              userType:
+                settings.main.mediaServerType === MediaServerType.JELLYFIN
+                  ? UserType.JELLYFIN
+                  : UserType.EMBY,
+            })
+          );
 
           await userRepository.save(newUser);
           createdUsers.push(newUser);
         }
       }
-      return res.status(201).json(User.filterMany(createdUsers));
+
+      return res.status(201).json({
+        createdUsers: User.filterMany(createdUsers),
+        refreshedUsers,
+      });
     } catch (e) {
       next({ status: 500, message: e.message });
     }

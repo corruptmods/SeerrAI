@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { before, describe, it, mock } from 'node:test';
 
+import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
+import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
@@ -10,7 +12,9 @@ import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
 import authRoutes from '@server/routes/auth';
+import settingsRoutes from '@server/routes/settings';
 import { setupTestDb } from '@server/test/db';
+import axios from 'axios';
 import type { Express } from 'express';
 import express from 'express';
 import session from 'express-session';
@@ -36,6 +40,7 @@ before(() => {
   app.use(checkUser);
   app.use('/auth', authRoutes);
   app.use('/user', isAuthenticated(), userRoutes);
+  app.use('/settings', isAuthenticated(Permission.ADMIN), settingsRoutes);
   app.use(
     (
       err: { status?: number; message?: string },
@@ -250,6 +255,234 @@ describe('importing Plex users', () => {
     assert.equal(after.plexId, null);
     assert.equal(after.plexUsername, null);
   });
+});
+
+describe('importing Jellyfin users', () => {
+  // Two people on the Jellyfin server: one already brought in (stored the
+  // way older imports and Emby kept ids, with dashes and capitals) who has
+  // since been renamed there, and one who is new.
+  const known = '0123456789abcdef0123456789abcdef';
+  const fresh = 'fedcba9876543210fedcba9876543210';
+
+  const withJellyfin = async (run: () => Promise<void>) => {
+    const main = getSettings().main;
+    const saved = main.mediaServerType;
+    main.mediaServerType = MediaServerType.JELLYFIN;
+    const getUsers = mock.method(
+      JellyfinAPI.prototype,
+      'getUsers',
+      async () => ({
+        users: [
+          { Id: known, Name: 'Renamed On Jellyfin' },
+          { Id: fresh, Name: 'Newcomer' },
+        ],
+      })
+    );
+    // Avatars are looked up on the Jellyfin server; there is none here.
+    const head = mock.method(axios, 'head', async () => {
+      throw new Error('no Jellyfin server in tests');
+    });
+    try {
+      await getRepository(User).save(
+        new User({
+          email: 'old-name',
+          jellyfinUsername: 'Old Name',
+          jellyfinUserId: '01234567-89AB-CDEF-0123-456789ABCDEF',
+          avatar: '',
+          permissions: Permission.REQUEST,
+          userType: UserType.JELLYFIN,
+        })
+      );
+      await run();
+    } finally {
+      getUsers.mock.restore();
+      head.mock.restore();
+      main.mediaServerType = saved;
+    }
+  };
+
+  it('refreshes people already imported and creates only those chosen', () =>
+    withJellyfin(async () => {
+      const { agent } = await loginAs('admin@seerr.dev');
+      const res = await agent
+        .post('/user/import-from-jellyfin')
+        .send({ jellyfinUserIds: [fresh] });
+
+      assert.equal(res.status, 201);
+      assert.equal(res.body.refreshedUsers, 1);
+      assert.deepEqual(
+        res.body.createdUsers.map((u: User) => u.jellyfinUsername),
+        ['Newcomer']
+      );
+
+      const users = getRepository(User);
+      const kept = await users.find({ where: { userType: UserType.JELLYFIN } });
+      assert.equal(kept.length, 2, 'the imported person was not duplicated');
+      const refreshed = kept.find((u) => u.email === 'old-name');
+      assert.equal(refreshed?.jellyfinUsername, 'Renamed On Jellyfin');
+      // The account itself is left as it was: only what comes from Jellyfin
+      // is brought up to date.
+      assert.equal(refreshed?.permissions, Permission.REQUEST);
+    }));
+
+  it('refreshes without creating anyone when nobody is chosen', () =>
+    withJellyfin(async () => {
+      const { agent } = await loginAs('admin@seerr.dev');
+      const res = await agent
+        .post('/user/import-from-jellyfin')
+        .send({ jellyfinUserIds: [] });
+
+      assert.equal(res.status, 201);
+      assert.equal(res.body.refreshedUsers, 1);
+      assert.deepEqual(res.body.createdUsers, []);
+    }));
+
+  it('offers only the people not yet imported', () =>
+    withJellyfin(async () => {
+      const { agent } = await loginAs('admin@seerr.dev');
+      const res = await agent.get('/settings/jellyfin/users');
+
+      assert.equal(res.status, 200);
+      assert.deepEqual(
+        res.body.map((u: { id: string }) => u.id),
+        [fresh]
+      );
+    }));
+});
+
+describe('watchlist sync for new people', () => {
+  const syncOf = async (where: { email?: string; jellyfinUserId?: string }) => {
+    const user = await getRepository(User).findOneOrFail({ where });
+    return [
+      !!user.settings?.watchlistSyncMovies,
+      !!user.settings?.watchlistSyncTv,
+    ];
+  };
+
+  const withDefaults = async (
+    movies: boolean,
+    tv: boolean,
+    run: () => Promise<void>
+  ) => {
+    const main = getSettings().main;
+    main.defaultWatchlistSyncMovies = movies;
+    main.defaultWatchlistSyncTv = tv;
+    try {
+      await run();
+    } finally {
+      main.defaultWatchlistSyncMovies = false;
+      main.defaultWatchlistSyncTv = false;
+    }
+  };
+
+  it('starts someone an admin creates as admins chose', () =>
+    withDefaults(true, false, async () => {
+      const { agent } = await loginAs('admin@seerr.dev');
+      const res = await agent.post('/user').send({
+        email: 'made@seerr.dev',
+        username: 'made',
+        password: 'test1234',
+      });
+      assert.equal(res.status, 201);
+      assert.deepEqual(await syncOf({ email: 'made@seerr.dev' }), [
+        true,
+        false,
+      ]);
+    }));
+
+  it('leaves it off, as before, unless admins chose otherwise', async () => {
+    const { agent } = await loginAs('admin@seerr.dev');
+    const res = await agent.post('/user').send({
+      email: 'plain@seerr.dev',
+      username: 'plain',
+      password: 'test1234',
+    });
+    assert.equal(res.status, 201);
+    assert.deepEqual(await syncOf({ email: 'plain@seerr.dev' }), [
+      false,
+      false,
+    ]);
+  });
+
+  it('starts people imported from Plex as admins chose, and leaves others be', () =>
+    withDefaults(false, true, async () => {
+      const users = getRepository(User);
+      // The seeded friend shares the owner's Plex id; give them their own,
+      // so the import refreshes them as someone already here.
+      const friend = await users.findOneByOrFail({ email: 'friend@seerr.dev' });
+      await users.update(friend.id, { plexId: 9200 });
+      const getUsers = mock.method(
+        PlexTvAPI.prototype,
+        'getUsers',
+        async () => ({
+          MediaContainer: {
+            User: [
+              {
+                $: {
+                  id: '9100',
+                  title: 'new',
+                  username: 'newplex',
+                  email: 'newplex@seerr.dev',
+                  thumb: 'https://plex.tv/thumb',
+                },
+                Server: [],
+              },
+              {
+                $: {
+                  id: '9200',
+                  title: 'friend',
+                  username: 'friend',
+                  email: 'friend@seerr.dev',
+                  thumb: 'https://plex.tv/thumb',
+                },
+                Server: [],
+              },
+            ],
+          },
+        })
+      );
+      try {
+        const { agent } = await loginAs('admin@seerr.dev');
+        const res = await agent.post('/user/import-from-plex').send();
+        assert.equal(res.status, 201);
+      } finally {
+        getUsers.mock.restore();
+      }
+      assert.deepEqual(await syncOf({ email: 'newplex@seerr.dev' }), [
+        false,
+        true,
+      ]);
+      assert.deepEqual(await syncOf({ email: 'friend@seerr.dev' }), [
+        false,
+        false,
+      ]);
+    }));
+
+  it('starts people imported from Jellyfin as admins chose', () =>
+    withDefaults(true, true, async () => {
+      const id = 'abcdefabcdefabcdefabcdefabcdef12';
+      const main = getSettings().main;
+      const saved = main.mediaServerType;
+      main.mediaServerType = MediaServerType.JELLYFIN;
+      const getUsers = mock.method(
+        JellyfinAPI.prototype,
+        'getUsers',
+        async () => ({
+          users: [{ Id: id, Name: 'Jelly' }],
+        })
+      );
+      try {
+        const { agent } = await loginAs('admin@seerr.dev');
+        const res = await agent
+          .post('/user/import-from-jellyfin')
+          .send({ jellyfinUserIds: [id] });
+        assert.equal(res.status, 201);
+      } finally {
+        getUsers.mock.restore();
+        main.mediaServerType = saved;
+      }
+      assert.deepEqual(await syncOf({ jellyfinUserId: id }), [true, true]);
+    }));
 });
 
 describe('a name to show for someone', () => {

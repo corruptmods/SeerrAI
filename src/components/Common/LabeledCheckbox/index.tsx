@@ -25,7 +25,8 @@ const LabeledCheckbox: React.FC<LabeledCheckboxProps> = ({
           <Field type="checkbox" id={id} name={id} onChange={onChange} />
         </div>
         <div className="ml-3 text-sm leading-6">
-          <label htmlFor="localLogin" className="block" aria-label={label}>
+          {/* Each label is for its own box; they all used to toggle Local Sign-In. */}
+          <label htmlFor={id} className="block" aria-label={label}>
             <div className="flex flex-col">
               <span className="font-medium text-white">{label}</span>
               <span className="font-normal text-gray-400">{description}</span>

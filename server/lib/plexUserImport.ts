@@ -4,6 +4,7 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import RemovedPlexAccount from '@server/entity/RemovedPlexAccount';
 import { User } from '@server/entity/User';
+import { withNewUserDefaults } from '@server/lib/newUserDefaults';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 
@@ -73,15 +74,17 @@ class PlexUserImport {
         }
 
         const user = await repository.save(
-          new User({
-            plexUsername: account.username,
-            email: account.email,
-            permissions: settings.main.defaultPermissions,
-            plexId: parseInt(account.id),
-            plexToken: '',
-            avatar: account.thumb,
-            userType: UserType.PLEX,
-          })
+          withNewUserDefaults(
+            new User({
+              plexUsername: account.username,
+              email: account.email,
+              permissions: settings.main.defaultPermissions,
+              plexId: parseInt(account.id),
+              plexToken: '',
+              avatar: account.thumb,
+              userType: UserType.PLEX,
+            })
+          )
         );
         created.push(user);
         logger.info('Imported a new Plex user', {

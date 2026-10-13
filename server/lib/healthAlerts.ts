@@ -1,6 +1,7 @@
 import type { HealthCheck } from '@server/lib/health';
 import { serviceChecks } from '@server/lib/health';
 import notificationManager, { Notification } from '@server/lib/notifications';
+import { healthEvent } from '@server/lib/notifications/eventTitles';
 import logger from '@server/logger';
 
 /*
@@ -122,7 +123,7 @@ class HealthAlerts {
     const more = problems.length - NAMED;
     try {
       notificationManager.sendNotification(Notification.HEALTH, {
-        event: 'Health',
+        ...healthEvent(),
         notifyAdmin: true,
         notifySystem: true,
         subject:

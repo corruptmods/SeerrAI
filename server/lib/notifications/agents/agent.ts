@@ -3,11 +3,17 @@ import type IssueComment from '@server/entity/IssueComment';
 import type Media from '@server/entity/Media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
+import type { EventTitle } from '@server/lib/notifications/eventTitles';
 import type { NotificationAgentConfig } from '@server/lib/settings';
 import type { Notification } from '..';
 
 export interface NotificationPayload {
+  /**
+   * The line above the title, in English. Webhooks are sent this; the other
+   * channels show `eventTitle` in their own language when there is one.
+   */
   event?: string;
+  eventTitle?: EventTitle;
   subject: string;
   notifySystem: boolean;
   notifyAdmin: boolean;

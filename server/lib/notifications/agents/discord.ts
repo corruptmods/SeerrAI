@@ -7,6 +7,7 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
+import { eventText } from '@server/lib/notifications/eventTitles';
 import type { NotificationAgentDiscord } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -212,10 +213,10 @@ class DiscordAgent
             : undefined
       : undefined;
 
+    const event = eventText(payload, intl);
+
     return {
-      title: payload.event
-        ? `${payload.event}: ${payload.subject}`
-        : payload.subject,
+      title: event ? `${event}: ${payload.subject}` : payload.subject,
       url,
       description: payload.message,
       color,

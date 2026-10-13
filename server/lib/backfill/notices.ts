@@ -1,5 +1,6 @@
 import notificationManager, { Notification } from '@server/lib/notifications';
 import type { NotificationPayload } from '@server/lib/notifications/agents/agent';
+import { backfillEvent } from '@server/lib/notifications/eventTitles';
 import logger from '@server/logger';
 
 /*
@@ -82,7 +83,7 @@ const byKind = (notices: Notice[]) => {
 export const summarize = (notices: Notice[]): NotificationPayload => {
   const titles = [...new Set(notices.map((n) => n.seriesId))];
   const base = {
-    event: 'Backfill',
+    ...backfillEvent(),
     notifyAdmin: true,
     notifySystem: true,
   };

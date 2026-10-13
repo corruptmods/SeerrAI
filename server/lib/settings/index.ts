@@ -409,6 +409,13 @@ export interface MainSettings {
    */
   imageCacheMaxMb?: number;
   defaultPermissions: number;
+  /**
+   * Whether people get watchlist sync (requesting what is on their Plex or
+   * Trakt watchlist) turned on for movies and for series when their account
+   * is made. Existing accounts keep their own choice.
+   */
+  defaultWatchlistSyncMovies: boolean;
+  defaultWatchlistSyncTv: boolean;
   defaultQuotas: {
     movie: Quota;
     tv: Quota;
@@ -724,6 +731,8 @@ class Settings {
         cacheImages: false,
         imageCacheMaxMb: DEFAULT_IMAGE_CACHE_MAX_MB,
         defaultPermissions: Permission.REQUEST,
+        defaultWatchlistSyncMovies: false,
+        defaultWatchlistSyncTv: false,
         defaultQuotas: {
           movie: {},
           tv: {},

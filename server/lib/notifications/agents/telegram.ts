@@ -4,6 +4,7 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
+import { eventText } from '@server/lib/notifications/eventTitles';
 import type { NotificationAgentTelegram } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -60,8 +61,20 @@ class TelegramAgent
     return false;
   }
 
+  /**
+   * Escapes text for Telegram's MarkdownV2, which refuses a whole message
+   * over any of these characters left bare. The backslash is escaped in the
+   * same single pass as the rest, so text is never escaped twice.
+   */
   private escapeText(text: string | undefined): string {
-    return text ? text.replace(/[_*[\]()~>#+=|{}.!-]/gi, (x) => '\\' + x) : '';
+    return text
+      ? text.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, (x) => '\\' + x)
+      : '';
+  }
+
+  /** A link's address only needs its closing bracket and backslash escaped. */
+  private escapeUrl(url: string): string {
+    return url.replace(/[)\\]/g, (x) => '\\' + x);
   }
 
   private getNotificationPayload(
@@ -74,9 +87,11 @@ class TelegramAgent
     const { applicationUrl, applicationTitle } = settings.main;
     const { embedPoster } = settings.notifications.agents.telegram;
 
+    const event = eventText(payload, intl);
+
     /* eslint-disable no-useless-escape */
     let message = `\*${this.escapeText(
-      payload.event ? `${payload.event} - ${payload.subject}` : payload.subject
+      event ? `${event} - ${payload.subject}` : payload.subject
     )}\*`;
     if (payload.message) {
       message += `\n${this.escapeText(payload.message)}`;
@@ -141,7 +156,9 @@ class TelegramAgent
     }
 
     for (const extra of payload.extra ?? []) {
-      message += `\n\*${extra.name}:\* ${extra.value}`;
+      message += `\n\*${this.escapeText(extra.name)}:\* ${this.escapeText(
+        extra.value
+      )}`;
     }
 
     const url = applicationUrl
@@ -164,7 +181,7 @@ class TelegramAgent
                 : globalMessages.viewMedia,
               { applicationTitle }
             )
-      )}\]\(${url}\)`;
+      )}\]\(${this.escapeUrl(url)}\)`;
     }
     /* eslint-enable */
 

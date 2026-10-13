@@ -7,6 +7,7 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { startJobs } from '@server/job/schedule';
 import { plexAccountMayClaim } from '@server/lib/manageUser';
+import { withNewUserDefaults } from '@server/lib/newUserDefaults';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import { endSessions, maySignIn, startSession } from '@server/lib/signIn';
@@ -133,15 +134,17 @@ authRoutes.post('/plex', async (req, res, next) => {
           .getOne();
 
     if (!user && !(await userRepository.count())) {
-      user = new User({
-        email: account.email,
-        plexUsername: account.username,
-        plexId: account.id,
-        plexToken: account.authToken,
-        permissions: Permission.ADMIN,
-        avatar: account.thumb,
-        userType: UserType.PLEX,
-      });
+      user = withNewUserDefaults(
+        new User({
+          email: account.email,
+          plexUsername: account.username,
+          plexId: account.id,
+          plexToken: account.authToken,
+          permissions: Permission.ADMIN,
+          avatar: account.thumb,
+          userType: UserType.PLEX,
+        })
+      );
 
       settings.main.mediaServerType = MediaServerType.PLEX;
       await settings.save();
@@ -245,15 +248,17 @@ authRoutes.post('/plex', async (req, res, next) => {
               plexUsername: account.username,
             }
           );
-          user = new User({
-            email: account.email,
-            plexUsername: account.username,
-            plexId: account.id,
-            plexToken: account.authToken,
-            permissions: settings.main.defaultPermissions,
-            avatar: account.thumb,
-            userType: UserType.PLEX,
-          });
+          user = withNewUserDefaults(
+            new User({
+              email: account.email,
+              plexUsername: account.username,
+              plexId: account.id,
+              plexToken: account.authToken,
+              permissions: settings.main.defaultPermissions,
+              avatar: account.thumb,
+              userType: UserType.PLEX,
+            })
+          );
 
           await userRepository.save(user);
         }
@@ -419,19 +424,21 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
         // User doesn't exist, and there are no users in the database, we'll create the user
         // with admin permissions
 
-        user = new User({
-          id: 1,
-          email: body.email || account.User.Name,
-          jellyfinUsername: account.User.Name,
-          jellyfinUserId: account.User.Id,
-          jellyfinDeviceId: deviceId,
-          jellyfinAuthToken: account.AccessToken,
-          permissions: Permission.ADMIN,
-          userType:
-            body.serverType === MediaServerType.JELLYFIN
-              ? UserType.JELLYFIN
-              : UserType.EMBY,
-        });
+        user = withNewUserDefaults(
+          new User({
+            id: 1,
+            email: body.email || account.User.Name,
+            jellyfinUsername: account.User.Name,
+            jellyfinUserId: account.User.Id,
+            jellyfinDeviceId: deviceId,
+            jellyfinAuthToken: account.AccessToken,
+            permissions: Permission.ADMIN,
+            userType:
+              body.serverType === MediaServerType.JELLYFIN
+                ? UserType.JELLYFIN
+                : UserType.EMBY,
+          })
+        );
         user.avatar = getUserAvatarUrl(user);
 
         await userRepository.save(user);
@@ -538,17 +545,19 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
         }
       );
 
-      user = new User({
-        email: body.email,
-        jellyfinUsername: account.User.Name,
-        jellyfinUserId: account.User.Id,
-        jellyfinDeviceId: deviceId,
-        permissions: settings.main.defaultPermissions,
-        userType:
-          settings.main.mediaServerType === MediaServerType.JELLYFIN
-            ? UserType.JELLYFIN
-            : UserType.EMBY,
-      });
+      user = withNewUserDefaults(
+        new User({
+          email: body.email,
+          jellyfinUsername: account.User.Name,
+          jellyfinUserId: account.User.Id,
+          jellyfinDeviceId: deviceId,
+          permissions: settings.main.defaultPermissions,
+          userType:
+            settings.main.mediaServerType === MediaServerType.JELLYFIN
+              ? UserType.JELLYFIN
+              : UserType.EMBY,
+        })
+      );
       user.avatar = getUserAvatarUrl(user);
 
       //initialize Jellyfin/Emby users with local login
@@ -874,14 +883,16 @@ authRoutes.post(
           }
         );
 
-        user = new User({
-          email: account.User.Name,
-          jellyfinUsername: account.User.Name,
-          jellyfinUserId: account.User.Id,
-          jellyfinDeviceId: deviceId,
-          permissions: settings.main.defaultPermissions,
-          userType: UserType.JELLYFIN,
-        });
+        user = withNewUserDefaults(
+          new User({
+            email: account.User.Name,
+            jellyfinUsername: account.User.Name,
+            jellyfinUserId: account.User.Id,
+            jellyfinDeviceId: deviceId,
+            permissions: settings.main.defaultPermissions,
+            userType: UserType.JELLYFIN,
+          })
+        );
         user.avatar = getUserAvatarUrl(user);
         await userRepository.save(user);
       }

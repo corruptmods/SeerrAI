@@ -47,6 +47,8 @@ beforeEach(async () => {
   settings.main.autoImportPlexUsers = true;
   settings.main.mediaServerType = MediaServerType.PLEX;
   settings.main.defaultPermissions = Permission.REQUEST;
+  settings.main.defaultWatchlistSyncMovies = false;
+  settings.main.defaultWatchlistSyncTv = false;
   settings.plex.machineId = MACHINE;
   await getRepository(User).update({ id: 1 }, { plexToken: 'owner-token' });
 
@@ -87,6 +89,33 @@ describe('Plex user auto-import', () => {
     assert.equal(after?.avatar, before?.avatar);
     assert.equal(after?.userType, before?.userType);
     assert.equal(after?.permissions, before?.permissions);
+  });
+
+  it('starts new people with watchlist sync as admins chose', async () => {
+    const main = getSettings().main;
+    main.defaultWatchlistSyncMovies = true;
+    main.defaultWatchlistSyncTv = true;
+    const before = await byEmail('friend@seerr.dev');
+
+    await plexUserImport.run();
+
+    const user = await byEmail('new@example.com');
+    assert.equal(user?.settings?.watchlistSyncMovies, true);
+    assert.equal(user?.settings?.watchlistSyncTv, true);
+    // Someone already here keeps their own choice.
+    const after = await byEmail('friend@seerr.dev');
+    assert.equal(
+      !!after?.settings?.watchlistSyncMovies,
+      !!before?.settings?.watchlistSyncMovies
+    );
+  });
+
+  it('leaves watchlist sync off for new people unless admins chose it', async () => {
+    await plexUserImport.run();
+
+    const user = await byEmail('new@example.com');
+    assert.ok(!user?.settings?.watchlistSyncMovies);
+    assert.ok(!user?.settings?.watchlistSyncTv);
   });
 
   it('adds nobody twice', async () => {

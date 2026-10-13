@@ -22,6 +22,7 @@ import {
 } from '@server/lib/notificationDelivery';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import type { NotificationPayload } from '@server/lib/notifications/agents/agent';
+import { requestAvailableEvent } from '@server/lib/notifications/eventTitles';
 import { radarrRouting } from '@server/lib/radarrRouting';
 import { markUndispatchable } from '@server/lib/requestDispatch';
 import { resolveSeasonMonitorTarget } from '@server/lib/seasonMonitorTarget';
@@ -340,7 +341,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       });
 
       const moviePayload: NotificationPayload = {
-        event: `${entity.is4k ? '4K ' : ''}Movie Request Now Available`,
+        ...requestAvailableEvent(MediaType.MOVIE, entity.is4k),
         notifyAdmin: false,
         notifySystem: true,
         notifyUser: entity.requesterMuted ? undefined : entity.requestedBy,
@@ -432,7 +433,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       const tv = await tmdb.getTvShow({ tvId: entity.media.tmdbId });
 
       const seriesPayload: NotificationPayload = {
-        event: `${entity.is4k ? '4K ' : ''}Series Request Now Available`,
+        ...requestAvailableEvent(MediaType.TV, entity.is4k),
         subject: `${tv.name}${
           tv.first_air_date ? ` (${tv.first_air_date.slice(0, 4)})` : ''
         }`,

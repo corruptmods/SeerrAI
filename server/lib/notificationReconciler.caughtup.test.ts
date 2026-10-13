@@ -202,7 +202,12 @@ describe('series caught-up notifications', () => {
     assert.equal(ready.length, 2, 'the requester, then the watcher');
     const [, toWatcher] = ready;
     assert.equal(toWatcher[0].requestedBy.id, request.requestedBy.id);
-    assert.equal(toWatcher[3], 'Series Ready to Watch');
+    const event = toWatcher[3];
+    assert.equal(
+      typeof event === 'string' ? event : event?.event,
+      'Series Ready to Watch'
+    );
+    assert.deepEqual(toWatcher[3], ready[0][3]);
     assert.deepEqual(toWatcher[4], ready[0][4]);
     // Sent to the watcher alone, not dressed up as their own request.
     assert.equal(toWatcher[5]?.id, watcher.id);

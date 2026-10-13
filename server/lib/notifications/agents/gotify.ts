@@ -1,6 +1,7 @@
 import { IssueStatus, IssueTypeName } from '@server/constants/issue';
 import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
+import { eventText } from '@server/lib/notifications/eventTitles';
 import type { NotificationAgentGotify } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -55,9 +56,8 @@ class GotifyAgent
     const embedPoster = settings.embedPoster;
     const priority = settings.options.priority ?? 1;
 
-    const title = payload.event
-      ? `${payload.event} - ${payload.subject}`
-      : payload.subject;
+    const event = eventText(payload, intl);
+    const title = event ? `${event} - ${payload.subject}` : payload.subject;
 
     let message = payload.message ? `${payload.message}  \n\n` : '';
 

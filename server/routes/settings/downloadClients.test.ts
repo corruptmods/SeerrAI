@@ -85,7 +85,13 @@ before(async () => {
 after(() => servers.forEach((server) => server.close()));
 
 beforeEach(() => {
-  getSettings().downloadClients = [];
+  const settings = getSettings();
+  settings.downloadClients = [];
+  settings.backfill = {
+    ...settings.backfill,
+    torrentClientId: null,
+    usenetClientId: null,
+  };
 });
 
 const call = <T = Record<string, unknown>>(
@@ -167,12 +173,77 @@ describe('download clients in settings', () => {
     assert.deepEqual([saved.name, saved.apiKey], ['Usenet', 'the-key']);
   });
 
+  it('does not send a saved key or password to a different address', async () => {
+    const added = await call('POST', '', sab('the-key'));
+    const id = Number(added.body.id);
+
+    const moved = await call('POST', '/test', {
+      ...sab(''),
+      id,
+      hostname: 'localhost',
+    });
+    assert.equal(moved.status, 400, 'the saved key stays with its address');
+    const saved = await call('PUT', `/${id}`, {
+      ...sab(''),
+      hostname: 'localhost',
+    });
+    assert.equal(saved.status, 400);
+    assert.equal(getSettings().downloadClients[0].hostname, '127.0.0.1');
+
+    const nzbget = await call('POST', '', {
+      name: 'NZBGet',
+      type: 'nzbget',
+      hostname: '127.0.0.1',
+      port: nzbgetPort,
+      username: 'nzbget',
+      password: 'pw',
+    });
+    assert.equal(nzbget.status, 201);
+    const elsewhere = await call('POST', '/test', {
+      name: 'NZBGet',
+      type: 'nzbget',
+      id: nzbget.body.id,
+      hostname: 'localhost',
+      port: nzbgetPort,
+      username: 'nzbget',
+      password: '',
+    });
+    assert.deepEqual(
+      [elsewhere.status, elsewhere.body.message],
+      [400, 'NZBGet did not accept the username or password.']
+    );
+  });
+
   it('removes a client', async () => {
     const added = await call('POST', '', sab('the-key'));
     const removed = await call('DELETE', `/${added.body.id}`);
     assert.equal(removed.status, 200);
     assert.equal(getSettings().downloadClients.length, 0);
     assert.equal((await call('DELETE', `/${added.body.id}`)).status, 404);
+  });
+
+  it("never gives a new client a removed one's id", async () => {
+    await call('POST', '', sab('the-key'));
+    const second = await call('POST', '', { ...sab('the-key'), name: 'Two' });
+    const id = Number(second.body.id);
+    await call('DELETE', `/${id}`);
+    const third = await call('POST', '', { ...sab('the-key'), name: 'Three' });
+    assert.deepEqual([third.status, third.body.id], [201, id + 1]);
+  });
+
+  it('stops Backfill using a client that is removed', async () => {
+    const kept = await call('POST', '', sab('the-key'));
+    const removed = await call('POST', '', { ...sab('the-key'), name: 'Two' });
+    const settings = getSettings();
+    settings.backfill = {
+      ...settings.backfill,
+      usenetClientId: Number(removed.body.id),
+    };
+    await call('DELETE', `/${kept.body.id}`);
+    assert.equal(getSettings().backfill.usenetClientId, removed.body.id);
+
+    await call('DELETE', `/${removed.body.id}`);
+    assert.equal(getSettings().backfill.usenetClientId, null);
   });
 
   it('adds NZBGet with its sign-in, and keeps the password left blank', async () => {

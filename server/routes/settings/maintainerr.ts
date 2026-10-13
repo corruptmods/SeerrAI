@@ -47,12 +47,10 @@ maintainerrSettingsRoutes.post('/', async (req, res, next) => {
     return next(connectionFailed(e));
   }
 
-  // One past the highest id, as Radarr and Sonarr do. Removing the highest
-  // server frees its id for the next one; its cached schedule is dropped when
-  // it is removed, so nothing carries over.
+  // Never a removed server's id, as for Radarr and Sonarr.
   const server: MaintainerrSettings = {
     ...incoming,
-    id: Math.max(-1, ...settings.maintainerr.map((s) => s.id)) + 1,
+    id: settings.newId('maintainerr'),
   };
 
   settings.maintainerr = [...settings.maintainerr, server];

@@ -9,6 +9,10 @@ import useLocale from '@app/hooks/useLocale';
 import useMediaQuery from '@app/hooks/useMediaQuery';
 import useSettings from '@app/hooks/useSettings';
 
+import {
+  SCHEDULE_CHOICES,
+  scheduleFor,
+} from '@app/components/Settings/SettingsJobsCache/schedule';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -44,12 +48,15 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     canceljob: 'Cancel Job',
     jobstarted: '{jobname} started.',
     jobcancelled: '{jobname} canceled.',
+    jobStartFailed: '{jobname} could not be started.',
+    jobCancelFailed: '{jobname} could not be canceled.',
     process: 'Process',
     command: 'Command',
     cache: 'Cache',
     cacheDescription:
       'Seerr AI caches requests to external API endpoints to optimize performance and avoid making unnecessary API calls.',
     cacheflushed: '{cachename} cache flushed.',
+    cacheFlushFailed: '{cachename} cache could not be flushed.',
     cachename: 'Cache Name',
     cachehits: 'Hits',
     cachemisses: 'Misses',
@@ -126,6 +133,8 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     imagecacheconversionoff:
       'not available on this server; images are served as they come',
     usersavatars: "Users' Avatars",
+    tmdbcache: 'The Movie Database (tmdb)',
+    tvdbcache: 'TheTVDB (tvdb)',
   }
 );
 
@@ -241,36 +250,47 @@ const SettingsJobs = () => {
     return <LoadingSpinner />;
   }
 
+  const failed = (message: string) =>
+    addToast(message, { appearance: 'error', autoDismiss: true });
+
   const runJob = async (job: Job) => {
-    await axios.post(`/api/v1/settings/jobs/${job.id}/run`);
-    addToast(
-      intl.formatMessage(messages.jobstarted, {
-        jobname: intl.formatMessage(messages[job.id] ?? messages.unknownJob),
-      }),
-      {
-        appearance: 'success',
-        autoDismiss: true,
-      }
-    );
+    const jobname = intl.formatMessage(messages[job.id] ?? messages.unknownJob);
+    try {
+      await axios.post(`/api/v1/settings/jobs/${job.id}/run`);
+    } catch {
+      return failed(intl.formatMessage(messages.jobStartFailed, { jobname }));
+    }
+    addToast(intl.formatMessage(messages.jobstarted, { jobname }), {
+      appearance: 'success',
+      autoDismiss: true,
+    });
     revalidate();
   };
 
   const cancelJob = async (job: Job) => {
-    await axios.post(`/api/v1/settings/jobs/${job.id}/cancel`);
-    addToast(
-      intl.formatMessage(messages.jobcancelled, {
-        jobname: intl.formatMessage(messages[job.id] ?? messages.unknownJob),
-      }),
-      {
-        appearance: 'error',
-        autoDismiss: true,
-      }
-    );
+    const jobname = intl.formatMessage(messages[job.id] ?? messages.unknownJob);
+    try {
+      await axios.post(`/api/v1/settings/jobs/${job.id}/cancel`);
+    } catch {
+      return failed(intl.formatMessage(messages.jobCancelFailed, { jobname }));
+    }
+    addToast(intl.formatMessage(messages.jobcancelled, { jobname }), {
+      appearance: 'error',
+      autoDismiss: true,
+    });
     revalidate();
   };
 
   const flushCache = async (cache: CacheItem) => {
-    await axios.post(`/api/v1/settings/cache/${cache.id}/flush`);
+    try {
+      await axios.post(`/api/v1/settings/cache/${cache.id}/flush`);
+    } catch {
+      return failed(
+        intl.formatMessage(messages.cacheFlushFailed, {
+          cachename: cache.name,
+        })
+      );
+    }
     addToast(
       intl.formatMessage(messages.cacheflushed, { cachename: cache.name }),
       {
@@ -282,7 +302,13 @@ const SettingsJobs = () => {
   };
 
   const flushDnsCache = async (hostname: string) => {
-    await axios.post(`/api/v1/settings/cache/dns/${hostname}/flush`);
+    try {
+      await axios.post(`/api/v1/settings/cache/dns/${hostname}/flush`);
+    } catch {
+      return failed(
+        intl.formatMessage(messages.cacheFlushFailed, { cachename: hostname })
+      );
+    }
     addToast(
       intl.formatMessage(messages.dnscacheflushed, { hostname: hostname }),
       {
@@ -294,30 +320,24 @@ const SettingsJobs = () => {
   };
 
   const scheduleJob = async () => {
-    const jobScheduleCron = ['0', '0', '*', '*', '*', '*'];
-
     try {
-      if (jobModalState.job?.interval === 'seconds') {
-        jobScheduleCron.splice(0, 2, `*/${jobModalState.scheduleSeconds}`, '*');
-      } else if (jobModalState.job?.interval === 'minutes') {
-        jobScheduleCron[1] = `*/${jobModalState.scheduleMinutes}`;
-      } else if (jobModalState.job?.interval === 'hours') {
-        jobScheduleCron[2] = `*/${jobModalState.scheduleHours}`;
-      } else if (jobModalState.job?.interval === 'days') {
-        jobScheduleCron[2] = '1';
-        jobScheduleCron[3] = `*/${jobModalState.scheduleDays}`;
-      } else {
-        // jobs with interval: fixed should not be editable
-        throw new Error();
-      }
+      const job = jobModalState.job;
+      // Jobs with a fixed interval are not editable.
+      if (!job || job.interval === 'fixed') throw new Error();
+      const schedule = scheduleFor(
+        job.interval,
+        {
+          seconds: jobModalState.scheduleSeconds,
+          minutes: jobModalState.scheduleMinutes,
+          hours: jobModalState.scheduleHours,
+          days: jobModalState.scheduleDays,
+        }[job.interval]
+      );
 
       setIsSaving(true);
-      await axios.post(
-        `/api/v1/settings/jobs/${jobModalState.job.id}/schedule`,
-        {
-          schedule: jobScheduleCron.join(' '),
-        }
-      );
+      await axios.post(`/api/v1/settings/jobs/${job.id}/schedule`, {
+        schedule,
+      });
 
       addToast(intl.formatMessage(messages.jobScheduleEditSaved), {
         appearance: 'success',
@@ -408,7 +428,7 @@ const SettingsJobs = () => {
                         })
                       }
                     >
-                      {[10, 15, 20, 30, 45, 60].map((v) => (
+                      {SCHEDULE_CHOICES.seconds.map((v) => (
                         <option value={v} key={`jobScheduleSeconds-${v}`}>
                           {intl.formatMessage(
                             messages.editJobScheduleSelectorSeconds,
@@ -431,7 +451,7 @@ const SettingsJobs = () => {
                         })
                       }
                     >
-                      {[1, 2, 3, 5, 10, 15, 20, 30, 60].map((v) => (
+                      {SCHEDULE_CHOICES.minutes.map((v) => (
                         <option value={v} key={`jobScheduleMinutes-${v}`}>
                           {intl.formatMessage(
                             messages.editJobScheduleSelectorMinutes,
@@ -454,7 +474,7 @@ const SettingsJobs = () => {
                         })
                       }
                     >
-                      {[1, 2, 3, 4, 5, 6, 7, 10, 14, 21].map((v) => (
+                      {SCHEDULE_CHOICES.days.map((v) => (
                         <option value={v} key={`jobScheduleDays-${v}`}>
                           {intl.formatMessage(
                             messages.editJobScheduleSelectorDays,
@@ -477,7 +497,7 @@ const SettingsJobs = () => {
                         })
                       }
                     >
-                      {[1, 2, 3, 4, 6, 8, 12, 18, 24, 48, 72].map((v) => (
+                      {SCHEDULE_CHOICES.hours.map((v) => (
                         <option value={v} key={`jobScheduleHours-${v}`}>
                           {intl.formatMessage(
                             messages.editJobScheduleSelectorHours,
@@ -856,7 +876,7 @@ const SettingsJobs = () => {
           </thead>
           <Table.TBody>
             <tr>
-              <Table.TD>The Movie Database (tmdb)</Table.TD>
+              <Table.TD>{intl.formatMessage(messages.tmdbcache)}</Table.TD>
               <Table.TD>
                 {intl.formatNumber(cacheData?.imageCache.tmdb.imageCount ?? 0)}
               </Table.TD>
@@ -865,7 +885,7 @@ const SettingsJobs = () => {
               </Table.TD>
             </tr>
             <tr>
-              <Table.TD>TheTVDB (tvdb)</Table.TD>
+              <Table.TD>{intl.formatMessage(messages.tvdbcache)}</Table.TD>
               <Table.TD>
                 {intl.formatNumber(cacheData?.imageCache.tvdb?.imageCount ?? 0)}
               </Table.TD>

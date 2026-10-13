@@ -356,9 +356,14 @@ describe('the admin agent’s routes', () => {
     );
     assert.equal(await runs.count({ where: { id: done.id } }), 0);
 
+    // Counted across every page, so Clear finished is offered from any.
+    const later = await call('GET', '/api/v1/agent?page=1');
+    assert.deepEqual([later.body.runs.length, later.body.finished], [0, 1]);
+
     const cleared = await call('POST', '/api/v1/agent/clear');
     assert.equal(cleared.status, 200);
     assert.deepEqual(cleared.body, { deleted: 1 });
+    assert.equal((await call('GET', '/api/v1/agent')).body.finished, 0);
     assert.deepEqual(
       (await runs.find({ order: { id: 'ASC' } })).map((r) => r.id),
       [waiting.id, working.id]

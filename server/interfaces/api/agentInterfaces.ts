@@ -52,4 +52,6 @@ export interface AgentOverview {
   busy: boolean;
   runs: AgentRunSummary[];
   total: number;
+  /** How many finished runs there are, on any page. */
+  finished: number;
 }

@@ -652,7 +652,7 @@ describe('Maintainerr servers in settings', () => {
     getSettings().maintainerr = [];
   });
 
-  it('adds a server after a successful test, numbering it one past the highest', async () => {
+  it("adds a server after a successful test, never reusing a removed one's number", async () => {
     const first = await call<MaintainerrSettings>(
       'POST',
       '/api/v1/settings/maintainerr',
@@ -674,7 +674,9 @@ describe('Maintainerr servers in settings', () => {
       '/api/v1/settings/maintainerr',
       { ...server(b, 0), id: undefined, name: 'Third' }
     );
-    assert.equal(third.body.id, 1, 'one past the highest remaining');
+    // Titles may still carry the removed server's id, so the new one must
+    // not take it over.
+    assert.equal(third.body.id, 2, 'one past the highest it has ever had');
 
     const { body } = await call<MaintainerrSettings[]>(
       'GET',

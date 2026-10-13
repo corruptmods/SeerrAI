@@ -1,3 +1,4 @@
+import { durationParts } from '@app/components/Backfill/duration';
 import type {
   CandidateView,
   JobStatus,
@@ -8,6 +9,7 @@ import Badge from '@app/components/Common/Badge';
 import CachedImage from '@app/components/Common/CachedImage';
 import defineMessages from '@app/utils/defineMessages';
 import { FilmIcon } from '@heroicons/react/24/outline';
+import type { IntlShape } from 'react-intl';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Backfill', {
@@ -36,6 +38,8 @@ const messages = defineMessages('components.Backfill', {
   upgrades: 'upgrades {count}',
   hasMovie: 'has the movie',
   upgradesMovie: 'upgrades the movie',
+  hoursMinutes: '{hours} h {minutes} min',
+  minutes: '{minutes} min',
 });
 
 export const appName = (kind: TitleKind) =>
@@ -52,11 +56,15 @@ export const formatBytes = (bytes: number): string => {
   return `${value >= 100 || i === 0 ? Math.round(value) : value.toFixed(1)} ${units[i]}`;
 };
 
-export const formatDuration = (seconds: number | null | undefined): string => {
+export const formatDuration = (
+  intl: IntlShape,
+  seconds: number | null | undefined
+): string => {
   if (!seconds || seconds <= 0) return '';
-  const h = Math.floor(seconds / 3600);
-  const m = Math.round((seconds % 3600) / 60);
-  return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`;
+  const { hours, minutes } = durationParts(seconds);
+  return hours
+    ? intl.formatMessage(messages.hoursMinutes, { hours, minutes })
+    : intl.formatMessage(messages.minutes, { minutes });
 };
 
 /** Episode label: "E202 · S05E23" for anime, "S05E23" otherwise. */

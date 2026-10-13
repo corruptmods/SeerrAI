@@ -16,8 +16,8 @@ sonarrRoutes.post('/', async (req, res) => {
   const settings = getSettings();
 
   const newSonarr = req.body as SonarrSettings;
-  const lastItem = settings.sonarr[settings.sonarr.length - 1];
-  newSonarr.id = lastItem ? lastItem.id + 1 : 0;
+  // Never a removed server's id: titles keep the id of the server they are on.
+  newSonarr.id = settings.newId('sonarr');
 
   // If we are setting this as the default, clear any previous defaults for the same type first
   // ex: if is4k is true, it will only remove defaults for other servers that have is4k set to true

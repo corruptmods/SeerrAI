@@ -165,6 +165,26 @@ describe('Tautulli in settings', () => {
     );
   });
 
+  it('does not send the saved key to a different address', async () => {
+    await call('POST', '', tautulli('the-key'));
+    const moved = [
+      { ...tautulli(''), hostname: 'localhost' },
+      { ...tautulli(''), useSsl: true },
+      { ...tautulli(''), urlBase: '/tautulli' },
+    ];
+    for (const body of moved) {
+      const tested = await call('POST', '/test', body);
+      assert.deepEqual(
+        [tested.status, tested.body.message],
+        [400, 'Enter Tautulli’s API key.'],
+        JSON.stringify(body)
+      );
+    }
+    const saved = await call('POST', '', moved[0]);
+    assert.equal(saved.status, 400);
+    assert.equal(getSettings().tautulli.hostname, '127.0.0.1');
+  });
+
   it('takes over Tautulli as the Plex page saved it', async () => {
     // As the old form stored it: no useSsl at all, no hasApiKey.
     getSettings().tautulli = {

@@ -168,7 +168,7 @@ const BackfillForTitle = ({
                     <span className="flex-shrink-0 tabular-nums">
                       {job.secondsLeft
                         ? intl.formatMessage(messages.eta, {
-                            time: formatDuration(job.secondsLeft),
+                            time: formatDuration(intl, job.secondsLeft),
                           })
                         : `${job.progress}%`}
                     </span>

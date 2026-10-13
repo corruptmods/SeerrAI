@@ -322,7 +322,7 @@ const JobDetail = () => {
                 <span className="text-gray-400">
                   {data.secondsLeft && data.status === 'downloading'
                     ? intl.formatMessage(messages.eta, {
-                        time: formatDuration(data.secondsLeft),
+                        time: formatDuration(intl, data.secondsLeft),
                       })
                     : `${data.progress}%`}
                 </span>

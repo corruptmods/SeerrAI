@@ -691,8 +691,17 @@ export interface AllSettings {
   metadataSettings: MetadataSettings;
   ai: AiSettings;
   aiCredit: AiCreditSettings;
+  /** The next id for each list of servers; see `newId`. */
+  nextIds?: Partial<Record<ServerList, number>>;
   migrations: string[];
 }
+
+/** The lists of servers and clients whose ids are kept elsewhere. */
+export type ServerList =
+  | 'radarr'
+  | 'sonarr'
+  | 'maintainerr'
+  | 'downloadClients';
 
 const SETTINGS_PATH = process.env.CONFIG_DIRECTORY
   ? `${process.env.CONFIG_DIRECTORY}/settings.json`
@@ -1218,6 +1227,21 @@ class Settings {
 
   set network(data: NetworkSettings) {
     this.data.network = mergeSettings(this.data.network, data);
+  }
+
+  /**
+   * An id for a new server or download client in one of the lists. It is
+   * past the highest id that list has ever had, so a removed one's id is
+   * never given to another: titles, Backfill and its downloads keep the id
+   * they were sent to, and must not end up pointing at a different server.
+   * The caller saves the settings.
+   */
+  public newId(list: ServerList): number {
+    const saved: { id: number }[] = this.data[list] ?? [];
+    const highest = Math.max(-1, ...saved.map((s) => s.id));
+    const id = Math.max(highest + 1, this.data.nextIds?.[list] ?? 0);
+    this.data.nextIds = { ...this.data.nextIds, [list]: id + 1 };
+    return id;
   }
 
   get migrations(): string[] {

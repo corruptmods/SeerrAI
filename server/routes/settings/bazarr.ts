@@ -1,4 +1,5 @@
 import BazarrAPI from '@server/api/bazarr';
+import { keptSecret } from '@server/lib/savedSecret';
 import type { BazarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -7,8 +8,8 @@ import { z } from 'zod';
 
 /*
  * Bazarr's address and API key. Like the download clients, the key is never
- * sent back, a blank one on saving or testing keeps the saved one, and the
- * connection is tested before anything is saved.
+ * sent back, a blank one on saving or testing keeps the saved one (for the
+ * same address only), and the connection is tested before anything is saved.
  */
 const bazarrSettingsRoutes = Router();
 
@@ -39,13 +40,16 @@ const shown = (bazarr: BazarrSettings) => ({
   hasApiKey: !!bazarr.apiKey,
 });
 
-const withKey = (body: z.infer<typeof bazarrBody>): BazarrSettings => ({
-  hostname: body.hostname,
-  port: body.port,
-  useSsl: body.useSsl,
-  urlBase: body.urlBase,
-  apiKey: body.apiKey || getSettings().bazarr.apiKey,
-});
+const withKey = (body: z.infer<typeof bazarrBody>): BazarrSettings => {
+  const saved = getSettings().bazarr;
+  return {
+    hostname: body.hostname,
+    port: body.port,
+    useSsl: body.useSsl,
+    urlBase: body.urlBase,
+    apiKey: keptSecret(body.apiKey, body, saved, saved.apiKey),
+  };
+};
 
 const connectionFailed = (e: unknown) => {
   const status =

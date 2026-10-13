@@ -20,6 +20,20 @@ const messages = defineMessages('components.Settings.SettingsGuide', {
     'Once the media server lists it, the title is Available and the requester is told, by web push or whatever they have turned on.',
 
   pillsTitle: 'What the status pills mean',
+  labelPending: 'Pending',
+  labelRequested: 'Requested',
+  labelWaiting: 'Waiting',
+  labelQueued: 'Queued',
+  labelDownloading: 'Downloading {percent}%',
+  labelStalled: 'Stalled',
+  labelFinishing: 'Finishing up',
+  labelImporting: 'Importing',
+  labelAdding: 'Adding to library',
+  labelAttention: 'Needs attention',
+  labelFailed: 'Download failed',
+  labelPartial: 'Partially Available',
+  labelAvailable: 'Available',
+  labelDeleted: 'Deleted',
   pillPending: 'Waiting for an admin to approve it.',
   pillRequested:
     'Approved and with Radarr or Sonarr, but nothing is downloading yet: still searching, or nothing good enough has been found.',
@@ -158,46 +172,51 @@ const SettingsGuide = () => {
 
       <Section title={t('pillsTitle')}>
         <ul className="divide-y divide-gray-700/60">
-          <Pill label="Pending" tone="yellow">
+          <Pill label={t('labelPending')} tone="yellow">
             {t('pillPending')}
           </Pill>
-          <Pill label="Requested" tone="indigo">
+          <Pill label={t('labelRequested')} tone="indigo">
             {t('pillRequested')}
           </Pill>
-          <Pill label="Waiting" tone="gray">
+          <Pill label={t('labelWaiting')} tone="gray">
             {t('pillWaiting')}
           </Pill>
-          <Pill label="Queued" tone="gray">
+          <Pill label={t('labelQueued')} tone="gray">
             {t('pillQueued')}
           </Pill>
-          <Pill label="Downloading 42%" tone="indigo">
+          <Pill
+            label={intl.formatMessage(messages.labelDownloading, {
+              percent: 42,
+            })}
+            tone="indigo"
+          >
             {t('pillDownloading')}
           </Pill>
-          <Pill label="Stalled" tone="yellow">
+          <Pill label={t('labelStalled')} tone="yellow">
             {t('pillStalled')}
           </Pill>
-          <Pill label="Finishing up" tone="indigo">
+          <Pill label={t('labelFinishing')} tone="indigo">
             {t('pillFinishing')}
           </Pill>
-          <Pill label="Importing" tone="green">
+          <Pill label={t('labelImporting')} tone="green">
             {t('pillImporting')}
           </Pill>
-          <Pill label="Adding to library" tone="green">
+          <Pill label={t('labelAdding')} tone="green">
             {t('pillAdding')}
           </Pill>
-          <Pill label="Needs attention" tone="yellow">
+          <Pill label={t('labelAttention')} tone="yellow">
             {t('pillAttention')}
           </Pill>
-          <Pill label="Download failed" tone="red">
+          <Pill label={t('labelFailed')} tone="red">
             {t('pillFailed')}
           </Pill>
-          <Pill label="Partially Available" tone="green">
+          <Pill label={t('labelPartial')} tone="green">
             {t('pillPartial')}
           </Pill>
-          <Pill label="Available" tone="green">
+          <Pill label={t('labelAvailable')} tone="green">
             {t('pillAvailable')}
           </Pill>
-          <Pill label="Deleted" tone="red">
+          <Pill label={t('labelDeleted')} tone="red">
             {t('pillDeleted')}
           </Pill>
         </ul>

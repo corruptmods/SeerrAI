@@ -4,6 +4,7 @@ import {
   RunStatusBadge,
   messages,
 } from '@app/components/Backfill/Agent/parts';
+import { runRefreshMs } from '@app/components/Backfill/Agent/refresh';
 import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
@@ -288,9 +289,7 @@ const RunDetail = () => {
     Number.isInteger(id) && id > 0 ? `/api/v1/agent/${id}` : null,
     {
       refreshInterval: (latest) =>
-        latest && (latest.status === 'running' || latest.status === 'queued')
-          ? 2000
-          : 0,
+        latest ? runRefreshMs([latest.status], { working: 2000, idle: 0 }) : 0,
     }
   );
   const count = data?.steps.length ?? 0;

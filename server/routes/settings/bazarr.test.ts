@@ -135,11 +135,35 @@ describe('Bazarr in settings', () => {
     assert.deepEqual([body.apiKey, body.hasApiKey], ['', true]);
 
     assert.equal((await call('POST', '/test', bazarr(''))).status, 200);
-    await call('PUT', '', { ...bazarr(''), urlBase: '/bazarr' });
+    assert.equal((await call('PUT', '', bazarr(''))).status, 200);
+    assert.equal(getSettings().bazarr.apiKey, 'the-key');
+  });
+
+  it('does not send the saved key to a different address', async () => {
+    await call('PUT', '', bazarr('the-key'));
+    const moved = [
+      { ...bazarr(''), hostname: 'localhost' },
+      { ...bazarr(''), port: 1 },
+      { ...bazarr(''), useSsl: true },
+      { ...bazarr(''), urlBase: '/bazarr' },
+    ];
+    for (const body of moved) {
+      const tested = await call('POST', '/test', body);
+      assert.deepEqual(
+        [tested.status, tested.body.message],
+        [400, 'Enter Bazarr’s API key.'],
+        JSON.stringify(body)
+      );
+    }
+    assert.equal((await call('PUT', '', moved[3])).status, 400);
     assert.deepEqual(
       [getSettings().bazarr.urlBase, getSettings().bazarr.apiKey],
-      ['/bazarr', 'the-key']
+      ['', 'the-key']
     );
+
+    // With the key entered again, the new address is saved.
+    await call('PUT', '', { ...bazarr('the-key'), urlBase: '/bazarr' });
+    assert.equal(getSettings().bazarr.urlBase, '/bazarr');
   });
 
   it('disconnects Bazarr', async () => {

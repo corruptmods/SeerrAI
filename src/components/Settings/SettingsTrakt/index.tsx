@@ -1,9 +1,11 @@
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
+import Modal from '@app/components/Common/Modal';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { Transition } from '@headlessui/react';
 import { ArrowDownOnSquareIcon, TrashIcon } from '@heroicons/react/24/outline';
 import axios, { isAxiosError } from 'axios';
 import { useState } from 'react';
@@ -21,6 +23,10 @@ const messages = defineMessages('components.Settings.SettingsTrakt', {
   connected: 'Connected to Trakt.',
   removed: 'Trakt removed.',
   remove: 'Remove',
+  removeTitle: 'Remove Trakt',
+  removeConfirm:
+    'Remove Trakt? People can no longer import Trakt lists, and nothing more is requested from their Trakt watchlists, until a Client ID is saved again.',
+  removeFailed: 'Could not remove Trakt.',
   saveFailed: 'Could not save: {reason}',
   badKey:
     'Trakt did not accept that Client ID. Check it, and that Trakt has approved the app.',
@@ -40,6 +46,7 @@ const SettingsTrakt = () => {
   );
   const [clientId, setClientId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const reason = (e: unknown) => {
     const problem = isAxiosError(e) ? e.response?.data?.problem : undefined;
@@ -77,12 +84,18 @@ const SettingsTrakt = () => {
   };
 
   const remove = async () => {
+    setRemoving(false);
     setBusy(true);
     try {
       await axios.delete('/api/v1/settings/trakt');
       await refresh();
       addToast(intl.formatMessage(messages.removed), {
         appearance: 'info',
+        autoDismiss: true,
+      });
+    } catch {
+      addToast(intl.formatMessage(messages.removeFailed), {
+        appearance: 'error',
         autoDismiss: true,
       });
     } finally {
@@ -98,6 +111,26 @@ const SettingsTrakt = () => {
           {intl.formatMessage(messages.description)}
         </p>
       </div>
+      <Transition
+        as="div"
+        show={removing}
+        enter="transition-opacity ease-in-out duration-300"
+        enterFrom="opacity-0"
+        enterTo="opacity-100"
+        leave="transition-opacity ease-in-out duration-300"
+        leaveFrom="opacity-100"
+        leaveTo="opacity-0"
+      >
+        <Modal
+          okText={intl.formatMessage(messages.remove)}
+          okButtonType="danger"
+          onOk={() => void remove()}
+          onCancel={() => setRemoving(false)}
+          title={intl.formatMessage(messages.removeTitle)}
+        >
+          {intl.formatMessage(messages.removeConfirm)}
+        </Modal>
+      </Transition>
       <div className="section">
         {!data ? (
           <LoadingSpinner />
@@ -150,7 +183,7 @@ const SettingsTrakt = () => {
                     buttonType="danger"
                     type="button"
                     disabled={busy}
-                    onClick={() => void remove()}
+                    onClick={() => setRemoving(true)}
                   >
                     <TrashIcon />
                     <span>{intl.formatMessage(messages.remove)}</span>

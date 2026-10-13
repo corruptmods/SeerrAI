@@ -1,4 +1,5 @@
 import TautulliAPI from '@server/api/tautulli';
+import { keptSecret } from '@server/lib/savedSecret';
 import type { TautulliSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -9,7 +10,8 @@ import { z } from 'zod';
 /*
  * Tautulli's address and API key, set up from Settings → Services like
  * Bazarr: the key is never sent back, a blank one on saving or testing keeps
- * the saved one, and the connection is tested before anything is saved.
+ * the saved one (for the same address only), and the connection is tested
+ * before anything is saved.
  */
 const tautulliSettingsRoutes = Router();
 
@@ -52,14 +54,17 @@ const shown = (tautulli: TautulliSettings) => ({
   hasApiKey: !!tautulli.apiKey,
 });
 
-const withKey = (body: z.infer<typeof tautulliBody>): TautulliSettings => ({
-  hostname: body.hostname,
-  port: body.port,
-  useSsl: body.useSsl,
-  urlBase: body.urlBase,
-  apiKey: body.apiKey || getSettings().tautulli.apiKey || '',
-  externalUrl: body.externalUrl,
-});
+const withKey = (body: z.infer<typeof tautulliBody>): TautulliSettings => {
+  const saved = getSettings().tautulli;
+  return {
+    hostname: body.hostname,
+    port: body.port,
+    useSsl: body.useSsl,
+    urlBase: body.urlBase,
+    apiKey: keptSecret(body.apiKey, body, saved, saved.apiKey),
+    externalUrl: body.externalUrl,
+  };
+};
 
 /** Its version, if it answers and is new enough (2.9 or later). */
 const check = async (tautulli: TautulliSettings): Promise<string> => {

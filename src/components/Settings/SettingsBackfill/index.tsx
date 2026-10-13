@@ -74,6 +74,7 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
     'Then the nightly Database Maintenance job removes them and the packs they came from. Packs you turned down are kept. 0 keeps everything.',
   saved: 'Backfill settings saved.',
   saveFailed: 'Backfill settings could not be saved.',
+  loadFailed: 'Backfill settings could not be loaded.',
   openBackfill: 'Open Backfill',
   agent: 'Admin agent',
   agentTip:
@@ -104,6 +105,13 @@ interface Shown extends Omit<BackfillSettings, 'prowlarr'> {
   usenetClients: { id: number; name: string }[];
 }
 
+/**
+ * The client chosen, or "Not used" for none, or for one that has since been
+ * removed, so the form can still be saved.
+ */
+const chosen = (id: number | null, clients: { id: number }[]): number | '' =>
+  id !== null && clients.some((c) => c.id === id) ? id : '';
+
 const SettingsBackfill = () => {
   const intl = useIntl();
   const { addToast } = useToasts();
@@ -112,7 +120,11 @@ const SettingsBackfill = () => {
   const [testing, setTesting] = useState(false);
 
   if (!data && !error) return <LoadingSpinner />;
-  if (!data) return <Alert type="error" title={String(error)} />;
+  if (!data) {
+    return (
+      <Alert type="error" title={intl.formatMessage(messages.loadFailed)} />
+    );
+  }
 
   const noClients = !data.torrentClients.length && !data.usenetClients.length;
 
@@ -130,8 +142,8 @@ const SettingsBackfill = () => {
       <Formik
         initialValues={{
           ...data,
-          torrentClientId: data.torrentClientId ?? '',
-          usenetClientId: data.usenetClientId ?? '',
+          torrentClientId: chosen(data.torrentClientId, data.torrentClients),
+          usenetClientId: chosen(data.usenetClientId, data.usenetClients),
         }}
         enableReinitialize
         onSubmit={async (values) => {

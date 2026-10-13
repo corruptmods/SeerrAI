@@ -1,3 +1,4 @@
+import { runRefreshMs } from '@app/components/Backfill/Agent/refresh';
 import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import defineMessages from '@app/utils/defineMessages';
@@ -226,9 +227,10 @@ export const RunRow = ({
 export const useAgent = (page = 0) =>
   useSWR<AgentOverview>(`/api/v1/agent${page ? `?page=${page}` : ''}`, {
     refreshInterval: (latest) =>
-      latest?.runs.some((r) => r.status === 'running' || r.status === 'queued')
-        ? 3000
-        : 30000,
+      runRefreshMs(latest?.runs.map((r) => r.status) ?? [], {
+        working: 3000,
+        idle: 30000,
+      }),
   });
 
 export interface AgentTitle {

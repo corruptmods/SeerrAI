@@ -2,6 +2,7 @@ import { isTorrentClient } from '@server/api/downloadclients';
 import ProwlarrAPI from '@server/api/prowlarr';
 import backfill from '@server/lib/backfill/engine';
 import { GROUP_NAME, setGroupBlocked } from '@server/lib/blockedGroups';
+import { keptSecret } from '@server/lib/savedSecret';
 import type { BackfillSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -92,14 +93,8 @@ const shown = (settings: BackfillSettings) => ({
 type ProwlarrBody = z.infer<typeof body>['prowlarr'];
 
 const keyFor = (prowlarr: ProwlarrBody): string => {
-  if (prowlarr.apiKey) return prowlarr.apiKey;
   const saved = getSettings().backfill.prowlarr;
-  const same =
-    saved.hostname === prowlarr.hostname &&
-    saved.port === prowlarr.port &&
-    !!saved.useSsl === prowlarr.useSsl &&
-    (saved.urlBase ?? '') === prowlarr.urlBase;
-  return same ? saved.apiKey : '';
+  return keptSecret(prowlarr.apiKey, prowlarr, saved, saved.apiKey);
 };
 
 const withKey = (data: z.infer<typeof body>): BackfillSettings => ({

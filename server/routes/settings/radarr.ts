@@ -16,8 +16,8 @@ radarrRoutes.post('/', async (req, res) => {
   const settings = getSettings();
 
   const newRadarr = req.body as RadarrSettings;
-  const lastItem = settings.radarr[settings.radarr.length - 1];
-  newRadarr.id = lastItem ? lastItem.id + 1 : 0;
+  // Never a removed server's id: titles keep the id of the server they are on.
+  newRadarr.id = settings.newId('radarr');
 
   // If we are setting this as the default, clear any previous defaults for the same type first
   // ex: if is4k is true, it will only remove defaults for other servers that have is4k set to true
@@ -84,7 +84,7 @@ radarrRoutes.put<{ id: string }, RadarrSettings, RadarrSettings>(
     );
 
     if (radarrIndex === -1) {
-      return next({ status: '404', message: 'Settings instance not found' });
+      return next({ status: 404, message: 'Settings instance not found' });
     }
 
     // If we are setting this as the default, clear any previous defaults for the same type first
@@ -116,7 +116,7 @@ radarrRoutes.get<{ id: string }>('/:id/profiles', async (req, res, next) => {
   );
 
   if (!radarrSettings) {
-    return next({ status: '404', message: 'Settings instance not found' });
+    return next({ status: 404, message: 'Settings instance not found' });
   }
 
   const radarr = new RadarrAPI({
@@ -142,7 +142,7 @@ radarrRoutes.delete<{ id: string }>('/:id', async (req, res, next) => {
   );
 
   if (radarrIndex === -1) {
-    return next({ status: '404', message: 'Settings instance not found' });
+    return next({ status: 404, message: 'Settings instance not found' });
   }
 
   const removed = settings.radarr.splice(radarrIndex, 1);

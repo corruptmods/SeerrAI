@@ -39,7 +39,7 @@ import type { AgentOverview } from '@server/interfaces/api/agentInterfaces';
 import axios from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FormattedRelativeTime, useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -149,6 +149,8 @@ const SeriesReview = () => {
   const [selectedId, setSelectedId] = useState<number>();
   const [expanded, setExpanded] = useState<number>();
   const [approving, setApproving] = useState(false);
+  // The pack the Approve dialog was opened for, as it was then.
+  const [approveTarget, setApproveTarget] = useState<CandidateView>();
   const [searchOpen, setSearchOpen] = useState(false);
   const [problem, setProblem] = useState<string>();
   const [asking, setAsking] = useState(false);
@@ -188,6 +190,13 @@ const SeriesReview = () => {
   const selected =
     data?.candidates.find((c) => c.id === selectedId && c.status === 'ready') ??
     ranked[0];
+
+  // Keep the pack on show, even when the page refreshes and another ranks
+  // above it, so Approve and Skip act on the pack the admin is reading. It
+  // changes only when they pick another, or when it stops being usable.
+  useEffect(() => {
+    if (selected && selected.id !== selectedId) setSelectedId(selected.id);
+  }, [selected, selectedId]);
 
   if (error && !data) {
     return (
@@ -230,6 +239,11 @@ const SeriesReview = () => {
       rejectedReasons.set(c.reason, (rejectedReasons.get(c.reason) ?? 0) + 1);
     }
   }
+
+  // The dialog's pack as it is now, while it can still be approved.
+  const approveCandidate = data.candidates.find(
+    (c) => c.id === approveTarget?.id && c.status === 'ready'
+  );
 
   const fileCount = (c: CandidateView) =>
     (c.summary?.fill ?? 0) + (c.summary?.upgrade ?? 0);
@@ -441,12 +455,13 @@ const SeriesReview = () => {
         knownNames={names?.filter((n) => !series.searchTerms.includes(n))}
         initialTerms={series.searchTerms}
       />
-      {selected && (
+      {approveTarget && (
         <ApproveModal
           show={approving}
           kind={series.kind}
           seriesTitle={series.title}
-          candidate={selected}
+          candidate={approveCandidate ?? approveTarget}
+          unavailable={!approveCandidate}
           onClose={() => setApproving(false)}
           onApproved={(jobId) => router.push(`/backfill/jobs/${jobId}`)}
         />
@@ -619,7 +634,10 @@ const SeriesReview = () => {
                   <Button
                     buttonType="success"
                     disabled={blocked || !data.readiness.ready}
-                    onClick={() => setApproving(true)}
+                    onClick={() => {
+                      setApproveTarget(selected);
+                      setApproving(true);
+                    }}
                   >
                     <CheckIcon />
                     <span>{intl.formatMessage(messages.approve)}</span>

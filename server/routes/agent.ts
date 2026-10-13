@@ -11,6 +11,7 @@ import backfill from '@server/lib/backfill/engine';
 import { getSettings } from '@server/lib/settings';
 import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
+import { In } from 'typeorm';
 import { z } from 'zod';
 
 /*
@@ -63,6 +64,10 @@ agentRoutes.get('/', async (req, res) => {
     busy: agent.isBusy(),
     runs: runs.map(summaryOf),
     total,
+    // Across every page, so Clear finished is offered whichever page is open.
+    finished: await getRepository(AgentRun).count({
+      where: { status: In(['done', 'failed']) },
+    }),
   };
   return res.status(200).json(body);
 });

@@ -28,6 +28,7 @@ const messages = defineMessages('components.Backfill.SearchAll', {
   finished:
     'Searched {done} of {total} stuck {total, plural, one {title} other {titles}}; {found, plural, =0 {nothing new was found} one {packs found for # title} other {packs found for # titles}}.',
   failed: 'Could not start searching.',
+  stopFailed: 'Could not stop searching.',
 });
 
 /**
@@ -93,9 +94,18 @@ const SearchAllPanel = ({
             disabled={stopping}
             onClick={async () => {
               setStopping(true);
-              await axios
-                .delete('/api/v1/backfill/search-all')
-                .catch(() => undefined);
+              setProblem(undefined);
+              try {
+                await axios.delete('/api/v1/backfill/search-all');
+              } catch (e) {
+                // Still running: offer Stop again, and say why it didn't.
+                setStopping(false);
+                setProblem(
+                  axios.isAxiosError(e) && e.response?.data?.message
+                    ? String(e.response.data.message)
+                    : intl.formatMessage(messages.stopFailed)
+                );
+              }
               onChanged();
             }}
           >
@@ -105,6 +115,7 @@ const SearchAllPanel = ({
             </span>
           </Button>
         </div>
+        {problem && <p className="mt-2 text-sm text-red-300">{problem}</p>}
         {ready && (
           <div className="mt-3 space-y-2">
             <ProgressBar

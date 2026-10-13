@@ -3,6 +3,7 @@ import ConfirmButton from '@app/components/Common/ConfirmButton';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import ContainerResources from '@app/components/Settings/SettingsHealth/ContainerResources';
+import { itemKeys } from '@app/components/Settings/SettingsHealth/itemKeys';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -20,7 +21,7 @@ import {
 import type { HealthCheck, HealthStatus } from '@server/lib/health';
 import axios from 'axios';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -273,22 +274,36 @@ const SearchAll = ({ onDone }: { onDone: () => void }) => {
 
 const CheckRow = ({
   check,
+  checkedAt,
   onChanged,
 }: {
   check: HealthCheck;
+  /** When the checks were last run; a new time means a fresh answer. */
+  checkedAt: string;
   onChanged: () => void;
 }) => {
   const intl = useIntl();
   const { addToast } = useToasts();
   // Ten to a page. Page one comes with the check; others are fetched as they
   // are stepped to, keeping the current page on screen meanwhile.
-  const [page, setPage] = useState(1);
+  const [chosenPage, setPage] = useState(1);
   const pages = Math.max(1, Math.ceil(check.count / PAGE_SIZE));
-  const { data: paged, isValidating: pageLoading } = useSWR<HealthCheck>(
+  // A list that has shrunk since a later page was opened shows its last page.
+  const page = Math.min(chosenPage, pages);
+  const {
+    data: paged,
+    isValidating: pageLoading,
+    mutate: refreshPage,
+  } = useSWR<HealthCheck>(
     page > 1 ? `/api/v1/settings/health/checks/${check.id}?page=${page}` : null,
     { revalidateOnFocus: false, keepPreviousData: true }
   );
+  // After Check Again, a later page is fetched again too, not left as it was.
+  useEffect(() => {
+    void refreshPage();
+  }, [checkedAt, refreshPage]);
   const items = page > 1 && paged ? paged.items : check.items;
+  const keys = itemKeys(items);
 
   const removeUnlinked = async () => {
     try {
@@ -379,7 +394,7 @@ const CheckRow = ({
               <ul className={pageLoading ? 'opacity-60' : undefined}>
                 {items.map((item, index) => (
                   <li
-                    key={`${check.id}-${index}`}
+                    key={keys[index]}
                     // Stacked: the title on its line, the detail wrapping
                     // beneath. Side by side, a long detail squeezed the
                     // title to a couple of letters on a phone.
@@ -592,6 +607,7 @@ const SettingsHealth = () => {
                         <CheckRow
                           key={check.id}
                           check={check}
+                          checkedAt={data.checkedAt}
                           onChanged={() => mutate()}
                         />
                       ))}

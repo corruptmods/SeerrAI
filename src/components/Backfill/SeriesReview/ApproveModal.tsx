@@ -32,6 +32,8 @@ const messages = defineMessages('components.Backfill.ApproveModal', {
   includeAiTip:
     'Their names did not say which episode they are; the AI matched them, and Sonarr agreed with the episode. Check them under Show files first.',
   failed: 'The pack could not be approved.',
+  unavailable:
+    'This pack is no longer waiting for approval: it was approved, skipped or dropped since this opened. Close this and choose again.',
 });
 
 const ApproveModal = ({
@@ -39,6 +41,7 @@ const ApproveModal = ({
   kind,
   seriesTitle,
   candidate,
+  unavailable = false,
   onClose,
   onApproved,
 }: {
@@ -46,6 +49,8 @@ const ApproveModal = ({
   kind: TitleKind;
   seriesTitle: string;
   candidate: CandidateView;
+  /** The pack can no longer be approved, so OK is turned off. */
+  unavailable?: boolean;
   onClose: () => void;
   onApproved: (jobId: number) => void;
 }) => {
@@ -165,10 +170,16 @@ const ApproveModal = ({
           busy ? messages.approving : messages.approve
         )}
         okButtonType="success"
-        okDisabled={busy || !confirmed || !chosen.length}
+        okDisabled={busy || unavailable || !confirmed || !chosen.length}
         loading={busy}
       >
         <div className="space-y-4">
+          {unavailable && (
+            <Alert
+              type="warning"
+              title={intl.formatMessage(messages.unavailable)}
+            />
+          )}
           {problem && <Alert type="error" title={problem} />}
           <div className="text-label">
             {intl.formatMessage(messages.whatToImport)}

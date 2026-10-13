@@ -1,5 +1,6 @@
 import { downloadClientFor } from '@server/api/downloadclients';
 import downloadTracker from '@server/lib/downloadtracker';
+import { keptSecret } from '@server/lib/savedSecret';
 import type { DownloadClientSettings } from '@server/lib/settings';
 import { DOWNLOAD_CLIENT_TYPES, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -47,29 +48,35 @@ const shown = (client: DownloadClientSettings) => ({
 /** Every client but SABnzbd, which uses an API key. */
 const signsIn = (type: DownloadClientSettings['type']) => type !== 'sabnzbd';
 
-/** The client as it will be saved, keeping a saved secret left blank. */
+/**
+ * The client as it will be saved, keeping a saved secret left blank, but only
+ * for the same kind of client at the same address.
+ */
 const withSecrets = (
   body: ClientBody,
   id: number,
   saved?: DownloadClientSettings
-): DownloadClientSettings => ({
-  id,
-  name: body.name,
-  type: body.type,
-  hostname: body.hostname,
-  port: body.port,
-  useSsl: body.useSsl,
-  urlBase: body.urlBase,
-  apiKey: body.type === 'sabnzbd' ? body.apiKey || saved?.apiKey || '' : '',
-  // Deluge's Web UI has a password and no username.
-  username: signsIn(body.type) && body.type !== 'deluge' ? body.username : '',
-  password: signsIn(body.type)
-    ? body.password ||
-      // A saved password is kept only for the same client at the same place.
-      (saved?.type === body.type ? saved.password : '') ||
-      ''
-    : '',
-});
+): DownloadClientSettings => {
+  const same = saved?.type === body.type ? saved : undefined;
+  return {
+    id,
+    name: body.name,
+    type: body.type,
+    hostname: body.hostname,
+    port: body.port,
+    useSsl: body.useSsl,
+    urlBase: body.urlBase,
+    apiKey:
+      body.type === 'sabnzbd'
+        ? keptSecret(body.apiKey, body, same, same?.apiKey)
+        : '',
+    // Deluge's Web UI has a password and no username.
+    username: signsIn(body.type) && body.type !== 'deluge' ? body.username : '',
+    password: signsIn(body.type)
+      ? keptSecret(body.password, body, same, same?.password)
+      : '',
+  };
+};
 
 const connectionFailed = (client: DownloadClientSettings, e: unknown) => {
   const message = e instanceof Error ? e.message : String(e);
@@ -124,10 +131,7 @@ downloadClientRoutes.post('/', async (req, res, next) => {
     return next({ status: 400, message: 'Check the client details.' });
   }
   const settings = getSettings();
-  const client = withSecrets(
-    parsed.data,
-    Math.max(-1, ...settings.downloadClients.map((c) => c.id)) + 1
-  );
+  const client = withSecrets(parsed.data, -1);
 
   try {
     await downloadClientFor(client).getVersion();
@@ -135,6 +139,9 @@ downloadClientRoutes.post('/', async (req, res, next) => {
     return next(connectionFailed(client, e));
   }
 
+  // Never a removed client's id: Backfill's downloads keep the id of the
+  // client they were sent to.
+  client.id = settings.newId('downloadClients');
   settings.downloadClients = [...settings.downloadClients, client];
   await settings.save();
   void downloadTracker.updateLive();
@@ -180,6 +187,21 @@ downloadClientRoutes.delete<{ id: string }>('/:id', async (req, res, next) => {
   settings.downloadClients = settings.downloadClients.filter(
     (c) => c !== saved
   );
+  // Backfill stops sending packs to it, rather than keeping a choice its
+  // settings page can no longer show or save.
+  const backfill = settings.backfill;
+  if (
+    backfill.torrentClientId === saved.id ||
+    backfill.usenetClientId === saved.id
+  ) {
+    settings.backfill = {
+      ...backfill,
+      torrentClientId:
+        backfill.torrentClientId === saved.id ? null : backfill.torrentClientId,
+      usenetClientId:
+        backfill.usenetClientId === saved.id ? null : backfill.usenetClientId,
+    };
+  }
   await settings.save();
   void downloadTracker.updateLive();
 

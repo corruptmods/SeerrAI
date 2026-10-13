@@ -21,6 +21,9 @@ const messages = defineMessages(
     processes: 'Processes',
     nodeMemory: 'Node.js',
     uptime: 'Up for',
+    upDays: '{days}d {hours}h',
+    upHours: '{hours}h {minutes}m',
+    upMinutes: '{minutes}m',
     lastHour: 'Last hour',
     lastDay: 'Last 24 hours',
     notContainer:
@@ -57,12 +60,25 @@ const ContainerResources = () => {
     return null;
   }
 
+  // Units in the reader's own language, as the browser writes them.
   const bytes = (value: number) =>
     value >= GiB
-      ? `${intl.formatNumber(value / GiB, { maximumFractionDigits: 1 })} GB`
-      : `${intl.formatNumber(value / MiB, { maximumFractionDigits: 0 })} MB`;
+      ? intl.formatNumber(value / GiB, {
+          style: 'unit',
+          unit: 'gigabyte',
+          maximumFractionDigits: 1,
+        })
+      : intl.formatNumber(value / MiB, {
+          style: 'unit',
+          unit: 'megabyte',
+          maximumFractionDigits: 0,
+        });
   const percent = (value: number) =>
-    `${intl.formatNumber(value, { maximumFractionDigits: value < 10 ? 1 : 0 })}%`;
+    intl.formatNumber(value, {
+      style: 'unit',
+      unit: 'percent',
+      maximumFractionDigits: value < 10 ? 1 : 0,
+    });
   const time = (t: number) =>
     range === 'hour'
       ? intl.formatTime(t, { hour: 'numeric', minute: '2-digit' })
@@ -76,10 +92,10 @@ const ContainerResources = () => {
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     return days
-      ? `${days}d ${hours}h`
+      ? intl.formatMessage(messages.upDays, { days, hours })
       : hours
-        ? `${hours}h ${minutes}m`
-        : `${minutes}m`;
+        ? intl.formatMessage(messages.upHours, { hours, minutes })
+        : intl.formatMessage(messages.upMinutes, { minutes });
   };
 
   const { current } = data;

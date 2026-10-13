@@ -5,6 +5,7 @@ import {
   useAgent,
 } from '@app/components/Backfill/Agent/parts';
 import { SCROLL_LIST } from '@app/components/Backfill/shared';
+import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
 import Header from '@app/components/Common/Header';
@@ -24,6 +25,7 @@ const pageMessages = defineMessages('components.Backfill.Agent.List', {
   older: 'Older',
   clear: 'Clear finished',
   confirmClear: 'Delete them?',
+  clearFailed: 'Could not clear finished conversations.',
   clearTip:
     'Finished conversations are cleared out on their own after the days set in Settings. Ones whose downloads are still going stay until those import or fail, and clearing never touches what they downloaded.',
 });
@@ -35,13 +37,22 @@ const AgentList = () => {
   const intl = useIntl();
   const [page, setPage] = useState(0);
   const { data, error, mutate } = useAgent(page);
-  const finished = data?.runs.some(
-    (run) => run.status === 'done' || run.status === 'failed'
-  );
+  const [clearProblem, setClearProblem] = useState<string>();
+  // Counted on every page, so it can be cleared from any of them.
+  const finished = !!data?.finished;
   const clear = async () => {
-    await axios.post('/api/v1/agent/clear');
-    setPage(0);
-    await mutate();
+    setClearProblem(undefined);
+    try {
+      await axios.post('/api/v1/agent/clear');
+      setPage(0);
+      await mutate();
+    } catch (e) {
+      setClearProblem(
+        axios.isAxiosError(e) && e.response?.data?.message
+          ? String(e.response.data.message)
+          : intl.formatMessage(pageMessages.clearFailed)
+      );
+    }
   };
   if (error && !data) return <ErrorPage statusCode={500} />;
   return (
@@ -93,6 +104,7 @@ const AgentList = () => {
               </ConfirmButton>
             </div>
           )}
+          {clearProblem && <Alert type="error" title={clearProblem} />}
           <section className="rounded-lg bg-gray-800 ring-1 ring-gray-700">
             <ul className={`divide-y divide-gray-700 ${SCROLL_LIST}`}>
               {!data.runs.length && (

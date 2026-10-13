@@ -8186,6 +8186,27 @@ paths:
                     type: number
                     description: Titles added but not requested, past the 20 one import may request
   /list/{listId}/membership:
+    post:
+      summary: Accept a list that was shared with you
+      description: >-
+        A list can be seen as soon as it is shared, but the member's watch
+        history is only used for it (watch sync, picks for a room) once they
+        accept. Turning a list down is leaving it.
+      tags:
+        - list
+      parameters:
+        - in: path
+          name: listId
+          required: true
+          schema:
+            type: number
+      responses:
+        '204':
+          description: Accepted (accepting again keeps the first time)
+        '400':
+          description: The owner does not accept their own list
+        '404':
+          description: List not found
     delete:
       summary: Leave a list that was shared with you
       tags:
@@ -8246,6 +8267,14 @@ paths:
                   type: array
                   items:
                     type: number
+                previousMemberIds:
+                  type: array
+                  description: >-
+                    Who the list was shared with when the sharing dialog
+                    opened. If that has changed since, the save is refused
+                    with 409 rather than undo the change.
+                  items:
+                    type: number
       responses:
         '200':
           description: List updated
@@ -8253,6 +8282,8 @@ paths:
             application/json:
               schema:
                 type: object
+        '409':
+          description: Who the list is shared with changed since previousMemberIds
     delete:
       summary: Delete a list
       tags:

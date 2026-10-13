@@ -182,6 +182,26 @@ describe('the Trakt client', () => {
     );
   });
 
+  it('never asks for a path made of dots', async () => {
+    // A user or list called "." or ".." would change which address is asked
+    // for, rather than name anyone: a watchlist username comes from a
+    // person's own settings, not only from a parsed link.
+    const api = new TraktAPI('client-id', base);
+    for (const name of ['.', '..', '...']) {
+      await assert.rejects(
+        api.recentWatchlist(name),
+        (e: unknown) => e instanceof TraktError && e.problem === 'notFound',
+        name
+      );
+      await assert.rejects(
+        api.titles({ kind: 'list', user: 'someone', list: name }),
+        (e: unknown) => e instanceof TraktError && e.problem === 'notFound',
+        name
+      );
+    }
+    assert.deepEqual(seen, []);
+  });
+
   it('checks a Client ID with one cheap call', async () => {
     await new TraktAPI('client-id', base).check();
     assert.deepEqual(

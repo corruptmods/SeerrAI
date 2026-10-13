@@ -483,8 +483,10 @@ export const suggestionReasons = async (
 /**
  * Who someone may include in a pick: people they share a watch list with,
  * who have not turned picks off. What someone watches is otherwise theirs
- * (and admins') to see, so sharing a list is the line. Admins may include
- * anyone.
+ * (and admins') to see, so sharing a list is the line. A list counts once
+ * the person it was shared with has accepted it: anyone can add anyone to
+ * a list, and that alone is not agreeing to share their history. Admins
+ * may include anyone.
  */
 const pickableIds = async (caller: User): Promise<number[]> => {
   if (caller.hasPermission(Permission.ADMIN)) {
@@ -503,7 +505,9 @@ const pickableIds = async (caller: User): Promise<number[]> => {
       await getRepository(MediaListMember).find({
         where: { userId: caller.id },
       })
-    ).map((m) => m.listId),
+    )
+      .filter((m) => m.acceptedAt)
+      .map((m) => m.listId),
   ];
   if (!mine.length) {
     return [];
@@ -518,7 +522,7 @@ const pickableIds = async (caller: User): Promise<number[]> => {
   return [
     ...new Set([
       ...owners.map((l) => l.ownerId),
-      ...members.map((m) => m.userId),
+      ...members.filter((m) => m.acceptedAt).map((m) => m.userId),
     ]),
   ].filter((id) => id !== caller.id);
 };

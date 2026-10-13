@@ -194,17 +194,18 @@ listRoutes.get('/suggestions', isAuthenticated(), async (req, res, next) => {
     if (!featureEnabled('watchSuggestions', req.user)) {
       return res.status(200).json([]);
     }
-    // A watch history that is unreachable should cost the user this refresh, not
-    // the suggestions already stored from previous checks.
-    try {
-      await refreshWatchSuggestions(req.user as User);
-    } catch (e) {
+    // Answered from the suggestions already stored, while the (throttled)
+    // watch-history check runs behind: one person per title per list is a
+    // lot of questions for a slow history, and the app should not wait on
+    // them. What the check finds is offered on the next load. A history
+    // that is unreachable costs that check, not the stored suggestions.
+    refreshWatchSuggestions(req.user as User).catch((e) => {
       logger.debug('Could not refresh watch suggestions', {
         label: 'API',
         userId: req.user?.id,
         errorMessage: e instanceof Error ? e.message : String(e),
       });
-    }
+    });
 
     const lists = await getRepository(MediaList).find({
       where: { ownerId: req.user?.id as number, watchedSync: true },
@@ -428,9 +429,13 @@ listRoutes.post<{ listId: string }>(
       }
 
       const wasWatched = !!item.watchedAt;
-      item.watchedAt = watched ? new Date() : null;
-      item.watchedById = watched ? (req.user?.id ?? null) : null;
-      await itemRepository.save(item);
+
+      // Updated by id: saving the loaded item would write back the person
+      // in its loaded watchedBy, crediting whoever marked it before.
+      await itemRepository.update(item.id, {
+        watchedAt: watched ? new Date() : null,
+        watchedById: watched ? (req.user?.id ?? null) : null,
+      });
 
       // Only announce the transition into watched, and only if it changed.
       if (watched && !wasWatched) {

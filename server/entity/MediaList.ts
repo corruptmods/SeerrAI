@@ -142,6 +142,15 @@ export class MediaListMember {
   @Column()
   public userId: number;
 
+  /**
+   * When the member accepted the list. Until then they can see it, but
+   * nothing that reads their watch history (watch sync, picks for a room)
+   * counts them: being added to a list is not agreeing to share what you
+   * watch.
+   */
+  @DbAwareColumn({ type: 'datetime', nullable: true })
+  public acceptedAt?: Date | null;
+
   constructor(init?: Partial<MediaListMember>) {
     Object.assign(this, init);
   }

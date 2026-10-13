@@ -4,7 +4,7 @@
 import TheMovieDb from '@server/api/themoviedb';
 import { POSTER_BACKFILL_LIMIT } from '@server/constants/lists';
 import { MediaStatus, MediaType } from '@server/constants/media';
-import { getRepository } from '@server/datasource';
+import dataSource, { getRepository } from '@server/datasource';
 import Episode from '@server/entity/Episode';
 import Media from '@server/entity/Media';
 import {
@@ -17,17 +17,24 @@ import { warmTmdbImages } from '@server/lib/imageproxy';
 import { loadAccessibleList } from '@server/lib/listAccess';
 import { notifyListShared } from '@server/lib/listActivity';
 import { getSettings } from '@server/lib/settings';
+import { watchSource } from '@server/lib/watchHistory';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 import { Router } from 'express';
-import { In } from 'typeorm';
+import { In, IsNull } from 'typeorm';
 
 const listRoutes = Router();
 
 /** Posters warmed for each list card, and for the whole page at most. */
 const PREVIEWS_WARMED = 9;
 const PREVIEWS_WARMED_TOTAL = 90;
+
+/**
+ * Posters sent for each list card. A card rotates through a few at a time,
+ * so a list of hundreds does not need hundreds of them in the page.
+ */
+const PREVIEWS_PER_LIST = 30;
 
 listRoutes.get('/', isAuthenticated(), async (req, res, next) => {
   try {
@@ -143,6 +150,7 @@ listRoutes.get('/', isAuthenticated(), async (req, res, next) => {
         list.id,
         source
           .filter((item) => item.posterPath)
+          .slice(0, PREVIEWS_PER_LIST)
           .map((item) => ({ tmdbId: item.tmdbId, posterPath: item.posterPath }))
       );
     }
@@ -368,11 +376,33 @@ listRoutes.get<{ listId: string }>(
         }))
       );
 
+      // Watch sync only suggests a title once everyone on the list can be
+      // checked, so the owner is told who cannot be: anyone without an
+      // account on the media server.
+      const source = watchSource();
+      const cannotCheck =
+        access.isOwner && source
+          ? [
+              access.list.owner,
+              ...members
+                .filter((m) => m.acceptedAt)
+                .map((m) => m.user)
+                .filter((user): user is User => !!user),
+            ]
+              .filter((user) => !source.viewerOf(user))
+              .map((user) => ({ id: user.id, displayName: user.displayName }))
+          : [];
+
       return res.status(200).json({
         id: access.list.id,
         name: access.list.name,
         isOwner: access.isOwner,
+        // Whether the viewer has accepted the list. The owner always has.
+        accepted:
+          access.isOwner ||
+          members.some((m) => m.userId === req.user?.id && !!m.acceptedAt),
         watchedSync: access.list.watchedSync,
+        cannotCheck,
         owner: {
           id: access.list.owner.id,
           displayName: access.list.owner.displayName,
@@ -380,6 +410,7 @@ listRoutes.get<{ listId: string }>(
         members: members.map((m) => ({
           id: m.user?.id,
           displayName: m.user?.displayName,
+          accepted: !!m.acceptedAt,
         })),
         items: hydrated.map((item) => ({
           ...item,
@@ -423,8 +454,6 @@ listRoutes.put<{ listId: string }>(
         });
       }
 
-      const listRepository = getRepository(MediaList);
-
       if (req.body.name !== undefined) {
         const name = String(req.body.name).trim();
 
@@ -435,50 +464,105 @@ listRoutes.put<{ listId: string }>(
         access.list.name = name;
       }
 
-      // Membership is replaced wholesale with the ids supplied. The owner is
-      // never a member of their own list.
       if (typeof req.body.watchedSync === 'boolean') {
         access.list.watchedSync = req.body.watchedSync;
       }
 
-      if (Array.isArray(req.body.memberIds)) {
-        const memberRepository = getRepository(MediaListMember);
-        const requested = (req.body.memberIds as number[])
-          .map(Number)
-          .filter((id) => Number.isFinite(id) && id !== access.list.ownerId);
+      const listId = access.list.id;
+      let newMembers: User[] = [];
 
-        const users = requested.length
-          ? await getRepository(User).find({ where: { id: In(requested) } })
-          : [];
+      // One change: if any part fails, none of it is kept, so a list is never
+      // left with its old members removed and the new ones missing.
+      const conflict = await dataSource.transaction(async (manager) => {
+        if (Array.isArray(req.body.memberIds)) {
+          const memberRepository = manager.getRepository(MediaListMember);
 
-        // Work out who is new before replacing the rows, so re-saving the
-        // sharing dialog does not notify people who were already on the list.
-        const previous = await memberRepository.find({
-          where: { listId: access.list.id },
-        });
-        const previousIds = new Set(previous.map((member) => member.userId));
-        const newMembers = users.filter((user) => !previousIds.has(user.id));
+          // Membership is set to the ids supplied. The owner is never a
+          // member of their own list.
+          const requested = (req.body.memberIds as unknown[])
+            .map(Number)
+            .filter((id) => Number.isFinite(id) && id !== access.list.ownerId);
 
-        await memberRepository.delete({ listId: access.list.id });
+          const users = requested.length
+            ? await manager
+                .getRepository(User)
+                .find({ where: { id: In(requested) } })
+            : [];
 
-        if (users.length) {
-          await memberRepository.save(
-            users.map(
-              (user) =>
-                new MediaListMember({ listId: access.list.id, userId: user.id })
-            )
+          // Two saves at once must not both work from the same members.
+          // SQLite runs one write at a time already.
+          if (manager.connection.options.type === 'postgres') {
+            await manager
+              .getRepository(MediaList)
+              .createQueryBuilder('list')
+              .select('list.id')
+              .where('list.id = :listId', { listId })
+              .setLock('pessimistic_write')
+              .getOne();
+          }
+
+          const previous = await memberRepository.find({ where: { listId } });
+          const previousIds = new Set(previous.map((member) => member.userId));
+
+          // The sharing dialog says who was on the list when it opened. If
+          // that has changed since (someone left), saving it would quietly
+          // put them back, so it is refused and the owner looks again.
+          if (Array.isArray(req.body.previousMemberIds)) {
+            const startedFrom = new Set(
+              (req.body.previousMemberIds as unknown[]).map(Number)
+            );
+
+            if (
+              startedFrom.size !== previousIds.size ||
+              [...previousIds].some((id) => !startedFrom.has(id))
+            ) {
+              return true;
+            }
+          }
+
+          // Only the differences are written, so people who stay on the list
+          // keep their rows, and with them whether they have accepted it.
+          const wanted = new Set(users.map((user) => user.id));
+          const removed = previous.filter(
+            (member) => !wanted.has(member.userId)
           );
+
+          if (removed.length) {
+            await memberRepository.delete({
+              id: In(removed.map((member) => member.id)),
+            });
+          }
+
+          // Worked out against the rows already there, so re-saving the
+          // sharing dialog does not notify people who were already on it.
+          newMembers = users.filter((user) => !previousIds.has(user.id));
+
+          if (newMembers.length) {
+            await memberRepository.insert(
+              newMembers.map((user) => ({ listId, userId: user.id }))
+            );
+          }
         }
 
-        if (newMembers.length) {
-          await notifyListShared(access.list, newMembers, req.user as User);
-        }
+        await manager.getRepository(MediaList).update(listId, {
+          name: access.list.name,
+          watchedSync: access.list.watchedSync,
+        });
+
+        return false;
+      });
+
+      if (conflict) {
+        return next({
+          status: 409,
+          message:
+            'Who this list is shared with changed after you opened it. Open Share again to see who is on it now.',
+        });
       }
 
-      await listRepository.update(access.list.id, {
-        name: access.list.name,
-        watchedSync: access.list.watchedSync,
-      });
+      if (newMembers.length) {
+        await notifyListShared(access.list, newMembers, req.user as User);
+      }
 
       return res
         .status(200)
@@ -528,9 +612,54 @@ listRoutes.delete<{ listId: string }>(
 );
 
 /*
- * Someone a list was shared with can leave it: sharing needs no acceptance,
- * so anyone could otherwise put a list in someone's view for good. The owner
- * deletes their list instead.
+ * Someone a list was shared with accepts it. They can see a list as soon as
+ * it is shared, but their watch history is only used for it (watch sync,
+ * picks for a room) once they accept: anyone can add anyone to a list, and
+ * that alone is not agreeing to share what they watch.
+ */
+listRoutes.post<{ listId: string }>(
+  '/:listId/membership',
+  isAuthenticated(),
+  async (req, res, next) => {
+    try {
+      const userId = req.user?.id as number;
+      const access = await loadAccessibleList(
+        Number(req.params.listId),
+        userId
+      );
+
+      if (!access) {
+        return next({ status: 404, message: 'List not found.' });
+      }
+
+      if (access.isOwner) {
+        return next({
+          status: 400,
+          message: 'The owner does not need to accept their own list.',
+        });
+      }
+
+      // Accepting again keeps the first time.
+      await getRepository(MediaListMember).update(
+        { listId: access.list.id, userId, acceptedAt: IsNull() },
+        { acceptedAt: new Date() }
+      );
+
+      return res.status(204).send();
+    } catch (e) {
+      logger.error('Failed to accept list', {
+        label: 'API',
+        errorMessage: e.message,
+      });
+      next({ status: 500, message: 'Failed to accept list.' });
+    }
+  }
+);
+
+/*
+ * Someone a list was shared with can leave it, which is also how they turn
+ * it down: anyone could otherwise put a list in someone's view for good.
+ * The owner deletes their list instead.
  */
 listRoutes.delete<{ listId: string }>(
   '/:listId/membership',

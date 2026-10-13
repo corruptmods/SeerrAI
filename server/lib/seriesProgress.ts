@@ -88,6 +88,15 @@ export const getSeriesProgress = async (
   viewer: User,
   tmdbIds: number[]
 ): Promise<Record<number, SeriesProgress>> => {
+  // Expired positions are dropped as each page asks, or every viewer and
+  // series ever looked at would stay in memory for the life of the server.
+  const now = Date.now();
+  for (const [key, entry] of cache) {
+    if (now - entry.at >= CACHE_MS) {
+      cache.delete(key);
+    }
+  }
+
   const source = watchSource();
   const viewerId = source?.viewerOf(viewer);
 
@@ -178,3 +187,6 @@ export const getSeriesProgress = async (
 
   return result;
 };
+
+/** Tests only: how many positions are held. */
+export const seriesProgressCachedForTests = (): number => cache.size;

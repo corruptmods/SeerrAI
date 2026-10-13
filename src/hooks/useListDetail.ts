@@ -27,9 +27,13 @@ export interface ListDetailData {
   id: number;
   name: string;
   isOwner: boolean;
+  /** Whether the viewer has accepted the list; the owner always has. */
+  accepted: boolean;
   watchedSync?: boolean;
+  /** For the owner: people on the list whose watch history cannot be read. */
+  cannotCheck?: { id: number; displayName: string }[];
   owner: { id: number; displayName: string };
-  members: { id: number; displayName: string }[];
+  members: { id: number; displayName: string; accepted: boolean }[];
   items: ListItem[];
 }
 

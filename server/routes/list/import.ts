@@ -345,35 +345,51 @@ listRoutes.post<{ listId: string }>(
 
       // A collection stands for its films; expand so the list holds real
       // titles rather than a reference to a set.
-      await mapWithConcurrency(collections, 3, async (entry) => {
-        const tmdbId = Number(entry.tmdbId);
+      const expanded = await mapWithConcurrency(
+        collections,
+        3,
+        async (entry) => {
+          const tmdbId = Number(entry.tmdbId);
 
-        if (!Number.isFinite(tmdbId)) {
-          skipped++;
-          return;
-        }
-
-        try {
-          const collection = await tmdb.getCollection({ collectionId: tmdbId });
-
-          for (const part of collection.parts ?? []) {
-            resolved.push({
-              tmdbId: part.id,
-              mediaType: 'movie',
-              posterPath: part.poster_path ?? null,
-            });
+          if (!Number.isFinite(tmdbId)) {
+            skipped++;
+            return [];
           }
-        } catch (e) {
-          // Counted as skipped so the import still reports honestly, but
-          // without this the user cannot tell which collection failed.
-          logger.warn('Could not expand a collection on import', {
-            label: 'API',
-            collectionId: tmdbId,
-            errorMessage: e instanceof Error ? e.message : String(e),
-          });
+
+          try {
+            const collection = await tmdb.getCollection({
+              collectionId: tmdbId,
+            });
+
+            return (collection.parts ?? []).map((part) => ({
+              tmdbId: part.id,
+              mediaType: 'movie' as const,
+              posterPath: part.poster_path ?? null,
+            }));
+          } catch (e) {
+            // Counted as skipped so the import still reports honestly, but
+            // without this the user cannot tell which collection failed.
+            logger.warn('Could not expand a collection on import', {
+              label: 'API',
+              collectionId: tmdbId,
+              errorMessage: e instanceof Error ? e.message : String(e),
+            });
+            skipped++;
+            return [];
+          }
+        }
+      );
+
+      // Each film of a collection counts towards the limit like any other
+      // title, or a few collections could put thousands on a list at once.
+      // Taken in the order they were chosen; the rest are reported skipped.
+      for (const part of expanded.flat()) {
+        if (resolved.length < IMPORT_ITEM_LIMIT) {
+          resolved.push(part);
+        } else {
           skipped++;
         }
-      });
+      }
 
       // One query for what is already there, rather than one per title.
       const alreadyOnList = resolved.length

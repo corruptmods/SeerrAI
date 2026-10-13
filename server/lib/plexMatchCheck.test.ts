@@ -303,4 +303,61 @@ describe('Plex Match Check, the whole library', () => {
       undefined
     );
   });
+
+  it('keeps the last full report when a run is cancelled', async (t) => {
+    t.after(() => fs.rm(REPORT_PATH, { force: true }));
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.PLEX;
+    settings.plex.libraries = [
+      { id: '1', name: 'TV Shows', enabled: true, type: 'show' },
+    ];
+    settings.sonarr = [
+      { id: 0, name: 'Sonarr', hostname: 's', port: 1, apiKey: 'k' },
+    ] as unknown as SonarrSettings[];
+    settings.radarr = [];
+    t.mock.method(SonarrAPI.prototype, 'getSeries', async () => [
+      { ...carrie, path: '/tv/Carrie' },
+      { title: 'Bluey', year: 2018, tvdbId: 353546, path: '/tv/Bluey' },
+    ]);
+    const shows = [
+      ...Array.from({ length: 250 }, (_, i) =>
+        show(`b${i}`, 'Bluey', 'Bluey', ['tvdb://353546'])
+      ),
+      show('126741', 'The Carrie Diaries', 'Carrie', ['tvdb://257454']),
+    ];
+    let cancelAfterFirstPage = false;
+    t.mock.method(
+      PlexAPI.prototype,
+      'getLibraryContents',
+      async (_id: string, { offset = 0, size = 50 } = {}) => {
+        if (cancelAfterFirstPage) {
+          plexMatchCheck.cancel();
+        }
+        return {
+          totalSize: shows.length,
+          items: shows.slice(offset, offset + size),
+        };
+      }
+    );
+
+    await plexMatchCheck.run();
+    const full = await plexMatchCheck.lastReport();
+    assert.equal(full.checked, 251);
+    assert.equal(full.problems.length, 1);
+
+    // Stopped after the first page: Carrie, on the second, is never reached.
+    cancelAfterFirstPage = true;
+    await plexMatchCheck.run();
+
+    const kept = await plexMatchCheck.lastReport();
+    assert.equal(kept.checked, 251, 'not the 200 the cancelled run got to');
+    assert.equal(kept.finishedAt, full.finishedAt);
+    assert.equal(kept.problems.length, 1);
+    assert.equal(
+      (JSON.parse(await fs.readFile(REPORT_PATH, 'utf-8')) as typeof full)
+        .checked,
+      251,
+      'nor in the kept file'
+    );
+  });
 });

@@ -301,8 +301,12 @@ class TautulliAPI {
 
     try {
       // Tautulli's `after` is a date, not a timestamp, so the exact cutoff is
-      // applied below against each record's own date.
+      // applied below against each record's own date. Tautulli reads the
+      // date as midnight in its own time zone, which need not be this
+      // server's: asking from the day before means plays in the hours after
+      // `after` are never left out when the two differ.
       const afterDate = new Date(after);
+      afterDate.setDate(afterDate.getDate() - 1);
       const afterParam = `${afterDate.getFullYear()}-${String(
         afterDate.getMonth() + 1
       ).padStart(2, '0')}-${String(afterDate.getDate()).padStart(2, '0')}`;

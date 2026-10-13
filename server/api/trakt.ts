@@ -81,7 +81,19 @@ export class TraktError extends Error {
   }
 }
 
-const SLUG = /^[\w.-]+$/;
+/**
+ * A Trakt username or list slug. Not dots alone: "." and ".." are steps in
+ * a path, not names, and would change which address is asked for.
+ */
+const SLUG = /^(?!\.+$)[\w.-]+$/;
+
+/** A username or slug for an API path, refused unless it could be one. */
+const pathPart = (name: string): string => {
+  if (!SLUG.test(name)) {
+    throw new TraktError('notFound', `"${name}" is not a Trakt name.`);
+  }
+  return encodeURIComponent(name);
+};
 
 /**
  * Reads a link from trakt.tv or app.trakt.tv (or the same without the
@@ -171,9 +183,9 @@ class TraktAPI extends ExternalAPI {
   public async titles(source: TraktSource): Promise<TraktTitle[]> {
     const path =
       source.kind === 'watchlist'
-        ? `/users/${encodeURIComponent(source.user)}/watchlist/movie,show`
+        ? `/users/${pathPart(source.user)}/watchlist/movie,show`
         : source.kind === 'list'
-          ? `/users/${encodeURIComponent(source.user)}/lists/${encodeURIComponent(source.list)}/items/movie,show`
+          ? `/users/${pathPart(source.user)}/lists/${pathPart(source.list)}/items/movie,show`
           : `/lists/${encodeURIComponent(source.id)}/items/movie,show`;
     const items: TraktListItem[] = [];
     for (let page = 1; page <= MAX_PAGES; page++) {
@@ -200,11 +212,11 @@ class TraktAPI extends ExternalAPI {
     user: string,
     count = 20
   ): Promise<TraktTitle[]> {
+    const path = `/users/${pathPart(user)}/watchlist/movie,show/added/desc`;
     const response = await this.call(() =>
-      this.axios.get<TraktListItem[]>(
-        `/users/${encodeURIComponent(user)}/watchlist/movie,show/added/desc`,
-        { params: { page: 1, limit: 100 } }
-      )
+      this.axios.get<TraktListItem[]>(path, {
+        params: { page: 1, limit: 100 },
+      })
     );
     return (Array.isArray(response.data) ? response.data : [])
       .map(asTitle)

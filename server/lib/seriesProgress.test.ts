@@ -8,7 +8,11 @@ import Season from '@server/entity/Season';
 import { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
 import type { EpisodeRef } from '@server/lib/seriesProgress';
-import { getSeriesProgress, workOutProgress } from '@server/lib/seriesProgress';
+import {
+  getSeriesProgress,
+  seriesProgressCachedForTests,
+  workOutProgress,
+} from '@server/lib/seriesProgress';
 import { getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
@@ -211,6 +215,23 @@ describe('series progress from Tautulli', () => {
     viewer.plexId = undefined;
 
     assert.deepEqual(await getSeriesProgress(viewer, [503]), {});
+  });
+
+  it('forgets positions once they are too old to be used', async (t) => {
+    await seedSeries(505);
+    await seedSeries(506);
+    await getSeriesProgress(viewer, [505]);
+    const before = seriesProgressCachedForTests();
+    assert.ok(before >= 1);
+
+    // Eleven minutes on, someone else's page asks about another series: the
+    // first position can never be used again and is let go, rather than
+    // kept for the life of the server.
+    const later = Date.now() + 11 * 60 * 1000;
+    t.mock.method(Date, 'now', () => later);
+    await getSeriesProgress(viewer, [506]);
+
+    assert.equal(seriesProgressCachedForTests(), 1);
   });
 
   it('answers nothing when Tautulli is not configured', async () => {

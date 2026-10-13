@@ -1,3 +1,4 @@
+import TautulliAPI from '@server/api/tautulli';
 import TheMovieDb from '@server/api/themoviedb';
 import type { TraktSource, TraktTitle } from '@server/api/trakt';
 import TraktAPI, { TraktError } from '@server/api/trakt';
@@ -6,12 +7,13 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
-import { getRepository } from '@server/datasource';
+import dataSource, { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import {
   MediaList,
   MediaListItem,
   MediaListMember,
+  MediaListWatchSuggestion,
 } from '@server/entity/MediaList';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
@@ -26,6 +28,7 @@ import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import http from 'node:http';
 import { after, beforeEach, describe, it } from 'node:test';
+import type { EntitySubscriberInterface } from 'typeorm';
 import { In } from 'typeorm';
 
 const stubTmdb = () => {
@@ -236,6 +239,111 @@ describe('watch lists', () => {
     });
   });
 
+  describe('accepting a shared list', () => {
+    const view = (id: number) =>
+      call<{
+        accepted: boolean;
+        members: { id: number; accepted: boolean }[];
+      }>('GET', `/api/v1/list/${id}`);
+
+    it('shows the list at once, but waits for the member to accept', async () => {
+      const id = await createList();
+      await call('PUT', `/api/v1/list/${id}`, { memberIds: [member.id] });
+
+      actingAs = member;
+      const pending = await view(id);
+      assert.equal(pending.status, 200);
+      assert.equal(pending.body.accepted, false);
+
+      const accepted = await call('POST', `/api/v1/list/${id}/membership`);
+      assert.equal(accepted.status, 204);
+      assert.equal((await view(id)).body.accepted, true);
+
+      actingAs = undefined;
+      const asOwner = await view(id);
+      assert.equal(asOwner.body.accepted, true, 'the owner never has to');
+      assert.deepEqual(asOwner.body.members, [
+        { id: member.id, displayName: member.displayName, accepted: true },
+      ]);
+    });
+
+    it('stays accepted when the owner saves the sharing dialog again', async () => {
+      const id = await createList();
+      await call('PUT', `/api/v1/list/${id}`, { memberIds: [member.id] });
+      actingAs = member;
+      await call('POST', `/api/v1/list/${id}/membership`);
+
+      actingAs = undefined;
+      await call('PUT', `/api/v1/list/${id}`, {
+        memberIds: [member.id, outsider.id],
+      });
+
+      const members = await getRepository(MediaListMember).findBy({
+        listId: id,
+      });
+      assert.ok(members.find((m) => m.userId === member.id)?.acceptedAt);
+      assert.equal(
+        members.find((m) => m.userId === outsider.id)?.acceptedAt ?? null,
+        null
+      );
+    });
+
+    it('is not something the owner or a stranger can do', async () => {
+      const id = await createList();
+      await call('PUT', `/api/v1/list/${id}`, { memberIds: [member.id] });
+
+      assert.equal(
+        (await call('POST', `/api/v1/list/${id}/membership`)).status,
+        400
+      );
+
+      actingAs = outsider;
+      assert.equal(
+        (await call('POST', `/api/v1/list/${id}/membership`)).status,
+        404
+      );
+    });
+  });
+
+  describe('marking watched', () => {
+    it('credits whoever marked it watched last', async () => {
+      const id = await createList();
+      await call('PUT', `/api/v1/list/${id}`, { memberIds: [member.id] });
+      await call('POST', `/api/v1/list/${id}/item`, {
+        tmdbId: 550,
+        mediaType: 'movie',
+      });
+
+      await call('POST', `/api/v1/list/${id}/item/watched`, {
+        tmdbId: 550,
+        mediaType: 'movie',
+      });
+
+      actingAs = member;
+      await call('POST', `/api/v1/list/${id}/item/watched`, {
+        tmdbId: 550,
+        mediaType: 'movie',
+      });
+
+      const watchedBy = async () =>
+        (
+          await call<{ items: { watchedBy: { id: number } | null }[] }>(
+            'GET',
+            `/api/v1/list/${id}`
+          )
+        ).body.items[0].watchedBy;
+
+      assert.equal((await watchedBy())?.id, member.id);
+
+      await call('POST', `/api/v1/list/${id}/item/watched`, {
+        tmdbId: 550,
+        mediaType: 'movie',
+        watched: false,
+      });
+      assert.equal(await watchedBy(), null);
+    });
+  });
+
   describe('sharing', () => {
     it('shares with a user and notifies only the new member', async () => {
       const id = await createList();
@@ -283,6 +391,72 @@ describe('watch lists', () => {
       assert.equal(
         await getRepository(MediaListMember).countBy({ listId: id }),
         0
+      );
+    });
+
+    it('refuses a save from a dialog opened before someone left', async () => {
+      const id = await createList();
+      await call('PUT', `/api/v1/list/${id}`, { memberIds: [member.id] });
+
+      // The owner opens the sharing dialog with the member on the list...
+      const openedWith = [member.id];
+
+      // ...the member leaves meanwhile...
+      actingAs = member;
+      await call('DELETE', `/api/v1/list/${id}/membership`);
+
+      // ...and the owner saves, adding someone else.
+      actingAs = undefined;
+      const stale = await call('PUT', `/api/v1/list/${id}`, {
+        memberIds: [member.id, outsider.id],
+        previousMemberIds: openedWith,
+      });
+
+      assert.equal(stale.status, 409);
+      assert.equal(
+        await getRepository(MediaListMember).countBy({ listId: id }),
+        0,
+        'the person who left is not put back, and nothing else changes'
+      );
+
+      const fresh = await call('PUT', `/api/v1/list/${id}`, {
+        memberIds: [outsider.id],
+        previousMemberIds: [],
+      });
+      assert.equal(fresh.status, 200);
+    });
+
+    it('keeps the membership as it was when saving it fails part way', async () => {
+      const id = await createList();
+      await call('PUT', `/api/v1/list/${id}`, { memberIds: [member.id] });
+
+      // Swapping one person for another removes a row and adds one. Make the
+      // adding fail: the removal must not stand on its own.
+      const failInsert: EntitySubscriberInterface<MediaListMember> = {
+        listenTo: () => MediaListMember,
+        beforeInsert: () => {
+          throw new Error('insert failed');
+        },
+      };
+      dataSource.subscribers.push(failInsert);
+
+      try {
+        const swapped = await call('PUT', `/api/v1/list/${id}`, {
+          memberIds: [outsider.id],
+        });
+        assert.equal(swapped.status, 500);
+      } finally {
+        dataSource.subscribers.splice(
+          dataSource.subscribers.indexOf(failInsert),
+          1
+        );
+      }
+
+      assert.deepEqual(
+        (await getRepository(MediaListMember).findBy({ listId: id })).map(
+          (m) => m.userId
+        ),
+        [member.id]
       );
     });
 
@@ -880,5 +1054,159 @@ describe('watch lists', () => {
         'every item should have its poster stored after the first load'
       );
     });
+
+    it('sends a bounded number of posters for each list', async () => {
+      const id = await createList();
+      await getRepository(MediaListItem).save(
+        Array.from(
+          { length: 45 },
+          (_, i) =>
+            new MediaListItem({
+              listId: id,
+              tmdbId: i + 1,
+              mediaType: 'movie',
+              posterPath: `/p${i + 1}.jpg`,
+            })
+        )
+      );
+
+      const { body } = await call<{ itemCount: number; previews: unknown[] }[]>(
+        'GET',
+        '/api/v1/list'
+      );
+      assert.equal(body[0].itemCount, 45);
+      assert.equal(body[0].previews.length, 30);
+    });
+  });
+
+  describe('collections on import', () => {
+    it('count each film towards the 500-title limit', async () => {
+      const id = await createList();
+      const { body } = await call<{ added: number; skipped: number }>(
+        'POST',
+        `/api/v1/list/${id}/import`,
+        {
+          items: [
+            ...Array.from({ length: 499 }, (_, i) => ({
+              tmdbId: 20_000 + i,
+              mediaType: 'movie',
+            })),
+            // Three films, with room for one.
+            { tmdbId: 500, mediaType: 'collection' },
+          ],
+          request: false,
+        }
+      );
+
+      assert.equal(body.added, 500);
+      assert.equal(body.skipped, 2);
+      assert.equal(
+        await getRepository(MediaListItem).countBy({ listId: id }),
+        500
+      );
+    });
+  });
+
+  describe('watch suggestions', () => {
+    it(
+      'answers from what is stored, checking watch history once, behind',
+      { timeout: 10_000 },
+      async (t) => {
+        const kept = getSettings().tautulli;
+        t.after(() => {
+          getSettings().tautulli = kept;
+        });
+        getSettings().tautulli = {
+          hostname: 'tautulli.invalid',
+          port: 8181,
+          apiKey: 'x',
+        };
+        await getRepository(User).update(owner.id, { plexId: 9001 });
+        owner = await getRepository(User).findOneOrFail({
+          where: { id: owner.id },
+        });
+
+        const list = await getRepository(MediaList).save(
+          new MediaList({
+            name: 'Synced',
+            ownerId: owner.id,
+            watchedSync: true,
+          })
+        );
+        await getRepository(Media).save(
+          new Media({
+            tmdbId: 550,
+            mediaType: MediaType.MOVIE,
+            status: MediaStatus.AVAILABLE,
+            ratingKey: 'rk-550',
+          })
+        );
+        const item = await getRepository(MediaListItem).save(
+          new MediaListItem({
+            listId: list.id,
+            tmdbId: 550,
+            mediaType: 'movie',
+          })
+        );
+
+        // Tautulli answers only when the test lets it.
+        let asked = 0;
+        let answer: () => void = () => undefined;
+        const answered = new Promise<void>((resolve) => (answer = resolve));
+        Object.defineProperty(TautulliAPI.prototype, 'getUserPlaysSince', {
+          configurable: true,
+          set() {},
+          get() {
+            return async () => {
+              asked++;
+              await answered;
+              return [
+                {
+                  media_type: 'movie',
+                  rating_key: 'rk-550',
+                  watched_status: 1,
+                  percent_complete: 100,
+                  user_id: 9001,
+                  date: Math.floor(item.createdAt.getTime() / 1000) + 60,
+                },
+              ];
+            };
+          },
+        });
+
+        const waitFor = async (done: () => Promise<boolean> | boolean) => {
+          for (let i = 0; i < 200 && !(await done()); i++) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
+        };
+
+        // Answered while Tautulli has not: the check runs behind.
+        const first = await call<unknown[]>('GET', '/api/v1/list/suggestions');
+        assert.equal(first.status, 200);
+        assert.deepEqual(first.body, [], 'nothing stored yet');
+        await waitFor(() => asked > 0);
+        assert.equal(asked, 1);
+
+        // A second load while that check waits joins it.
+        const second = await call<unknown[]>('GET', '/api/v1/list/suggestions');
+        assert.deepEqual(second.body, []);
+        assert.equal(asked, 1, 'one check at a time');
+
+        answer();
+        await waitFor(
+          async () =>
+            (await getRepository(MediaListWatchSuggestion).count()) > 0
+        );
+
+        const third = await call<{ tmdbId: number }[]>(
+          'GET',
+          '/api/v1/list/suggestions'
+        );
+        assert.deepEqual(
+          third.body.map((s) => s.tmdbId),
+          [550]
+        );
+      }
+    );
   });
 });

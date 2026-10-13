@@ -1133,9 +1133,22 @@ describe('who can be included in a pick', () => {
     const list = await getRepository(MediaList).save(
       new MediaList({ name: 'Ours', ownerId: member.id })
     );
-    await getRepository(MediaListMember).save(
+    const membership = await getRepository(MediaListMember).save(
       new MediaListMember({ listId: list.id, userId: partner.id })
     );
+    assert.deepEqual(
+      await people(),
+      [],
+      'not until the person it was shared with accepts it'
+    );
+    actingAs = partner;
+    assert.deepEqual(await people(), [], 'either way round');
+
+    await getRepository(MediaListMember).update(membership.id, {
+      acceptedAt: new Date(),
+    });
+    assert.deepEqual(await people(), [member.id]);
+    actingAs = member;
     assert.deepEqual(await people(), [partner.id]);
 
     actingAs = admin;

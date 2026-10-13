@@ -1,3 +1,4 @@
+import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import Header from '@app/components/Common/Header';
 import { PosterGridSkeleton } from '@app/components/Common/PageSkeleton';
@@ -8,6 +9,8 @@ import Roulette from '@app/components/MediaLists/Roulette';
 import ShareListModal from '@app/components/MediaLists/ShareListModal';
 import type { ListItem, SeriesProgress } from '@app/hooks/useListDetail';
 import { useListDetail } from '@app/hooks/useListDetail';
+import useToasts from '@app/hooks/useToasts';
+import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import type { ListSort } from '@app/utils/listSort';
 import {
@@ -59,6 +62,12 @@ const messages = defineMessages('components.MediaLists.ListDetail', {
   'sort-title': 'Title',
   'sort-release-desc': 'Newest release',
   'sort-release-asc': 'Oldest release',
+  actionfailed: 'That did not work: {detail}',
+  acceptprompt:
+    '{name} shared this list with you. If you accept, what you watch can be used to tell when everyone on it has finished a title, and when someone on it uses Pick for the Room. Leave the list to turn it down.',
+  accept: 'Accept',
+  cannotcheck:
+    'Watch sync cannot see what {names} watched (no account on the media server), so it will not suggest removing anything from this list.',
 });
 
 /** The order you last chose, on this device, for every list. */
@@ -91,6 +100,8 @@ const ListDetail = () => {
   const [isSavingName, setSavingName] = useState(false);
   const [isSavingWatchedSync, setSavingWatchedSync] = useState(false);
   const [isImporting, setImporting] = useState(false);
+  const [isAccepting, setAccepting] = useState(false);
+  const { addToast } = useToasts();
   const [rouletteType, setRouletteType] = useState<
     'movie' | 'tv' | 'all' | null
   >(null);
@@ -123,23 +134,52 @@ const ListDetail = () => {
   }
 
   if (!data) {
-    return null;
+    // A list that was deleted, or that the viewer was taken off, is a 404.
+    return (
+      <ErrorPage
+        statusCode={
+          (axios.isAxiosError(error) && error.response?.status) || 500
+        }
+      />
+    );
   }
 
-  const toggleWatched = async (item: ListItem) => {
-    await axios.post(`/api/v1/list/${data.id}/item/watched`, {
-      tmdbId: item.tmdbId,
-      mediaType: item.mediaType,
-      watched: !item.watchedAt,
+  // Says what went wrong, and reloads the list so the page shows what is
+  // really saved rather than what was tried.
+  const showFailure = (e: unknown) => {
+    const detail =
+      (axios.isAxiosError(e) && e.response?.data?.message) ||
+      (e instanceof Error ? e.message : String(e));
+
+    addToast(intl.formatMessage(messages.actionfailed, { detail }), {
+      appearance: 'error',
+      autoDismiss: true,
     });
     mutate();
   };
 
+  const toggleWatched = async (item: ListItem) => {
+    try {
+      await axios.post(`/api/v1/list/${data.id}/item/watched`, {
+        tmdbId: item.tmdbId,
+        mediaType: item.mediaType,
+        watched: !item.watchedAt,
+      });
+      mutate();
+    } catch (e) {
+      showFailure(e);
+    }
+  };
+
   const removeItem = async (item: ListItem) => {
-    await axios.delete(
-      `/api/v1/list/${data.id}/item?tmdbId=${item.tmdbId}&mediaType=${item.mediaType}`
-    );
-    mutate();
+    try {
+      await axios.delete(
+        `/api/v1/list/${data.id}/item?tmdbId=${item.tmdbId}&mediaType=${item.mediaType}`
+      );
+      mutate();
+    } catch (e) {
+      showFailure(e);
+    }
   };
 
   const renderItem = (item: ListItem) => (
@@ -180,6 +220,8 @@ const ListDetail = () => {
       await axios.put(`/api/v1/list/${data.id}`, { name });
       await mutate();
       setRenaming(false);
+    } catch (e) {
+      showFailure(e);
     } finally {
       setSavingName(false);
     }
@@ -193,8 +235,23 @@ const ListDetail = () => {
         watchedSync: !data.watchedSync,
       });
       await mutate();
+    } catch (e) {
+      showFailure(e);
     } finally {
       setSavingWatchedSync(false);
+    }
+  };
+
+  const acceptList = async () => {
+    setAccepting(true);
+
+    try {
+      await axios.post(`/api/v1/list/${data.id}/membership`);
+      await mutate();
+    } catch (e) {
+      showFailure(e);
+    } finally {
+      setAccepting(false);
     }
   };
 
@@ -203,8 +260,12 @@ const ListDetail = () => {
       return;
     }
 
-    await axios.delete(`/api/v1/list/${data.id}/membership`);
-    router.push('/lists');
+    try {
+      await axios.delete(`/api/v1/list/${data.id}/membership`);
+      router.push('/lists');
+    } catch (e) {
+      showFailure(e);
+    }
   };
 
   const deleteList = async () => {
@@ -212,8 +273,12 @@ const ListDetail = () => {
       return;
     }
 
-    await axios.delete(`/api/v1/list/${data.id}`);
-    router.push('/lists');
+    try {
+      await axios.delete(`/api/v1/list/${data.id}`);
+      router.push('/lists');
+    } catch (e) {
+      showFailure(e);
+    }
   };
 
   return (
@@ -222,7 +287,7 @@ const ListDetail = () => {
         <ShareListModal
           listId={data.id}
           listName={data.name}
-          initialMemberIds={data.members.map((m) => m.id)}
+          initialMembers={data.members}
           ownerId={data.owner.id}
           onComplete={() => {
             setSharing(false);
@@ -322,6 +387,30 @@ const ListDetail = () => {
         )}
       </div>
 
+      {!data.isOwner && !data.accepted && (
+        <Alert type="info">
+          <p>
+            {intl.formatMessage(messages.acceptprompt, {
+              name: data.owner.displayName,
+            })}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              buttonSize="sm"
+              buttonType="primary"
+              disabled={isAccepting}
+              onClick={acceptList}
+            >
+              {intl.formatMessage(messages.accept)}
+            </Button>
+            <Button buttonSize="sm" disabled={isAccepting} onClick={leaveList}>
+              <ArrowRightStartOnRectangleIcon />
+              <span>{intl.formatMessage(messages.leavelist)}</span>
+            </Button>
+          </div>
+        </Alert>
+      )}
+
       {data.items.length > 1 && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">
@@ -382,6 +471,16 @@ const ListDetail = () => {
             {intl.formatMessage(messages.watchedsync)}
           </span>
         </label>
+      )}
+      {data.isOwner && data.watchedSync && !!data.cannotCheck?.length && (
+        <p className="-mt-2 mb-4 text-xs text-yellow-400 sm:text-sm">
+          {intl.formatMessage(messages.cannotcheck, {
+            names: intl.formatList(
+              data.cannotCheck.map((person) => person.displayName),
+              { type: 'conjunction' }
+            ),
+          })}
+        </p>
       )}
 
       {data.items.length ? (

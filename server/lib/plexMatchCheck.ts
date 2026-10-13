@@ -502,15 +502,25 @@ class PlexMatchCheck {
         errorMessage: report.error,
       });
     } finally {
-      report.finishedAt = new Date().toISOString();
-      this.report = report;
       this.running = false;
-      await fs.writeFile(REPORT_PATH, JSON.stringify(report)).catch((e) =>
-        logger.warn('Could not keep the Match Check report', {
+
+      // A cancelled run only got part of the way through the libraries, so
+      // its counts and problems would read as a whole check that found less.
+      // The last full report stays instead.
+      if (this.cancelled) {
+        logger.info('Match Check cancelled; the last report is kept', {
           label: 'Match Check',
-          errorMessage: e.message,
-        })
-      );
+        });
+      } else {
+        report.finishedAt = new Date().toISOString();
+        this.report = report;
+        await fs.writeFile(REPORT_PATH, JSON.stringify(report)).catch((e) =>
+          logger.warn('Could not keep the Match Check report', {
+            label: 'Match Check',
+            errorMessage: e.message,
+          })
+        );
+      }
     }
   }
 }

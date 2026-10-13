@@ -26,13 +26,32 @@ const ITEM_CONCURRENCY = 3;
 
 const episodeKey = (season: number, episode: number) => `${season}:${episode}`;
 
+/** Checks in progress, by owner, so a second load joins the first. */
+const inFlight = new Map<number, Promise<void>>();
+
 /**
  * Checks the owner's watch-sync lists and records a suggestion for any title
- * everyone on the list has finished since it was added.
+ * everyone on the list has finished since it was added. One check at a time
+ * for each owner: asking while one runs waits for that one.
  *
  * Nothing is removed here — the owner is prompted and decides.
  */
-export const refreshWatchSuggestions = async (owner: User): Promise<void> => {
+export const refreshWatchSuggestions = (owner: User): Promise<void> => {
+  const running = inFlight.get(owner.id);
+
+  if (running) {
+    return running;
+  }
+
+  const check = checkOwnerLists(owner).finally(() => {
+    inFlight.delete(owner.id);
+  });
+  inFlight.set(owner.id, check);
+
+  return check;
+};
+
+const checkOwnerLists = async (owner: User): Promise<void> => {
   const source = watchSource();
 
   if (!source) {
@@ -66,8 +85,15 @@ export const refreshWatchSuggestions = async (owner: User): Promise<void> => {
       });
     }
 
-    list.lastWatchCheck = new Date();
-    await listRepository.save(list);
+    // Only the check time is written. Saving the loaded list would write back
+    // a name or setting the owner changed meanwhile, and a check is not
+    // activity: updatedAt is kept so the list does not move up the page.
+    await listRepository
+      .createQueryBuilder()
+      .update()
+      .set({ lastWatchCheck: new Date(), updatedAt: () => '"updatedAt"' })
+      .where('id = :id', { id: list.id })
+      .execute();
   }
 };
 
@@ -81,13 +107,18 @@ const checkList = async (
     relations: { user: true },
   });
 
-  // Everyone who can see the list has to have finished it — one person
-  // watching does not mean the household is done with it.
-  const viewers = [owner, ...members.map((m) => m.user)].filter(
-    (user): user is User => !!user && !!source.viewerOf(user)
-  );
+  // Everyone on the list has to have finished it — one person watching does
+  // not mean the household is done with it. Someone it was shared with only
+  // counts once they have accepted it: until then their history is theirs.
+  const viewers = [
+    owner,
+    ...members.filter((m) => m.acceptedAt).map((m) => m.user),
+  ].filter((user): user is User => !!user);
 
-  if (!viewers.length) {
+  // Someone with no account on the media server has no history to ask, so
+  // "everyone has watched it" cannot be known; suggest nothing rather than
+  // go by the others alone. The list page tells the owner who it is.
+  if (viewers.some((user) => !source.viewerOf(user))) {
     return;
   }
 

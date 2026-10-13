@@ -2,6 +2,7 @@ import Modal from '@app/components/Common/Modal';
 import PosterBackground from '@app/components/Common/PosterBackground';
 import { useNotice } from '@app/context/NoticeQueue';
 import useFeature from '@app/hooks/useFeature';
+import useToasts from '@app/hooks/useToasts';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
@@ -17,6 +18,7 @@ const messages = defineMessages('components.MediaLists.WatchSuggestions', {
   remove: 'Remove selected',
   keep: 'Keep all',
   onlist: 'on {list}',
+  failed: 'Could not save your choice: {detail}',
 });
 
 interface Suggestion {
@@ -35,6 +37,7 @@ const WatchSuggestions = () => {
   const [selected, setSelected] = useState<number[] | null>(null);
   const [isSaving, setSaving] = useState(false);
   const [isClosed, setClosed] = useState(false);
+  const { addToast } = useToasts();
 
   // Only fetched once a user is present; the request also triggers the
   // throttled watch-history check on the server.
@@ -76,6 +79,18 @@ const WatchSuggestions = () => {
 
       await mutate();
       setClosed(true);
+    } catch (e) {
+      // Some may have been saved before the failure; reloading shows only
+      // the ones still waiting, so the dialog can be tried again.
+      const detail =
+        (axios.isAxiosError(e) && e.response?.data?.message) ||
+        (e instanceof Error ? e.message : String(e));
+
+      addToast(intl.formatMessage(messages.failed, { detail }), {
+        appearance: 'error',
+        autoDismiss: true,
+      });
+      mutate();
     } finally {
       setSaving(false);
     }

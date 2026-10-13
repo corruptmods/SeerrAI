@@ -34,6 +34,7 @@ import { owner } from '@server/lib/owner';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import { isAxiosError } from 'axios';
 import { randomUUID } from 'node:crypto';
 import type { FindOptionsWhere } from 'typeorm';
 import { In, LessThan, MoreThan } from 'typeorm';
@@ -97,6 +98,11 @@ interface ReportMemory {
   seasonNumber?: number;
   /** Reported by an admin: their ask, not the agent starting on its own. */
   byAdmin?: boolean;
+  /**
+   * The issue has had its answer: an admin's follow-ups after it stay
+   * between them and the agent.
+   */
+  answered?: boolean;
 }
 
 /** The runs among these with a Backfill download they started still going. */
@@ -165,7 +171,7 @@ How to work:
 3. Steps are limited, so do not spend them on what you already know. A release whose name plainly says it is one missing episode, with no other language in its name, needs neither release_files nor check_language: grab it. Grab several in the same turn. When the admin tells you to start what you found, grab it at once, without checking again what you checked earlier in this conversation. Before you grab a release with several files, or one whose name does not plainly say which episode it is, open it with release_files. Map each file to an episode by its number AND its title. Collections often number files in their own order (shorts or specials first, or one numbering across seasons): compare each file's title with the episode titles from title_status, and never trust the numbers alone.
 4. Be certain before you grab. Check the language with check_language when there is any question. Grab only files for missing episodes. One file per episode is preferred: take a release whose files each hold several episodes (S06E01-02, "Title A + Title B") only when no release has those episodes one per file, and then give each such file every episode it holds (episodes: [1, 2]), so Sonarr names it S06E01-E02. Weigh it in this order: the right content; English or the title's original language; covering as much as possible; quality; size. When nothing meets the quality profile, a lower quality is fine as a stopgap, since Sonarr and Radarr keep looking for upgrades. Prefer a well-seeded torrent or usenet.
 5. Turn down dubs in other languages (TRUEFRENCH, iTALiAN, GERMAN and so on, unless that is the original language), fakes (sizes far too small, torrents of archives or executables only), samples, and other shows. A Usenet post packed in archives, or with scrambled file names (only its PAR2 repair files named), is normal but cannot be opened: when its name is exactly one missing episode, or the movie, grab it whole (whole: true); a season pack like that cannot be used.
-6. If the admin says something you started is wrong, stop it with stop_download and fix it. A file already imported that holds several episodes but is linked to only one (title_status shows the others missing, the file's name or length says it holds them) is fixed with relink_file; nothing is downloaded. If nothing usable exists, say so and what you tried. Only ask the admin (ask_admin) when you truly cannot decide yourself.
+6. If the admin says something you started is wrong, stop it with stop_download and fix it. A file already imported that holds several episodes but is linked to only one (title_status shows the others missing, the file's name or length says it holds them) is fixed with relink_file, when an admin is in the conversation; nothing is downloaded. If nothing usable exists, say so and what you tried. Only ask the admin (ask_admin) when you truly cannot decide yourself.
 7. When the admin asks you to change what is already there, propose it; the admin approves or declines, and nothing happens before that. A bad or wrong file: find a good release and grab it with replace: true (the old file goes only once the new one has imported), or search_upgrade to let Radarr or Sonarr find something better by its profile. A release group they do not want: propose_change blockGroup. A download that is wrong or broken: propose_change markFailed. Files to remove: propose_change deleteFiles. Another quality profile: propose_change changeProfile. Propose only what was asked for, then stop and wait; the next message says what was decided and what came of it.
 
 Reply in short plain text, no headings or markdown: what was missing, what you found, what you started downloading (with its Backfill job number), and what is still missing and why.`;
@@ -202,6 +208,46 @@ export const compact = (messages: ConverseMessage[]): ConverseMessage[] => {
     );
   }
   return messages;
+};
+
+/** Calls it asked for after it was told it had no steps left. */
+const PAST_LIMIT =
+  'Not run: that was past the step limit for this go. Ask for it again if it is still wanted.';
+
+/** Calls whose answer never came back, so it is not known what they did. */
+const NO_ANSWER =
+  'No answer: it stopped on an error before this answer came back, so it may or may not have been done. Look at where things stand before doing it again.';
+
+/**
+ * Every tool call answered in the message after it. Both APIs refuse a
+ * conversation with a call left unanswered, so one saved that way (it
+ * stopped on an error between a call and its answer, or was saved so by an
+ * older version) could never be replied to; each such call is answered as
+ * having no answer.
+ */
+export const answerCalls = (messages: ConverseMessage[]): ConverseMessage[] => {
+  const out: ConverseMessage[] = [];
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i];
+    out.push(message);
+    if (message.role !== 'assistant' || !message.calls?.length) continue;
+    const next = messages[i + 1];
+    const results = next?.role === 'tool' ? [...next.results] : [];
+    const answered = new Set(results.map((result) => result.id));
+    const missing = message.calls.filter((call) => !answered.has(call.id));
+    if (!missing.length) continue;
+    results.push(
+      ...missing.map((call) => ({
+        id: call.id,
+        content: NO_ANSWER,
+        isError: true,
+      }))
+    );
+    out.push({ role: 'tool', results });
+    // Its answers so far are in the one just added.
+    if (next?.role === 'tool') i += 1;
+  }
+  return out;
 };
 
 const describe = (input: Record<string, unknown>) =>
@@ -341,33 +387,85 @@ class Agent {
     try {
       const runs = getRepository(AgentRun);
       for (const run of await runs.find({ where: { status: 'held' } })) {
-        let verdict: { go: true } | { wait: true } | { notNeeded: string };
+        let verdict:
+          | { go: true }
+          | { wait: true }
+          | { notNeeded: string }
+          | { failed: string };
         try {
           verdict = await this.holdVerdict(run, now);
         } catch (e) {
-          logger.debug('Could not check on a reported title', {
-            label: LABEL,
-            runId: run.id,
-            errorMessage: e instanceof Error ? e.message : String(e),
+          const why = e instanceof Error ? e.message : String(e);
+          verdict = this.cannotCheck(run, now, e, why) ?? { wait: true };
+          if ('wait' in verdict) {
+            logger.debug('Could not check on a reported title', {
+              label: LABEL,
+              runId: run.id,
+              errorMessage: why,
+            });
+          }
+        }
+        if ('wait' in verdict) continue;
+        // Only while it is still held: an admin may have replied to it
+        // while it was being checked on, and their reply stands.
+        const held = { id: run.id, status: 'held' as const };
+        if ('notNeeded' in verdict) {
+          await runs.update(held, {
+            status: 'done',
+            summary: verdict.notNeeded,
+            finishedAt: new Date(),
           });
           continue;
         }
-        if ('wait' in verdict) continue;
-        if ('notNeeded' in verdict) {
-          run.status = 'done';
-          run.summary = verdict.notNeeded;
-          run.finishedAt = new Date();
-          await runs.save(run);
+        if ('failed' in verdict) {
+          await runs.update(held, {
+            status: 'failed',
+            error: verdict.failed.slice(0, 500),
+            finishedAt: new Date(),
+          });
           continue;
         }
-        run.status = 'queued';
-        await runs.save(run);
-        this.queue.push(run.id);
+        const queued = await runs.update(held, { status: 'queued' });
+        if (queued.affected) this.queue.push(run.id);
       }
       void this.pump();
     } finally {
       this.checkingHeld = false;
     }
+  }
+
+  /**
+   * A held report that could not be checked on is given up when its title
+   * or its server is gone, or once it has been held as long as a report is.
+   * Otherwise it is tried again at the next check.
+   */
+  private cannotCheck(
+    run: AgentRun,
+    now: number,
+    error: unknown,
+    why: string
+  ): { failed: string } | null {
+    const servers =
+      run.kind === 'movie' ? getSettings().radarr : getSettings().sonarr;
+    const serverGone = !servers.some((s) => s.id === (run.serverId ?? 0));
+    const titleGone = isAxiosError(error) && error.response?.status === 404;
+    if (serverGone || titleGone) {
+      return {
+        failed: `Not looked into: ${
+          serverGone
+            ? `that ${run.kind === 'movie' ? 'Radarr' : 'Sonarr'} server is no longer set up`
+            : `${run.kind === 'movie' ? 'Radarr' : 'Sonarr'} no longer has the title`
+        }.`,
+      };
+    }
+    if (now - new Date(run.createdAt).getTime() >= HOLD_LONGEST_MS) {
+      return {
+        failed: `Not looked into: it could not be checked on for ${
+          HOLD_LONGEST_MS / (60 * 60 * 1000)
+        } hours (${why}).`,
+      };
+    }
+    return null;
   }
 
   /**
@@ -559,20 +657,36 @@ class Agent {
       kind: 'reply',
       text: `${user.displayName}: ${said}`,
     });
-    // Answering instead of approving leaves the proposal undone.
+    // Answering instead of approving leaves the proposal undone. An
+    // approval a failed run never got to is not carried out now either:
+    // the admin approved it for then, not for whenever it is next replied to.
     const pending = proposalOf(run);
-    const { proposal: _dropped, ...memory } = (run.memory ?? {}) as {
+    const {
+      proposal: _dropped,
+      decision: undone,
+      ...memory
+    } = (run.memory ?? {}) as {
       proposal?: Proposal;
+      decision?: Decision;
     };
     void _dropped;
     run.memory = memory;
+    // A run that stopped before its first turn (or a report replied to
+    // while held) has no conversation yet: what it was asked comes first.
+    const opening = run.conversation.length
+      ? ''
+      : `${this.firstMessage(run)}\n\n`;
     run.conversation = [
       ...run.conversation,
       {
         role: 'user',
-        text: `${user.displayName} (admin) says: ${said}${
+        text: `${opening}${user.displayName} (admin) says: ${said}${
           pending
             ? '\n(What you proposed was not approved and nothing of it was done; propose again if it is still wanted.)'
+            : ''
+        }${
+          undone
+            ? '\n(What an admin approved earlier was never done: you stopped before getting to it. Propose it again if it is still wanted.)'
             : ''
         }`,
       },
@@ -820,7 +934,9 @@ class Agent {
     });
     if (run.trigger === 'report') {
       const { seasonNumber } = reportOf(run);
-      return `${run.requestedByName ?? 'Someone'} reported that ${run.title} (${ref}) is missing${
+      // Not the reporter's name: they chose it, and it is not for the model
+      // to read as anything. The page still shows who it was.
+      return `Someone reported that ${run.title} (${ref}) is missing${
         seasonNumber !== undefined ? ` episodes in season ${seasonNumber}` : ''
       }. ${
         run.kind === 'movie' ? 'Radarr' : 'Sonarr'
@@ -859,21 +975,29 @@ class Agent {
 
     let asked: string | null = null;
     const proposed: ProposedChange[] = [];
+    let messages: ConverseMessage[] | null = null;
+    let answerIssue = false;
     try {
       const problem = this.problem(user);
       if (problem || !user) {
         throw new Error(problem ?? 'There is no owner account.');
       }
 
-      const grabsToday = (
-        await runs.find({
-          where: { createdAt: MoreThan(new Date(Date.now() - DAY)) },
-        })
-      ).reduce(
+      // Downloads count by when each was started, in any conversation: an
+      // old one replied to today has no fresh day's worth. A go ends with
+      // its finish time set, so any run that started one in the last day
+      // finished a go since.
+      const dayAgo = Date.now() - DAY;
+      const others = await runs.find({
+        select: { id: true, actions: true },
+        where: { finishedAt: MoreThan(new Date(dayAgo)) },
+      });
+      const grabsToday = [...others.filter((r) => r.id !== run.id), run].reduce(
         (n, r) =>
           n +
-          (r.id === run.id ? run : r).actions.filter((a) => a.type === 'grab')
-            .length,
+          r.actions.filter(
+            (a) => a.type === 'grab' && new Date(a.at).getTime() > dayAgo
+          ).length,
         0
       );
       const remembered = (run.memory?.releases ?? {}) as Record<
@@ -928,8 +1052,8 @@ class Agent {
       const system = standing
         ? `${SYSTEM}\n\nStanding instructions from the admin, always to be followed:\n${standing}`
         : SYSTEM;
-      const messages: ConverseMessage[] = run.conversation.length
-        ? compact(run.conversation as ConverseMessage[])
+      messages = run.conversation.length
+        ? compact(answerCalls(run.conversation as ConverseMessage[]))
         : [{ role: 'user', text: this.firstMessage(run) }];
       const decision = (run.memory as { decision?: Decision }).decision;
       if (decision) {
@@ -976,12 +1100,27 @@ class Agent {
           raw: turn.raw,
         });
         if (!turn.calls.length || warned) {
+          // Told to stop, it may still ask for tools: none is run, and
+          // each is answered so, or the conversation could not go on.
+          if (turn.calls.length) {
+            messages.push({
+              role: 'tool',
+              results: turn.calls.map((call) => ({
+                id: call.id,
+                content: PAST_LIMIT,
+                isError: true,
+              })),
+            });
+          }
           answer = turn.text;
           break;
         }
+        // Answers go in as they come back, so that should it stop part way,
+        // the ones it has are kept.
+        const results: ToolResult[] = [];
+        messages.push({ role: 'tool', results });
         // Calls that only look run together (searches can take minutes);
         // anything that changes something runs alone, in the order asked.
-        const results: ToolResult[] = [];
         const batches: (typeof turn.calls)[] = [];
         const skipped = turn.calls.slice(MAX_CALLS_PER_TURN);
         for (const call of turn.calls.slice(0, MAX_CALLS_PER_TURN)) {
@@ -1045,7 +1184,6 @@ class Agent {
           });
         }
         used += 1;
-        messages.push({ role: 'tool', results });
         keep(messages);
         await runs.save(run);
         if (asked || proposed.length) break;
@@ -1109,15 +1247,52 @@ class Agent {
       run.status = 'failed';
       run.error = (e instanceof Error ? e.message : String(e)).slice(0, 500);
       step('error', run.error);
+      // An approval it never got to is dropped, not left to be carried out
+      // whenever the run is next replied to; the admin is told.
+      const { decision: undone, ...rest } = (run.memory ?? {}) as {
+        decision?: Decision;
+      };
+      if (undone) {
+        run.memory = rest;
+        const note = `What ${undone.by} approved was not done: ${undone.changes
+          .map((c) => c.headline)
+          .join('; ')}. Reply to have it proposed again.`.slice(0, 500);
+        step('error', note);
+        run.error = `${run.error}\n\n${note}`;
+      }
     } finally {
+      // Kept as far as it got, with every call it made answered, so it can
+      // be replied to.
+      if (messages) run.conversation = answerCalls(messages);
       run.finishedAt = new Date();
+      answerIssue = this.reportSettled(run);
       await runs.save(run);
     }
     await this.remember(run, run.actions.slice(actionsBefore));
     await this.tell(run, run.actions.slice(actionsBefore)).catch(
       () => undefined
     );
-    await this.answerReport(run);
+    if (answerIssue) await this.answerReport(run);
+  }
+
+  /**
+   * Whether this go answers the issue a title was reported on: the first
+   * go of the report's conversation to finish (one waiting on an admin, or
+   * failed, is for admins to see to first). Marks the report answered, so
+   * an admin's later follow-ups stay off the issue.
+   */
+  private reportSettled(run: AgentRun): boolean {
+    const report = reportOf(run);
+    if (
+      run.trigger !== 'report' ||
+      !report.issueId ||
+      report.answered ||
+      run.status !== 'done'
+    ) {
+      return false;
+    }
+    run.memory = { ...run.memory, report: { ...report, answered: true } };
+    return true;
   }
 
   /**
@@ -1130,7 +1305,10 @@ class Agent {
     actions: AgentRun['actions']
   ): Promise<void> {
     if (!run.kind || run.arrId == null) return;
-    if (run.status !== 'done' && run.status !== 'failed') return;
+    // A go that ends waiting on an admin is noted for what it did; the rest
+    // is noted when the conversation is over.
+    const over = run.status === 'done' || run.status === 'failed';
+    if (!over && !actions.length) return;
     const own =
       run.trigger === 'auto' ||
       (run.trigger === 'report' && !reportOf(run).byAdmin);
@@ -1142,7 +1320,7 @@ class Agent {
         arrId: run.arrId,
       };
       const row = await series.findOne({ where });
-      if (own && row && !row.agentAutoRunAt) {
+      if (own && over && row && !row.agentAutoRunAt) {
         await series.update(row.id, { agentAutoRunAt: new Date() });
       }
       if (!row?.tmdbId) return;
@@ -1172,8 +1350,10 @@ class Agent {
         run.status === 'failed'
           ? `it could not finish: ${run.error ?? 'an error'}`
           : did.length
-            ? did.join(', ')
-            : 'it found nothing it could use';
+            ? `${did.join(', ')}${over ? '' : ', and is waiting on an admin'}`
+            : run.actions.length > actions.length
+              ? 'it found nothing more it could use'
+              : 'it found nothing it could use';
       await recordMediaEvent({
         tmdbId: row.tmdbId,
         mediaType: run.kind === 'movie' ? MediaType.MOVIE : MediaType.TV,
@@ -1193,7 +1373,7 @@ class Agent {
   /** A reported title's outcome, on the issue it was reported on. */
   private async answerReport(run: AgentRun): Promise<void> {
     const { issueId } = reportOf(run);
-    if (run.trigger !== 'report' || !issueId || run.status !== 'done') return;
+    if (!issueId) return;
     try {
       const issue = await getRepository(Issue).findOne({
         where: { id: issueId },
@@ -1236,7 +1416,8 @@ class Agent {
         actionUrl: `/backfill/agent/${run.id}`,
         actionUrlTitle: proposal ? 'Review' : 'Answer',
       });
-      return;
+      // What it did before it stopped to ask is told as any other go's.
+      if (!actions.length) return;
     }
     const count = (type: string) =>
       actions.filter((a) => a.type === type).length;

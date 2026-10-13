@@ -1022,6 +1022,19 @@ const hasFileRefusal = (state: AgentState) =>
     ? 'The movie already has a file. To replace it, call grab again with replace: true; the admin is asked to approve first, and the old file goes only once the new one has imported.'
     : 'The movie already has a file; it is never replaced.';
 
+/**
+ * A movie is only downloaded while Radarr is monitoring it, as episodes are
+ * only while Sonarr is: one not monitored is not wanted. Replacing the file
+ * of one an admin asked about is the exception, as for episodes.
+ */
+const wantedMovie = (
+  movie: RadarrMovieDetail,
+  args: Pick<GrabInput, 'replace'>
+) => movie.monitored || (!!args.replace && movie.hasFile);
+
+const notMonitored = (movie: RadarrMovieDetail) =>
+  `${movie.title} is not monitored in Radarr, so it is not wanted.`;
+
 /** A download checked against every rule, not yet started. */
 interface PreparedGrab {
   title: TitleRef;
@@ -1084,6 +1097,9 @@ const prepareWhole = async (
     name = movie.title;
     if (movie.hasFile && !args.replace) {
       throw new ToolError(hasFileRefusal(state));
+    }
+    if (!wantedMovie(movie, args)) {
+      throw new ToolError(notMonitored(movie));
     }
     if (await movieCtx.radarr.getMovieQueueCount(movie.id)) {
       throw new ToolError('The movie is already downloading in Radarr.');
@@ -1299,6 +1315,9 @@ const prepareGrab = async (
     name = ctx.movie.title;
     if (ctx.movie.hasFile && !args.replace) {
       throw new ToolError(hasFileRefusal(state));
+    }
+    if (!wantedMovie(ctx.movie, args)) {
+      throw new ToolError(notMonitored(ctx.movie));
     }
     if (await ctx.radarr.getMovieQueueCount(ctx.movie.id)) {
       throw new ToolError('The movie is already downloading in Radarr.');
@@ -1519,6 +1538,7 @@ const commitGrab = async (
       title: name,
       detail: `${files} more from "${known.title}" for ${labels}, added to Backfill job #${job.id}`,
       jobId: job.id,
+      extended: true,
       episodeIds: plan.flatMap((e) => e.episodeIds),
       release: known.title,
     });
@@ -1716,9 +1736,16 @@ const stopDownload: AgentTool = {
         reason: z.string().trim().min(3).max(600),
       })
       .parse(input);
-    if (!state.run.actions.some((a) => a.type === 'grab' && a.jobId === id)) {
+    // Only a download it started: one it added files to was someone
+    // else's, and ending it would take their files with it.
+    const grabs = state.run.actions.filter(
+      (a) => a.type === 'grab' && a.jobId === id
+    );
+    if (!grabs.some((a) => !a.extended)) {
       throw new ToolError(
-        `Job #${id} was not started in this conversation, so it is not yours to stop. The admin can end it on its Backfill page.`
+        `Job #${id} was not started in this conversation${
+          grabs.length ? ' (it only added files to it)' : ''
+        }, so it is not yours to stop. The admin can end it on its Backfill page.`
       );
     }
     const job = await getRepository(BackfillJob).findOne({ where: { id } });
@@ -1814,6 +1841,9 @@ const checkLanguage: AgentTool = {
 
 const relinkFile: AgentTool = {
   name: 'relink_file',
+  // It changes what Sonarr has on file, from what a file's name and length
+  // suggest: only with an admin in the conversation to see it done.
+  askOnly: true,
   description:
     'Fixes a file already imported that holds several episodes (S06E01-02) but that Sonarr links to only one, so the others look missing and Plex shows one: links the file to every episode it holds and has Sonarr rename it (S06E01-E02). Give the season and every episode the file holds, in a row; the file is the one on the first of them that has one. The others must have no file of their own. Nothing is downloaded, moved or deleted.',
   parameters: {
@@ -2076,6 +2106,37 @@ export const TOOLS: AgentTool[] = [
   proposeChange,
 ];
 
+/**
+ * Why a run with no admin in it may not use a tool on this title, or null.
+ * Such a run (started on its own, or for someone's report) is about its one
+ * title: what it reads (release names, file paths) cannot send it to work
+ * on another.
+ */
+const elsewhere = (
+  run: AgentRun,
+  input: Record<string, unknown>
+): string | null => {
+  if (adminPresent(run) || run.arrId === null || run.arrId === undefined) {
+    return null;
+  }
+  if (input.title === undefined) return null;
+  let asked: TitleRef;
+  try {
+    asked = readTitleRef(input.title);
+  } catch {
+    // Not a reference at all: the tool says so itself.
+    return null;
+  }
+  const own = titleRef({
+    kind: run.kind ?? 'series',
+    serverId: run.serverId ?? 0,
+    arrId: run.arrId,
+  });
+  return titleRef(asked) === own
+    ? null
+    : `This conversation is only about ${run.title ?? 'its title'} (${own}). No admin is in it, so no other title is looked at or changed.`;
+};
+
 /** Runs one tool for the model: its answer, or why it could not. */
 export const runTool = async (
   state: AgentState,
@@ -2086,6 +2147,8 @@ export const runTool = async (
   if (!tool || (tool.askOnly && !adminPresent(state.run))) {
     return { text: `There is no tool called ${name}.`, isError: true };
   }
+  const refused = elsewhere(state.run, input);
+  if (refused) return { text: refused, isError: true };
   try {
     return { text: clip(await tool.run(state, input)), isError: false };
   } catch (e) {

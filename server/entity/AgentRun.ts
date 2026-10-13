@@ -61,6 +61,11 @@ export interface AgentAction {
   title: string;
   detail: string;
   jobId?: number;
+  /**
+   * For a grab: files added to a download already under way (started by
+   * Backfill, someone else or another conversation), not one it started.
+   */
+  extended?: boolean;
   requestId?: number;
   /** The episodes or movie it is for, to keep caps and repeats in check. */
   episodeIds?: number[];

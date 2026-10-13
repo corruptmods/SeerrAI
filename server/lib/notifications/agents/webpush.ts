@@ -36,6 +36,11 @@ const messages = defineMessages('notifications.agents.webpush', {
   issueReopened: 'The {issueType} was reopened by {userName}.',
   viewIssue: 'View Issue',
   viewMedia: 'View Media',
+  approve: 'Approve',
+  decline: 'Decline',
+  approveFailed: 'Could not approve',
+  declineFailed: 'Could not decline',
+  actionFailedBody: '{title} — open {applicationTitle} to try again.',
 });
 
 interface PushNotificationPayload {
@@ -48,6 +53,19 @@ interface PushNotificationPayload {
   requestId?: number;
   pendingRequestsCount?: number;
   isAdmin?: boolean;
+  /**
+   * The words for the Approve and Decline buttons on a request waiting for
+   * approval, and for the notice shown when a tap on one does not go
+   * through, in the person's language: the service worker has none of its
+   * own.
+   */
+  actionLabels?: {
+    approve: string;
+    decline: string;
+    approveFailed: string;
+    declineFailed: string;
+    failedBody: string;
+  };
 }
 
 interface WebPushError extends Error {
@@ -302,6 +320,19 @@ class WebPushAgent
       actionUrlTitle,
       pendingRequestsCount: payload.pendingRequestsCount,
       isAdmin: payload.isAdmin,
+      actionLabels:
+        type === Notification.MEDIA_PENDING
+          ? {
+              approve: intl.formatMessage(messages.approve),
+              decline: intl.formatMessage(messages.decline),
+              approveFailed: intl.formatMessage(messages.approveFailed),
+              declineFailed: intl.formatMessage(messages.declineFailed),
+              failedBody: intl.formatMessage(messages.actionFailedBody, {
+                title: subject ?? '',
+                applicationTitle: getSettings().main.applicationTitle,
+              }),
+            }
+          : undefined,
     };
   }
 

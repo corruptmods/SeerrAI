@@ -1,4 +1,8 @@
-import { MediaStatus, MediaType } from '@server/constants/media';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -6,6 +10,7 @@ import {
   getRequestDownloadStatus,
   refreshIntervalHelper,
   watchMedia,
+  watchRequest,
 } from './refreshIntervalHelper';
 
 const createDownloadItem = (
@@ -203,5 +208,52 @@ describe('watching a title for a download to start', () => {
     );
     assert.equal(interval({ status: MediaStatus.AVAILABLE }), 0);
     assert.equal(interval(undefined), 0);
+  });
+});
+
+describe('watching a request', () => {
+  const interval = refreshIntervalHelper(watchRequest);
+
+  it('keeps checking while the request is still on its way', () => {
+    assert.equal(
+      interval({
+        status: MediaRequestStatus.APPROVED,
+        media: { status: MediaStatus.PARTIALLY_AVAILABLE },
+      }),
+      30_000
+    );
+  });
+
+  it('stops once the request is done, though the series is only part here', () => {
+    // Season 1 was asked for and arrived; nobody asked for season 2. The
+    // series stays partly available for good, and the card has nothing
+    // more to wait for.
+    assert.equal(
+      interval({
+        status: MediaRequestStatus.COMPLETED,
+        media: { status: MediaStatus.PARTIALLY_AVAILABLE },
+      }),
+      0
+    );
+    assert.equal(
+      interval({
+        status: MediaRequestStatus.DECLINED,
+        media: { status: MediaStatus.PROCESSING },
+      }),
+      0
+    );
+  });
+
+  it('still shows a download in progress', () => {
+    assert.equal(
+      interval({
+        status: MediaRequestStatus.COMPLETED,
+        media: {
+          status: MediaStatus.PARTIALLY_AVAILABLE,
+          downloadStatus: [createDownloadItem({ downloadId: 'y' })],
+        },
+      }),
+      5_000
+    );
   });
 });

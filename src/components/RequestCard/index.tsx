@@ -13,7 +13,7 @@ import defineMessages from '@app/utils/defineMessages';
 import {
   getRequestDownloadStatus,
   refreshIntervalHelper,
-  watchMedia,
+  watchRequest,
 } from '@app/utils/refreshIntervalHelper';
 import { withProperties } from '@app/utils/typeHelpers';
 import {
@@ -219,8 +219,15 @@ interface RequestCardProps {
 }
 
 const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
+  // On screen now, for checking on the request; on screen at any point, for
+  // loading the title, which then stays loaded.
+  const [seen, setSeen] = useState(false);
   const { ref, inView } = useInView({
-    triggerOnce: true,
+    onChange: (visible) => {
+      if (visible) {
+        setSeen(true);
+      }
+    },
   });
   const intl = useIntl();
   const { user, hasPermission } = useUser();
@@ -236,7 +243,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
       : `/api/v1/tv/${request.media.tmdbId}`;
 
   const { data: title, error } = useSWR<MovieDetails | TvDetails>(
-    inView ? `${url}` : null
+    seen ? `${url}` : null
   );
   const {
     data: requestData,
@@ -246,9 +253,14 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
     `/api/v1/request/${request.id}`,
     {
       fallbackData: request,
-      refreshInterval: refreshIntervalHelper<
-        NonFunctionProperties<MediaRequest>
-      >((latest) => watchMedia(latest.media), request),
+      // Only while it can be seen: a card scrolled out of the row is not
+      // asked about again until it comes back into view.
+      refreshInterval: inView
+        ? refreshIntervalHelper<NonFunctionProperties<MediaRequest>>(
+            watchRequest,
+            request
+          )
+        : 0,
     }
   );
 
@@ -346,6 +358,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
       <div
         className="relative flex w-72 overflow-hidden rounded-xl bg-gray-800 bg-cover bg-center p-4 text-gray-400 shadow ring-1 ring-gray-700 sm:w-96"
         data-testid="request-card"
+        ref={ref}
       >
         {title.backdropPath && (
           <div className="absolute inset-0 z-0">

@@ -22,7 +22,7 @@ import defineMessages from '@app/utils/defineMessages';
 import {
   getRequestDownloadStatus,
   refreshIntervalHelper,
-  watchMedia,
+  watchRequest,
 } from '@app/utils/refreshIntervalHelper';
 import {
   ArrowPathIcon,
@@ -320,8 +320,15 @@ const RequestItem = ({
   backfill,
   backfillStatus,
 }: RequestItemProps) => {
+  // On screen now, for checking on the request; on screen at any point, for
+  // loading the title, which then stays loaded.
+  const [seen, setSeen] = useState(false);
   const { ref, inView } = useInView({
-    triggerOnce: true,
+    onChange: (visible) => {
+      if (visible) {
+        setSeen(true);
+      }
+    },
   });
   const { addToast } = useToasts();
   const intl = useIntl();
@@ -332,16 +339,20 @@ const RequestItem = ({
       ? `/api/v1/movie/${request.media.tmdbId}`
       : `/api/v1/tv/${request.media.tmdbId}`;
   const { data: title, error } = useSWR<MovieDetails | TvDetails>(
-    inView ? url : null
+    seen ? url : null
   );
   const { data: requestData, mutate: revalidate } = useSWR<
     NonFunctionProperties<MediaRequest>
   >(`/api/v1/request/${request.id}`, {
     fallbackData: request,
-    refreshInterval: refreshIntervalHelper<NonFunctionProperties<MediaRequest>>(
-      (latest) => watchMedia(latest.media),
-      request
-    ),
+    // Only while it can be seen: a long list scrolled past is not asked
+    // about again until it comes back into view.
+    refreshInterval: inView
+      ? refreshIntervalHelper<NonFunctionProperties<MediaRequest>>(
+          watchRequest,
+          request
+        )
+      : 0,
   });
 
   const [isRetrying, setRetrying] = useState(false);
@@ -455,7 +466,10 @@ const RequestItem = ({
           setShowEditModal(false);
         }}
       />
-      <div className="relative flex w-full flex-col justify-between overflow-hidden rounded-xl bg-gray-800 py-2 text-gray-400 shadow-md ring-1 ring-gray-700 xl:h-28 xl:flex-row">
+      <div
+        className="relative flex w-full flex-col justify-between overflow-hidden rounded-xl bg-gray-800 py-2 text-gray-400 shadow-md ring-1 ring-gray-700 xl:h-28 xl:flex-row"
+        ref={ref}
+      >
         {title.backdropPath && (
           <div className="absolute inset-0 z-0 w-full bg-cover bg-center xl:w-2/3">
             <CachedImage

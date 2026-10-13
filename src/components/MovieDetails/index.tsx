@@ -325,7 +325,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
 
   function getAvailable4kMediaServerName() {
     if (settings.currentSettings.mediaServerType === MediaServerType.EMBY) {
-      return intl.formatMessage(messages.play, { mediaServerName: 'Emby' });
+      return intl.formatMessage(messages.play4k, { mediaServerName: 'Emby' });
     }
 
     if (settings.currentSettings.mediaServerType === MediaServerType.PLEX) {

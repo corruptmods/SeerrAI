@@ -38,6 +38,7 @@ export const menuMessages = defineMessages('components.Layout.Sidebar', {
   users: 'Users',
   backfill: 'Backfill',
   settings: 'Settings',
+  closeSidebar: 'Close sidebar',
 });
 
 interface SidebarProps {
@@ -211,7 +212,7 @@ const Sidebar = ({
                   <div className="sidebar-close-button absolute right-0 -mr-14 p-1">
                     <button
                       className="flex h-12 w-12 items-center justify-center rounded-full focus:bg-gray-600 focus:outline-none"
-                      aria-label="Close sidebar"
+                      aria-label={intl.formatMessage(menuMessages.closeSidebar)}
                       onClick={() => setClosed()}
                     >
                       <XMarkIcon className="h-6 w-6 text-white" />

@@ -1,6 +1,7 @@
 import type { User } from '@app/hooks/useUser';
 import { useUser } from '@app/hooks/useUser';
 import forgetSession from '@app/utils/forgetSession';
+import sessionEnded from '@app/utils/sessionEnded';
 import { useRouter } from 'next/dist/client/router';
 import { useEffect, useRef } from 'react';
 
@@ -29,7 +30,7 @@ export const UserContext = ({ initialUser, children }: UserContextProps) => {
   useEffect(() => {
     if (
       !router.pathname.match(/(setup|login|resetpassword)/) &&
-      (!user || error) &&
+      sessionEnded(user, error) &&
       !routing.current
     ) {
       routing.current = true;

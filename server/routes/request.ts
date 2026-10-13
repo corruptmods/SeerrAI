@@ -451,6 +451,11 @@ requestRoutes.post<never, MediaRequest, MediaRequestBody>(
           message: 'You must be logged in to request media.',
         });
       }
+      // With partial requests off, every request is for whole seasons, so
+      // any single episodes asked for are left out.
+      if (!getSettings().main.partialRequestsEnabled) {
+        delete req.body.episodes;
+      }
       const request = await MediaRequest.request(
         mayChooseAdvancedOptions(req.user)
           ? req.body

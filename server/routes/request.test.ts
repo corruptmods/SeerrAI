@@ -1443,6 +1443,42 @@ describe('POST /request (tv), override rules', () => {
   });
 });
 
+describe('POST /request (tv), single episodes', () => {
+  const requestEpisodes = async () => {
+    configureSonarr([{ id: 0, isDefault: true, is4k: false }]);
+    getSettings().radarr = [];
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.post('/request').send({
+      mediaType: MediaType.TV,
+      mediaId: 88010,
+      seasons: [1],
+      episodes: { 1: [2] },
+    });
+    assert.strictEqual(res.status, 201);
+
+    const [season] = await getRepository(SeasonRequest).find({
+      relations: { episodes: true },
+    });
+    return season.episodes.length;
+  };
+
+  it('keeps the episodes chosen while partial requests are on', async () => {
+    assert.strictEqual(await requestEpisodes(), 1);
+  });
+
+  it('requests whole seasons while partial requests are off', async (t) => {
+    const settings = getSettings();
+    const prior = settings.main.partialRequestsEnabled;
+    settings.main.partialRequestsEnabled = false;
+    t.after(() => {
+      settings.main.partialRequestsEnabled = prior;
+    });
+
+    assert.strictEqual(await requestEpisodes(), 0);
+  });
+});
+
 describe('POST /request, override rules and requester choices', () => {
   async function requestWithRule(permissions: number) {
     configureRadarr([{ id: 1, isDefault: true, is4k: false }]);

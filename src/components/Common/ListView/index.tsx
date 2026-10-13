@@ -281,7 +281,8 @@ const ListView = ({
                     isAddedToWatchlist={true}
                     canExpand
                     mutateParent={mutateParent}
-                  />
+                  />,
+                  title.title
                 )}
               </li>
             );
@@ -381,7 +382,11 @@ const ListView = ({
                   keyOf(title.mediaType, title.id),
                   title.mediaType,
                   status,
-                  titleCard
+                  titleCard,
+                  title.mediaType === 'movie' ||
+                    title.mediaType === 'collection'
+                    ? title.title
+                    : title.name
                 )}
               </li>
             );

@@ -378,14 +378,14 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
 
   function getAvailable4kMediaServerName() {
     if (settings.currentSettings.mediaServerType === MediaServerType.EMBY) {
-      return intl.formatMessage(messages.play, { mediaServerName: 'Emby' });
+      return intl.formatMessage(messages.play4k, { mediaServerName: 'Emby' });
     }
 
     if (settings.currentSettings.mediaServerType === MediaServerType.PLEX) {
       return intl.formatMessage(messages.play4k, { mediaServerName: 'Plex' });
     }
 
-    return intl.formatMessage(messages.play, { mediaServerName: 'Jellyfin' });
+    return intl.formatMessage(messages.play4k, { mediaServerName: 'Jellyfin' });
   }
 
   const onClickWatchlistBtn = async (): Promise<void> => {
@@ -526,7 +526,8 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
    * any status (partly available, available, processing) or in any request
    * that is not declined or completed is taken, and would be dropped from a
    * new one. Offering a button there would look like it worked and do
-   * nothing. Never for a blocklisted title.
+   * nothing. Never for a blocklisted title, and not at all while partial
+   * requests are off: a request is then for every season still wanted.
    */
   const takenSeasons = new Set<number>([
     ...(data.mediaInfo?.requests ?? [])
@@ -545,6 +546,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
       .map((s) => s.seasonNumber),
   ]);
   const seasonRequestable = (seasonNumber: number) =>
+    settings.currentSettings.partialRequestsEnabled &&
     data.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
     hasPermission([Permission.REQUEST, Permission.REQUEST_TV], {
       type: 'or',

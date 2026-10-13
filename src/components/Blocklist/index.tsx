@@ -36,6 +36,7 @@ import { FormattedRelativeTime, useIntl } from 'react-intl';
 import useSWR from 'swr';
 
 const messages = defineMessages('components.Blocklist', {
+  pagination: 'Pagination',
   blocklistsettings: 'Blocklist Settings',
   blocklistSettingsDescription: 'Manage blocklisted media.',
   mediaName: 'Name',
@@ -253,7 +254,7 @@ const Blocklist = () => {
       <div className="actions">
         <nav
           className="mb-3 flex flex-col items-center space-y-3 sm:flex-row sm:space-y-0"
-          aria-label="Pagination"
+          aria-label={intl.formatMessage(messages.pagination)}
         >
           <div className="hidden lg:flex lg:flex-1">
             <p className="text-sm">

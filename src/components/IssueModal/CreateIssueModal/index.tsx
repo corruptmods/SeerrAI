@@ -37,6 +37,7 @@ const messages = defineMessages('components.IssueModal.CreateIssueModal', {
   toastviewissue: 'View Issue',
   reportissue: 'Report an Issue',
   submitissue: 'Submit Issue',
+  selectissue: 'Select an Issue',
 });
 
 const isMovie = (movie: MovieDetails | TvDetails): movie is MovieDetails => {
@@ -241,7 +242,9 @@ const CreateIssueModal = ({
               onChange={(issue) => setFieldValue('selectedIssue', issue)}
               className="mt-4"
             >
-              <Label className="sr-only">Select an Issue</Label>
+              <Label className="sr-only">
+                {intl.formatMessage(messages.selectissue)}
+              </Label>
               <div className="-space-y-px overflow-hidden rounded-md bg-gray-800/30">
                 {issueOptions.map((setting, index) => (
                   <Radio

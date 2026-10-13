@@ -605,6 +605,7 @@ self.addEventListener('push', (event) => {
       actionUrl: payload.actionUrl,
       requestId: payload.requestId,
       subject: payload.subject,
+      actionLabels: payload.actionLabels,
     },
     actions: [],
   };
@@ -617,14 +618,17 @@ self.addEventListener('push', (event) => {
   }
 
   if (payload.notificationType === 'MEDIA_PENDING') {
+    // In the person's language when the server sent the words; English
+    // from a server that predates them.
+    const labels = payload.actionLabels ?? {};
     options.actions.push(
       {
         action: 'approve',
-        title: 'Approve',
+        title: labels.approve ?? 'Approve',
       },
       {
         action: 'decline',
-        title: 'Decline',
+        title: labels.decline ?? 'Decline',
       }
     );
   }
@@ -676,19 +680,50 @@ const openApp = async (url) => {
 };
 
 /**
+ * The token the server wants with anything that changes something, when its
+ * CSRF protection is on. The page reads it from a cookie; the worker can only
+ * where the browser lets it read cookies (cookieStore). With none yet, any
+ * answer from the server hands one out. Undefined where cookies cannot be
+ * read, or with the protection off.
+ */
+const csrfToken = async () => {
+  if (!self.cookieStore) {
+    return undefined;
+  }
+
+  const read = async () =>
+    (await self.cookieStore.get('XSRF-TOKEN'))?.value || undefined;
+
+  try {
+    const token = await read();
+    if (token) {
+      return token;
+    }
+    await fetchWithTimeout(
+      new Request('/api/v1/request/count', { credentials: 'same-origin' })
+    );
+    return await read();
+  } catch {
+    return undefined;
+  }
+};
+
+/**
  * Approves or declines a request from the notification. The worker is kept
  * alive until the server answers — otherwise it can be stopped as soon as the
  * tap is handled, and the request is never sent. If it did not go through,
- * the page opens so it can be done there.
+ * a notification says to open the app, and tapping it opens the request.
  */
 const actOnRequest = async (data, status) => {
   let ok = false;
 
   try {
+    const token = await csrfToken();
     const response = await fetchWithTimeout(
       new Request(`/api/v1/request/${data.requestId}/${status}`, {
         method: 'POST',
         credentials: 'same-origin',
+        headers: token ? { 'X-XSRF-TOKEN': token } : {},
       })
     );
     ok = response.ok;
@@ -697,12 +732,17 @@ const actOnRequest = async (data, status) => {
   }
 
   if (!ok) {
+    const labels = data.actionLabels ?? {};
     await self.registration.showNotification(
-      status === 'approve' ? 'Could not approve' : 'Could not decline',
+      status === 'approve'
+        ? (labels.approveFailed ?? 'Could not approve')
+        : (labels.declineFailed ?? 'Could not decline'),
       {
-        body: data.subject
-          ? `${data.subject} — open Seerr AI to try again.`
-          : 'Open Seerr AI to try again.',
+        body:
+          labels.failedBody ??
+          (data.subject
+            ? `${data.subject} — open Seerr AI to try again.`
+            : 'Open Seerr AI to try again.'),
         badge: 'badge-128x128.png',
         icon: 'android-chrome-192x192.png',
         data: { actionUrl: data.actionUrl ?? '/requests' },

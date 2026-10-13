@@ -118,6 +118,12 @@ const TvRequestModal = ({
     animeSetting: data?.mediaInfo?.animeSetting,
     requestSeriesType: editRequest?.seriesType,
   });
+  // Choosing single episodes is for a new request, and only while partial
+  // requests are on: editing a request changes its seasons, never which
+  // episodes of them it holds, and with partial requests off every request
+  // is for whole seasons.
+  const pickEpisodes =
+    !editRequest && settings.currentSettings.partialRequestsEnabled;
   // Per-season episode selection. A season absent here, or mapped to an empty
   // array, means the whole season — which is what the API expects too.
   // A preselected episode is its season with just that episode picked; an
@@ -126,12 +132,14 @@ const TvRequestModal = ({
   const [selectedEpisodes, setSelectedEpisodes] = useState<
     Record<number, number[]>
   >(
-    start?.episodeNumber !== undefined
+    pickEpisodes && start?.episodeNumber !== undefined
       ? { [start.seasonNumber]: [start.episodeNumber] }
       : {}
   );
   const [expandedSeason, setExpandedSeason] = useState<number | null>(
-    start?.episodeNumber !== undefined ? start.seasonNumber : null
+    pickEpisodes && start?.episodeNumber !== undefined
+      ? start.seasonNumber
+      : null
   );
 
   const [selectedSeasons, setSelectedSeasons] = useState<number[]>(
@@ -206,7 +214,6 @@ const TvRequestModal = ({
           tags: requestOverrides?.tags,
           seriesType: animeChoice.seriesType,
           seasons: selectedSeasons.sort((a, b) => a - b),
-          episodes: selectedEpisodes,
         });
 
         if (alsoApproveRequest) {
@@ -292,7 +299,7 @@ const TvRequestModal = ({
           : getAllSeasons().filter(
               (season) => !getAllRequestedSeasons().includes(season)
             ),
-        episodes: selectedEpisodes,
+        ...(pickEpisodes ? { episodes: selectedEpisodes } : {}),
         ...overrideParams,
       });
       globalMutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');
@@ -493,6 +500,10 @@ const TvRequestModal = ({
     ) {
       return;
     }
+
+    // Either way any episodes picked go: all seasons means every season
+    // whole, and none means nothing from any of them.
+    setSelectedEpisodes({});
 
     if (
       data &&
@@ -884,7 +895,7 @@ const TvRequestModal = ({
                             <td className="whitespace-nowrap px-5 py-4 text-sm leading-5 text-gray-200 md:px-6">
                               <div className="flex items-center space-x-2">
                                 <span>{season.episodeCount}</span>
-                                {season.seasonNumber > 0 && (
+                                {pickEpisodes && season.seasonNumber > 0 && (
                                   <button
                                     aria-label={intl.formatMessage(
                                       messages.chooseepisodes,
@@ -955,36 +966,37 @@ const TvRequestModal = ({
                               )}
                             </td>
                           </tr>
-                          {expandedSeason === season.seasonNumber && (
-                            <tr key={`season-${season.id}-episodes`}>
-                              <td
-                                className="bg-gray-800 p-0"
-                                colSpan={4}
-                                id={`season-${season.seasonNumber}-episodes`}
-                              >
-                                <EpisodePicker
-                                  tvId={data?.id as number}
-                                  seasonNumber={season.seasonNumber}
-                                  seasonSelected={isSelectedSeason(
-                                    season.seasonNumber
-                                  )}
-                                  selected={
-                                    selectedEpisodes[season.seasonNumber]
-                                  }
-                                  onChange={(
-                                    episodeNumbers: number[],
-                                    totalEpisodes: number
-                                  ) =>
-                                    setSeasonEpisodes(
-                                      season.seasonNumber,
-                                      episodeNumbers,
-                                      totalEpisodes
-                                    )
-                                  }
-                                />
-                              </td>
-                            </tr>
-                          )}
+                          {pickEpisodes &&
+                            expandedSeason === season.seasonNumber && (
+                              <tr key={`season-${season.id}-episodes`}>
+                                <td
+                                  className="bg-gray-800 p-0"
+                                  colSpan={4}
+                                  id={`season-${season.seasonNumber}-episodes`}
+                                >
+                                  <EpisodePicker
+                                    tvId={data?.id as number}
+                                    seasonNumber={season.seasonNumber}
+                                    seasonSelected={isSelectedSeason(
+                                      season.seasonNumber
+                                    )}
+                                    selected={
+                                      selectedEpisodes[season.seasonNumber]
+                                    }
+                                    onChange={(
+                                      episodeNumbers: number[],
+                                      totalEpisodes: number
+                                    ) =>
+                                      setSeasonEpisodes(
+                                        season.seasonNumber,
+                                        episodeNumbers,
+                                        totalEpisodes
+                                      )
+                                    }
+                                  />
+                                </td>
+                              </tr>
+                            )}
                         </Fragment>
                       );
                     })}

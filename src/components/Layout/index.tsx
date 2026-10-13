@@ -11,11 +11,18 @@ import PushOptInBanner from '@app/components/PushOptIn/PushOptInBanner';
 import useLocale from '@app/hooks/useLocale';
 import useSettings from '@app/hooks/useSettings';
 import { useUser } from '@app/hooks/useUser';
+import defineMessages from '@app/utils/defineMessages';
 import { ArrowLeftIcon, Bars3BottomLeftIcon } from '@heroicons/react/24/solid';
 import type { AvailableLocale } from '@server/types/languages';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useIntl } from 'react-intl';
 import useSWR from 'swr';
+
+const messages = defineMessages('components.Layout', {
+  openSidebar: 'Open sidebar',
+  goBack: 'Go back',
+});
 
 type LayoutProps = {
   children: React.ReactNode;
@@ -24,6 +31,7 @@ type LayoutProps = {
 const Layout = ({ children }: LayoutProps) => {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const intl = useIntl();
   const { user } = useUser();
   const router = useRouter();
   const { currentSettings } = useSettings();
@@ -175,14 +183,14 @@ const Layout = ({ children }: LayoutProps) => {
               className={`mr-2 hidden text-white sm:block ${
                 isScrolled ? 'opacity-90' : 'opacity-70'
               } transition duration-300 focus:outline-none lg:hidden`}
-              aria-label="Open sidebar"
+              aria-label={intl.formatMessage(messages.openSidebar)}
               onClick={() => setSidebarOpen(true)}
               data-testid="sidebar-toggle"
             >
               <Bars3BottomLeftIcon className="h-7 w-7" />
             </button>
             <button
-              aria-label="Go back"
+              aria-label={intl.formatMessage(messages.goBack)}
               className={`mr-2 text-white ${
                 isScrolled ? 'opacity-90' : 'opacity-70'
               } transition duration-300 hover:text-white focus:text-white focus:outline-none`}

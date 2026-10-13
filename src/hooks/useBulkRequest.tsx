@@ -218,12 +218,16 @@ const useBulkRequest = ({ onDone }: { onDone?: () => void } = {}) => {
    * the poster's size, and the poster underneath is inert while choosing: a
    * tap picks it rather than opening it. Positioned, so a page's backdrop
    * (a person's, a collection's) can never sit over it and take the tap.
+   *
+   * `name` is the title, what a screen reader says for the poster while
+   * choosing: the poster's own title only appears on hover.
    */
   const pick = (
     key: string,
     mediaType: string | undefined,
     status: MediaStatus | undefined,
-    card: React.ReactNode
+    card: React.ReactNode,
+    name: string
   ) => {
     if (!selecting) {
       return card;
@@ -247,7 +251,7 @@ const useBulkRequest = ({ onDone }: { onDone?: () => void } = {}) => {
         role="button"
         tabIndex={0}
         aria-pressed={isSelected}
-        aria-label={key}
+        aria-label={name}
         onClick={choose}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {

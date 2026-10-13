@@ -9,7 +9,7 @@ import {
   usePasskeySupport,
 } from '@app/hooks/usePasskeys';
 import useToasts from '@app/hooks/useToasts';
-import { useUser } from '@app/hooks/useUser';
+import { UserType, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { FingerPrintIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { isAxiosError } from 'axios';
@@ -20,7 +20,9 @@ import useSWR from 'swr';
 
 const messages = defineMessages('components.PasskeyNudge', {
   title: 'Sign in faster with a passkey',
-  body: 'Use Face ID, Touch ID or your screen lock next time instead of signing in with Plex.',
+  body: 'Use Face ID, Touch ID or your screen lock next time instead of signing in with {mediaServerName}.',
+  bodyPassword:
+    'Use Face ID, Touch ID or your screen lock next time instead of your password.',
   add: 'Add a Passkey',
   notNow: 'Not now',
   added: 'Passkey added. Next time, choose Sign in with a passkey.',
@@ -136,7 +138,20 @@ const PasskeyNudge = () => {
           {intl.formatMessage(messages.title)}
         </p>
         <p className="mt-1 text-sm text-gray-300">
-          {intl.formatMessage(messages.body)}
+          {
+            // What they sign in with now: their media server's account, or
+            // a password of their own here.
+            user?.userType === UserType.LOCAL
+              ? intl.formatMessage(messages.bodyPassword)
+              : intl.formatMessage(messages.body, {
+                  mediaServerName:
+                    user?.userType === UserType.JELLYFIN
+                      ? 'Jellyfin'
+                      : user?.userType === UserType.EMBY
+                        ? 'Emby'
+                        : 'Plex',
+                })
+          }
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button

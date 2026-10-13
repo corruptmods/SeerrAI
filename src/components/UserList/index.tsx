@@ -46,6 +46,7 @@ import * as Yup from 'yup';
 import JellyfinImportModal from './JellyfinImportModal';
 
 const messages = defineMessages('components.UserList', {
+  pagination: 'Pagination',
   users: 'Users',
   userlist: 'User List',
   importfrommediaserver: 'Import {mediaServerName} Users',
@@ -1032,7 +1033,7 @@ const UserList = () => {
             <Table.TD colSpan={8} noPadding>
               <nav
                 className="flex w-screen flex-col items-center space-x-4 space-y-3 px-6 py-3 sm:flex-row sm:space-y-0 lg:w-full"
-                aria-label="Pagination"
+                aria-label={intl.formatMessage(messages.pagination)}
               >
                 <div className="hidden lg:flex lg:flex-1">
                   <p className="text-sm">

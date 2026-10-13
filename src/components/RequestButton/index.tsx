@@ -19,6 +19,7 @@ import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import type Media from '@server/entity/Media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import axios from 'axios';
+import { useRouter } from 'next/router';
 import { useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR, { useSWRConfig } from 'swr';
@@ -72,6 +73,7 @@ const RequestButton = ({
   const intl = useIntl();
   const { mutate: globalMutate } = useSWRConfig();
   const settings = useSettings();
+  const router = useRouter();
   const { user, hasPermission } = useUser();
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showRequest4kModal, setShowRequest4kModal] = useState(false);
@@ -197,13 +199,26 @@ const RequestButton = ({
       id: 'enable-notifications',
       text: intl.formatMessage(messages.enablenotifications),
       action: async () => {
+        // This device can be asked for notifications right here. Otherwise
+        // (already asked and refused, not installed, not supported) it is
+        // set up on their notification settings, where every way of being
+        // told is offered.
         if (pushState === 'prompt') {
           const subscribed = await subscribeToPush();
 
           if (subscribed) {
             revalidateWatch();
           }
+          return;
         }
+
+        router.push(
+          settings.currentSettings.enablePushRegistration
+            ? '/profile/settings/notifications/webpush'
+            : settings.currentSettings.emailEnabled
+              ? '/profile/settings/notifications/email'
+              : '/profile/settings/notifications/discord'
+        );
       },
       svg: <BellAlertIcon />,
     });

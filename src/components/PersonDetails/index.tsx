@@ -213,7 +213,8 @@ const PersonDetails = () => {
                     media.mediaInfo?.status
                   )}
                   canExpand
-                />
+                />,
+                media.mediaType === 'movie' ? media.title : media.name
               )}
               {media.character && (
                 <div className="mt-2 w-full truncate text-center text-xs text-gray-300">
@@ -265,7 +266,8 @@ const PersonDetails = () => {
                     media.mediaInfo?.status
                   )}
                   canExpand
-                />
+                />,
+                media.mediaType === 'movie' ? media.title : media.name
               )}
               {media.job && (
                 <div className="mt-2 w-full truncate text-center text-xs text-gray-300">

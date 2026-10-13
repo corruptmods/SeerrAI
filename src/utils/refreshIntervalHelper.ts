@@ -1,4 +1,4 @@
-import { MediaStatus } from '@server/constants/media';
+import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
 
 export const getRequestDownloadStatus = (
@@ -64,6 +64,29 @@ export const watchMedia = (
         ),
       }
     : undefined;
+
+/**
+ * What to watch on a request card: its title, as `watchMedia`, until the
+ * request itself is finished with. A completed request (everything it asked
+ * for is here) or a declined one has nothing more coming, however the title
+ * stands: a series stays partly available for good when only some of its
+ * seasons were ever asked for, and waiting on that would check every half
+ * minute for as long as the card is open. A download still shows.
+ */
+export const watchRequest = (request: {
+  status: MediaRequestStatus;
+  media?: Parameters<typeof watchMedia>[0];
+}): Watched | undefined => {
+  const watched = watchMedia(request.media);
+  if (
+    watched &&
+    (request.status === MediaRequestStatus.COMPLETED ||
+      request.status === MediaRequestStatus.DECLINED)
+  ) {
+    return { ...watched, waiting: false };
+  }
+  return watched;
+};
 
 /**
  * How often SWR asks again, worked out from the latest answer rather than

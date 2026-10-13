@@ -48,16 +48,14 @@ export const SettingsProvider = ({
   children,
   currentSettings,
 }: SettingsContextProps) => {
-  const { data, error } = useSWR<PublicSettingsResponse>(
-    '/api/v1/settings/public',
-    { fallbackData: currentSettings }
-  );
+  const { data } = useSWR<PublicSettingsResponse>('/api/v1/settings/public', {
+    fallbackData: currentSettings,
+  });
 
-  let newSettings = defaultSettings;
-
-  if (data && !error) {
-    newSettings = data;
-  }
+  // A failed refresh keeps the settings last loaded (SWR holds on to them):
+  // falling back to the defaults would turn features off until it next
+  // succeeded.
+  const newSettings = data ?? defaultSettings;
 
   return (
     <SettingsContext.Provider value={{ currentSettings: newSettings }}>

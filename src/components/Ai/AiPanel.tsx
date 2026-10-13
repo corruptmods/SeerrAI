@@ -31,7 +31,7 @@ export const useAiAnswer = <T,>() => {
       } catch (e) {
         setState({
           busy: false,
-          error: aiErrorMessage(e, intl.formatMessage(messages.failed)),
+          error: aiErrorMessage(e, intl.formatMessage(messages.failed), intl),
         });
       } finally {
         refresh();

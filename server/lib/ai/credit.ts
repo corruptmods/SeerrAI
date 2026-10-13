@@ -361,8 +361,14 @@ export const creditReport = async (now = new Date()): Promise<CreditReport> => {
   const credit = settings.aiCredit;
   const provider = billedBy(ai);
 
-  const monthStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthStart = today(monthStartDate);
+  // This month by the server's clock, as Seerr's own counts are kept. The
+  // provider's report counts whole UTC days, so it is asked from the 1st in
+  // UTC: local midnight on the 1st, east of UTC, is still the last day of
+  // the month before there, and that whole day was counted in.
+  const monthStart = today(new Date(now.getFullYear(), now.getMonth(), 1));
+  const providerMonthStart = new Date(
+    Date.UTC(now.getFullYear(), now.getMonth(), 1)
+  );
   const balanceAt = credit.balanceAt ? new Date(credit.balanceAt) : null;
 
   const month = await ownSpend(monthStart);
@@ -400,7 +406,11 @@ export const creditReport = async (now = new Date()): Promise<CreditReport> => {
   if (provider && credit.adminKey) {
     try {
       const [thisMonth, since] = await Promise.all([
-        providerSpend(provider, credit.adminKey, monthStartDate),
+        // In its first hours here, the month may not have begun in UTC:
+        // nothing is spent in it yet.
+        providerMonthStart > now
+          ? Promise.resolve(0)
+          : providerSpend(provider, credit.adminKey, providerMonthStart),
         balanceAt
           ? providerSpend(provider, credit.adminKey, balanceAt)
           : Promise.resolve(null),

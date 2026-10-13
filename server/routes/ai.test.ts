@@ -8,7 +8,7 @@ import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
 import agent from '@server/lib/agent';
 import { clearAiCache, today } from '@server/lib/ai';
-import { forgetSpendReports } from '@server/lib/ai/credit';
+import { creditReport, forgetSpendReports } from '@server/lib/ai/credit';
 import { redact } from '@server/lib/ai/features';
 import { resetProviderMemoryForTests } from '@server/lib/ai/providers';
 import ImageProxy from '@server/lib/imageproxy';
@@ -392,8 +392,15 @@ describe('who gets the AI features', () => {
       '/api/v1/ai/status'
     );
     assert.ok(Object.values(body.features).every((on) => !on));
-    const chat = await call('POST', '/api/v1/ai/chat', { message: 'hi' });
+    const chat = await call<{ message: string; code: string }>(
+      'POST',
+      '/api/v1/ai/chat',
+      { message: 'hi' }
+    );
     assert.equal(chat.status, 403);
+    // A code for the page to show in the person's language, and the English.
+    assert.equal(chat.body.code, 'off');
+    assert.match(chat.body.message, /turned off/);
     assert.equal(calls.length, 0);
   });
 
@@ -571,6 +578,23 @@ describe('the AI chat', () => {
     // like that" with nothing under it.
     assert.deepEqual(body.results, []);
     assert.match(body.reply, /Nothing new turned up/);
+  });
+
+  it('clips an earlier turn that runs long rather than refusing the message', async () => {
+    // The app marks a turn that came with a photo, which can take a full
+    // 500-character message over the limit.
+    answers = ['{"r":"ok","titles":[]}'];
+    const { status } = await call('POST', '/api/v1/ai/chat', {
+      message: 'and another',
+      turns: [
+        {
+          ask: `(sent a photo) ${'a'.repeat(500)}`,
+          offered: ['x'.repeat(250)],
+        },
+      ],
+    });
+    assert.equal(status, 200);
+    assert.equal(calls.length, 1);
   });
 
   it('sets up requesting what it offered, and leaves the rest to the person', async () => {
@@ -1051,18 +1075,94 @@ describe('the daily limit', () => {
     assert.equal(await usesToday(), 1);
   });
 
-  it('gives the answer back when nothing usable came of it', async () => {
+  it('gives the answer back only when the provider fails', async () => {
+    // An answer that cannot be read, even on the second try, still counts:
+    // the provider billed for both replies, and handing it back let anyone
+    // word every question so the reply could not be read and never use up
+    // their answers. An empty answer was billed too.
     getSettings().ai.dailyLimit = 5;
-    answers = ['not json', 'still not', httpError(500)];
+    answers = ['not json', 'still not', '', httpError(500)];
+    const unreadable = await call<{ code: string }>('POST', '/api/v1/ai/chat', {
+      message: 'x',
+    });
+    assert.equal(unreadable.status, 502);
+    assert.equal(unreadable.body.code, 'unreadable');
+    assert.equal(await usesToday(), 1);
+    const empty = await call<{ code: string }>('POST', '/api/v1/ai/chat', {
+      message: 'y',
+    });
+    assert.equal(empty.status, 502);
+    assert.equal(empty.body.code, 'empty');
+    assert.equal(await usesToday(), 2);
     assert.equal(
-      (await call('POST', '/api/v1/ai/chat', { message: 'x' })).status,
-      502
-    );
-    assert.equal(
-      (await call('POST', '/api/v1/ai/chat', { message: 'y' })).status,
+      (await call('POST', '/api/v1/ai/chat', { message: 'z' })).status,
       503
     );
-    assert.equal(await usesToday(), 0);
+    assert.equal(await usesToday(), 2);
+  });
+
+  describe('with a photo', () => {
+    // A JPEG by its first bytes, and nothing a decoder can read.
+    const unreadable = Buffer.from([
+      0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8,
+    ]).toString('base64');
+
+    it('is taken before the photo is read, so someone with none left is not given the work', async () => {
+      getSettings().ai.dailyLimit = 1;
+      const first = await call<{ message: string }>('POST', '/api/v1/ai/chat', {
+        message: 'this',
+        image: { type: 'image/jpeg', data: unreadable },
+      });
+      assert.equal(first.status, 400);
+      assert.match(first.body.message, /could not be read/);
+      // Reading it was the work; the answer it took is kept.
+      assert.equal(await usesToday(), 1);
+      const second = await call('POST', '/api/v1/ai/chat', {
+        message: 'this',
+        image: { type: 'image/jpeg', data: unreadable },
+      });
+      assert.equal(second.status, 429);
+      assert.equal(calls.length, 0);
+    });
+
+    it('is handed back when the answer comes from memory', async () => {
+      getSettings().ai.dailyLimit = 5;
+      const jpeg = (
+        await sharp({
+          create: { width: 32, height: 32, channels: 3, background: '#808080' },
+        })
+          .jpeg()
+          .toBuffer()
+      ).toString('base64');
+      answers = ['{"r":"","titles":[]}'];
+      for (let i = 0; i < 2; i++) {
+        const { status } = await call('POST', '/api/v1/ai/chat', {
+          message: 'what is this',
+          image: { type: 'image/jpeg', data: jpeg },
+        });
+        assert.equal(status, 200);
+      }
+      assert.equal(calls.length, 1);
+      assert.equal(await usesToday(), 1);
+    });
+
+    it('is handed back when the provider fails', async () => {
+      getSettings().ai.dailyLimit = 5;
+      const jpeg = (
+        await sharp({
+          create: { width: 32, height: 32, channels: 3, background: '#408040' },
+        })
+          .jpeg()
+          .toBuffer()
+      ).toString('base64');
+      answers = [httpError(500)];
+      const { status } = await call('POST', '/api/v1/ai/chat', {
+        message: 'what is this',
+        image: { type: 'image/jpeg', data: jpeg },
+      });
+      assert.equal(status, 503);
+      assert.equal(await usesToday(), 0);
+    });
   });
 
   it('stops at the limit and says so', async () => {
@@ -1076,11 +1176,16 @@ describe('the daily limit', () => {
       (await call('POST', '/api/v1/ai/chat', { message: 'b' })).status,
       200
     );
-    const third = await call<{ message: string }>('POST', '/api/v1/ai/chat', {
-      message: 'c',
-    });
+    const third = await call<{
+      message: string;
+      code: string;
+      values: unknown;
+    }>('POST', '/api/v1/ai/chat', { message: 'c' });
     assert.equal(third.status, 429);
     assert.match(third.body.message, /all 2 of today's AI answers/);
+    // A code the page shows in the person's language.
+    assert.equal(third.body.code, 'limit');
+    assert.deepEqual(third.body.values, { limit: 2 });
     assert.equal(calls.length, 2);
 
     const { body } = await call<{ remaining: number }>(
@@ -1237,6 +1342,53 @@ describe('explaining a log entry', () => {
       redact('Request failed with status code 404'),
       'Request failed with status code 404'
     );
+  });
+
+  it('keeps people out of it: their addresses, names and emails', () => {
+    const cases: [unknown, string][] = [
+      ['Sign-in from 192.168.1.23 failed', '192.168.1.23'],
+      [
+        'Request from 2001:db8:85a3::8a2e:370:7334 refused',
+        '2001:db8:85a3::8a2e:370:7334',
+      ],
+      ['Request from ::ffff:10.0.0.7 refused', '10.0.0.7'],
+      ['Listening on [fe80::1ff:fe23:4567:890a]:5055', 'fe80::1ff'],
+      ['User alice_smith has no valid email address', 'alice_smith'],
+      ['body {"plexUsername":"bob jones"}', 'jones'],
+      ["jellyfinUsername='dan the man'", 'the man'],
+      ['login failed password="correct horse battery"', 'battery'],
+      [{ ip: 'gateway-7' }, 'gateway-7'],
+      [{ plexUsername: 'carol' }, 'carol'],
+      [{ displayName: 'Carol King' }, 'King'],
+      [{ email: 'carol at home' }, 'carol'],
+      [{ user: { name: 'Erin' } }, 'Erin'],
+      // As Tautulli's lookups log who they were for.
+      [{ user: 'frank_w', userId: 7 }, 'frank_w'],
+    ];
+    for (const [value, personal] of cases) {
+      const sent = JSON.stringify(redact(value));
+      assert.ok(!sent.includes(personal), `${JSON.stringify(value)} → ${sent}`);
+    }
+    // What explains the entry stays.
+    for (const kept of [
+      'Request failed at 12:34:56 with status code 404',
+      'Sonarr v4.0.10 answered in 1.5s',
+      'Failed to update user settings',
+      'hostname: radarr.local',
+      'Plex :: library scan finished',
+    ]) {
+      assert.equal(redact(kept), kept);
+    }
+  });
+
+  it('redacts the entry’s label too', async () => {
+    actingAs = admin;
+    answers = ['Harmless.'];
+    await call('POST', '/api/v1/ai/explain-log', {
+      label: 'Proxy 203.0.113.9',
+      message: 'Request handled',
+    });
+    assert.ok(!calls[0].prompt.includes('203.0.113.9'), calls[0].prompt);
   });
 });
 
@@ -1458,6 +1610,45 @@ describe('credit', () => {
       assert.equal(body.source, 'estimate');
       assert.match(body.providerProblem ?? '', /organization accounts/);
     } finally {
+      get.mock.restore();
+    }
+  });
+
+  it("counts the provider's month from the 1st in UTC, wherever the server is", async () => {
+    actingAs = admin;
+    getSettings().aiCredit.adminKey = 'sk-ant-admin01-good';
+    const since: string[] = [];
+    const get = mock.method(
+      axios,
+      'get',
+      async (_url: string, config: { params: { starting_at: string } }) => {
+        since.push(config.params.starting_at);
+        return { data: { data: [], has_more: false, next_page: null } };
+      }
+    );
+    const zone = process.env.TZ;
+    try {
+      // East of UTC, local midnight on the 1st is still the last day of
+      // the month before in UTC.
+      process.env.TZ = 'Australia/Sydney';
+      const report = await creditReport(new Date('2026-10-15T00:00:00Z'));
+      assert.equal(report.monthStart, '2026-10-01');
+      assert.deepEqual(since, ['2026-10-01T00:00:00.000Z']);
+
+      // In the first hours of the month there, the UTC month has not
+      // begun: nothing has been spent in it yet.
+      forgetSpendReports();
+      since.length = 0;
+      const early = await creditReport(new Date('2026-09-30T15:00:00Z'));
+      assert.equal(early.monthStart, '2026-10-01');
+      assert.equal(early.spentThisMonth, 0);
+      assert.deepEqual(since, []);
+    } finally {
+      if (zone === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = zone;
+      }
       get.mock.restore();
     }
   });

@@ -864,7 +864,7 @@ describe('Auto-fix: from AI Search', () => {
     assert.deepEqual(downloads, ['subdl-es']);
   });
 
-  it('files a broken movie as an issue and fixes it in the background', async () => {
+  it('asks before replacing a file, then files it as an issue and fixes it in the background', async () => {
     releases = [
       release({
         guid: 'new',
@@ -878,9 +878,25 @@ describe('Auto-fix: from AI Search', () => {
       do: 'fix',
       fx: 'broken',
     });
-    const res = await call('POST', '/api/v1/ai/chat', {
+    const asked = await call('POST', '/api/v1/ai/chat', {
       message: 'groundhog day has no sound',
     });
+    assert.equal(asked.status, 200, JSON.stringify(asked.body));
+    // Nothing is touched until they confirm, with the title it would act
+    // on shown to them.
+    assert.equal(await getRepository(Issue).count(), 0);
+    assert.equal(asked.body.fix, undefined);
+    assert.deepEqual(
+      asked.body.results.map((r: { id: number }) => r.id),
+      [137]
+    );
+    assert.deepEqual(asked.body.confirm, {
+      kind: 'broken',
+      mediaId: movie.id,
+      message: 'groundhog day has no sound',
+    });
+
+    const res = await call('POST', '/api/v1/ai/fix', asked.body.confirm);
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.match(res.body.reply, /^Reported it, and started fixing it/);
     const issueId = Number(res.body.fix.link.split('/').pop());
@@ -912,8 +928,61 @@ describe('Auto-fix: from AI Search', () => {
       message: 'groundhog day is broken',
     });
     assert.match(res.body.reply, /needs permission to report problems/);
+    assert.equal(res.body.confirm, undefined);
+    // Nor can it be confirmed by asking the server directly.
+    const direct = await call('POST', '/api/v1/ai/fix', {
+      kind: 'broken',
+      mediaId: movie.id,
+      message: 'groundhog day is broken',
+    });
+    assert.match(direct.body.reply, /needs permission to report problems/);
     assert.equal(await getRepository(Issue).count(), 0);
     assert.deepEqual(deleted, []);
+  });
+
+  it('acts on the title in the library, not the first TMDB has by that name', async () => {
+    const found = (id: number, date: string) => ({
+      id,
+      title: 'Groundhog Day',
+      release_date: date,
+      media_type: 'movie',
+      genre_ids: [],
+      overview: '',
+      popularity: 1,
+      vote_average: 8,
+      vote_count: 1,
+      adult: false,
+      original_language: 'en',
+      original_title: 'Groundhog Day',
+      video: false,
+    });
+    // A newer film by the same name comes first, and is not on the server.
+    Object.defineProperty(TheMovieDb.prototype, 'searchMovies', {
+      configurable: true,
+      set() {},
+      get: () => async () => ({
+        page: 1,
+        total_pages: 1,
+        total_results: 2,
+        results: [found(999001, '2031-01-01'), found(137, '1993-02-11')],
+      }),
+    });
+    modelAnswer = JSON.stringify({
+      r: '',
+      titles: [{ t: 'Groundhog Day', k: 'movie' }],
+      do: 'fix',
+      fx: 'subtitles',
+      lang: 'es',
+    });
+    const res = await call('POST', '/api/v1/ai/chat', {
+      message: 'spanish subtitles for groundhog day',
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.match(res.body.reply, /Downloaded es subtitles/);
+    assert.deepEqual(
+      res.body.results.map((r: { id: number }) => r.id),
+      [137]
+    );
   });
 
   it('points at the open report when the same problem is asked about again', async () => {
@@ -923,9 +992,10 @@ describe('Auto-fix: from AI Search', () => {
       do: 'fix',
       fx: 'broken',
     });
-    const first = await call('POST', '/api/v1/ai/chat', {
+    const asked = await call('POST', '/api/v1/ai/chat', {
       message: 'groundhog day has no sound',
     });
+    const first = await call('POST', '/api/v1/ai/fix', asked.body.confirm);
     await commentOn(Number(first.body.fix.link.split('/').pop()));
     const again = await call('POST', '/api/v1/ai/chat', {
       message: 'groundhog day still has no sound',

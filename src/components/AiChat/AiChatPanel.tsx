@@ -54,6 +54,7 @@ const messages = defineMessages('components.AiChat.AiChatPanel', {
   thinking: 'Thinking…',
   nothingFound: 'Nothing matched. Try describing it another way.',
   openFix: 'Follow it',
+  confirmFix: 'Go Ahead',
   failed: 'That did not work. Try again.',
   clear: 'Start Over',
   search: 'Search',
@@ -86,8 +87,13 @@ interface Turn {
   source?: { name: string; more: boolean };
   /** A fix that was done or started, and the page that follows it. */
   fix?: { kind: string; ok: boolean; link?: string };
+  /** A fix that replaces files, offered, waiting for them to confirm it. */
+  confirm?: Record<string, unknown>;
   error?: string;
 }
+
+/** As long as the server reads a message, or an earlier one sent back. */
+const MAX_ASK = 500;
 
 /** Cards shown for a whole set before "Show all". */
 const SET_PREVIEW = 12;
@@ -198,7 +204,10 @@ const AiChatPanel = ({
       .filter((t) => !t.error)
       .slice(-3)
       .map((t) => ({
-        ask: t.photo ? `(sent a photo) ${t.ask}`.trim() : t.ask,
+        ask: (t.photo ? `(sent a photo) ${t.ask}`.trim() : t.ask).slice(
+          0,
+          MAX_ASK
+        ),
         reply: t.reply,
         offered: (t.results ?? []).slice(0, 8).map(resultLabel),
       }));
@@ -211,6 +220,7 @@ const AiChatPanel = ({
         source?: Turn['source'];
         action?: ChatAction;
         fix?: Turn['fix'];
+        confirm?: Turn['confirm'];
       }>('/api/v1/ai/chat', {
         message: ask,
         turns: earlier,
@@ -218,10 +228,10 @@ const AiChatPanel = ({
           image: { type: withPhoto.type, data: withPhoto.data },
         }),
       });
-      const { reply, results, source, action, fix } = response.data;
+      const { reply, results, source, action, fix, confirm } = response.data;
       setTurns((all) => [
         ...all.slice(0, -1),
-        { ask, photo: shown, reply, results, source, fix },
+        { ask, photo: shown, reply, results, source, fix, confirm },
       ]);
       // Asked to list or request titles: set it up to confirm, never more.
       if (action) {
@@ -238,12 +248,44 @@ const AiChatPanel = ({
         {
           ask,
           photo: shown,
-          error: aiErrorMessage(e, intl.formatMessage(messages.failed)),
+          error: aiErrorMessage(e, intl.formatMessage(messages.failed), intl),
         },
       ]);
     } finally {
       setBusy(false);
       refresh();
+    }
+  };
+
+  // A fix that replaces files, confirmed: filed and started, and the
+  // answer it was offered in says so.
+  const confirmFix = async (index: number) => {
+    const turn = turns[index];
+    if (!turn?.confirm || busy) {
+      return;
+    }
+    setBusy(true);
+    const update = (change: Partial<Turn>) =>
+      setTurns((all) =>
+        all.map((t, i) => (i === index ? { ...t, ...change } : t))
+      );
+    try {
+      const response = await axios.post<{ reply: string; fix?: Turn['fix'] }>(
+        '/api/v1/ai/fix',
+        turn.confirm
+      );
+      update({
+        reply: response.data.reply,
+        fix: response.data.fix,
+        confirm: undefined,
+        error: undefined,
+      });
+    } catch (e) {
+      update({
+        error: aiErrorMessage(e, intl.formatMessage(messages.failed), intl),
+      });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -492,6 +534,17 @@ const AiChatPanel = ({
                       (!turn.results?.length &&
                         intl.formatMessage(messages.nothingFound))}
                   </div>
+                )}
+                {turn.confirm && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => confirmFix(i)}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:opacity-50"
+                  >
+                    <WrenchScrewdriverIcon className="h-4 w-4" />
+                    {intl.formatMessage(messages.confirmFix)}
+                  </button>
                 )}
                 {turn.fix?.link && (
                   <button

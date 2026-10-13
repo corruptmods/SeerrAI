@@ -6985,6 +6985,42 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /ai/fix:
+    post:
+      summary: Carry out a fix offered in the AI chat that replaces files
+      description: The chat only offers a fix that replaces a file (`confirm` in its answer); this files it as an issue and starts it, once the person has confirmed it. Requires permission to report issues.
+      tags:
+        - ai
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - kind
+                - mediaId
+              properties:
+                kind:
+                  type: string
+                  enum: [broken, wrongEpisode]
+                mediaId:
+                  type: number
+                seasonNumber:
+                  type: number
+                episodeNumber:
+                  type: number
+                message:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: What was done, and the issue that follows it
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /ai/reasons:
     get:
       summary: Why each title on a page of suggestions was suggested

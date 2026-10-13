@@ -14,6 +14,7 @@ import {
 } from '@server/lib/ai/features';
 import type { CompletionImage } from '@server/lib/ai/providers';
 import { AiProviderError, IMAGE_TYPES } from '@server/lib/ai/providers';
+import { confirmFix } from '@server/lib/autofix/chat';
 import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
@@ -27,25 +28,56 @@ import { z } from 'zod';
  */
 const aiRoutes = Router();
 
+/**
+ * Why there is no answer: the English, and a code the page shows in the
+ * person's language instead when it knows it (with any numbers it needs).
+ */
+const refuse = (
+  res: Response,
+  status: number,
+  message: string,
+  code?: string,
+  values?: Record<string, string | number>
+) =>
+  res.status(status).json({
+    message,
+    ...(code && { code }),
+    ...(values && { values }),
+  });
+
 /** An answer, or the reason there is none, as a message the page can show. */
 const handle =
   (run: (req: Request) => Promise<unknown>) =>
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response) => {
     try {
       return res.status(200).json(await run(req));
     } catch (e) {
-      if (e instanceof AiError || e instanceof AiProviderError) {
-        return next({ status: e.status, message: e.message });
+      if (e instanceof AiError) {
+        return refuse(res, e.status, e.message, e.code, e.values);
+      }
+      if (e instanceof AiProviderError) {
+        return refuse(res, e.status, e.message, e.code);
       }
       if (e instanceof z.ZodError) {
-        return next({ status: 400, message: e.issues[0]?.message });
+        const issue = e.issues[0];
+        // The only checks a person can trip are on the picture they sent.
+        return refuse(
+          res,
+          400,
+          issue?.message ?? 'That request could not be read.',
+          issue?.path[0] === 'image'
+            ? issue.code === 'too_big'
+              ? 'pictureTooBig'
+              : 'picture'
+            : undefined
+        );
       }
       logger.error('AI feature failed', {
         label: 'AI',
         path: req.path,
         errorMessage: e instanceof Error ? e.message : String(e),
       });
-      return next({ status: 500, message: 'Something went wrong.' });
+      return refuse(res, 500, 'Something went wrong.', 'failed');
     }
   };
 
@@ -54,10 +86,10 @@ const handle =
  * no model, gets a plain refusal rather than lookups made for nothing.
  */
 const need =
-  (feature: AiFeature) => (req: Request, _res: Response, next: NextFunction) =>
+  (feature: AiFeature) => (req: Request, res: Response, next: NextFunction) =>
     aiFeatureOn(feature, req.user)
       ? next()
-      : next({ status: 403, message: 'This AI feature is turned off.' });
+      : refuse(res, 403, 'This AI feature is turned off.', 'off');
 
 /** Which AI features this person has, and how many answers are left today. */
 aiRoutes.get(
@@ -98,18 +130,21 @@ const chatImage = z
     'That picture could not be read.'
   );
 
+// Earlier turns are only context, so anything long is cut to size rather
+// than the whole message refused: a refusal here would stop the
+// conversation for good, as every later message sends the same turns.
 const chatBody = z.object({
   message: z.string().trim().max(500).default(''),
   image: chatImage.optional(),
   turns: z
     .array(
       z.object({
-        ask: z.string().max(500),
+        ask: z.string().transform((a) => a.slice(0, 500)),
         reply: z
           .string()
           .optional()
           .transform((r) => r?.slice(0, 400)),
-        offered: z.array(z.string().max(200)).max(10),
+        offered: z.array(z.string().transform((o) => o.slice(0, 200))).max(10),
       })
     )
     .max(10)
@@ -122,10 +157,32 @@ aiRoutes.post(
   handle(async (req) => {
     const { message, turns, image } = chatBody.parse(req.body);
     if (!message && !image) {
-      throw new AiError('Ask something, or send a picture.', 400);
+      throw new AiError(
+        'Ask something, or send a picture.',
+        400,
+        'askSomething'
+      );
     }
     return chat(req.user!, message, turns, image);
   })
+);
+
+const fixBody = z.object({
+  kind: z.enum(['broken', 'wrongEpisode']),
+  mediaId: z.number().int().positive(),
+  seasonNumber: z.number().int().min(0).max(500).optional(),
+  episodeNumber: z.number().int().min(0).max(5000).optional(),
+  message: z.string().max(500).default(''),
+});
+
+/**
+ * A fix offered in the chat that replaces files, once the person has seen
+ * which title it is for and confirmed it. No model is asked.
+ */
+aiRoutes.post(
+  '/fix',
+  need('aiChat'),
+  handle(async (req) => confirmFix(req.user!, fixBody.parse(req.body)))
 );
 
 aiRoutes.get(

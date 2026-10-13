@@ -12,7 +12,13 @@ import {
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
 import agent from '@server/lib/agent';
-import { AiError, askAi, askAiJson, cacheKey } from '@server/lib/ai';
+import {
+  AiError,
+  askAi,
+  askAiJson,
+  cacheKey,
+  reserveUse,
+} from '@server/lib/ai';
 import type { Activity, NamedTitle } from '@server/lib/ai/context';
 import {
   ago,
@@ -265,9 +271,24 @@ export const chat = async (
   turns: ChatTurn[],
   sent?: CompletionImage
 ) => {
-  // Shrunk to the budget first, so the same photo is the same question.
-  const image = sent && (await preparePhoto(sent));
-  const history = historyNote(await recentActivity(user));
+  // A photo takes real work to read, so one of today's answers is taken
+  // before it is looked at: someone with none left is turned away first.
+  // It is handed back if the answer then comes from the cache or the
+  // provider fails; a picture that cannot be read keeps it.
+  const paid = sent ? await reserveUse(user) : undefined;
+  let image: CompletionImage | undefined;
+  let history: string;
+  try {
+    // Shrunk to the budget first, so the same photo is the same question.
+    image = sent && (await preparePhoto(sent));
+    history = historyNote(await recentActivity(user));
+  } catch (e) {
+    // Seerr failing on its own side is not the person's to pay for.
+    if (!(e instanceof AiError)) {
+      await paid?.();
+    }
+    throw e;
+  }
   // The last few turns word for word, so "yes" or "no, the older one" makes
   // sense; older ones cost tokens and rarely matter.
   const earlier = turns
@@ -304,6 +325,7 @@ export const chat = async (
     feature: 'aiChat',
     user,
     image,
+    paid,
     system:
       'You help someone find films and TV series for their home media server. ' +
       (image ? PICTURE_NOTE : '') +
@@ -456,7 +478,11 @@ export const suggestionReasons = async (
   }
   const watching = await recentWatching(user, 10);
   if (!watching.length) {
-    throw new AiError('There is no watch history to explain these by.', 409);
+    throw new AiError(
+      'There is no watch history to explain these by.',
+      409,
+      'noHistory'
+    );
   }
   const list = items.map((item, i) => `${i + 1}. ${label(item)}`).join('\n');
 
@@ -606,7 +632,8 @@ export const pickForRoom = async (
   if (!tastes.length) {
     throw new AiError(
       'Nobody chosen has any watch history to pick from yet.',
-      409
+      409,
+      'nobodyHistory'
     );
   }
 
@@ -639,7 +666,8 @@ export const pickForRoom = async (
       options.availableOnly
         ? 'Nothing in the library matches yet. Try including titles not in the library.'
         : 'There is nothing to pick from yet.',
-      409
+      409,
+      options.availableOnly ? 'nothingInLibrary' : 'nothingToPick'
     );
   }
 
@@ -719,7 +747,11 @@ export const recap = async (user: User, tvId: number, upTo: Position) => {
     .filter((s) => s.season_number >= 1 && s.season_number <= upTo.season)
     .sort((a, b) => a.season_number - b.season_number);
   if (!seasons.length || (upTo.season === 1 && upTo.episode <= 1)) {
-    throw new AiError('There is nothing before this episode to recap.', 400);
+    throw new AiError(
+      'There is nothing before this episode to recap.',
+      400,
+      'nothingToRecap'
+    );
   }
 
   const lines: string[] = [];
@@ -756,7 +788,11 @@ export const recap = async (user: User, tvId: number, upTo: Position) => {
     );
   }
   if (!lines.length) {
-    throw new AiError('TMDB has no episode summaries for this series.', 409);
+    throw new AiError(
+      'TMDB has no episode summaries for this series.',
+      409,
+      'noSummaries'
+    );
   }
 
   const text = await askAi({
@@ -877,7 +913,7 @@ export const triageIssue = async (user: User, issueId: number) => {
     relations: { media: true, comments: true },
   });
   if (!issue) {
-    throw new AiError('Issue not found.', 404);
+    throw new AiError('Issue not found.', 404, 'issueNotFound');
   }
   const tmdb = new TheMovieDb();
   const details = await (
@@ -948,6 +984,35 @@ export const triageIssue = async (user: User, issueId: number) => {
 const SECRET_KEY =
   /(token|key|secret|password|passwd|pwd|auth|cookie|session|credential|signature)/i;
 
+/**
+ * Nor anything that says who someone is or where they are: their address,
+ * their name on Seerr, Plex, Jellyfin or Emby, their email.
+ */
+const PERSONAL_KEY =
+  /^(?:ip|ips|ipv[46]|\w*ip_?address(?:es)?|(?:client|remote|real|user)_?ip|remote_?address|x-forwarded-for|x-real-ip|\w*user_?name|display_?name|e-?mail(?:_?address)?|name)$/i;
+
+/**
+ * Who something was for or by, when it is given as their name rather than
+ * as the whole user (`user: 'alice'`, as Tautulli's lookups log it). A
+ * whole user under these keys is gone through like anything else.
+ */
+const PERSON_KEY = /^(?:user|owner|requested_?by|modified_?by)$/i;
+
+/**
+ * A value after `name=`, `name: ` or `"name":`, quoted or not. A quoted
+ * value is taken whole, spaces and all, up to its closing quote, and its
+ * quotes are kept: replace with KEYED_REDACTED.
+ */
+const keyed = (names: string) =>
+  new RegExp(
+    `(["']?${names}["']?\\s*[=:]\\s*)(?:(")(?:[^"\\\\]|\\\\.)*"|(')(?:[^'\\\\]|\\\\.)*'|[^\\s"'&,;}]+)`,
+    'gi'
+  );
+const KEYED_REDACTED = '$1$2$3[redacted]$2$3';
+
+/** One group of an IPv6 address. */
+const HEX = '[0-9a-f]{1,4}';
+
 const SECRET_TEXT: [RegExp, string][] = [
   // user:password@ in an address.
   [/(\/\/)[^/\s:@]+:[^/\s@]+@/g, '$1[redacted]@'],
@@ -956,12 +1021,37 @@ const SECRET_TEXT: [RegExp, string][] = [
   // name=value, name: value and "name":"value" for anything secret-sounding,
   // in addresses, headers, or JSON inside a string.
   [
-    /(["']?[\w-]*(?:token|key|secret|password|passwd|pwd|auth|cookie|session|signature)[\w-]*["']?\s*[=:]\s*["']?)[^\s"'&,;}]+/gi,
-    '$1[redacted]',
+    keyed(
+      '[\\w-]*(?:token|key|secret|password|passwd|pwd|auth|cookie|session|signature)[\\w-]*'
+    ),
+    KEYED_REDACTED,
+  ],
+  // The same for names and addresses (plexUsername=…, "displayName":"…").
+  [
+    keyed(
+      '(?:[\\w-]*user_?name|display_?name|\\be-?mail|\\bip|\\bip_?address|client_?ip|remote_?address|\\bname)'
+    ),
+    KEYED_REDACTED,
+  ],
+  // Someone named in a sentence: "User alice_smith has no valid email".
+  [
+    /\b(user(?:name)?\s+)(?!(?:id|ids|settings?|not|is|was|has|had|with|from|to|in|on|of|for|and|or|the|a|an|by|account|accounts|lists?|data|requests?|permissions?|agent|sync|import|found|cannot|could|does|did|tried|logged|signed|deleted|created|updated)\b)("[^"]*"|'[^']*'|[^\s"',;:()[\]{}]+)/gi,
+    '$1[user]',
   ],
   // Long opaque strings: API keys and tokens, including Plex's 20 characters.
   [/\b[A-Za-z0-9_-]{20,}\b/g, '[redacted]'],
   [/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]'],
+  // IPv6 addresses, written out in full or shortened with "::", and IPv4
+  // written inside one (::ffff:10.0.0.7).
+  [
+    new RegExp(
+      `(?<![\\w:.])(?:(?:${HEX}:){7}${HEX}|${HEX}(?::${HEX})*::(?:${HEX}(?::${HEX})*)?|::${HEX}(?::${HEX})*)(?:\\.\\d{1,3}){0,3}`,
+      'gi'
+    ),
+    '[ip]',
+  ],
+  // IPv4 addresses.
+  [/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[ip]'],
 ];
 
 export const redact = (value: unknown, depth = 0): unknown => {
@@ -983,7 +1073,11 @@ export const redact = (value: unknown, depth = 0): unknown => {
         .slice(0, 20)
         .map(([k, v]) => [
           k,
-          SECRET_KEY.test(k) ? '[redacted]' : redact(v, depth + 1),
+          SECRET_KEY.test(k) ||
+          PERSONAL_KEY.test(k) ||
+          (PERSON_KEY.test(k) && typeof v === 'string')
+            ? '[redacted]'
+            : redact(v, depth + 1),
         ])
     );
   }
@@ -995,7 +1089,9 @@ export const explainLog = async (
   entry: { label?: string; level?: string; message: string; data?: unknown }
 ) => {
   const data = entry.data ? clip(JSON.stringify(redact(entry.data)), 800) : '';
-  const prompt = `[${entry.level ?? 'error'}] [${entry.label ?? 'Seerr'}] ${clip(
+  const prompt = `[${entry.level ?? 'error'}] [${
+    entry.label ? clip(redact(entry.label) as string, 60) : 'Seerr'
+  }] ${clip(
     redact(entry.message) as string,
     600
   )}${data ? `\nDetails: ${data}` : ''}`;

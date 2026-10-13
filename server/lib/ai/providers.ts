@@ -73,7 +73,12 @@ export class AiProviderError extends Error {
     message: string,
     public readonly status = 502,
     /** The provider said the account has no credit left. */
-    public readonly outOfCredit = false
+    public readonly outOfCredit = false,
+    /**
+     * For the page to show it in the person's language, as AiError's code;
+     * left out where the message carries the provider's own details.
+     */
+    public readonly code?: string
   ) {
     super(message);
   }
@@ -190,14 +195,21 @@ const explain = (
     );
   }
   if (e.code === 'ECONNABORTED' || e.code === 'ETIMEDOUT') {
-    return new AiProviderError(`${provider} took too long to answer.`, 504);
+    return new AiProviderError(
+      `${provider} took too long to answer.`,
+      504,
+      false,
+      'timeout'
+    );
   }
   const status = e.response?.status;
   const detail = scrub(detailOf(e)).slice(0, 300);
   if (withImage && refusedPicture(e)) {
     return new AiProviderError(
       'The AI model in use cannot read pictures. An admin can choose one that can in the AI settings.',
-      400
+      400,
+      false,
+      'noPictures'
     );
   }
   if (isOutOfCredit(e)) {
@@ -210,7 +222,8 @@ const explain = (
             : 'The AI service account'
       } is out of credit. AI features work again once more is added.`,
       503,
-      true
+      true,
+      'outOfCredit'
     );
   }
   if (status === 401) {
@@ -229,13 +242,17 @@ const explain = (
   if (status === 429) {
     return new AiProviderError(
       `${provider} is limiting requests. Try again shortly.`,
-      503
+      503,
+      false,
+      'busy'
     );
   }
   if (status && status >= 500) {
     return new AiProviderError(
       `${provider} is having trouble right now. Try again shortly.`,
-      503
+      503,
+      false,
+      'busy'
     );
   }
   if (!e.response) {

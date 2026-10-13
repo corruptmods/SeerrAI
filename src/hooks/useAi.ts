@@ -1,7 +1,7 @@
 import useSettings from '@app/hooks/useSettings';
 import { useUser } from '@app/hooks/useUser';
+import aiErrorMessage from '@app/utils/aiErrorMessage';
 import type { AiFeature } from '@server/constants/features';
-import { isAxiosError } from 'axios';
 import useSWR from 'swr';
 
 interface AiStatus {
@@ -30,9 +30,6 @@ const useAi = () => {
   };
 };
 
-/** The server's reason, which is always written to be shown. */
-export const aiErrorMessage = (e: unknown, fallback: string): string =>
-  (isAxiosError(e) && (e.response?.data as { message?: string })?.message) ||
-  fallback;
+export { aiErrorMessage };
 
 export default useAi;

@@ -4,6 +4,7 @@ import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import type {
   NoneFoundOutcome,
+  SubtitleError,
   SubtitleSearchResponse,
 } from '@server/interfaces/api/subtitlesInterfaces';
 import { featureEnabled } from '@server/lib/features';
@@ -31,12 +32,13 @@ import {
   subtitlesReady,
   toSearchResult,
   whisperOn,
+  whisperProblemText,
   whisperUnavailable,
 } from '@server/lib/subtitles';
 import transcriber from '@server/lib/transcriber';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
-import type { NextFunction, Request } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 
@@ -48,11 +50,33 @@ import { z } from 'zod';
  */
 const subtitleRoutes = Router();
 
-const notFound = (message: string) => ({ status: 404, message });
+/*
+ * A failure is answered with a code the page turns into words in the
+ * viewer's language (see the error handler at the end), and the same
+ * reason in English as `message`, for anything else reading the API.
+ */
+interface Failure {
+  status: number;
+  message: string;
+  problem: SubtitleError;
+}
+
+const failure = (
+  status: number,
+  problem: SubtitleError | SubtitleError['code'],
+  message: string
+): Failure => ({
+  status,
+  message,
+  problem: typeof problem === 'string' ? { code: problem } : problem,
+});
+
+const notFound = (code: SubtitleError['code'], message: string) =>
+  failure(404, code, message);
 
 subtitleRoutes.use((req, _res, next) => {
   if (!subtitlesReady() || !featureEnabled('subtitles', req.user)) {
-    return next(notFound('Subtitles are not set up.'));
+    return next(notFound('off', 'Subtitles are not set up.'));
   }
   next();
 });
@@ -62,7 +86,17 @@ const bazarrFailed = (next: NextFunction, e: unknown, what: string) => {
     label: 'Subtitles',
     errorMessage: e instanceof Error ? e.message : String(e),
   });
-  next({ status: 502, message: 'Bazarr did not answer.' });
+  next(failure(502, 'bazarrFailed', 'Bazarr did not answer.'));
+};
+
+/** Whisper cannot be used now: says why, or carries on. */
+const whisperRefused = async (next: NextFunction): Promise<boolean> => {
+  const paused = await whisperUnavailable();
+  if (paused) {
+    next(failure(409, paused, whisperProblemText(paused)));
+    return true;
+  }
+  return false;
 };
 
 const idParam = (value: string) => {
@@ -83,13 +117,26 @@ const arrId = async (
   next: NextFunction
 ): Promise<number | undefined> => {
   const tmdbId = idParam(tmdbIdParam);
-  const id = tmdbId ? await arrIdFor(MEDIA_TYPE[kind], tmdbId) : undefined;
-  if (!id) {
+  const { inArr, id } = tmdbId
+    ? await arrIdFor(MEDIA_TYPE[kind], tmdbId)
+    : { inArr: false, id: undefined };
+  if (!inArr) {
     next(
       notFound(
+        'notInArr',
         kind === 'movie'
           ? 'This movie is not in Radarr.'
           : 'This series is not in Sonarr.'
+      )
+    );
+  } else if (!id) {
+    // On a Radarr or Sonarr that Bazarr does not follow.
+    next(
+      notFound(
+        'notInBazarr',
+        kind === 'movie'
+          ? 'Bazarr does not have this movie.'
+          : 'Bazarr does not have this series.'
       )
     );
   }
@@ -115,7 +162,7 @@ const episodeOf = async (params: EpisodeParams, next: NextFunction) => {
       ? await findEpisode(seriesId, season, number)
       : undefined;
   if (!episode) {
-    next(notFound('Bazarr does not have this episode.'));
+    next(notFound('notInBazarr', 'Bazarr does not have this episode.'));
     return undefined;
   }
   return { seriesId, episode };
@@ -133,7 +180,9 @@ subtitleRoutes.get<{ tmdbId: string }>(
     try {
       const subtitles = await movieSubtitles(radarrId);
       if (!subtitles) {
-        return next(notFound('Bazarr does not have this movie.'));
+        return next(
+          notFound('notInBazarr', 'Bazarr does not have this movie.')
+        );
       }
       return res.status(200).json(subtitles);
     } catch (e) {
@@ -152,7 +201,9 @@ subtitleRoutes.get<{ tmdbId: string }>(
     try {
       const subtitles = await seriesSubtitles(seriesId);
       if (!subtitles) {
-        return next(notFound('Bazarr does not have this series.'));
+        return next(
+          notFound('notInBazarr', 'Bazarr does not have this series.')
+        );
       }
       return res.status(200).json(subtitles);
     } catch (e) {
@@ -357,7 +408,7 @@ subtitleRoutes.delete<{ tmdbId: string; subtitleId: string }>(
       );
       // Only a file can be deleted; a track inside the video stays.
       if (!subtitle?.path) {
-        return next(notFound('That subtitle file is not there.'));
+        return next(notFound('notOnDisk', 'That subtitle file is not there.'));
       }
       await bazarr().deleteMovieSubtitle(radarrId, subtitle);
       return res.status(204).send();
@@ -379,7 +430,7 @@ subtitleRoutes.delete<EpisodeParams & { subtitleId: string }>(
       (s) => s.id === Number(req.params.subtitleId)
     );
     if (!subtitle?.path) {
-      return next(notFound('That subtitle file is not there.'));
+      return next(notFound('notOnDisk', 'That subtitle file is not there.'));
     }
     try {
       await bazarr().deleteEpisodeSubtitle(
@@ -416,9 +467,8 @@ subtitleRoutes.post<{ tmdbId: string }>(
     if (!radarrId) {
       return;
     }
-    const paused = await whisperUnavailable();
-    if (paused) {
-      return next({ status: 409, message: paused });
+    if (await whisperRefused(next)) {
+      return;
     }
     const owner = `movie:${idParam(req.params.tmdbId)}`;
     const added = queueMovieTranscription(owner, radarrId);
@@ -452,9 +502,8 @@ subtitleRoutes.post<{ tmdbId: string }>(
     if (!seriesId) {
       return;
     }
-    const paused = await whisperUnavailable();
-    if (paused) {
-      return next({ status: 409, message: paused });
+    if (await whisperRefused(next)) {
+      return;
     }
     try {
       const owner = `tv:${idParam(req.params.tmdbId)}`;
@@ -490,7 +539,7 @@ const plexFailed = (next: NextFunction, e: unknown) => {
     label: 'Subtitles',
     errorMessage: e instanceof Error ? e.message : String(e),
   });
-  next({ status: 502, message: 'Plex did not answer.' });
+  next(failure(502, 'plexFailed', 'Plex did not answer.'));
 };
 
 const UNAVAILABLE = { available: false, options: [], selected: 0 };
@@ -521,7 +570,7 @@ subtitleRoutes.put<{ tmdbId: string }>(
     }
     const ratingKey = await ratingKeyOf('movie', req.params.tmdbId);
     if (!ratingKey || !req.user) {
-      return next(notFound('This movie is not in Plex.'));
+      return next(notFound('notInPlex', 'This movie is not in Plex.'));
     }
     try {
       const done = await setMovieDefault(
@@ -530,7 +579,7 @@ subtitleRoutes.put<{ tmdbId: string }>(
         body.data.streamId
       );
       if (!done) {
-        return next({ status: 409, message: 'Plex did not offer that.' });
+        return next(failure(409, 'notOffered', 'Plex did not offer that.'));
       }
       return res.status(204).send();
     } catch (e) {
@@ -565,7 +614,7 @@ subtitleRoutes.put<{ tmdbId: string }>(
     }
     const ratingKey = await ratingKeyOf('tv', req.params.tmdbId);
     if (!ratingKey || !req.user) {
-      return next(notFound('This series is not in Plex.'));
+      return next(notFound('notInPlex', 'This series is not in Plex.'));
     }
     try {
       const episodes = await setSeriesDefault(
@@ -574,12 +623,26 @@ subtitleRoutes.put<{ tmdbId: string }>(
         body.data.language
       );
       if (episodes === undefined) {
-        return next({ status: 409, message: 'No Plex sign-in to use.' });
+        return next(failure(409, 'noPlexSignIn', 'No Plex sign-in to use.'));
       }
       return res.status(202).json({ episodes });
     } catch (e) {
       return plexFailed(next, e);
     }
+  }
+);
+
+// The failures above, with their codes; anything else goes on to the
+// server's own error handler.
+subtitleRoutes.use(
+  (err: unknown, _req: Request, res: Response, next: NextFunction) => {
+    const failed = err as Partial<Failure> | undefined;
+    if (!failed?.problem || res.headersSent) {
+      return next(err);
+    }
+    res
+      .status(failed.status ?? 500)
+      .json({ message: failed.message, ...failed.problem });
   }
 );
 

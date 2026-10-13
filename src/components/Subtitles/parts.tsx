@@ -1,7 +1,14 @@
+import useSettings from '@app/hooks/useSettings';
+import type { SubtitlesKind } from '@app/hooks/useSubtitles';
 import defineMessages from '@app/utils/defineMessages';
 import { formatOf, formatSize, providerName } from '@app/utils/subtitles';
 import { ArrowPathIcon, TrashIcon } from '@heroicons/react/24/outline';
-import type { SubtitleTrack } from '@server/interfaces/api/subtitlesInterfaces';
+import { MediaServerType } from '@server/constants/server';
+import type {
+  SubtitleError,
+  SubtitleTrack,
+} from '@server/interfaces/api/subtitlesInterfaces';
+import { isAxiosError } from 'axios';
 import type { ReactNode } from 'react';
 import type { IntlShape } from 'react-intl';
 import { useIntl } from 'react-intl';
@@ -30,7 +37,95 @@ export const messages = defineMessages('components.Subtitles', {
   replaceNamed: 'Replace the {language} subtitle',
   addInstead: 'Add a {language} subtitle file to play instead',
   deleteNamed: 'Delete the {language} subtitle file',
+  reasonOff: 'Subtitles are not set up.',
+  reasonNotInRadarr: 'This movie is not in Radarr.',
+  reasonNotInSonarr: 'This series is not in Sonarr.',
+  reasonNotInBazarr: 'Bazarr does not have it yet.',
+  reasonNotOnDisk: 'That subtitle file is not there.',
+  reasonWhisperOff:
+    'WhisperAI is not turned on in Bazarr (Settings → Providers).',
+  reasonWhisperPaused:
+    'Bazarr paused WhisperAI after an error ({error}). Whisper may be busy with another job.',
+  reasonWhisperPausedRetry:
+    'Bazarr paused WhisperAI after an error ({error}), and tries again {retry}. Whisper may be busy with another job.',
+  reasonNoWhisper: 'Bazarr offered no Whisper transcription for it.',
+  reasonBazarrFailed: 'Bazarr did not answer.',
+  reasonNotInPlex: 'This is not in Plex.',
+  reasonPlexFailed: 'Plex did not answer.',
+  reasonNotOffered: 'Plex did not offer that.',
+  reasonNoPlexSignIn: 'There is no Plex sign-in to use for you.',
 });
+
+/** The media server's name, for wording that is not Plex's alone. */
+export const useMediaServerName = (): string => {
+  const { currentSettings } = useSettings();
+  switch (currentSettings.mediaServerType) {
+    case MediaServerType.EMBY:
+      return 'Emby';
+    case MediaServerType.PLEX:
+      return 'Plex';
+    default:
+      return 'Jellyfin';
+  }
+};
+
+/**
+ * Why something to do with a title's subtitles did not work, in the
+ * viewer's language. The server answers with a code for that; anything
+ * without one (no answer at all) reads as Bazarr not answering.
+ */
+export const useSubtitleReasons = (kind: SubtitlesKind) => {
+  const intl = useIntl();
+  const describe = (problem?: Partial<SubtitleError>): string => {
+    switch (problem?.code) {
+      case 'off':
+        return intl.formatMessage(messages.reasonOff);
+      case 'notInArr':
+        return intl.formatMessage(
+          kind === 'movie'
+            ? messages.reasonNotInRadarr
+            : messages.reasonNotInSonarr
+        );
+      case 'notInBazarr':
+        return intl.formatMessage(messages.reasonNotInBazarr);
+      case 'notOnDisk':
+        return intl.formatMessage(messages.reasonNotOnDisk);
+      case 'whisperOff':
+        return intl.formatMessage(messages.reasonWhisperOff);
+      case 'whisperPaused':
+        return problem.retry
+          ? intl.formatMessage(messages.reasonWhisperPausedRetry, {
+              error: problem.error,
+              retry: problem.retry,
+            })
+          : intl.formatMessage(messages.reasonWhisperPaused, {
+              error: problem.error,
+            });
+      case 'noWhisper':
+        return intl.formatMessage(messages.reasonNoWhisper);
+      case 'notInPlex':
+        return intl.formatMessage(messages.reasonNotInPlex);
+      case 'plexFailed':
+        return intl.formatMessage(messages.reasonPlexFailed);
+      case 'notOffered':
+        return intl.formatMessage(messages.reasonNotOffered);
+      case 'noPlexSignIn':
+        return intl.formatMessage(messages.reasonNoPlexSignIn);
+      default:
+        return intl.formatMessage(messages.reasonBazarrFailed);
+    }
+  };
+  return {
+    describe,
+    /** The reason in a failed request's answer. */
+    reasonOf: (e: unknown) =>
+      describe(
+        isAxiosError(e)
+          ? (e.response?.data as Partial<SubtitleError> | undefined)
+          : undefined
+      ),
+  };
+};
 
 /** A small tag: the subtitle's format, or AI, SDH, FORCED, MISSING. */
 export const Tag = ({

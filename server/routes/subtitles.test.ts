@@ -13,6 +13,7 @@ import type {
 } from '@server/interfaces/api/subtitlesInterfaces';
 import { Permission } from '@server/lib/permissions';
 import { pickStream } from '@server/lib/plexSubtitles';
+import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import {
   forgetWhisper,
@@ -181,6 +182,8 @@ let providersOn = ['opensubtitlescom', 'whisperai'];
 let pausedNow: Record<string, { status: string; retry: string }> = {};
 /** Holds Bazarr's own search open until released. */
 let searchGate: Promise<void> | undefined;
+/** Holds Plex's answers about single episodes open until released. */
+let plexGate: Promise<void> | undefined;
 
 const movieHistory = [
   { action: 5, provider: null, subtitles_path: movie.subtitles[1].path },
@@ -359,7 +362,7 @@ before(async () => {
     res.end('<!doctype html><title>Bazarr</title>');
   });
 
-  plexPort = await listen((req, res) => {
+  plexPort = await listen(async (req, res) => {
     const url = new URL(req.url ?? '', 'http://x');
     const token = String(req.headers['x-plex-token'] ?? '');
     res.setHeader('Content-Type', 'application/json');
@@ -396,6 +399,9 @@ before(async () => {
     }
     const episodeKey = url.pathname.match(/^\/library\/metadata\/(90\d)$/);
     if (episodeKey) {
+      if (plexGate) {
+        await plexGate;
+      }
       const n = Number(episodeKey[1]) - 900;
       return res.end(
         JSON.stringify({
@@ -456,6 +462,7 @@ beforeEach(async () => {
   providersOn = ['opensubtitlescom', 'whisperai'];
   pausedNow = {};
   searchGate = undefined;
+  plexGate = undefined;
   forgetWhisper();
   const settings = getSettings();
   settings.bazarr = {
@@ -467,6 +474,16 @@ beforeEach(async () => {
   };
   settings.main.disabledFeatures = [];
   settings.main.mediaServerType = MediaServerType.PLEX;
+  // Bazarr follows the main servers; the second ones number their titles
+  // on their own, so the same ids name other titles there.
+  settings.radarr = [
+    { id: 0, name: 'Radarr', is4k: false, isDefault: true },
+    { id: 1, name: 'Radarr Anime', is4k: false, isDefault: false },
+  ] as RadarrSettings[];
+  settings.sonarr = [
+    { id: 0, name: 'Sonarr', is4k: false, isDefault: true },
+    { id: 1, name: 'Sonarr Anime', is4k: false, isDefault: false },
+  ] as SonarrSettings[];
   settings.plex = {
     ...settings.plex,
     machineId: 'machine-1',
@@ -505,6 +522,7 @@ beforeEach(async () => {
       tmdbId: 333371,
       mediaType: MediaType.MOVIE,
       status: MediaStatus.AVAILABLE,
+      serviceId: 0,
       externalServiceId: RADARR_ID,
       ratingKey: '121141',
     }),
@@ -512,8 +530,24 @@ beforeEach(async () => {
       tmdbId: 212989,
       mediaType: MediaType.TV,
       status: MediaStatus.AVAILABLE,
+      serviceId: 0,
       externalServiceId: SONARR_ID,
       ratingKey: '900',
+    }),
+    // On the second servers, under ids the main ones gave other titles.
+    new Media({
+      tmdbId: 990001,
+      mediaType: MediaType.MOVIE,
+      status: MediaStatus.AVAILABLE,
+      serviceId: 1,
+      externalServiceId: RADARR_ID,
+    }),
+    new Media({
+      tmdbId: 990002,
+      mediaType: MediaType.TV,
+      status: MediaStatus.AVAILABLE,
+      serviceId: 1,
+      externalServiceId: SONARR_ID,
     }),
   ]);
 });
@@ -613,11 +647,30 @@ describe('reading a title’s subtitles', () => {
     assert.equal((await call('GET', '/movie/333371')).status, 404);
   });
 
+  it('leaves alone a title on a Radarr or Sonarr Bazarr does not follow', async () => {
+    actingAs = admin;
+    for (const route of [
+      'GET /movie/990001',
+      'GET /tv/990002',
+      'GET /movie/990001/search',
+      'DELETE /movie/990001/subtitle/103755',
+      'POST /movie/990001/transcription',
+      'POST /tv/990002/search-missing',
+    ]) {
+      const [method, url] = route.split(' ');
+      const { status, body } = await call<{ code?: string }>(method, url);
+      assert.deepEqual([status, body.code], [404, 'notInBazarr'], route);
+    }
+    assert.deepEqual(writes, [], 'nothing was asked of Bazarr');
+    assert.equal(transcriber.status('movie:990001').queued, 0);
+    assert.equal(transcriber.status('movie:990001').running, false);
+  });
+
   it('says so for a title Radarr does not have', async () => {
     const { status, body } = await call('GET', '/movie/1');
     assert.deepEqual(
-      [status, body.message],
-      [404, 'This movie is not in Radarr.']
+      [status, body.message, body.code],
+      [404, 'This movie is not in Radarr.', 'notInArr']
     );
   });
 });
@@ -939,14 +992,21 @@ describe('transcribing', () => {
     pausedNow = {
       whisperai: { status: 'ReadTimeout', retry: 'in 41 minutes' },
     };
-    const movie = await call<{ message: string }>(
-      'POST',
-      '/movie/333371/transcription'
-    );
+    const movie = await call<{
+      message: string;
+      code?: string;
+      error?: string;
+      retry?: string;
+    }>('POST', '/movie/333371/transcription');
     assert.equal(movie.status, 409);
     assert.equal(
       movie.body.message,
       'Bazarr paused WhisperAI after an error (ReadTimeout); it tries again in 41 minutes. Whisper may be busy with another job.'
+    );
+    assert.deepEqual(
+      [movie.body.code, movie.body.error, movie.body.retry],
+      ['whisperPaused', 'ReadTimeout', 'in 41 minutes'],
+      'for the page to say in the viewer’s language'
     );
     const series = await call('POST', '/tv/212989/transcription', {
       scope: 'notTranscribed',
@@ -967,7 +1027,26 @@ describe('transcribing', () => {
     await waitFor(() => !transcriber.status('movie:333371').running);
     const status = transcriber.status('movie:333371');
     assert.equal(status.failed, 1);
-    assert.match(status.error ?? '', /^Bazarr paused WhisperAI/);
+    assert.deepEqual(status.error, {
+      code: 'whisperPaused',
+      error: 'ReadTimeout',
+      retry: 'in 41 minutes',
+    });
+  });
+
+  it('tells anyone who looks only that Bazarr failed, not how', async () => {
+    const queue = new Transcriber();
+    queue.enqueue([
+      {
+        key: 'movie:1',
+        owner: 'movie:1',
+        run: async () => {
+          throw new Error('connect ECONNREFUSED 10.0.0.5:6767');
+        },
+      },
+    ]);
+    await waitFor(() => queue.status('movie:1').failed === 1);
+    assert.deepEqual(queue.status('movie:1').error, { code: 'bazarrFailed' });
   });
 });
 
@@ -1028,6 +1107,29 @@ describe('the subtitle your own Plex player starts with', () => {
         ['/library/parts/610', '612'],
         ['/library/parts/620', '622'],
       ]
+    );
+  });
+
+  it('lets a newer choice for a series win over one still being set', async () => {
+    let release: () => void = () => undefined;
+    plexGate = new Promise<void>((resolve) => (release = resolve));
+    for (const language of ['eng', 'spa']) {
+      assert.equal(
+        (await call('PUT', '/tv/212989/plex-default', { language })).status,
+        202
+      );
+    }
+    release();
+    await waitFor(() => plexWrites.length >= 2);
+    // Long enough for a pass still going to have written too.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.deepEqual(
+      plexWrites.map((w) => [w.path, w.query.subtitleStreamID]).sort(),
+      [
+        ['/library/parts/610', '613'],
+        ['/library/parts/620', '623'],
+      ],
+      'only Spanish, the later choice'
     );
   });
 

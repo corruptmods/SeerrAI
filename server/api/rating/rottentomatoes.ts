@@ -89,6 +89,9 @@ const best = (rs: RTAlgoliaHit[], name: string, year?: number): RTAlgoliaHit =>
     .filter(({ score }) => score > MINIMUM_SCORE)
     .sort(({ score: a }, { score: b }) => b - a)[0]?.result;
 
+/** A search is a read, so its answer is kept like any other (seconds). */
+const SEARCH_TTL = 300;
+
 /**
  * This is a best-effort API. The Rotten Tomatoes API is technically
  * private and getting access costs money/requires approval.
@@ -136,15 +139,20 @@ class RottenTomatoes extends ExternalAPI {
   ): Promise<RTRating | null> {
     try {
       const filters = encodeURIComponent('isEmsSearchable=1 AND type:"movie"');
-      const data = await this.post<RTAlgoliaSearchResponse>('/queries', {
-        requests: [
-          {
-            indexName: 'content_rt',
-            query: name.replace(/\bthe\b ?/gi, ''),
-            params: `filters=${filters}&hitsPerPage=20`,
-          },
-        ],
-      });
+      const data = await this.post<RTAlgoliaSearchResponse>(
+        '/queries',
+        {
+          requests: [
+            {
+              indexName: 'content_rt',
+              query: name.replace(/\bthe\b ?/gi, ''),
+              params: `filters=${filters}&hitsPerPage=20`,
+            },
+          ],
+        },
+        undefined,
+        SEARCH_TTL
+      );
 
       const contentResults = data.results.find((r) => r.index === 'content_rt');
       const movie = best(contentResults?.hits || [], name, year);
@@ -179,15 +187,20 @@ class RottenTomatoes extends ExternalAPI {
   ): Promise<RTRating | null> {
     try {
       const filters = encodeURIComponent('isEmsSearchable=1 AND type:"tv"');
-      const data = await this.post<RTAlgoliaSearchResponse>('/queries', {
-        requests: [
-          {
-            indexName: 'content_rt',
-            query: name,
-            params: `filters=${filters}&hitsPerPage=20`,
-          },
-        ],
-      });
+      const data = await this.post<RTAlgoliaSearchResponse>(
+        '/queries',
+        {
+          requests: [
+            {
+              indexName: 'content_rt',
+              query: name,
+              params: `filters=${filters}&hitsPerPage=20`,
+            },
+          ],
+        },
+        undefined,
+        SEARCH_TTL
+      );
 
       const contentResults = data.results.find((r) => r.index === 'content_rt');
       const tvshow = best(contentResults?.hits || [], name, year);

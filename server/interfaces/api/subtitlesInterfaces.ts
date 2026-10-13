@@ -125,8 +125,50 @@ export interface TranscriptionStatus {
   auto: number;
   /** The episode being transcribed now, for a series. */
   current?: { seasonNumber: number; episodeNumber: number };
-  /** Why the last one that failed did, in words an admin can act on. */
+  /** Why the last one that failed did. */
+  error?: SubtitleError;
+}
+
+/**
+ * Why something asked of subtitles could not be done, for the page to say
+ * in the viewer's own language. Error answers carry it beside an English
+ * `message`, which is for anything else that reads the API.
+ */
+export type SubtitleErrorCode =
+  /** Subtitles are not set up, or are off for this person. */
+  | 'off'
+  /** Not in Radarr or Sonarr. */
+  | 'notInArr'
+  /**
+   * Radarr or Sonarr has it, but Bazarr does not (yet), or it is on a
+   * Radarr or Sonarr Bazarr does not follow (it follows one of each).
+   */
+  | 'notInBazarr'
+  /** The subtitle file is not there to delete. */
+  | 'notOnDisk'
+  /** Bazarr's WhisperAI provider is not turned on. */
+  | 'whisperOff'
+  /** Bazarr paused WhisperAI after an error; see `error` and `retry`. */
+  | 'whisperPaused'
+  /** Bazarr offered no Whisper transcription. */
+  | 'noWhisper'
+  /** Bazarr did not answer, or answered with an error. */
+  | 'bazarrFailed'
+  /** The title is not in Plex. */
+  | 'notInPlex'
+  /** Plex did not answer. */
+  | 'plexFailed'
+  /** Plex did not offer the subtitle chosen. */
+  | 'notOffered'
+  /** The viewer has no Plex sign-in Seerr can use. */
+  | 'noPlexSignIn';
+
+export interface SubtitleError {
+  code: SubtitleErrorCode;
+  /** whisperPaused: the error Bazarr paused WhisperAI after, as Bazarr names it. */
   error?: string;
+  /** whisperPaused: when Bazarr tries again, as Bazarr puts it ("in 41 minutes"). */
+  retry?: string;
 }
 
 /** Which episodes of a series to transcribe. */

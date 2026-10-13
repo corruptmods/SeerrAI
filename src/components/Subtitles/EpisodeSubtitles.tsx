@@ -6,6 +6,8 @@ import {
   Tag,
   TrackRow,
   messages as partMessages,
+  useMediaServerName,
+  useSubtitleReasons,
 } from '@app/components/Subtitles/parts';
 import {
   subtitlesKey,
@@ -28,7 +30,7 @@ import type {
   SubtitleTrack,
   TranscriptionStatus,
 } from '@server/interfaces/api/subtitlesInterfaces';
-import axios, { isAxiosError } from 'axios';
+import axios from 'axios';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 
@@ -65,7 +67,7 @@ const messages = defineMessages('components.Subtitles.EpisodeSubtitles', {
   failed: 'Bazarr did not answer.',
   deleteTitle: 'Delete Subtitle File',
   deleteConfirm:
-    'Delete {file}? Plex and Bazarr stop offering it, and it cannot be undone.',
+    'Delete {file}? {mediaServerName} and Bazarr stop offering it, and it cannot be undone.',
   deleted: 'Subtitle file deleted.',
 });
 
@@ -271,6 +273,8 @@ export const EpisodeSubtitlePanel = ({
   const { addToast } = useToasts();
   const on = useSubtitlesOn();
   const rights = useSubtitleRights();
+  const mediaServerName = useMediaServerName();
+  const { reasonOf } = useSubtitleReasons('tv');
   const { data, mutate } = useSeriesSubtitles(tvId, on);
   const transcription = useTranscription('tv', tvId, on);
   const [search, setSearch] = useState<{
@@ -286,9 +290,6 @@ export const EpisodeSubtitlePanel = ({
   }
   const wanted = data?.wanted ?? [];
   const base = `${subtitlesKey('tv', tvId)}/season/${seasonNumber}/episode/${episodeNumber}`;
-  const reasonOf = (e: unknown) =>
-    (isAxiosError(e) && (e.response?.data as { message?: string })?.message) ||
-    intl.formatMessage(messages.failed);
   const toast = (message: string, ok = true) =>
     addToast(message, {
       appearance: ok ? 'success' : 'error',
@@ -463,6 +464,7 @@ export const EpisodeSubtitlePanel = ({
         >
           {intl.formatMessage(messages.deleteConfirm, {
             file: toDelete?.fileName ?? '',
+            mediaServerName,
           })}
         </Modal>
       </Transition>

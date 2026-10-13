@@ -1,4 +1,6 @@
-import ExternalAPI from '@server/api/externalapi';
+import ExternalAPI, {
+  DEFAULT_REQUEST_TIMEOUT_MS,
+} from '@server/api/externalapi';
 import type { TvShowProvider } from '@server/api/provider';
 import TheMovieDb from '@server/api/themoviedb';
 import type {
@@ -54,6 +56,7 @@ class Tvdb extends ExternalAPI implements TvShowProvider {
       {},
       {
         nodeCache: cacheManager.getCache(finalConfig.cachePrefix).data,
+        timeout: DEFAULT_REQUEST_TIMEOUT_MS,
         rateLimit: {
           maxRequests: finalConfig.maxRequests,
           maxRPS: finalConfig.maxRequestsPerSecond,

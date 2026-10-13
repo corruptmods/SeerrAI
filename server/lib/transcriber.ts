@@ -1,4 +1,7 @@
-import type { TranscriptionStatus } from '@server/interfaces/api/subtitlesInterfaces';
+import type {
+  SubtitleError,
+  TranscriptionStatus,
+} from '@server/interfaces/api/subtitlesInterfaces';
 import logger from '@server/logger';
 
 /*
@@ -10,6 +13,19 @@ import logger from '@server/logger';
  * The queue is in memory. A restart forgets what had not started yet; what
  * was under way finishes in Bazarr regardless.
  */
+
+/**
+ * A failure the title page can explain: the reason travels with it as a
+ * code, and its message is the same reason in English, for the log.
+ */
+export class SubtitleProblem extends Error {
+  constructor(
+    public readonly problem: SubtitleError,
+    message: string
+  ) {
+    super(message);
+  }
+}
 
 export interface TranscriptionTask {
   /** One per movie or episode: asking twice is asking once. */
@@ -26,8 +42,12 @@ export interface TranscriptionTask {
 interface Tally {
   done: number;
   failed: number;
-  /** Why the last one that failed did. */
-  error?: string;
+  /**
+   * Why the last one that failed did. Anyone who can see the title reads
+   * it, so anything other than a known reason is only "Bazarr failed"; the
+   * detail is in the log.
+   */
+  error?: SubtitleError;
 }
 
 export class Transcriber {
@@ -135,7 +155,8 @@ export class Transcriber {
       tally.done++;
     } catch (e) {
       tally.failed++;
-      tally.error = e instanceof Error ? e.message : String(e);
+      tally.error =
+        e instanceof SubtitleProblem ? e.problem : { code: 'bazarrFailed' };
       logger.warn('A transcription did not finish', {
         label: 'Subtitles',
         task: task.key,

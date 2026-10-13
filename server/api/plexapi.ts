@@ -1,4 +1,6 @@
-import ExternalAPI from '@server/api/externalapi';
+import ExternalAPI, {
+  DEFAULT_REQUEST_TIMEOUT_MS,
+} from '@server/api/externalapi';
 import { ApiErrorCode } from '@server/constants/error';
 import type { Library, PlexSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
@@ -124,7 +126,7 @@ class PlexAPI extends ExternalAPI {
       baseUrl,
       {},
       {
-        timeout,
+        timeout: timeout ?? DEFAULT_REQUEST_TIMEOUT_MS,
         headers: {
           'X-Plex-Token': plexToken ?? '',
           'X-Plex-Client-Identifier': settings.clientId,

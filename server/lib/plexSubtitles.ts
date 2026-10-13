@@ -243,6 +243,15 @@ export const seriesDefault = async (
   };
 };
 
+/*
+ * The pass setting each person's series, by "user:show", numbered. A new
+ * choice for the same series starts a new pass, and the one before stops
+ * before its next write, so the episodes all end up with the latest choice
+ * rather than a mix of the two.
+ */
+const seriesPasses = new Map<string, number>();
+let passCount = 0;
+
 /**
  * Sets every episode to the language given (or to none), in the
  * background. Returns how many episodes it will go through, or undefined
@@ -253,16 +262,36 @@ export const setSeriesDefault = async (
   showKey: string,
   language: string
 ): Promise<number | undefined> => {
-  const token = await serverToken(userId);
-  if (!token) {
-    return undefined;
+  // Numbered as it is asked, before anything is awaited, so the order of
+  // the choices is the order they were made in.
+  const passKey = `${userId}:${showKey}`;
+  const pass = ++passCount;
+  seriesPasses.set(passKey, pass);
+  const superseded = () => seriesPasses.get(passKey) !== pass;
+  const finished = () => {
+    if (!superseded()) {
+      seriesPasses.delete(passKey);
+    }
+  };
+
+  let plex: AxiosInstance;
+  let episodes: PlexItem[];
+  try {
+    const token = await serverToken(userId);
+    if (!token) {
+      finished();
+      return undefined;
+    }
+    plex = plexFor(token);
+    episodes = await episodesOf(plex, showKey);
+  } catch (e) {
+    finished();
+    throw e;
   }
-  const plex = plexFor(token);
-  const episodes = await episodesOf(plex, showKey);
 
   let next = 0;
   const worker = async () => {
-    while (next < episodes.length) {
+    while (next < episodes.length && !superseded()) {
       const episode = episodes[next++];
       try {
         const part = partOf(await itemOf(plex, episode.ratingKey));
@@ -275,6 +304,9 @@ export const setSeriesDefault = async (
         // An episode without that language is left as it is.
         if (language && !stream) {
           continue;
+        }
+        if (superseded()) {
+          return;
         }
         await selectStream(plex, part.id, stream?.id ?? 0);
       } catch (e) {
@@ -291,6 +323,6 @@ export const setSeriesDefault = async (
       { length: Math.min(EPISODE_CONCURRENCY, episodes.length) },
       worker
     )
-  );
+  ).finally(finished);
   return episodes.length;
 };

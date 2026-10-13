@@ -10,7 +10,7 @@ import BazarrAPI, {
   WHISPER_PROVIDER,
   bazarrConfigured,
 } from '@server/api/bazarr';
-import type { MediaType } from '@server/constants/media';
+import { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import type {
@@ -19,14 +19,16 @@ import type {
   MovieSubtitles,
   NoneFoundOutcome,
   SeriesSubtitles,
+  SubtitleError,
   SubtitleOrigin,
   SubtitleSearchResult,
   SubtitleTrack,
   TranscribeScope,
 } from '@server/interfaces/api/subtitlesInterfaces';
+import type { DVRSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import type { TranscriptionTask } from '@server/lib/transcriber';
-import transcriber from '@server/lib/transcriber';
+import transcriber, { SubtitleProblem } from '@server/lib/transcriber';
 
 /*
  * Subtitles as Bazarr has them, for title pages. Bazarr knows a movie by
@@ -39,15 +41,60 @@ export const subtitlesReady = (): boolean =>
 
 export const bazarr = (): BazarrAPI => new BazarrAPI(getSettings().bazarr);
 
-/** A title Seerr has, and the id Radarr or Sonarr gave it, when it has one. */
+/**
+ * The Radarr or Sonarr server Bazarr follows. Bazarr follows one of each,
+ * and Seerr cannot ask which, so it is taken to be the main (not 4K) server
+ * new requests go to: the one marked default, or the only one there is.
+ */
+const followedServer = (servers: DVRSettings[]): DVRSettings | undefined => {
+  const main = servers.filter((server) => !server.is4k);
+  return main.length === 1 ? main[0] : main.find((server) => server.isDefault);
+};
+
+/**
+ * The id Bazarr knows a title by: the one Radarr or Sonarr gave it, but only
+ * when the title is on the server Bazarr follows. Each server numbers its
+ * titles on its own, so the same id on another server names some other
+ * title in Bazarr, whose subtitles would be shown, replaced or deleted
+ * instead. A title on another server counts as not in Bazarr.
+ */
+export const bazarrIdOf = (
+  media: Pick<Media, 'mediaType' | 'serviceId' | 'externalServiceId'>
+): number | undefined => {
+  if (!media.externalServiceId) {
+    return undefined;
+  }
+  const settings = getSettings();
+  const servers =
+    media.mediaType === MediaType.MOVIE ? settings.radarr : settings.sonarr;
+  const followed = followedServer(servers);
+  if (!followed) {
+    return undefined;
+  }
+  // Without a record of its server, the id can only be trusted when there
+  // is a single main server it could have come from.
+  const onFollowed =
+    media.serviceId == null
+      ? servers.filter((server) => !server.is4k).length === 1
+      : media.serviceId === followed.id;
+  return onFollowed ? media.externalServiceId : undefined;
+};
+
+/**
+ * A title Seerr has: whether Radarr or Sonarr has it at all, and the id
+ * Bazarr knows it by, when Bazarr can have it.
+ */
 export const arrIdFor = async (
   mediaType: MediaType,
   tmdbId: number
-): Promise<number | undefined> => {
+): Promise<{ inArr: boolean; id?: number }> => {
   const media = await getRepository(Media).findOne({
     where: { tmdbId, mediaType },
   });
-  return media?.externalServiceId ?? undefined;
+  return {
+    inArr: !!media?.externalServiceId,
+    id: media ? bazarrIdOf(media) : undefined,
+  };
 };
 
 /** The file's name, without the folders it is in on the server. */
@@ -417,7 +464,8 @@ const transcribeWith = async ({
   }
   const whisper = known ?? whisperResult(await search(), languages, auto);
   if (!whisper) {
-    throw new Error(await noWhisperReason());
+    const reason = await noWhisperReason();
+    throw new SubtitleProblem(reason, whisperProblemText(reason));
   }
   await download(whisper);
 };
@@ -428,7 +476,7 @@ const transcribeWith = async ({
  * to Whisper timed out (Whisper busy with another job), and offers no
  * Whisper result until the pause is over.
  */
-export const whisperUnavailable = async (): Promise<string | null> => {
+export const whisperUnavailable = async (): Promise<SubtitleError | null> => {
   const providers = await bazarr()
     .getProviderStatus()
     .catch(() => null);
@@ -437,22 +485,37 @@ export const whisperUnavailable = async (): Promise<string | null> => {
   }
   const whisper = providers.find((p) => p.name === WHISPER_PROVIDER);
   if (!whisper) {
-    return 'WhisperAI is not turned on in Bazarr (Settings → Providers).';
+    return { code: 'whisperOff' };
   }
   if (whisper.status && whisper.status !== 'Good') {
-    const retry =
-      whisper.retry && whisper.retry !== '-'
-        ? `; it tries again ${whisper.retry}`
-        : '';
-    return `Bazarr paused WhisperAI after an error (${whisper.status})${retry}. Whisper may be busy with another job.`;
+    return {
+      code: 'whisperPaused',
+      error: whisper.status,
+      ...(whisper.retry && whisper.retry !== '-'
+        ? { retry: whisper.retry }
+        : {}),
+    };
   }
   return null;
 };
 
 /** Why a search offered no Whisper result. */
-export const noWhisperReason = async (): Promise<string> =>
-  (await whisperUnavailable()) ??
-  'Bazarr offered no Whisper transcription for it.';
+export const noWhisperReason = async (): Promise<SubtitleError> =>
+  (await whisperUnavailable()) ?? { code: 'noWhisper' };
+
+/** A reason Whisper cannot be used, in English, for the log and the API. */
+export const whisperProblemText = (reason: SubtitleError): string => {
+  switch (reason.code) {
+    case 'whisperOff':
+      return 'WhisperAI is not turned on in Bazarr (Settings → Providers).';
+    case 'whisperPaused':
+      return `Bazarr paused WhisperAI after an error (${reason.error})${
+        reason.retry ? `; it tries again ${reason.retry}` : ''
+      }. Whisper may be busy with another job.`;
+    default:
+      return 'Bazarr offered no Whisper transcription for it.';
+  }
+};
 
 /** What Bazarr is told to download for a search result. */
 export const choiceOf = (result: BazarrSearchResult) => ({

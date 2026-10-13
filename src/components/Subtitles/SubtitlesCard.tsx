@@ -10,6 +10,8 @@ import {
   TrackRow,
   iconButtonClass,
   messages as partMessages,
+  useMediaServerName,
+  useSubtitleReasons,
 } from '@app/components/Subtitles/parts';
 import type { SubtitlesKind } from '@app/hooks/useSubtitles';
 import {
@@ -106,7 +108,7 @@ const messages = defineMessages('components.Subtitles.SubtitlesCard', {
   couldNot: 'That did not work: {reason}',
   deleteTitle: 'Delete Subtitle File',
   deleteConfirm:
-    'Delete {file}? Plex and Bazarr stop offering it, and it cannot be undone.',
+    'Delete {file}? {mediaServerName} and Bazarr stop offering it, and it cannot be undone.',
   deleted: 'Subtitle file deleted.',
   transcribeStarted:
     'Transcribing. It shows here when Whisper is done, which can take a while.',
@@ -138,10 +140,6 @@ const useRememberedOpen = (): [boolean, (open: boolean) => void] => {
     },
   ];
 };
-
-const reasonOf = (intl: IntlShape, e: unknown) =>
-  (isAxiosError(e) && (e.response?.data as { message?: string })?.message) ||
-  intl.formatMessage(messages.failed);
 
 export const describeWhere = (intl: IntlShape, where: Where): string => {
   if (where.kind === 'episodes') {
@@ -192,6 +190,8 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
   const { addToast } = useToasts();
   const on = useSubtitlesOn();
   const rights = useSubtitleRights();
+  const mediaServerName = useMediaServerName();
+  const { reasonOf, describe } = useSubtitleReasons(kind);
   const bodyId = useId();
   const [open, setOpen] = useRememberedOpen();
 
@@ -261,7 +261,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
       void transcription.mutate(data, { revalidate: false });
     } catch (e) {
       toast(
-        intl.formatMessage(messages.couldNot, { reason: reasonOf(intl, e) }),
+        intl.formatMessage(messages.couldNot, { reason: reasonOf(e) }),
         false
       );
     }
@@ -274,7 +274,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
       void transcription.mutate();
     } catch (e) {
       toast(
-        intl.formatMessage(messages.couldNot, { reason: reasonOf(intl, e) }),
+        intl.formatMessage(messages.couldNot, { reason: reasonOf(e) }),
         false
       );
     }
@@ -291,7 +291,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
       void current.mutate();
     } catch (e) {
       toast(
-        intl.formatMessage(messages.couldNot, { reason: reasonOf(intl, e) }),
+        intl.formatMessage(messages.couldNot, { reason: reasonOf(e) }),
         false
       );
     } finally {
@@ -319,7 +319,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
       void plex.mutate();
     } catch (e) {
       toast(
-        intl.formatMessage(messages.couldNot, { reason: reasonOf(intl, e) }),
+        intl.formatMessage(messages.couldNot, { reason: reasonOf(e) }),
         false
       );
     }
@@ -752,7 +752,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
                 <span className="text-xs text-yellow-300">
                   {intl.formatMessage(messages.transcribeFailed, {
                     count: status.failed,
-                    reason: status.error,
+                    reason: describe(status.error),
                   })}
                 </span>
               )}
@@ -831,6 +831,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
         >
           {intl.formatMessage(messages.deleteConfirm, {
             file: toDelete?.fileName ?? '',
+            mediaServerName,
           })}
         </Modal>
       </Transition>

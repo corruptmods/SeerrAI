@@ -22,6 +22,7 @@ import backfill from '@server/lib/backfill/engine';
 import { Permission } from '@server/lib/permissions';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import transcriber from '@server/lib/transcriber';
 import aiRoutes from '@server/routes/ai';
 import issueRoutes from '@server/routes/issue';
 import { IssueCommentSubscriber } from '@server/subscriber/IssueCommentSubscriber';
@@ -695,6 +696,31 @@ describe('Auto-fix: reported issues', () => {
     const comment = await commentOn(res.body.id);
     assert.match(comment, /Downloaded en subtitles from subdl/);
     assert.deepEqual(downloads, ['subdl-1']);
+  });
+
+  it('leaves the subtitles of a title on a Radarr Bazarr does not follow', async () => {
+    // A second Radarr numbers its films on its own: its 9 is not Bazarr's 9.
+    getSettings().radarr = [
+      { ...RADARR, isDefault: true },
+      { ...RADARR, id: 1, name: 'Radarr Anime', isDefault: false },
+    ];
+    const elsewhere = await getRepository(Media).save(
+      new Media({
+        tmdbId: 129,
+        mediaType: MediaType.MOVIE,
+        status: MediaStatus.AVAILABLE,
+        serviceId: 1,
+        externalServiceId: 9,
+      })
+    );
+    for (const kind of ['subtitles', 'transcribe'] as const) {
+      const result = await autofix.run({ kind, media: elsewhere, user: admin });
+      assert.equal(result.ok, false, kind);
+      assert.match(result.message, /Bazarr/, kind);
+    }
+    assert.deepEqual(downloads, []);
+    assert.equal(transcriber.status('movie:129').queued, 0);
+    assert.equal(transcriber.status('movie:129').running, false);
   });
 
   it('lets one person have only ten files replaced a day; admins are not limited', async () => {

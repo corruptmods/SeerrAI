@@ -7,9 +7,29 @@ import type {
 } from '@server/interfaces/api/serviceInterfaces';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import type { NextFunction } from 'express';
 import { Router } from 'express';
 
 const serviceRoutes = Router();
+
+/*
+ * Anyone signed in reads these, for the request window. Why a server did
+ * not answer (its address, the error) is for the log; people are told
+ * only that it did not.
+ */
+const serverFailed = (
+  next: NextFunction,
+  name: string,
+  serverName: string,
+  e: unknown
+) => {
+  logger.warn(`${name} did not answer`, {
+    label: 'Service',
+    server: serverName,
+    errorMessage: e instanceof Error ? e.message : String(e),
+  });
+  next({ status: 500, message: `${name} did not answer.` });
+};
 
 serviceRoutes.get('/radarr', async (req, res) => {
   const settings = getSettings();
@@ -53,35 +73,39 @@ serviceRoutes.get<{ radarrId: string }>(
       url: RadarrAPI.buildUrl(radarrSettings, '/api/v3'),
     });
 
-    const profiles = await radarr.getProfiles();
-    const rootFolders = await radarr.getRootFolders();
-    const tags = await radarr.getTags();
+    try {
+      const profiles = await radarr.getProfiles();
+      const rootFolders = await radarr.getRootFolders();
+      const tags = await radarr.getTags();
 
-    return res.status(200).json({
-      server: {
-        id: radarrSettings.id,
-        name: radarrSettings.name,
-        is4k: radarrSettings.is4k,
-        isDefault: radarrSettings.isDefault,
-        activeDirectory: radarrSettings.activeDirectory,
-        activeProfileId: radarrSettings.activeProfileId,
-        activeAnimeProfileId: radarrSettings.activeAnimeProfileId,
-        activeAnimeDirectory: radarrSettings.activeAnimeDirectory,
-        activeTags: radarrSettings.tags,
-        activeAnimeTags: radarrSettings.animeTags,
-      },
-      profiles: profiles.map((profile) => ({
-        id: profile.id,
-        name: profile.name,
-      })),
-      rootFolders: rootFolders.map((folder) => ({
-        id: folder.id,
-        freeSpace: folder.freeSpace,
-        path: folder.path,
-        totalSpace: folder.totalSpace,
-      })),
-      tags,
-    } as ServiceCommonServerWithDetails);
+      return res.status(200).json({
+        server: {
+          id: radarrSettings.id,
+          name: radarrSettings.name,
+          is4k: radarrSettings.is4k,
+          isDefault: radarrSettings.isDefault,
+          activeDirectory: radarrSettings.activeDirectory,
+          activeProfileId: radarrSettings.activeProfileId,
+          activeAnimeProfileId: radarrSettings.activeAnimeProfileId,
+          activeAnimeDirectory: radarrSettings.activeAnimeDirectory,
+          activeTags: radarrSettings.tags,
+          activeAnimeTags: radarrSettings.animeTags,
+        },
+        profiles: profiles.map((profile) => ({
+          id: profile.id,
+          name: profile.name,
+        })),
+        rootFolders: rootFolders.map((folder) => ({
+          id: folder.id,
+          freeSpace: folder.freeSpace,
+          path: folder.path,
+          totalSpace: folder.totalSpace,
+        })),
+        tags,
+      } as ServiceCommonServerWithDetails);
+    } catch (e) {
+      return serverFailed(next, 'Radarr', radarrSettings.name, e);
+    }
   }
 );
 
@@ -168,7 +192,7 @@ serviceRoutes.get<{ sonarrId: string }>(
         tags,
       } as ServiceCommonServerWithDetails);
     } catch (e) {
-      next({ status: 500, message: e.message });
+      serverFailed(next, 'Sonarr', sonarrSettings.name, e);
     }
   }
 );

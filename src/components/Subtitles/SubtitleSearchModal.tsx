@@ -1,6 +1,11 @@
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
-import { Tag, messages as partMessages } from '@app/components/Subtitles/parts';
+import {
+  Tag,
+  messages as partMessages,
+  useMediaServerName,
+  useSubtitleReasons,
+} from '@app/components/Subtitles/parts';
 import type { SubtitlesKind } from '@app/hooks/useSubtitles';
 import { subtitlesKey } from '@app/hooks/useSubtitles';
 import useToasts from '@app/hooks/useToasts';
@@ -12,7 +17,7 @@ import type {
   SubtitleSearchResponse,
   SubtitleSearchResult,
 } from '@server/interfaces/api/subtitlesInterfaces';
-import axios, { isAxiosError } from 'axios';
+import axios from 'axios';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MessageDescriptor } from 'react-intl';
 import { useIntl } from 'react-intl';
@@ -41,7 +46,8 @@ const messages = defineMessages('components.Subtitles.SubtitleSearchModal', {
   aiTranscription: 'AI transcription',
   transcribeDetail: 'Transcribe the audio into subtitles',
   showAll: 'Show all {count}',
-  downloaded: 'Subtitle downloaded. Plex shows it after its next library scan.',
+  downloaded:
+    'Subtitle downloaded. {mediaServerName} shows it after its next library scan.',
   transcribing:
     'Transcribing. It shows here when Whisper is done, which can take a while.',
   couldNot: 'Could not get that subtitle: {reason}',
@@ -100,6 +106,8 @@ const SubtitleSearchModal = ({
 }: SubtitleSearchModalProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
+  const mediaServerName = useMediaServerName();
+  const { reasonOf } = useSubtitleReasons(kind);
   const base =
     kind === 'movie'
       ? subtitlesKey('movie', tmdbId)
@@ -180,10 +188,6 @@ const SubtitleSearchModal = ({
     byProvider.set(result.provider, (byProvider.get(result.provider) ?? 0) + 1);
   }
 
-  const reasonOf = (e: unknown) =>
-    (isAxiosError(e) && (e.response?.data as { message?: string })?.message) ||
-    intl.formatMessage(messages.failed);
-
   const choose = async (result: SubtitleSearchResult) => {
     setBusy(result.subtitle);
     try {
@@ -206,7 +210,7 @@ const SubtitleSearchModal = ({
           forced: result.forced,
           originalFormat: result.originalFormat,
         });
-        addToast(intl.formatMessage(messages.downloaded), {
+        addToast(intl.formatMessage(messages.downloaded, { mediaServerName }), {
           appearance: 'success',
           autoDismiss: true,
         });

@@ -23,6 +23,7 @@ import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import {
   bazarr,
+  bazarrIdOf,
   choiceOf,
   findEpisode,
   forgetEpisodeHistory,
@@ -233,6 +234,13 @@ const NOT_ON_SERVER: Omit<FixResult, 'kind'> = {
   skipped: true,
   message:
     'This title is not in Sonarr or Radarr yet, so there is nothing on the server to fix.',
+};
+
+const NOT_IN_BAZARR: Omit<FixResult, 'kind'> = {
+  ok: false,
+  skipped: true,
+  message:
+    'This title is on a Radarr or Sonarr that Bazarr does not follow, so its subtitles cannot be fixed here.',
 };
 
 const NO_BAZARR = (what: string): Omit<FixResult, 'kind'> => ({
@@ -529,9 +537,10 @@ class AutoFix {
 
   private async subtitles(req: FixRequest): Promise<Outcome> {
     if (!subtitlesReady()) return NO_BAZARR('subtitles cannot be fetched');
-    // Bazarr follows the main Radarr and Sonarr, not the 4K ones.
-    const arrId = req.media.externalServiceId;
-    if (!arrId) return NOT_ON_SERVER;
+    if (!req.media.externalServiceId) return NOT_ON_SERVER;
+    // Bazarr follows one Radarr and one Sonarr; another's ids are not its.
+    const arrId = bazarrIdOf(req.media);
+    if (!arrId) return NOT_IN_BAZARR;
     if (needsSeason(req)) return ASK_SEASON;
     const isMovie = req.media.mediaType === MediaType.MOVIE;
     return this.holding(
@@ -672,8 +681,9 @@ class AutoFix {
 
   private async transcribe(req: FixRequest): Promise<Outcome> {
     if (!subtitlesReady()) return NO_BAZARR('nothing can be transcribed');
-    const arrId = req.media.externalServiceId;
-    if (!arrId) return NOT_ON_SERVER;
+    if (!req.media.externalServiceId) return NOT_ON_SERVER;
+    const arrId = bazarrIdOf(req.media);
+    if (!arrId) return NOT_IN_BAZARR;
     if (needsSeason(req)) return ASK_SEASON;
     return this.holding(
       `transcribe:${req.media.id}:${req.seasonNumber ?? ''}:${req.episodeNumber ?? ''}`,

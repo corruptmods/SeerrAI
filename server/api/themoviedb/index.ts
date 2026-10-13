@@ -1,8 +1,11 @@
-import ExternalAPI from '@server/api/externalapi';
+import ExternalAPI, {
+  DEFAULT_REQUEST_TIMEOUT_MS,
+} from '@server/api/externalapi';
 import type { TvShowProvider } from '@server/api/provider';
 import type { CacheStore } from '@server/lib/cache';
 import cacheManager from '@server/lib/cache';
 import { getSettings } from '@server/lib/settings';
+import logger from '@server/logger';
 import { sortBy } from 'lodash';
 import type {
   TmdbCollection,
@@ -176,6 +179,18 @@ const stripUnreadTvCredits = <T>(data: T): T => {
   return data;
 };
 
+/*
+ * A search TMDB does not answer finds nothing, so the page still shows; the
+ * log says why, so that it does not pass for a search with no matches.
+ */
+const searchFailed = (what: string, e: unknown) => {
+  logger.warn(`TMDB did not answer a ${what} search`, {
+    label: 'TMDB',
+    errorMessage: e instanceof Error ? e.message : String(e),
+  });
+  return { page: 1, results: [], total_pages: 1, total_results: 0 };
+};
+
 class TheMovieDb extends ExternalAPI implements TvShowProvider {
   private scanCache = cacheManager.getCache('tmdbscan').data;
   private locale: string;
@@ -192,6 +207,7 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
       },
       {
         nodeCache: cacheManager.getCache('tmdb').data,
+        timeout: DEFAULT_REQUEST_TIMEOUT_MS,
         rateLimit: {
           maxRequests: 20,
           maxRPS: 50,
@@ -215,13 +231,8 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
       });
 
       return data;
-    } catch {
-      return {
-        page: 1,
-        results: [],
-        total_pages: 1,
-        total_results: 0,
-      };
+    } catch (e) {
+      return searchFailed('multi', e);
     }
   };
 
@@ -244,13 +255,8 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
       });
 
       return data;
-    } catch {
-      return {
-        page: 1,
-        results: [],
-        total_pages: 1,
-        total_results: 0,
-      };
+    } catch (e) {
+      return searchFailed('movie', e);
     }
   };
 
@@ -273,13 +279,8 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
       });
 
       return data;
-    } catch {
-      return {
-        page: 1,
-        results: [],
-        total_pages: 1,
-        total_results: 0,
-      };
+    } catch (e) {
+      return searchFailed('TV', e);
     }
   };
 

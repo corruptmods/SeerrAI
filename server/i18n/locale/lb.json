@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Guttheeschen",
   "notifications.agents.webpush.approveFailed": "Konnt net guttgeheescht ginn",
   "notifications.agents.webpush.decline": "Ofleenen",
-  "notifications.agents.webpush.declineFailed": "Konnt net ofgeleent ginn"
+  "notifications.agents.webpush.declineFailed": "Konnt net ofgeleent ginn",
+  "notifications.events.adminAgent": "Admin-Agent",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Zoustand",
+  "notifications.events.issueComment": "{issueType, select, video {Neie Kommentar zu engem Videoproblem} audio {Neie Kommentar zu engem Audioproblem} subtitles {Neie Kommentar zu engem Ënnertitelproblem} other {Neie Kommentar zu engem Problem}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Neit Videoproblem gemellt} audio {Neit Audioproblem gemellt} subtitles {Neit Ënnertitelproblem gemellt} other {Neit Problem gemellt}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Videoproblem nees opgemaach} audio {Audioproblem nees opgemaach} subtitles {Ënnertitelproblem nees opgemaach} other {Problem nees opgemaach}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Videoproblem geléist} audio {Audioproblem geléist} subtitles {Ënnertitelproblem geléist} other {Problem geléist}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Film-Ufro guttgeheescht} movie4k {4K-Film-Ufro guttgeheescht} tv4k {4K-Serien-Ufro guttgeheescht} other {Serien-Ufro guttgeheescht}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Film-Ufro automatesch guttgeheescht} movie4k {4K-Film-Ufro automatesch guttgeheescht} tv4k {4K-Serien-Ufro automatesch guttgeheescht} other {Serien-Ufro automatesch guttgeheescht}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Film-Ufro automatesch ofgeschéckt} movie4k {4K-Film-Ufro automatesch ofgeschéckt} tv4k {4K-Serien-Ufro automatesch ofgeschéckt} other {Serien-Ufro automatesch ofgeschéckt}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Film elo disponibel} movie4k {4K-Film elo disponibel} tv4k {4K-Serie elo disponibel} other {Serie elo disponibel}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Film-Ufro ofgeleent} movie4k {4K-Film-Ufro ofgeleent} tv4k {4K-Serien-Ufro ofgeleent} other {Serien-Ufro ofgeleent}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Film-Ufro feelgeschloen} movie4k {4K-Film-Ufro feelgeschloen} tv4k {4K-Serien-Ufro feelgeschloen} other {Serien-Ufro feelgeschloen}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Nei Film-Ufro} movie4k {Nei 4K-Film-Ufro} tv4k {Nei 4K-Serien-Ufro} other {Nei Serien-Ufro}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Ugefrote Film elo disponibel} movie4k {Ugefrote 4K-Film elo disponibel} tv4k {Ugefroten 4K-Serie elo disponibel} other {Ugefroten Serie elo disponibel}}",
+  "notifications.events.seriesReadyToWatch": "Serie prett zum Kucken"
 }

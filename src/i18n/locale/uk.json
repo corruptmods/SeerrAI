@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Не вдалося прочитати це зображення.",
   "utils.aiErrorMessage.pictureTooBig": "Це зображення завелике.",
   "utils.aiErrorMessage.timeout": "Сервіс ШІ відповідав надто довго. Спробуйте ще раз.",
-  "utils.aiErrorMessage.unreadable": "Модель відповіла не в тому вигляді, який Seerr може прочитати. Спробуйте ще раз або виберіть потужнішу модель."
+  "utils.aiErrorMessage.unreadable": "Модель відповіла не в тому вигляді, який Seerr може прочитати. Спробуйте ще раз або виберіть потужнішу модель.",
+  "components.RequestModal.noSeasonsAvailable": "Усі вибрані сезони вже запитано або вони доступні.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Синхронізація списку перегляду для нових користувачів",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Фільми",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Запитувати фільми, додані до їхнього списку перегляду",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Чи буде в нових користувачів одразу ввімкнено автоматичний запит усього з їхнього списку перегляду Plex або Trakt. Наявні користувачі зберігають свій вибір, і кожен може змінити його у своєму профілі. Запити створюються лише для користувачів із дозволом на автоматичні запити",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Серіали",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Запитувати серіали, додані до їхнього списку перегляду",
+  "components.UserList.importfromJellyfinnochanges": "Імпорт із {mediaServerName} завершено. Жодного користувача не створено й не оновлено.",
+  "components.UserList.importfromJellyfinsynced": "Користувачів {mediaServerName} успішно синхронізовано. Наявних користувачів оновлено.",
+  "components.UserList.jellyfinsyncnotice": "Усіх користувачів {mediaServerName} уже імпортовано. Ви все одно можете натиснути «Синхронізувати», щоб оновити їхні дані, наприклад змінене ім’я чи фото."
 }

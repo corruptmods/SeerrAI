@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Phê duyệt",
   "notifications.agents.webpush.approveFailed": "Không thể phê duyệt",
   "notifications.agents.webpush.decline": "Từ chối",
-  "notifications.agents.webpush.declineFailed": "Không thể từ chối"
+  "notifications.agents.webpush.declineFailed": "Không thể từ chối",
+  "notifications.events.adminAgent": "Trợ lý quản trị",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Tình trạng",
+  "notifications.events.issueComment": "{issueType, select, video {Bình luận mới về sự cố video} audio {Bình luận mới về sự cố âm thanh} subtitles {Bình luận mới về sự cố phụ đề} other {Bình luận mới về sự cố}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Có sự cố video mới được báo cáo} audio {Có sự cố âm thanh mới được báo cáo} subtitles {Có sự cố phụ đề mới được báo cáo} other {Có sự cố mới được báo cáo}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Sự cố video đã được mở lại} audio {Sự cố âm thanh đã được mở lại} subtitles {Sự cố phụ đề đã được mở lại} other {Sự cố đã được mở lại}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Sự cố video đã được giải quyết} audio {Sự cố âm thanh đã được giải quyết} subtitles {Sự cố phụ đề đã được giải quyết} other {Sự cố đã được giải quyết}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Yêu cầu phim đã được phê duyệt} movie4k {Yêu cầu phim 4K đã được phê duyệt} tv4k {Yêu cầu phim bộ 4K đã được phê duyệt} other {Yêu cầu phim bộ đã được phê duyệt}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Yêu cầu phim đã được tự động phê duyệt} movie4k {Yêu cầu phim 4K đã được tự động phê duyệt} tv4k {Yêu cầu phim bộ 4K đã được tự động phê duyệt} other {Yêu cầu phim bộ đã được tự động phê duyệt}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Yêu cầu phim đã được tự động gửi} movie4k {Yêu cầu phim 4K đã được tự động gửi} tv4k {Yêu cầu phim bộ 4K đã được tự động gửi} other {Yêu cầu phim bộ đã được tự động gửi}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Phim đã có sẵn} movie4k {Phim 4K đã có sẵn} tv4k {Phim bộ 4K đã có sẵn} other {Phim bộ đã có sẵn}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Yêu cầu phim đã bị từ chối} movie4k {Yêu cầu phim 4K đã bị từ chối} tv4k {Yêu cầu phim bộ 4K đã bị từ chối} other {Yêu cầu phim bộ đã bị từ chối}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Yêu cầu phim thất bại} movie4k {Yêu cầu phim 4K thất bại} tv4k {Yêu cầu phim bộ 4K thất bại} other {Yêu cầu phim bộ thất bại}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Yêu cầu phim mới} movie4k {Yêu cầu phim 4K mới} tv4k {Yêu cầu phim bộ 4K mới} other {Yêu cầu phim bộ mới}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Phim đã yêu cầu nay đã có sẵn} movie4k {Phim 4K đã yêu cầu nay đã có sẵn} tv4k {Phim bộ 4K đã yêu cầu nay đã có sẵn} other {Phim bộ đã yêu cầu nay đã có sẵn}}",
+  "notifications.events.seriesReadyToWatch": "Phim bộ đã sẵn sàng để xem"
 }

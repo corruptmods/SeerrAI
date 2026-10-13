@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Schváliť",
   "notifications.agents.webpush.approveFailed": "Nepodarilo sa schváliť",
   "notifications.agents.webpush.decline": "Zamietnuť",
-  "notifications.agents.webpush.declineFailed": "Nepodarilo sa zamietnuť"
+  "notifications.agents.webpush.declineFailed": "Nepodarilo sa zamietnuť",
+  "notifications.events.adminAgent": "Agent správcu",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Stav systému",
+  "notifications.events.issueComment": "{issueType, select, video {Nový komentár k problému s obrazom} audio {Nový komentár k problému so zvukom} subtitles {Nový komentár k problému s titulkami} other {Nový komentár k problému}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Nahlásený nový problém s obrazom} audio {Nahlásený nový problém so zvukom} subtitles {Nahlásený nový problém s titulkami} other {Nahlásený nový problém}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Problém s obrazom znova otvorený} audio {Problém so zvukom znova otvorený} subtitles {Problém s titulkami znova otvorený} other {Problém znova otvorený}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Problém s obrazom vyriešený} audio {Problém so zvukom vyriešený} subtitles {Problém s titulkami vyriešený} other {Problém vyriešený}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Žiadosť o film schválená} movie4k {Žiadosť o film v 4K schválená} tv4k {Žiadosť o seriál v 4K schválená} other {Žiadosť o seriál schválená}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Žiadosť o film automaticky schválená} movie4k {Žiadosť o film v 4K automaticky schválená} tv4k {Žiadosť o seriál v 4K automaticky schválená} other {Žiadosť o seriál automaticky schválená}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Žiadosť o film automaticky odoslaná} movie4k {Žiadosť o film v 4K automaticky odoslaná} tv4k {Žiadosť o seriál v 4K automaticky odoslaná} other {Žiadosť o seriál automaticky odoslaná}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Film je teraz dostupný} movie4k {Film v 4K je teraz dostupný} tv4k {Seriál v 4K je teraz dostupný} other {Seriál je teraz dostupný}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Žiadosť o film zamietnutá} movie4k {Žiadosť o film v 4K zamietnutá} tv4k {Žiadosť o seriál v 4K zamietnutá} other {Žiadosť o seriál zamietnutá}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Žiadosť o film zlyhala} movie4k {Žiadosť o film v 4K zlyhala} tv4k {Žiadosť o seriál v 4K zlyhala} other {Žiadosť o seriál zlyhala}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Nová žiadosť o film} movie4k {Nová žiadosť o film v 4K} tv4k {Nová žiadosť o seriál v 4K} other {Nová žiadosť o seriál}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Vyžiadaný film je teraz dostupný} movie4k {Vyžiadaný film v 4K je teraz dostupný} tv4k {Vyžiadaný seriál v 4K je teraz dostupný} other {Vyžiadaný seriál je teraz dostupný}}",
+  "notifications.events.seriesReadyToWatch": "Seriál je pripravený na pozeranie"
 }

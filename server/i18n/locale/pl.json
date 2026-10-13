@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Zatwierdź",
   "notifications.agents.webpush.approveFailed": "Nie udało się zatwierdzić",
   "notifications.agents.webpush.decline": "Odrzuć",
-  "notifications.agents.webpush.declineFailed": "Nie udało się odrzucić"
+  "notifications.agents.webpush.declineFailed": "Nie udało się odrzucić",
+  "notifications.events.adminAgent": "Agent administratora",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Stan usług",
+  "notifications.events.issueComment": "{issueType, select, video {Nowy komentarz do problemu z obrazem} audio {Nowy komentarz do problemu z dźwiękiem} subtitles {Nowy komentarz do problemu z napisami} other {Nowy komentarz do problemu}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Zgłoszono nowy problem z obrazem} audio {Zgłoszono nowy problem z dźwiękiem} subtitles {Zgłoszono nowy problem z napisami} other {Zgłoszono nowy problem}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Ponownie otwarto problem z obrazem} audio {Ponownie otwarto problem z dźwiękiem} subtitles {Ponownie otwarto problem z napisami} other {Ponownie otwarto problem}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Rozwiązano problem z obrazem} audio {Rozwiązano problem z dźwiękiem} subtitles {Rozwiązano problem z napisami} other {Rozwiązano problem}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Zatwierdzono prośbę o film} movie4k {Zatwierdzono prośbę o film 4K} tv4k {Zatwierdzono prośbę o serial 4K} other {Zatwierdzono prośbę o serial}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Automatycznie zatwierdzono prośbę o film} movie4k {Automatycznie zatwierdzono prośbę o film 4K} tv4k {Automatycznie zatwierdzono prośbę o serial 4K} other {Automatycznie zatwierdzono prośbę o serial}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Automatycznie wysłano prośbę o film} movie4k {Automatycznie wysłano prośbę o film 4K} tv4k {Automatycznie wysłano prośbę o serial 4K} other {Automatycznie wysłano prośbę o serial}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Film jest już dostępny} movie4k {Film 4K jest już dostępny} tv4k {Serial 4K jest już dostępny} other {Serial jest już dostępny}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Odrzucono prośbę o film} movie4k {Odrzucono prośbę o film 4K} tv4k {Odrzucono prośbę o serial 4K} other {Odrzucono prośbę o serial}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Prośba o film nie powiodła się} movie4k {Prośba o film 4K nie powiodła się} tv4k {Prośba o serial 4K nie powiodła się} other {Prośba o serial nie powiodła się}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Nowa prośba o film} movie4k {Nowa prośba o film 4K} tv4k {Nowa prośba o serial 4K} other {Nowa prośba o serial}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Film, o który proszono, jest już dostępny} movie4k {Film 4K, o który proszono, jest już dostępny} tv4k {Serial 4K, o który proszono, jest już dostępny} other {Serial, o który proszono, jest już dostępny}}",
+  "notifications.events.seriesReadyToWatch": "Serial gotowy do oglądania"
 }

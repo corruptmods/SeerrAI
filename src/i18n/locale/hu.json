@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Ezt a képet nem sikerült beolvasni.",
   "utils.aiErrorMessage.pictureTooBig": "Ez a kép túl nagy.",
   "utils.aiErrorMessage.timeout": "Az MI-szolgáltatás túl sokáig nem válaszolt. Próbálja újra.",
-  "utils.aiErrorMessage.unreadable": "A modell nem olyan formában válaszolt, amelyet a Seerr be tud olvasni. Próbálja újra, vagy válasszon erősebb modellt."
+  "utils.aiErrorMessage.unreadable": "A modell nem olyan formában válaszolt, amelyet a Seerr be tud olvasni. Próbálja újra, vagy válasszon erősebb modellt.",
+  "components.RequestModal.noSeasonsAvailable": "Az összes kiválasztott évadot már kérték, vagy már elérhető.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Figyelőlista-szinkronizálás új felhasználóknak",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filmek",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "A figyelőlistájukhoz adott filmek kérése",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Az új felhasználók Plex- vagy Trakt-figyelőlistájának tartalmát kezdettől automatikusan kérje-e a rendszer. A meglévő felhasználók megtartják a saját beállításukat, és bárki módosíthatja a sajátját a profiljában. Kérések csak automatikus kérési jogosultsággal rendelkező felhasználóknak készülnek",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Sorozatok",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "A figyelőlistájukhoz adott sorozatok kérése",
+  "components.UserList.importfromJellyfinnochanges": "A(z) {mediaServerName} importálása befejeződött. Nem jött létre és nem frissült egy felhasználó sem.",
+  "components.UserList.importfromJellyfinsynced": "A(z) {mediaServerName} felhasználói sikeresen szinkronizálva. A meglévő felhasználók frissültek.",
+  "components.UserList.jellyfinsyncnotice": "A(z) {mediaServerName} összes felhasználója importálva van. A Szinkronizálás gombra kattintva továbbra is frissítheti őket, például ha megváltozott egy név vagy kép."
 }

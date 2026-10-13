@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Das Bild konnte nicht gelesen werden.",
   "utils.aiErrorMessage.pictureTooBig": "Das Bild ist zu groß.",
   "utils.aiErrorMessage.timeout": "Der KI-Dienst hat zu lange für die Antwort gebraucht. Versuche es erneut.",
-  "utils.aiErrorMessage.unreadable": "Das Modell hat nicht in einer Form geantwortet, die Seerr lesen kann. Versuche es erneut oder wähle ein stärkeres Modell."
+  "utils.aiErrorMessage.unreadable": "Das Modell hat nicht in einer Form geantwortet, die Seerr lesen kann. Versuche es erneut oder wähle ein stärkeres Modell.",
+  "components.RequestModal.noSeasonsAvailable": "Alle ausgewählten Staffeln sind bereits angefragt oder verfügbar.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Merkliste-Synchronisierung für neue Benutzer",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filme",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Filme anfragen, die zur Merkliste hinzugefügt werden",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Ob für neue Benutzer die Plex- oder Trakt-Merkliste von Anfang an automatisch angefragt wird. Bestehende Benutzer behalten ihre eigene Einstellung, und jeder kann seine im eigenen Profil ändern. Anfragen werden nur für Benutzer mit einer Berechtigung zum automatischen Anfragen gestellt",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Serien",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Serien anfragen, die zur Merkliste hinzugefügt werden",
+  "components.UserList.importfromJellyfinnochanges": "Import aus {mediaServerName} abgeschlossen. Es wurden keine Benutzer erstellt oder aktualisiert.",
+  "components.UserList.importfromJellyfinsynced": "{mediaServerName}-Benutzer erfolgreich synchronisiert. Bestehende Benutzer wurden aktualisiert.",
+  "components.UserList.jellyfinsyncnotice": "Alle Benutzer von {mediaServerName} wurden importiert. Du kannst trotzdem auf „Synchronisieren“ klicken, um sie zu aktualisieren, etwa bei einem geänderten Namen oder Bild."
 }

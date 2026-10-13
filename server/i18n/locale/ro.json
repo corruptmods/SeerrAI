@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Aprobă",
   "notifications.agents.webpush.approveFailed": "Nu s-a putut aproba",
   "notifications.agents.webpush.decline": "Respinge",
-  "notifications.agents.webpush.declineFailed": "Nu s-a putut respinge"
+  "notifications.agents.webpush.declineFailed": "Nu s-a putut respinge",
+  "notifications.events.adminAgent": "Agent de administrare",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Sănătate",
+  "notifications.events.issueComment": "{issueType, select, video {Comentariu nou la o problemă video} audio {Comentariu nou la o problemă audio} subtitles {Comentariu nou la o problemă de subtitrare} other {Comentariu nou la o problemă}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Problemă video nouă raportată} audio {Problemă audio nouă raportată} subtitles {Problemă de subtitrare nouă raportată} other {Problemă nouă raportată}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Problemă video redeschisă} audio {Problemă audio redeschisă} subtitles {Problemă de subtitrare redeschisă} other {Problemă redeschisă}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Problemă video rezolvată} audio {Problemă audio rezolvată} subtitles {Problemă de subtitrare rezolvată} other {Problemă rezolvată}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Solicitare de film aprobată} movie4k {Solicitare de film 4K aprobată} tv4k {Solicitare de serial 4K aprobată} other {Solicitare de serial aprobată}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Solicitare de film aprobată automat} movie4k {Solicitare de film 4K aprobată automat} tv4k {Solicitare de serial 4K aprobată automat} other {Solicitare de serial aprobată automat}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Solicitare de film trimisă automat} movie4k {Solicitare de film 4K trimisă automat} tv4k {Solicitare de serial 4K trimisă automat} other {Solicitare de serial trimisă automat}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Film disponibil acum} movie4k {Film 4K disponibil acum} tv4k {Serial 4K disponibil acum} other {Serial disponibil acum}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Solicitare de film respinsă} movie4k {Solicitare de film 4K respinsă} tv4k {Solicitare de serial 4K respinsă} other {Solicitare de serial respinsă}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Solicitarea filmului a eșuat} movie4k {Solicitarea filmului 4K a eșuat} tv4k {Solicitarea serialului 4K a eșuat} other {Solicitarea serialului a eșuat}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Solicitare nouă de film} movie4k {Solicitare nouă de film 4K} tv4k {Solicitare nouă de serial 4K} other {Solicitare nouă de serial}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Filmul solicitat este disponibil acum} movie4k {Filmul 4K solicitat este disponibil acum} tv4k {Serialul 4K solicitat este disponibil acum} other {Serialul solicitat este disponibil acum}}",
+  "notifications.events.seriesReadyToWatch": "Serial gata de vizionat"
 }

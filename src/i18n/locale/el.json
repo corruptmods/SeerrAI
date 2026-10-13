@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Δεν ήταν δυνατή η ανάγνωση αυτής της εικόνας.",
   "utils.aiErrorMessage.pictureTooBig": "Αυτή η εικόνα είναι πολύ μεγάλη.",
   "utils.aiErrorMessage.timeout": "Η υπηρεσία AI άργησε πολύ να απαντήσει. Δοκιμάστε ξανά.",
-  "utils.aiErrorMessage.unreadable": "Το μοντέλο δεν απάντησε σε μορφή που μπορεί να διαβάσει το Seerr. Δοκιμάστε ξανά ή επιλέξτε ένα ισχυρότερο μοντέλο."
+  "utils.aiErrorMessage.unreadable": "Το μοντέλο δεν απάντησε σε μορφή που μπορεί να διαβάσει το Seerr. Δοκιμάστε ξανά ή επιλέξτε ένα ισχυρότερο μοντέλο.",
+  "components.RequestModal.noSeasonsAvailable": "Όλες οι επιλεγμένες σεζόν έχουν ήδη ζητηθεί ή είναι διαθέσιμες.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Συγχρονισμός λίστας παρακολούθησης για νέους χρήστες",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Ταινίες",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Αίτημα για ταινίες που προστίθενται στη λίστα παρακολούθησής τους",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Αν οι νέοι χρήστες ξεκινούν με αυτόματα αιτήματα για τη λίστα παρακολούθησής τους στο Plex ή στο Trakt. Οι υπάρχοντες χρήστες κρατούν τη δική τους επιλογή και ο καθένας μπορεί να αλλάξει τη δική του στο προφίλ του. Αιτήματα γίνονται μόνο για χρήστες με δικαίωμα αυτόματου αιτήματος",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Σειρές",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Αίτημα για σειρές που προστίθενται στη λίστα παρακολούθησής τους",
+  "components.UserList.importfromJellyfinnochanges": "Η εισαγωγή από το {mediaServerName} ολοκληρώθηκε. Δεν δημιουργήθηκαν ούτε ανανεώθηκαν χρήστες.",
+  "components.UserList.importfromJellyfinsynced": "Οι χρήστες του {mediaServerName} συγχρονίστηκαν επιτυχώς. Οι υπάρχοντες χρήστες ανανεώθηκαν.",
+  "components.UserList.jellyfinsyncnotice": "Όλοι οι χρήστες του {mediaServerName} έχουν εισαχθεί. Μπορείτε ακόμη να πατήσετε «Συγχρονισμός» για να τους ανανεώσετε, π.χ. αν άλλαξε κάποιο όνομα ή εικόνα."
 }

@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Impossibile leggere l’immagine.",
   "utils.aiErrorMessage.pictureTooBig": "L’immagine è troppo grande.",
   "utils.aiErrorMessage.timeout": "Il servizio IA ha impiegato troppo tempo a rispondere. Riprova.",
-  "utils.aiErrorMessage.unreadable": "Il modello non ha risposto in un formato leggibile da Seerr. Riprova o scegli un modello più potente."
+  "utils.aiErrorMessage.unreadable": "Il modello non ha risposto in un formato leggibile da Seerr. Riprova o scegli un modello più potente.",
+  "components.RequestModal.noSeasonsAvailable": "Tutte le stagioni selezionate sono già richieste o disponibili.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Sincronizzazione della lista da guardare per i nuovi utenti",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Film",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Richiedi i film aggiunti alla loro lista da guardare",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Se i nuovi utenti partono con la loro lista da guardare di Plex o Trakt richiesta automaticamente. Gli utenti esistenti mantengono la propria scelta, e chiunque può cambiare la sua nel proprio profilo. Le richieste vengono fatte solo per gli utenti con un permesso di richiesta automatica",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Serie",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Richiedi le serie aggiunte alla loro lista da guardare",
+  "components.UserList.importfromJellyfinnochanges": "Importazione da {mediaServerName} completata. Nessun utente è stato creato o aggiornato.",
+  "components.UserList.importfromJellyfinsynced": "Utenti di {mediaServerName} sincronizzati correttamente. Gli utenti esistenti sono stati aggiornati.",
+  "components.UserList.jellyfinsyncnotice": "Tutti gli utenti di {mediaServerName} sono stati importati. Puoi comunque fare clic su Sincronizza per aggiornarli, ad esempio se è cambiato un nome o un’immagine."
 }

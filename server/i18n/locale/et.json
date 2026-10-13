@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Kinnita",
   "notifications.agents.webpush.approveFailed": "Kinnitamine ebaõnnestus",
   "notifications.agents.webpush.decline": "Keeldu",
-  "notifications.agents.webpush.declineFailed": "Keeldumine ebaõnnestus"
+  "notifications.agents.webpush.declineFailed": "Keeldumine ebaõnnestus",
+  "notifications.events.adminAgent": "Haldusagent",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Seisund",
+  "notifications.events.issueComment": "{issueType, select, video {Uus kommentaar videoprobleemile} audio {Uus kommentaar heliprobleemile} subtitles {Uus kommentaar subtiitriprobleemile} other {Uus kommentaar probleemile}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Teatati uuest videoprobleemist} audio {Teatati uuest heliprobleemist} subtitles {Teatati uuest subtiitriprobleemist} other {Teatati uuest probleemist}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Videoprobleem avati uuesti} audio {Heliprobleem avati uuesti} subtitles {Subtiitriprobleem avati uuesti} other {Probleem avati uuesti}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Videoprobleem lahendatud} audio {Heliprobleem lahendatud} subtitles {Subtiitriprobleem lahendatud} other {Probleem lahendatud}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Filmi taotlus kinnitatud} movie4k {4K-filmi taotlus kinnitatud} tv4k {4K-sarja taotlus kinnitatud} other {Sarja taotlus kinnitatud}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Filmi taotlus automaatselt kinnitatud} movie4k {4K-filmi taotlus automaatselt kinnitatud} tv4k {4K-sarja taotlus automaatselt kinnitatud} other {Sarja taotlus automaatselt kinnitatud}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Filmi taotlus automaatselt esitatud} movie4k {4K-filmi taotlus automaatselt esitatud} tv4k {4K-sarja taotlus automaatselt esitatud} other {Sarja taotlus automaatselt esitatud}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Film on nüüd saadaval} movie4k {4K-film on nüüd saadaval} tv4k {4K-sari on nüüd saadaval} other {Sari on nüüd saadaval}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Filmi taotlus tagasi lükatud} movie4k {4K-filmi taotlus tagasi lükatud} tv4k {4K-sarja taotlus tagasi lükatud} other {Sarja taotlus tagasi lükatud}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Filmi taotlus ebaõnnestus} movie4k {4K-filmi taotlus ebaõnnestus} tv4k {4K-sarja taotlus ebaõnnestus} other {Sarja taotlus ebaõnnestus}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Uus filmi taotlus} movie4k {Uus 4K-filmi taotlus} tv4k {Uus 4K-sarja taotlus} other {Uus sarja taotlus}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Taotletud film on nüüd saadaval} movie4k {Taotletud 4K-film on nüüd saadaval} tv4k {Taotletud 4K-sari on nüüd saadaval} other {Taotletud sari on nüüd saadaval}}",
+  "notifications.events.seriesReadyToWatch": "Sari on vaatamiseks valmis"
 }

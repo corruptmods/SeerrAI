@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "核准",
   "notifications.agents.webpush.approveFailed": "無法核准",
   "notifications.agents.webpush.decline": "拒絕",
-  "notifications.agents.webpush.declineFailed": "無法拒絕"
+  "notifications.agents.webpush.declineFailed": "無法拒絕",
+  "notifications.events.adminAgent": "管理代理程式",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "健康狀態",
+  "notifications.events.issueComment": "{issueType, select, video {影片問題有新評論} audio {音訊問題有新評論} subtitles {字幕問題有新評論} other {問題有新評論}}",
+  "notifications.events.issueCreated": "{issueType, select, video {有人回報了新的影片問題} audio {有人回報了新的音訊問題} subtitles {有人回報了新的字幕問題} other {有人回報了新問題}}",
+  "notifications.events.issueReopened": "{issueType, select, video {影片問題已重新開啟} audio {音訊問題已重新開啟} subtitles {字幕問題已重新開啟} other {問題已重新開啟}}",
+  "notifications.events.issueResolved": "{issueType, select, video {影片問題已解決} audio {音訊問題已解決} subtitles {字幕問題已解決} other {問題已解決}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {電影請求已核准} movie4k {4K 電影請求已核准} tv4k {4K 影集請求已核准} other {影集請求已核准}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {電影請求已自動核准} movie4k {4K 電影請求已自動核准} tv4k {4K 影集請求已自動核准} other {影集請求已自動核准}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {已自動送出電影請求} movie4k {已自動送出 4K 電影請求} tv4k {已自動送出 4K 影集請求} other {已自動送出影集請求}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {電影現已可觀看} movie4k {4K 電影現已可觀看} tv4k {4K 影集現已可觀看} other {影集現已可觀看}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {電影請求已拒絕} movie4k {4K 電影請求已拒絕} tv4k {4K 影集請求已拒絕} other {影集請求已拒絕}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {電影請求失敗} movie4k {4K 電影請求失敗} tv4k {4K 影集請求失敗} other {影集請求失敗}}",
+  "notifications.events.mediaPending": "{kind, select, movie {新的電影請求} movie4k {新的 4K 電影請求} tv4k {新的 4K 影集請求} other {新的影集請求}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {請求的電影現已可觀看} movie4k {請求的 4K 電影現已可觀看} tv4k {請求的 4K 影集現已可觀看} other {請求的影集現已可觀看}}",
+  "notifications.events.seriesReadyToWatch": "影集可以觀看了"
 }

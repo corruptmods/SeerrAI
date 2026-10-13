@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Jóváhagyás",
   "notifications.agents.webpush.approveFailed": "Nem sikerült jóváhagyni",
   "notifications.agents.webpush.decline": "Elutasítás",
-  "notifications.agents.webpush.declineFailed": "Nem sikerült elutasítani"
+  "notifications.agents.webpush.declineFailed": "Nem sikerült elutasítani",
+  "notifications.events.adminAgent": "Adminügynök",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Rendszerállapot",
+  "notifications.events.issueComment": "{issueType, select, video {Új hozzászólás egy képproblémához} audio {Új hozzászólás egy hangproblémához} subtitles {Új hozzászólás egy feliratproblémához} other {Új hozzászólás egy problémához}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Új képprobléma bejelentve} audio {Új hangprobléma bejelentve} subtitles {Új feliratprobléma bejelentve} other {Új probléma bejelentve}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Képprobléma újranyitva} audio {Hangprobléma újranyitva} subtitles {Feliratprobléma újranyitva} other {Probléma újranyitva}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Képprobléma megoldva} audio {Hangprobléma megoldva} subtitles {Feliratprobléma megoldva} other {Probléma megoldva}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Filmkérés jóváhagyva} movie4k {4K filmkérés jóváhagyva} tv4k {4K sorozatkérés jóváhagyva} other {Sorozatkérés jóváhagyva}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Filmkérés automatikusan jóváhagyva} movie4k {4K filmkérés automatikusan jóváhagyva} tv4k {4K sorozatkérés automatikusan jóváhagyva} other {Sorozatkérés automatikusan jóváhagyva}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Filmkérés automatikusan elküldve} movie4k {4K filmkérés automatikusan elküldve} tv4k {4K sorozatkérés automatikusan elküldve} other {Sorozatkérés automatikusan elküldve}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {A film már elérhető} movie4k {A 4K film már elérhető} tv4k {A 4K sorozat már elérhető} other {A sorozat már elérhető}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Filmkérés elutasítva} movie4k {4K filmkérés elutasítva} tv4k {4K sorozatkérés elutasítva} other {Sorozatkérés elutasítva}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Sikertelen filmkérés} movie4k {Sikertelen 4K filmkérés} tv4k {Sikertelen 4K sorozatkérés} other {Sikertelen sorozatkérés}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Új filmkérés} movie4k {Új 4K filmkérés} tv4k {Új 4K sorozatkérés} other {Új sorozatkérés}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {A kért film már elérhető} movie4k {A kért 4K film már elérhető} tv4k {A kért 4K sorozat már elérhető} other {A kért sorozat már elérhető}}",
+  "notifications.events.seriesReadyToWatch": "A sorozat megnézhető"
 }

@@ -42,8 +42,46 @@ describe('notification languages', () => {
     const en = JSON.parse(
       fs.readFileSync(path.join(dir, 'en.json'), 'utf-8')
     ) as Record<string, string>;
-    const names = (text: string) =>
-      new Set([...text.matchAll(/\{(\w+)/g)].map((m) => m[1]));
+    // The names of a message's arguments, at any depth. The text inside a
+    // select or plural option ({kind, select, movie {Movie Approved} …}) is
+    // wording, not a name, and differs in every language.
+    const names = (text: string) => {
+      const found = new Set<string>();
+      let i = 0;
+      const message = (): void => {
+        while (i < text.length && text[i] !== '}') {
+          if (text[i] === '{') {
+            i += 1;
+            argument();
+          } else {
+            i += 1;
+          }
+        }
+      };
+      const argument = (): void => {
+        const head = /^\s*(\w+)\s*(?:,\s*(\w+)\s*)?/.exec(text.slice(i));
+        if (!head) return;
+        found.add(head[1]);
+        i += head[0].length;
+        const withOptions = ['select', 'plural', 'selectordinal'].includes(
+          head[2]
+        );
+        if (text[i] === ',') i += 1;
+        while (i < text.length && text[i] !== '}') {
+          if (withOptions && text[i] === '{') {
+            i += 1;
+            message();
+          }
+          i += 1;
+        }
+        i += 1;
+      };
+      while (i < text.length) {
+        message();
+        i += 1;
+      }
+      return found;
+    };
     for (const file of fs.readdirSync(dir)) {
       const messages = JSON.parse(
         fs.readFileSync(path.join(dir, file), 'utf-8')

@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Goedkeuren",
   "notifications.agents.webpush.approveFailed": "Kon niet goedkeuren",
   "notifications.agents.webpush.decline": "Afwijzen",
-  "notifications.agents.webpush.declineFailed": "Kon niet afwijzen"
+  "notifications.agents.webpush.declineFailed": "Kon niet afwijzen",
+  "notifications.events.adminAgent": "Beheeragent",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Gezondheid",
+  "notifications.events.issueComment": "{issueType, select, video {Nieuwe opmerking bij videoprobleem} audio {Nieuwe opmerking bij audioprobleem} subtitles {Nieuwe opmerking bij ondertitelingsprobleem} other {Nieuwe opmerking bij probleem}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Nieuw videoprobleem gemeld} audio {Nieuw audioprobleem gemeld} subtitles {Nieuw ondertitelingsprobleem gemeld} other {Nieuw probleem gemeld}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Videoprobleem heropend} audio {Audioprobleem heropend} subtitles {Ondertitelingsprobleem heropend} other {Probleem heropend}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Videoprobleem opgelost} audio {Audioprobleem opgelost} subtitles {Ondertitelingsprobleem opgelost} other {Probleem opgelost}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Filmaanvraag goedgekeurd} movie4k {4K-filmaanvraag goedgekeurd} tv4k {4K-serie-aanvraag goedgekeurd} other {Serie-aanvraag goedgekeurd}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Filmaanvraag automatisch goedgekeurd} movie4k {4K-filmaanvraag automatisch goedgekeurd} tv4k {4K-serie-aanvraag automatisch goedgekeurd} other {Serie-aanvraag automatisch goedgekeurd}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Filmaanvraag automatisch ingediend} movie4k {4K-filmaanvraag automatisch ingediend} tv4k {4K-serie-aanvraag automatisch ingediend} other {Serie-aanvraag automatisch ingediend}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Film nu beschikbaar} movie4k {4K-film nu beschikbaar} tv4k {4K-serie nu beschikbaar} other {Serie nu beschikbaar}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Filmaanvraag afgewezen} movie4k {4K-filmaanvraag afgewezen} tv4k {4K-serie-aanvraag afgewezen} other {Serie-aanvraag afgewezen}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Filmaanvraag mislukt} movie4k {4K-filmaanvraag mislukt} tv4k {4K-serie-aanvraag mislukt} other {Serie-aanvraag mislukt}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Nieuwe filmaanvraag} movie4k {Nieuwe 4K-filmaanvraag} tv4k {Nieuwe 4K-serie-aanvraag} other {Nieuwe serie-aanvraag}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Aangevraagde film nu beschikbaar} movie4k {Aangevraagde 4K-film nu beschikbaar} tv4k {Aangevraagde 4K-serie nu beschikbaar} other {Aangevraagde serie nu beschikbaar}}",
+  "notifications.events.seriesReadyToWatch": "Serie klaar om te kijken"
 }

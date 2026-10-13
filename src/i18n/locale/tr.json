@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Bu fotoğraf okunamadı.",
   "utils.aiErrorMessage.pictureTooBig": "Bu fotoğraf çok büyük.",
   "utils.aiErrorMessage.timeout": "Yapay zekâ hizmetinin yanıt vermesi çok uzun sürdü. Tekrar deneyin.",
-  "utils.aiErrorMessage.unreadable": "Model, Seerr’ın okuyabileceği bir biçimde yanıt vermedi. Tekrar deneyin ya da daha güçlü bir model seçin."
+  "utils.aiErrorMessage.unreadable": "Model, Seerr’ın okuyabileceği bir biçimde yanıt vermedi. Tekrar deneyin ya da daha güçlü bir model seçin.",
+  "components.RequestModal.noSeasonsAvailable": "Seçilen sezonların tümü zaten talep edilmiş veya mevcut.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Yeni Kullanıcılar için İzleme Listesi Eşitleme",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filmler",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "İzleme listelerine eklenen filmleri talep et",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Yeni kullanıcıların Plex veya Trakt izleme listelerinin otomatik olarak talep edilmesiyle başlayıp başlamayacağı. Mevcut kullanıcılar kendi seçimlerini korur ve herkes kendi ayarını profilinden değiştirebilir. Talepler yalnızca Otomatik Talep iznine sahip kullanıcılar için oluşturulur",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Diziler",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "İzleme listelerine eklenen dizileri talep et",
+  "components.UserList.importfromJellyfinnochanges": "{mediaServerName} içe aktarma tamamlandı. Hiçbir kullanıcı oluşturulmadı veya güncellenmedi.",
+  "components.UserList.importfromJellyfinsynced": "{mediaServerName} kullanıcıları başarıyla eşitlendi. Mevcut kullanıcılar güncellendi.",
+  "components.UserList.jellyfinsyncnotice": "{mediaServerName} üzerindeki herkes içe aktarıldı. Değişen bir ad veya resim gibi bilgileri güncellemek için yine de Eşitle’ye tıklayabilirsiniz."
 }

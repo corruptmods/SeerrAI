@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Kuvaa ei voitu lukea.",
   "utils.aiErrorMessage.pictureTooBig": "Kuva on liian suuri.",
   "utils.aiErrorMessage.timeout": "Tekoälypalvelulta kesti liian kauan vastata. Yritä uudelleen.",
-  "utils.aiErrorMessage.unreadable": "Malli ei vastannut muodossa, jota Seerr osaa lukea. Yritä uudelleen tai valitse tehokkaampi malli."
+  "utils.aiErrorMessage.unreadable": "Malli ei vastannut muodossa, jota Seerr osaa lukea. Yritä uudelleen tai valitse tehokkaampi malli.",
+  "components.RequestModal.noSeasonsAvailable": "Kaikki valitut kaudet on jo pyydetty tai ne ovat saatavilla.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Katselulistan synkronointi uusille käyttäjille",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Elokuvat",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Pyydä elokuvat, jotka lisätään käyttäjän katselulistaan",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Pyydetäänkö uusien käyttäjien Plex- tai Trakt-katselulistan sisältö automaattisesti heti alusta alkaen. Nykyiset käyttäjät pitävät oman valintansa, ja kuka tahansa voi muuttaa omaansa profiilissaan. Pyyntöjä tehdään vain käyttäjille, joilla on automaattisen pyynnön oikeus",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Sarjat",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Pyydä sarjat, jotka lisätään käyttäjän katselulistaan",
+  "components.UserList.importfromJellyfinnochanges": "Tuonti palvelusta {mediaServerName} valmis. Käyttäjiä ei luotu eikä päivitetty.",
+  "components.UserList.importfromJellyfinsynced": "Palvelun {mediaServerName} käyttäjät synkronoitiin. Nykyiset käyttäjät päivitettiin.",
+  "components.UserList.jellyfinsyncnotice": "Kaikki palvelun {mediaServerName} käyttäjät on tuotu. Voit silti napsauttaa Synkronoi päivittääksesi heidät, esimerkiksi jos nimi tai kuva on muuttunut."
 }

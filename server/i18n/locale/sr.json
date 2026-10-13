@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Odobri",
   "notifications.agents.webpush.approveFailed": "Odobravanje nije uspelo",
   "notifications.agents.webpush.decline": "Odbij",
-  "notifications.agents.webpush.declineFailed": "Odbijanje nije uspelo"
+  "notifications.agents.webpush.declineFailed": "Odbijanje nije uspelo",
+  "notifications.events.adminAgent": "Admin agent",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Stanje sistema",
+  "notifications.events.issueComment": "{issueType, select, video {Novi komentar na problem sa slikom} audio {Novi komentar na problem sa zvukom} subtitles {Novi komentar na problem sa titlovima} other {Novi komentar na problem}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Prijavljen novi problem sa slikom} audio {Prijavljen novi problem sa zvukom} subtitles {Prijavljen novi problem sa titlovima} other {Prijavljen novi problem}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Problem sa slikom ponovo otvoren} audio {Problem sa zvukom ponovo otvoren} subtitles {Problem sa titlovima ponovo otvoren} other {Problem ponovo otvoren}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Problem sa slikom rešen} audio {Problem sa zvukom rešen} subtitles {Problem sa titlovima rešen} other {Problem rešen}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Zahtev za film odobren} movie4k {Zahtev za 4K film odobren} tv4k {Zahtev za 4K seriju odobren} other {Zahtev za seriju odobren}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Zahtev za film automatski odobren} movie4k {Zahtev za 4K film automatski odobren} tv4k {Zahtev za 4K seriju automatski odobren} other {Zahtev za seriju automatski odobren}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Zahtev za film automatski poslat} movie4k {Zahtev za 4K film automatski poslat} tv4k {Zahtev za 4K seriju automatski poslat} other {Zahtev za seriju automatski poslat}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Film je sada dostupan} movie4k {4K film je sada dostupan} tv4k {4K serija je sada dostupna} other {Serija je sada dostupna}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Zahtev za film odbijen} movie4k {Zahtev za 4K film odbijen} tv4k {Zahtev za 4K seriju odbijen} other {Zahtev za seriju odbijen}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Zahtev za film nije uspeo} movie4k {Zahtev za 4K film nije uspeo} tv4k {Zahtev za 4K seriju nije uspeo} other {Zahtev za seriju nije uspeo}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Novi zahtev za film} movie4k {Novi zahtev za 4K film} tv4k {Novi zahtev za 4K seriju} other {Novi zahtev za seriju}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Traženi film je sada dostupan} movie4k {Traženi 4K film je sada dostupan} tv4k {Tražena 4K serija je sada dostupna} other {Tražena serija je sada dostupna}}",
+  "notifications.events.seriesReadyToWatch": "Serija je spremna za gledanje"
 }

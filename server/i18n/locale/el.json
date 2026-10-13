@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Έγκριση",
   "notifications.agents.webpush.approveFailed": "Η έγκριση απέτυχε",
   "notifications.agents.webpush.decline": "Απόρριψη",
-  "notifications.agents.webpush.declineFailed": "Η απόρριψη απέτυχε"
+  "notifications.agents.webpush.declineFailed": "Η απόρριψη απέτυχε",
+  "notifications.events.adminAgent": "Agent διαχειριστή",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Υγεία",
+  "notifications.events.issueComment": "{issueType, select, video {Νέο σχόλιο σε πρόβλημα βίντεο} audio {Νέο σχόλιο σε πρόβλημα ήχου} subtitles {Νέο σχόλιο σε πρόβλημα υποτίτλων} other {Νέο σχόλιο σε πρόβλημα}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Αναφέρθηκε νέο πρόβλημα βίντεο} audio {Αναφέρθηκε νέο πρόβλημα ήχου} subtitles {Αναφέρθηκε νέο πρόβλημα υποτίτλων} other {Αναφέρθηκε νέο πρόβλημα}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Το πρόβλημα βίντεο άνοιξε ξανά} audio {Το πρόβλημα ήχου άνοιξε ξανά} subtitles {Το πρόβλημα υποτίτλων άνοιξε ξανά} other {Το πρόβλημα άνοιξε ξανά}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Το πρόβλημα βίντεο επιλύθηκε} audio {Το πρόβλημα ήχου επιλύθηκε} subtitles {Το πρόβλημα υποτίτλων επιλύθηκε} other {Το πρόβλημα επιλύθηκε}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Το αίτημα ταινίας εγκρίθηκε} movie4k {Το αίτημα ταινίας 4K εγκρίθηκε} tv4k {Το αίτημα σειράς 4K εγκρίθηκε} other {Το αίτημα σειράς εγκρίθηκε}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Το αίτημα ταινίας εγκρίθηκε αυτόματα} movie4k {Το αίτημα ταινίας 4K εγκρίθηκε αυτόματα} tv4k {Το αίτημα σειράς 4K εγκρίθηκε αυτόματα} other {Το αίτημα σειράς εγκρίθηκε αυτόματα}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Το αίτημα ταινίας υποβλήθηκε αυτόματα} movie4k {Το αίτημα ταινίας 4K υποβλήθηκε αυτόματα} tv4k {Το αίτημα σειράς 4K υποβλήθηκε αυτόματα} other {Το αίτημα σειράς υποβλήθηκε αυτόματα}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Η ταινία είναι πλέον διαθέσιμη} movie4k {Η ταινία 4K είναι πλέον διαθέσιμη} tv4k {Η σειρά 4K είναι πλέον διαθέσιμη} other {Η σειρά είναι πλέον διαθέσιμη}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Το αίτημα ταινίας απορρίφθηκε} movie4k {Το αίτημα ταινίας 4K απορρίφθηκε} tv4k {Το αίτημα σειράς 4K απορρίφθηκε} other {Το αίτημα σειράς απορρίφθηκε}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Το αίτημα ταινίας απέτυχε} movie4k {Το αίτημα ταινίας 4K απέτυχε} tv4k {Το αίτημα σειράς 4K απέτυχε} other {Το αίτημα σειράς απέτυχε}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Νέο αίτημα ταινίας} movie4k {Νέο αίτημα ταινίας 4K} tv4k {Νέο αίτημα σειράς 4K} other {Νέο αίτημα σειράς}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Η ταινία που ζητήθηκε είναι πλέον διαθέσιμη} movie4k {Η ταινία 4K που ζητήθηκε είναι πλέον διαθέσιμη} tv4k {Η σειρά 4K που ζητήθηκε είναι πλέον διαθέσιμη} other {Η σειρά που ζητήθηκε είναι πλέον διαθέσιμη}}",
+  "notifications.events.seriesReadyToWatch": "Η σειρά είναι έτοιμη για προβολή"
 }

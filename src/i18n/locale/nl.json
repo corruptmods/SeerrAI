@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Die foto kon niet worden gelezen.",
   "utils.aiErrorMessage.pictureTooBig": "Die foto is te groot.",
   "utils.aiErrorMessage.timeout": "De AI-dienst deed er te lang over om te antwoorden. Probeer het opnieuw.",
-  "utils.aiErrorMessage.unreadable": "Het model antwoordde niet in een vorm die Seerr kon lezen. Probeer het opnieuw, of kies een sterker model."
+  "utils.aiErrorMessage.unreadable": "Het model antwoordde niet in een vorm die Seerr kon lezen. Probeer het opnieuw, of kies een sterker model.",
+  "components.RequestModal.noSeasonsAvailable": "Alle geselecteerde seizoenen zijn al aangevraagd of beschikbaar.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Kijklijst synchroniseren voor nieuwe gebruikers",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Films",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Films aanvragen die aan hun kijklijst worden toegevoegd",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Of nieuwe gebruikers beginnen met hun Plex- of Trakt-kijklijst automatisch aangevraagd. Bestaande gebruikers houden hun eigen keuze, en iedereen kan die van zichzelf wijzigen in zijn profiel. Aanvragen worden alleen gedaan voor gebruikers met een recht om automatisch aan te vragen",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Series",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Series aanvragen die aan hun kijklijst worden toegevoegd",
+  "components.UserList.importfromJellyfinnochanges": "{mediaServerName}-import voltooid. Er zijn geen gebruikers aangemaakt of bijgewerkt.",
+  "components.UserList.importfromJellyfinsynced": "{mediaServerName}-gebruikers zijn gesynchroniseerd. Bestaande gebruikers zijn bijgewerkt.",
+  "components.UserList.jellyfinsyncnotice": "Iedereen op {mediaServerName} is geïmporteerd. Je kunt nog steeds op Synchroniseren klikken om hun gegevens bij te werken, zoals een gewijzigde naam of foto."
 }

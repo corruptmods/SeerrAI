@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "मंज़ूर करें",
   "notifications.agents.webpush.approveFailed": "मंज़ूर नहीं हो सका",
   "notifications.agents.webpush.decline": "अस्वीकार करें",
-  "notifications.agents.webpush.declineFailed": "अस्वीकार नहीं हो सका"
+  "notifications.agents.webpush.declineFailed": "अस्वीकार नहीं हो सका",
+  "notifications.events.adminAgent": "एडमिन एजेंट",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "सेहत",
+  "notifications.events.issueComment": "{issueType, select, video {वीडियो समस्या पर नई टिप्पणी} audio {ऑडियो समस्या पर नई टिप्पणी} subtitles {सबटाइटल समस्या पर नई टिप्पणी} other {समस्या पर नई टिप्पणी}}",
+  "notifications.events.issueCreated": "{issueType, select, video {नई वीडियो समस्या की रिपोर्ट की गई} audio {नई ऑडियो समस्या की रिपोर्ट की गई} subtitles {नई सबटाइटल समस्या की रिपोर्ट की गई} other {नई समस्या की रिपोर्ट की गई}}",
+  "notifications.events.issueReopened": "{issueType, select, video {वीडियो समस्या फिर से खोली गई} audio {ऑडियो समस्या फिर से खोली गई} subtitles {सबटाइटल समस्या फिर से खोली गई} other {समस्या फिर से खोली गई}}",
+  "notifications.events.issueResolved": "{issueType, select, video {वीडियो समस्या हल हो गई} audio {ऑडियो समस्या हल हो गई} subtitles {सबटाइटल समस्या हल हो गई} other {समस्या हल हो गई}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {फिल्म का अनुरोध मंज़ूर हुआ} movie4k {4K फिल्म का अनुरोध मंज़ूर हुआ} tv4k {4K शृंखला का अनुरोध मंज़ूर हुआ} other {शृंखला का अनुरोध मंज़ूर हुआ}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {फिल्म का अनुरोध अपने-आप मंज़ूर हुआ} movie4k {4K फिल्म का अनुरोध अपने-आप मंज़ूर हुआ} tv4k {4K शृंखला का अनुरोध अपने-आप मंज़ूर हुआ} other {शृंखला का अनुरोध अपने-आप मंज़ूर हुआ}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {फिल्म का अनुरोध अपने-आप भेजा गया} movie4k {4K फिल्म का अनुरोध अपने-आप भेजा गया} tv4k {4K शृंखला का अनुरोध अपने-आप भेजा गया} other {शृंखला का अनुरोध अपने-आप भेजा गया}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {फिल्म अब उपलब्ध है} movie4k {4K फिल्म अब उपलब्ध है} tv4k {4K शृंखला अब उपलब्ध है} other {शृंखला अब उपलब्ध है}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {फिल्म का अनुरोध अस्वीकार किया गया} movie4k {4K फिल्म का अनुरोध अस्वीकार किया गया} tv4k {4K शृंखला का अनुरोध अस्वीकार किया गया} other {शृंखला का अनुरोध अस्वीकार किया गया}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {फिल्म का अनुरोध विफल रहा} movie4k {4K फिल्म का अनुरोध विफल रहा} tv4k {4K शृंखला का अनुरोध विफल रहा} other {शृंखला का अनुरोध विफल रहा}}",
+  "notifications.events.mediaPending": "{kind, select, movie {फिल्म का नया अनुरोध} movie4k {4K फिल्म का नया अनुरोध} tv4k {4K शृंखला का नया अनुरोध} other {शृंखला का नया अनुरोध}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {अनुरोधित फिल्म अब उपलब्ध है} movie4k {अनुरोधित 4K फिल्म अब उपलब्ध है} tv4k {अनुरोधित 4K शृंखला अब उपलब्ध है} other {अनुरोधित शृंखला अब उपलब्ध है}}",
+  "notifications.events.seriesReadyToWatch": "शृंखला देखने के लिए तैयार है"
 }

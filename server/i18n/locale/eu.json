@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Onartu",
   "notifications.agents.webpush.approveFailed": "Ezin izan da onartu",
   "notifications.agents.webpush.decline": "Baztertu",
-  "notifications.agents.webpush.declineFailed": "Ezin izan da baztertu"
+  "notifications.agents.webpush.declineFailed": "Ezin izan da baztertu",
+  "notifications.events.adminAgent": "Administratzaile-agentea",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Osasuna",
+  "notifications.events.issueComment": "{issueType, select, video {Iruzkin berria bideo-intzidentzia batean} audio {Iruzkin berria audio-intzidentzia batean} subtitles {Iruzkin berria azpititulu-intzidentzia batean} other {Iruzkin berria intzidentzia batean}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Bideo-intzidentzia berri baten berri eman da} audio {Audio-intzidentzia berri baten berri eman da} subtitles {Azpititulu-intzidentzia berri baten berri eman da} other {Intzidentzia berri baten berri eman da}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Bideo-intzidentzia berriro ireki da} audio {Audio-intzidentzia berriro ireki da} subtitles {Azpititulu-intzidentzia berriro ireki da} other {Intzidentzia berriro ireki da}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Bideo-intzidentzia konponduta} audio {Audio-intzidentzia konponduta} subtitles {Azpititulu-intzidentzia konponduta} other {Intzidentzia konponduta}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Film-eskaera onartuta} movie4k {4K film-eskaera onartuta} tv4k {4K telesail-eskaera onartuta} other {Telesail-eskaera onartuta}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Film-eskaera automatikoki onartuta} movie4k {4K film-eskaera automatikoki onartuta} tv4k {4K telesail-eskaera automatikoki onartuta} other {Telesail-eskaera automatikoki onartuta}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Film-eskaera automatikoki bidalita} movie4k {4K film-eskaera automatikoki bidalita} tv4k {4K telesail-eskaera automatikoki bidalita} other {Telesail-eskaera automatikoki bidalita}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Filma eskuragarri dago orain} movie4k {4K filma eskuragarri dago orain} tv4k {4K telesaila eskuragarri dago orain} other {Telesaila eskuragarri dago orain}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Film-eskaera baztertuta} movie4k {4K film-eskaera baztertuta} tv4k {4K telesail-eskaera baztertuta} other {Telesail-eskaera baztertuta}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Film-eskaerak huts egin du} movie4k {4K film-eskaerak huts egin du} tv4k {4K telesail-eskaerak huts egin du} other {Telesail-eskaerak huts egin du}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Film-eskaera berria} movie4k {4K film-eskaera berria} tv4k {4K telesail-eskaera berria} other {Telesail-eskaera berria}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Eskatutako filma eskuragarri dago orain} movie4k {Eskatutako 4K filma eskuragarri dago orain} tv4k {Eskatutako 4K telesaila eskuragarri dago orain} other {Eskatutako telesaila eskuragarri dago orain}}",
+  "notifications.events.seriesReadyToWatch": "Telesaila ikusteko prest"
 }

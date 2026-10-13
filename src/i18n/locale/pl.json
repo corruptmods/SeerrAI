@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Nie udało się odczytać tego zdjęcia.",
   "utils.aiErrorMessage.pictureTooBig": "To zdjęcie jest za duże.",
   "utils.aiErrorMessage.timeout": "Usługa AI odpowiadała zbyt długo. Spróbuj ponownie.",
-  "utils.aiErrorMessage.unreadable": "Model nie odpowiedział w formie, którą Seerr potrafi odczytać. Spróbuj ponownie lub wybierz mocniejszy model."
+  "utils.aiErrorMessage.unreadable": "Model nie odpowiedział w formie, którą Seerr potrafi odczytać. Spróbuj ponownie lub wybierz mocniejszy model.",
+  "components.RequestModal.noSeasonsAvailable": "Wszystkie wybrane sezony są już objęte prośbą lub dostępne.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Synchronizacja listy obserwowanych dla nowych użytkowników",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filmy",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Proś o filmy dodane do ich listy obserwowanych",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Czy nowi użytkownicy zaczynają z automatycznym wysyłaniem próśb o pozycje z ich listy obserwowanych w Plex lub Trakt. Obecni użytkownicy zachowują własny wybór, a każdy może zmienić swój w profilu. Prośby są wysyłane tylko dla użytkowników z uprawnieniem do automatycznych próśb",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Seriale",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Proś o seriale dodane do ich listy obserwowanych",
+  "components.UserList.importfromJellyfinnochanges": "Import z {mediaServerName} zakończony. Nie utworzono ani nie odświeżono żadnych użytkowników.",
+  "components.UserList.importfromJellyfinsynced": "Pomyślnie zsynchronizowano użytkowników {mediaServerName}. Istniejący użytkownicy zostali odświeżeni.",
+  "components.UserList.jellyfinsyncnotice": "Wszyscy z {mediaServerName} zostali już zaimportowani. Nadal możesz kliknąć Synchronizuj, aby odświeżyć ich dane, np. zmienioną nazwę lub zdjęcie."
 }

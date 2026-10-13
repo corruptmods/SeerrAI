@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Ezin izan da irudi hori irakurri.",
   "utils.aiErrorMessage.pictureTooBig": "Irudi hori handiegia da.",
   "utils.aiErrorMessage.timeout": "AA zerbitzuak gehiegi behar izan du erantzuteko. Saiatu berriro.",
-  "utils.aiErrorMessage.unreadable": "Ereduak ez du Seerr-ek irakur dezakeen moduan erantzun. Saiatu berriro, edo aukeratu eredu indartsuago bat."
+  "utils.aiErrorMessage.unreadable": "Ereduak ez du Seerr-ek irakur dezakeen moduan erantzun. Saiatu berriro, edo aukeratu eredu indartsuago bat.",
+  "components.RequestModal.noSeasonsAvailable": "Hautatutako denboraldi guztiak dagoeneko eskatuta edo eskuragarri daude.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Erabiltzaile berrien jarraipen-zerrendaren sinkronizazioa",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filmak",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Eskatu beren jarraipen-zerrendara gehitutako filmak",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Erabiltzaile berriek beren Plex edo Trakt jarraipen-zerrenda automatikoki eskatuta hasten diren ala ez. Lehendik dauden erabiltzaileek beren aukera mantentzen dute, eta edonork alda dezake berea bere profilean. Eskaera automatikoen baimena duten erabiltzaileentzat bakarrik egiten dira eskaerak",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Telesailak",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Eskatu beren jarraipen-zerrendara gehitutako telesailak",
+  "components.UserList.importfromJellyfinnochanges": "{mediaServerName} inportazioa osatu da. Ez da erabiltzailerik sortu edo freskatu.",
+  "components.UserList.importfromJellyfinsynced": "{mediaServerName} erabiltzaileak ondo sinkronizatu dira. Lehendik zeuden erabiltzaileak freskatu dira.",
+  "components.UserList.jellyfinsyncnotice": "{mediaServerName} zerbitzariko guztiak inportatu dira. Sinkronizatu sakatu dezakezu oraindik haiek freskatzeko, adibidez izena edo irudia aldatu bada."
 }

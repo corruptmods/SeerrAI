@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Aprovar",
   "notifications.agents.webpush.approveFailed": "Não foi possível aprovar",
   "notifications.agents.webpush.decline": "Recusar",
-  "notifications.agents.webpush.declineFailed": "Não foi possível recusar"
+  "notifications.agents.webpush.declineFailed": "Não foi possível recusar",
+  "notifications.events.adminAgent": "Agente de administração",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Saúde",
+  "notifications.events.issueComment": "{issueType, select, video {Novo comentário em problema de vídeo} audio {Novo comentário em problema de áudio} subtitles {Novo comentário em problema de legenda} other {Novo comentário em problema}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Novo problema de vídeo relatado} audio {Novo problema de áudio relatado} subtitles {Novo problema de legenda relatado} other {Novo problema relatado}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Problema de vídeo reaberto} audio {Problema de áudio reaberto} subtitles {Problema de legenda reaberto} other {Problema reaberto}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Problema de vídeo resolvido} audio {Problema de áudio resolvido} subtitles {Problema de legenda resolvido} other {Problema resolvido}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Solicitação de filme aprovada} movie4k {Solicitação de filme em 4K aprovada} tv4k {Solicitação de série em 4K aprovada} other {Solicitação de série aprovada}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Solicitação de filme aprovada automaticamente} movie4k {Solicitação de filme em 4K aprovada automaticamente} tv4k {Solicitação de série em 4K aprovada automaticamente} other {Solicitação de série aprovada automaticamente}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Solicitação de filme enviada automaticamente} movie4k {Solicitação de filme em 4K enviada automaticamente} tv4k {Solicitação de série em 4K enviada automaticamente} other {Solicitação de série enviada automaticamente}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Filme já disponível} movie4k {Filme em 4K já disponível} tv4k {Série em 4K já disponível} other {Série já disponível}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Solicitação de filme recusada} movie4k {Solicitação de filme em 4K recusada} tv4k {Solicitação de série em 4K recusada} other {Solicitação de série recusada}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Falha na solicitação de filme} movie4k {Falha na solicitação de filme em 4K} tv4k {Falha na solicitação de série em 4K} other {Falha na solicitação de série}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Nova solicitação de filme} movie4k {Nova solicitação de filme em 4K} tv4k {Nova solicitação de série em 4K} other {Nova solicitação de série}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Filme solicitado já disponível} movie4k {Filme em 4K solicitado já disponível} tv4k {Série em 4K solicitada já disponível} other {Série solicitada já disponível}}",
+  "notifications.events.seriesReadyToWatch": "Série pronta para assistir"
 }

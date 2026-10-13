@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "사진을 읽을 수 없었습니다.",
   "utils.aiErrorMessage.pictureTooBig": "사진이 너무 큽니다.",
   "utils.aiErrorMessage.timeout": "AI 서비스의 응답이 너무 오래 걸렸습니다. 다시 시도해 주세요.",
-  "utils.aiErrorMessage.unreadable": "모델이 Seerr가 읽을 수 있는 형식으로 답하지 않았습니다. 다시 시도하거나 더 성능이 좋은 모델을 선택하세요."
+  "utils.aiErrorMessage.unreadable": "모델이 Seerr가 읽을 수 있는 형식으로 답하지 않았습니다. 다시 시도하거나 더 성능이 좋은 모델을 선택하세요.",
+  "components.RequestModal.noSeasonsAvailable": "선택한 시즌이 모두 이미 요청되었거나 시청 가능합니다.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "새 사용자의 관심 목록 동기화",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "영화",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "관심 목록에 추가된 영화 요청",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "새 사용자가 Plex 또는 Trakt 관심 목록을 자동으로 요청하는 상태로 시작할지 정합니다. 기존 사용자는 각자 선택한 설정을 유지하며, 누구나 프로필에서 자신의 설정을 바꿀 수 있습니다. 요청은 자동 요청 권한이 있는 사용자에게만 이루어집니다",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "시리즈",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "관심 목록에 추가된 시리즈 요청",
+  "components.UserList.importfromJellyfinnochanges": "{mediaServerName} 가져오기를 완료했습니다. 새로 만들거나 갱신한 사용자가 없습니다.",
+  "components.UserList.importfromJellyfinsynced": "{mediaServerName} 사용자를 동기화했습니다. 기존 사용자 정보도 갱신했습니다.",
+  "components.UserList.jellyfinsyncnotice": "{mediaServerName}의 모든 사용자를 가져왔습니다. 이름이나 사진이 바뀐 경우 등에는 동기화를 눌러 정보를 갱신할 수 있습니다."
 }

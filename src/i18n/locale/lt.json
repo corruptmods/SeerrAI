@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Nepavyko nuskaityti nuotraukos.",
   "utils.aiErrorMessage.pictureTooBig": "Nuotrauka per didelė.",
   "utils.aiErrorMessage.timeout": "DI paslauga atsakinėjo per ilgai. Bandykite dar kartą.",
-  "utils.aiErrorMessage.unreadable": "Modelis atsakė forma, kurios Seerr negali perskaityti. Bandykite dar kartą arba pasirinkite pajėgesnį modelį."
+  "utils.aiErrorMessage.unreadable": "Modelis atsakė forma, kurios Seerr negali perskaityti. Bandykite dar kartą arba pasirinkite pajėgesnį modelį.",
+  "components.RequestModal.noSeasonsAvailable": "Visi pasirinkti sezonai jau rezervuoti arba pasiekiami.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Norimų žiūrėti sąrašo sinchronizavimas naujiems vartotojams",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filmai",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Rezervuoti filmus, įtrauktus į jų norimų žiūrėti sąrašą",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Ar nauji vartotojai pradeda su automatiškai rezervuojamu Plex ar Trakt norimų žiūrėti sąrašu. Esami vartotojai išlaiko savo pasirinkimą, o kiekvienas gali jį pakeisti savo profilyje. Rezervacijos atliekamos tik vartotojams, turintiems automatinės rezervacijos leidimą",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Serialai",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Rezervuoti serialus, įtrauktus į jų norimų žiūrėti sąrašą",
+  "components.UserList.importfromJellyfinnochanges": "{mediaServerName} importas baigtas. Jokie vartotojai nebuvo sukurti ar atnaujinti.",
+  "components.UserList.importfromJellyfinsynced": "{mediaServerName} vartotojai sėkmingai sinchronizuoti. Esami vartotojai atnaujinti.",
+  "components.UserList.jellyfinsyncnotice": "Visi {mediaServerName} vartotojai jau importuoti. Vis tiek galite spustelėti „Sinchronizuoti“, kad atnaujintumėte jų duomenis, pavyzdžiui, pakeistą vardą ar nuotrauką."
 }

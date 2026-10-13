@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Den bilden gick inte att läsa.",
   "utils.aiErrorMessage.pictureTooBig": "Den bilden är för stor.",
   "utils.aiErrorMessage.timeout": "AI-tjänsten tog för lång tid på sig att svara. Försök igen.",
-  "utils.aiErrorMessage.unreadable": "Modellen svarade inte i en form som Seerr kunde läsa. Försök igen eller välj en kraftfullare modell."
+  "utils.aiErrorMessage.unreadable": "Modellen svarade inte i en form som Seerr kunde läsa. Försök igen eller välj en kraftfullare modell.",
+  "components.RequestModal.noSeasonsAvailable": "Alla valda säsonger är redan begärda eller tillgängliga.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Synkning av bevakningslista för nya användare",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filmer",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Begär filmer som läggs till på deras bevakningslista",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Om nya användare börjar med att deras bevakningslista på Plex eller Trakt begärs automatiskt. Befintliga användare behåller sitt eget val, och alla kan ändra sitt i sin profil. Förfrågningar görs bara för användare med behörighet för automatiska förfrågningar",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Serier",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Begär serier som läggs till på deras bevakningslista",
+  "components.UserList.importfromJellyfinnochanges": "Importen från {mediaServerName} är klar. Inga användare skapades eller uppdaterades.",
+  "components.UserList.importfromJellyfinsynced": "Användarna från {mediaServerName} har synkats. Befintliga användare uppdaterades.",
+  "components.UserList.jellyfinsyncnotice": "Alla på {mediaServerName} har importerats. Du kan fortfarande klicka på Synkronisera för att uppdatera dem, till exempel vid ändrat namn eller bild."
 }

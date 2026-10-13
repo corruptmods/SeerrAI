@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Mirato",
   "notifications.agents.webpush.approveFailed": "Nuk mund të miratohej",
   "notifications.agents.webpush.decline": "Refuzo",
-  "notifications.agents.webpush.declineFailed": "Nuk mund të refuzohej"
+  "notifications.agents.webpush.declineFailed": "Nuk mund të refuzohej",
+  "notifications.events.adminAgent": "Agjenti i administratorit",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Shëndeti",
+  "notifications.events.issueComment": "{issueType, select, video {Koment i ri te një problem me videon} audio {Koment i ri te një problem me audion} subtitles {Koment i ri te një problem me titrat} other {Koment i ri te një problem}}",
+  "notifications.events.issueCreated": "{issueType, select, video {U raportua një problem i ri me videon} audio {U raportua një problem i ri me audion} subtitles {U raportua një problem i ri me titrat} other {U raportua një problem i ri}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Problemi me videon u rihap} audio {Problemi me audion u rihap} subtitles {Problemi me titrat u rihap} other {Problemi u rihap}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Problemi me videon u zgjidh} audio {Problemi me audion u zgjidh} subtitles {Problemi me titrat u zgjidh} other {Problemi u zgjidh}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Kërkesa për filmin u miratua} movie4k {Kërkesa për filmin 4K u miratua} tv4k {Kërkesa për serialin 4K u miratua} other {Kërkesa për serialin u miratua}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Kërkesa për filmin u miratua automatikisht} movie4k {Kërkesa për filmin 4K u miratua automatikisht} tv4k {Kërkesa për serialin 4K u miratua automatikisht} other {Kërkesa për serialin u miratua automatikisht}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Kërkesa për filmin u dërgua automatikisht} movie4k {Kërkesa për filmin 4K u dërgua automatikisht} tv4k {Kërkesa për serialin 4K u dërgua automatikisht} other {Kërkesa për serialin u dërgua automatikisht}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Filmi tani është i disponueshëm} movie4k {Filmi 4K tani është i disponueshëm} tv4k {Seriali 4K tani është i disponueshëm} other {Seriali tani është i disponueshëm}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Kërkesa për filmin u refuzua} movie4k {Kërkesa për filmin 4K u refuzua} tv4k {Kërkesa për serialin 4K u refuzua} other {Kërkesa për serialin u refuzua}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Kërkesa për filmin dështoi} movie4k {Kërkesa për filmin 4K dështoi} tv4k {Kërkesa për serialin 4K dështoi} other {Kërkesa për serialin dështoi}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Kërkesë e re për film} movie4k {Kërkesë e re për film 4K} tv4k {Kërkesë e re për serial 4K} other {Kërkesë e re për serial}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Filmi i kërkuar tani është i disponueshëm} movie4k {Filmi 4K i kërkuar tani është i disponueshëm} tv4k {Seriali 4K i kërkuar tani është i disponueshëm} other {Seriali i kërkuar tani është i disponueshëm}}",
+  "notifications.events.seriesReadyToWatch": "Seriali është gati për t’u parë"
 }

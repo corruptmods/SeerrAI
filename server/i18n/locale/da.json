@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Godkend",
   "notifications.agents.webpush.approveFailed": "Kunne ikke godkende",
   "notifications.agents.webpush.decline": "Afvis",
-  "notifications.agents.webpush.declineFailed": "Kunne ikke afvise"
+  "notifications.agents.webpush.declineFailed": "Kunne ikke afvise",
+  "notifications.events.adminAgent": "Admin-agent",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Tilstand",
+  "notifications.events.issueComment": "{issueType, select, video {Ny kommentar til videoproblem} audio {Ny kommentar til lydproblem} subtitles {Ny kommentar til undertekstproblem} other {Ny kommentar til problem}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Nyt videoproblem rapporteret} audio {Nyt lydproblem rapporteret} subtitles {Nyt undertekstproblem rapporteret} other {Nyt problem rapporteret}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Videoproblem genåbnet} audio {Lydproblem genåbnet} subtitles {Undertekstproblem genåbnet} other {Problem genåbnet}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Videoproblem løst} audio {Lydproblem løst} subtitles {Undertekstproblem løst} other {Problem løst}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Filmanmodning godkendt} movie4k {4K-filmanmodning godkendt} tv4k {4K-serieanmodning godkendt} other {Serieanmodning godkendt}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Filmanmodning automatisk godkendt} movie4k {4K-filmanmodning automatisk godkendt} tv4k {4K-serieanmodning automatisk godkendt} other {Serieanmodning automatisk godkendt}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Filmanmodning automatisk sendt} movie4k {4K-filmanmodning automatisk sendt} tv4k {4K-serieanmodning automatisk sendt} other {Serieanmodning automatisk sendt}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Film nu tilgængelig} movie4k {4K-film nu tilgængelig} tv4k {4K-serie nu tilgængelig} other {Serie nu tilgængelig}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Filmanmodning afvist} movie4k {4K-filmanmodning afvist} tv4k {4K-serieanmodning afvist} other {Serieanmodning afvist}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Filmanmodning mislykkedes} movie4k {4K-filmanmodning mislykkedes} tv4k {4K-serieanmodning mislykkedes} other {Serieanmodning mislykkedes}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Ny filmanmodning} movie4k {Ny 4K-filmanmodning} tv4k {Ny 4K-serieanmodning} other {Ny serieanmodning}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Anmodet film nu tilgængelig} movie4k {Anmodet 4K-film nu tilgængelig} tv4k {Anmodet 4K-serie nu tilgængelig} other {Anmodet serie nu tilgængelig}}",
+  "notifications.events.seriesReadyToWatch": "Serie klar til at blive set"
 }

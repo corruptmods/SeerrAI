@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Tento obrázok sa nepodarilo prečítať.",
   "utils.aiErrorMessage.pictureTooBig": "Tento obrázok je príliš veľký.",
   "utils.aiErrorMessage.timeout": "Službe AI trvala odpoveď príliš dlho. Skúste to znova.",
-  "utils.aiErrorMessage.unreadable": "Model neodpovedal v podobe, ktorú by Seerr vedel prečítať. Skúste to znova alebo vyberte silnejší model."
+  "utils.aiErrorMessage.unreadable": "Model neodpovedal v podobe, ktorú by Seerr vedel prečítať. Skúste to znova alebo vyberte silnejší model.",
+  "components.RequestModal.noSeasonsAvailable": "Všetky vybrané série sú už vyžiadané alebo dostupné.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Synchronizácia zoznamu na pozretie pre nových používateľov",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filmy",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Vyžiadať filmy pridané do ich zoznamu na pozretie",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Či noví používatelia začnú s automatickým vyžiadaním svojho zoznamu na pozretie z Plex alebo Trakt. Existujúci používatelia si ponechajú svoju voľbu a každý ju môže zmeniť vo svojom profile. Žiadosti sa vytvárajú len pre používateľov s oprávnením na automatické vyžiadanie",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Seriály",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Vyžiadať seriály pridané do ich zoznamu na pozretie",
+  "components.UserList.importfromJellyfinnochanges": "Import z {mediaServerName} je dokončený. Žiadni používatelia neboli vytvorení ani aktualizovaní.",
+  "components.UserList.importfromJellyfinsynced": "Používatelia z {mediaServerName} boli úspešne synchronizovaní. Existujúci používatelia boli aktualizovaní.",
+  "components.UserList.jellyfinsyncnotice": "Všetci z {mediaServerName} už boli importovaní. Stále môžete kliknúť na Synchronizovať a aktualizovať ich údaje, napríklad zmenené meno alebo obrázok."
 }

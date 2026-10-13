@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Não foi possível ler essa imagem.",
   "utils.aiErrorMessage.pictureTooBig": "Essa imagem é demasiado grande.",
   "utils.aiErrorMessage.timeout": "O serviço de IA demorou demasiado a responder. Tente novamente.",
-  "utils.aiErrorMessage.unreadable": "O modelo não respondeu num formato que o Seerr consiga ler. Tente novamente, ou escolha um modelo mais capaz."
+  "utils.aiErrorMessage.unreadable": "O modelo não respondeu num formato que o Seerr consiga ler. Tente novamente, ou escolha um modelo mais capaz.",
+  "components.RequestModal.noSeasonsAvailable": "Todas as temporadas selecionadas já foram pedidas ou estão disponíveis.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Sincronização da Lista para Ver para Novos Utilizadores",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filmes",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Pedir filmes adicionados à lista para ver deles",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Define se os novos utilizadores começam com a sua lista para ver do Plex ou do Trakt pedida automaticamente. Os utilizadores existentes mantêm a sua própria escolha, e qualquer pessoa pode alterar a sua no perfil. Os pedidos só são feitos para utilizadores com uma permissão de pedido automático",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Séries",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Pedir séries adicionadas à lista para ver deles",
+  "components.UserList.importfromJellyfinnochanges": "Importação do {mediaServerName} concluída. Nenhum utilizador foi criado ou atualizado.",
+  "components.UserList.importfromJellyfinsynced": "Utilizadores do {mediaServerName} sincronizados com sucesso. Os utilizadores existentes foram atualizados.",
+  "components.UserList.jellyfinsyncnotice": "Todos os utilizadores do {mediaServerName} já foram importados. Pode ainda clicar em Sincronizar para os atualizar, por exemplo, se mudaram de nome ou de imagem."
 }

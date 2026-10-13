@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "No s'ha pogut llegir aquesta imatge.",
   "utils.aiErrorMessage.pictureTooBig": "Aquesta imatge és massa gran.",
   "utils.aiErrorMessage.timeout": "El servei d'IA ha trigat massa a respondre. Torneu-ho a provar.",
-  "utils.aiErrorMessage.unreadable": "El model no ha respost en un format que Seerr pugui llegir. Torneu-ho a provar o trieu un model més potent."
+  "utils.aiErrorMessage.unreadable": "El model no ha respost en un format que Seerr pugui llegir. Torneu-ho a provar o trieu un model més potent.",
+  "components.RequestModal.noSeasonsAvailable": "Totes les temporades seleccionades ja estan sol·licitades o disponibles.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Sincronització de la llista de seguiment per a usuaris nous",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Pel·lícules",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Sol·licita les pel·lícules afegides a la seva llista de seguiment",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Si els usuaris nous comencen amb la seva llista de seguiment de Plex o Trakt sol·licitada automàticament. Els usuaris existents mantenen la seva elecció, i tothom pot canviar la seva al perfil. Només es fan sol·licituds per als usuaris amb un permís de sol·licitud automàtica",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Sèries",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Sol·licita les sèries afegides a la seva llista de seguiment",
+  "components.UserList.importfromJellyfinnochanges": "S’ha completat la importació de {mediaServerName}. No s’ha creat ni actualitzat cap usuari.",
+  "components.UserList.importfromJellyfinsynced": "Els usuaris de {mediaServerName} s’han sincronitzat correctament. S’han actualitzat els usuaris existents.",
+  "components.UserList.jellyfinsyncnotice": "Ja s’ha importat tothom de {mediaServerName}. Encara podeu fer clic a Sincronitza per actualitzar-los, per exemple si han canviat el nom o la imatge."
 }

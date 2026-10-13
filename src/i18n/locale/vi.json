@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Không thể đọc bức ảnh đó.",
   "utils.aiErrorMessage.pictureTooBig": "Bức ảnh đó quá lớn.",
   "utils.aiErrorMessage.timeout": "Dịch vụ AI phản hồi quá lâu. Hãy thử lại.",
-  "utils.aiErrorMessage.unreadable": "Mô hình không trả lời theo dạng Seerr đọc được. Hãy thử lại, hoặc chọn một mô hình mạnh hơn."
+  "utils.aiErrorMessage.unreadable": "Mô hình không trả lời theo dạng Seerr đọc được. Hãy thử lại, hoặc chọn một mô hình mạnh hơn.",
+  "components.RequestModal.noSeasonsAvailable": "Tất cả các mùa đã chọn đều đã được yêu cầu hoặc đã có sẵn.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Đồng bộ danh sách theo dõi cho người dùng mới",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Phim",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Yêu cầu phim được thêm vào danh sách theo dõi của họ",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Người dùng mới có bắt đầu với việc tự động yêu cầu nội dung trong danh sách theo dõi Plex hoặc Trakt của họ hay không. Người dùng hiện có giữ nguyên lựa chọn của mình, và ai cũng có thể thay đổi lựa chọn của mình trong hồ sơ. Yêu cầu chỉ được tạo cho người dùng có quyền tự động yêu cầu",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Phim bộ",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Yêu cầu phim bộ được thêm vào danh sách theo dõi của họ",
+  "components.UserList.importfromJellyfinnochanges": "Đã nhập xong từ {mediaServerName}. Không có người dùng nào được tạo hoặc làm mới.",
+  "components.UserList.importfromJellyfinsynced": "Đã đồng bộ người dùng {mediaServerName} thành công. Người dùng hiện có đã được làm mới.",
+  "components.UserList.jellyfinsyncnotice": "Mọi người trên {mediaServerName} đều đã được nhập. Bạn vẫn có thể bấm Đồng bộ để làm mới thông tin của họ, chẳng hạn như tên hoặc ảnh đã thay đổi."
 }

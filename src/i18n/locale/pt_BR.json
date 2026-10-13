@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Não foi possível ler essa imagem.",
   "utils.aiErrorMessage.pictureTooBig": "Essa imagem é grande demais.",
   "utils.aiErrorMessage.timeout": "O serviço de IA demorou demais para responder. Tente novamente.",
-  "utils.aiErrorMessage.unreadable": "O modelo não respondeu num formato que o Seerr consiga ler. Tente novamente ou escolha um modelo mais forte."
+  "utils.aiErrorMessage.unreadable": "O modelo não respondeu num formato que o Seerr consiga ler. Tente novamente ou escolha um modelo mais forte.",
+  "components.RequestModal.noSeasonsAvailable": "Todas as temporadas selecionadas já foram solicitadas ou estão disponíveis.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Sincronização da lista para assistir para novos usuários",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filmes",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Solicitar filmes adicionados à lista para assistir deles",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Define se novos usuários começam com a lista para assistir do Plex ou do Trakt solicitada automaticamente. Usuários existentes mantêm a própria escolha, e qualquer pessoa pode alterar a sua no perfil. As solicitações só são feitas para usuários com uma permissão de solicitação automática",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Séries",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Solicitar séries adicionadas à lista para assistir deles",
+  "components.UserList.importfromJellyfinnochanges": "Importação do {mediaServerName} concluída. Nenhum usuário foi criado ou atualizado.",
+  "components.UserList.importfromJellyfinsynced": "Usuários do {mediaServerName} sincronizados com sucesso. Os usuários existentes foram atualizados.",
+  "components.UserList.jellyfinsyncnotice": "Todos do {mediaServerName} já foram importados. Você ainda pode clicar em Sincronizar para atualizá-los, por exemplo, se mudaram o nome ou a foto."
 }

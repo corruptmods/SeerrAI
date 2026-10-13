@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Qbel",
   "notifications.agents.webpush.approveFailed": "Ur yezmir ara ad yettwaqbel",
   "notifications.agents.webpush.decline": "Agi",
-  "notifications.agents.webpush.declineFailed": "Ur yezmir ara ad yettwagi"
+  "notifications.agents.webpush.declineFailed": "Ur yezmir ara ad yettwagi",
+  "notifications.events.adminAgent": "Amɛiwen n unedbal",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Tazmert",
+  "notifications.events.issueComment": "{issueType, select, video {Awennit amaynut ɣef ugur n tvidyut} audio {Awennit amaynut ɣef ugur n umeslaw} subtitles {Awennit amaynut ɣef ugur n yiduzwilen} other {Awennit amaynut ɣef ugur}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Yettwammel-d ugur amaynut n tvidyut} audio {Yettwammel-d ugur amaynut n umeslaw} subtitles {Yettwammel-d ugur amaynut n yiduzwilen} other {Yettwammel-d ugur amaynut}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Ugur n tvidyut yettwaldi tikkelt-nniḍen} audio {Ugur n umeslaw yettwaldi tikkelt-nniḍen} subtitles {Ugur n yiduzwilen yettwaldi tikkelt-nniḍen} other {Ugur yettwaldi tikkelt-nniḍen}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Ugur n tvidyut yefra} audio {Ugur n umeslaw yefra} subtitles {Ugur n yiduzwilen yefra} other {Ugur yefra}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Asuter n usaru yettwaqbel} movie4k {Asuter n usaru 4K yettwaqbel} tv4k {Asuter n tesnasla 4K yettwaqbel} other {Asuter n tesnasla yettwaqbel}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Asuter n usaru yettwaqbel s wudem awurman} movie4k {Asuter n usaru 4K yettwaqbel s wudem awurman} tv4k {Asuter n tesnasla 4K yettwaqbel s wudem awurman} other {Asuter n tesnasla yettwaqbel s wudem awurman}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Asuter n usaru yettwazen s wudem awurman} movie4k {Asuter n usaru 4K yettwazen s wudem awurman} tv4k {Asuter n tesnasla 4K yettwazen s wudem awurman} other {Asuter n tesnasla yettwazen s wudem awurman}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Asaru yella tura} movie4k {Asaru 4K yella tura} tv4k {Tasnasla 4K tella tura} other {Tasnasla tella tura}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Asuter n usaru yettwagi} movie4k {Asuter n usaru 4K yettwagi} tv4k {Asuter n tesnasla 4K yettwagi} other {Asuter n tesnasla yettwagi}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Asuter n usaru yecceḍ} movie4k {Asuter n usaru 4K yecceḍ} tv4k {Asuter n tesnasla 4K yecceḍ} other {Asuter n tesnasla yecceḍ}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Asuter amaynut n usaru} movie4k {Asuter amaynut n usaru 4K} tv4k {Asuter amaynut n tesnasla 4K} other {Asuter amaynut n tesnasla}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Asaru yettwasutren yella tura} movie4k {Asaru 4K yettwasutren yella tura} tv4k {Tasnasla 4K yettwasutren tella tura} other {Tasnasla yettwasutren tella tura}}",
+  "notifications.events.seriesReadyToWatch": "Tasnasla tewjed i tmuɣli"
 }

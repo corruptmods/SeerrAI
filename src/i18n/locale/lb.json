@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Dat Bild konnt net gelies ginn.",
   "utils.aiErrorMessage.pictureTooBig": "Dat Bild ass ze grouss.",
   "utils.aiErrorMessage.timeout": "De KI-Service huet ze laang gebraucht fir z’äntweren. Probéiert et nach eng Kéier.",
-  "utils.aiErrorMessage.unreadable": "De Modell huet net an enger Form geäntwert, déi Seerr liese kann. Probéiert et nach eng Kéier, oder wielt e méi staarke Modell."
+  "utils.aiErrorMessage.unreadable": "De Modell huet net an enger Form geäntwert, déi Seerr liese kann. Probéiert et nach eng Kéier, oder wielt e méi staarke Modell.",
+  "components.RequestModal.noSeasonsAvailable": "All déi ausgewielt Staffele sinn schonn ugefrot oder disponibel.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Merklëscht-Synchronisatioun fir nei Benotzer",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filmer",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Filmer ufroen, déi op hir Merklëscht gesat ginn",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Ob nei Benotzer domat ufänken, datt hir Plex- oder Trakt-Merklëscht automatesch ugefrot gëtt. Bestoend Benotzer behalen hir eege Wiel, an all Benotzer kann seng Astellung a sengem Profil änneren. Ufroe ginn nëmme fir Benotzer mat enger Auto-Ufro-Berechtegung gemaach",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Serien",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Serien ufroen, déi op hir Merklëscht gesat ginn",
+  "components.UserList.importfromJellyfinnochanges": "{mediaServerName}-Import ofgeschloss. Et goufe keng Benotzer erstallt oder aktualiséiert.",
+  "components.UserList.importfromJellyfinsynced": "{mediaServerName}-Benotzer erfollegräich synchroniséiert. Bestoend Benotzer goufen aktualiséiert.",
+  "components.UserList.jellyfinsyncnotice": "Jiddereen op {mediaServerName} gouf importéiert. Dir kënnt ëmmer nach op Synchroniséieren klicken, fir hir Donnéeën ze aktualiséieren, z. B. en geännerten Numm oder e geännert Bild."
 }

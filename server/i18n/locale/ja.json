@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "承認",
   "notifications.agents.webpush.approveFailed": "承認できませんでした",
   "notifications.agents.webpush.decline": "却下",
-  "notifications.agents.webpush.declineFailed": "却下できませんでした"
+  "notifications.agents.webpush.declineFailed": "却下できませんでした",
+  "notifications.events.adminAgent": "管理エージェント",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "ヘルスチェック",
+  "notifications.events.issueComment": "{issueType, select, video {映像のチケットに新しいコメント} audio {オーディオのチケットに新しいコメント} subtitles {字幕のチケットに新しいコメント} other {チケットに新しいコメント}}",
+  "notifications.events.issueCreated": "{issueType, select, video {映像の新しいチケットが報告されました} audio {オーディオの新しいチケットが報告されました} subtitles {字幕の新しいチケットが報告されました} other {新しいチケットが報告されました}}",
+  "notifications.events.issueReopened": "{issueType, select, video {映像のチケットが再オープンされました} audio {オーディオのチケットが再オープンされました} subtitles {字幕のチケットが再オープンされました} other {チケットが再オープンされました}}",
+  "notifications.events.issueResolved": "{issueType, select, video {映像のチケットが解決しました} audio {オーディオのチケットが解決しました} subtitles {字幕のチケットが解決しました} other {チケットが解決しました}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {映画のリクエスト承認} movie4k {4K映画のリクエスト承認} tv4k {4Kシリーズのリクエスト承認} other {シリーズのリクエスト承認}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {映画のリクエスト自動承認} movie4k {4K映画のリクエスト自動承認} tv4k {4Kシリーズのリクエスト自動承認} other {シリーズのリクエスト自動承認}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {映画のリクエストを自動送信} movie4k {4K映画のリクエストを自動送信} tv4k {4Kシリーズのリクエストを自動送信} other {シリーズのリクエストを自動送信}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {映画が視聴可能になりました} movie4k {4K映画が視聴可能になりました} tv4k {4Kシリーズが視聴可能になりました} other {シリーズが視聴可能になりました}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {映画のリクエスト却下} movie4k {4K映画のリクエスト却下} tv4k {4Kシリーズのリクエスト却下} other {シリーズのリクエスト却下}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {映画のリクエスト失敗} movie4k {4K映画のリクエスト失敗} tv4k {4Kシリーズのリクエスト失敗} other {シリーズのリクエスト失敗}}",
+  "notifications.events.mediaPending": "{kind, select, movie {新しい映画のリクエスト} movie4k {新しい4K映画のリクエスト} tv4k {新しい4Kシリーズのリクエスト} other {新しいシリーズのリクエスト}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {リクエストした映画が視聴可能になりました} movie4k {リクエストした4K映画が視聴可能になりました} tv4k {リクエストした4Kシリーズが視聴可能になりました} other {リクエストしたシリーズが視聴可能になりました}}",
+  "notifications.events.seriesReadyToWatch": "シリーズの視聴準備ができました"
 }

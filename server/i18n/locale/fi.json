@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Hyväksy",
   "notifications.agents.webpush.approveFailed": "Hyväksyminen epäonnistui",
   "notifications.agents.webpush.decline": "Hylkää",
-  "notifications.agents.webpush.declineFailed": "Hylkääminen epäonnistui"
+  "notifications.agents.webpush.declineFailed": "Hylkääminen epäonnistui",
+  "notifications.events.adminAgent": "Ylläpitoagentti",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Kunto",
+  "notifications.events.issueComment": "{issueType, select, video {Uusi kommentti kuvaongelmaan} audio {Uusi kommentti ääniongelmaan} subtitles {Uusi kommentti tekstitysongelmaan} other {Uusi kommentti ongelmaan}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Uusi kuvaongelma ilmoitettu} audio {Uusi ääniongelma ilmoitettu} subtitles {Uusi tekstitysongelma ilmoitettu} other {Uusi ongelma ilmoitettu}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Kuvaongelma avattu uudelleen} audio {Ääniongelma avattu uudelleen} subtitles {Tekstitysongelma avattu uudelleen} other {Ongelma avattu uudelleen}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Kuvaongelma ratkaistu} audio {Ääniongelma ratkaistu} subtitles {Tekstitysongelma ratkaistu} other {Ongelma ratkaistu}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Elokuvapyyntö hyväksytty} movie4k {4K-elokuvapyyntö hyväksytty} tv4k {4K-sarjapyyntö hyväksytty} other {Sarjapyyntö hyväksytty}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Elokuvapyyntö hyväksytty automaattisesti} movie4k {4K-elokuvapyyntö hyväksytty automaattisesti} tv4k {4K-sarjapyyntö hyväksytty automaattisesti} other {Sarjapyyntö hyväksytty automaattisesti}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Elokuvapyyntö lähetetty automaattisesti} movie4k {4K-elokuvapyyntö lähetetty automaattisesti} tv4k {4K-sarjapyyntö lähetetty automaattisesti} other {Sarjapyyntö lähetetty automaattisesti}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Elokuva nyt saatavilla} movie4k {4K-elokuva nyt saatavilla} tv4k {4K-sarja nyt saatavilla} other {Sarja nyt saatavilla}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Elokuvapyyntö hylätty} movie4k {4K-elokuvapyyntö hylätty} tv4k {4K-sarjapyyntö hylätty} other {Sarjapyyntö hylätty}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Elokuvapyyntö epäonnistui} movie4k {4K-elokuvapyyntö epäonnistui} tv4k {4K-sarjapyyntö epäonnistui} other {Sarjapyyntö epäonnistui}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Uusi elokuvapyyntö} movie4k {Uusi 4K-elokuvapyyntö} tv4k {Uusi 4K-sarjapyyntö} other {Uusi sarjapyyntö}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Pyydetty elokuva nyt saatavilla} movie4k {Pyydetty 4K-elokuva nyt saatavilla} tv4k {Pyydetty 4K-sarja nyt saatavilla} other {Pyydetty sarja nyt saatavilla}}",
+  "notifications.events.seriesReadyToWatch": "Sarja valmiina katsottavaksi"
 }

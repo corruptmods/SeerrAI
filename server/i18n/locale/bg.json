@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Одобри",
   "notifications.agents.webpush.approveFailed": "Неуспешно одобрение",
   "notifications.agents.webpush.decline": "Отхвърли",
-  "notifications.agents.webpush.declineFailed": "Неуспешно отхвърляне"
+  "notifications.agents.webpush.declineFailed": "Неуспешно отхвърляне",
+  "notifications.events.adminAgent": "Администраторски агент",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Състояние",
+  "notifications.events.issueComment": "{issueType, select, video {Нов коментар по проблем с видеото} audio {Нов коментар по проблем със звука} subtitles {Нов коментар по проблем със субтитрите} other {Нов коментар по проблем}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Докладван е нов проблем с видеото} audio {Докладван е нов проблем със звука} subtitles {Докладван е нов проблем със субтитрите} other {Докладван е нов проблем}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Проблемът с видеото е отворен отново} audio {Проблемът със звука е отворен отново} subtitles {Проблемът със субтитрите е отворен отново} other {Проблемът е отворен отново}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Проблемът с видеото е решен} audio {Проблемът със звука е решен} subtitles {Проблемът със субтитрите е решен} other {Проблемът е решен}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Заявката за филм е одобрена} movie4k {Заявката за филм в 4K е одобрена} tv4k {Заявката за сериал в 4K е одобрена} other {Заявката за сериал е одобрена}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Заявката за филм е одобрена автоматично} movie4k {Заявката за филм в 4K е одобрена автоматично} tv4k {Заявката за сериал в 4K е одобрена автоматично} other {Заявката за сериал е одобрена автоматично}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Автоматично е подадена заявка за филм} movie4k {Автоматично е подадена заявка за филм в 4K} tv4k {Автоматично е подадена заявка за сериал в 4K} other {Автоматично е подадена заявка за сериал}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Филмът вече е наличен} movie4k {Филмът в 4K вече е наличен} tv4k {Сериалът в 4K вече е наличен} other {Сериалът вече е наличен}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Заявката за филм е отхвърлена} movie4k {Заявката за филм в 4K е отхвърлена} tv4k {Заявката за сериал в 4K е отхвърлена} other {Заявката за сериал е отхвърлена}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Неуспешна заявка за филм} movie4k {Неуспешна заявка за филм в 4K} tv4k {Неуспешна заявка за сериал в 4K} other {Неуспешна заявка за сериал}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Нова заявка за филм} movie4k {Нова заявка за филм в 4K} tv4k {Нова заявка за сериал в 4K} other {Нова заявка за сериал}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Заявеният филм вече е наличен} movie4k {Заявеният филм в 4K вече е наличен} tv4k {Заявеният сериал в 4K вече е наличен} other {Заявеният сериал вече е наличен}}",
+  "notifications.events.seriesReadyToWatch": "Сериалът е готов за гледане"
 }

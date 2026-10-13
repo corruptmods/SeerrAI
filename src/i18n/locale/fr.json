@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Impossible de lire cette image.",
   "utils.aiErrorMessage.pictureTooBig": "Cette image est trop grande.",
   "utils.aiErrorMessage.timeout": "Le service d’IA a mis trop de temps à répondre. Réessayez.",
-  "utils.aiErrorMessage.unreadable": "Le modèle n’a pas répondu dans un format lisible par Seerr. Réessayez, ou choisissez un modèle plus puissant."
+  "utils.aiErrorMessage.unreadable": "Le modèle n’a pas répondu dans un format lisible par Seerr. Réessayez, ou choisissez un modèle plus puissant.",
+  "components.RequestModal.noSeasonsAvailable": "Toutes les saisons sélectionnées sont déjà demandées ou disponibles.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Synchronisation de la liste de suivi pour les nouveaux utilisateurs",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Films",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Demander les films ajoutés à leur liste de suivi",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Indique si les nouveaux utilisateurs démarrent avec leur liste de suivi Plex ou Trakt demandée automatiquement. Les utilisateurs existants gardent leur propre choix, et chacun peut modifier le sien dans son profil. Les demandes ne sont faites que pour les utilisateurs disposant d’une autorisation de demande automatique",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Séries",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Demander les séries ajoutées à leur liste de suivi",
+  "components.UserList.importfromJellyfinnochanges": "Importation depuis {mediaServerName} terminée. Aucun utilisateur n’a été créé ni actualisé.",
+  "components.UserList.importfromJellyfinsynced": "Utilisateurs {mediaServerName} synchronisés. Les utilisateurs existants ont été actualisés.",
+  "components.UserList.jellyfinsyncnotice": "Tous les utilisateurs de {mediaServerName} ont été importés. Vous pouvez toujours cliquer sur Synchroniser pour les actualiser, par exemple après un changement de nom ou d’image."
 }

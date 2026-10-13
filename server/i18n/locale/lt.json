@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Patvirtinti",
   "notifications.agents.webpush.approveFailed": "Nepavyko patvirtinti",
   "notifications.agents.webpush.decline": "Atmesti",
-  "notifications.agents.webpush.declineFailed": "Nepavyko atmesti"
+  "notifications.agents.webpush.declineFailed": "Nepavyko atmesti",
+  "notifications.events.adminAgent": "Administratoriaus agentas",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Būklė",
+  "notifications.events.issueComment": "{issueType, select, video {Naujas komentaras apie vaizdo problemą} audio {Naujas komentaras apie garso problemą} subtitles {Naujas komentaras apie subtitrų problemą} other {Naujas komentaras apie problemą}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Pranešta apie naują vaizdo problemą} audio {Pranešta apie naują garso problemą} subtitles {Pranešta apie naują subtitrų problemą} other {Pranešta apie naują problemą}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Vaizdo problema atverta iš naujo} audio {Garso problema atverta iš naujo} subtitles {Subtitrų problema atverta iš naujo} other {Problema atverta iš naujo}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Vaizdo problema išspręsta} audio {Garso problema išspręsta} subtitles {Subtitrų problema išspręsta} other {Problema išspręsta}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Filmo rezervacija patvirtinta} movie4k {4K filmo rezervacija patvirtinta} tv4k {4K serialo rezervacija patvirtinta} other {Serialo rezervacija patvirtinta}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Filmo rezervacija patvirtinta automatiškai} movie4k {4K filmo rezervacija patvirtinta automatiškai} tv4k {4K serialo rezervacija patvirtinta automatiškai} other {Serialo rezervacija patvirtinta automatiškai}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Filmo rezervacija pateikta automatiškai} movie4k {4K filmo rezervacija pateikta automatiškai} tv4k {4K serialo rezervacija pateikta automatiškai} other {Serialo rezervacija pateikta automatiškai}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Filmas jau pasiekiamas} movie4k {4K filmas jau pasiekiamas} tv4k {4K serialas jau pasiekiamas} other {Serialas jau pasiekiamas}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Filmo rezervacija atmesta} movie4k {4K filmo rezervacija atmesta} tv4k {4K serialo rezervacija atmesta} other {Serialo rezervacija atmesta}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Filmo rezervacija nepavyko} movie4k {4K filmo rezervacija nepavyko} tv4k {4K serialo rezervacija nepavyko} other {Serialo rezervacija nepavyko}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Nauja filmo rezervacija} movie4k {Nauja 4K filmo rezervacija} tv4k {Nauja 4K serialo rezervacija} other {Nauja serialo rezervacija}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Rezervuotas filmas jau pasiekiamas} movie4k {Rezervuotas 4K filmas jau pasiekiamas} tv4k {Rezervuotas 4K serialas jau pasiekiamas} other {Rezervuotas serialas jau pasiekiamas}}",
+  "notifications.events.seriesReadyToWatch": "Serialas paruoštas žiūrėti"
 }

@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Billedet kunne ikke læses.",
   "utils.aiErrorMessage.pictureTooBig": "Billedet er for stort.",
   "utils.aiErrorMessage.timeout": "AI-tjenesten var for længe om at svare. Prøv igen.",
-  "utils.aiErrorMessage.unreadable": "Modellen svarede ikke i en form, Seerr kunne læse. Prøv igen, eller vælg en stærkere model."
+  "utils.aiErrorMessage.unreadable": "Modellen svarede ikke i en form, Seerr kunne læse. Prøv igen, eller vælg en stærkere model.",
+  "components.RequestModal.noSeasonsAvailable": "Alle de valgte sæsoner er allerede anmodet om eller tilgængelige.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Synkronisering af se senere-liste for nye brugere",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Film",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Anmod om film, der tilføjes deres se senere-liste",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Om nye brugere starter med, at der automatisk anmodes om indholdet på deres se senere-liste fra Plex eller Trakt. Eksisterende brugere beholder deres eget valg, og alle kan ændre deres i deres profil. Der anmodes kun for brugere med en tilladelse til automatisk anmodning",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Serier",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Anmod om serier, der tilføjes deres se senere-liste",
+  "components.UserList.importfromJellyfinnochanges": "Importen fra {mediaServerName} er færdig. Ingen brugere blev oprettet eller opdateret.",
+  "components.UserList.importfromJellyfinsynced": "Brugerne fra {mediaServerName} blev synkroniseret. Eksisterende brugere blev opdateret.",
+  "components.UserList.jellyfinsyncnotice": "Alle på {mediaServerName} er blevet importeret. Du kan stadig klikke på Synkronisér for at opdatere dem, f.eks. hvis et navn eller billede er ændret."
 }

@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "批准",
   "notifications.agents.webpush.approveFailed": "无法批准",
   "notifications.agents.webpush.decline": "拒绝",
-  "notifications.agents.webpush.declineFailed": "无法拒绝"
+  "notifications.agents.webpush.declineFailed": "无法拒绝",
+  "notifications.events.adminAgent": "管理员助手",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "健康状况",
+  "notifications.events.issueComment": "{issueType, select, video {视频问题有新评论} audio {音频问题有新评论} subtitles {字幕问题有新评论} other {问题有新评论}}",
+  "notifications.events.issueCreated": "{issueType, select, video {有人报告了新的视频问题} audio {有人报告了新的音频问题} subtitles {有人报告了新的字幕问题} other {有人报告了新问题}}",
+  "notifications.events.issueReopened": "{issueType, select, video {视频问题已重新打开} audio {音频问题已重新打开} subtitles {字幕问题已重新打开} other {问题已重新打开}}",
+  "notifications.events.issueResolved": "{issueType, select, video {视频问题已解决} audio {音频问题已解决} subtitles {字幕问题已解决} other {问题已解决}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {电影请求已批准} movie4k {4K 电影请求已批准} tv4k {4K 电视节目请求已批准} other {电视节目请求已批准}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {电影请求已自动批准} movie4k {4K 电影请求已自动批准} tv4k {4K 电视节目请求已自动批准} other {电视节目请求已自动批准}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {已自动提交电影请求} movie4k {已自动提交 4K 电影请求} tv4k {已自动提交 4K 电视节目请求} other {已自动提交电视节目请求}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {电影现已可观看} movie4k {4K 电影现已可观看} tv4k {4K 电视节目现已可观看} other {电视节目现已可观看}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {电影请求已拒绝} movie4k {4K 电影请求已拒绝} tv4k {4K 电视节目请求已拒绝} other {电视节目请求已拒绝}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {电影请求失败} movie4k {4K 电影请求失败} tv4k {4K 电视节目请求失败} other {电视节目请求失败}}",
+  "notifications.events.mediaPending": "{kind, select, movie {新的电影请求} movie4k {新的 4K 电影请求} tv4k {新的 4K 电视节目请求} other {新的电视节目请求}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {请求的电影现已可观看} movie4k {请求的 4K 电影现已可观看} tv4k {请求的 4K 电视节目现已可观看} other {请求的电视节目现已可观看}}",
+  "notifications.events.seriesReadyToWatch": "电视节目可以观看了"
 }

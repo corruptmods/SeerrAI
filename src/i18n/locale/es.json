@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "No se ha podido leer esa imagen.",
   "utils.aiErrorMessage.pictureTooBig": "Esa imagen es demasiado grande.",
   "utils.aiErrorMessage.timeout": "El servicio de IA ha tardado demasiado en responder. Vuelve a intentarlo.",
-  "utils.aiErrorMessage.unreadable": "El modelo no ha respondido en un formato que Seerr pueda leer. Vuelve a intentarlo o elige un modelo más potente."
+  "utils.aiErrorMessage.unreadable": "El modelo no ha respondido en un formato que Seerr pueda leer. Vuelve a intentarlo o elige un modelo más potente.",
+  "components.RequestModal.noSeasonsAvailable": "Todas las temporadas seleccionadas ya están pedidas o disponibles.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Sincronización de la lista de seguimiento para usuarios nuevos",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Películas",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Pedir las películas añadidas a su lista de seguimiento",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Si los usuarios nuevos empiezan con su lista de seguimiento de Plex o Trakt pedida automáticamente. Los usuarios existentes mantienen su propia elección, y cualquiera puede cambiar la suya en su perfil. Solo se hacen peticiones para usuarios con un permiso de petición automática",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Series",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Pedir las series añadidas a su lista de seguimiento",
+  "components.UserList.importfromJellyfinnochanges": "Importación de {mediaServerName} completada. No se ha creado ni actualizado ningún usuario.",
+  "components.UserList.importfromJellyfinsynced": "Usuarios de {mediaServerName} sincronizados correctamente. Se han actualizado los usuarios existentes.",
+  "components.UserList.jellyfinsyncnotice": "Ya se ha importado a todos los usuarios de {mediaServerName}. Aún puedes hacer clic en Sincronizar para actualizarlos, por ejemplo si ha cambiado un nombre o una imagen."
 }

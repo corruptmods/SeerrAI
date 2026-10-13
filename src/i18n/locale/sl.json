@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Te slike ni bilo mogoče prebrati.",
   "utils.aiErrorMessage.pictureTooBig": "Ta slika je prevelika.",
   "utils.aiErrorMessage.timeout": "Storitev UI je za odgovor potrebovala predolgo. Poskusite znova.",
-  "utils.aiErrorMessage.unreadable": "Model ni odgovoril v obliki, ki bi jo Seerr lahko prebral. Poskusite znova ali izberite zmogljivejši model."
+  "utils.aiErrorMessage.unreadable": "Model ni odgovoril v obliki, ki bi jo Seerr lahko prebral. Poskusite znova ali izberite zmogljivejši model.",
+  "components.RequestModal.noSeasonsAvailable": "Vse izbrane sezone so že zahtevane ali na voljo.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Sinhronizacija seznama za ogled za nove uporabnike",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filmi",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Zahtevaj filme, dodane na njihov seznam za ogled",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Ali novi uporabniki začnejo s samodejnim zahtevanjem vsebin s svojega seznama za ogled v Plex ali Trakt. Obstoječi uporabniki obdržijo svojo izbiro, vsak pa jo lahko spremeni v svojem profilu. Zahteve se ustvarijo le za uporabnike z dovoljenjem za samodejno zahtevanje",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Serije",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Zahtevaj serije, dodane na njihov seznam za ogled",
+  "components.UserList.importfromJellyfinnochanges": "Uvoz iz {mediaServerName} je končan. Noben uporabnik ni bil ustvarjen ali osvežen.",
+  "components.UserList.importfromJellyfinsynced": "Uporabniki iz {mediaServerName} so uspešno sinhronizirani. Obstoječi uporabniki so bili osveženi.",
+  "components.UserList.jellyfinsyncnotice": "Vsi iz {mediaServerName} so že uvoženi. Še vedno lahko kliknete Sinhroniziraj, da osvežite njihove podatke, na primer spremenjeno ime ali sliko."
 }

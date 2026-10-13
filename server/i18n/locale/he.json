@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "אשר",
   "notifications.agents.webpush.approveFailed": "לא ניתן היה לאשר",
   "notifications.agents.webpush.decline": "דחה",
-  "notifications.agents.webpush.declineFailed": "לא ניתן היה לדחות"
+  "notifications.agents.webpush.declineFailed": "לא ניתן היה לדחות",
+  "notifications.events.adminAgent": "סוכן הניהול",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "תקינות",
+  "notifications.events.issueComment": "{issueType, select, video {תגובה חדשה במקרה וידאו} audio {תגובה חדשה במקרה אודיו} subtitles {תגובה חדשה במקרה כתוביות} other {תגובה חדשה במקרה}}",
+  "notifications.events.issueCreated": "{issueType, select, video {דווח מקרה וידאו חדש} audio {דווח מקרה אודיו חדש} subtitles {דווח מקרה כתוביות חדש} other {דווח מקרה חדש}}",
+  "notifications.events.issueReopened": "{issueType, select, video {מקרה וידאו נפתח מחדש} audio {מקרה אודיו נפתח מחדש} subtitles {מקרה כתוביות נפתח מחדש} other {המקרה נפתח מחדש}}",
+  "notifications.events.issueResolved": "{issueType, select, video {מקרה וידאו נפתר} audio {מקרה אודיו נפתר} subtitles {מקרה כתוביות נפתר} other {המקרה נפתר}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {בקשת הסרט אושרה} movie4k {בקשת הסרט ב-4K אושרה} tv4k {בקשת הסדרה ב-4K אושרה} other {בקשת הסדרה אושרה}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {בקשת הסרט אושרה אוטומטית} movie4k {בקשת הסרט ב-4K אושרה אוטומטית} tv4k {בקשת הסדרה ב-4K אושרה אוטומטית} other {בקשת הסדרה אושרה אוטומטית}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {בקשת סרט נשלחה אוטומטית} movie4k {בקשת סרט ב-4K נשלחה אוטומטית} tv4k {בקשת סדרה ב-4K נשלחה אוטומטית} other {בקשת סדרה נשלחה אוטומטית}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {הסרט זמין עכשיו} movie4k {הסרט ב-4K זמין עכשיו} tv4k {הסדרה ב-4K זמינה עכשיו} other {הסדרה זמינה עכשיו}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {בקשת הסרט נדחתה} movie4k {בקשת הסרט ב-4K נדחתה} tv4k {בקשת הסדרה ב-4K נדחתה} other {בקשת הסדרה נדחתה}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {בקשת הסרט נכשלה} movie4k {בקשת הסרט ב-4K נכשלה} tv4k {בקשת הסדרה ב-4K נכשלה} other {בקשת הסדרה נכשלה}}",
+  "notifications.events.mediaPending": "{kind, select, movie {בקשת סרט חדשה} movie4k {בקשת סרט חדשה ב-4K} tv4k {בקשת סדרה חדשה ב-4K} other {בקשת סדרה חדשה}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {הסרט שהתבקש זמין עכשיו} movie4k {הסרט ב-4K שהתבקש זמין עכשיו} tv4k {הסדרה ב-4K שהתבקשה זמינה עכשיו} other {הסדרה שהתבקשה זמינה עכשיו}}",
+  "notifications.events.seriesReadyToWatch": "הסדרה מוכנה לצפייה"
 }

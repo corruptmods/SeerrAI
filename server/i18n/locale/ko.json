@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "승인",
   "notifications.agents.webpush.approveFailed": "승인할 수 없었음",
   "notifications.agents.webpush.decline": "거절",
-  "notifications.agents.webpush.declineFailed": "거절할 수 없었음"
+  "notifications.agents.webpush.declineFailed": "거절할 수 없었음",
+  "notifications.events.adminAgent": "관리자 에이전트",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "상태 점검",
+  "notifications.events.issueComment": "{issueType, select, video {영상 이슈에 새 댓글} audio {오디오 이슈에 새 댓글} subtitles {자막 이슈에 새 댓글} other {이슈에 새 댓글}}",
+  "notifications.events.issueCreated": "{issueType, select, video {새 영상 이슈 보고됨} audio {새 오디오 이슈 보고됨} subtitles {새 자막 이슈 보고됨} other {새 이슈 보고됨}}",
+  "notifications.events.issueReopened": "{issueType, select, video {영상 이슈 다시 열림} audio {오디오 이슈 다시 열림} subtitles {자막 이슈 다시 열림} other {이슈 다시 열림}}",
+  "notifications.events.issueResolved": "{issueType, select, video {영상 이슈 해결됨} audio {오디오 이슈 해결됨} subtitles {자막 이슈 해결됨} other {이슈 해결됨}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {영화 요청 승인됨} movie4k {4K 영화 요청 승인됨} tv4k {4K 시리즈 요청 승인됨} other {시리즈 요청 승인됨}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {영화 요청 자동 승인됨} movie4k {4K 영화 요청 자동 승인됨} tv4k {4K 시리즈 요청 자동 승인됨} other {시리즈 요청 자동 승인됨}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {영화 요청 자동 제출됨} movie4k {4K 영화 요청 자동 제출됨} tv4k {4K 시리즈 요청 자동 제출됨} other {시리즈 요청 자동 제출됨}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {이제 영화 시청 가능} movie4k {이제 4K 영화 시청 가능} tv4k {이제 4K 시리즈 시청 가능} other {이제 시리즈 시청 가능}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {영화 요청 거절됨} movie4k {4K 영화 요청 거절됨} tv4k {4K 시리즈 요청 거절됨} other {시리즈 요청 거절됨}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {영화 요청 실패} movie4k {4K 영화 요청 실패} tv4k {4K 시리즈 요청 실패} other {시리즈 요청 실패}}",
+  "notifications.events.mediaPending": "{kind, select, movie {새 영화 요청} movie4k {새 4K 영화 요청} tv4k {새 4K 시리즈 요청} other {새 시리즈 요청}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {요청한 영화 이제 시청 가능} movie4k {요청한 4K 영화 이제 시청 가능} tv4k {요청한 4K 시리즈 이제 시청 가능} other {요청한 시리즈 이제 시청 가능}}",
+  "notifications.events.seriesReadyToWatch": "시리즈 시청 준비 완료"
 }

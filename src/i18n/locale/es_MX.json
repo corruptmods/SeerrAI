@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "No se pudo leer esa imagen.",
   "utils.aiErrorMessage.pictureTooBig": "Esa imagen es demasiado grande.",
   "utils.aiErrorMessage.timeout": "El servicio de IA tardó demasiado en responder. Vuelve a intentarlo.",
-  "utils.aiErrorMessage.unreadable": "El modelo no respondió en un formato que Seerr pueda leer. Vuelve a intentarlo o elige un modelo más potente."
+  "utils.aiErrorMessage.unreadable": "El modelo no respondió en un formato que Seerr pueda leer. Vuelve a intentarlo o elige un modelo más potente.",
+  "components.RequestModal.noSeasonsAvailable": "Todas las temporadas seleccionadas ya están solicitadas o disponibles.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Sincronización de la lista de seguimiento para usuarios nuevos",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Películas",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Solicitar las películas agregadas a su lista de seguimiento",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Si los usuarios nuevos empiezan con su lista de seguimiento de Plex o Trakt solicitada automáticamente. Los usuarios existentes conservan su propia elección, y cualquiera puede cambiar la suya en su perfil. Solo se hacen peticiones para usuarios con un permiso de solicitud automática",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Series",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Solicitar las series agregadas a su lista de seguimiento",
+  "components.UserList.importfromJellyfinnochanges": "Se completó la importación de {mediaServerName}. No se creó ni actualizó ningún usuario.",
+  "components.UserList.importfromJellyfinsynced": "Los usuarios de {mediaServerName} se sincronizaron correctamente. Se actualizaron los usuarios existentes.",
+  "components.UserList.jellyfinsyncnotice": "Ya se importaron todos los usuarios de {mediaServerName}. Aún puedes hacer clic en Sincronizar para actualizarlos, por ejemplo si cambió un nombre o una imagen."
 }

@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Seda pilti ei õnnestunud lugeda.",
   "utils.aiErrorMessage.pictureTooBig": "See pilt on liiga suur.",
   "utils.aiErrorMessage.timeout": "AI-teenus vastas liiga kaua. Proovi uuesti.",
-  "utils.aiErrorMessage.unreadable": "Mudel ei vastanud kujul, mida Seerr lugeda oskab. Proovi uuesti või vali võimsam mudel."
+  "utils.aiErrorMessage.unreadable": "Mudel ei vastanud kujul, mida Seerr lugeda oskab. Proovi uuesti või vali võimsam mudel.",
+  "components.RequestModal.noSeasonsAvailable": "Kõik valitud hooajad on juba taotletud või saadaval.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Uute kasutajate vaatamisnimekirja sünkroonimine",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filmid",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Taotle filme, mis lisatakse nende vaatamisnimekirja",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Kas uutel kasutajatel taotletakse nende Plexi või Trakti vaatamisnimekiri kohe algusest automaatselt. Olemasolevad kasutajad jäävad oma valiku juurde ja igaüks saab enda oma profiilis muuta. Taotlusi tehakse ainult kasutajatele, kellel on automaatse taotlemise õigus",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Sarjad",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Taotle sarju, mis lisatakse nende vaatamisnimekirja",
+  "components.UserList.importfromJellyfinnochanges": "Import serverist {mediaServerName} on lõpetatud. Ühtegi kasutajat ei loodud ega värskendatud.",
+  "components.UserList.importfromJellyfinsynced": "Serveri {mediaServerName} kasutajad on edukalt sünkroonitud. Olemasolevad kasutajad värskendati.",
+  "components.UserList.jellyfinsyncnotice": "Kõik serveri {mediaServerName} kasutajad on imporditud. Saad ikka klõpsata nupul Sünkrooni, et neid värskendada, näiteks kui nimi või pilt on muutunud."
 }

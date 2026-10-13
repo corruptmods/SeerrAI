@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Схвалити",
   "notifications.agents.webpush.approveFailed": "Не вдалося схвалити",
   "notifications.agents.webpush.decline": "Відхилити",
-  "notifications.agents.webpush.declineFailed": "Не вдалося відхилити"
+  "notifications.agents.webpush.declineFailed": "Не вдалося відхилити",
+  "notifications.events.adminAgent": "Агент адміністратора",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Стан системи",
+  "notifications.events.issueComment": "{issueType, select, video {Новий коментар до проблеми з відео} audio {Новий коментар до проблеми зі звуком} subtitles {Новий коментар до проблеми із субтитрами} other {Новий коментар до проблеми}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Повідомлено про нову проблему з відео} audio {Повідомлено про нову проблему зі звуком} subtitles {Повідомлено про нову проблему із субтитрами} other {Повідомлено про нову проблему}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Проблему з відео знову відкрито} audio {Проблему зі звуком знову відкрито} subtitles {Проблему із субтитрами знову відкрито} other {Проблему знову відкрито}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Проблему з відео вирішено} audio {Проблему зі звуком вирішено} subtitles {Проблему із субтитрами вирішено} other {Проблему вирішено}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Запит на фільм схвалено} movie4k {Запит на фільм у 4K схвалено} tv4k {Запит на серіал у 4K схвалено} other {Запит на серіал схвалено}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Запит на фільм схвалено автоматично} movie4k {Запит на фільм у 4K схвалено автоматично} tv4k {Запит на серіал у 4K схвалено автоматично} other {Запит на серіал схвалено автоматично}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Запит на фільм надіслано автоматично} movie4k {Запит на фільм у 4K надіслано автоматично} tv4k {Запит на серіал у 4K надіслано автоматично} other {Запит на серіал надіслано автоматично}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Фільм уже доступний} movie4k {Фільм у 4K уже доступний} tv4k {Серіал у 4K уже доступний} other {Серіал уже доступний}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Запит на фільм відхилено} movie4k {Запит на фільм у 4K відхилено} tv4k {Запит на серіал у 4K відхилено} other {Запит на серіал відхилено}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Запит на фільм не виконано} movie4k {Запит на фільм у 4K не виконано} tv4k {Запит на серіал у 4K не виконано} other {Запит на серіал не виконано}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Новий запит на фільм} movie4k {Новий запит на фільм у 4K} tv4k {Новий запит на серіал у 4K} other {Новий запит на серіал}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Запитаний фільм уже доступний} movie4k {Запитаний фільм у 4K уже доступний} tv4k {Запитаний серіал у 4K уже доступний} other {Запитаний серіал уже доступний}}",
+  "notifications.events.seriesReadyToWatch": "Серіал готовий до перегляду"
 }

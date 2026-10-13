@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Ajo foto nuk mund të lexohej.",
   "utils.aiErrorMessage.pictureTooBig": "Ajo foto është shumë e madhe.",
   "utils.aiErrorMessage.timeout": "Shërbimit të AI iu desh shumë kohë për t’u përgjigjur. Provoni sërish.",
-  "utils.aiErrorMessage.unreadable": "Modeli nuk u përgjigj në një formë që Seerr mund ta lexonte. Provoni sërish ose zgjidhni një model më të fuqishëm."
+  "utils.aiErrorMessage.unreadable": "Modeli nuk u përgjigj në një formë që Seerr mund ta lexonte. Provoni sërish ose zgjidhni një model më të fuqishëm.",
+  "components.RequestModal.noSeasonsAvailable": "Të gjithë sezonet e zgjedhur janë tashmë të kërkuar ose të disponueshëm.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Sinkronizimi i listës së shikimit për përdoruesit e rinj",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filma",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Kërko filmat e shtuar në listën e tyre të shikimit",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Nëse përdoruesit e rinj fillojnë me listën e tyre të shikimit në Plex ose Trakt të kërkuar automatikisht. Përdoruesit ekzistues ruajnë zgjedhjen e tyre dhe secili mund ta ndryshojë të vetën në profil. Kërkesat bëhen vetëm për përdoruesit që kanë leje për kërkesë automatike",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Seriale",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Kërko serialet e shtuar në listën e tyre të shikimit",
+  "components.UserList.importfromJellyfinnochanges": "Importi nga {mediaServerName} përfundoi. Asnjë përdorues nuk u krijua apo u rifreskua.",
+  "components.UserList.importfromJellyfinsynced": "Përdoruesit e {mediaServerName} u sinkronizuan me sukses. Përdoruesit ekzistues u rifreskuan.",
+  "components.UserList.jellyfinsyncnotice": "Të gjithë në {mediaServerName} janë importuar. Mund të klikoni përsëri Sinkronizo për t’i rifreskuar, p.sh. nëse u ka ndryshuar emri ose fotoja."
 }

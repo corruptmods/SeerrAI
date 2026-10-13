@@ -12,6 +12,15 @@ The newest changes are at the top. **Coming next** is what's on the `dev` branch
 - **Ratings show up more often.** When Rotten Tomatoes or IMDb is having trouble, a film's page still shows the rating from the other one.
 - **No false alarm on series requests.** Requesting seasons someone else just requested, or that are already available, now tells you so instead of saying something went wrong.
 
+### Radarr waits for the release you chose
+
+- **Radarr follows your Minimum Availability.** When a movie is approved, Radarr is only asked to search straight away if it's already available by the Minimum Availability you set in Radarr. A film that's only in cinemas, with yours set to Released, is added and watched for instead, so you don't end up with a cinema recording. Set a movie to Announced and it's searched for right away, as before.
+- **Movies with both a 1080p and a 4K copy in one Plex item** now show as available in both, not just 4K.
+- **Plex or Jellyfin having a bad moment no longer marks seasons as deleted.** If your media server doesn't answer during the nightly availability check, everything is left as it was.
+- **New files on Jellyfin and Emby show up sooner.** A movie the server hasn't finished reading yet now counts as available instead of waiting for the next scan.
+- **Override rules for a second Radarr or Sonarr** now apply when a request goes to that server.
+- **Watchlist Sync's schedule** can now be set in minutes, and the schedule editor opens on what each job is already set to.
+
 ### A big round of fixes
 
 We went through all of Seerr AI looking for things that could go wrong, and fixed a lot of them. The ones you're most likely to notice:

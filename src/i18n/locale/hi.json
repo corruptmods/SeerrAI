@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "वह तस्वीर पढ़ी नहीं जा सकी।",
   "utils.aiErrorMessage.pictureTooBig": "वह तस्वीर बहुत बड़ी है।",
   "utils.aiErrorMessage.timeout": "AI सेवा ने जवाब देने में बहुत देर लगाई। फिर से कोशिश करें।",
-  "utils.aiErrorMessage.unreadable": "मॉडल ने ऐसे रूप में जवाब नहीं दिया जिसे Seerr पढ़ सके। फिर से कोशिश करें, या कोई ज़्यादा सक्षम मॉडल चुनें।"
+  "utils.aiErrorMessage.unreadable": "मॉडल ने ऐसे रूप में जवाब नहीं दिया जिसे Seerr पढ़ सके। फिर से कोशिश करें, या कोई ज़्यादा सक्षम मॉडल चुनें।",
+  "components.RequestModal.noSeasonsAvailable": "चुने गए सभी सीज़न पहले से अनुरोधित हैं या उपलब्ध हैं।",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "नए उपयोगकर्ताओं के लिए वॉचलिस्ट सिंक",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "फिल्में",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "उनकी वॉचलिस्ट में जोड़ी गई फिल्मों का अनुरोध करें",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "क्या नए उपयोगकर्ताओं की Plex या Trakt वॉचलिस्ट का अनुरोध शुरू से ही अपने-आप हो। मौजूदा उपयोगकर्ताओं की अपनी पसंद बनी रहती है, और कोई भी अपनी प्रोफ़ाइल में अपनी पसंद बदल सकता है। अनुरोध सिर्फ़ उन्हीं उपयोगकर्ताओं के लिए किए जाते हैं जिनके पास अपने-आप अनुरोध की अनुमति है",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "शृंखलाएँ",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "उनकी वॉचलिस्ट में जोड़ी गई शृंखलाओं का अनुरोध करें",
+  "components.UserList.importfromJellyfinnochanges": "{mediaServerName} से इम्पोर्ट पूरा हुआ। कोई उपयोगकर्ता न बनाया गया, न रीफ़्रेश किया गया।",
+  "components.UserList.importfromJellyfinsynced": "{mediaServerName} उपयोगकर्ता सफलतापूर्वक सिंक हो गए। मौजूदा उपयोगकर्ता रीफ़्रेश कर दिए गए।",
+  "components.UserList.jellyfinsyncnotice": "{mediaServerName} पर मौजूद सभी लोगों को इम्पोर्ट कर लिया गया है। आप अब भी उन्हें रीफ़्रेश करने के लिए “सिंक करें” पर क्लिक कर सकते हैं, जैसे कि नाम या तस्वीर बदलने पर।"
 }

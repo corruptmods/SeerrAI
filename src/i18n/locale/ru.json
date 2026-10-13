@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Не удалось прочитать это изображение.",
   "utils.aiErrorMessage.pictureTooBig": "Изображение слишком большое.",
   "utils.aiErrorMessage.timeout": "Сервис ИИ слишком долго не отвечал. Попробуйте ещё раз.",
-  "utils.aiErrorMessage.unreadable": "Модель ответила в формате, который Seerr не может прочитать. Попробуйте ещё раз или выберите более мощную модель."
+  "utils.aiErrorMessage.unreadable": "Модель ответила в формате, который Seerr не может прочитать. Попробуйте ещё раз или выберите более мощную модель.",
+  "components.RequestModal.noSeasonsAvailable": "Все выбранные сезоны уже запрошены или доступны.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Синхронизация списка просмотра для новых пользователей",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Фильмы",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Запрашивать фильмы, добавленные в их список просмотра",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Будет ли у новых пользователей сразу включён автоматический запрос всего из их списка просмотра Plex или Trakt. Существующие пользователи сохраняют свой выбор, и каждый может изменить его в своём профиле. Запросы создаются только для пользователей с разрешением на автоматические запросы",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Сериалы",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Запрашивать сериалы, добавленные в их список просмотра",
+  "components.UserList.importfromJellyfinnochanges": "Импорт из {mediaServerName} завершён. Ни один пользователь не был создан или обновлён.",
+  "components.UserList.importfromJellyfinsynced": "Пользователи {mediaServerName} успешно синхронизированы. Существующие пользователи обновлены.",
+  "components.UserList.jellyfinsyncnotice": "Все пользователи {mediaServerName} уже импортированы. Вы всё равно можете нажать «Синхронизировать», чтобы обновить их данные, например изменившееся имя или фото."
 }

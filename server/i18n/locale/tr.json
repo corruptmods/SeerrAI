@@ -64,5 +64,21 @@
   "notifications.agents.webpush.approve": "Onayla",
   "notifications.agents.webpush.approveFailed": "Onaylanamadı",
   "notifications.agents.webpush.decline": "Reddet",
-  "notifications.agents.webpush.declineFailed": "Reddedilemedi"
+  "notifications.agents.webpush.declineFailed": "Reddedilemedi",
+  "notifications.events.adminAgent": "Yönetici ajanı",
+  "notifications.events.backfill": "Backfill",
+  "notifications.events.health": "Sağlık",
+  "notifications.events.issueComment": "{issueType, select, video {Video Sorununa Yeni Yorum} audio {Ses Sorununa Yeni Yorum} subtitles {Altyazı Sorununa Yeni Yorum} other {Soruna Yeni Yorum}}",
+  "notifications.events.issueCreated": "{issueType, select, video {Yeni Video Sorunu Bildirildi} audio {Yeni Ses Sorunu Bildirildi} subtitles {Yeni Altyazı Sorunu Bildirildi} other {Yeni Sorun Bildirildi}}",
+  "notifications.events.issueReopened": "{issueType, select, video {Video Sorunu Yeniden Açıldı} audio {Ses Sorunu Yeniden Açıldı} subtitles {Altyazı Sorunu Yeniden Açıldı} other {Sorun Yeniden Açıldı}}",
+  "notifications.events.issueResolved": "{issueType, select, video {Video Sorunu Çözüldü} audio {Ses Sorunu Çözüldü} subtitles {Altyazı Sorunu Çözüldü} other {Sorun Çözüldü}}",
+  "notifications.events.mediaApproved": "{kind, select, movie {Film Talebi Onaylandı} movie4k {4K Film Talebi Onaylandı} tv4k {4K Dizi Talebi Onaylandı} other {Dizi Talebi Onaylandı}}",
+  "notifications.events.mediaAutoApproved": "{kind, select, movie {Film Talebi Otomatik Olarak Onaylandı} movie4k {4K Film Talebi Otomatik Olarak Onaylandı} tv4k {4K Dizi Talebi Otomatik Olarak Onaylandı} other {Dizi Talebi Otomatik Olarak Onaylandı}}",
+  "notifications.events.mediaAutoRequested": "{kind, select, movie {Film Talebi Otomatik Olarak Gönderildi} movie4k {4K Film Talebi Otomatik Olarak Gönderildi} tv4k {4K Dizi Talebi Otomatik Olarak Gönderildi} other {Dizi Talebi Otomatik Olarak Gönderildi}}",
+  "notifications.events.mediaAvailable": "{kind, select, movie {Film Artık Mevcut} movie4k {4K Film Artık Mevcut} tv4k {4K Dizi Artık Mevcut} other {Dizi Artık Mevcut}}",
+  "notifications.events.mediaDeclined": "{kind, select, movie {Film Talebi Reddedildi} movie4k {4K Film Talebi Reddedildi} tv4k {4K Dizi Talebi Reddedildi} other {Dizi Talebi Reddedildi}}",
+  "notifications.events.mediaFailed": "{kind, select, movie {Film Talebi Başarısız} movie4k {4K Film Talebi Başarısız} tv4k {4K Dizi Talebi Başarısız} other {Dizi Talebi Başarısız}}",
+  "notifications.events.mediaPending": "{kind, select, movie {Yeni Film Talebi} movie4k {Yeni 4K Film Talebi} tv4k {Yeni 4K Dizi Talebi} other {Yeni Dizi Talebi}}",
+  "notifications.events.requestAvailable": "{kind, select, movie {Talep Edilen Film Artık Mevcut} movie4k {Talep Edilen 4K Film Artık Mevcut} tv4k {Talep Edilen 4K Dizi Artık Mevcut} other {Talep Edilen Dizi Artık Mevcut}}",
+  "notifications.events.seriesReadyToWatch": "Dizi İzlemeye Hazır"
 }

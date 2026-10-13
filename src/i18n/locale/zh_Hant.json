@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "無法讀取該圖片。",
   "utils.aiErrorMessage.pictureTooBig": "該圖片太大。",
   "utils.aiErrorMessage.timeout": "AI 服務回應時間過長。請再試一次。",
-  "utils.aiErrorMessage.unreadable": "模型回答的格式 Seerr 無法讀取。請再試一次，或選擇更強大的模型。"
+  "utils.aiErrorMessage.unreadable": "模型回答的格式 Seerr 無法讀取。請再試一次，或選擇更強大的模型。",
+  "components.RequestModal.noSeasonsAvailable": "所選的季皆已請求或已可觀看。",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "新使用者的關注列表同步",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "電影",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "請求其關注列表中新增的電影",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "新使用者是否預設自動請求其 Plex 或 Trakt 關注列表中的內容。現有使用者會保留各自的選擇，每個人都可以在個人檔案中變更自己的設定。只會為擁有自動請求權限的使用者送出請求",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "影集",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "請求其關注列表中新增的影集",
+  "components.UserList.importfromJellyfinnochanges": "{mediaServerName} 匯入完成。沒有建立或更新任何使用者。",
+  "components.UserList.importfromJellyfinsynced": "{mediaServerName} 使用者同步成功。已更新現有使用者。",
+  "components.UserList.jellyfinsyncnotice": "{mediaServerName} 上的所有人都已匯入。您仍可按一下「同步」來更新他們的資訊，例如變更過的名稱或頭像。"
 }

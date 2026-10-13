@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "その画像を読み取れませんでした。",
   "utils.aiErrorMessage.pictureTooBig": "その画像は大きすぎます。",
   "utils.aiErrorMessage.timeout": "AIサービスの応答に時間がかかりすぎました。もう一度お試しください。",
-  "utils.aiErrorMessage.unreadable": "モデルの回答が Seerr で読み取れない形式でした。もう一度試すか、より高性能なモデルを選んでください。"
+  "utils.aiErrorMessage.unreadable": "モデルの回答が Seerr で読み取れない形式でした。もう一度試すか、より高性能なモデルを選んでください。",
+  "components.RequestModal.noSeasonsAvailable": "選択したシーズンはすべて、リクエスト済みか視聴可能です。",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "新規ユーザーのウォッチリスト同期",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "映画",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "ウォッチリストに追加された映画をリクエストする",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "新規ユーザーの Plex または Trakt のウォッチリストを、最初から自動でリクエストするかどうかです。既存のユーザーは自分の設定がそのまま残り、誰でもプロフィールで自分の設定を変更できます。リクエストが作成されるのは、自動リクエストの権限を持つユーザーだけです",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "シリーズ",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "ウォッチリストに追加されたシリーズをリクエストする",
+  "components.UserList.importfromJellyfinnochanges": "{mediaServerName} からのインポートが完了しました。作成または更新されたユーザーはいません。",
+  "components.UserList.importfromJellyfinsynced": "{mediaServerName} のユーザーを同期しました。既存のユーザーは更新されました。",
+  "components.UserList.jellyfinsyncnotice": "{mediaServerName} のユーザーは全員インポート済みです。名前や画像が変わったときなどは、「同期」をクリックして更新できます。"
 }

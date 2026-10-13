@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Imaginea nu a putut fi citită.",
   "utils.aiErrorMessage.pictureTooBig": "Imaginea este prea mare.",
   "utils.aiErrorMessage.timeout": "Serviciul AI a răspuns prea greu. Încercați din nou.",
-  "utils.aiErrorMessage.unreadable": "Modelul nu a răspuns într-o formă pe care Seerr să o poată citi. Încercați din nou sau alegeți un model mai puternic."
+  "utils.aiErrorMessage.unreadable": "Modelul nu a răspuns într-o formă pe care Seerr să o poată citi. Încercați din nou sau alegeți un model mai puternic.",
+  "components.RequestModal.noSeasonsAvailable": "Toate sezoanele selectate sunt deja solicitate sau disponibile.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Sincronizarea listei de urmărire pentru utilizatorii noi",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Filme",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Solicită filmele adăugate în lista lor de urmărire",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Dacă utilizatorii noi încep cu lista de urmărire Plex sau Trakt solicitată automat. Utilizatorii existenți își păstrează propria alegere și oricine o poate schimba pe a sa din profil. Solicitările se fac doar pentru utilizatorii cu o permisiune de solicitare automată",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Seriale",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Solicită serialele adăugate în lista lor de urmărire",
+  "components.UserList.importfromJellyfinnochanges": "Importul din {mediaServerName} s-a încheiat. Niciun utilizator nu a fost creat sau actualizat.",
+  "components.UserList.importfromJellyfinsynced": "Utilizatorii {mediaServerName} au fost sincronizați cu succes. Utilizatorii existenți au fost actualizați.",
+  "components.UserList.jellyfinsyncnotice": "Toți utilizatorii de pe {mediaServerName} au fost importați. Puteți totuși să apăsați pe Sincronizează pentru a-i actualiza, de exemplu dacă și-au schimbat numele sau poza."
 }

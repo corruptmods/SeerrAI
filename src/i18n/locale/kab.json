@@ -3343,5 +3343,15 @@
   "utils.aiErrorMessage.picture": "Tawlaft-a ur tezmir ara ad tettwaɣer.",
   "utils.aiErrorMessage.pictureTooBig": "Tawlaft-a meqqret aṭas.",
   "utils.aiErrorMessage.timeout": "Ameẓlu n AI yeṭṭef aṭas n wakud akken ad d-yerr. Ɛreḍ tikkelt nniḍen.",
-  "utils.aiErrorMessage.unreadable": "Tamudemt ur d-terri ara s talɣa i yezmer ad yeɣṛ Seerr. Ɛreḍ tikkelt nniḍen, neɣ fren tamudemt yugaren tazmert."
+  "utils.aiErrorMessage.unreadable": "Tamudemt ur d-terri ara s talɣa i yezmer ad yeɣṛ Seerr. Ɛreḍ tikkelt nniḍen, neɣ fren tamudemt yugaren tazmert.",
+  "components.RequestModal.noSeasonsAvailable": "Akk tallitin yettwafernen ttwasutrent yakan neɣ llant.",
+  "components.Settings.SettingsUsers.defaultWatchlistSync": "Amtawi n tebdart n tmuɣli i yiseqdacen imaynuten",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMovies": "Isura",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncMoviesTip": "Suter isura yettwarnan ɣer tebdart-nsen n tmuɣli",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTip": "Ma yella iseqdacen imaynuten ad bdun s tebdart-nsen n tmuɣli n Plex neɣ n Trakt yettwasutren s wudem awurman. Iseqdacen yellan ad qqimen ɣef wayen i fernen, yal yiwen yezmer ad ibeddel ayen-is deg umaɣnu-ines. Isuturen ttwaxedmen kan i yiseqdacen yesɛan tasiregt n usuter awurman",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTv": "Tisnasliwin",
+  "components.Settings.SettingsUsers.defaultWatchlistSyncTvTip": "Suter tisnasliwin yettwarnan ɣer tebdart-nsen n tmuɣli",
+  "components.UserList.importfromJellyfinnochanges": "Aktar seg {mediaServerName} yemmed. Ula d yiwen n useqdac ur yettwarna, ur yettwasmiren.",
+  "components.UserList.importfromJellyfinsynced": "Iseqdacen n {mediaServerName} ttwamtawan akken iwata. Iseqdacen yellan ttwasmirnen.",
+  "components.UserList.jellyfinsyncnotice": "Akk wid yellan deg {mediaServerName} ttwaktren. Mazal tzemreḍ ad tsiteḍ ɣef Mtawi akken ad ten-tsmirneḍ, am akken ma ibeddel yisem neɣ tugna."
 }

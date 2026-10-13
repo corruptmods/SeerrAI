@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Wali ugur deg {applicationTitle}",
   "notifications.common.viewMedia": "Wali amidya deg {applicationTitle}",
   "notifications.test.message": "Asekyed, 1, 2, 3. Tsellem-d akken iwata?",
-  "notifications.test.subject": "Alɣu n usekyed"
+  "notifications.test.subject": "Alɣu n usekyed",
+  "notifications.agents.webpush.actionFailedBody": "{title} — ldi {applicationTitle} akken ad tɛerḍeḍ tikkelt nniḍen.",
+  "notifications.agents.webpush.approve": "Qbel",
+  "notifications.agents.webpush.approveFailed": "Ur yezmir ara ad yettwaqbel",
+  "notifications.agents.webpush.decline": "Agi",
+  "notifications.agents.webpush.declineFailed": "Ur yezmir ara ad yettwagi"
 }

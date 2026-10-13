@@ -59,5 +59,10 @@
   "notifications.agents.webpush.downloadedTitleTv": "Sèrie baixada",
   "notifications.agents.webpush.failedBody": "No s'ha pogut baixar {title}.",
   "notifications.agents.webpush.failedTitleMovie": "Ha fallat la sol·licitud de la pel·lícula",
-  "notifications.agents.webpush.failedTitleTv": "Ha fallat la sol·licitud de la sèrie"
+  "notifications.agents.webpush.failedTitleTv": "Ha fallat la sol·licitud de la sèrie",
+  "notifications.agents.webpush.actionFailedBody": "{title} — obriu {applicationTitle} per tornar-ho a provar.",
+  "notifications.agents.webpush.approve": "Aprova",
+  "notifications.agents.webpush.approveFailed": "No s'ha pogut aprovar",
+  "notifications.agents.webpush.decline": "Rebutja",
+  "notifications.agents.webpush.declineFailed": "No s'ha pogut rebutjar"
 }

@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Xem sự cố trong {applicationTitle}",
   "notifications.common.viewMedia": "Xem nội dung trong {applicationTitle}",
   "notifications.test.message": "Thử, thử, 1, 2, 3. Có nghe rõ không?",
-  "notifications.test.subject": "Thông báo thử nghiệm"
+  "notifications.test.subject": "Thông báo thử nghiệm",
+  "notifications.agents.webpush.actionFailedBody": "{title} — mở {applicationTitle} để thử lại.",
+  "notifications.agents.webpush.approve": "Phê duyệt",
+  "notifications.agents.webpush.approveFailed": "Không thể phê duyệt",
+  "notifications.agents.webpush.decline": "Từ chối",
+  "notifications.agents.webpush.declineFailed": "Không thể từ chối"
 }

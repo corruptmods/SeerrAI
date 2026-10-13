@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Ikusi intzidentzia {applicationTitle}-(e)n",
   "notifications.common.viewMedia": "Ikusi multimedia {applicationTitle}-(e)n",
   "notifications.test.message": "Proba, proba, 1, 2, 3. Ondo iristen al da?",
-  "notifications.test.subject": "Proba-jakinarazpena"
+  "notifications.test.subject": "Proba-jakinarazpena",
+  "notifications.agents.webpush.actionFailedBody": "{title} — ireki {applicationTitle} berriro saiatzeko.",
+  "notifications.agents.webpush.approve": "Onartu",
+  "notifications.agents.webpush.approveFailed": "Ezin izan da onartu",
+  "notifications.agents.webpush.decline": "Baztertu",
+  "notifications.agents.webpush.declineFailed": "Ezin izan da baztertu"
 }

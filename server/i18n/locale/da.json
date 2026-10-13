@@ -59,5 +59,10 @@
   "notifications.agents.webpush.downloadedTitleTv": "Serie downloadet",
   "notifications.agents.webpush.failedBody": "{title} kunne ikke downloades.",
   "notifications.agents.webpush.failedTitleMovie": "Filmanmodning mislykkedes",
-  "notifications.agents.webpush.failedTitleTv": "Serieanmodning mislykkedes"
+  "notifications.agents.webpush.failedTitleTv": "Serieanmodning mislykkedes",
+  "notifications.agents.webpush.actionFailedBody": "{title} — åbn {applicationTitle} for at prøve igen.",
+  "notifications.agents.webpush.approve": "Godkend",
+  "notifications.agents.webpush.approveFailed": "Kunne ikke godkende",
+  "notifications.agents.webpush.decline": "Afvis",
+  "notifications.agents.webpush.declineFailed": "Kunne ikke afvise"
 }

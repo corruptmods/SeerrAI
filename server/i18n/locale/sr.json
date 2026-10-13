@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Prikaži problem u {applicationTitle}",
   "notifications.common.viewMedia": "Prikaži sadržaj u {applicationTitle}",
   "notifications.test.message": "Proba, proba, 1, 2, 3. Da li se čujemo jasno?",
-  "notifications.test.subject": "Probno obaveštenje"
+  "notifications.test.subject": "Probno obaveštenje",
+  "notifications.agents.webpush.actionFailedBody": "{title} — otvorite {applicationTitle} da biste pokušali ponovo.",
+  "notifications.agents.webpush.approve": "Odobri",
+  "notifications.agents.webpush.approveFailed": "Odobravanje nije uspelo",
+  "notifications.agents.webpush.decline": "Odbij",
+  "notifications.agents.webpush.declineFailed": "Odbijanje nije uspelo"
 }

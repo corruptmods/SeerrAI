@@ -59,5 +59,10 @@
   "notifications.agents.webpush.downloadedTitleTv": "Serie nedladdad",
   "notifications.agents.webpush.failedBody": "{title} kunde inte laddas ned.",
   "notifications.agents.webpush.failedTitleMovie": "Filmförfrågan misslyckades",
-  "notifications.agents.webpush.failedTitleTv": "Serieförfrågan misslyckades"
+  "notifications.agents.webpush.failedTitleTv": "Serieförfrågan misslyckades",
+  "notifications.agents.webpush.actionFailedBody": "{title} — öppna {applicationTitle} för att försöka igen.",
+  "notifications.agents.webpush.approve": "Godkänn",
+  "notifications.agents.webpush.approveFailed": "Det gick inte att godkänna",
+  "notifications.agents.webpush.decline": "Avslå",
+  "notifications.agents.webpush.declineFailed": "Det gick inte att avslå"
 }

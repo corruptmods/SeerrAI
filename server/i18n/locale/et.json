@@ -59,5 +59,10 @@
   "notifications.agents.webpush.downloadedTitleTv": "Sari alla laaditud",
   "notifications.agents.webpush.failedBody": "Teost {title} ei õnnestunud alla laadida.",
   "notifications.agents.webpush.failedTitleMovie": "Filmi taotlus ebaõnnestus",
-  "notifications.agents.webpush.failedTitleTv": "Sarja taotlus ebaõnnestus"
+  "notifications.agents.webpush.failedTitleTv": "Sarja taotlus ebaõnnestus",
+  "notifications.agents.webpush.actionFailedBody": "{title} — uuesti proovimiseks ava {applicationTitle}.",
+  "notifications.agents.webpush.approve": "Kinnita",
+  "notifications.agents.webpush.approveFailed": "Kinnitamine ebaõnnestus",
+  "notifications.agents.webpush.decline": "Keeldu",
+  "notifications.agents.webpush.declineFailed": "Keeldumine ebaõnnestus"
 }

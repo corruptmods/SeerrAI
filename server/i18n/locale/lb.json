@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Problem an {applicationTitle} ukucken",
   "notifications.common.viewMedia": "Medium an {applicationTitle} ukucken",
   "notifications.test.message": "Test, Test, 1, 2, 3. Kënnt alles kloer un?",
-  "notifications.test.subject": "Test-Notifikatioun"
+  "notifications.test.subject": "Test-Notifikatioun",
+  "notifications.agents.webpush.actionFailedBody": "{title} — maacht {applicationTitle} op, fir et nach eng Kéier ze probéieren.",
+  "notifications.agents.webpush.approve": "Guttheeschen",
+  "notifications.agents.webpush.approveFailed": "Konnt net guttgeheescht ginn",
+  "notifications.agents.webpush.decline": "Ofleenen",
+  "notifications.agents.webpush.declineFailed": "Konnt net ofgeleent ginn"
 }

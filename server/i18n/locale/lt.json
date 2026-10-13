@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Peržiūrėti problemą {applicationTitle}",
   "notifications.common.viewMedia": "Peržiūrėti įrašą {applicationTitle}",
   "notifications.test.message": "Tikrinam, tikrinam, 1, 2, 3. Ar girdite aiškiai?",
-  "notifications.test.subject": "Bandomasis pranešimas"
+  "notifications.test.subject": "Bandomasis pranešimas",
+  "notifications.agents.webpush.actionFailedBody": "{title} — atidarykite {applicationTitle} ir bandykite dar kartą.",
+  "notifications.agents.webpush.approve": "Patvirtinti",
+  "notifications.agents.webpush.approveFailed": "Nepavyko patvirtinti",
+  "notifications.agents.webpush.decline": "Atmesti",
+  "notifications.agents.webpush.declineFailed": "Nepavyko atmesti"
 }

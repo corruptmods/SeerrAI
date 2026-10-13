@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Προβολή προβλήματος στο {applicationTitle}",
   "notifications.common.viewMedia": "Προβολή τίτλου στο {applicationTitle}",
   "notifications.test.message": "Δοκιμή, δοκιμή, 1, 2, 3. Μας ακούτε καθαρά;",
-  "notifications.test.subject": "Δοκιμαστική ειδοποίηση"
+  "notifications.test.subject": "Δοκιμαστική ειδοποίηση",
+  "notifications.agents.webpush.actionFailedBody": "{title} — ανοίξτε το {applicationTitle} για να δοκιμάσετε ξανά.",
+  "notifications.agents.webpush.approve": "Έγκριση",
+  "notifications.agents.webpush.approveFailed": "Η έγκριση απέτυχε",
+  "notifications.agents.webpush.decline": "Απόρριψη",
+  "notifications.agents.webpush.declineFailed": "Η απόρριψη απέτυχε"
 }

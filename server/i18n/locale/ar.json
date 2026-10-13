@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "عرض المشكلة في {applicationTitle}",
   "notifications.common.viewMedia": "عرض الوسائط في {applicationTitle}",
   "notifications.test.message": "تجربة، تجربة، 1، 2، 3. هل تصلكم الرسالة بوضوح؟",
-  "notifications.test.subject": "إشعار تجريبي"
+  "notifications.test.subject": "إشعار تجريبي",
+  "notifications.agents.webpush.actionFailedBody": "{title} — افتح {applicationTitle} للمحاولة مرة أخرى.",
+  "notifications.agents.webpush.approve": "موافقة",
+  "notifications.agents.webpush.approveFailed": "تعذّرت الموافقة",
+  "notifications.agents.webpush.decline": "رفض",
+  "notifications.agents.webpush.declineFailed": "تعذّر الرفض"
 }

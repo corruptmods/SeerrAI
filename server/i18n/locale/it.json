@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Visualizza la segnalazione in {applicationTitle}",
   "notifications.common.viewMedia": "Visualizza il media in {applicationTitle}",
   "notifications.test.message": "Prova, prova, 1, 2, 3. Ci sentite bene?",
-  "notifications.test.subject": "Notifica di prova"
+  "notifications.test.subject": "Notifica di prova",
+  "notifications.agents.webpush.actionFailedBody": "{title} — apri {applicationTitle} per riprovare.",
+  "notifications.agents.webpush.approve": "Approva",
+  "notifications.agents.webpush.approveFailed": "Impossibile approvare",
+  "notifications.agents.webpush.decline": "Rifiuta",
+  "notifications.agents.webpush.declineFailed": "Impossibile rifiutare"
 }

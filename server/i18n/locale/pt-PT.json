@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Ver Problema no {applicationTitle}",
   "notifications.common.viewMedia": "Ver Título no {applicationTitle}",
   "notifications.test.message": "Teste, teste, 1, 2, 3. Estão a receber bem?",
-  "notifications.test.subject": "Notificação de Teste"
+  "notifications.test.subject": "Notificação de Teste",
+  "notifications.agents.webpush.actionFailedBody": "{title} — abra o {applicationTitle} para tentar novamente.",
+  "notifications.agents.webpush.approve": "Aprovar",
+  "notifications.agents.webpush.approveFailed": "Não foi possível aprovar",
+  "notifications.agents.webpush.decline": "Recusar",
+  "notifications.agents.webpush.declineFailed": "Não foi possível recusar"
 }

@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Zobraziť problém v {applicationTitle}",
   "notifications.common.viewMedia": "Zobraziť titul v {applicationTitle}",
   "notifications.test.message": "Skúška, skúška, 1, 2, 3. Počujete nás dobre?",
-  "notifications.test.subject": "Testovacie upozornenie"
+  "notifications.test.subject": "Testovacie upozornenie",
+  "notifications.agents.webpush.actionFailedBody": "{title} — ak to chcete skúsiť znova, otvorte {applicationTitle}.",
+  "notifications.agents.webpush.approve": "Schváliť",
+  "notifications.agents.webpush.approveFailed": "Nepodarilo sa schváliť",
+  "notifications.agents.webpush.decline": "Zamietnuť",
+  "notifications.agents.webpush.declineFailed": "Nepodarilo sa zamietnuť"
 }

@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "צפה במקרה ב-{applicationTitle}",
   "notifications.common.viewMedia": "צפה במדיה ב-{applicationTitle}",
   "notifications.test.message": "בדיקה, בדיקה, 1, 2, 3. שומעים אותנו טוב?",
-  "notifications.test.subject": "התראת בדיקה"
+  "notifications.test.subject": "התראת בדיקה",
+  "notifications.agents.webpush.actionFailedBody": "{title} — פתח את {applicationTitle} כדי לנסות שוב.",
+  "notifications.agents.webpush.approve": "אשר",
+  "notifications.agents.webpush.approveFailed": "לא ניתן היה לאשר",
+  "notifications.agents.webpush.decline": "דחה",
+  "notifications.agents.webpush.declineFailed": "לא ניתן היה לדחות"
 }

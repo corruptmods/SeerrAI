@@ -59,5 +59,10 @@
   "notifications.agents.webpush.downloadedTitleTv": "Сериалът е изтеглен",
   "notifications.agents.webpush.failedBody": "{title} не можа да бъде изтеглен.",
   "notifications.agents.webpush.failedTitleMovie": "Неуспешна заявка за филм",
-  "notifications.agents.webpush.failedTitleTv": "Неуспешна заявка за сериал"
+  "notifications.agents.webpush.failedTitleTv": "Неуспешна заявка за сериал",
+  "notifications.agents.webpush.actionFailedBody": "{title} — отворете {applicationTitle}, за да опитате отново.",
+  "notifications.agents.webpush.approve": "Одобри",
+  "notifications.agents.webpush.approveFailed": "Неуспешно одобрение",
+  "notifications.agents.webpush.decline": "Отхвърли",
+  "notifications.agents.webpush.declineFailed": "Неуспешно отхвърляне"
 }

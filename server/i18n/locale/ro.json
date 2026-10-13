@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Vedeți problema în {applicationTitle}",
   "notifications.common.viewMedia": "Vedeți titlul în {applicationTitle}",
   "notifications.test.message": "Probă, probă, 1, 2, 3. Se aude bine?",
-  "notifications.test.subject": "Notificare de test"
+  "notifications.test.subject": "Notificare de test",
+  "notifications.agents.webpush.actionFailedBody": "{title} — deschideți {applicationTitle} pentru a încerca din nou.",
+  "notifications.agents.webpush.approve": "Aprobă",
+  "notifications.agents.webpush.approveFailed": "Nu s-a putut aproba",
+  "notifications.agents.webpush.decline": "Respinge",
+  "notifications.agents.webpush.declineFailed": "Nu s-a putut respinge"
 }

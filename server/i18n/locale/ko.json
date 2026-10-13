@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "{applicationTitle}에서 이슈 보기",
   "notifications.common.viewMedia": "{applicationTitle}에서 미디어 보기",
   "notifications.test.message": "마이크 테스트, 하나, 둘, 셋. 잘 들리나요?",
-  "notifications.test.subject": "테스트 알림"
+  "notifications.test.subject": "테스트 알림",
+  "notifications.agents.webpush.actionFailedBody": "{title} — 다시 시도하려면 {applicationTitle}을(를) 여세요.",
+  "notifications.agents.webpush.approve": "승인",
+  "notifications.agents.webpush.approveFailed": "승인할 수 없었음",
+  "notifications.agents.webpush.decline": "거절",
+  "notifications.agents.webpush.declineFailed": "거절할 수 없었음"
 }

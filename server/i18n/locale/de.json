@@ -59,5 +59,10 @@
   "notifications.agents.webpush.downloadedTitleTv": "Serie heruntergeladen",
   "notifications.agents.webpush.failedBody": "{title} konnte nicht heruntergeladen werden.",
   "notifications.agents.webpush.failedTitleMovie": "Filmanfrage fehlgeschlagen",
-  "notifications.agents.webpush.failedTitleTv": "Serienanfrage fehlgeschlagen"
+  "notifications.agents.webpush.failedTitleTv": "Serienanfrage fehlgeschlagen",
+  "notifications.agents.webpush.actionFailedBody": "{title} — öffne {applicationTitle}, um es erneut zu versuchen.",
+  "notifications.agents.webpush.approve": "Genehmigen",
+  "notifications.agents.webpush.approveFailed": "Genehmigen fehlgeschlagen",
+  "notifications.agents.webpush.decline": "Ablehnen",
+  "notifications.agents.webpush.declineFailed": "Ablehnen fehlgeschlagen"
 }

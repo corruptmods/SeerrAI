@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Näytä ongelma sovelluksessa {applicationTitle}",
   "notifications.common.viewMedia": "Näytä media sovelluksessa {applicationTitle}",
   "notifications.test.message": "Testi, testi, 1, 2, 3. Kuuluuko selvästi?",
-  "notifications.test.subject": "Testi-ilmoitus"
+  "notifications.test.subject": "Testi-ilmoitus",
+  "notifications.agents.webpush.actionFailedBody": "{title} — avaa {applicationTitle} yrittääksesi uudelleen.",
+  "notifications.agents.webpush.approve": "Hyväksy",
+  "notifications.agents.webpush.approveFailed": "Hyväksyminen epäonnistui",
+  "notifications.agents.webpush.decline": "Hylkää",
+  "notifications.agents.webpush.declineFailed": "Hylkääminen epäonnistui"
 }

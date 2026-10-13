@@ -59,5 +59,10 @@
   "notifications.agents.webpush.downloadedTitleTv": "Dizi İndirildi",
   "notifications.agents.webpush.failedBody": "{title} indirilemedi.",
   "notifications.agents.webpush.failedTitleMovie": "Film Talebi Başarısız",
-  "notifications.agents.webpush.failedTitleTv": "Dizi Talebi Başarısız"
+  "notifications.agents.webpush.failedTitleTv": "Dizi Talebi Başarısız",
+  "notifications.agents.webpush.actionFailedBody": "{title} — tekrar denemek için {applicationTitle} uygulamasını açın.",
+  "notifications.agents.webpush.approve": "Onayla",
+  "notifications.agents.webpush.approveFailed": "Onaylanamadı",
+  "notifications.agents.webpush.decline": "Reddet",
+  "notifications.agents.webpush.declineFailed": "Reddedilemedi"
 }

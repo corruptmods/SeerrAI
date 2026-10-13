@@ -59,5 +59,10 @@
   "notifications.agents.webpush.downloadedTitleTv": "Сериал загружен",
   "notifications.agents.webpush.failedBody": "Не удалось загрузить {title}.",
   "notifications.agents.webpush.failedTitleMovie": "Запрос фильма не выполнен",
-  "notifications.agents.webpush.failedTitleTv": "Запрос сериала не выполнен"
+  "notifications.agents.webpush.failedTitleTv": "Запрос сериала не выполнен",
+  "notifications.agents.webpush.actionFailedBody": "{title} — откройте {applicationTitle}, чтобы попробовать ещё раз.",
+  "notifications.agents.webpush.approve": "Одобрить",
+  "notifications.agents.webpush.approveFailed": "Не удалось одобрить",
+  "notifications.agents.webpush.decline": "Отклонить",
+  "notifications.agents.webpush.declineFailed": "Не удалось отклонить"
 }

@@ -59,5 +59,10 @@
   "notifications.agents.webpush.downloadedTitleTv": "Seriál stažen",
   "notifications.agents.webpush.failedBody": "{title} se nepodařilo stáhnout.",
   "notifications.agents.webpush.failedTitleMovie": "Žádost o film selhala",
-  "notifications.agents.webpush.failedTitleTv": "Žádost o seriál selhala"
+  "notifications.agents.webpush.failedTitleTv": "Žádost o seriál selhala",
+  "notifications.agents.webpush.actionFailedBody": "{title} — otevřete {applicationTitle} a zkuste to znovu.",
+  "notifications.agents.webpush.approve": "Schválit",
+  "notifications.agents.webpush.approveFailed": "Schválení se nezdařilo",
+  "notifications.agents.webpush.decline": "Zamítnout",
+  "notifications.agents.webpush.declineFailed": "Zamítnutí se nezdařilo"
 }

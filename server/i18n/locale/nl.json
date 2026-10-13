@@ -59,5 +59,10 @@
   "notifications.agents.webpush.downloadedTitleTv": "Serie gedownload",
   "notifications.agents.webpush.failedBody": "{title} kon niet worden gedownload.",
   "notifications.agents.webpush.failedTitleMovie": "Filmaanvraag mislukt",
-  "notifications.agents.webpush.failedTitleTv": "Serie-aanvraag mislukt"
+  "notifications.agents.webpush.failedTitleTv": "Serie-aanvraag mislukt",
+  "notifications.agents.webpush.actionFailedBody": "{title} — open {applicationTitle} om het opnieuw te proberen.",
+  "notifications.agents.webpush.approve": "Goedkeuren",
+  "notifications.agents.webpush.approveFailed": "Kon niet goedkeuren",
+  "notifications.agents.webpush.decline": "Afwijzen",
+  "notifications.agents.webpush.declineFailed": "Kon niet afwijzen"
 }

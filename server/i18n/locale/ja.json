@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "{applicationTitle} でチケットを表示",
   "notifications.common.viewMedia": "{applicationTitle} でメディアを表示",
   "notifications.test.message": "テスト、テスト、1、2、3。ちゃんと届いていますか？",
-  "notifications.test.subject": "テスト通知"
+  "notifications.test.subject": "テスト通知",
+  "notifications.agents.webpush.actionFailedBody": "{title} — {applicationTitle} を開いて、もう一度お試しください。",
+  "notifications.agents.webpush.approve": "承認",
+  "notifications.agents.webpush.approveFailed": "承認できませんでした",
+  "notifications.agents.webpush.decline": "却下",
+  "notifications.agents.webpush.declineFailed": "却下できませんでした"
 }

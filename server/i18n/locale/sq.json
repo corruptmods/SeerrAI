@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Shiko problemin në {applicationTitle}",
   "notifications.common.viewMedia": "Shiko median në {applicationTitle}",
   "notifications.test.message": "Provë, provë, 1, 2, 3. A na dëgjoni qartë?",
-  "notifications.test.subject": "Njoftim prove"
+  "notifications.test.subject": "Njoftim prove",
+  "notifications.agents.webpush.actionFailedBody": "{title} — hapni {applicationTitle} për të provuar sërish.",
+  "notifications.agents.webpush.approve": "Mirato",
+  "notifications.agents.webpush.approveFailed": "Nuk mund të miratohej",
+  "notifications.agents.webpush.decline": "Refuzo",
+  "notifications.agents.webpush.declineFailed": "Nuk mund të refuzohej"
 }

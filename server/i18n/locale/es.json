@@ -59,5 +59,10 @@
   "notifications.agents.webpush.downloadedTitleTv": "Serie descargada",
   "notifications.agents.webpush.failedBody": "No se ha podido descargar {title}.",
   "notifications.agents.webpush.failedTitleMovie": "Ha fallado la petición de la película",
-  "notifications.agents.webpush.failedTitleTv": "Ha fallado la petición de la serie"
+  "notifications.agents.webpush.failedTitleTv": "Ha fallado la petición de la serie",
+  "notifications.agents.webpush.actionFailedBody": "{title} — abre {applicationTitle} para volver a intentarlo.",
+  "notifications.agents.webpush.approve": "Aprobar",
+  "notifications.agents.webpush.approveFailed": "No se ha podido aprobar",
+  "notifications.agents.webpush.decline": "Rechazar",
+  "notifications.agents.webpush.declineFailed": "No se ha podido rechazar"
 }

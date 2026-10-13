@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "在 {applicationTitle} 中查看问题",
   "notifications.common.viewMedia": "在 {applicationTitle} 中查看媒体",
   "notifications.test.message": "测试，测试，1、2、3。收到了吗？",
-  "notifications.test.subject": "测试通知"
+  "notifications.test.subject": "测试通知",
+  "notifications.agents.webpush.actionFailedBody": "{title} — 打开 {applicationTitle} 重试。",
+  "notifications.agents.webpush.approve": "批准",
+  "notifications.agents.webpush.approveFailed": "无法批准",
+  "notifications.agents.webpush.decline": "拒绝",
+  "notifications.agents.webpush.declineFailed": "无法拒绝"
 }

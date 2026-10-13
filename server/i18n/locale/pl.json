@@ -59,5 +59,10 @@
   "notifications.agents.webpush.downloadedTitleTv": "Pobrano serial",
   "notifications.agents.webpush.failedBody": "Nie udało się pobrać: {title}.",
   "notifications.agents.webpush.failedTitleMovie": "Prośba o film nie powiodła się",
-  "notifications.agents.webpush.failedTitleTv": "Prośba o serial nie powiodła się"
+  "notifications.agents.webpush.failedTitleTv": "Prośba o serial nie powiodła się",
+  "notifications.agents.webpush.actionFailedBody": "{title} — otwórz {applicationTitle}, aby spróbować ponownie.",
+  "notifications.agents.webpush.approve": "Zatwierdź",
+  "notifications.agents.webpush.approveFailed": "Nie udało się zatwierdzić",
+  "notifications.agents.webpush.decline": "Odrzuć",
+  "notifications.agents.webpush.declineFailed": "Nie udało się odrzucić"
 }

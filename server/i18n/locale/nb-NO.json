@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Se avvik i {applicationTitle}",
   "notifications.common.viewMedia": "Se medie i {applicationTitle}",
   "notifications.test.message": "Test, test, 1, 2, 3. Hører dere oss tydelig?",
-  "notifications.test.subject": "Testvarsel"
+  "notifications.test.subject": "Testvarsel",
+  "notifications.agents.webpush.actionFailedBody": "{title} — åpne {applicationTitle} for å prøve igjen.",
+  "notifications.agents.webpush.approve": "Godkjenn",
+  "notifications.agents.webpush.approveFailed": "Kunne ikke godkjenne",
+  "notifications.agents.webpush.decline": "Avslå",
+  "notifications.agents.webpush.declineFailed": "Kunne ikke avslå"
 }

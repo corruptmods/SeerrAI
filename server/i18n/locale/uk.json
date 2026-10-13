@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "Переглянути проблему в {applicationTitle}",
   "notifications.common.viewMedia": "Переглянути медіа в {applicationTitle}",
   "notifications.test.message": "Перевірка зв’язку: раз, два, три. Як чути?",
-  "notifications.test.subject": "Тестове сповіщення"
+  "notifications.test.subject": "Тестове сповіщення",
+  "notifications.agents.webpush.actionFailedBody": "{title} — відкрийте {applicationTitle}, щоб спробувати ще раз.",
+  "notifications.agents.webpush.approve": "Схвалити",
+  "notifications.agents.webpush.approveFailed": "Не вдалося схвалити",
+  "notifications.agents.webpush.decline": "Відхилити",
+  "notifications.agents.webpush.declineFailed": "Не вдалося відхилити"
 }

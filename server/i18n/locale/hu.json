@@ -59,5 +59,10 @@
   "notifications.agents.webpush.downloadedTitleTv": "Sorozat letöltve",
   "notifications.agents.webpush.failedBody": "A(z) {title} nem tölthető le.",
   "notifications.agents.webpush.failedTitleMovie": "Sikertelen filmkérés",
-  "notifications.agents.webpush.failedTitleTv": "Sikertelen sorozatkérés"
+  "notifications.agents.webpush.failedTitleTv": "Sikertelen sorozatkérés",
+  "notifications.agents.webpush.actionFailedBody": "{title} — nyissa meg ezt: {applicationTitle}, és próbálja újra.",
+  "notifications.agents.webpush.approve": "Jóváhagyás",
+  "notifications.agents.webpush.approveFailed": "Nem sikerült jóváhagyni",
+  "notifications.agents.webpush.decline": "Elutasítás",
+  "notifications.agents.webpush.declineFailed": "Nem sikerült elutasítani"
 }

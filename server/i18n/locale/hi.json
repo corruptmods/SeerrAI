@@ -59,5 +59,10 @@
   "notifications.common.viewIssue": "{applicationTitle} में समस्या देखें",
   "notifications.common.viewMedia": "{applicationTitle} में मीडिया देखें",
   "notifications.test.message": "हैलो, हैलो, 1, 2, 3। क्या आवाज़ साफ़ आ रही है?",
-  "notifications.test.subject": "टेस्ट सूचना"
+  "notifications.test.subject": "टेस्ट सूचना",
+  "notifications.agents.webpush.actionFailedBody": "{title} — फिर से कोशिश करने के लिए {applicationTitle} खोलें।",
+  "notifications.agents.webpush.approve": "मंज़ूर करें",
+  "notifications.agents.webpush.approveFailed": "मंज़ूर नहीं हो सका",
+  "notifications.agents.webpush.decline": "अस्वीकार करें",
+  "notifications.agents.webpush.declineFailed": "अस्वीकार नहीं हो सका"
 }

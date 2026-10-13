@@ -4,6 +4,12 @@ The newest changes are at the top. **Coming next** is what's on the `dev` branch
 
 ## Coming next
 
+Nothing new since 1.1.0 yet.
+
+## 1.1.0 (13 October 2026)
+
+Seerr AI on a Jellyfin or Emby server now does everything it does on Plex, it speaks 40 languages, Trakt lists and watchlists come in, Sonarr v5 is supported, and a long list of fixes makes everything safer and steadier.
+
 ### Search finds collections, and sign-in takes you back
 
 - **Collections in search.** Searching for a franchise, like "Star Wars", now shows its collection alongside the films and series, and the card opens the collection page.

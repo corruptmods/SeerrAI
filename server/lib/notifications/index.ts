@@ -207,9 +207,27 @@ class NotificationManager {
   }
 
   private deliver(type: Notification, payload: NotificationPayload): void {
+    // Each agent's failure is caught and logged here. Nothing waits for a
+    // send, so one that failed (a service down, a database read) would
+    // otherwise be an unhandled rejection, which stops the whole server.
+    const failed = (agent: NotificationAgent, e: unknown) =>
+      logger.error('A notification agent failed to send', {
+        label: 'Notifications',
+        agent: agent.constructor?.name,
+        type: Notification[type],
+        subject: payload.subject,
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+
     this.activeAgents.forEach((agent) => {
-      if (agent.shouldSend()) {
-        agent.send(type, payload);
+      try {
+        if (agent.shouldSend()) {
+          Promise.resolve(agent.send(type, payload)).catch((e) =>
+            failed(agent, e)
+          );
+        }
+      } catch (e) {
+        failed(agent, e);
       }
     });
   }
@@ -244,15 +262,15 @@ class NotificationManager {
       return;
     }
     const { type } = gathering;
-    // The same title twice in one burst (it can be told about twice as a
-    // request completes) is told once.
+    // The same request twice in one burst (it can be told about twice as it
+    // completes) is told once. Two requests for one series, its first and
+    // second seasons say, are two things to tell.
+    const sameThing = (p: NotificationPayload) =>
+      p.request?.id != null
+        ? `request:${p.request.id}`
+        : `${p.media?.id ?? p.subject}:${p.request?.is4k}`;
     const payloads = gathering.payloads.filter(
-      (p, i, all) =>
-        all.findIndex(
-          (q) =>
-            (q.media?.id ?? q.subject) === (p.media?.id ?? p.subject) &&
-            q.request?.is4k === p.request?.is4k
-        ) === i
+      (p, i, all) => all.findIndex((q) => sameThing(q) === sameThing(p)) === i
     );
     if (payloads.length === 1) {
       this.deliver(type, payloads[0]);

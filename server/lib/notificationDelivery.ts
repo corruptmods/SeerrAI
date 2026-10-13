@@ -1,6 +1,8 @@
 import { getRepository } from '@server/datasource';
+import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
 import { NotificationDelivery } from '@server/entity/NotificationDelivery';
-import type { Notification } from '@server/lib/notifications';
+import type { User } from '@server/entity/User';
+import { Notification } from '@server/lib/notifications';
 import logger from '@server/logger';
 import { isUniqueViolation } from '@server/utils/isUniqueViolation';
 
@@ -92,5 +94,61 @@ export const releaseDelivery = async (
       type,
       errorMessage: e instanceof Error ? e.message : String(e),
     });
+  }
+};
+
+/**
+ * Tells each person watching a request that it is ready to watch. The
+ * requester, the channels and admins are told separately by the caller; this
+ * is only the watchers' own copies. Each watcher has a claim of their own, so
+ * one failed send cannot stop the others, and a failed one is released to be
+ * tried again later.
+ *
+ * `send` sends one watcher's copy and says whether it went out.
+ */
+export const notifyRequestWatchers = async (
+  requestId: number,
+  send: (watcher: User) => Promise<boolean> | boolean,
+  episodeKey = ''
+): Promise<void> => {
+  const watchers = await getRepository(MediaRequestWatcher).find({
+    where: { requestId },
+    relations: { user: true },
+  });
+
+  for (const watcher of watchers) {
+    if (
+      !watcher.user ||
+      !(await claimDelivery(
+        requestId,
+        Notification.MEDIA_AVAILABLE,
+        watcher.userId,
+        episodeKey
+      ))
+    ) {
+      continue;
+    }
+
+    let sent = false;
+
+    try {
+      sent = await send(watcher.user);
+    } catch (e) {
+      logger.error('Failed to notify request watcher', {
+        label: 'Notifications',
+        requestId,
+        userId: watcher.userId,
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+    }
+
+    if (!sent) {
+      await releaseDelivery(
+        requestId,
+        Notification.MEDIA_AVAILABLE,
+        watcher.userId,
+        episodeKey
+      );
+    }
   }
 };

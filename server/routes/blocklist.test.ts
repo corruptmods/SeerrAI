@@ -25,6 +25,8 @@ import type { Server } from 'node:http';
 import http from 'node:http';
 import path from 'node:path';
 import { after, beforeEach, describe, it } from 'node:test';
+import type { ObjectLiteral } from 'typeorm';
+import { Repository } from 'typeorm';
 
 /*
  * The real OpenAPI validator sits in front of the routers here, as it does in
@@ -506,6 +508,100 @@ describe('a reason for blocklisting', () => {
     });
     assert.equal(entries.length, 2);
     assert.ok(entries.every((entry) => entry.reason === 'Not for this house'));
+  });
+});
+
+describe('requests for a title being blocklisted', () => {
+  it('are declined without telling anyone, when files are not removed', async (t) => {
+    const notify = t.mock.method(
+      MediaRequest,
+      'sendNotification',
+      async () => true
+    );
+    const media = await seedHeldMovie(720, moderator);
+    // An approved one too, approved without the save hooks so nothing is
+    // sent to Radarr here.
+    const approved = await getRepository(MediaRequest).save(
+      new MediaRequest({
+        media,
+        requestedBy: admin,
+        type: MediaType.MOVIE,
+        status: MediaRequestStatus.PENDING,
+        is4k: true,
+      })
+    );
+    await getRepository(MediaRequest).update(approved.id, {
+      status: MediaRequestStatus.APPROVED,
+    });
+    notify.mock.resetCalls();
+
+    const { status } = await call('POST', '/api/v1/blocklist', {
+      tmdbId: 720,
+      mediaType: 'movie',
+      title: 'Held film',
+      user: admin.id,
+    });
+
+    assert.equal(status, 201);
+    const requests = await getRepository(MediaRequest).find({
+      where: { media: { id: media.id } },
+    });
+    assert.deepEqual(
+      requests.map((r) => r.status),
+      [MediaRequestStatus.DECLINED, MediaRequestStatus.DECLINED]
+    );
+    assert.equal(notify.mock.callCount(), 0);
+    const after = await getRepository(Media).findOneOrFail({
+      where: { id: media.id },
+    });
+    assert.equal(after.status, MediaStatus.BLOCKLISTED);
+  });
+
+  it('are declined when their film is blocklisted with its collection', async () => {
+    const media = await seedHeldMovie(801, moderator);
+
+    const { status } = await call('POST', '/api/v1/blocklist/collection/5');
+
+    assert.equal(status, 201);
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { media: { id: media.id } },
+    });
+    assert.equal(request.status, MediaRequestStatus.DECLINED);
+  });
+
+  it('copes with a film blocklisted meanwhile, on either engine', async (t) => {
+    // Blocklisted by someone else between the collection being read and its
+    // films being written: the lookup misses it, the insert collides.
+    await getRepository(Blocklist).save(
+      new Blocklist({
+        tmdbId: 802,
+        mediaType: MediaType.MOVIE,
+        title: 'Part Two',
+      })
+    );
+    const find = Repository.prototype.find;
+    t.mock.method(
+      Repository.prototype,
+      'find',
+      function (this: Repository<ObjectLiteral>, ...args: unknown[]) {
+        if (this.metadata.target === Blocklist) {
+          return Promise.resolve([]);
+        }
+        return find.apply(this, args as never);
+      }
+    );
+
+    const { status } = await call('POST', '/api/v1/blocklist/collection/5');
+
+    assert.equal(status, 201);
+    const media = await getRepository(Media).find({
+      where: [{ tmdbId: 801 }, { tmdbId: 802 }],
+      order: { tmdbId: 'ASC' },
+    });
+    assert.deepEqual(
+      media.map((m) => m.status),
+      [MediaStatus.BLOCKLISTED, MediaStatus.BLOCKLISTED]
+    );
   });
 });
 

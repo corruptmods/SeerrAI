@@ -1,15 +1,10 @@
-import {
-  MediaRequestStatus,
-  MediaStatus,
-  MediaType,
-} from '@server/constants/media';
+import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import { Blocklist } from '@server/entity/Blocklist';
 import Media from '@server/entity/Media';
-import { MediaRequest } from '@server/entity/MediaRequest';
 import { removeFromArr } from '@server/lib/arrRemoval';
 import { recordMediaDeletion } from '@server/lib/mediaDeletions';
 import logger from '@server/logger';
-import { In } from 'typeorm';
 
 export interface BlocklistRemovalResult {
   /** The servers it was removed from, e.g. "Radarr" or "4K Sonarr". */
@@ -94,19 +89,9 @@ export const removeBlocklistedFromLibrary = async (
     await recordMediaDeletion(tmdbId, mediaType);
   }
 
-  // A plain update, so declining here does not send each requester a
-  // "declined" notification for what was an admin clean-up.
-  const declined = await getRepository(MediaRequest)
-    .createQueryBuilder()
-    .update(MediaRequest)
-    .set({ status: MediaRequestStatus.DECLINED })
-    .where({
-      media: { id: media.id },
-      status: In([MediaRequestStatus.PENDING, MediaRequestStatus.APPROVED]),
-    })
-    .execute();
-
-  result.declinedRequests = declined.affected ?? 0;
+  // Blocklisting the title has declined these already; this is in case one
+  // was approved again in between.
+  result.declinedRequests = await Blocklist.declineOpenRequests(media.id);
 
   return result;
 };

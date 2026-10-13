@@ -18,6 +18,7 @@ import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
 import { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
+import { MediaRequestSubscriber } from '@server/subscriber/MediaRequestSubscriber';
 import { setupTestDb } from '@server/test/db';
 
 // get is a prototype method unlike getMovie, and replaces the cache lookup too
@@ -190,6 +191,45 @@ describe('MediaRequest.request', () => {
     assert.strictEqual(await requestRepository.count(), 1);
   });
 
+  it('rejects a duplicate while any earlier request is still open', async () => {
+    const requestRepository = getRepository(MediaRequest);
+    const requester = await seedRequester(5);
+    const other = await createRequester('second@seerr.dev');
+    const media = await getRepository(Media).save(
+      new Media({
+        tmdbId: 99001,
+        mediaType: MediaType.MOVIE,
+        status: MediaStatus.PENDING,
+        status4k: MediaStatus.UNKNOWN,
+      })
+    );
+    // An old declined request, then one still waiting for approval.
+    for (const status of [
+      MediaRequestStatus.DECLINED,
+      MediaRequestStatus.PENDING,
+    ]) {
+      await requestRepository.save(
+        new MediaRequest({
+          type: MediaType.MOVIE,
+          status,
+          media,
+          requestedBy: other,
+          is4k: false,
+        })
+      );
+    }
+
+    await assert.rejects(
+      () =>
+        MediaRequest.request(
+          { mediaId: 99001, mediaType: MediaType.MOVIE, is4k: false },
+          requester
+        ),
+      DuplicateMediaRequestError
+    );
+    assert.strictEqual(await requestRepository.count(), 2);
+  });
+
   it('rejects a concurrent duplicate request from a different user', async () => {
     const requestRepository = getRepository(MediaRequest);
     const requester = await seedRequester(5);
@@ -269,5 +309,89 @@ describe('MediaRequest.request', () => {
       }),
       1
     );
+  });
+});
+
+describe('saving a request', () => {
+  it('neither announces it again nor sends it on when its status is unchanged', async (t) => {
+    const requestRepository = getRepository(MediaRequest);
+    const requester = await seedRequester(5);
+    const media = await getRepository(Media).save(
+      new Media({
+        tmdbId: 99101,
+        mediaType: MediaType.MOVIE,
+        status: MediaStatus.PROCESSING,
+        status4k: MediaStatus.UNKNOWN,
+      })
+    );
+    const { id } = await requestRepository.save(
+      new MediaRequest({
+        type: MediaType.MOVIE,
+        status: MediaRequestStatus.PENDING,
+        media,
+        requestedBy: requester,
+        is4k: false,
+      })
+    );
+    // Approved long ago, without the save hooks.
+    await requestRepository.update(id, {
+      status: MediaRequestStatus.APPROVED,
+    });
+
+    const notify = t.mock.method(
+      MediaRequest,
+      'sendNotification',
+      async () => true
+    );
+    const sendToRadarr = t.mock.method(
+      MediaRequestSubscriber.prototype,
+      'sendToRadarr',
+      async () => undefined
+    );
+
+    const request = await requestRepository.findOneOrFail({ where: { id } });
+    request.requesterMuted = true;
+    await requestRepository.save(request);
+
+    assert.strictEqual(notify.mock.callCount(), 0, 'nobody told again');
+    assert.strictEqual(sendToRadarr.mock.callCount(), 0, 'not sent again');
+    assert.strictEqual(
+      (await getRepository(Media).findOneOrFail({ where: { id: media.id } }))
+        .status,
+      MediaStatus.PROCESSING
+    );
+
+    // A real change of status still is announced.
+    request.status = MediaRequestStatus.DECLINED;
+    await requestRepository.save(request);
+
+    assert.deepStrictEqual(
+      notify.mock.calls.map((call) => call.arguments[2]),
+      [Notification.MEDIA_DECLINED]
+    );
+  });
+
+  it('logs a failed automatic approval notice rather than leaving it unhandled', async (t) => {
+    t.mock.method(
+      MediaRequest.prototype,
+      'notifyApprovedOrDeclined',
+      async () => {
+        throw new Error('The database went away');
+      }
+    );
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+
+    try {
+      await new MediaRequest({
+        status: MediaRequestStatus.APPROVED,
+      }).autoapprovalNotification();
+      await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+
+    assert.deepStrictEqual(unhandled, []);
   });
 });

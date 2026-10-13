@@ -11,13 +11,13 @@ import {
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
-import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import type { User } from '@server/entity/User';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
 import {
   claimDelivery,
+  notifyRequestWatchers,
   releaseDelivery,
 } from '@server/lib/notificationDelivery';
 import notificationManager, { Notification } from '@server/lib/notifications';
@@ -50,57 +50,19 @@ const sanitizeDisplayName = (displayName: string): string => {
 };
 
 /**
- * Sends an availability notification to every user watching this request.
- * The original requester is notified separately. Each recipient gets their own
- * delivery claim so one failure cannot suppress the others.
+ * A watcher's copy of an availability notification: for them alone, about
+ * the request as it is. The channels and admins hear once, from the
+ * requester's copy, not once more for every watcher.
  */
-const notifyWatchers = async (
-  requestId: number,
-  buildPayload: (user: User) => NotificationPayload
-): Promise<void> => {
-  const watchers: MediaRequestWatcher[] = await getRepository(
-    MediaRequestWatcher
-  ).find({
-    where: { requestId },
-    relations: { user: true },
-  });
-
-  for (const watcher of watchers) {
-    if (!watcher.user) {
-      continue;
-    }
-
-    if (
-      !(await claimDelivery(
-        requestId,
-        Notification.MEDIA_AVAILABLE,
-        watcher.userId
-      ))
-    ) {
-      continue;
-    }
-
-    try {
-      notificationManager.sendNotification(
-        Notification.MEDIA_AVAILABLE,
-        buildPayload(watcher.user)
-      );
-    } catch (e) {
-      await releaseDelivery(
-        requestId,
-        Notification.MEDIA_AVAILABLE,
-        watcher.userId
-      );
-
-      logger.error('Failed to notify request watcher', {
-        label: 'Notifications',
-        requestId,
-        userId: watcher.userId,
-        errorMessage: e instanceof Error ? e.message : String(e),
-      });
-    }
-  }
-};
+const forWatcher = (
+  payload: NotificationPayload,
+  watcher: User
+): NotificationPayload => ({
+  ...payload,
+  notifyUser: watcher,
+  notifySystem: false,
+  notifyAdmin: false,
+});
 
 /**
  * Reconciles Sonarr's episode monitoring for every season this request
@@ -311,6 +273,35 @@ const reconcileMonitoringAfterRemoval = async (
 
 @EventSubscriber()
 export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRequest> {
+  /**
+   * A blocklisted title is never sent to Radarr or Sonarr, whatever state a
+   * request for it is in: one approved from before the blocklist would
+   * otherwise bring it straight back.
+   */
+  private async titleBlocklisted(
+    entity: MediaRequest,
+    manager: EntityManager
+  ): Promise<boolean> {
+    const media = await manager.getRepository(Media).findOne({
+      where: { id: entity.media.id },
+    });
+
+    if (
+      media?.status !== MediaStatus.BLOCKLISTED &&
+      media?.status4k !== MediaStatus.BLOCKLISTED
+    ) {
+      return false;
+    }
+
+    logger.info('Not sending a request for a blocklisted title', {
+      label: 'Media Request',
+      requestId: entity.id,
+      mediaId: entity.media.id,
+    });
+
+    return true;
+  }
+
   private async notifyAvailableMovie(
     entity: MediaRequest,
     event?: UpdateEvent<MediaRequest>
@@ -373,10 +364,13 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         moviePayload
       );
 
-      await notifyWatchers(entity.id, (watcher) => ({
-        ...moviePayload,
-        notifyUser: watcher,
-      }));
+      await notifyRequestWatchers(entity.id, (watcher) => {
+        notificationManager.sendNotification(
+          Notification.MEDIA_AVAILABLE,
+          forWatcher(moviePayload, watcher)
+        );
+        return true;
+      });
     } catch (e) {
       await releaseDelivery(entity.id, Notification.MEDIA_AVAILABLE);
 
@@ -470,10 +464,13 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         seriesPayload
       );
 
-      await notifyWatchers(entity.id, (watcher) => ({
-        ...seriesPayload,
-        notifyUser: watcher,
-      }));
+      await notifyRequestWatchers(entity.id, (watcher) => {
+        notificationManager.sendNotification(
+          Notification.MEDIA_AVAILABLE,
+          forWatcher(seriesPayload, watcher)
+        );
+        return true;
+      });
     } catch (e) {
       await releaseDelivery(entity.id, Notification.MEDIA_AVAILABLE);
 
@@ -493,6 +490,10 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       entity.status === MediaRequestStatus.APPROVED &&
       entity.type === MediaType.MOVIE
     ) {
+      if (await this.titleBlocklisted(entity, manager)) {
+        return;
+      }
+
       try {
         const mediaRepository = manager.getRepository(Media);
         const settings = getSettings();
@@ -808,6 +809,10 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       entity.status === MediaRequestStatus.APPROVED &&
       entity.type === MediaType.TV
     ) {
+      if (await this.titleBlocklisted(entity, manager)) {
+        return;
+      }
+
       try {
         const mediaRepository = manager.getRepository(Media);
         const settings = getSettings();
@@ -1181,9 +1186,13 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     const statusKey = entity.is4k ? 'status4k' : 'status';
     const seasonRequestRepository = manager.getRepository(SeasonRequest);
     const requestRepository = manager.getRepository(MediaRequest);
+    // Only taking it off the blocklist changes a blocklisted title's status:
+    // approving, declining or deleting a request for it leaves it there.
+    const blocklisted = media[statusKey] === MediaStatus.BLOCKLISTED;
 
     if (
       entity.status === MediaRequestStatus.APPROVED &&
+      !blocklisted &&
       // Do not update the status if the item is already partially available or available
       media[statusKey] !== MediaStatus.AVAILABLE &&
       media[statusKey] !== MediaStatus.PARTIALLY_AVAILABLE &&
@@ -1196,6 +1205,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     if (
       media.mediaType === MediaType.MOVIE &&
       entity.status === MediaRequestStatus.DECLINED &&
+      !blocklisted &&
       media[statusKey] !== MediaStatus.DELETED
     ) {
       media[statusKey] = MediaStatus.UNKNOWN;
@@ -1312,15 +1322,18 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         request.status !== MediaRequestStatus.DECLINED
     );
 
+    // A blocklisted title stays blocklisted when its requests go.
     const needsStatusUpdate =
       !hasActive &&
       fullMedia.status !== MediaStatus.AVAILABLE &&
-      fullMedia.status !== MediaStatus.PARTIALLY_AVAILABLE;
+      fullMedia.status !== MediaStatus.PARTIALLY_AVAILABLE &&
+      fullMedia.status !== MediaStatus.BLOCKLISTED;
 
     const needs4kStatusUpdate =
       !hasActive4k &&
       fullMedia.status4k !== MediaStatus.AVAILABLE &&
-      fullMedia.status4k !== MediaStatus.PARTIALLY_AVAILABLE;
+      fullMedia.status4k !== MediaStatus.PARTIALLY_AVAILABLE &&
+      fullMedia.status4k !== MediaStatus.BLOCKLISTED;
 
     if (needsStatusUpdate || needs4kStatusUpdate) {
       // Re-fetch WITHOUT requests to avoid cascade issues on save
@@ -1484,28 +1497,42 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       return;
     }
 
+    const previousStatus = (event.databaseEntity as MediaRequest | undefined)
+      ?.status;
+
     await this.recordRequestHistory(
       event.entity as MediaRequest,
-      (event.databaseEntity as MediaRequest | undefined)?.status ??
-        (event.entity as MediaRequest).status,
+      previousStatus ?? (event.entity as MediaRequest).status,
       event.manager
     );
 
-    try {
-      await this.sendToRadarr(event.entity as MediaRequest, event.manager);
-      await this.sendToSonarr(event.entity as MediaRequest, event.manager);
-    } catch (e) {
-      logger.error('Error while sending to *arr in afterUpdate subscriber', {
-        label: 'Media Request',
-        requestId: (event.entity as MediaRequest).id,
-        errorMessage: e instanceof Error ? e.message : String(e),
-      });
+    // Sending on and the title's status follow a change of status. A save
+    // that changed something else must not send an approved request to
+    // Radarr or Sonarr again (a fresh search), or reset its title. A plain
+    // update() of a few columns arrives with only those columns and nothing
+    // to compare against, and is not a request to act on either.
+    const statusChanged =
+      previousStatus !== undefined && previousStatus !== event.entity.status;
+
+    if (statusChanged) {
+      try {
+        await this.sendToRadarr(event.entity as MediaRequest, event.manager);
+        await this.sendToSonarr(event.entity as MediaRequest, event.manager);
+      } catch (e) {
+        logger.error('Error while sending to *arr in afterUpdate subscriber', {
+          label: 'Media Request',
+          requestId: (event.entity as MediaRequest).id,
+          errorMessage: e instanceof Error ? e.message : String(e),
+        });
+      }
     }
 
     try {
-      await withNestedTransaction(event.manager, async (manager) => {
-        await this.updateParentStatus(manager, event.entity as MediaRequest);
-      });
+      if (statusChanged) {
+        await withNestedTransaction(event.manager, async (manager) => {
+          await this.updateParentStatus(manager, event.entity as MediaRequest);
+        });
+      }
 
       if (event.entity.status === MediaRequestStatus.COMPLETED) {
         if (event.entity.media.mediaType === MediaType.MOVIE) {

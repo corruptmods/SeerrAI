@@ -26,6 +26,8 @@ import type {
 } from '@server/interfaces/api/requestInterfaces';
 import { featureEnabled } from '@server/lib/features';
 import { getNotificationChannels } from '@server/lib/notificationChannels';
+import { releaseDelivery } from '@server/lib/notificationDelivery';
+import { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import { defaultRegion, estimateRequest } from '@server/lib/requestEta';
 import { requestMissing } from '@server/lib/requestMissing';
@@ -56,6 +58,15 @@ const mayChooseAdvancedOptions = (user?: User) =>
     [Permission.REQUEST_ADVANCED, Permission.MANAGE_REQUESTS],
     { type: 'or' }
   );
+
+/*
+ * A blocklisted title must stay out of Radarr and Sonarr. Approving or
+ * retrying a request made before it was blocklisted would send it there
+ * anyway, so both are refused; declining or deleting it is still allowed.
+ */
+const titleBlocklisted = (request: MediaRequest) =>
+  request.media?.status === MediaStatus.BLOCKLISTED ||
+  request.media?.status4k === MediaStatus.BLOCKLISTED;
 
 const withoutAdvancedOptions = (body: MediaRequestBody): MediaRequestBody => {
   const allowed = { ...body };
@@ -690,9 +701,13 @@ requestRoutes.post<{ requestId: string }>(
       // notifications back on means clearing the mute rather than adding a
       // watcher row.
       if (request.requestedBy.id === req.user.id) {
+        // Only the flag is written. Saving the whole request ran its save
+        // hooks, which announced an approved or declined request all over
+        // again and sent an approved one to Radarr or Sonarr a second time.
         if (request.requesterMuted) {
-          request.requesterMuted = false;
-          await requestRepository.save(request);
+          await requestRepository.update(request.id, {
+            requesterMuted: false,
+          });
         }
 
         return res.status(200).json({ watching: true, isRequester: true });
@@ -750,9 +765,11 @@ requestRoutes.delete<{ requestId: string }>(
       // Muting a request you made leaves the request itself alone — only a
       // deliberate delete removes it.
       if (request && request.requestedBy?.id === req.user?.id) {
+        // Only the flag is written, as when turning notifications back on.
         if (!request.requesterMuted) {
-          request.requesterMuted = true;
-          await getRepository(MediaRequest).save(request);
+          await getRepository(MediaRequest).update(request.id, {
+            requesterMuted: true,
+          });
         }
 
         return res.status(200).json({ watching: false, isRequester: true });
@@ -1131,6 +1148,17 @@ requestRoutes.post<{
           });
         }
 
+        if (titleBlocklisted(request)) {
+          return next({
+            status: 409,
+            message: 'This title is blocklisted, so it cannot be retried.',
+          });
+        }
+
+        // The failure was reported once; without letting go of that, a
+        // second failure after this retry would never be reported at all.
+        await releaseDelivery(request.id, Notification.MEDIA_FAILED);
+
         // this also triggers updating the parent media's status & sending to *arr
         request.status = MediaRequestStatus.APPROVED;
         request.modifiedBy = req.user;
@@ -1185,6 +1213,16 @@ requestRoutes.post<{
           return next({
             status: 409,
             message: 'Only pending requests can be approved or declined.',
+          });
+        }
+
+        if (
+          newStatus === MediaRequestStatus.APPROVED &&
+          titleBlocklisted(request)
+        ) {
+          return next({
+            status: 409,
+            message: 'This title is blocklisted, so it cannot be approved.',
           });
         }
 

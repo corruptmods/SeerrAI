@@ -74,6 +74,14 @@ const approvalExtra = (
   return expected ? [{ name: 'Expected', value: expected }] : [];
 };
 
+/**
+ * Each request's status as last read from or written to the database, so the
+ * approval hook can tell a save that changed it from one that only touched
+ * another column. Kept beside the entity rather than on it, so it is never
+ * sent anywhere with the request.
+ */
+const savedStatus = new WeakMap<MediaRequest, MediaRequestStatus>();
+
 @Entity()
 export class MediaRequest {
   public static async request(
@@ -251,7 +259,11 @@ export class MediaRequest {
         mediaType: requestBody.mediaType,
       });
     } else {
-      if (media.status === MediaStatus.BLOCKLISTED) {
+      // Blocklisting sets both, but either one is enough to refuse.
+      if (
+        media.status === MediaStatus.BLOCKLISTED ||
+        media.status4k === MediaStatus.BLOCKLISTED
+      ) {
         logger.warn('Request for media blocked due to being blocklisted', {
           tmdbId: tmdbMedia.id,
           mediaType: requestBody.mediaType,
@@ -303,11 +315,17 @@ export class MediaRequest {
       .getMany();
 
     if (existing && existing.length > 0) {
-      // If there is an existing movie request that isn't declined, don't allow a new one.
+      // If any existing movie request is still open (not declined or
+      // completed), don't allow a new one. Every one is checked: they come
+      // back in no particular order, and an old declined one listed first
+      // used to let a duplicate through.
       if (
         requestBody.mediaType === MediaType.MOVIE &&
-        existing[0].status !== MediaRequestStatus.DECLINED &&
-        existing[0].status !== MediaRequestStatus.COMPLETED
+        existing.some(
+          (r) =>
+            r.status !== MediaRequestStatus.DECLINED &&
+            r.status !== MediaRequestStatus.COMPLETED
+        )
       ) {
         logger.warn('Duplicate request for media blocked', {
           tmdbId: tmdbMedia.id,
@@ -761,6 +779,16 @@ export class MediaRequest {
     // is looked up below, and a request no longer approved must not then be
     // reported as declined.
     const status = this.status;
+    const before = savedStatus.get(this);
+    savedStatus.set(this, status);
+
+    // A save that left the status as it was (a change to the request's
+    // options, say) is not a new approval or decline, and telling everyone
+    // again would be wrong.
+    if (!autoApproved && before !== undefined && before === status) {
+      return;
+    }
+
     if (
       status === MediaRequestStatus.APPROVED ||
       status === MediaRequestStatus.DECLINED
@@ -820,9 +848,24 @@ export class MediaRequest {
 
   @AfterInsert()
   public async autoapprovalNotification(): Promise<void> {
+    savedStatus.set(this, this.status);
+
     if (this.status === MediaRequestStatus.APPROVED) {
-      this.notifyApprovedOrDeclined(true);
+      // Not waited for, so a failure here (the media lookup, say) is caught
+      // and logged: left unhandled, it would stop the whole server.
+      this.notifyApprovedOrDeclined(true).catch((e) => {
+        logger.error('Could not send the automatic approval notification', {
+          label: 'Media Request',
+          requestId: this.id,
+          errorMessage: e instanceof Error ? e.message : String(e),
+        });
+      });
     }
+  }
+
+  @AfterLoad()
+  private rememberStatus() {
+    savedStatus.set(this, this.status);
   }
 
   @AfterLoad()
@@ -842,7 +885,13 @@ export class MediaRequest {
      * episodes that are not there yet.
      */
     eventOverride?: string,
-    extraFields?: { name: string; value: string }[]
+    extraFields?: { name: string; value: string }[],
+    /**
+     * Someone watching this request, not its requester: the notification is
+     * sent to them alone, whether or not the requester muted it, and the
+     * channels and admins are not told again.
+     */
+    watcher?: User
   ): Promise<boolean> {
     const tmdb = new TheMovieDb();
 
@@ -889,6 +938,17 @@ export class MediaRequest {
           break;
       }
 
+      const notifyUser = watcher
+        ? watcher
+        : (notifyAdmin && !notifyRequester) || entity.requesterMuted
+          ? undefined
+          : entity.requestedBy;
+
+      if (watcher) {
+        notifyAdmin = false;
+        notifySystem = false;
+      }
+
       if (entity.type === MediaType.MOVIE) {
         const movie = await tmdb.getMovie({ movieId: media.tmdbId });
         notificationManager.sendNotification(type, {
@@ -896,10 +956,7 @@ export class MediaRequest {
           request: entity,
           notifyAdmin,
           notifySystem,
-          notifyUser:
-            (notifyAdmin && !notifyRequester) || entity.requesterMuted
-              ? undefined
-              : entity.requestedBy,
+          notifyUser,
           event,
           subject: `${movie.title}${
             movie.release_date ? ` (${movie.release_date.slice(0, 4)})` : ''
@@ -924,10 +981,7 @@ export class MediaRequest {
           request: entity,
           notifyAdmin,
           notifySystem,
-          notifyUser:
-            (notifyAdmin && !notifyRequester) || entity.requesterMuted
-              ? undefined
-              : entity.requestedBy,
+          notifyUser,
           event,
           subject: `${tv.name}${
             tv.first_air_date ? ` (${tv.first_air_date.slice(0, 4)})` : ''

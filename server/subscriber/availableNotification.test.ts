@@ -7,11 +7,13 @@ import {
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
+import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
 import NotificationDelivery from '@server/entity/NotificationDelivery';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
 import notificationManager, { Notification } from '@server/lib/notifications';
+import type { NotificationPayload } from '@server/lib/notifications/agents/agent';
 import { Permission } from '@server/lib/permissions';
 import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
@@ -29,10 +31,12 @@ import { beforeEach, describe, it } from 'node:test';
 setupTestDb();
 
 let sent: Notification[] = [];
+let payloads: NotificationPayload[] = [];
 Object.defineProperty(notificationManager, 'sendNotification', {
   configurable: true,
-  value: (type: Notification) => {
+  value: (type: Notification, payload: NotificationPayload) => {
     sent.push(type);
+    payloads.push(payload);
   },
 });
 Object.defineProperty(TheMovieDb.prototype, 'getMovie', {
@@ -186,5 +190,50 @@ describe('"now available" when a scan marks the title available', () => {
       1,
       'claimed once'
     );
+  });
+
+  it('posts to the channels once, however many people are watching', async () => {
+    const media = await getRepository(Media).save(
+      new Media({
+        tmdbId: 9102,
+        mediaType: MediaType.MOVIE,
+        status: MediaStatus.PROCESSING,
+        externalServiceId: 7,
+      })
+    );
+    const request = await approvedRequest(media);
+    for (const name of ['watcher-one', 'watcher-two']) {
+      const watcher = await getRepository(User).save(
+        new User({
+          email: `${name}@test.local`,
+          plexUsername: name,
+          permissions: Permission.REQUEST,
+          avatar: '',
+        })
+      );
+      await getRepository(MediaRequestWatcher).save(
+        new MediaRequestWatcher({ requestId: request.id, userId: watcher.id })
+      );
+    }
+    sent = [];
+    payloads = [];
+
+    const fresh = await getRepository(Media).findOneOrFail({
+      where: { id: media.id },
+    });
+    fresh.status = MediaStatus.AVAILABLE;
+    await getRepository(Media).save(fresh);
+
+    assert.equal(payloads.length, 3, 'the requester and both watchers');
+    assert.equal(
+      payloads.filter((p) => p.notifySystem || p.notifyAdmin).length,
+      1,
+      'one post to the channels'
+    );
+    assert.deepEqual(payloads.map((p) => p.notifyUser?.plexUsername).sort(), [
+      'avail',
+      'watcher-one',
+      'watcher-two',
+    ]);
   });
 });

@@ -10,9 +10,11 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
 import { User } from '@server/entity/User';
 import { UserPushSubscription } from '@server/entity/UserPushSubscription';
+import { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import requestRoutes from '@server/routes/request';
+import { MediaRequestSubscriber } from '@server/subscriber/MediaRequestSubscriber';
 import { setupTestDb } from '@server/test/db';
 import express from 'express';
 import assert from 'node:assert/strict';
@@ -209,6 +211,53 @@ describe('request watch state', () => {
       await getRepository(MediaRequest).countBy({ id: request.id }),
       1
     );
+  });
+
+  it('neither re-announces nor re-sends a request when muting it', async (t) => {
+    // Approved and declined without the save hooks, as they would have been
+    // long before anyone turns notifications off.
+    const approved = await makeRequest(requester, 60004);
+    const declined = await makeRequest(requester, 60005);
+    await getRepository(MediaRequest).update(declined.id, {
+      status: MediaRequestStatus.DECLINED,
+    });
+
+    const sendToRadarr = t.mock.method(
+      MediaRequestSubscriber.prototype,
+      'sendToRadarr',
+      async () => undefined
+    );
+    const notify = t.mock.method(
+      MediaRequest,
+      'sendNotification',
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      async (_request: MediaRequest, _media: Media, _type: Notification) => true
+    );
+
+    for (const request of [approved, declined]) {
+      await call('DELETE', `/api/v1/request/${request.id}/watch`);
+      await call('POST', `/api/v1/request/${request.id}/watch`);
+    }
+
+    assert.equal(sendToRadarr.mock.callCount(), 0, 'nothing sent to Radarr');
+    // Counted by kind: the auto-approval notice from creating the request is
+    // sent without being waited for, and may land after the mock is set.
+    assert.deepEqual(
+      notify.mock.calls
+        .map((c) => c.arguments[2])
+        .filter(
+          (type) =>
+            type === Notification.MEDIA_APPROVED ||
+            type === Notification.MEDIA_DECLINED
+        ),
+      [],
+      'nobody told again'
+    );
+    const after = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: declined.id },
+    });
+    assert.equal(after.status, MediaRequestStatus.DECLINED);
+    assert.equal(after.requesterMuted, false);
   });
 
   it('records another user as a watcher rather than muting', async () => {

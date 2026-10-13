@@ -12,6 +12,7 @@ import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { isUniqueViolation } from '@server/utils/isUniqueViolation';
+import { withNestedTransaction } from '@server/utils/nestedTransaction';
 import { pageOf } from '@server/utils/pagination';
 import { Router } from 'express';
 import type { EntityManager } from 'typeorm';
@@ -201,7 +202,9 @@ blocklistRoutes.post(
         });
       }
 
-      await Blocklist.addToBlocklist({
+      // Also declines its pending and approved requests, files removed or
+      // not, so none of them can be approved and sent on afterwards.
+      const declinedRequests = await Blocklist.addToBlocklist({
         blocklistRequest: values,
       });
 
@@ -232,7 +235,10 @@ blocklistRoutes.post(
         });
       }
 
-      return res.status(201).json(removal);
+      return res.status(201).json({
+        ...removal,
+        declinedRequests: declinedRequests + removal.declinedRequests,
+      });
     } catch (error) {
       if (!(error instanceof Error)) {
         return;
@@ -303,63 +309,70 @@ blocklistRoutes.post(
         );
         const mediaByTmdbId = new Map(existingMedia.map((m) => [m.tmdbId, m]));
 
-        await Promise.all(
-          uniqueParts.map(async (part) => {
-            if (blocklistByTmdbId.has(part.id)) {
-              return;
-            }
+        // One film at a time: each insert has a savepoint of its own, and
+        // savepoints taken side by side on one transaction would undo each
+        // other's work.
+        for (const part of uniqueParts) {
+          if (blocklistByTmdbId.has(part.id)) {
+            continue;
+          }
 
-            let blocklist = new Blocklist({
-              tmdbId: part.id,
-              mediaType: MediaType.MOVIE,
-              title: part.title,
-              user: req.user,
-              reason,
-            });
+          let blocklist = new Blocklist({
+            tmdbId: part.id,
+            mediaType: MediaType.MOVIE,
+            title: part.title,
+            user: req.user,
+            reason,
+          });
 
-            try {
-              await blocklistRepository.save(blocklist);
-              await recordMediaEvent({
+          try {
+            // In a savepoint: on Postgres a failed insert aborts the whole
+            // transaction otherwise, and the film blocklisted meanwhile by
+            // someone else could not be picked up below.
+            await withNestedTransaction(em, (nested) =>
+              nested.getRepository(Blocklist).save(blocklist)
+            );
+            await recordMediaEvent(
+              {
                 tmdbId: part.id,
                 mediaType: MediaType.MOVIE,
                 type: MediaEventType.BLOCKLISTED,
                 userId: req.user?.id,
                 detail: reason,
-              });
-            } catch (error) {
-              if (
-                !(error instanceof QueryFailedError) ||
-                error.driverError.errno !== 19
-              ) {
-                throw error;
-              }
-              const row = await blocklistRepository.findOne({
-                where: { tmdbId: part.id, mediaType: MediaType.MOVIE },
-              });
-              if (!row) {
-                throw error;
-              }
-              blocklist = row;
+              },
+              em
+            );
+          } catch (error) {
+            if (!isUniqueViolation(error)) {
+              throw error;
             }
-
-            let media = mediaByTmdbId.get(part.id);
-            if (!media) {
-              media = new Media({
-                tmdbId: part.id,
-                status: MediaStatus.BLOCKLISTED,
-                status4k: MediaStatus.BLOCKLISTED,
-                mediaType: MediaType.MOVIE,
-                blocklist: Promise.resolve(blocklist),
-              });
-            } else {
-              media.status = MediaStatus.BLOCKLISTED;
-              media.status4k = MediaStatus.BLOCKLISTED;
-              media.blocklist = Promise.resolve(blocklist);
+            const row = await blocklistRepository.findOne({
+              where: { tmdbId: part.id, mediaType: MediaType.MOVIE },
+            });
+            if (!row) {
+              throw error;
             }
+            blocklist = row;
+          }
 
-            await mediaRepository.save(media);
-          })
-        );
+          let media = mediaByTmdbId.get(part.id);
+          if (!media) {
+            media = new Media({
+              tmdbId: part.id,
+              status: MediaStatus.BLOCKLISTED,
+              status4k: MediaStatus.BLOCKLISTED,
+              mediaType: MediaType.MOVIE,
+              blocklist: Promise.resolve(blocklist),
+            });
+          } else {
+            media.status = MediaStatus.BLOCKLISTED;
+            media.status4k = MediaStatus.BLOCKLISTED;
+            media.blocklist = Promise.resolve(blocklist);
+          }
+
+          await mediaRepository.save(media);
+          await Blocklist.declineOpenRequests(media.id, em);
+        }
       });
 
       return res.status(201).send();

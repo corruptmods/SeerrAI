@@ -1,3 +1,5 @@
+import type Media from '@server/entity/Media';
+import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import type {
@@ -20,7 +22,18 @@ const agent: NotificationAgent = {
     return true;
   },
 };
-notificationManager.registerAgents([agent]);
+// Fails when told to, as an agent does when its service is down.
+let failing = false;
+const flaky: NotificationAgent = {
+  shouldSend: () => true,
+  send: async () => {
+    if (failing) {
+      throw new Error('Service unavailable');
+    }
+    return true;
+  },
+};
+notificationManager.registerAgents([agent, flaky]);
 
 const person = (id: number) => ({ id, displayName: `P${id}` }) as User;
 const available = (title: string, who = person(1)): NotificationPayload => ({
@@ -36,6 +49,7 @@ const toUser = () =>
 
 beforeEach(() => {
   sent = [];
+  failing = false;
   notificationManager.gathering = { quietMs: 60, longestMs: 400 };
 });
 
@@ -202,5 +216,44 @@ describe('notifications sent close together', () => {
     );
     notificationManager.flush();
     assert.equal(toUser().length, 1);
+  });
+
+  it('tells about two requests for the same series apart', async () => {
+    const series = { id: 7 } as Media;
+    for (const [requestId, seasons] of [
+      [1, 'Season 1'],
+      [2, 'Season 2'],
+      [1, 'Season 1'],
+    ] as const) {
+      notificationManager.sendNotification(Notification.MEDIA_AVAILABLE, {
+        ...available(`Show (2020) ${seasons}`),
+        media: series,
+        request: { id: requestId, is4k: false } as MediaRequest,
+      });
+    }
+    await wait(120);
+    assert.equal(toUser().length, 1);
+    assert.equal(toUser()[0].payload.subject, '2 titles are ready to watch');
+  });
+});
+
+describe('an agent that fails', () => {
+  it('is logged, and cannot take the server down', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      failing = true;
+      notificationManager.sendNotification(Notification.ISSUE_CREATED, {
+        subject: 'Broken',
+        notifySystem: true,
+        notifyAdmin: true,
+      });
+      await wait(20);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+    assert.deepEqual(unhandled, []);
+    assert.equal(sent.length, 1, 'the other agents still sent it');
   });
 });

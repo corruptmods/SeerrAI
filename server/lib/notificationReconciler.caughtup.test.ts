@@ -8,6 +8,7 @@ import { getRepository } from '@server/datasource';
 import Episode from '@server/entity/Episode';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
+import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
 import NotificationDelivery from '@server/entity/NotificationDelivery';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
@@ -79,6 +80,8 @@ const AFTER_REQUEST = [daysFromNow(7), daysFromNow(14)];
  * tests flaky on Postgres; counting only the one being tested does not.
  */
 let sent: number[] = [];
+/** Everything each send was given, for the watcher's copy. */
+let calls: Parameters<typeof MediaRequest.sendNotification>[] = [];
 
 const caughtUp = () =>
   sent.filter((type) => type === Notification.MEDIA_AVAILABLE);
@@ -107,13 +110,17 @@ describe('series caught-up notifications', () => {
     stubTmdb();
     stubSeason([...BEFORE_REQUEST, ...AFTER_REQUEST]);
     sent = [];
+    calls = [];
 
     // Record what the reconciler decides to send, without going near a real
     // notification agent.
     Object.defineProperty(MediaRequest, 'sendNotification', {
       configurable: true,
-      value: async (_request: MediaRequest, _media: Media, type: number) => {
-        sent.push(type);
+      value: async (
+        ...args: Parameters<typeof MediaRequest.sendNotification>
+      ) => {
+        sent.push(args[2]);
+        calls.push(args);
 
         return true;
       },
@@ -170,6 +177,35 @@ describe('series caught-up notifications', () => {
       1,
       'the requester can now watch it up to date'
     );
+  });
+
+  it('tells a watcher in the same words, about the same request', async () => {
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { media: { id: media.id } },
+    });
+    const watcher = await getRepository(User).save(
+      new User({
+        email: 'partial-watcher@test.local',
+        plexUsername: 'partial-watcher',
+        permissions: Permission.REQUEST,
+        avatar: '',
+      })
+    );
+    await getRepository(MediaRequestWatcher).save(
+      new MediaRequestWatcher({ requestId: request.id, userId: watcher.id })
+    );
+    await addEpisodes(3, MediaStatus.AVAILABLE);
+
+    await notificationReconciler.run();
+
+    const ready = calls.filter((c) => c[2] === Notification.MEDIA_AVAILABLE);
+    assert.equal(ready.length, 2, 'the requester, then the watcher');
+    const [, toWatcher] = ready;
+    assert.equal(toWatcher[0].requestedBy.id, request.requestedBy.id);
+    assert.equal(toWatcher[3], 'Series Ready to Watch');
+    assert.deepEqual(toWatcher[4], ready[0][4]);
+    // Sent to the watcher alone, not dressed up as their own request.
+    assert.equal(toWatcher[5]?.id, watcher.id);
   });
 
   it('says nothing while an already-aired episode is still missing', async () => {

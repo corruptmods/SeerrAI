@@ -1,13 +1,19 @@
-import { MediaStatus, type MediaType } from '@server/constants/media';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  type MediaType,
+} from '@server/constants/media';
 import dataSource from '@server/datasource';
 import Media from '@server/entity/Media';
+import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
 import type { BlocklistItem } from '@server/interfaces/api/blocklistInterfaces';
 import { DbAwareColumn } from '@server/utils/DbColumnHelper';
-import type { EntityManager } from 'typeorm';
+import type { DataSource, EntityManager } from 'typeorm';
 import {
   Column,
   Entity,
+  In,
   Index,
   JoinColumn,
   ManyToOne,
@@ -59,6 +65,32 @@ export class Blocklist implements BlocklistItem {
     Object.assign(this, init);
   }
 
+  /**
+   * Declines every request for a title that is still pending or approved,
+   * now it is blocklisted and can no longer be fulfilled. Left as they were,
+   * one could still be approved and sent to Radarr or Sonarr.
+   *
+   * A plain update, so nobody is sent a "declined" notification for what was
+   * an admin's decision about the title, and no request hooks run. Returns
+   * how many were declined.
+   */
+  public static async declineOpenRequests(
+    mediaId: number,
+    entityManager?: EntityManager | DataSource
+  ): Promise<number> {
+    const result = await (entityManager ?? dataSource)
+      .createQueryBuilder()
+      .update(MediaRequest)
+      .set({ status: MediaRequestStatus.DECLINED })
+      .where({
+        media: { id: mediaId },
+        status: In([MediaRequestStatus.PENDING, MediaRequestStatus.APPROVED]),
+      })
+      .execute();
+
+    return result.affected ?? 0;
+  }
+
   public static async addToBlocklist(
     {
       blocklistRequest,
@@ -72,7 +104,7 @@ export class Blocklist implements BlocklistItem {
       };
     },
     entityManager?: EntityManager
-  ): Promise<void> {
+  ): Promise<number> {
     const em = entityManager ?? dataSource;
     const blocklist = new this({
       ...blocklistRequest,
@@ -107,5 +139,7 @@ export class Blocklist implements BlocklistItem {
 
       await mediaRepository.save(media);
     }
+
+    return this.declineOpenRequests(media.id, em);
   }
 }

@@ -21,6 +21,8 @@ import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
+import { claimDelivery, hasDelivery } from '@server/lib/notificationDelivery';
+import { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
@@ -2190,6 +2192,163 @@ describe('anime movies', () => {
         [JAPANESE_ANIMATION, '/movies', 1],
         [FRENCH_ANIMATION, '/anime-movies', 9],
       ]
+    );
+  });
+});
+
+describe('requests for a blocklisted title', () => {
+  // A request left over from before its title was blocklisted.
+  async function seedBlocklisted(status: MediaRequestStatus) {
+    const seeded = await seedRequest(status);
+    await getRepository(Media).update(seeded.media.id, {
+      status: MediaStatus.BLOCKLISTED,
+      status4k: MediaStatus.BLOCKLISTED,
+    });
+    return seeded;
+  }
+
+  const mediaStatusOf = async (id: number) =>
+    (await getRepository(Media).findOneOrFail({ where: { id } })).status;
+
+  it('refuses to approve one, and sends nothing to Radarr', async (t) => {
+    const sendToRadarr = t.mock.method(
+      MediaRequestSubscriber.prototype,
+      'sendToRadarr',
+      async () => undefined
+    );
+    const pending = await seedBlocklisted(MediaRequestStatus.PENDING);
+    // Creating the request looked at it once, and found it pending.
+    sendToRadarr.mock.resetCalls();
+    const admin = await loginAs('admin@seerr.dev', 'test1234');
+
+    const res = await admin.post(`/request/${pending.id}/approve`);
+
+    assert.strictEqual(res.status, 409);
+    assert.match(res.body.message, /blocklisted/i);
+    assert.strictEqual(sendToRadarr.mock.callCount(), 0);
+    const persisted = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: pending.id },
+    });
+    assert.strictEqual(persisted.status, MediaRequestStatus.PENDING);
+    assert.strictEqual(
+      await mediaStatusOf(pending.media.id),
+      MediaStatus.BLOCKLISTED
+    );
+  });
+
+  it('refuses to retry one', async () => {
+    const failed = await seedBlocklisted(MediaRequestStatus.FAILED);
+    const admin = await loginAs('admin@seerr.dev', 'test1234');
+
+    const res = await admin.post(`/request/${failed.id}/retry`);
+
+    assert.strictEqual(res.status, 409);
+    const persisted = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: failed.id },
+    });
+    assert.strictEqual(persisted.status, MediaRequestStatus.FAILED);
+  });
+
+  it('keeps the title blocklisted when one is declined or deleted', async () => {
+    const pending = await seedBlocklisted(MediaRequestStatus.PENDING);
+    const admin = await loginAs('admin@seerr.dev', 'test1234');
+
+    const declined = await admin.post(`/request/${pending.id}/decline`);
+    assert.strictEqual(declined.status, 200);
+    assert.strictEqual(
+      await mediaStatusOf(pending.media.id),
+      MediaStatus.BLOCKLISTED
+    );
+
+    const deleted = await admin.delete(`/request/${pending.id}`);
+    assert.strictEqual(deleted.status, 204);
+    assert.strictEqual(
+      await mediaStatusOf(pending.media.id),
+      MediaStatus.BLOCKLISTED
+    );
+  });
+
+  it('never sends an approved one to Radarr', async () => {
+    const added: RadarrMovieOptions[] = [];
+    Object.defineProperty(RadarrAPI.prototype, 'addMovie', {
+      configurable: true,
+      set() {},
+      get() {
+        return async (options: RadarrMovieOptions) => {
+          added.push(options);
+          return { id: 1, titleSlug: 'movie-1' };
+        };
+      },
+    });
+    configureRadarr([{ id: 0, isDefault: true, is4k: false }]);
+    movieDetails.set(54321, {
+      genres: [],
+      original_language: 'en',
+      release_date: '2020-01-01',
+    });
+    const media = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.MOVIE,
+        tmdbId: 54321,
+        status: MediaStatus.BLOCKLISTED,
+        status4k: MediaStatus.BLOCKLISTED,
+      })
+    );
+
+    await getRepository(MediaRequest).save(
+      new MediaRequest({
+        type: MediaType.MOVIE,
+        status: MediaRequestStatus.APPROVED,
+        media,
+        requestedBy: await getRepository(User).findOneOrFail({
+          where: { email: 'friend@seerr.dev' },
+        }),
+        is4k: false,
+      })
+    );
+
+    assert.deepStrictEqual(added, []);
+    assert.strictEqual(await mediaStatusOf(media.id), MediaStatus.BLOCKLISTED);
+  });
+
+  it('refuses a new request when only the 4K copy is blocklisted', async () => {
+    await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.MOVIE,
+        tmdbId: 54322,
+        status: MediaStatus.UNKNOWN,
+        status4k: MediaStatus.BLOCKLISTED,
+      })
+    );
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+
+    const res = await agent
+      .post('/request')
+      .send({ mediaType: MediaType.MOVIE, mediaId: 54322 });
+
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(await getRepository(MediaRequest).count(), 0);
+  });
+});
+
+describe('retrying a failed request', () => {
+  it('lets a second failure be reported', async (t) => {
+    t.mock.method(
+      MediaRequestSubscriber.prototype,
+      'sendToRadarr',
+      async () => undefined
+    );
+    const failed = await seedRequest(MediaRequestStatus.FAILED);
+    // The first failure was reported.
+    assert.ok(await claimDelivery(failed.id, Notification.MEDIA_FAILED));
+    const admin = await loginAs('admin@seerr.dev', 'test1234');
+
+    const res = await admin.post(`/request/${failed.id}/retry`);
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(
+      await hasDelivery(failed.id, Notification.MEDIA_FAILED),
+      false
     );
   });
 });

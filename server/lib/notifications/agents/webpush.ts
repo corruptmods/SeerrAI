@@ -1,7 +1,6 @@
 import { IssueType, IssueTypeName } from '@server/constants/issue';
-import { MediaRequestStatus, MediaType } from '@server/constants/media';
+import { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
-import MediaRequest from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
 import { UserPushSubscription } from '@server/entity/UserPushSubscription';
 import { defineMessages, getIntl } from '@server/i18n';
@@ -334,12 +333,6 @@ class WebPushAgent
 
     const mainUser = await userRepository.findOne({ where: { id: 1 } });
 
-    const requestRepository = getRepository(MediaRequest);
-
-    const pendingRequests = await requestRepository.find({
-      where: { status: MediaRequestStatus.PENDING },
-    });
-
     const webPushNotification = async (
       pushSub: UserPushSubscription,
       notificationPayload: Buffer
@@ -448,10 +441,6 @@ class WebPushAgent
         settings.vapidPublic,
         settings.vapidPrivate
       );
-
-      if (type === Notification.MEDIA_PENDING) {
-        payload = { ...payload, pendingRequestsCount: pendingRequests.length };
-      }
 
       await Promise.all(
         pushSubs.map(async ({ sub, locale }) => {

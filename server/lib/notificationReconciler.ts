@@ -8,11 +8,11 @@ import { getRepository } from '@server/datasource';
 import Episode from '@server/entity/Episode';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
-import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
 import { NotificationDelivery } from '@server/entity/NotificationDelivery';
 import {
   claimDelivery,
   hasDelivery,
+  notifyRequestWatchers,
   releaseDelivery,
 } from '@server/lib/notificationDelivery';
 import { Notification } from '@server/lib/notifications';
@@ -39,50 +39,6 @@ const isRequestAvailable = (request: MediaRequest, media: Media): boolean => {
         season[statusKey] === MediaStatus.AVAILABLE
     )
   );
-};
-
-/**
- * The subscriber fans availability out to watchers itself; when the
- * reconciler is the path that caught a missed notification, it has to do the
- * same or watchers silently miss out.
- */
-const notifyWatchersForRequest = async (
-  request: MediaRequest,
-  media: Media,
-  episodeKey = ''
-): Promise<void> => {
-  const watchers: MediaRequestWatcher[] = await getRepository(
-    MediaRequestWatcher
-  ).find({ where: { requestId: request.id }, relations: { user: true } });
-
-  for (const watcher of watchers) {
-    if (
-      !watcher.user ||
-      !(await claimDelivery(
-        request.id,
-        Notification.MEDIA_AVAILABLE,
-        watcher.userId,
-        episodeKey
-      ))
-    ) {
-      continue;
-    }
-
-    const sent = await MediaRequest.sendNotification(
-      { ...request, requestedBy: watcher.user } as MediaRequest,
-      media,
-      Notification.MEDIA_AVAILABLE
-    );
-
-    if (!sent) {
-      await releaseDelivery(
-        request.id,
-        Notification.MEDIA_AVAILABLE,
-        watcher.userId,
-        episodeKey
-      );
-    }
-  }
 };
 
 /**
@@ -137,8 +93,25 @@ const deliver = async (
     extraFields
   );
 
+  // The subscriber tells watchers itself; when this is the path that caught
+  // a missed notification, it has to as well or they never hear. Each gets
+  // a copy of their own in the same words, about the request as it is: not
+  // one dressed up as theirs, which skipped them when the requester had
+  // muted it and told the channels the watcher had asked for it.
   if (sent && type === Notification.MEDIA_AVAILABLE) {
-    await notifyWatchersForRequest(request, media, episodeKey);
+    await notifyRequestWatchers(
+      request.id,
+      (watcher) =>
+        MediaRequest.sendNotification(
+          request,
+          media,
+          type,
+          eventOverride,
+          extraFields,
+          watcher
+        ),
+      episodeKey
+    );
   }
 
   if (!sent) {
@@ -167,10 +140,14 @@ const findUnclaimedRequests = (
 ): Promise<MediaRequest[]> => {
   const requestRepository = getRepository(MediaRequest);
 
+  // The requester's settings are joined by hand: a query builder does not
+  // load eager relations, and without them a requester's email ignored their
+  // PGP key and their choice of what to be told about.
   return requestRepository
     .createQueryBuilder('request')
     .leftJoinAndSelect('request.media', 'media')
     .leftJoinAndSelect('request.requestedBy', 'requestedBy')
+    .leftJoinAndSelect('requestedBy.settings', 'requestedBySettings')
     .leftJoinAndSelect('request.seasons', 'seasons')
     .where('request.status = :status', { status })
     .andWhere(

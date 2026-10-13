@@ -12,6 +12,7 @@ import PlexLoginButton from '@app/components/Login/PlexLoginButton';
 import useSettings from '@app/hooks/useSettings';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
+import { safeRedirect } from '@app/utils/loginRedirect';
 import { Transition } from '@headlessui/react';
 import { XCircleIcon } from '@heroicons/react/24/solid';
 import { MediaServerType } from '@server/constants/server';
@@ -68,11 +69,13 @@ const Login = () => {
     }
   }, [authToken, revalidate]);
 
-  // Effect that is triggered whenever `useUser`'s user changes. If we get a new
-  // valid user, we redirect the user to the home page as the login was successful.
+  // Effect that is triggered whenever `useUser`'s user changes. Every way of
+  // signing in (Plex, Jellyfin or Emby, Quick Connect, a password, a passkey)
+  // ends by revalidating the user, so this is where all of them go on: to
+  // the page the person was sent here from, or home.
   useEffect(() => {
     if (user) {
-      router.push('/');
+      router.push(safeRedirect(router.query.redirect));
     }
   }, [user, router]);
 

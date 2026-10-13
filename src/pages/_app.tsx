@@ -13,6 +13,7 @@ import { PushDeviceProvider } from '@app/hooks/usePushDeviceState';
 import type { User } from '@app/hooks/useUser';
 import { Permission, useUser } from '@app/hooks/useUser';
 import '@app/styles/globals.css';
+import { loginUrl, safeRedirect } from '@app/utils/loginRedirect';
 import { polyfillIntl } from '@app/utils/polyfillIntl';
 import { getHostAndPort } from '@app/utils/urlHelper';
 import '@fontsource-variable/inter';
@@ -378,16 +379,22 @@ CoreApp.getInitialProps = async (initialProps) => {
       user = userResponse.data;
 
       if (router.pathname.match(/(setup|login)/)) {
+        // Already signed in: on to the page sign-in was asked to return to,
+        // if there is one.
         ctx.res.writeHead(307, {
-          Location: '/',
+          Location:
+            router.pathname === '/login'
+              ? safeRedirect(ctx.query.redirect)
+              : '/',
         });
         ctx.res.end();
       }
     } else if (!router.pathname.match(/(login|setup|resetpassword)/)) {
       // No user and not already on an auth route: redirect to /login with a
-      // 307 before anything actually renders
+      // 307 before anything actually renders, remembering the page asked for
+      // so signing in comes back to it.
       ctx.res.writeHead(307, {
-        Location: '/login',
+        Location: loginUrl(ctx.asPath),
       });
       ctx.res.end();
     }

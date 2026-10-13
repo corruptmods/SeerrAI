@@ -1441,15 +1441,17 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
 
   public async searchCollection({
     query,
+    page = 1,
     language = this.locale,
   }: {
     query: string;
+    page?: number;
     language?: string;
   }): Promise<TmdbSearchCollectionResponse> {
     try {
       return await this.get<TmdbSearchCollectionResponse>(
         '/search/collection',
-        { params: { query, language, include_adult: false } },
+        { params: { query, page, language, include_adult: false } },
         86400 // 24 hours
       );
     } catch (e) {

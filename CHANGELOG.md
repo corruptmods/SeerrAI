@@ -4,6 +4,14 @@ The newest changes are at the top. **Coming next** is what's on the `dev` branch
 
 ## Coming next
 
+### Search finds collections, and sign-in takes you back
+
+- **Collections in search.** Searching for a franchise, like "Star Wars", now shows its collection alongside the films and series, and the card opens the collection page.
+- **Back where you were.** If you open a link while signed out, or get signed out while using the app, signing in takes you to the page you were on instead of the home page. This works for every way of signing in.
+- **Studio and network pages follow your Discover settings.** The region and original language you chose for Discover now apply when you open a studio or a network too, including from your Networks row.
+- **Ratings show up more often.** When Rotten Tomatoes or IMDb is having trouble, a film's page still shows the rating from the other one.
+- **No false alarm on series requests.** Requesting seasons someone else just requested, or that are already available, now tells you so instead of saying something went wrong.
+
 ### A big round of fixes
 
 We went through all of Seerr AI looking for things that could go wrong, and fixed a lot of them. The ones you're most likely to notice:

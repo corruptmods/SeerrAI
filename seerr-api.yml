@@ -1498,6 +1498,33 @@ components:
             oneOf:
               - $ref: '#/components/schemas/MovieResult'
               - $ref: '#/components/schemas/TvResult'
+    CollectionResult:
+      type: object
+      properties:
+        id:
+          type: number
+          example: 10
+        mediaType:
+          type: string
+          default: 'collection'
+        title:
+          type: string
+          example: Star Wars Collection
+        originalTitle:
+          type: string
+          example: Star Wars Collection
+        adult:
+          type: boolean
+          example: false
+        posterPath:
+          type: string
+        backdropPath:
+          type: string
+        overview:
+          type: string
+        originalLanguage:
+          type: string
+          example: en
     Genre:
       type: object
       properties:
@@ -9340,8 +9367,8 @@ paths:
                     type: number
   /search:
     get:
-      summary: Search for movies, TV shows, or people
-      description: Returns a list of movies, TV shows, or people a JSON object.
+      summary: Search for movies, TV shows, people, or collections
+      description: Returns a list of movies, TV shows, people, or collections as a JSON object.
       tags:
         - search
       parameters:
@@ -9386,6 +9413,7 @@ paths:
                         - $ref: '#/components/schemas/MovieResult'
                         - $ref: '#/components/schemas/TvResult'
                         - $ref: '#/components/schemas/PersonResult'
+                        - $ref: '#/components/schemas/CollectionResult'
   /search/keyword:
     get:
       summary: Search for keywords

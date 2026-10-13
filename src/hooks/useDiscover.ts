@@ -172,8 +172,13 @@ const useDiscover = <
   }
 
   const isEmpty = !isLoadingInitialData && titles?.length === 0;
+  const lastPage = data?.[data.length - 1];
   const isReachingEnd =
     isEmpty ||
+    // No page past the last one the server counts is ever asked for. A page
+    // can hold more than 20 (search adds collections to each), so the
+    // counts below alone could leave this waiting for a page never asked.
+    (!!data && !!lastPage && data.length >= lastPage.totalPages) ||
     (!!data && (data[data?.length - 1]?.results.length ?? 0) < 20) ||
     (!!data && (data[data?.length - 1]?.totalResults ?? 0) <= size * 20) ||
     (!!data && (data[data?.length - 1]?.totalResults ?? 0) < 41);

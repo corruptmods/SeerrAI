@@ -65,6 +65,8 @@ const messages = defineMessages('components.RequestModal', {
   requestcancelled: 'Request for <strong>{title}</strong> canceled.',
   autoapproval: 'Automatic Approval',
   requesterror: 'Something went wrong while submitting the request.',
+  noSeasonsAvailable:
+    'All of the selected seasons are already requested or available.',
   pendingapproval: 'Your request is pending approval.',
   followingNew:
     'New seasons of <strong>{title}</strong> will be requested as each premieres.',
@@ -192,6 +194,18 @@ const TvRequestModal = ({
     selectedSeasons.length +
     (editRequest?.seasons ?? []).length;
 
+  // The server answers 202, with only a message, when every season asked
+  // for is already requested or in the library: nothing new was asked for.
+  // That is not an error. The seasons are fetched again so the list shows
+  // what already covers them.
+  const seasonsAlreadyCovered = () => {
+    addToast(intl.formatMessage(messages.noSeasonsAvailable), {
+      appearance: 'info',
+      autoDismiss: true,
+    });
+    globalMutate(`/api/v1/tv/${tmdbId}`);
+  };
+
   const updateRequest = async (alsoApproveRequest = false) => {
     if (!editRequest) {
       return;
@@ -204,7 +218,7 @@ const TvRequestModal = ({
 
     try {
       if (selectedSeasons.length > 0) {
-        await axios.put(`/api/v1/request/${editRequest.id}`, {
+        const response = await axios.put(`/api/v1/request/${editRequest.id}`, {
           mediaType: 'tv',
           serverId: requestOverrides?.server,
           profileId: requestOverrides?.profile,
@@ -215,6 +229,13 @@ const TvRequestModal = ({
           seriesType: animeChoice.seriesType,
           seasons: selectedSeasons.sort((a, b) => a - b),
         });
+
+        // The edit would leave the request with no season of its own, so
+        // the server changed nothing; there is nothing to approve either.
+        if (response.status === 202) {
+          seasonsAlreadyCovered();
+          return;
+        }
 
         if (alsoApproveRequest) {
           await axios.post(`/api/v1/request/${editRequest.id}/approve`);
@@ -303,6 +324,12 @@ const TvRequestModal = ({
         ...overrideParams,
       });
       globalMutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');
+
+      // Nothing was requested, so nothing is put on lists or followed.
+      if (response.status === 202) {
+        seasonsAlreadyCovered();
+        return;
+      }
 
       if (response.data) {
         // The request has already succeeded; adding to lists is a follow-on

@@ -1444,6 +1444,7 @@
   "components.RequestModal.errorediting": "Something went wrong while editing the request.",
   "components.RequestModal.followFailed": "The request went through, but following new seasons did not. Use Get New Seasons on the series page.",
   "components.RequestModal.followingNew": "New seasons of <strong>{title}</strong> will be requested as each premieres.",
+  "components.RequestModal.noSeasonsAvailable": "All of the selected seasons are already requested or available.",
   "components.RequestModal.numberofepisodes": "# of Episodes",
   "components.RequestModal.pending4krequest": "Pending 4K Request",
   "components.RequestModal.pendingapproval": "Your request is pending approval.",

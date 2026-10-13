@@ -192,7 +192,8 @@ movieRoutes.get('/:id/ratings', async (req, res, next) => {
 });
 
 /**
- * Endpoint combining RottenTomatoes and IMDB
+ * Rotten Tomatoes and IMDb together. Either source can be down or not know
+ * the film; the other is still returned.
  */
 movieRoutes.get('/:id/ratingscombined', async (req, res, next) => {
   const tmdb = new TheMovieDb();
@@ -204,15 +205,28 @@ movieRoutes.get('/:id/ratingscombined', async (req, res, next) => {
       movieId: Number(req.params.id),
     });
 
-    const rtratings = await rtapi.getMovieRatings(
-      movie.title,
-      Number(movie.release_date.slice(0, 4))
-    );
+    const [rt, imdb] = await Promise.allSettled([
+      rtapi.getMovieRatings(
+        movie.title,
+        Number(movie.release_date.slice(0, 4))
+      ),
+      movie.imdb_id
+        ? imdbApi.getMovieRatings(movie.imdb_id)
+        : Promise.resolve(null),
+    ]);
 
-    let imdbRatings;
-    if (movie.imdb_id) {
-      imdbRatings = await imdbApi.getMovieRatings(movie.imdb_id);
+    for (const result of [rt, imdb]) {
+      if (result.status === 'rejected') {
+        logger.debug('A ratings source failed for a movie', {
+          label: 'API',
+          errorMessage: (result.reason as Error)?.message,
+          movieId: req.params.id,
+        });
+      }
     }
+
+    const rtratings = rt.status === 'fulfilled' ? rt.value : null;
+    const imdbRatings = imdb.status === 'fulfilled' ? imdb.value : null;
 
     if (!rtratings && !imdbRatings) {
       return next({

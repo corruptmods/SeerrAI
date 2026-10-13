@@ -66,7 +66,16 @@ export interface TmdbSearchMultiResponse extends TmdbPaginatedResponse {
 }
 
 export interface TmdbSearchCollectionResponse extends TmdbPaginatedResponse {
-  results: { id: number; name: string; poster_path?: string | null }[];
+  results: {
+    id: number;
+    name: string;
+    original_name?: string;
+    overview?: string;
+    original_language?: string;
+    adult?: boolean;
+    poster_path?: string | null;
+    backdrop_path?: string | null;
+  }[];
 }
 
 export interface TmdbSearchPersonResponse extends TmdbPaginatedResponse {

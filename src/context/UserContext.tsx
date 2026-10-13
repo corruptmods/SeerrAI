@@ -1,6 +1,7 @@
 import type { User } from '@app/hooks/useUser';
 import { useUser } from '@app/hooks/useUser';
 import forgetSession from '@app/utils/forgetSession';
+import { loginUrl } from '@app/utils/loginRedirect';
 import sessionEnded from '@app/utils/sessionEnded';
 import { useRouter } from 'next/dist/client/router';
 import { useEffect, useRef } from 'react';
@@ -39,8 +40,10 @@ export const UserContext = ({ initialUser, children }: UserContextProps) => {
       forgetSession().finally(() => {
         // A full page load on purpose: nothing held in memory for the last
         // person (cached rows, their settings) survives into the next.
-        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-        location.href = '/login';
+        // Signing in again comes back to this page.
+        location.href = loginUrl(
+          location.pathname + location.search + location.hash
+        );
       });
     }
   }, [router, user, error]);

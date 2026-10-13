@@ -4,6 +4,21 @@ The newest changes are at the top. **Coming next** is what's on the `dev` branch
 
 ## Coming next
 
+### A big round of fixes
+
+We went through all of Seerr AI looking for things that could go wrong, and fixed a lot of them. The ones you're most likely to notice:
+
+- **Safer accounts.** Someone allowed to manage users can no longer change an admin's account, changing your password asks for your current one, and too many wrong passwords means a short wait. Changing your password signs you out everywhere else.
+- **Blocklisted means blocklisted.** An old request can't sneak a blocklisted title back in anymore.
+- **Fewer repeat notifications.** Muting your own request, or someone watching it, no longer sends the same notice again on every channel.
+- **Backfill keeps your downloads.** If Sonarr, Radarr or your download client goes away for a while (an update, a reboot), Backfill now waits for it instead of giving up and deleting the download.
+- **Shared lists ask first.** When someone shares a list with you, you choose whether to join it before it uses what you've watched. Everyone already on a list stays on it.
+- **Staying signed in.** A server restart or a flaky connection no longer signs you out of the app.
+- **Approve from a notification** now works, and in your language.
+- **Subtitles with two Radarr or Sonarr servers** no longer show another title's subtitles.
+
+Plus many smaller fixes to the admin agent, AI Search, the job schedule, Health and Settings. Everything you set up before keeps working as it did.
+
 ### Trakt lists and watchlists
 
 Paste a link to a public Trakt list into a list's **Import** and its titles come straight in for you to check, no title-by-title matching. And if you keep a Trakt watchlist, add your Trakt username in your profile settings: what you put on it gets requested for you, just like a Plex watchlist, on Plex, Jellyfin or Emby alike. An admin turns this on once in **Settings → Services → Trakt**.

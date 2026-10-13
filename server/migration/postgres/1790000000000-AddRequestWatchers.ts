@@ -36,6 +36,11 @@ export class AddRequestWatchers1790000000000 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "notification_delivery" DROP CONSTRAINT "UQ_notification_delivery_request_type_user"`
     );
+    // Only the original requester's deliveries fit the old one-per-request
+    // shape; the watchers' would break its uniqueness.
+    await queryRunner.query(
+      `DELETE FROM "notification_delivery" WHERE "userId" <> 0`
+    );
     await queryRunner.query(
       `ALTER TABLE "notification_delivery" ADD CONSTRAINT "UQ_notification_delivery_request_type" UNIQUE ("requestId", "type")`
     );

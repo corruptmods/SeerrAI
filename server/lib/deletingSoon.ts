@@ -59,6 +59,8 @@ export interface DeletingSoonItem {
 
 const snapshots = new Map<number, ServerSnapshot>();
 const lastErrors = new Map<number, { at: Date; message: string }>();
+/** When each server was last asked, answered or not. */
+const attemptedAt = new Map<number, number>();
 let refreshedOnce = false;
 let inFlight: Promise<void> | null = null;
 
@@ -144,8 +146,14 @@ export const refreshDeletingSoon = async (): Promise<void> => {
           lastErrors.delete(id);
         }
       }
+      for (const id of [...attemptedAt.keys()]) {
+        if (!servers.some((server) => server.id === id)) {
+          attemptedAt.delete(id);
+        }
+      }
 
       for (const server of servers) {
+        attemptedAt.set(server.id, Date.now());
         try {
           snapshots.set(server.id, await fetchServer(server));
           lastErrors.delete(server.id);
@@ -176,8 +184,12 @@ const ensureFresh = async (): Promise<void> => {
     return;
   }
 
+  // By when each server was last asked, not last answered: one that cannot
+  // be reached is tried again after the same wait, rather than on every call
+  // (or, if it never answered, never). A server just added has not been
+  // asked at all.
   const oldest = Math.min(
-    ...[...snapshots.values()].map((snapshot) => snapshot.fetchedAt),
+    ...configuredServers().map((server) => attemptedAt.get(server.id) ?? 0),
     Date.now()
   );
 
@@ -335,6 +347,7 @@ export const getMaintainerrStatus = () =>
 export const resetDeletingSoonForTests = () => {
   snapshots.clear();
   lastErrors.clear();
+  attemptedAt.clear();
   refreshedOnce = false;
   inFlight = null;
 };

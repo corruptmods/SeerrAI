@@ -25,6 +25,7 @@ import { sessionStoreFor } from '@server/lib/sessionStore';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import clearCookies from '@server/middleware/clearcookies';
+import { aiChatBody, jsonBody } from '@server/middleware/jsonBody';
 import warmPosters from '@server/middleware/warmPosters';
 import routes from '@server/routes';
 import avatarproxy from '@server/routes/avatarproxy';
@@ -60,6 +61,18 @@ logger.info(`Starting Seerr AI version ${getAppVersion()}`);
 const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
+
+// A promise that fails with nothing waiting on it would otherwise stop the
+// whole server (Node's default). It is logged instead: only the message and
+// stack, since an API client's error carries the request it made, API key
+// included.
+process.on('unhandledRejection', (reason) => {
+  logger.error('A background task failed with nothing to catch it', {
+    label: 'Server',
+    errorMessage: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+});
 
 if (!appDataPermissions()) {
   logger.error(
@@ -209,10 +222,9 @@ app
       })
     );
     server.use(cookieParser());
-    // A photo sent to AI Search is bigger than any other request body; the
-    // route checks its size and type.
-    server.use('/api/v1/ai/chat', express.json({ limit: '8mb' }));
-    server.use(express.json());
+    // AI Search's body is read once the session is known (below), as a
+    // photo sent to it may be larger than the usual limit.
+    server.use(jsonBody);
     server.use(express.urlencoded({ extended: true }));
     server.use((req, _res, next) => {
       try {
@@ -269,6 +281,7 @@ app
       store: sessionStore,
     });
     server.use('/api', sessions);
+    server.use(aiChatBody);
     // The image cache only takes new images for someone signed in.
     useSessionForImages({
       store: sessionStore,

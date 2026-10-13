@@ -2315,4 +2315,97 @@ describe('AvailabilitySync', () => {
       );
     });
   });
+
+  describe('blocklisted titles', () => {
+    it('keeps a blocklisted show blocklisted once its files are gone', async () => {
+      configurePlex();
+      configureSonarr([{ syncEnabled: true }]);
+
+      const mediaRepository = getRepository(Media);
+      const media = new Media();
+      media.tmdbId = 4500;
+      media.mediaType = MediaType.TV;
+      media.status = MediaStatus.BLOCKLISTED;
+      media.status4k = MediaStatus.BLOCKLISTED;
+      media.ratingKey = 'plex-blocked';
+      media.externalServiceId = 450;
+      media.seasons = [
+        new Season({
+          seasonNumber: 1,
+          status: MediaStatus.AVAILABLE,
+          status4k: MediaStatus.UNKNOWN,
+        }),
+      ];
+      await mediaRepository.save(media);
+
+      await availabilitySync.run();
+
+      const updated = await mediaRepository.findOneOrFail({
+        where: { tmdbId: 4500 },
+      });
+      assert.equal(updated.status, MediaStatus.BLOCKLISTED);
+      assert.equal(updated.status4k, MediaStatus.BLOCKLISTED);
+    });
+  });
+
+  describe('running', () => {
+    it('does not start a second run while one is under way', async () => {
+      configurePlex();
+      configureSonarr([{ syncEnabled: true }]);
+
+      const media = new Media();
+      media.tmdbId = 4600;
+      media.mediaType = MediaType.TV;
+      media.status = MediaStatus.AVAILABLE;
+      media.externalServiceId = 460;
+      media.seasons = [];
+      await getRepository(Media).save(media);
+
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      let lookups = 0;
+      getSeriesByIdImpl = async () => {
+        lookups++;
+        if (lookups === 1) await gate;
+        throw new Error('404');
+      };
+
+      const first = availabilitySync.run();
+      while (lookups === 0) await new Promise((r) => setImmediate(r));
+
+      await availabilitySync.run();
+      assert.equal(lookups, 1, 'the second run looked titles up again');
+      assert.equal(availabilitySync.running, true);
+
+      release();
+      await first;
+      assert.equal(availabilitySync.running, false);
+    });
+
+    it('checks every title, however many drop out as it goes', async () => {
+      configurePlex();
+      configureRadarr([{ syncEnabled: true }]);
+
+      // More than a page of movies, none of them still on disk anywhere.
+      const mediaRepository = getRepository(Media);
+      await mediaRepository.save(
+        Array.from({ length: 60 }, (_, i) => {
+          const media = new Media();
+          media.tmdbId = 5000 + i;
+          media.mediaType = MediaType.MOVIE;
+          media.status = MediaStatus.AVAILABLE;
+          return media;
+        })
+      );
+
+      await availabilitySync.run();
+
+      assert.equal(
+        await mediaRepository.count({
+          where: { status: MediaStatus.AVAILABLE },
+        }),
+        0
+      );
+    });
+  });
 });

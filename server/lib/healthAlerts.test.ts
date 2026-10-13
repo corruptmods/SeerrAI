@@ -119,4 +119,36 @@ describe('health alerts', () => {
       'Prowlarr: Not answering (connect ECONNREFUSED)',
     ]);
   });
+
+  it('keeps what it knew of a service whose own report could not be read', () => {
+    const radarrIndexers = service({
+      id: 'radarr:0',
+      name: 'Radarr',
+      status: 'warning',
+      count: 1,
+      items: [{ title: 'Indexers unavailable', detail: 'IndexerStatusCheck' }],
+    });
+    // Radarr answered, but its health list timed out: nothing is known of
+    // its indexers this time, which is not the same as their being fine.
+    const radarrUnread = service({
+      id: 'radarr:0',
+      name: 'Radarr',
+      partial: true,
+    });
+
+    healthAlerts.consider(problemsIn([radarrIndexers]));
+    healthAlerts.consider(problemsIn([radarrIndexers]));
+    assert.equal(sent.length, 1);
+
+    healthAlerts.consider(problemsIn([radarrUnread]), new Set(['radarr:0']));
+    healthAlerts.consider(problemsIn([radarrIndexers]));
+    healthAlerts.consider(problemsIn([radarrIndexers]));
+    assert.equal(sent.length, 1, 'not told again after a slow answer');
+
+    // Read in full and clear: told again if it comes back.
+    healthAlerts.consider(problemsIn([service({ id: 'radarr:0' })]));
+    healthAlerts.consider(problemsIn([radarrIndexers]));
+    healthAlerts.consider(problemsIn([radarrIndexers]));
+    assert.equal(sent.length, 2);
+  });
 });

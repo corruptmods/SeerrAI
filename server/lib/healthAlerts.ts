@@ -63,7 +63,13 @@ class HealthAlerts {
     if (this.running) return [];
     this.running = true;
     try {
-      return this.consider(problemsIn(await serviceChecks()));
+      const checks = await serviceChecks();
+      return this.consider(
+        problemsIn(checks),
+        new Set(
+          checks.filter((check) => check.partial).map((check) => check.id)
+        )
+      );
     } catch (e) {
       logger.warn('Could not run the health checks for alerts', {
         label: 'Health',
@@ -75,11 +81,24 @@ class HealthAlerts {
     }
   }
 
-  /** What to tell, of what was found this run; sends it. */
-  public consider(problems: HealthProblem[]): HealthProblem[] {
+  /**
+   * What to tell, of what was found this run; sends it. `unread` names the
+   * services that answered but whose own report could not all be read this
+   * run: what was known of them stands, rather than counting as cleared and
+   * being told again on the next run that reads it.
+   */
+  public consider(
+    problems: HealthProblem[],
+    unread: ReadonlySet<string> = new Set()
+  ): HealthProblem[] {
     const now = new Set(problems.map((p) => p.key));
+    // It answered, so if it was down before, that has cleared.
+    const ofUnread = (key: string) =>
+      [...unread].some(
+        (id) => key.startsWith(`${id}:`) && key !== `${id}:down`
+      );
     for (const key of [...this.seen.keys()]) {
-      if (!now.has(key)) {
+      if (!now.has(key) && !ofUnread(key)) {
         // Cleared: told again if it comes back.
         this.seen.delete(key);
         this.told.delete(key);

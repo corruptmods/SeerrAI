@@ -39,6 +39,26 @@ interface ScheduledJob {
 
 export const scheduledJobs: ScheduledJob[] = [];
 
+/**
+ * The work of one scheduled job, waited for, with anything it throws logged
+ * and dropped. A job's failure (a service down, a bad answer) must not leave
+ * a rejected promise nobody waits for: Node stops the whole server on one.
+ * Only the message and stack are logged, since an API client's error carries
+ * the request it made, API key included.
+ */
+export const runJob =
+  (name: string, work: () => unknown) => async (): Promise<void> => {
+    try {
+      await work();
+    } catch (e) {
+      logger.error(`Scheduled job failed: ${name}`, {
+        label: 'Jobs',
+        errorMessage: e instanceof Error ? e.message : String(e),
+        stack: e instanceof Error ? e.stack : undefined,
+      });
+    }
+  };
+
 export const startJobs = (): void => {
   const jobs = getSettings().jobs;
   const mediaServerType = getSettings().main.mediaServerType;
@@ -53,12 +73,12 @@ export const startJobs = (): void => {
       cronSchedule: jobs['plex-recently-added-scan'].schedule,
       job: schedule.scheduleJob(
         jobs['plex-recently-added-scan'].schedule,
-        () => {
+        runJob('Plex Recently Added Scan', () => {
           logger.info('Starting scheduled job: Plex Recently Added Scan', {
             label: 'Jobs',
           });
-          plexRecentScanner.run();
-        }
+          return plexRecentScanner.run();
+        })
       ),
       running: () => plexRecentScanner.status().running,
       cancelFn: () => plexRecentScanner.cancel(),
@@ -71,12 +91,15 @@ export const startJobs = (): void => {
       type: 'process',
       interval: 'hours',
       cronSchedule: jobs['plex-full-scan'].schedule,
-      job: schedule.scheduleJob(jobs['plex-full-scan'].schedule, () => {
-        logger.info('Starting scheduled job: Plex Full Library Scan', {
-          label: 'Jobs',
-        });
-        plexFullScanner.run();
-      }),
+      job: schedule.scheduleJob(
+        jobs['plex-full-scan'].schedule,
+        runJob('Plex Full Library Scan', () => {
+          logger.info('Starting scheduled job: Plex Full Library Scan', {
+            label: 'Jobs',
+          });
+          return plexFullScanner.run();
+        })
+      ),
       running: () => plexFullScanner.status().running,
       cancelFn: () => plexFullScanner.cancel(),
     });
@@ -87,12 +110,15 @@ export const startJobs = (): void => {
       type: 'process',
       interval: 'fixed',
       cronSchedule: jobs['plex-refresh-token'].schedule,
-      job: schedule.scheduleJob(jobs['plex-refresh-token'].schedule, () => {
-        logger.info('Starting scheduled job: Plex Refresh Token', {
-          label: 'Jobs',
-        });
-        refreshToken.run();
-      }),
+      job: schedule.scheduleJob(
+        jobs['plex-refresh-token'].schedule,
+        runJob('Plex Refresh Token', () => {
+          logger.info('Starting scheduled job: Plex Refresh Token', {
+            label: 'Jobs',
+          });
+          return refreshToken.run();
+        })
+      ),
     });
   } else if (
     mediaServerType === MediaServerType.JELLYFIN ||
@@ -107,12 +133,12 @@ export const startJobs = (): void => {
       cronSchedule: jobs['jellyfin-recently-added-scan'].schedule,
       job: schedule.scheduleJob(
         jobs['jellyfin-recently-added-scan'].schedule,
-        () => {
+        runJob('Jellyfin Recently Added Scan', () => {
           logger.info('Starting scheduled job: Jellyfin Recently Added Scan', {
             label: 'Jobs',
           });
-          jellyfinRecentScanner.run();
-        }
+          return jellyfinRecentScanner.run();
+        })
       ),
       running: () => jellyfinRecentScanner.status().running,
       cancelFn: () => jellyfinRecentScanner.cancel(),
@@ -125,12 +151,15 @@ export const startJobs = (): void => {
       type: 'process',
       interval: 'hours',
       cronSchedule: jobs['jellyfin-full-scan'].schedule,
-      job: schedule.scheduleJob(jobs['jellyfin-full-scan'].schedule, () => {
-        logger.info('Starting scheduled job: Jellyfin Full Scan', {
-          label: 'Jobs',
-        });
-        jellyfinFullScanner.run();
-      }),
+      job: schedule.scheduleJob(
+        jobs['jellyfin-full-scan'].schedule,
+        runJob('Jellyfin Full Library Scan', () => {
+          logger.info('Starting scheduled job: Jellyfin Full Scan', {
+            label: 'Jobs',
+          });
+          return jellyfinFullScanner.run();
+        })
+      ),
       running: () => jellyfinFullScanner.status().running,
       cancelFn: () => jellyfinFullScanner.cancel(),
     });
@@ -144,17 +173,15 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'seconds',
     cronSchedule: jobs['plex-watchlist-sync'].schedule,
-    job: schedule.scheduleJob(jobs['plex-watchlist-sync'].schedule, () => {
-      logger.info('Starting scheduled job: Watchlist Sync', {
-        label: 'Jobs',
-      });
-      watchlistSync.syncWatchlist().catch((e) => {
-        logger.error('Failed to sync watchlists', {
-          label: 'Watchlist Sync',
-          errorMessage: e.message,
+    job: schedule.scheduleJob(
+      jobs['plex-watchlist-sync'].schedule,
+      runJob('Watchlist Sync', () => {
+        logger.info('Starting scheduled job: Watchlist Sync', {
+          label: 'Jobs',
         });
-      });
-    }),
+        return watchlistSync.syncWatchlist();
+      })
+    ),
     running: () => watchlistSync.running,
   });
 
@@ -165,10 +192,13 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'hours',
     cronSchedule: jobs['radarr-scan'].schedule,
-    job: schedule.scheduleJob(jobs['radarr-scan'].schedule, () => {
-      logger.info('Starting scheduled job: Radarr Scan', { label: 'Jobs' });
-      radarrScanner.run();
-    }),
+    job: schedule.scheduleJob(
+      jobs['radarr-scan'].schedule,
+      runJob('Radarr Scan', () => {
+        logger.info('Starting scheduled job: Radarr Scan', { label: 'Jobs' });
+        return radarrScanner.run();
+      })
+    ),
     running: () => radarrScanner.status().running,
     cancelFn: () => radarrScanner.cancel(),
   });
@@ -180,10 +210,13 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'hours',
     cronSchedule: jobs['sonarr-scan'].schedule,
-    job: schedule.scheduleJob(jobs['sonarr-scan'].schedule, () => {
-      logger.info('Starting scheduled job: Sonarr Scan', { label: 'Jobs' });
-      sonarrScanner.run();
-    }),
+    job: schedule.scheduleJob(
+      jobs['sonarr-scan'].schedule,
+      runJob('Sonarr Scan', () => {
+        logger.info('Starting scheduled job: Sonarr Scan', { label: 'Jobs' });
+        return sonarrScanner.run();
+      })
+    ),
     running: () => sonarrScanner.status().running,
     cancelFn: () => sonarrScanner.cancel(),
   });
@@ -195,12 +228,15 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'hours',
     cronSchedule: jobs['availability-sync'].schedule,
-    job: schedule.scheduleJob(jobs['availability-sync'].schedule, () => {
-      logger.info('Starting scheduled job: Media Availability Sync', {
-        label: 'Jobs',
-      });
-      availabilitySync.run();
-    }),
+    job: schedule.scheduleJob(
+      jobs['availability-sync'].schedule,
+      runJob('Media Availability Sync', () => {
+        logger.info('Starting scheduled job: Media Availability Sync', {
+          label: 'Jobs',
+        });
+        return availabilitySync.run();
+      })
+    ),
     running: () => availabilitySync.running,
     cancelFn: () => availabilitySync.cancel(),
   });
@@ -212,12 +248,15 @@ export const startJobs = (): void => {
     type: 'command',
     interval: 'seconds',
     cronSchedule: jobs['download-sync'].schedule,
-    job: schedule.scheduleJob(jobs['download-sync'].schedule, () => {
-      logger.debug('Starting scheduled job: Download Sync', {
-        label: 'Jobs',
-      });
-      downloadTracker.updateDownloads();
-    }),
+    job: schedule.scheduleJob(
+      jobs['download-sync'].schedule,
+      runJob('Download Sync', () => {
+        logger.debug('Starting scheduled job: Download Sync', {
+          label: 'Jobs',
+        });
+        return downloadTracker.updateDownloads();
+      })
+    ),
   });
 
   // A minute after Radarr or Sonarr imports something, the media server's
@@ -246,10 +285,13 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'minutes',
     cronSchedule: jobs['episode-sync'].schedule,
-    job: schedule.scheduleJob(jobs['episode-sync'].schedule, () => {
-      logger.debug('Starting scheduled job: Episode Sync', { label: 'Jobs' });
-      episodeSync.run();
-    }),
+    job: schedule.scheduleJob(
+      jobs['episode-sync'].schedule,
+      runJob('Episode Sync', () => {
+        logger.debug('Starting scheduled job: Episode Sync', { label: 'Jobs' });
+        return episodeSync.run();
+      })
+    ),
   });
 
   // Give new Plex friends an account, when Auto-Import Plex Users is on
@@ -260,12 +302,15 @@ export const startJobs = (): void => {
       type: 'process',
       interval: 'hours',
       cronSchedule: jobs['plex-user-import'].schedule,
-      job: schedule.scheduleJob(jobs['plex-user-import'].schedule, () => {
-        logger.debug('Starting scheduled job: Plex User Import', {
-          label: 'Jobs',
-        });
-        plexUserImport.run();
-      }),
+      job: schedule.scheduleJob(
+        jobs['plex-user-import'].schedule,
+        runJob('Plex User Import', () => {
+          logger.debug('Starting scheduled job: Plex User Import', {
+            label: 'Jobs',
+          });
+          return plexUserImport.run();
+        })
+      ),
     });
   }
 
@@ -276,12 +321,15 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'hours',
     cronSchedule: jobs['future-seasons'].schedule,
-    job: schedule.scheduleJob(jobs['future-seasons'].schedule, () => {
-      logger.debug('Starting scheduled job: Future Season Requests', {
-        label: 'Jobs',
-      });
-      futureSeasons.run();
-    }),
+    job: schedule.scheduleJob(
+      jobs['future-seasons'].schedule,
+      runJob('Future Season Requests', () => {
+        logger.debug('Starting scheduled job: Future Season Requests', {
+          label: 'Jobs',
+        });
+        return futureSeasons.run();
+      })
+    ),
   });
 
   // Catch any availability or failure notification the subscribers missed
@@ -291,12 +339,15 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'minutes',
     cronSchedule: jobs['notification-reconcile'].schedule,
-    job: schedule.scheduleJob(jobs['notification-reconcile'].schedule, () => {
-      logger.debug('Starting scheduled job: Notification Reconcile', {
-        label: 'Jobs',
-      });
-      notificationReconciler.run();
-    }),
+    job: schedule.scheduleJob(
+      jobs['notification-reconcile'].schedule,
+      runJob('Notification Reconcile', () => {
+        logger.debug('Starting scheduled job: Notification Reconcile', {
+          label: 'Jobs',
+        });
+        return notificationReconciler.run();
+      })
+    ),
   });
 
   // Reset download sync everyday at 01:00 am
@@ -306,12 +357,15 @@ export const startJobs = (): void => {
     type: 'command',
     interval: 'hours',
     cronSchedule: jobs['download-sync-reset'].schedule,
-    job: schedule.scheduleJob(jobs['download-sync-reset'].schedule, () => {
-      logger.info('Starting scheduled job: Download Sync Reset', {
-        label: 'Jobs',
-      });
-      downloadTracker.resetDownloadTracker();
-    }),
+    job: schedule.scheduleJob(
+      jobs['download-sync-reset'].schedule,
+      runJob('Download Sync Reset', () => {
+        logger.info('Starting scheduled job: Download Sync Reset', {
+          label: 'Jobs',
+        });
+        return downloadTracker.resetDownloadTracker();
+      })
+    ),
   });
 
   // Run image cache cleanup every 24 hours
@@ -321,26 +375,24 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'hours',
     cronSchedule: jobs['image-cache-cleanup'].schedule,
-    job: schedule.scheduleJob(jobs['image-cache-cleanup'].schedule, () => {
-      logger.info('Starting scheduled job: Image Cache Cleanup', {
-        label: 'Jobs',
-      });
-      // Images not seen for a month past their expiry, from every source,
-      // then the least recently used, to keep the cache under its limit.
-      // Expired images seen since are kept: they are revalidated with the
-      // host, not downloaded again, when next asked for.
-      (async () => {
-        for (const source of ['tmdb', 'tvdb', 'avatar']) {
-          await ImageProxy.clearCache(source);
-        }
-        await ImageProxy.trimToLimit();
-      })().catch((e) =>
-        logger.error('Image Cache Cleanup failed', {
+    job: schedule.scheduleJob(
+      jobs['image-cache-cleanup'].schedule,
+      runJob('Image Cache Cleanup', () => {
+        logger.info('Starting scheduled job: Image Cache Cleanup', {
           label: 'Jobs',
-          errorMessage: e.message,
-        })
-      );
-    }),
+        });
+        // Images not seen for a month past their expiry, from every source,
+        // then the least recently used, to keep the cache under its limit.
+        // Expired images seen since are kept: they are revalidated with the
+        // host, not downloaded again, when next asked for.
+        return (async () => {
+          for (const source of ['tmdb', 'tvdb', 'avatar']) {
+            await ImageProxy.clearCache(source);
+          }
+          await ImageProxy.trimToLimit();
+        })();
+      })
+    ),
   });
 
   scheduledJobs.push({
@@ -349,12 +401,15 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'days',
     cronSchedule: jobs['process-blocklisted-tags'].schedule,
-    job: schedule.scheduleJob(jobs['process-blocklisted-tags'].schedule, () => {
-      logger.info('Starting scheduled job: Process Blocklisted Tags', {
-        label: 'Jobs',
-      });
-      blocklistedTagsProcessor.run();
-    }),
+    job: schedule.scheduleJob(
+      jobs['process-blocklisted-tags'].schedule,
+      runJob('Process Blocklisted Tags', () => {
+        logger.info('Starting scheduled job: Process Blocklisted Tags', {
+          label: 'Jobs',
+        });
+        return blocklistedTagsProcessor.run();
+      })
+    ),
     running: () => blocklistedTagsProcessor.status().running,
     cancelFn: () => blocklistedTagsProcessor.cancel(),
   });
@@ -367,10 +422,13 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'days',
     cronSchedule: jobs['anime-check'].schedule,
-    job: schedule.scheduleJob(jobs['anime-check'].schedule, () => {
-      logger.info('Starting scheduled job: Anime Check', { label: 'Jobs' });
-      animeCheck.run();
-    }),
+    job: schedule.scheduleJob(
+      jobs['anime-check'].schedule,
+      runJob('Anime Check', () => {
+        logger.info('Starting scheduled job: Anime Check', { label: 'Jobs' });
+        return animeCheck.run();
+      })
+    ),
     running: () => animeCheck.status().running,
     cancelFn: () => animeCheck.cancel(),
   });
@@ -383,10 +441,13 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'hours',
     cronSchedule: jobs['backfill-scan'].schedule,
-    job: schedule.scheduleJob(jobs['backfill-scan'].schedule, () => {
-      logger.info('Starting scheduled job: Backfill Scan', { label: 'Jobs' });
-      backfill.scan();
-    }),
+    job: schedule.scheduleJob(
+      jobs['backfill-scan'].schedule,
+      runJob('Backfill Scan', () => {
+        logger.info('Starting scheduled job: Backfill Scan', { label: 'Jobs' });
+        return backfill.scan();
+      })
+    ),
     running: () => backfill.status().running,
     cancelFn: () => backfill.cancel(),
   });
@@ -398,9 +459,12 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'fixed',
     cronSchedule: jobs['backfill-monitor'].schedule,
-    job: schedule.scheduleJob(jobs['backfill-monitor'].schedule, () => {
-      backfill.tick();
-    }),
+    job: schedule.scheduleJob(
+      jobs['backfill-monitor'].schedule,
+      runJob('Backfill Downloads', () => {
+        return backfill.tick();
+      })
+    ),
     running: () => backfill.monitorStatus().running,
   });
 
@@ -413,12 +477,15 @@ export const startJobs = (): void => {
       type: 'process',
       interval: 'days',
       cronSchedule: jobs['plex-match-check'].schedule,
-      job: schedule.scheduleJob(jobs['plex-match-check'].schedule, () => {
-        logger.info('Starting scheduled job: Plex Match Check', {
-          label: 'Jobs',
-        });
-        plexMatchCheck.run();
-      }),
+      job: schedule.scheduleJob(
+        jobs['plex-match-check'].schedule,
+        runJob('Plex Match Check', () => {
+          logger.info('Starting scheduled job: Plex Match Check', {
+            label: 'Jobs',
+          });
+          return plexMatchCheck.run();
+        })
+      ),
       running: () => plexMatchCheck.status().running,
       cancelFn: () => plexMatchCheck.cancel(),
     });
@@ -432,9 +499,12 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'minutes',
     cronSchedule: jobs['health-watch'].schedule,
-    job: schedule.scheduleJob(jobs['health-watch'].schedule, () => {
-      healthAlerts.run();
-    }),
+    job: schedule.scheduleJob(
+      jobs['health-watch'].schedule,
+      runJob('Health Alerts', () => {
+        return healthAlerts.run();
+      })
+    ),
     running: () => false,
   });
 
@@ -444,12 +514,16 @@ export const startJobs = (): void => {
     type: 'process',
     interval: 'days',
     cronSchedule: jobs['database-maintenance'].schedule,
-    job: schedule.scheduleJob(jobs['database-maintenance'].schedule, () => {
-      logger.info('Starting scheduled job: Database Maintenance', {
-        label: 'Jobs',
-      });
-      runDbMaintenance().catch(() => undefined);
-    }),
+    job: schedule.scheduleJob(
+      jobs['database-maintenance'].schedule,
+      runJob('Database Maintenance', () => {
+        logger.info('Starting scheduled job: Database Maintenance', {
+          label: 'Jobs',
+        });
+        // Maintenance logs its own failure.
+        return runDbMaintenance().catch(() => undefined);
+      })
+    ),
     running: () => maintenanceStatus().running,
   });
 

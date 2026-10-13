@@ -322,4 +322,13 @@ describe('the release calendar', () => {
       'the spec caps it at 12'
     );
   });
+
+  it('refuses a fractional week count rather than asking every server for it', async () => {
+    // Each range is cached on its own: weeks=7.0001 and the like would
+    // otherwise each ask every Radarr and Sonarr.
+    for (const weeks of ['7.0001', '7.5']) {
+      assert.equal((await calendar(`?weeks=${weeks}`)).status, 400);
+    }
+    assert.deepEqual(asked, []);
+  });
 });

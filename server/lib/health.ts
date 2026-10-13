@@ -67,6 +67,12 @@ export interface HealthCheck {
   count: number;
   detail?: string;
   items: HealthItem[];
+  /**
+   * A service that answered, but some of what it reports (its own health
+   * list, its disks) could not be read this time. What that would have
+   * said is unknown, which is not the same as nothing being wrong.
+   */
+  partial?: boolean;
 }
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -174,6 +180,27 @@ const size = (bytes: number) =>
     ? `${(bytes / (1024 * GB)).toFixed(1)} TB`
     : `${Math.round(bytes / GB)} GB`;
 
+/**
+ * For the lookups a service that answered still makes: notes that one
+ * failed or was too slow, and stands in for its answer with an empty list.
+ */
+const unreadTracker = () => {
+  const state = { partial: false };
+  return {
+    state,
+    missed: (): never[] => {
+      state.partial = true;
+      return [];
+    },
+  };
+};
+
+/** The check, marked partial when some of the service's report was missed. */
+const withPartial = (
+  check: HealthCheck,
+  state: { partial: boolean }
+): HealthCheck => (state.partial ? { ...check, partial: true } : check);
+
 /** A reachable service with things of its own to report. */
 const reported = (
   id: string,
@@ -209,13 +236,14 @@ const arrCheck = async (
     return serviceDown(id, name, e);
   }
   const ms = Date.now() - started;
+  const unread = unreadTracker();
   const [issues, folders] = await Promise.all([
     withTimeout(api.getHealth(), SERVICE_TIMEOUT_MS)
       .then(listOf)
-      .catch(() => []),
+      .catch(unread.missed),
     withTimeout(api.getRootFolderSpace(), SERVICE_TIMEOUT_MS)
       .then(listOf)
-      .catch(() => []),
+      .catch(unread.missed),
   ]);
   const found: { status: HealthStatus; item: HealthItem }[] = [
     ...issues
@@ -244,12 +272,15 @@ const arrCheck = async (
   const leastFree = folders.length
     ? Math.min(...folders.map((f) => f.freeSpace))
     : undefined;
-  return reported(
-    id,
-    name,
-    ms,
-    found,
-    leastFree !== undefined ? `${size(leastFree)} free` : undefined
+  return withPartial(
+    reported(
+      id,
+      name,
+      ms,
+      found,
+      leastFree !== undefined ? `${size(leastFree)} free` : undefined
+    ),
+    unread.state
   );
 };
 
@@ -262,11 +293,14 @@ const prowlarrCheck = async (api: ProwlarrAPI): Promise<HealthCheck> => {
     return serviceDown('prowlarr', 'Prowlarr', e);
   }
   const ms = Date.now() - started;
+  const unread = unreadTracker();
   const [issues, failing] = await Promise.all([
     withTimeout(api.getHealth(), SERVICE_TIMEOUT_MS)
       .then(listOf)
-      .catch(() => []),
-    withTimeout(api.getFailingIndexers(), SERVICE_TIMEOUT_MS).catch(() => []),
+      .catch(unread.missed),
+    withTimeout(api.getFailingIndexers(), SERVICE_TIMEOUT_MS).catch(
+      unread.missed
+    ),
   ]);
   const now = Date.now();
   const found: { status: HealthStatus; item: HealthItem }[] = [
@@ -304,7 +338,7 @@ const prowlarrCheck = async (api: ProwlarrAPI): Promise<HealthCheck> => {
         item: { title: issue.message, detail: issue.source },
       })),
   ];
-  return reported('prowlarr', 'Prowlarr', ms, found);
+  return withPartial(reported('prowlarr', 'Prowlarr', ms, found), unread.state);
 };
 
 /**
@@ -320,9 +354,12 @@ const bazarrCheck = async (api: BazarrAPI): Promise<HealthCheck> => {
     return serviceDown('bazarr', 'Bazarr', e);
   }
   const ms = Date.now() - started;
+  const unread = unreadTracker();
   const [issues, providers] = await Promise.all([
-    withTimeout(api.getHealth(), SERVICE_TIMEOUT_MS).catch(() => []),
-    withTimeout(api.getProviderStatus(), SERVICE_TIMEOUT_MS).catch(() => []),
+    withTimeout(api.getHealth(), SERVICE_TIMEOUT_MS).catch(unread.missed),
+    withTimeout(api.getProviderStatus(), SERVICE_TIMEOUT_MS).catch(
+      unread.missed
+    ),
   ]);
   const found: { status: HealthStatus; item: HealthItem }[] = [
     ...providers
@@ -346,12 +383,15 @@ const bazarrCheck = async (api: BazarrAPI): Promise<HealthCheck> => {
         item: { title: issue.issue!, detail: issue.object },
       })),
   ];
-  return reported(
-    'bazarr',
-    'Bazarr',
-    ms,
-    found,
-    `${providers.length} provider${providers.length === 1 ? '' : 's'}`
+  return withPartial(
+    reported(
+      'bazarr',
+      'Bazarr',
+      ms,
+      found,
+      `${providers.length} provider${providers.length === 1 ? '' : 's'}`
+    ),
+    unread.state
   );
 };
 

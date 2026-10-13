@@ -70,7 +70,7 @@ let sonarrEpisodes: unknown[] = [];
 let commands: { name: string; episodeIds?: number[]; movieIds?: number[] }[] =
   [];
 // What the fake Radarr says on its health page, and its disks.
-let arrHealth: unknown[] = [];
+let arrHealth: unknown[] | null = [];
 let rootFolders: unknown[] = [];
 // The fake Prowlarr's indexers and their failures.
 let indexers: unknown[] = [];
@@ -102,6 +102,11 @@ const fake = http.createServer((req, res) => {
     ['/api/providers', { data: bazarrProviders }],
   ];
   const answer = answers.find(([prefix]) => url.startsWith(prefix));
+  // null: the request gets no answer at all.
+  if (answer && answer[1] === null) {
+    req.socket.destroy();
+    return;
+  }
   if (answer) {
     res.end(JSON.stringify(answer[1]));
     return;
@@ -132,6 +137,7 @@ type Check = {
   status: string;
   count: number;
   detail?: string;
+  partial?: boolean;
   items: { title: string; detail?: string; href?: string }[];
 };
 const health = () =>
@@ -336,6 +342,16 @@ describe('services', () => {
     ];
     arrHealth = [];
     assert.equal(byId(await health(), 'radarr:0').status, 'error');
+  });
+
+  it('says when Radarr answered but its own health list could not be read', async () => {
+    arrHealth = null;
+    const radarr = byId(await health(), 'radarr:0');
+    assert.equal(radarr.status, 'ok');
+    assert.equal(radarr.partial, true);
+
+    arrHealth = [];
+    assert.equal(byId(await health(), 'radarr:0').partial, undefined);
   });
 
   it('names the indexers Prowlarr has paused, and the download clients that do not answer', async () => {

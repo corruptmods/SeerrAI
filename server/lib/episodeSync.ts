@@ -44,7 +44,7 @@ const fingerprintOf = (series: SonarrSeries): string | null => {
 class EpisodeSync {
   private running = false;
 
-  /** Each series' fingerprint as of its last successful sync, by server. */
+  /** Each series' fingerprint as of its last successful sync, by title. */
   private synced = new Map<string, string>();
 
   public async run(): Promise<void> {
@@ -141,7 +141,10 @@ class EpisodeSync {
           continue;
         }
 
-        const key = `${show.serviceId}:${show.externalServiceId}`;
+        // The title's own id is part of the key: a title cleared and
+        // requested again is a new row, with no episodes stored yet, though
+        // the Sonarr series and its counts are the same.
+        const key = `${show.id}:${show.serviceId}:${show.externalServiceId}`;
         const fingerprint = fingerprintOf(series);
         if (fingerprint && this.synced.get(key) === fingerprint) {
           continue;

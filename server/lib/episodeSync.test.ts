@@ -190,4 +190,20 @@ describe('Episode Sync', () => {
     assert.deepEqual(episodeCalls, [505, 505]);
     assert.equal(await availableOf(media), 3);
   });
+
+  it('reads a title again when its data is cleared and it is requested anew', async () => {
+    const first = await show(70006, 506);
+    series = [seriesWith(506, 2)];
+    episodesOf[506] = files(2);
+    await episodeSync.run();
+    assert.equal(await availableOf(first), 2);
+
+    // Cleared, taking its seasons and episodes with it, then requested
+    // again: the same Sonarr series, whose counts have not moved.
+    await getRepository(Media).delete(first.id);
+    const again = await show(70006, 506);
+
+    await episodeSync.run();
+    assert.equal(await availableOf(again), 2);
+  });
 });

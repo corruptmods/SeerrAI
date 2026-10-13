@@ -18,10 +18,12 @@ import MediaRequest from '@server/entity/MediaRequest';
 import type Season from '@server/entity/Season';
 import { User } from '@server/entity/User';
 import { recordMediaDeletion } from '@server/lib/mediaDeletions';
+import { isBlocklisted } from '@server/lib/scanners/baseScanner';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { getHostname } from '@server/utils/getHostname';
+import { MoreThan } from 'typeorm';
 
 class AvailabilitySync {
   public running = false;
@@ -42,6 +44,14 @@ class AvailabilitySync {
   readonly tmdb = new TheMovieDb();
 
   async run() {
+    // A second run at once (Run now during a scheduled one) would reset the
+    // first one's caches under it and stop it when it finished.
+    if (this.running) {
+      logger.debug('Availability sync is already running.', {
+        label: 'AvailabilitySync',
+      });
+      return;
+    }
     const settings = getSettings();
     const mediaServerType = getSettings().main.mediaServerType;
     this.running = true;
@@ -132,6 +142,12 @@ class AvailabilitySync {
       for await (const media of this.loadAvailableMediaPaginated(pageSize)) {
         if (!this.running) {
           throw new Error('Job aborted');
+        }
+
+        // A blocklisted title stays blocklisted, files or not: marking it
+        // deleted would let it be requested again.
+        if (isBlocklisted(media)) {
+          continue;
         }
 
         // Check plex, radarr, and sonarr for that specific media and
@@ -478,7 +494,7 @@ class AvailabilitySync {
   }
 
   private async *loadAvailableMediaPaginated(pageSize: number) {
-    let offset = 0;
+    let lastId = 0;
     const mediaRepository = getRepository(Media);
     const whereOptions = [
       { status: MediaStatus.AVAILABLE },
@@ -493,13 +509,19 @@ class AvailabilitySync {
 
     let mediaPage: Media[];
 
+    // Paged by id, not by position: titles marked deleted as the sync goes
+    // drop out of the set, and counting past them would skip as many others.
     do {
-      yield* (mediaPage = await mediaRepository.find({
-        where: whereOptions,
-        skip: offset,
+      mediaPage = await mediaRepository.find({
+        where: whereOptions.map((where) => ({
+          ...where,
+          id: MoreThan(lastId),
+        })),
+        order: { id: 'ASC' },
         take: pageSize,
-      }));
-      offset += pageSize;
+      });
+      if (mediaPage.length > 0) lastId = mediaPage[mediaPage.length - 1].id;
+      yield* mediaPage;
     } while (mediaPage.length > 0);
   }
 

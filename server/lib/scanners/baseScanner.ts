@@ -67,7 +67,7 @@ export interface ProcessableSeason {
  * this, the next scan would find that file and mark the title available again,
  * silently undoing the blocklist.
  */
-const isBlocklisted = (media: Media): boolean =>
+export const isBlocklisted = (media: Media): boolean =>
   media.status === MediaStatus.BLOCKLISTED ||
   media.status4k === MediaStatus.BLOCKLISTED;
 

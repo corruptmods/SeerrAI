@@ -753,6 +753,110 @@ describe('Sonarr Scanner', () => {
       assert.strictEqual(updatedRequest.status, MediaRequestStatus.APPROVED);
     });
 
+    it('keeps a new monitored series requested while Sonarr lists no seasons for it yet', async () => {
+      const mediaRepository = getRepository(Media);
+      const requestRepository = getRepository(MediaRequest);
+      const requestedBy = await getRepository(User).findOneOrFail({
+        where: { id: 1 },
+      });
+
+      const media = await mediaRepository.save(
+        new Media({
+          tmdbId: 2101,
+          tvdbId: 610,
+          mediaType: MediaType.TV,
+          status: MediaStatus.PROCESSING,
+          seasons: [
+            new Season({
+              seasonNumber: 1,
+              status: MediaStatus.PROCESSING,
+              status4k: MediaStatus.UNKNOWN,
+            }),
+          ],
+        })
+      );
+      // No Sonarr while the request is saved, so it is not sent there.
+      getSettings().sonarr = [];
+      const request = await requestRepository.save(
+        new MediaRequest({
+          type: MediaType.TV,
+          status: MediaRequestStatus.APPROVED,
+          media,
+          requestedBy,
+          is4k: false,
+        })
+      );
+
+      // Just added: Sonarr has the series, monitored, but its seasons
+      // have not come through from TheTVDB yet.
+      configureSonarr([{ syncEnabled: true }]);
+      getSeriesImpl = async () => [
+        fakeSonarrSeries({ tvdbId: 610, monitored: true, seasons: [] }),
+      ];
+      getShowByTvdbIdImpl = async () => fakeTmdbShow(2101);
+      getTvShowImpl = async () => fakeTmdbShow(2101);
+
+      await runWithMockTimers(() => sonarrScanner.run());
+
+      const updatedRequest = await requestRepository.findOneOrFail({
+        where: { id: request.id },
+      });
+      assert.strictEqual(updatedRequest.status, MediaRequestStatus.APPROVED);
+      const updated = await mediaRepository.findOneOrFail({
+        where: { id: media.id },
+      });
+      assert.strictEqual(updated.status, MediaStatus.PROCESSING);
+    });
+
+    it('never declines a request over a series Sonarr lists no seasons for', async () => {
+      const mediaRepository = getRepository(Media);
+      const requestRepository = getRepository(MediaRequest);
+      const requestedBy = await getRepository(User).findOneOrFail({
+        where: { id: 1 },
+      });
+
+      const media = await mediaRepository.save(
+        new Media({
+          tmdbId: 2102,
+          tvdbId: 611,
+          mediaType: MediaType.TV,
+          status: MediaStatus.PROCESSING,
+          seasons: [
+            new Season({
+              seasonNumber: 1,
+              status: MediaStatus.PROCESSING,
+              status4k: MediaStatus.UNKNOWN,
+            }),
+          ],
+        })
+      );
+      getSettings().sonarr = [];
+      const request = await requestRepository.save(
+        new MediaRequest({
+          type: MediaType.TV,
+          status: MediaRequestStatus.APPROVED,
+          media,
+          requestedBy,
+          is4k: false,
+        })
+      );
+
+      // Unmonitored, and with no seasons to say what it would have wanted.
+      configureSonarr([{ syncEnabled: true }]);
+      getSeriesImpl = async () => [
+        fakeSonarrSeries({ tvdbId: 611, monitored: false, seasons: [] }),
+      ];
+      getShowByTvdbIdImpl = async () => fakeTmdbShow(2102);
+      getTvShowImpl = async () => fakeTmdbShow(2102);
+
+      await runWithMockTimers(() => sonarrScanner.run());
+
+      const updatedRequest = await requestRepository.findOneOrFail({
+        where: { id: request.id },
+      });
+      assert.strictEqual(updatedRequest.status, MediaRequestStatus.APPROVED);
+    });
+
     it('skips cleanup and leaves the request approved when Sonarr returns an empty list', async () => {
       const mediaRepository = getRepository(Media);
       const requestRepository = getRepository(MediaRequest);

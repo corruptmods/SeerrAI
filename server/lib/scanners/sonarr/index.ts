@@ -197,6 +197,12 @@ class SonarrScanner
 
       const settings = getSettings();
 
+      // A series just added to Sonarr can have no seasons yet, until Sonarr
+      // hears of them from TheTVDB. Its seasons are on their way if the series
+      // is monitored; read as unmonitored, its request would be declined.
+      const seasonsNotListedYet =
+        sonarrSeries.seasons.length === 0 && sonarrSeries.monitored;
+
       const filteredSeasons = tvShow.seasons
         .filter(
           (sn) => settings.main.enableSpecialEpisodes || sn.season_number !== 0
@@ -209,7 +215,7 @@ class SonarrScanner
             return {
               seasonNumber: season.season_number,
               episodeCount: season.episode_count,
-              monitored: false,
+              monitored: seasonsNotListedYet,
               statistics: {
                 episodeFileCount: 0,
                 totalEpisodeCount: season.episode_count,
@@ -233,7 +239,12 @@ class SonarrScanner
         });
       }
 
-      if (processableSeasons.some((season) => season.processing)) {
+      // With no seasons listed at all, Sonarr cannot say the series was given
+      // up on, so its request is never declined for it.
+      if (
+        processableSeasons.some((season) => season.processing) ||
+        sonarrSeries.seasons.length === 0
+      ) {
         if (server4k) {
           this.processing4kTmdbIds.add(tmdbId);
         } else {

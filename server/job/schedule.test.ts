@@ -118,6 +118,18 @@ describe('scheduled jobs', () => {
     });
   }
 
+  // The interval decides which choices the schedule editor offers. Watchlist
+  // Sync runs every few minutes, so offering only seconds left admins no way
+  // to keep its schedule, or to set a sensible one.
+  it('edits Watchlist Sync in minutes', () => {
+    getSettings().main.mediaServerType = MediaServerType.PLEX;
+    stubEveryJob();
+
+    startJobs();
+    const job = scheduledJobs.find((j) => j.id === 'plex-watchlist-sync');
+    assert.equal(job?.interval, 'minutes');
+  });
+
   it('logs a job that throws before it starts', async () => {
     const logged: [string, Record<string, unknown>][] = [];
     mock.method(logger, 'error', (message: string, meta: object) => {

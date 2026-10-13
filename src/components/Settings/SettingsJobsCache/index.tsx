@@ -9,8 +9,10 @@ import useLocale from '@app/hooks/useLocale';
 import useMediaQuery from '@app/hooks/useMediaQuery';
 import useSettings from '@app/hooks/useSettings';
 
+import type { ScheduleInterval } from '@app/components/Settings/SettingsJobsCache/schedule';
 import {
   SCHEDULE_CHOICES,
+  choiceFor,
   scheduleFor,
 } from '@app/components/Settings/SettingsJobsCache/schedule';
 import useToasts from '@app/hooks/useToasts';
@@ -181,15 +183,22 @@ const jobModalReducer = (
         isOpen: false,
       };
 
-    case 'open':
+    case 'open': {
+      // Open on the job's own schedule where it is one of the choices, so
+      // saving without a change keeps it.
+      const saved = (interval: ScheduleInterval) =>
+        action.job?.interval === interval
+          ? choiceFor(interval, action.job.cronSchedule)
+          : undefined;
       return {
         isOpen: true,
         job: action.job,
-        scheduleDays: 1,
-        scheduleHours: 1,
-        scheduleMinutes: 5,
-        scheduleSeconds: 30,
+        scheduleDays: saved('days') ?? 1,
+        scheduleHours: saved('hours') ?? 1,
+        scheduleMinutes: saved('minutes') ?? 5,
+        scheduleSeconds: saved('seconds') ?? 30,
       };
+    }
 
     case 'set':
       return {

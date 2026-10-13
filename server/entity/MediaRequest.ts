@@ -367,9 +367,17 @@ export class MediaRequest {
       requestBody.seriesType == null
         ? null
         : toSeriesTypeFor(requestBody.mediaType, requestBody.seriesType);
+    // Rules belong to a server, so they are matched against the one the
+    // request goes to: the server chosen with it, or else the default one.
+    const chosenServerId = (
+      requestBody.mediaType === MediaType.MOVIE
+        ? settings.radarr
+        : settings.sonarr
+    ).find((server) => server.id === requestBody.serverId)?.id;
     const ruleResult = await overrideRules({
       mediaType: requestBody.mediaType,
       is4k: requestBody.is4k || false,
+      serviceId: chosenServerId,
       tmdbMedia,
       requestUser,
       tags,

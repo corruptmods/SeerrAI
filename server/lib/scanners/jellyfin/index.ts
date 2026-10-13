@@ -2,6 +2,7 @@ import animeList from '@server/api/animelist';
 import type {
   JellyfinLibraryItem,
   JellyfinLibraryItemExtended,
+  JellyfinMediaSource,
 } from '@server/api/jellyfin';
 import JellyfinAPI from '@server/api/jellyfin';
 import { getMetadataProvider } from '@server/api/metadata';
@@ -24,6 +25,23 @@ import { getSettings } from '@server/lib/settings';
 import { getHostname } from '@server/utils/getHostname';
 import { isAnime } from '@server/utils/isAnime';
 import { uniqWith } from 'lodash';
+
+/**
+ * Whether the server has not read an item's file yet: Jellyfin and Emby list
+ * a file before they probe it, and until then it has no media sources, or
+ * sources without a video stream. Such an item counts as standard quality
+ * until its resolution is known. If it then turns out to be 4K, the next
+ * scan adds it as 4K too; the standard status it was given is not taken
+ * back.
+ */
+const resolutionUnknown = (item: {
+  MediaSources?: JellyfinMediaSource[];
+}): boolean =>
+  !item.MediaSources?.some((MediaSource) =>
+    MediaSource.MediaStreams?.some(
+      (MediaStream) => MediaStream.Type === 'Video'
+    )
+  );
 
 interface JellyfinSyncStatus extends StatusBase {
   currentLibrary: Library;
@@ -146,7 +164,11 @@ class JellyfinScanner
         ? new Date(metadata.DateCreated)
         : undefined;
 
-      if (hasOtherResolution || (!this.enable4kMovie && has4k)) {
+      if (
+        hasOtherResolution ||
+        resolutionUnknown(metadata) ||
+        (!this.enable4kMovie && has4k)
+      ) {
         await this.processMovie(tmdbId, {
           is4k: false,
           mediaAddedAt,
@@ -355,13 +377,15 @@ class JellyfinScanner
                   )
                 );
 
-                const hasStandard = episode.MediaSources?.some((MediaSource) =>
-                  MediaSource.MediaStreams.some(
-                    (MediaStream) =>
-                      MediaStream.Type === 'Video' &&
-                      (MediaStream.Width ?? 0) <= 2000
-                  )
-                );
+                const hasStandard =
+                  resolutionUnknown(episode) ||
+                  episode.MediaSources?.some((MediaSource) =>
+                    MediaSource.MediaStreams.some(
+                      (MediaStream) =>
+                        MediaStream.Type === 'Video' &&
+                        (MediaStream.Width ?? 0) <= 2000
+                    )
+                  );
 
                 // Count in both if episode has both versions
                 // TODO: Make this more robust in the future

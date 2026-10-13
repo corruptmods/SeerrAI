@@ -37,3 +37,16 @@ export const scheduleFor = (
       return every === 7 ? '0 0 1 * * 0' : '0 0 1 * * *';
   }
 };
+
+/**
+ * Which choice a saved schedule is, so the editor opens on it rather than on
+ * a default that saving would quietly put in its place. Undefined for a
+ * schedule none of the choices make (an older one, or one set by hand).
+ */
+export const choiceFor = (
+  interval: ScheduleInterval,
+  schedule: string
+): number | undefined =>
+  SCHEDULE_CHOICES[interval].find(
+    (every) => scheduleFor(interval, every) === schedule
+  );

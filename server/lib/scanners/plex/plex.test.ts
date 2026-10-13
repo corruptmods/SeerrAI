@@ -23,12 +23,12 @@ import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
 import { plexFullScanner } from '@server/lib/scanners/plex';
-import type { Library } from '@server/lib/settings';
+import type { Library, RadarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
 import { runWithMockTimers } from '@server/test/runWithMockTimers';
 import assert from 'node:assert/strict';
-import { beforeEach, describe, it, mock } from 'node:test';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 Object.defineProperty(animeList, 'sync', {
   value: async () => {},
@@ -222,6 +222,33 @@ function configurePlexWithLibrary(
   };
 }
 
+function fakePlexMovieItem(
+  ratingKey: string,
+  tmdbId: number,
+  resolutions: string[]
+): PlexLibraryItem {
+  return {
+    ratingKey,
+    title: 'Test Movie',
+    guid: 'plex://movie/test-movie',
+    Guid: [{ id: `tmdb://${tmdbId}` }],
+    addedAt: 1700000000,
+    updatedAt: 1700000000,
+    type: 'movie',
+    Media: resolutions.map(
+      (videoResolution) =>
+        ({ videoResolution }) as PlexLibraryItem['Media'][number]
+    ),
+  };
+}
+
+const movieLibrary: Library = {
+  id: 'test-movie-library-id',
+  name: 'Movies',
+  enabled: true,
+  type: 'movie',
+};
+
 describe('Plex Scanner', () => {
   beforeEach(() => {
     getLibrariesImpl = async () => [
@@ -319,6 +346,67 @@ describe('Plex Scanner', () => {
         MediaRequestStatus.APPROVED,
         'A media server scan must not cancel a request Sonarr is still working on'
       );
+    });
+  });
+
+  describe('movie versions', () => {
+    beforeEach(() => {
+      configurePlexWithLibrary([movieLibrary]);
+      getLibrariesImpl = async () => [
+        {
+          key: movieLibrary.id,
+          title: 'Movies',
+          type: 'movie',
+          agent: 'tv.plex.agents.movie',
+        },
+      ];
+    });
+
+    afterEach(() => {
+      getSettings().radarr = [];
+    });
+
+    const scanMovie = async (tmdbId: number, resolutions: string[]) => {
+      getLibraryContentsImpl = async (id: string) =>
+        id === movieLibrary.id
+          ? {
+              totalSize: 1,
+              items: [
+                fakePlexMovieItem(`movie-${tmdbId}`, tmdbId, resolutions),
+              ],
+            }
+          : { totalSize: 0, items: [] };
+
+      await runWithMockTimers(() => plexFullScanner.run());
+
+      return getRepository(Media).findOneOrFail({ where: { tmdbId } });
+    };
+
+    it('marks both qualities available when one item holds a 1080p and a 4K version', async () => {
+      getSettings().radarr = [{ id: 0, is4k: true } as RadarrSettings];
+
+      const media = await scanMovie(6200, ['1080', '4k']);
+
+      assert.strictEqual(media.status, MediaStatus.AVAILABLE);
+      assert.strictEqual(media.status4k, MediaStatus.AVAILABLE);
+      assert.strictEqual(media.ratingKey, 'movie-6200');
+      assert.strictEqual(media.ratingKey4k, 'movie-6200');
+    });
+
+    it('marks only 4K available for a 4K-only item', async () => {
+      getSettings().radarr = [{ id: 0, is4k: true } as RadarrSettings];
+
+      const media = await scanMovie(6201, ['4k']);
+
+      assert.notStrictEqual(media.status, MediaStatus.AVAILABLE);
+      assert.strictEqual(media.status4k, MediaStatus.AVAILABLE);
+    });
+
+    it('counts a 4K version as standard when there is no 4K Radarr', async () => {
+      const media = await scanMovie(6202, ['4k']);
+
+      assert.strictEqual(media.status, MediaStatus.AVAILABLE);
+      assert.notStrictEqual(media.status4k, MediaStatus.AVAILABLE);
     });
   });
 });

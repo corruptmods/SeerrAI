@@ -172,8 +172,9 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
           tags: Array.from(new Set([...movie.tags, ...options.tags])),
           rootFolderPath: options.rootFolderPath,
           monitored: options.monitored,
+          // Searched below, only once Radarr says the movie is available.
           addOptions: {
-            searchForMovie: options.searchNow,
+            searchForMovie: false,
           },
         });
 
@@ -191,9 +192,7 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
             movie: response.data,
           });
 
-          if (options.searchNow) {
-            this.searchMovie(response.data.id);
-          }
+          this.searchIfAvailable(response.data, options);
 
           return response.data;
         } else {
@@ -214,18 +213,9 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
           hasFile: movie.hasFile,
         });
 
-        // If searchNow is requested and movie doesn't have a file, trigger search
-        if (options.searchNow && !movie.hasFile) {
-          logger.info(
-            'Triggering search for existing monitored movie without file',
-            {
-              label: 'Radarr',
-              movieId: movie.id,
-              movieTitle: movie.title,
-            }
-          );
-          this.searchMovie(movie.id);
-        }
+        // It has no file (one with a file was returned above), so search
+        // for it if Radarr says it is available.
+        this.searchIfAvailable(movie, options);
 
         return movie;
       }
@@ -241,8 +231,10 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
         rootFolderPath: options.rootFolderPath,
         monitored: options.monitored,
         tags: options.tags,
+        // Radarr would search as it adds the movie, available or not. It is
+        // searched below instead, once Radarr's answer says it is available.
         addOptions: {
-          searchForMovie: options.searchNow,
+          searchForMovie: false,
         },
       });
 
@@ -252,6 +244,7 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
           label: 'Radarr',
           movie: response.data,
         });
+        this.searchIfAvailable(response.data, options);
       } else {
         logger.error('Failed to add movie to Radarr', {
           label: 'Radarr',
@@ -273,6 +266,43 @@ class RadarrAPI extends ServarrBase<{ movieId: number }> {
       throw new Error('Failed to add movie to Radarr', { cause: e });
     }
   };
+
+  /**
+   * Searches for a requested movie now if Radarr says it is available, which
+   * Radarr works out from the movie's Minimum Availability (and its delay
+   * setting). A movie not available yet is left monitored, and Radarr grabs
+   * it once it is. Radarr does not hold a search asked for like this to
+   * Minimum Availability, so searching early could grab a release the
+   * admin chose to wait past, such as a cinema recording.
+   */
+  private searchIfAvailable(
+    movie: RadarrMovie,
+    options: RadarrMovieOptions
+  ): void {
+    if (!options.searchNow) {
+      return;
+    }
+    // An answer without isAvailable (an older Radarr, say) is searched as
+    // before rather than left waiting for good.
+    if (movie.isAvailable === false) {
+      logger.info(
+        'Movie is not available yet in Radarr; it stays monitored and Radarr will grab it once it is',
+        {
+          label: 'Radarr',
+          movieId: movie.id,
+          movieTitle: movie.title,
+          minimumAvailability: movie.minimumAvailability,
+        }
+      );
+      return;
+    }
+    logger.info('Movie is available in Radarr; searching for it now', {
+      label: 'Radarr',
+      movieId: movie.id,
+      movieTitle: movie.title,
+    });
+    this.searchMovie(movie.id);
+  }
 
   /**
    * Changes a movie's root folder or quality profile with Radarr's movie

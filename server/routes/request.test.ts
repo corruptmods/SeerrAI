@@ -1354,6 +1354,134 @@ describe('POST /request (movie), override rules', () => {
   });
 });
 
+/**
+ * Lets the seeded friend choose the server, as the advanced request options
+ * do, and adds a rule of theirs for one server.
+ */
+async function friendWithRuleFor(rule: Partial<OverrideRule>): Promise<void> {
+  const userRepo = getRepository(User);
+  const friend = await userRepo.findOneOrFail({
+    where: { email: 'friend@seerr.dev' },
+  });
+  friend.permissions = Permission.REQUEST | Permission.REQUEST_ADVANCED;
+  await userRepo.save(friend);
+
+  await getRepository(OverrideRule).save(
+    new OverrideRule({ users: String(friend.id), ...rule })
+  );
+}
+
+describe('POST /request, override rules for the chosen server', () => {
+  it('applies the rule for the Radarr server a movie is sent to', async () => {
+    configureRadarr([
+      { id: 1, isDefault: true, is4k: false },
+      { id: 2, isDefault: false, is4k: false },
+    ]);
+    getSettings().sonarr = [];
+    await friendWithRuleFor({
+      radarrServiceId: 2,
+      rootFolder: '/chosen/movies',
+    });
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.post('/request').send({
+      mediaType: MediaType.MOVIE,
+      mediaId: 88021,
+      serverId: 2,
+    });
+
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.rootFolder, '/chosen/movies');
+  });
+
+  it("leaves out the default Radarr server's rule when another is chosen", async () => {
+    configureRadarr([
+      { id: 1, isDefault: true, is4k: false },
+      { id: 2, isDefault: false, is4k: false },
+    ]);
+    getSettings().sonarr = [];
+    await friendWithRuleFor({
+      radarrServiceId: 1,
+      rootFolder: '/default/movies',
+    });
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.post('/request').send({
+      mediaType: MediaType.MOVIE,
+      mediaId: 88022,
+      serverId: 2,
+    });
+
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.rootFolder, null);
+  });
+
+  it("uses the default Radarr server's rule when the chosen one is gone", async () => {
+    configureRadarr([{ id: 1, isDefault: true, is4k: false }]);
+    getSettings().sonarr = [];
+    await friendWithRuleFor({
+      radarrServiceId: 1,
+      rootFolder: '/default/movies',
+    });
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.post('/request').send({
+      mediaType: MediaType.MOVIE,
+      mediaId: 88023,
+      serverId: 7,
+    });
+
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.rootFolder, '/default/movies');
+  });
+
+  it('applies the rule for the Sonarr server a series is sent to', async () => {
+    configureSonarr([
+      { id: 1, isDefault: true, is4k: false },
+      { id: 2, isDefault: false, is4k: false },
+    ]);
+    getSettings().radarr = [];
+    await friendWithRuleFor({
+      sonarrServiceId: 2,
+      rootFolder: '/chosen/tv',
+    });
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.post('/request').send({
+      mediaType: MediaType.TV,
+      mediaId: 88024,
+      seasons: [1],
+      serverId: 2,
+    });
+
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.rootFolder, '/chosen/tv');
+  });
+
+  it("leaves out the default Sonarr server's rule when another is chosen", async () => {
+    configureSonarr([
+      { id: 1, isDefault: true, is4k: false },
+      { id: 2, isDefault: false, is4k: false },
+    ]);
+    getSettings().radarr = [];
+    await friendWithRuleFor({
+      sonarrServiceId: 1,
+      rootFolder: '/default/tv',
+    });
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.post('/request').send({
+      mediaType: MediaType.TV,
+      mediaId: 88025,
+      seasons: [1],
+      serverId: 2,
+    });
+
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(res.body.rootFolder, null);
+  });
+});
+
 describe('POST /request (tv), override rules', () => {
   it('applies an override rule when the default Sonarr server id differs from its array index', async () => {
     configureSonarr([{ id: 5, isDefault: true, is4k: false }]);

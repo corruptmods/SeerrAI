@@ -312,32 +312,37 @@ class PlexScanner
   private async processPlexMovie(plexitem: PlexLibraryItem) {
     const mediaIds = await this.getMediaIds(plexitem);
 
-    const has4k = plexitem.Media.some(
-      (media) => media.videoResolution === '4k'
-    );
-
-    await this.processMovie(mediaIds.tmdbId, {
-      is4k: has4k && this.enable4kMovie,
-      mediaAddedAt: new Date(plexitem.addedAt * 1000),
-      ratingKey: plexitem.ratingKey,
-      title: plexitem.title,
-    });
+    await this.processPlexMovieByTmdbId(plexitem, mediaIds.tmdbId);
   }
 
+  /**
+   * One Plex item can hold several versions of a movie. Each counts for the
+   * quality it is: a 1080p and a 4K version side by side make the movie
+   * available in both. Without a 4K Radarr there is only one quality, and
+   * any version counts for it.
+   */
   private async processPlexMovieByTmdbId(
-    plexitem: PlexMetadata,
+    plexitem: PlexLibraryItem | PlexMetadata,
     tmdbId: number
   ) {
-    const has4k = plexitem.Media.some(
-      (media) => media.videoResolution === '4k'
-    );
-
-    await this.processMovie(tmdbId, {
-      is4k: has4k && this.enable4kMovie,
+    const has4k =
+      this.enable4kMovie &&
+      plexitem.Media.some((media) => media.videoResolution === '4k');
+    const hasStandard =
+      !has4k || plexitem.Media.some((media) => media.videoResolution !== '4k');
+    const details = {
       mediaAddedAt: new Date(plexitem.addedAt * 1000),
       ratingKey: plexitem.ratingKey,
       title: plexitem.title,
-    });
+    };
+
+    if (hasStandard) {
+      await this.processMovie(tmdbId, { ...details, is4k: false });
+    }
+
+    if (has4k) {
+      await this.processMovie(tmdbId, { ...details, is4k: true });
+    }
   }
 
   private async getTvShow({

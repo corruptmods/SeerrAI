@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { SCHEDULE_CHOICES, scheduleFor } from './schedule';
+import { SCHEDULE_CHOICES, choiceFor, scheduleFor } from './schedule';
 
 // When a six-field schedule runs within a day, read plainly: each second of
 // the day whose seconds, minutes and hours fields match.
@@ -50,5 +50,22 @@ describe('job schedules', () => {
     assert.throws(() => scheduleFor('hours', 18));
     assert.throws(() => scheduleFor('seconds', 45));
     assert.throws(() => scheduleFor('days', 3));
+  });
+
+  it('opens on the choice a job is saved with', () => {
+    for (const interval of ['seconds', 'minutes', 'hours', 'days'] as const) {
+      for (const every of SCHEDULE_CHOICES[interval]) {
+        assert.equal(choiceFor(interval, scheduleFor(interval, every)), every);
+      }
+    }
+    // Watchlist Sync's default, every 3 minutes.
+    assert.equal(choiceFor('minutes', '0 */3 * * * *'), 3);
+  });
+
+  it('opens on no choice for a schedule it does not offer', () => {
+    // Saved before Watchlist Sync was edited in minutes, or set by hand.
+    assert.equal(choiceFor('minutes', '*/30 * * * * *'), undefined);
+    assert.equal(choiceFor('hours', '0 0 3 * * *'), undefined);
+    assert.equal(choiceFor('minutes', 'not a schedule'), undefined);
   });
 });

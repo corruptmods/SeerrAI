@@ -17,6 +17,7 @@ import type {
   TmdbTvDetails,
   TmdbTvSeasonResult,
 } from '@server/api/themoviedb/interfaces';
+import { ApiErrorCode } from '@server/constants/error';
 import {
   MediaRequestStatus,
   MediaStatus,
@@ -32,6 +33,7 @@ import availabilitySync from '@server/lib/availabilitySync';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
+import { ApiError } from '@server/types/error';
 
 // --- Mock JellyfinAPI ---
 let getSystemInfoImpl: () => Promise<Record<string, unknown>> = async () => ({
@@ -104,6 +106,16 @@ Object.defineProperty(PlexAPI.prototype, 'getMetadata', {
   get() {
     return async (key: string, options?: { includeChildren?: boolean }) =>
       getMetadataImpl(key, options);
+  },
+  set() {},
+  configurable: true,
+});
+
+let getStatusImpl: () => Promise<unknown> = async () => ({});
+
+Object.defineProperty(PlexAPI.prototype, 'getStatus', {
+  get() {
+    return async () => getStatusImpl();
   },
   set() {},
   configurable: true,
@@ -439,6 +451,7 @@ describe('AvailabilitySync', () => {
       throw new Error('404');
     };
     getChildrenMetadataImpl = async () => [];
+    getStatusImpl = async () => ({});
     getSeriesByIdImpl = async () => {
       throw new Error('404');
     };
@@ -2406,6 +2419,160 @@ describe('AvailabilitySync', () => {
         }),
         0
       );
+    });
+  });
+
+  describe('media server unreachable', () => {
+    // A show whose four seasons are all here, only season 1 of which Sonarr
+    // has files for: the rest came from somewhere else.
+    const saveShow = async (fields: Partial<Media>) => {
+      const media = new Media();
+      media.tmdbId = 4700;
+      media.mediaType = MediaType.TV;
+      media.status = MediaStatus.AVAILABLE;
+      media.externalServiceId = 470;
+      Object.assign(media, fields);
+      media.seasons = [1, 2, 3, 4].map(
+        (seasonNumber) =>
+          new Season({
+            seasonNumber,
+            status: MediaStatus.AVAILABLE,
+            status4k: MediaStatus.UNKNOWN,
+          })
+      );
+      await getRepository(Media).save(media);
+
+      getSeriesByIdImpl = async (id: number) => {
+        if (id !== 470) throw new Error('404');
+        return {
+          tvdbId: 47000,
+          id: 470,
+          title: 'Test Show',
+          titleSlug: 'test-show',
+          monitored: true,
+          statistics: {
+            episodeFileCount: 10,
+            totalEpisodeCount: 40,
+            episodeCount: 40,
+            percentOfEpisodes: 25,
+            sizeOnDisk: 0,
+            seasonCount: 4,
+          },
+          seasons: fakeSonarrSeasons(4, { 1: 10 }),
+        } as unknown as SonarrSeries;
+      };
+    };
+
+    const seasonsOf = async () => {
+      const media = await getRepository(Media).findOneOrFail({
+        where: { tmdbId: 4700 },
+        relations: ['seasons'],
+      });
+      return {
+        status: media.status,
+        seasons: media.seasons
+          .sort((a, b) => a.seasonNumber - b.seasonNumber)
+          .map((season) => season.status),
+      };
+    };
+
+    const untouched = {
+      status: MediaStatus.AVAILABLE,
+      seasons: [1, 2, 3, 4].map(() => MediaStatus.AVAILABLE),
+    };
+
+    it('keeps the seasons when Plex fails to answer for a show', async () => {
+      configurePlex();
+      configureSonarr([{ syncEnabled: true }]);
+      await saveShow({ ratingKey: 'plex-down-rk' });
+      getMetadataImpl = async () => {
+        throw new Error('Request failed with status code 503');
+      };
+
+      await availabilitySync.run();
+
+      assert.deepStrictEqual(await seasonsOf(), untouched);
+    });
+
+    it('keeps the seasons when Jellyfin fails to answer for a show', async () => {
+      configureJellyfin();
+      configureSonarr([{ syncEnabled: true }]);
+      await saveShow({ jellyfinMediaId: 'jf-down-id' });
+      getItemDataImpl = async () => {
+        throw new ApiError(502, ApiErrorCode.ConnectionError);
+      };
+
+      await availabilitySync.run();
+
+      assert.deepStrictEqual(await seasonsOf(), untouched);
+    });
+
+    it('still marks seasons Plex no longer has once it answers', async () => {
+      configurePlex();
+      configureSonarr([{ syncEnabled: true }]);
+      await saveShow({ ratingKey: 'plex-up-rk' });
+      getMetadataImpl = async (key: string) => {
+        if (key === 'plex-up-rk') return fakePlexShow('plex-up-rk');
+        throw new Error('404');
+      };
+      getChildrenMetadataImpl = async (key: string) =>
+        key === 'plex-up-rk'
+          ? [1, 2, 3, 4].map((n) => fakePlexSeason(n, `plex-up-s${n}`))
+          : key === 'plex-up-s2'
+            ? fakePlexEpisodes(10)
+            : [];
+
+      await availabilitySync.run();
+
+      assert.deepStrictEqual(await seasonsOf(), {
+        status: MediaStatus.PARTIALLY_AVAILABLE,
+        seasons: [
+          MediaStatus.AVAILABLE,
+          MediaStatus.AVAILABLE,
+          MediaStatus.DELETED,
+          MediaStatus.DELETED,
+        ],
+      });
+    });
+
+    it('checks nothing while Plex cannot be reached', async () => {
+      configurePlex();
+      configureRadarr([{ syncEnabled: true }]);
+      const media = new Media();
+      media.tmdbId = 4800;
+      media.mediaType = MediaType.MOVIE;
+      media.status = MediaStatus.AVAILABLE;
+      media.ratingKey = 'plex-unreachable-rk';
+      await getRepository(Media).save(media);
+      getStatusImpl = async () => {
+        throw new Error('connect ECONNREFUSED 127.0.0.1:32400');
+      };
+
+      await availabilitySync.run();
+
+      const updated = await getRepository(Media).findOneByOrFail({
+        tmdbId: 4800,
+      });
+      assert.strictEqual(updated.status, MediaStatus.AVAILABLE);
+      assert.strictEqual(availabilitySync.running, false);
+    });
+
+    it('checks nothing while no Plex admin is signed in', async () => {
+      configurePlex();
+      configureRadarr([{ syncEnabled: true }]);
+      await getRepository(User).update(1, { plexToken: null });
+      const media = new Media();
+      media.tmdbId = 4801;
+      media.mediaType = MediaType.MOVIE;
+      media.status = MediaStatus.AVAILABLE;
+      await getRepository(Media).save(media);
+
+      await availabilitySync.run();
+
+      const updated = await getRepository(Media).findOneByOrFail({
+        tmdbId: 4801,
+      });
+      assert.strictEqual(updated.status, MediaStatus.AVAILABLE);
     });
   });
 });

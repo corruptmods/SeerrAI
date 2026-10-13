@@ -167,11 +167,12 @@ export const startJobs = (): void => {
 
   // Watchlist sync: Plex watchlists, and public Trakt watchlists on any
   // media server. The id stays as it was, so saved schedules carry over.
+  // It runs every few minutes, so its schedule is edited in minutes.
   scheduledJobs.push({
     id: 'plex-watchlist-sync',
     name: 'Watchlist Sync',
     type: 'process',
-    interval: 'seconds',
+    interval: 'minutes',
     cronSchedule: jobs['plex-watchlist-sync'].schedule,
     job: schedule.scheduleJob(
       jobs['plex-watchlist-sync'].schedule,

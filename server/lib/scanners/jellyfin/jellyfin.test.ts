@@ -2,6 +2,7 @@ import animeList from '@server/api/animelist';
 import type {
   JellyfinLibraryItem,
   JellyfinLibraryItemExtended,
+  JellyfinMediaSource,
 } from '@server/api/jellyfin';
 import JellyfinAPI from '@server/api/jellyfin';
 import TheMovieDb from '@server/api/themoviedb';
@@ -21,12 +22,16 @@ import MediaRequest from '@server/entity/MediaRequest';
 import Season from '@server/entity/Season';
 import { User } from '@server/entity/User';
 import { jellyfinFullScanner } from '@server/lib/scanners/jellyfin';
-import type { Library } from '@server/lib/settings';
+import type {
+  Library,
+  RadarrSettings,
+  SonarrSettings,
+} from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
 import { runWithMockTimers } from '@server/test/runWithMockTimers';
 import assert from 'node:assert/strict';
-import { beforeEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 // --- Mock animeList.sync to avoid filesystem/network I/O in tests ---
 Object.defineProperty(animeList, 'sync', {
@@ -598,6 +603,129 @@ describe('Jellyfin Scanner', () => {
         MediaStatus.PARTIALLY_AVAILABLE,
         'Show should stay PARTIALLY_AVAILABLE when a DELETED season is missing from the metadata provider'
       );
+    });
+  });
+
+  /*
+   * Jellyfin and Emby list a file before they have read it. Until then it
+   * has no media sources, or sources with no video stream, and so no
+   * resolution: it counts as standard quality until the server knows.
+   */
+  describe('files the server has not read yet', () => {
+    const movieLibrary: Library = {
+      id: 'test-movie-library-id',
+      name: 'Movies',
+      enabled: true,
+      type: 'movie',
+    };
+
+    const source = (widths: number[]): JellyfinMediaSource =>
+      ({
+        Protocol: 'File',
+        Id: 'source',
+        MediaStreams: [
+          { Codec: 'aac', Type: 'Audio' },
+          ...widths.map((Width) => ({ Codec: 'hevc', Type: 'Video', Width })),
+        ],
+      }) as unknown as JellyfinMediaSource;
+
+    afterEach(() => {
+      getSettings().radarr = [];
+      getSettings().sonarr = [];
+    });
+
+    const scanMovie = async (
+      tmdbId: number,
+      MediaSources: JellyfinMediaSource[] | undefined
+    ) => {
+      configureJellyfinWithLibrary([movieLibrary]);
+      getSettings().radarr = [{ id: 0, is4k: true } as RadarrSettings];
+      const id = `jf-movie-${tmdbId}`;
+      getLibraryContentsImpl = async (library: string) =>
+        library === movieLibrary.id
+          ? [
+              {
+                Name: 'Test Movie',
+                Id: id,
+                Type: 'Movie',
+                HasSubtitles: false,
+                LocationType: 'FileSystem',
+                MediaType: 'Video',
+              },
+            ]
+          : [];
+      getItemDataImpl = async (item: string) =>
+        item === id
+          ? {
+              Name: 'Test Movie',
+              Id: id,
+              Type: 'Movie',
+              HasSubtitles: false,
+              LocationType: 'FileSystem',
+              MediaType: 'Video',
+              ProviderIds: { Tmdb: String(tmdbId) },
+              MediaSources,
+            }
+          : undefined;
+
+      await runWithMockTimers(() => jellyfinFullScanner.run());
+
+      return getRepository(Media).findOneByOrFail({ tmdbId });
+    };
+
+    it('marks a movie with no media sources available in standard quality', async () => {
+      const media = await scanMovie(6300, undefined);
+
+      assert.strictEqual(media.status, MediaStatus.AVAILABLE);
+      assert.notStrictEqual(media.status4k, MediaStatus.AVAILABLE);
+      assert.strictEqual(media.jellyfinMediaId, 'jf-movie-6300');
+    });
+
+    it('marks a movie whose source has no video stream yet available in standard quality', async () => {
+      const media = await scanMovie(6301, [source([])]);
+
+      assert.strictEqual(media.status, MediaStatus.AVAILABLE);
+      assert.notStrictEqual(media.status4k, MediaStatus.AVAILABLE);
+    });
+
+    it('still places a read 4K movie in 4K only', async () => {
+      const media = await scanMovie(6302, [source([3840])]);
+
+      assert.notStrictEqual(media.status, MediaStatus.AVAILABLE);
+      assert.strictEqual(media.status4k, MediaStatus.AVAILABLE);
+    });
+
+    it('counts episodes not read yet as standard quality', async () => {
+      configureJellyfinWithLibrary();
+      // With a 4K Sonarr, episodes are sorted by resolution.
+      getSettings().sonarr = [{ id: 0, is4k: true } as SonarrSettings];
+      getTvShowImpl = async () => fakeTmdbShow(6303);
+      getLibraryContentsImpl = async (id: string) =>
+        id === 'test-library-id' ? [fakeJellyfinSeriesItem('jf-unread')] : [];
+      getItemDataImpl = async (id: string) =>
+        id === 'jf-unread'
+          ? fakeJellyfinShowMetadata('jf-unread', '6303')
+          : undefined;
+      getSeasonsImpl = async () => [fakeJellyfinSeason(1, 'jf-unread-s1')];
+      // Ten episodes: four with no sources, three with a source not read
+      // yet, three read as 4K.
+      getEpisodesImpl = async () =>
+        fakeJellyfinEpisodes(10).map((episode, i) => ({
+          ...episode,
+          MediaSources:
+            i < 4 ? undefined : i < 7 ? [source([])] : [source([3840])],
+        }));
+
+      await runWithMockTimers(() => jellyfinFullScanner.run());
+
+      const media = await getRepository(Media).findOneOrFail({
+        where: { tmdbId: 6303 },
+        relations: ['seasons'],
+      });
+      const season = media.seasons.find((s) => s.seasonNumber === 1);
+      assert.strictEqual(season?.status, MediaStatus.PARTIALLY_AVAILABLE);
+      assert.strictEqual(season?.status4k, MediaStatus.PARTIALLY_AVAILABLE);
+      assert.strictEqual(media.status, MediaStatus.PARTIALLY_AVAILABLE);
     });
   });
 });

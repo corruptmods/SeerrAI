@@ -95,10 +95,29 @@ class AvailabilitySync {
 
       switch (mediaServerType) {
         case MediaServerType.PLEX:
-          if (admin && admin.plexToken) {
-            this.plexClient = new PlexAPI({ plexToken: admin.plexToken });
-          } else {
-            logger.error('Plex admin is not configured.');
+          // As for Jellyfin below: without Plex to ask, every title Radarr
+          // and Sonarr do not have would look deleted.
+          if (!admin?.plexToken) {
+            logger.error('Plex admin is not configured.', {
+              label: 'AvailabilitySync',
+            });
+
+            this.running = false;
+            return;
+          }
+
+          this.plexClient = new PlexAPI({ plexToken: admin.plexToken });
+
+          try {
+            await this.plexClient.getStatus();
+          } catch (e) {
+            logger.error('Sync interrupted: Plex cannot be reached.', {
+              label: 'AvailabilitySync',
+              errorMessage: e.message,
+            });
+
+            this.running = false;
+            return;
           }
           break;
         case MediaServerType.JELLYFIN:
@@ -998,19 +1017,24 @@ class AvailabilitySync {
     }
 
     // Here we check each season in plex for availability
-    // If the API returns an error other than a 404,
-    // we will have to prevent the season check from happening
     if (media.mediaType === 'tv') {
       const seasonsMap: Map<number, boolean> = new Map();
+      const filteredSeasons = media.seasons.filter(
+        (season) =>
+          season[is4k ? 'status4k' : 'status'] === MediaStatus.AVAILABLE ||
+          season[is4k ? 'status4k' : 'status'] ===
+            MediaStatus.PARTIALLY_AVAILABLE
+      );
 
-      if (!preventSeasonSearch) {
-        const filteredSeasons = media.seasons.filter(
-          (season) =>
-            season[is4k ? 'status4k' : 'status'] === MediaStatus.AVAILABLE ||
-            season[is4k ? 'status4k' : 'status'] ===
-              MediaStatus.PARTIALLY_AVAILABLE
-        );
-
+      // If Plex could not answer for the show (any error but a 404), it
+      // cannot say which seasons are there either. They are kept as they
+      // are, as the show is: no answer would read as every season gone, and
+      // those Sonarr has no files for would be marked deleted.
+      if (preventSeasonSearch) {
+        for (const season of filteredSeasons) {
+          seasonsMap.set(season.seasonNumber, true);
+        }
+      } else {
         for (const season of filteredSeasons) {
           const seasonExists = await this.seasonExistsInPlex(
             media,
@@ -1147,19 +1171,24 @@ class AvailabilitySync {
     }
 
     // Here we check each season in jellyfin for availability
-    // If the API returns an error other than a 404,
-    // we will have to prevent the season check from happening
     if (media.mediaType === 'tv') {
       const seasonsMap: Map<number, boolean> = new Map();
+      const filteredSeasons = media.seasons.filter(
+        (season) =>
+          season[is4k ? 'status4k' : 'status'] === MediaStatus.AVAILABLE ||
+          season[is4k ? 'status4k' : 'status'] ===
+            MediaStatus.PARTIALLY_AVAILABLE
+      );
 
-      if (!preventSeasonSearch) {
-        const filteredSeasons = media.seasons.filter(
-          (season) =>
-            season[is4k ? 'status4k' : 'status'] === MediaStatus.AVAILABLE ||
-            season[is4k ? 'status4k' : 'status'] ===
-              MediaStatus.PARTIALLY_AVAILABLE
-        );
-
+      // If Jellyfin could not answer for the show (any error but a 404), it
+      // cannot say which seasons are there either. They are kept as they
+      // are, as the show is: no answer would read as every season gone, and
+      // those Sonarr has no files for would be marked deleted.
+      if (preventSeasonSearch) {
+        for (const season of filteredSeasons) {
+          seasonsMap.set(season.seasonNumber, true);
+        }
+      } else {
         for (const season of filteredSeasons) {
           const seasonExists = await this.seasonExistsInJellyfin(
             media,

@@ -8,8 +8,11 @@
 #   ghcr.io/<owner>/seerr-ai:sha-abc1234             for every build
 #
 # Release with:  git tag ai-v1.2.3 && git push origin ai-v1.2.3
-# A version with a "-" (ai-v1.3.0-beta.1) is a pre-release and does not move
-# :latest.
+# CHANGELOG.md needs a "## 1.2.3" section (a date after it is fine, like
+# "## 1.2.3 (14 October 2026)"): it becomes the release notes, so rename
+# "Coming next" to the version before tagging. A version with a "-"
+# (ai-v1.3.0-beta.1) is a pre-release and does not move :latest; without its
+# own section, it uses "Coming next".
 #
 # Seerr AI's tags start with "ai-v" because the repository also holds Seerr's
 # own v1.0.0…v3.x tags, which this must never build or collide with.
@@ -62,6 +65,29 @@ jobs:
             [[ "${VERSION}" == *-* ]] && PRERELEASE=true
             # The app reports this version, and checks releases against it.
             npm pkg set version="${VERSION}"
+            # This version's section of CHANGELOG.md, without its heading, is
+            # the release notes. Checked before the build, so a missing
+            # section fails in seconds, not after half an hour.
+            notes() {
+              awk -v h="## $1" '
+                !found && ($0 == h || index($0, h " (") == 1) { found = 1; next }
+                found && /^## / { exit }
+                found { print }
+              ' CHANGELOG.md \
+                | sed -e '/./,$!d' \
+                | sed -E "s#\]\((\./)?([A-Za-z0-9_.-][^):]*)\)#](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/\2)#g" \
+                | sed -e ':a' -e '/^\n*$/{$d;N;ba' -e '}' > release-notes.md
+              # Leading and trailing blank lines are dropped, and links to
+              # files in the repository point at them as of this release.
+            }
+            notes "${VERSION}"
+            if [[ ! -s release-notes.md && "${PRERELEASE}" == "true" ]]; then
+              notes "Coming next"
+            fi
+            if [[ ! -s release-notes.md ]]; then
+              echo "::error::CHANGELOG.md has no \"## ${VERSION}\" section. Rename \"## Coming next\" to \"## ${VERSION} (date)\", push it, and move the tag."
+              exit 1
+            fi
           elif [[ "${GITHUB_REF}" == refs/heads/dev ]]; then
             # Left at 0.1.0, the app reports "develop-<commit>" and checks
             # dev's commits for updates.
@@ -130,19 +156,30 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.VERSION }}
           PRERELEASE: ${{ steps.version.outputs.PRERELEASE }}
+          IMAGE: ${{ steps.version.outputs.IMAGE }}
         run: |
+          {
+            echo
+            echo "### Docker image"
+            echo
+            echo '```'
+            echo "${IMAGE}:${VERSION}"
+            echo '```'
+          } >> release-notes.md
           FLAGS=""
           [[ "${PRERELEASE}" == "true" ]] && FLAGS="--prerelease"
           # The title must contain the version: Settings → About compares it.
-          # A release cut again (the tag moved) keeps its page, retitled. GitHub
+          # A release cut again (the tag moved) keeps its page, retitled and
+          # with the notes refreshed from CHANGELOG.md. GitHub
           # turns a release back into a draft when its tag is deleted, so it is
           # published again here, and made the latest unless a pre-release.
           if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             EDIT="--prerelease=false --latest"
             [[ "${PRERELEASE}" == "true" ]] && EDIT="--prerelease"
             gh release edit "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" \
-              --title "Seerr AI ${VERSION}" --draft=false ${EDIT}
+              --title "Seerr AI ${VERSION}" --notes-file release-notes.md \
+              --draft=false ${EDIT}
           else
             gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" \
-              --title "Seerr AI ${VERSION}" --generate-notes ${FLAGS}
+              --title "Seerr AI ${VERSION}" --notes-file release-notes.md ${FLAGS}
           fi

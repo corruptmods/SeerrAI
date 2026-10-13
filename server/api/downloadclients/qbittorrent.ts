@@ -269,8 +269,7 @@ class QBittorrentAPI implements TorrentClient {
 
   /**
    * Adds a torrent from its .torrent file or a magnet link. It is added
-   * stopped, so its files can be chosen before anything downloads, and with
-   * seeding switched off, so it stops once the chosen files are in.
+   * stopped, so its files can be chosen before anything downloads.
    */
   public async addTorrent(options: {
     torrent?: Buffer;
@@ -304,8 +303,13 @@ class QBittorrentAPI implements TorrentClient {
       form.append('paused', 'true');
       form.append('stopped', 'true');
     }
-    form.append('ratioLimit', '0');
-    form.append('seedingTimeLimit', '0');
+    // No share limits of its own: reaching one makes qBittorrent do what it
+    // is set to (often removing the torrent and its files), which with a
+    // limit of 0 would happen the moment the files are in, before Sonarr or
+    // Radarr imports them. Backfill stops the torrent itself once it is done.
+    form.append('ratioLimit', '-1');
+    form.append('seedingTimeLimit', '-1');
+    form.append('inactiveSeedingTimeLimit', '-1');
     if (options.savePath) {
       form.append('savepath', options.savePath);
     }

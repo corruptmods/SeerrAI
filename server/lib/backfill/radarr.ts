@@ -112,11 +112,15 @@ class BackfillRadarr extends RadarrAPI {
     return data;
   }
 
-  /** Monitored movies that are missing, or below their cutoff. */
+  /**
+   * Monitored movies that are missing, or below their cutoff. `complete` is
+   * false when there were more than `maxPages` pages: what was left out is
+   * still wanted, not found.
+   */
   public async getWanted(
     kind: 'missing' | 'cutoff',
     maxPages = 40
-  ): Promise<RadarrMovieDetail[]> {
+  ): Promise<{ records: RadarrMovieDetail[]; complete: boolean }> {
     const movies: RadarrMovieDetail[] = [];
     for (let page = 1; page <= maxPages; page++) {
       const { data } = await this.axios.get<{
@@ -127,10 +131,10 @@ class BackfillRadarr extends RadarrAPI {
       });
       movies.push(...(data?.records ?? []));
       if (!data?.records?.length || movies.length >= data.totalRecords) {
-        break;
+        return { records: movies, complete: true };
       }
     }
-    return movies;
+    return { records: movies, complete: false };
   }
 
   /** Radarr's own search for a movie, with its reasons for each refusal. */

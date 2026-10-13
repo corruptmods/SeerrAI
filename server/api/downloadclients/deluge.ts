@@ -276,6 +276,9 @@ class DelugeAPI implements TorrentClient {
       add_paused: !!options.torrent,
       stop_at_ratio: true,
       stop_ratio: 0,
+      // Stopped once done, never removed: Deluge set to remove torrents at
+      // their ratio would otherwise take this one before it is imported.
+      remove_at_ratio: false,
       max_download_speed: options.metadataOnly ? 1 : -1,
     };
     let hash: string | null;

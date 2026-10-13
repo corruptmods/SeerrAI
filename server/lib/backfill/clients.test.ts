@@ -121,6 +121,8 @@ interface Held {
   label?: string;
   /** Download speed held down (Transmission's and Deluge's). */
   capped: boolean;
+  /** Deluge's own "remove at ratio" for it, when it was given one. */
+  removeAtRatio?: boolean;
 }
 
 /** What every stand-in shares: its torrents, and what was done to them. */
@@ -309,6 +311,7 @@ const deluge: http.RequestListener = async (req, res) => {
         method === 'core.add_torrent_magnet'
       );
       held.capped = options.max_download_speed > 0;
+      held.removeAtRatio = options.remove_at_ratio;
       return answer(held.hash);
     }
     case 'core.get_torrent_status': {
@@ -840,6 +843,17 @@ for (const type of ['transmission', 'deluge', 'rtorrent'] as const) {
     });
   });
 }
+
+describe('Backfill with Deluge', () => {
+  it('has Deluge stop the torrent once done, and never remove it before it is imported', async () => {
+    useClient('deluge');
+    const candidate = await seed('torrent', { kind: 'torrent', data: TORRENT });
+    await backfill.approve(candidate.id, { mode: 'missing' });
+    // Left to Deluge's own settings, one set to remove torrents at their
+    // ratio would take this one, files and all, the moment it is done.
+    assert.equal(swarm.torrents.get(HASH)?.removeAtRatio, false);
+  });
+});
 
 describe('Backfill with NZBGet', () => {
   it('adds the NZB, follows it to the history, imports from its folder and removes the job', async () => {

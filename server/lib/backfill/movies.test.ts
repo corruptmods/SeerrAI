@@ -24,6 +24,7 @@ import notificationManager from '@server/lib/notifications';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { BACKFILL_DEFAULTS, getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
+import { AxiosError } from 'axios';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
@@ -333,12 +334,35 @@ const RELEASE: ProwlarrRelease = {
   downloadUrl: 'http://prowlarr/3/download',
 };
 
+/**
+ * Radarr's and Sonarr's own wanted lists, kept before any test stands in
+ * for them: a method stood in for twice is not always put back as it was.
+ */
+const radarrWanted = BackfillRadarr.prototype.getWanted;
+const sonarrWanted = BackfillSonarr.prototype.getWanted;
+
 let movie: RadarrMovieDetail;
 let imports: { path: string; movieId: number }[][] = [];
 let priorities: { indexes: number[]; priority: number }[] = [];
 let removed: string[] = [];
 let done = false;
 let searchedWith: number[] | undefined;
+/** Whether qBittorrent holds the torrent. */
+let inClient = false;
+
+/** The torrent as qBittorrent has it. */
+const heldTorrent = (savePath = '/downloads/backfill') => ({
+  hash: HASH,
+  name: INFO.name,
+  state: done ? 'stoppedUP' : 'downloading',
+  progress: done ? 1 : 0.5,
+  size: 2 * GB,
+  amount_left: done ? 0 : GB,
+  eta: 60,
+  dlspeed: 1000,
+  save_path: savePath,
+  content_path: `${savePath}/Harry Potter Collection`,
+});
 
 beforeEach(() => {
   movie = { ...SECRETS };
@@ -388,9 +412,10 @@ beforeEach(() => {
 
   mock.method(notificationManager, 'sendNotification', () => undefined);
   const radarr = BackfillRadarr.prototype;
-  mock.method(radarr, 'getWanted', async (kind: string) =>
-    kind === 'missing' && !movie.hasFile ? [movie] : []
-  );
+  mock.method(radarr, 'getWanted', async (kind: string) => ({
+    records: kind === 'missing' && !movie.hasFile ? [movie] : [],
+    complete: true,
+  }));
   mock.method(radarr, 'getMovieQueueCount', async () => 0);
   mock.method(radarr, 'getMovieDetail', async () => movie);
   mock.method(radarr, 'getMovieFile', async () => null);
@@ -430,26 +455,13 @@ beforeEach(() => {
   }));
 
   const qbit = QBittorrentAPI.prototype;
-  let added = false;
+  inClient = false;
   mock.method(qbit, 'ensureCategory', async () => undefined);
   mock.method(qbit, 'addTorrent', async () => {
-    added = true;
+    inClient = true;
   });
   mock.method(qbit, 'getTorrent', async () =>
-    added
-      ? {
-          hash: HASH,
-          name: INFO.name,
-          state: done ? 'stoppedUP' : 'downloading',
-          progress: done ? 1 : 0.5,
-          size: 2 * GB,
-          amount_left: done ? 0 : GB,
-          eta: 60,
-          dlspeed: 1000,
-          save_path: '/downloads/backfill',
-          content_path: '/downloads/backfill/Harry Potter Collection',
-        }
-      : undefined
+    inClient ? heldTorrent() : undefined
   );
   mock.method(qbit, 'getFiles', async () =>
     INFO.files.map((f, index) => ({
@@ -472,7 +484,7 @@ beforeEach(() => {
   mock.method(qbit, 'stopTorrent', async () => undefined);
   mock.method(qbit, 'deleteTorrent', async (hash: string) => {
     removed.push(hash);
-    added = false;
+    inClient = false;
   });
 });
 
@@ -743,7 +755,10 @@ describe('Backfill for movies: from Radarr’s wanted list to the library', () =
       mock.method(
         BackfillRadarr.prototype,
         'getWanted',
-        async (kind: string) => (kind === 'missing' ? movies : [])
+        async (kind: string) => ({
+          records: kind === 'missing' ? movies : [],
+          complete: true,
+        })
       );
     };
     const repo = () => getRepository(BackfillSeries);
@@ -796,6 +811,27 @@ describe('Backfill for movies: from Radarr’s wanted list to the library', () =
         backfill.searchAllStatus().last?.stoppedBecause ?? '',
         /Prowlarr/
       );
+    });
+
+    it('searches the rest when one title’s search fails', async () => {
+      several(3);
+      const searched: number[] = [];
+      mock.method(backfill, 'search', async (id: number) => {
+        searched.push(id);
+        // As a real search does: the failure is recorded, then thrown.
+        if (searched.length === 1) {
+          await repo().update(id, {
+            searchError: 'Radarr answered 500',
+            lastSearchedAt: new Date(),
+          });
+          throw new Error('Radarr answered 500');
+        }
+        await repo().update(id, { status: 'none', lastSearchedAt: new Date() });
+      });
+      await backfill.startSearchAll(undefined, { pauseMs: 0 });
+      assert.equal(searched.length, 3);
+      assert.equal(backfill.searchAllStatus().last?.done, 3);
+      assert.equal(backfill.searchAllStatus().last?.stoppedBecause, undefined);
     });
 
     it('refuses to start twice at once', async () => {
@@ -955,5 +991,480 @@ describe('Backfill: searching for what a series is missing', () => {
     await backfill.search(row.id);
     assert.deepEqual(queries, ['Expedition Unknown', 'Expedition Unknown S17']);
     assert.equal(opened[0], 'the-episode');
+  });
+});
+
+describe('Backfill when something goes wrong', () => {
+  const jobs = () => getRepository(BackfillJob);
+  const candidates = () => getRepository(BackfillCandidate);
+  const titles = () => getRepository(BackfillSeries);
+  const jobNow = (id: number) => jobs().findOneOrFail({ where: { id } });
+  const logOf = (job: BackfillJob) => job.log.map((l) => l.message).join('\n');
+  /** The movie found by a scan, and its pack approved. */
+  const approved = async () => {
+    await backfill.scan();
+    const candidate = await candidates().findOneOrFail({
+      where: { status: 'ready' },
+    });
+    const job = await backfill.approve(candidate.id, { mode: 'missing' });
+    return { candidate, job };
+  };
+  const unreachable = () =>
+    new AxiosError('connect ECONNREFUSED 10.0.0.2:8080', 'ECONNREFUSED');
+  /** qBittorrent listing Backfill's category: the torrent, while it has it. */
+  const listsCategory = () =>
+    mock.method(QBittorrentAPI.prototype, 'getCategoryTorrents', async () =>
+      inClient ? [{ hash: HASH, progress: done ? 1 : 0, added_on: 1 }] : []
+    );
+  const IMPORTED = [
+    [
+      {
+        path: '/data/backfill/Harry Potter Collection/Harry.Potter.and.the.Chamber.of.Secrets.mkv',
+        movieId: 55,
+      },
+    ],
+  ];
+
+  it('waits out qBittorrent and Radarr not answering, however long, and carries on', async () => {
+    const { candidate, job } = await approved();
+    const qbitDown = mock.method(
+      QBittorrentAPI.prototype,
+      'getTorrent',
+      async () => {
+        throw unreachable();
+      }
+    );
+    for (let i = 0; i < 15; i++) await backfill.tick();
+    const waiting = await jobNow(job.id);
+    assert.equal(waiting.status, 'downloading', logOf(waiting));
+    assert.deepEqual(removed, [], 'the download is kept');
+    assert.equal(
+      waiting.log.filter((l) => l.message.startsWith('No answer')).length,
+      1,
+      'said once, not every minute'
+    );
+    assert.equal(
+      (await candidates().findOneOrFail({ where: { id: candidate.id } }))
+        .status,
+      'approved'
+    );
+    qbitDown.mock.restore();
+
+    done = true;
+    await backfill.tick();
+    assert.equal((await jobNow(job.id)).status, 'importing');
+    // Radarr's own calls wrap what went wrong.
+    const radarrDown = mock.method(
+      BackfillRadarr.prototype,
+      'getCommand',
+      async () => {
+        throw new Error('[Radarr] Failed to read the command', {
+          cause: unreachable(),
+        });
+      }
+    );
+    for (let i = 0; i < 12; i++) await backfill.tick();
+    assert.equal((await jobNow(job.id)).status, 'importing');
+    radarrDown.mock.restore();
+
+    movie = { ...movie, hasFile: true, movieFileId: 901 };
+    await backfill.tick();
+    const finished = await jobNow(job.id);
+    assert.equal(finished.status, 'done', logOf(finished));
+    assert.deepEqual(removed, [HASH]);
+  });
+
+  it('gives up on a finished download it cannot hand over, keeping it and offering the pack again', async () => {
+    const { candidate, job } = await approved();
+    done = true;
+    const mappings = mock.method(
+      BackfillRadarr.prototype,
+      'getRemotePathMappings',
+      async () => {
+        throw new Error('Radarr: the remote path mapping is wrong');
+      }
+    );
+    for (let i = 0; i < 10; i++) await backfill.tick();
+    const failed = await jobNow(job.id);
+    assert.equal(failed.status, 'failed', logOf(failed));
+    assert.deepEqual(removed, [], 'the files it fetched are kept');
+    assert.match(logOf(failed), /Kept the download/);
+    assert.equal(
+      (await candidates().findOneOrFail({ where: { id: candidate.id } }))
+        .status,
+      'ready',
+      'nothing was wrong with the release'
+    );
+    assert.equal(
+      (await titles().findOneOrFail({ where: { id: candidate.seriesId } }))
+        .status,
+      'found'
+    );
+
+    // Put right, and approved again: the torrent kept is taken on.
+    mappings.mock.restore();
+    listsCategory();
+    const adds = mock.method(
+      QBittorrentAPI.prototype,
+      'addTorrent',
+      async () => undefined
+    );
+    const again = await backfill.approve(candidate.id, { mode: 'missing' });
+    const taken = await jobNow(again.id);
+    assert.equal(taken.status, 'downloading', logOf(taken));
+    assert.equal(adds.mock.callCount(), 0, 'not fetched again');
+    await backfill.tick();
+    assert.deepEqual(imports, IMPORTED);
+  });
+
+  it('keeps an unfinished download, stopped, when it gives up for something other than the release', async () => {
+    const { candidate, job } = await approved();
+    mock.method(QBittorrentAPI.prototype, 'getTorrent', async () =>
+      inClient ? { ...heldTorrent(), state: 'missingFiles' } : undefined
+    );
+    const stops = mock.method(
+      QBittorrentAPI.prototype,
+      'stopTorrent',
+      async () => undefined
+    );
+    for (let i = 0; i < 10; i++) await backfill.tick();
+    const failed = await jobNow(job.id);
+    assert.equal(failed.status, 'failed', logOf(failed));
+    assert.deepEqual(removed, [], 'what it fetched is kept');
+    assert.equal(stops.mock.callCount(), 1, 'stopped in qBittorrent');
+    assert.equal(
+      (await candidates().findOneOrFail({ where: { id: candidate.id } }))
+        .status,
+      'ready'
+    );
+  });
+
+  it('takes on a torrent qBittorrent added though its answer was lost', async () => {
+    await backfill.scan();
+    const candidate = await candidates().findOneOrFail({
+      where: { status: 'ready' },
+    });
+    mock.method(QBittorrentAPI.prototype, 'addTorrent', async () => {
+      inClient = true;
+      throw new Error('socket hang up');
+    });
+    listsCategory();
+    const job = await backfill.approve(candidate.id, { mode: 'missing' });
+    assert.equal((await jobNow(job.id)).status, 'queued');
+    await backfill.tick();
+    const started = await jobNow(job.id);
+    assert.equal(started.status, 'downloading', logOf(started));
+    assert.equal(started.downloadId, HASH);
+    assert.deepEqual(priorities.at(-1), { indexes: [1], priority: 1 });
+  });
+
+  it('finds the chosen file in a client that numbers padding files, as rTorrent does', async () => {
+    const listed = [
+      { name: `${INFO.name}/${INFO.files[0].path[0]}`, size: 2 * GB },
+      { name: `${INFO.name}/.pad/1048576`, size: 1048576 },
+      { name: `${INFO.name}/${INFO.files[1].path[0]}`, size: 2 * GB },
+    ];
+    mock.method(QBittorrentAPI.prototype, 'getFiles', async () =>
+      listed.map((file, index) => ({
+        index,
+        ...file,
+        progress: done && index === 2 ? 1 : 0,
+        priority: index === 2 ? 1 : 0,
+      }))
+    );
+    const { job } = await approved();
+    const started = await jobNow(job.id);
+    assert.equal(started.status, 'downloading', logOf(started));
+    assert.deepEqual(priorities, [
+      { indexes: [0, 1], priority: 0 },
+      { indexes: [2], priority: 1 },
+    ]);
+    done = true;
+    await backfill.tick();
+    assert.deepEqual(imports, IMPORTED);
+  });
+
+  it('hands Radarr a Windows client’s path with Radarr’s own separators', async () => {
+    mock.method(QBittorrentAPI.prototype, 'getTorrent', async () =>
+      inClient ? heldTorrent('D:\\Downloads\\backfill') : undefined
+    );
+    mock.method(BackfillRadarr.prototype, 'getRemotePathMappings', async () => [
+      {
+        host: 'qbittorrent',
+        remotePath: 'D:\\Downloads\\',
+        localPath: '/data/',
+      },
+    ]);
+    await approved();
+    done = true;
+    await backfill.tick();
+    assert.deepEqual(imports, IMPORTED);
+  });
+
+  it('starts one download when a pack is approved twice at once', async () => {
+    await backfill.scan();
+    const candidate = await candidates().findOneOrFail({
+      where: { status: 'ready' },
+    });
+    const results = await Promise.allSettled([
+      backfill.approve(candidate.id, { mode: 'missing' }),
+      backfill.approve(candidate.id, { mode: 'missing' }),
+    ]);
+    assert.deepEqual(results.map((r) => r.status).sort(), [
+      'fulfilled',
+      'rejected',
+    ]);
+    assert.equal(await jobs().count(), 1);
+  });
+
+  it('keeps a pause made while the minute’s tick is under way', async () => {
+    const { job } = await approved();
+    let reached!: () => void;
+    let release!: () => void;
+    const inTick = new Promise<void>((resolve) => (reached = resolve));
+    const held = new Promise<void>((resolve) => (release = resolve));
+    mock.method(QBittorrentAPI.prototype, 'getTorrent', async () => {
+      reached();
+      await held;
+      return heldTorrent();
+    });
+    const ticking = backfill.tick();
+    await inTick;
+    // Paused while the tick has the job in hand, before it saves it.
+    const pausing = backfill.pause(job.id);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    release();
+    await Promise.all([ticking, pausing]);
+    assert.equal((await jobNow(job.id)).status, 'paused');
+  });
+
+  it('never lets the minute’s tick fail outright', async () => {
+    await approved();
+    mock.method(QBittorrentAPI.prototype, 'getTorrent', async () => {
+      throw new Error('qBittorrent answered nonsense');
+    });
+    const repo = jobs();
+    const saves = mock.method(repo, 'save', async () => {
+      throw new Error('database is locked');
+    });
+    await assert.doesNotReject(backfill.tick());
+    saves.mock.restore();
+    mock.method(repo, 'find', async () => {
+      throw new Error('database is locked');
+    });
+    await assert.doesNotReject(backfill.tick());
+  });
+
+  it('cancelling a scan stops that scan, and no search after it', async () => {
+    const row = await titles().save(
+      new BackfillSeries({
+        kind: 'movie',
+        serverId: 0,
+        arrId: 55,
+        title: SECRETS.title,
+        status: 'stuck',
+      })
+    );
+    mock.method(BackfillRadarr.prototype, 'getWanted', async () => {
+      backfill.cancel();
+      return { records: [movie], complete: true };
+    });
+    await backfill.scan();
+    assert.equal(
+      searchedWith,
+      undefined,
+      'the cancelled scan searched nothing'
+    );
+
+    await backfill.search(row.id);
+    assert.equal(
+      (await titles().findOneOrFail({ where: { id: row.id } })).status,
+      'found'
+    );
+    assert.equal(await candidates().count({ where: { status: 'ready' } }), 1);
+  });
+
+  it('leaves what changed while a scan ran: an approval, an admin’s search terms', async () => {
+    const wanted = await titles().save(
+      new BackfillSeries({
+        kind: 'movie',
+        serverId: 0,
+        arrId: 55,
+        title: SECRETS.title,
+        status: 'found',
+        lastSearchedAt: new Date(),
+      })
+    );
+    const gone = await titles().save(
+      new BackfillSeries({
+        kind: 'movie',
+        serverId: 0,
+        arrId: 56,
+        title: 'Harry Potter and the Goblet of Fire',
+        status: 'found',
+        lastSearchedAt: new Date(),
+      })
+    );
+    const repo = titles();
+    const find = repo.find.bind(repo);
+    mock.method(repo, 'find', async (...args: Parameters<typeof find>) => {
+      const rows = await find(...args);
+      // Read by the scan; then both are approved, and a search term added.
+      if (
+        (args[0]?.where as { serverId?: number } | undefined)?.serverId === 0
+      ) {
+        await repo.update(wanted.id, {
+          status: 'downloading',
+          searchTerms: ['Chamber of Secrets'],
+        });
+        await repo.update(gone.id, { status: 'downloading' });
+      }
+      return rows;
+    });
+    await backfill.scan();
+    const kept = await repo.findOneOrFail({ where: { id: wanted.id } });
+    assert.equal(kept.status, 'downloading');
+    assert.deepEqual(kept.searchTerms, ['Chamber of Secrets']);
+    assert.equal(kept.missing, 1, 'what the scan read is still saved');
+    assert.equal(
+      (await repo.findOneOrFail({ where: { id: gone.id } })).status,
+      'downloading'
+    );
+  });
+
+  it('searches again a title left mid-search when Seerr stopped', async () => {
+    const row = await titles().save(
+      new BackfillSeries({
+        kind: 'movie',
+        serverId: 0,
+        arrId: 55,
+        title: SECRETS.title,
+        status: 'searching',
+      })
+    );
+    await backfill.scan();
+    assert.deepEqual(searchedWith, [2000, 5070]);
+    assert.equal(
+      (await titles().findOneOrFail({ where: { id: row.id } })).status,
+      'found'
+    );
+  });
+
+  it('takes nothing for done when Radarr’s wanted list was too long to read whole', async () => {
+    const row = await titles().save(
+      new BackfillSeries({
+        kind: 'movie',
+        serverId: 0,
+        arrId: 56,
+        title: 'Harry Potter and the Goblet of Fire',
+        status: 'found',
+        missing: 1,
+        lastSearchedAt: new Date(),
+      })
+    );
+    mock.method(BackfillRadarr.prototype, 'getWanted', async () => ({
+      records: [],
+      complete: false,
+    }));
+    await backfill.scan();
+    assert.equal(
+      (await titles().findOneOrFail({ where: { id: row.id } })).status,
+      'found',
+      'not in the part read, so still missing'
+    );
+  });
+
+  it('says when a wanted list was cut short', async () => {
+    const server = getSettings().radarr[0];
+    const pages: number[] = [];
+    const answer = async (
+      _url: string,
+      options: { params: { page: number } }
+    ) => {
+      pages.push(options.params.page);
+      return {
+        data: {
+          totalRecords: 50_000,
+          records: Array.from({ length: 250 }, () => movie),
+        },
+      };
+    };
+    const radarr = BackfillRadarr.forServer(server);
+    mock.method(
+      (radarr as unknown as { axios: { get: typeof answer } }).axios,
+      'get',
+      answer
+    );
+    assert.equal((await radarrWanted.call(radarr, 'missing')).complete, false);
+    assert.equal(pages.length, 40);
+
+    const sonarr = BackfillSonarr.forServer(
+      server as unknown as SonarrSettings
+    );
+    mock.method(
+      (sonarr as unknown as { axios: { get: typeof answer } }).axios,
+      'get',
+      answer
+    );
+    assert.equal((await sonarrWanted.call(sonarr, 'missing')).complete, false);
+
+    const few = async () => ({
+      data: { totalRecords: 2, records: [movie, movie] },
+    });
+    mock.method(
+      (radarr as unknown as { axios: { get: typeof few } }).axios,
+      'get',
+      few
+    );
+    assert.equal((await radarrWanted.call(radarr, 'missing')).complete, true);
+  });
+
+  it('searches the rest of a scan’s titles when one fails, and stops when Prowlarr does not answer', async () => {
+    const films = Array.from({ length: 5 }, (_, i) => ({
+      ...SECRETS,
+      id: 55 + i,
+      tmdbId: 700 + i,
+      title: `Film ${i}`,
+    }));
+    mock.method(
+      BackfillRadarr.prototype,
+      'getWanted',
+      async (kind: string) => ({
+        records: kind === 'missing' ? films : [],
+        complete: true,
+      })
+    );
+    getSettings().backfill = {
+      ...getSettings().backfill,
+      searchesPerScan: 5,
+    };
+    let details = 0;
+    mock.method(
+      BackfillRadarr.prototype,
+      'getMovieDetail',
+      async (id: number) => {
+        details += 1;
+        if (details === 1) throw new Error('Radarr answered 500');
+        return films.find((f) => f.id === id)!;
+      }
+    );
+    await backfill.scan();
+    const rows = await titles().find();
+    assert.equal(rows.filter((r) => r.lastSearchedAt).length, 5);
+    assert.equal(rows.filter((r) => r.searchError).length, 1);
+
+    // Prowlarr down: three in a row fail, and the scan stops there.
+    mock.method(ProwlarrAPI.prototype, 'search', async () => {
+      throw unreachable();
+    });
+    await titles().update(
+      { kind: 'movie' },
+      { lastSearchedAt: null, searchError: null }
+    );
+    await backfill.scan();
+    assert.equal(
+      (await titles().find()).filter((r) => r.searchError).length,
+      3
+    );
   });
 });

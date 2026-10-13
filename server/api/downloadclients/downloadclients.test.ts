@@ -9,7 +9,7 @@ import SabnzbdAPI, {
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { after, before, describe, it } from 'node:test';
+import { after, afterEach, before, describe, it, mock } from 'node:test';
 
 const MB = 1024 * 1024;
 /** How SABnzbd 4.2 and later name a job, as Radarr records it here. */
@@ -334,5 +334,36 @@ describe('talking to them', () => {
       }).getVersion(),
       /did not accept/
     );
+  });
+});
+
+describe('adding a torrent to qBittorrent for Backfill', () => {
+  afterEach(() => mock.restoreAll());
+
+  it('sets no share limits on it, which would have qBittorrent act on it the moment it is done', async () => {
+    let form: FormData | undefined;
+    mock.method(
+      QBittorrentAPI.prototype as unknown as {
+        post: (path: string, body: FormData) => Promise<unknown>;
+      },
+      'post',
+      async (_path: string, body: FormData) => {
+        form = body;
+        return { data: 'Ok.' };
+      }
+    );
+    await new QBittorrentAPI({
+      hostname: '127.0.0.1',
+      port: 1,
+      useSsl: false,
+      urlBase: '',
+      username: '',
+      password: '',
+    }).addTorrent({ torrent: Buffer.from('torrent'), category: 'backfill' });
+    // A limit of 0 is reached at once, and qBittorrent is often set to
+    // remove a torrent and its files when it is: before Radarr imports it.
+    assert.equal(form?.get('ratioLimit'), '-1');
+    assert.equal(form?.get('seedingTimeLimit'), '-1');
+    assert.equal(form?.get('inactiveSeedingTimeLimit'), '-1');
   });
 });

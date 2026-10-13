@@ -89,7 +89,8 @@ export interface TorrentClient extends DownloadClient {
   /**
    * Adds a torrent from its .torrent file (stopped, so its files can be
    * chosen before anything downloads) or a magnet link (started, to fetch
-   * its file list), with seeding switched off.
+   * its file list). Backfill stops it once its files are in; nothing set
+   * on it lets the client remove it before they are imported.
    */
   addTorrent(options: {
     torrent?: Buffer;

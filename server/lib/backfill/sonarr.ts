@@ -255,11 +255,15 @@ class BackfillSonarr extends SonarrAPI {
     return data;
   }
 
-  /** Every monitored, missing episode, a page at a time. */
+  /**
+   * Every monitored, missing episode (or every one below its cutoff), a
+   * page at a time, newest first. `complete` is false when there were more
+   * than `maxPages` pages: what was left out is still missing, not found.
+   */
   public async getWanted(
     kind: 'missing' | 'cutoff',
     maxPages = 40
-  ): Promise<SonarrWantedRecord[]> {
+  ): Promise<{ records: SonarrWantedRecord[]; complete: boolean }> {
     const records: SonarrWantedRecord[] = [];
     for (let page = 1; page <= maxPages; page++) {
       const { data } = await this.axios.get<{
@@ -277,10 +281,10 @@ class BackfillSonarr extends SonarrAPI {
       });
       records.push(...(data?.records ?? []));
       if (!data?.records?.length || records.length >= data.totalRecords) {
-        break;
+        return { records, complete: true };
       }
     }
-    return records;
+    return { records, complete: false };
   }
 
   /** The episodes of a series waiting in Sonarr's download queue. */

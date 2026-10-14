@@ -26,6 +26,7 @@ import MediaSlider from '@app/components/MediaSlider';
 import PersonCard from '@app/components/PersonCard';
 import PlexMatchWarning from '@app/components/PlexMatchWarning';
 import RequestButton from '@app/components/RequestButton';
+import RequestedBy from '@app/components/RequestedBy';
 import TitleEta from '@app/components/RequestEta/TitleEta';
 import Slider from '@app/components/Slider';
 import StatusBadge from '@app/components/StatusBadge';
@@ -944,6 +945,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
               <span>{intl.formatMessage(globalMessages.status)}</span>
               <span className="media-fact-value">{data.status}</span>
             </div>
+            <RequestedBy requests={data.mediaInfo?.requests} />
             <WatchedBy mediaId={data.mediaInfo?.id} isShow={false} />
             {filteredReleases && filteredReleases.length > 0 ? (
               <div className="media-fact">

@@ -1,7 +1,9 @@
+import { MediaRequestStatus } from '@server/constants/media';
 import Issue from '@server/entity/Issue';
 import IssueComment from '@server/entity/IssueComment';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
+import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
 import mediaForViewer from '@server/lib/mediaForViewer';
 import { Permission } from '@server/lib/permissions';
@@ -89,6 +91,46 @@ describe('a title seen by different people', () => {
     assert.equal(
       (media?.issues[0].createdBy as Partial<User>).email,
       'reporter@example.com'
+    );
+  });
+
+  it('keeps what the title page lists of each request for anyone', () => {
+    // The page's "Requested by": who, with their picture, for what, how it
+    // stands and when.
+    const requester = person(1, 'requester@example.com');
+    requester.avatar = '/avatar/1.png';
+    requester.setDisplayName();
+    const createdAt = new Date('2026-10-01T12:00:00Z');
+    const media = mediaForViewer(
+      new Media({
+        requests: [
+          new MediaRequest({
+            id: 7,
+            requestedBy: requester,
+            status: MediaRequestStatus.APPROVED,
+            is4k: true,
+            createdAt,
+            seasons: [
+              new SeasonRequest({ seasonNumber: 1 }),
+              new SeasonRequest({ seasonNumber: 2 }),
+            ],
+          }),
+        ],
+        issues: [],
+      }),
+      person(3, 'viewer@example.com')
+    );
+    const [request] = media?.requests ?? [];
+    const shown = request.requestedBy as Partial<User>;
+    assert.equal(shown.id, 1);
+    assert.equal(shown.displayName, 'user1');
+    assert.equal(shown.avatar, '/avatar/1.png');
+    assert.equal(request.status, MediaRequestStatus.APPROVED);
+    assert.equal(request.is4k, true);
+    assert.equal(request.createdAt, createdAt);
+    assert.deepEqual(
+      request.seasons.map((s) => s.seasonNumber),
+      [1, 2]
     );
   });
 });

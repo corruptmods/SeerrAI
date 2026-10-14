@@ -32,6 +32,7 @@ import RequestButton from '@app/components/RequestButton';
 import TitleEta from '@app/components/RequestEta/TitleEta';
 import RequestModal from '@app/components/RequestModal';
 import type { RequestPreselect } from '@app/components/RequestModal/TvRequestModal';
+import RequestedBy from '@app/components/RequestedBy';
 import Slider from '@app/components/Slider';
 import StatusBadge from '@app/components/StatusBadge';
 import { SeasonSubtitleBadge } from '@app/components/Subtitles/EpisodeSubtitles';
@@ -1379,6 +1380,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
               <span>{intl.formatMessage(globalMessages.status)}</span>
               <span className="media-fact-value">{data.status}</span>
             </div>
+            <RequestedBy requests={data.mediaInfo?.requests} />
             <WatchedBy mediaId={data.mediaInfo?.id} isShow={true} />
             {data.firstAirDate && (
               <div className="media-fact">

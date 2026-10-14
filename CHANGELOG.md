@@ -5,6 +5,7 @@ The newest changes are at the top. **Coming next** is what's on the `dev` branch
 ## Coming next
 
 - **Anime on Discover.** A new **Anime This Season** row on the Discover page shows the anime series airing now. Open it for the full Anime page, where you can also see what premieres next season, what aired last season, the most popular anime series and anime films. The row is on for everyone; admins can move or turn it off under Customize Discover, and anyone can hide it from their own home page. Anime here is animation made in Japanese, the same way Seerr decides what to send to Sonarr and Radarr as anime, so it shows even if your Discover Language is set to another language.
+- **See who asked for a title.** A film's or a series' page now lists its requests under **Requested by**, among its details: who asked, when, whether it was for 4K, which seasons, and where it stands (pending, approved, declined and so on).
 
 ## 1.1.0 (13 October 2026)
 

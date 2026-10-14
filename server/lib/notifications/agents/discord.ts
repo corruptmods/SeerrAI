@@ -7,6 +7,10 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
+import {
+  declineReasonOf,
+  escapeMarkdown,
+} from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
 import type { NotificationAgentDiscord } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
@@ -142,6 +146,15 @@ class DiscordAgent
           name: intl.formatMessage(globalMessages.requestStatus),
           value: status,
           inline: true,
+        });
+      }
+
+      const declineReason = declineReasonOf(type, payload);
+      if (declineReason) {
+        fields.push({
+          name: intl.formatMessage(globalMessages.declineReason),
+          value: escapeMarkdown(declineReason),
+          inline: false,
         });
       }
     } else if (payload.comment) {

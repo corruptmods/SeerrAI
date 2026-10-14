@@ -644,6 +644,14 @@ export class MediaRequest {
   @Column({ default: false })
   public requesterMuted: boolean;
 
+  /**
+   * Why it was declined, in the words of whoever declined it, if they gave
+   * a reason. Shown to the requester and to admins, and sent in the
+   * declined notification. Plain text, never markup.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  public declineReason?: string | null;
+
   @ManyToOne(() => User, (user) => user.requests, {
     eager: true,
     onDelete: 'CASCADE',

@@ -1,6 +1,10 @@
 import { IssueStatus, IssueTypeName } from '@server/constants/issue';
 import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
+import {
+  declineReasonOf,
+  escapeMarkdown,
+} from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
 import type { NotificationAgentGotify } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
@@ -86,6 +90,11 @@ class GotifyAgent
 
       if (status) {
         message += `\n**${intl.formatMessage(globalMessages.requestStatus)}:** ${status}  `;
+      }
+
+      const declineReason = declineReasonOf(type, payload);
+      if (declineReason) {
+        message += `\n**${intl.formatMessage(globalMessages.declineReason)}:** ${escapeMarkdown(declineReason)}  `;
       }
     } else if (payload.comment) {
       message += `\n${intl.formatMessage(globalMessages.commentFrom, { userName: payload.comment.user.displayName })}:\n${payload.comment.message}  `;

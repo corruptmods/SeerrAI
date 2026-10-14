@@ -1487,6 +1487,11 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           type,
           userId:
             type === MediaEventType.FAILED ? null : request.modifiedBy?.id,
+          // Why it was declined, when whoever declined it said.
+          detail:
+            type === MediaEventType.DECLINED
+              ? request.declineReason || undefined
+              : undefined,
         },
         manager
       );

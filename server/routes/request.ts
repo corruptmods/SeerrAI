@@ -2,6 +2,7 @@ import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
 import { REQUEST_BATCH_LIMIT } from '@server/constants/lists';
 import {
+  DECLINE_REASON_MAX_LENGTH,
   MediaRequestStatus,
   MediaStatus,
   MediaType,
@@ -1181,6 +1182,24 @@ requestRoutes.post<{
   }
 );
 
+/*
+ * Whoever declines a request may say why. Blank after trimming is no reason
+ * at all. The Decline button on a push notification sends no body, so it
+ * declines without one.
+ */
+const statusChangeBody = z
+  .object({
+    declineReason: z
+      .string()
+      .trim()
+      .max(
+        DECLINE_REASON_MAX_LENGTH,
+        `A reason can be at most ${DECLINE_REASON_MAX_LENGTH} characters.`
+      )
+      .nullish(),
+  })
+  .optional();
+
 requestRoutes.post<{
   requestId: string;
   status: 'approve' | 'decline';
@@ -1190,6 +1209,12 @@ requestRoutes.post<{
   async (req, res, next) => {
     const requestRepository = getRepository(MediaRequest);
     const requestId = Number(req.params.requestId);
+
+    const body = statusChangeBody.safeParse(req.body);
+
+    if (!body.success) {
+      return next({ status: 400, message: body.error.issues[0]?.message });
+    }
 
     try {
       return await requestLock.dispatch(requestKey(requestId), async () => {
@@ -1233,6 +1258,11 @@ requestRoutes.post<{
 
         request.status = newStatus;
         request.modifiedBy = req.user;
+        // Saved with the status, so the declined notification and the
+        // title's history both have it.
+        if (newStatus === MediaRequestStatus.DECLINED) {
+          request.declineReason = body.data?.declineReason || null;
+        }
         await requestRepository.save(request);
 
         return res.status(200).json(request);

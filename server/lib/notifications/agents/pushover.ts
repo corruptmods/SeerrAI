@@ -4,6 +4,10 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
+import {
+  declineReasonOf,
+  escapeHtml,
+} from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
 import type { NotificationAgentPushover } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
@@ -33,6 +37,9 @@ interface PushoverPayload extends PushoverImagePayload {
   priority: number;
   html: number;
 }
+
+/** The most characters Pushover takes in a message. */
+const MESSAGE_LIMIT = 1024;
 
 class PushoverAgent
   extends BaseAgent<NotificationAgentPushover>
@@ -103,9 +110,10 @@ class PushoverAgent
     let message = event ? `<b>${payload.subject}</b>` : '';
     let priority = 0;
 
-    if (payload.message) {
-      message += `<small>${message ? '\n' : ''}${payload.message}</small>`;
-    }
+    const summary = payload.message
+      ? `<small>${message ? '\n' : ''}${payload.message}</small>`
+      : '';
+    message += summary;
 
     if (payload.request) {
       message += `<small>\n\n<b>${intl.formatMessage(globalMessages.requestedBy)}:</b> ${payload.request.requestedBy.displayName}</small>`;
@@ -141,6 +149,11 @@ class PushoverAgent
       if (status) {
         message += `<small>\n<b>${intl.formatMessage(globalMessages.requestStatus)}:</b> ${status}</small>`;
       }
+
+      const declineReason = declineReasonOf(type, payload);
+      if (declineReason) {
+        message += `<small>\n<b>${intl.formatMessage(globalMessages.declineReason)}:</b> ${escapeHtml(declineReason)}</small>`;
+      }
     } else if (payload.comment) {
       message += `<small>\n\n<b>${intl.formatMessage(globalMessages.commentFrom, { userName: payload.comment.user.displayName })}:</b> ${payload.comment.message}</small>`;
     } else if (payload.issue) {
@@ -159,6 +172,17 @@ class PushoverAgent
 
     for (const extra of payload.extra ?? []) {
       message += `<small>\n<b>${extra.name}:</b> ${extra.value}</small>`;
+    }
+
+    // Pushover takes at most 1,024 characters. Told why a request was
+    // declined, the requester needs the reason more than the plot summary,
+    // so the summary is left out when both do not fit.
+    if (
+      declineReasonOf(type, payload) &&
+      message.length > MESSAGE_LIMIT &&
+      summary
+    ) {
+      message = message.replace(summary, '');
     }
 
     const url = applicationUrl

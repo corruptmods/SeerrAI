@@ -18,6 +18,7 @@ import type { PlayButtonLink } from '@app/components/Common/PlayButton';
 import PlayButton from '@app/components/Common/PlayButton';
 import Tag from '@app/components/Common/Tag';
 import Tooltip from '@app/components/Common/Tooltip';
+import TitleDeclineReason from '@app/components/DeclineReason/TitleDeclineReason';
 import { DeletingSoonBadge, KeepButton } from '@app/components/DeletingSoon';
 import ExternalLinkBlock from '@app/components/ExternalLinkBlock';
 import IssueModal from '@app/components/IssueModal';
@@ -599,6 +600,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
             requests={data.mediaInfo?.requests}
             media={data.mediaInfo}
           />
+          <TitleDeclineReason requests={data.mediaInfo?.requests} />
         </div>
         <div className="media-actions">
           {blocklist.show && (

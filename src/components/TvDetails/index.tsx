@@ -21,6 +21,7 @@ import PlayButton from '@app/components/Common/PlayButton';
 import StatusBadgeMini from '@app/components/Common/StatusBadgeMini';
 import Tag from '@app/components/Common/Tag';
 import Tooltip from '@app/components/Common/Tooltip';
+import TitleDeclineReason from '@app/components/DeclineReason/TitleDeclineReason';
 import { DeletingSoonBadge, KeepButton } from '@app/components/DeletingSoon';
 import ExternalLinkBlock from '@app/components/ExternalLinkBlock';
 import IssueModal from '@app/components/IssueModal';
@@ -717,6 +718,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
             requests={data.mediaInfo?.requests}
             media={data.mediaInfo}
           />
+          <TitleDeclineReason requests={data.mediaInfo?.requests} />
         </div>
         <div className="media-actions">
           {blocklist.show && (

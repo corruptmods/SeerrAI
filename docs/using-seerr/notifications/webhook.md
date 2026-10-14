@@ -122,6 +122,7 @@ The following special variables are only included in request-related notificatio
 | `{{requestedBy_jellyfinUserId}}`          | The requesting user's Jellyfin User ID                                         |
 | `{{requestedBy_settings_discordIds}}`     | The requesting user's Discord ID(s) as a JSON array (if set)                   |
 | `{{requestedBy_settings_telegramChatId}}` | The requesting user's Telegram Chat ID (if set)                                |
+| `{{decline_reason}}`                      | Why the request was declined, if a reason was given (declined requests only)   |
 
 #### Issue
 

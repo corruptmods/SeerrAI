@@ -134,3 +134,65 @@ describe('a title seen by different people', () => {
     );
   });
 });
+
+describe('why a request was declined, on a title page', () => {
+  const declined = () => {
+    const requester = person(1, 'requester@example.com');
+    const other = person(2, 'other@example.com');
+    return new Media({
+      requests: [
+        new MediaRequest({
+          requestedBy: requester,
+          declineReason: 'Already on Netflix',
+        }),
+        new MediaRequest({
+          requestedBy: other,
+          declineReason: 'Not this one',
+        }),
+      ],
+      issues: [],
+    });
+  };
+
+  it('shows the requester the reason for their own request only', () => {
+    const media = mediaForViewer(
+      declined(),
+      person(1, 'requester@example.com')
+    );
+    assert.equal(media?.requests[0].declineReason, 'Already on Netflix');
+    assert.equal(media?.requests[1].declineReason, undefined);
+  });
+
+  it('keeps the reasons from anyone else who opens the title', () => {
+    const media = mediaForViewer(declined(), person(3, 'viewer@example.com'));
+    assert.deepEqual(
+      media?.requests.map((r) => r.declineReason),
+      [undefined, undefined]
+    );
+  });
+
+  it('keeps them from someone who is not signed in', () => {
+    const media = mediaForViewer(declined(), undefined);
+    assert.deepEqual(
+      media?.requests.map((r) => r.declineReason),
+      [undefined, undefined]
+    );
+  });
+
+  it('shows every reason to those who may see all requests', () => {
+    for (const permissions of [
+      Permission.MANAGE_REQUESTS,
+      Permission.REQUEST_VIEW,
+      Permission.ADMIN,
+    ]) {
+      const media = mediaForViewer(
+        declined(),
+        person(3, 'manager@example.com', permissions)
+      );
+      assert.deepEqual(
+        media?.requests.map((r) => r.declineReason),
+        ['Already on Netflix', 'Not this one']
+      );
+    }
+  });
+});

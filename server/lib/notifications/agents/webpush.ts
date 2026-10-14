@@ -5,6 +5,7 @@ import { User } from '@server/entity/User';
 import { UserPushSubscription } from '@server/entity/UserPushSubscription';
 import { defineMessages, getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
+import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import type { NotificationAgentConfig } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -221,12 +222,17 @@ class WebPushAgent
           mediaType,
         });
         break;
-      case Notification.MEDIA_DECLINED:
+      case Notification.MEDIA_DECLINED: {
         message = intl.formatMessage(messages.declined, {
           quality,
           mediaType,
         });
+        const declineReason = declineReasonOf(type, payload);
+        if (declineReason) {
+          message = `${message}\n${intl.formatMessage(globalMessages.declineReason)}: ${declineReason}`;
+        }
         break;
+      }
       case Notification.MEDIA_FAILED:
         message = intl.formatMessage(messages.failed, {
           quality,

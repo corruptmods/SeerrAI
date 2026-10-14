@@ -45,6 +45,7 @@
   "notifications.agents.webpush.viewMedia": "View Media",
   "notifications.common.available": "Available",
   "notifications.common.commentFrom": "Comment from {userName}",
+  "notifications.common.declineReason": "Reason",
   "notifications.common.declined": "Declined",
   "notifications.common.failed": "Failed",
   "notifications.common.issue": "issue",

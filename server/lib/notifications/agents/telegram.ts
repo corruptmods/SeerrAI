@@ -4,6 +4,7 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
+import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
 import type { NotificationAgentTelegram } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
@@ -34,6 +35,9 @@ interface TelegramPhotoPayload {
   message_thread_id: string;
   disable_notification: boolean;
 }
+
+/** The most characters Telegram takes in a photo's caption. */
+const CAPTION_LIMIT = 1024;
 
 class TelegramAgent
   extends BaseAgent<NotificationAgentTelegram>
@@ -133,6 +137,13 @@ class TelegramAgent
           intl.formatMessage(globalMessages.requestStatus)
         )}:\* ${this.escapeText(status)}`;
       }
+
+      const declineReason = declineReasonOf(type, payload);
+      if (declineReason) {
+        message += `\n\*${this.escapeText(
+          intl.formatMessage(globalMessages.declineReason)
+        )}:\* ${this.escapeText(declineReason)}`;
+      }
     } else if (payload.comment) {
       message += `\n\n\*${this.escapeText(
         intl.formatMessage(globalMessages.commentFrom, {
@@ -185,7 +196,10 @@ class TelegramAgent
     }
     /* eslint-enable */
 
-    return embedPoster && payload.image
+    // Telegram refuses a caption over 1,024 characters, where a text message
+    // may have 4,096. Escaped, the message is never shorter than Telegram
+    // counts it, so one that might be too long for a caption goes as text.
+    return embedPoster && payload.image && message.length <= CAPTION_LIMIT
       ? {
           photo: payload.image,
           caption: message,
@@ -202,9 +216,13 @@ class TelegramAgent
     payload: NotificationPayload
   ): Promise<boolean> {
     const settings = this.getSettings();
-    const endpoint = `${this.baseUrl}bot${settings.options.botAPI}/${
-      settings.embedPoster && payload.image ? 'sendPhoto' : 'sendMessage'
-    }`;
+    // A poster goes with its caption, or the message is sent as text.
+    const endpoint = (
+      built: Partial<TelegramMessagePayload | TelegramPhotoPayload>
+    ) =>
+      `${this.baseUrl}bot${settings.options.botAPI}/${
+        'photo' in built ? 'sendPhoto' : 'sendMessage'
+      }`;
 
     // Send system notification
     if (
@@ -221,7 +239,7 @@ class TelegramAgent
       try {
         const notificationPayload = this.getNotificationPayload(type, payload);
 
-        await axios.post(endpoint, {
+        await axios.post(endpoint(notificationPayload), {
           ...notificationPayload,
           chat_id: settings.options.chatId,
           message_thread_id: settings.options.messageThreadId,
@@ -265,7 +283,7 @@ class TelegramAgent
             payload.notifyUser.settings?.locale as AvailableLocale
           );
 
-          await axios.post(endpoint, {
+          await axios.post(endpoint(notificationPayload), {
             ...notificationPayload,
             chat_id: payload.notifyUser.settings.telegramChatId,
             message_thread_id:
@@ -320,7 +338,7 @@ class TelegramAgent
                   user.settings?.locale as AvailableLocale
                 );
 
-                await axios.post(endpoint, {
+                await axios.post(endpoint(notificationPayload), {
                   ...notificationPayload,
                   chat_id: user.settings.telegramChatId,
                   message_thread_id: user.settings.telegramMessageThreadId,

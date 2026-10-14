@@ -235,6 +235,32 @@ describe('notifications sent close together', () => {
     assert.equal(toUser().length, 1);
     assert.equal(toUser()[0].payload.subject, '2 titles are ready to watch');
   });
+
+  it('tells each decline that came with a reason on its own, reason and all', async () => {
+    const decline = (id: number, title: string, declineReason?: string) =>
+      notificationManager.sendNotification(Notification.MEDIA_DECLINED, {
+        ...available(title),
+        request: { id, is4k: false, declineReason } as MediaRequest,
+      });
+
+    decline(1, 'Dune (2021)', 'Already on Netflix');
+    decline(2, 'Up (2009)', 'We have it on disc');
+    decline(3, 'Heat (1995)');
+    decline(4, 'Alien (1979)');
+
+    const reasons = () =>
+      toUser().map(
+        (s) => s.payload.request?.declineReason ?? s.payload.subject
+      );
+    assert.deepEqual(reasons(), ['Already on Netflix', 'We have it on disc']);
+
+    await wait(120);
+    assert.deepEqual(reasons(), [
+      'Already on Netflix',
+      'We have it on disc',
+      '2 requests were declined',
+    ]);
+  });
 });
 
 describe('an agent that fails', () => {

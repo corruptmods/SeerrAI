@@ -1,6 +1,7 @@
 import { IssueStatus, IssueTypeName } from '@server/constants/issue';
 import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
+import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
 import type { NotificationAgentSlack } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
@@ -183,6 +184,19 @@ class SlackAgent
       blocks.push({
         type: 'section',
         fields,
+      });
+    }
+
+    // Plain text, so nothing in the reason is formatted or links anywhere.
+    const declineReason = declineReasonOf(type, payload);
+    if (declineReason) {
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'plain_text',
+          text: `${intl.formatMessage(globalMessages.declineReason)}\n${declineReason}`,
+          emoji: false,
+        },
       });
     }
 

@@ -2,6 +2,8 @@ import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import Tooltip from '@app/components/Common/Tooltip';
+import DeclineReason from '@app/components/DeclineReason';
+import DeclineRequestModal from '@app/components/DeclineRequestModal';
 import RequestModal from '@app/components/RequestModal';
 import useRequestOverride from '@app/hooks/useRequestOverride';
 import { useUser } from '@app/hooks/useUser';
@@ -50,12 +52,13 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
   const intl = useIntl();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
   const { profile, rootFolder, server, languageProfile } =
     useRequestOverride(request);
 
-  const updateRequest = async (type: 'approve' | 'decline'): Promise<void> => {
+  const approveRequest = async (): Promise<void> => {
     setIsUpdating(true);
-    await axios.post(`/api/v1/request/${request.id}/${type}`);
+    await axios.post(`/api/v1/request/${request.id}/approve`);
 
     if (onUpdate) {
       onUpdate();
@@ -90,6 +93,15 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
             onUpdate();
           }
           setShowEditModal(false);
+        }}
+      />
+      <DeclineRequestModal
+        show={showDeclineModal}
+        requests={[request]}
+        onCancel={() => setShowDeclineModal(false)}
+        onComplete={() => {
+          setShowDeclineModal(false);
+          onUpdate?.();
         }}
       />
       <div className="px-4 py-3 text-gray-300">
@@ -161,7 +173,7 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
                   <Button
                     buttonType="success"
                     className="mr-1"
-                    onClick={() => updateRequest('approve')}
+                    onClick={() => approveRequest()}
                     disabled={isUpdating}
                   >
                     <CheckIcon className="icon-sm" />
@@ -171,7 +183,7 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
                   <Button
                     buttonType="danger"
                     className="mr-1"
-                    onClick={() => updateRequest('decline')}
+                    onClick={() => setShowDeclineModal(true)}
                     disabled={isUpdating}
                   >
                     <XMarkIcon />
@@ -260,6 +272,14 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
             </Tooltip>
           </div>
         </div>
+        {request.status === MediaRequestStatus.DECLINED &&
+          request.declineReason && (
+            <DeclineReason
+              reason={request.declineReason}
+              whole
+              className="mt-2"
+            />
+          )}
         {(request.seasons ?? []).length > 0 && (
           <div className="mt-2 flex flex-col text-sm">
             <div className="mb-1 font-medium">

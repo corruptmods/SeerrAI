@@ -1,4 +1,6 @@
-import { initI18n } from '@server/i18n';
+import type { MediaRequest } from '@server/entity/MediaRequest';
+import { getIntl, initI18n } from '@server/i18n';
+import globalMessages from '@server/i18n/globalMessages';
 import { Notification } from '@server/lib/notifications';
 import type { NotificationPayload } from '@server/lib/notifications/agents/agent';
 import TelegramAgent from '@server/lib/notifications/agents/telegram';
@@ -162,5 +164,54 @@ describe('Telegram messages', () => {
 
     assert.ok(built.caption, 'sent as a photo with a caption');
     assert.equal(readMarkdownV2(built.caption!).shown, 'Poster `Film`\\');
+  });
+
+  it('says why a request was declined, escaped', () => {
+    const reason =
+      'Already on *Netflix* (4K) - see [here](https://e.vil) \\ `x`';
+    const { shown, links } = readMarkdownV2(
+      textOf(
+        {
+          subject: 'Film (2020)',
+          notifySystem: true,
+          notifyAdmin: false,
+          request: {
+            requestedBy: { displayName: 'Friend' },
+            declineReason: reason,
+          } as unknown as MediaRequest,
+        },
+        Notification.MEDIA_DECLINED
+      )
+    );
+
+    assert.ok(
+      shown.includes(
+        `${getIntl().formatMessage(globalMessages.declineReason)}: ${reason}`
+      ),
+      shown
+    );
+    assert.deepEqual(links, []);
+  });
+
+  it('sends a message too long for a poster caption as text instead', () => {
+    const built = new TelegramAgent()['getNotificationPayload'](
+      Notification.MEDIA_DECLINED,
+      {
+        subject: 'Film (2020)',
+        message: 'o'.repeat(500),
+        image: 'https://image.tmdb.org/t/p/w600_and_h900_bestv2/x.jpg',
+        notifySystem: true,
+        notifyAdmin: false,
+        request: {
+          requestedBy: { displayName: 'Friend' },
+          declineReason: 'r.'.repeat(250),
+        } as unknown as MediaRequest,
+      }
+    ) as { text?: string; caption?: string; photo?: string };
+
+    // Telegram refuses a caption over 1024 characters outright.
+    assert.equal(built.photo, undefined);
+    assert.equal(built.caption, undefined);
+    assert.ok(readMarkdownV2(built.text!).shown.includes('r.'.repeat(250)));
   });
 });

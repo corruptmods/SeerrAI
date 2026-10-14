@@ -4,6 +4,7 @@ import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
+import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
 import type { NotificationAgentPushbullet } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
@@ -86,6 +87,11 @@ class PushbulletAgent
 
       if (status) {
         body += `\n${intl.formatMessage(globalMessages.requestStatus)}: ${status}`;
+      }
+
+      const declineReason = declineReasonOf(type, payload);
+      if (declineReason) {
+        body += `\n${intl.formatMessage(globalMessages.declineReason)}: ${declineReason}`;
       }
     } else if (payload.comment) {
       body += `\n\n${intl.formatMessage(globalMessages.commentFrom, { userName: payload.comment.user.displayName })}:\n${payload.comment.message}`;

@@ -1,4 +1,5 @@
 import ButtonWithDropdown from '@app/components/Common/ButtonWithDropdown';
+import DeclineRequestModal from '@app/components/DeclineRequestModal';
 import RequestModal from '@app/components/RequestModal';
 import usePushDeviceState from '@app/hooks/usePushDeviceState';
 import useSettings from '@app/hooks/useSettings';
@@ -78,6 +79,13 @@ const RequestButton = ({
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [showRequest4kModal, setShowRequest4kModal] = useState(false);
   const [editRequest, setEditRequest] = useState(false);
+  // Kept while the dialog closes, so it does not change as it fades out.
+  const [declining, setDeclining] = useState<{
+    show: boolean;
+    requests: MediaRequest[];
+  }>({ show: false, requests: [] });
+  const declineRequests = (requests: MediaRequest[]) =>
+    setDeclining({ show: true, requests });
 
   // All pending requests
   const activeRequests = media?.requests.filter(
@@ -122,11 +130,8 @@ const RequestButton = ({
       : undefined;
   }, [active4kRequests, user]);
 
-  const modifyRequest = async (
-    request: MediaRequest,
-    type: 'approve' | 'decline'
-  ) => {
-    const response = await axios.post(`/api/v1/request/${request.id}/${type}`);
+  const approveRequest = async (request: MediaRequest) => {
+    const response = await axios.post(`/api/v1/request/${request.id}/approve`);
 
     if (response) {
       onUpdate();
@@ -134,17 +139,14 @@ const RequestButton = ({
     }
   };
 
-  const modifyRequests = async (
-    requests: MediaRequest[],
-    type: 'approve' | 'decline'
-  ): Promise<void> => {
+  const approveRequests = async (requests: MediaRequest[]): Promise<void> => {
     if (!requests) {
       return;
     }
 
     await Promise.all(
       requests.map(async (request) => {
-        return axios.post(`/api/v1/request/${request.id}/${type}`);
+        return axios.post(`/api/v1/request/${request.id}/approve`);
       })
     );
 
@@ -271,7 +273,7 @@ const RequestButton = ({
           id: 'approve-request',
           text: intl.formatMessage(messages.approverequest),
           action: () => {
-            modifyRequest(activeRequest, 'approve');
+            approveRequest(activeRequest);
           },
           svg: <CheckIcon />,
         },
@@ -279,7 +281,7 @@ const RequestButton = ({
           id: 'decline-request',
           text: intl.formatMessage(messages.declinerequest),
           action: () => {
-            modifyRequest(activeRequest, 'decline');
+            declineRequests([activeRequest]);
           },
           svg: <XMarkIcon />,
         }
@@ -297,7 +299,7 @@ const RequestButton = ({
             requestCount: activeRequests.length,
           }),
           action: () => {
-            modifyRequests(activeRequests, 'approve');
+            approveRequests(activeRequests);
           },
           svg: <CheckIcon />,
         },
@@ -307,7 +309,7 @@ const RequestButton = ({
             requestCount: activeRequests.length,
           }),
           action: () => {
-            modifyRequests(activeRequests, 'decline');
+            declineRequests(activeRequests);
           },
           svg: <XMarkIcon />,
         }
@@ -341,7 +343,7 @@ const RequestButton = ({
           id: 'approve-4k-request',
           text: intl.formatMessage(messages.approverequest4k),
           action: () => {
-            modifyRequest(active4kRequest, 'approve');
+            approveRequest(active4kRequest);
           },
           svg: <CheckIcon />,
         },
@@ -349,7 +351,7 @@ const RequestButton = ({
           id: 'decline-4k-request',
           text: intl.formatMessage(messages.declinerequest4k),
           action: () => {
-            modifyRequest(active4kRequest, 'decline');
+            declineRequests([active4kRequest]);
           },
           svg: <XMarkIcon />,
         }
@@ -367,7 +369,7 @@ const RequestButton = ({
             requestCount: active4kRequests.length,
           }),
           action: () => {
-            modifyRequests(active4kRequests, 'approve');
+            approveRequests(active4kRequests);
           },
           svg: <CheckIcon />,
         },
@@ -377,7 +379,7 @@ const RequestButton = ({
             requestCount: active4kRequests.length,
           }),
           action: () => {
-            modifyRequests(active4kRequests, 'decline');
+            declineRequests(active4kRequests);
           },
           svg: <XMarkIcon />,
         }
@@ -480,12 +482,25 @@ const RequestButton = ({
 
   const [buttonOne, ...others] = buttons;
 
+  const declineModal = (
+    <DeclineRequestModal
+      show={declining.show}
+      requests={declining.requests}
+      onCancel={() => setDeclining((d) => ({ ...d, show: false }))}
+      onComplete={() => {
+        setDeclining((d) => ({ ...d, show: false }));
+        onUpdate();
+      }}
+    />
+  );
+
   if (!buttonOne) {
-    return null;
+    return declineModal;
   }
 
   return (
     <>
+      {declineModal}
       <RequestModal
         tmdbId={tmdbId}
         show={showRequestModal}

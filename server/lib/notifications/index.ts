@@ -2,6 +2,7 @@ import type { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
 import type { NotificationAgent, NotificationPayload } from './agents/agent';
+import { declineReasonOf } from './declineReason';
 
 export enum Notification {
   NONE = 0,
@@ -189,7 +190,14 @@ class NotificationManager {
       subject: payload.subject,
     });
 
-    if (!GATHERED.has(type) || !payload.notifyUser || payload.digest) {
+    // A decline that came with a reason goes on its own too: the reason was
+    // written for that request, and a summary of several would lose it.
+    if (
+      !GATHERED.has(type) ||
+      !payload.notifyUser ||
+      payload.digest ||
+      declineReasonOf(type, payload)
+    ) {
       this.deliver(type, payload);
       return;
     }

@@ -6,6 +6,7 @@ import { User } from '@server/entity/User';
 import { defineMessages, getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
 import PreparedEmail from '@server/lib/email';
+import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
 import type { NotificationAgentEmail } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
@@ -216,6 +217,8 @@ class EmailAgent
           break;
       }
 
+      const declineReason = declineReasonOf(type, payload);
+
       return {
         template: path.join(
           __dirname,
@@ -227,6 +230,11 @@ class EmailAgent
         locals: {
           event: eventText(payload, intl),
           body,
+          // Escaped by the template, like every other value in it.
+          declineReason,
+          declineReasonLabel: declineReason
+            ? intl.formatMessage(globalMessages.declineReason)
+            : undefined,
           mediaName: payload.subject,
           mediaExtra: payload.extra ?? [],
           imageUrl: embedPoster ? payload.image : undefined,

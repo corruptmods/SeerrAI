@@ -1988,6 +1988,12 @@ components:
           type: boolean
           example: false
           description: If true, this request will not count against the user's quota. Requires MANAGE_REQUESTS permission.
+        declineReason:
+          type: string
+          nullable: true
+          readOnly: true
+          example: Already on Netflix
+          description: Why the request was declined, if whoever declined it gave a reason. Plain text. On a title's page, only the requester and those who can see all requests are sent it.
       required:
         - id
         - status
@@ -10994,6 +11000,19 @@ paths:
           schema:
             type: string
             enum: [approve, decline]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                declineReason:
+                  type: string
+                  nullable: true
+                  description: |
+                    Declining only: why, shown to the requester and sent in the declined notification. Plain text, trimmed; blank means no reason. At most 500 characters.
+                  example: Already on Netflix
       responses:
         '200':
           description: Request status changed
@@ -11002,7 +11021,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/MediaRequest'
         '400':
-          description: Status must be approve or decline
+          description: Status must be approve or decline, or the reason is too long
         '409':
           description: Only pending requests can be approved or declined
   /movie/{movieId}:

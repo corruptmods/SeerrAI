@@ -7,6 +7,8 @@ import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
+import DeclineReason from '@app/components/DeclineReason';
+import DeclineRequestModal from '@app/components/DeclineRequestModal';
 import RequestEta, {
   describeEta,
   expectedLabel,
@@ -356,14 +358,13 @@ const RequestItem = ({
   });
 
   const [isRetrying, setRetrying] = useState(false);
-  const [updatingType, setUpdatingType] = useState<
-    'approve' | 'decline' | null
-  >(null);
+  const [isApproving, setIsApproving] = useState(false);
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
 
-  const modifyRequest = async (type: 'approve' | 'decline') => {
-    setUpdatingType(type);
+  const approveRequest = async () => {
+    setIsApproving(true);
     try {
-      await axios.post(`/api/v1/request/${request.id}/${type}`);
+      await axios.post(`/api/v1/request/${request.id}/approve`);
       revalidate();
       revalidateList();
       mutate('/api/v1/request/count');
@@ -373,7 +374,7 @@ const RequestItem = ({
         appearance: 'error',
       });
     } finally {
-      setUpdatingType(null);
+      setIsApproving(false);
     }
   };
 
@@ -464,6 +465,17 @@ const RequestItem = ({
         onComplete={() => {
           revalidateList();
           setShowEditModal(false);
+        }}
+      />
+      <DeclineRequestModal
+        show={showDeclineModal}
+        requests={[request]}
+        subTitle={isMovie(title) ? title.title : title.name}
+        onCancel={() => setShowDeclineModal(false)}
+        onComplete={() => {
+          setShowDeclineModal(false);
+          revalidate();
+          revalidateList();
         }}
       />
       <div
@@ -558,9 +570,20 @@ const RequestItem = ({
                 {intl.formatMessage(globalMessages.status)}
               </span>
               {requestData.status === MediaRequestStatus.DECLINED ? (
-                <Badge badgeType="danger">
-                  {intl.formatMessage(globalMessages.declined)}
-                </Badge>
+                <>
+                  <Badge badgeType="danger">
+                    {intl.formatMessage(globalMessages.declined)}
+                  </Badge>
+                  {/* Beside the badge on a wide screen, where each row is
+                      one line high; on its own row, wrapping, below that. */}
+                  {requestData.declineReason && (
+                    <DeclineReason
+                      reason={requestData.declineReason}
+                      inline
+                      className="ml-2 hidden xl:block"
+                    />
+                  )}
+                </>
               ) : requestData.status === MediaRequestStatus.FAILED ? (
                 <Badge
                   badgeType="danger"
@@ -597,6 +620,13 @@ const RequestItem = ({
                 />
               )}
             </div>
+            {requestData.status === MediaRequestStatus.DECLINED &&
+              requestData.declineReason && (
+                <DeclineReason
+                  reason={requestData.declineReason}
+                  className="py-0.5 sm:py-1 xl:hidden"
+                />
+              )}
             {backfill && <BackfillRequestChip backfill={backfill} />}
             {backfillStatus && <BackfillStatusLine status={backfillStatus} />}
             {describeEta(intl, eta) && (
@@ -782,10 +812,10 @@ const RequestItem = ({
                   <Button
                     className="w-full"
                     buttonType="success"
-                    onClick={() => modifyRequest('approve')}
-                    disabled={updatingType !== null}
+                    onClick={() => approveRequest()}
+                    disabled={isApproving}
                   >
-                    {updatingType === 'approve' ? <Spinner /> : <CheckIcon />}
+                    {isApproving ? <Spinner /> : <CheckIcon />}
                     <span>{intl.formatMessage(globalMessages.approve)}</span>
                   </Button>
                 </span>
@@ -793,10 +823,10 @@ const RequestItem = ({
                   <Button
                     className="w-full"
                     buttonType="danger"
-                    onClick={() => modifyRequest('decline')}
-                    disabled={updatingType !== null}
+                    onClick={() => setShowDeclineModal(true)}
+                    disabled={isApproving}
                   >
-                    {updatingType === 'decline' ? <Spinner /> : <XMarkIcon />}
+                    <XMarkIcon />
                     <span>{intl.formatMessage(globalMessages.decline)}</span>
                   </Button>
                 </span>
@@ -812,7 +842,7 @@ const RequestItem = ({
                   className="w-full"
                   buttonType="primary"
                   onClick={() => setShowEditModal(true)}
-                  disabled={updatingType !== null}
+                  disabled={isApproving}
                 >
                   <PencilIcon />
                   <span>{intl.formatMessage(messages.editrequest)}</span>

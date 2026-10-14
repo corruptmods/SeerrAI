@@ -1,5 +1,6 @@
 import { IssueStatus, IssueType } from '@server/constants/issue';
 import { MediaStatus } from '@server/constants/media';
+import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import type { NotificationAgentWebhook } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -45,6 +46,7 @@ const KeyMap: Record<string, string | KeyMapFunction> = {
   requestedBy_settings_discordIds: 'request.requestedBy.settings.discordIds',
   requestedBy_settings_telegramChatId:
     'request.requestedBy.settings.telegramChatId',
+  decline_reason: (payload, type) => declineReasonOf(type, payload) ?? '',
   issue_id: 'issue.id',
   issue_type: (payload) =>
     payload.issue ? IssueType[payload.issue.issueType] : '',

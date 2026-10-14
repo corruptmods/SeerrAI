@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Seerr AI",
   "short_name": "Seerr AI",
-  "description": "Request and track movies and TV shows for your media server.",
+  "description": "Request and track films, series and music for your media server.",
   "start_url": "./",
   "scope": "/",
   "display": "standalone",

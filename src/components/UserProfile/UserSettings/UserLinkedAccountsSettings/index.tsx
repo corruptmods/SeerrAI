@@ -7,12 +7,16 @@ import Dropdown from '@app/components/Common/Dropdown';
 import PageTitle from '@app/components/Common/PageTitle';
 import LinkJellyfinQuickConnectModal from '@app/components/UserProfile/UserSettings/UserLinkedAccountsSettings/LinkJellyfinQuickConnectModal';
 import useSettings from '@app/hooks/useSettings';
-import { Permission, UserType, useUser } from '@app/hooks/useUser';
+import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { SERVER_NAMES, accountServers } from '@app/utils/mediaServerAccounts';
 import PlexOAuth from '@app/utils/plex';
 import { TrashIcon } from '@heroicons/react/24/solid';
-import { MediaServerType } from '@server/constants/server';
+import type {
+  JellyfinFamilyKind,
+  MediaServerKind,
+} from '@server/constants/server';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 import { useMemo, useState } from 'react';
@@ -32,22 +36,28 @@ const messages = defineMessages(
       "You do not have permission to modify this user's linked accounts.",
     plexErrorUnauthorized: 'Unable to connect to Plex using your credentials',
     plexErrorExists: 'This account is already linked to a Plex user',
+    plexErrorNoAccess:
+      'This Plex account does not have access to the Plex server.',
     errorUnknown: 'An unknown error occurred',
     deleteFailed: 'Unable to delete linked account.',
+    notConnected: 'Not connected',
+    linkAccount: 'Link Account',
   }
 );
 
 const plexOAuth = new PlexOAuth();
 
-enum LinkedAccountType {
-  Plex = 'Plex',
-  Jellyfin = 'Jellyfin',
-  Emby = 'Emby',
-}
+const SERVER_LOGOS: Record<MediaServerKind, typeof PlexLogo> = {
+  plex: PlexLogo,
+  jellyfin: JellyfinLogo,
+  emby: EmbyLogo,
+};
 
 type LinkedAccount = {
-  type: LinkedAccountType;
+  kind: MediaServerKind;
   username: string;
+  /** Seerr is connected to this server; the account is used to sign in. */
+  connected: boolean;
 };
 
 const UserLinkedAccountsSettings = () => {
@@ -63,33 +73,33 @@ const UserLinkedAccountsSettings = () => {
   const { data: passwordInfo } = useSWR<{ hasPassword: boolean }>(
     user ? `/api/v1/user/${user?.id}/settings/password` : null
   );
-  const [showJellyfinModal, setShowJellyfinModal] = useState(false);
+  const [jellyfinModalKind, setJellyfinModalKind] = useState<
+    JellyfinFamilyKind | undefined
+  >();
   const [showJellyfinQuickConnectModal, setShowJellyfinQuickConnectModal] =
     useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const applicationName = settings.currentSettings.applicationTitle;
 
+  const mediaServers = settings.currentSettings.mediaServers;
+  const primary = mediaServers.find((server) => server.primary)?.kind;
+
+  // Every account they have linked, their main one first, including any on
+  // a server Seerr is no longer connected to.
   const accounts: LinkedAccount[] = useMemo(() => {
-    const accounts: LinkedAccount[] = [];
-    if (!user) return accounts;
-    if (user.userType === UserType.PLEX && user.plexUsername)
-      accounts.push({
-        type: LinkedAccountType.Plex,
-        username: user.plexUsername,
-      });
-    if (user.userType === UserType.EMBY && user.embyUsername)
-      accounts.push({
-        type: LinkedAccountType.Emby,
-        username: user.embyUsername,
-      });
-    if (user.userType === UserType.JELLYFIN && user.jellyfinUsername)
-      accounts.push({
-        type: LinkedAccountType.Jellyfin,
-        username: user.jellyfinUsername,
-      });
-    return accounts;
-  }, [user]);
+    if (!user) return [];
+    const usernames: Record<MediaServerKind, string | null | undefined> = {
+      plex: user.plexUsername,
+      jellyfin: user.jellyfinUsername,
+      emby: user.embyUsername,
+    };
+    return accountServers(user).map((kind) => ({
+      kind,
+      username: usernames[kind] ?? '',
+      connected: mediaServers.some((server) => server.kind === kind),
+    }));
+  }, [user, mediaServers]);
 
   const linkPlexAccount = async () => {
     setError(null);
@@ -109,6 +119,9 @@ const UserLinkedAccountsSettings = () => {
         case 401:
           setError(intl.formatMessage(messages.plexErrorUnauthorized));
           break;
+        case 403:
+          setError(intl.formatMessage(messages.plexErrorNoAccess));
+          break;
         case 422:
           setError(intl.formatMessage(messages.plexErrorExists));
           break;
@@ -118,34 +131,38 @@ const UserLinkedAccountsSettings = () => {
     }
   };
 
-  const linkable = [
-    {
-      name: 'Plex',
+  // Each connected server they have no account linked from yet.
+  const linkable = mediaServers
+    .filter((server) => !accounts.some((a) => a.kind === server.kind))
+    .map(({ kind }) => ({
+      kind,
       action: () => {
-        plexOAuth.preparePopup();
-        setTimeout(() => linkPlexAccount(), 1500);
+        if (kind === 'plex') {
+          plexOAuth.preparePopup();
+          setTimeout(() => linkPlexAccount(), 1500);
+        } else {
+          setJellyfinModalKind(kind);
+        }
       },
-      hide:
-        settings.currentSettings.mediaServerType !== MediaServerType.PLEX ||
-        accounts.some((a) => a.type === LinkedAccountType.Plex),
-    },
-    {
-      name: 'Jellyfin',
-      action: () => setShowJellyfinModal(true),
-      hide:
-        settings.currentSettings.mediaServerType !== MediaServerType.JELLYFIN ||
-        accounts.some((a) => a.type === LinkedAccountType.Jellyfin),
-    },
-    {
-      name: 'Emby',
-      action: () => setShowJellyfinModal(true),
-      hide:
-        settings.currentSettings.mediaServerType !== MediaServerType.EMBY ||
-        accounts.some((a) => a.type === LinkedAccountType.Emby),
-    },
-  ].filter((l) => !l.hide);
+    }));
 
-  const deleteRequest = async (account: string) => {
+  /*
+   * Whether an account can be unlinked, as the server decides: never the
+   * owner's account on the primary server, nor the owner's Plex account
+   * while Plex is connected (Seerr reaches Plex with it), and only while a
+   * password or another account on a connected server still lets them in.
+   */
+  const mayUnlink = (account: LinkedAccount) =>
+    !(
+      user?.id === 1 &&
+      (account.kind === primary ||
+        (account.kind === 'plex' &&
+          mediaServers.some((server) => server.kind === 'plex')))
+    ) &&
+    (!!passwordInfo?.hasPassword ||
+      accounts.some((other) => other.kind !== account.kind && other.connected));
+
+  const deleteRequest = async (account: MediaServerKind) => {
     try {
       await axios.delete(
         `/api/v1/user/${user?.id}/settings/linked-accounts/${account}`
@@ -177,8 +194,6 @@ const UserLinkedAccountsSettings = () => {
     );
   }
 
-  const enableMediaServerUnlink = user?.id !== 1 && passwordInfo?.hasPassword;
-
   return (
     <>
       <PageTitle
@@ -201,10 +216,13 @@ const UserLinkedAccountsSettings = () => {
         </div>
         {currentUser?.id === user?.id && !!linkable.length && (
           <div>
-            <Dropdown text="Link Account" buttonType="ghost">
-              {linkable.map(({ name, action }) => (
-                <Dropdown.Item key={name} onClick={action}>
-                  {name}
+            <Dropdown
+              text={intl.formatMessage(messages.linkAccount)}
+              buttonType="ghost"
+            >
+              {linkable.map(({ kind, action }) => (
+                <Dropdown.Item key={kind} onClick={action}>
+                  {SERVER_NAMES[kind]}
                 </Dropdown.Item>
               ))}
             </Dropdown>
@@ -214,46 +232,50 @@ const UserLinkedAccountsSettings = () => {
       {error && <Alert title={error} type="error" />}
       {accounts.length ? (
         <ul className="space-y-4">
-          {accounts.map((acct, i) => (
-            <li
-              key={i}
-              className="flex items-center gap-4 overflow-hidden rounded-lg bg-gray-800/50 px-4 py-5 shadow ring-1 ring-gray-700 sm:p-6"
-            >
-              <div className="w-12">
-                {acct.type === LinkedAccountType.Plex ? (
-                  <div className="flex aspect-square h-full items-center justify-center rounded-full bg-neutral-800">
-                    <PlexLogo className="w-9" />
+          {accounts.map((acct) => {
+            const Logo = SERVER_LOGOS[acct.kind];
+            return (
+              <li
+                key={acct.kind}
+                className="flex items-center gap-4 overflow-hidden rounded-lg bg-gray-800/50 px-4 py-5 shadow ring-1 ring-gray-700 sm:p-6"
+              >
+                <div className={`w-12 ${acct.connected ? '' : 'opacity-50'}`}>
+                  {acct.kind === 'plex' ? (
+                    <div className="flex aspect-square h-full items-center justify-center rounded-full bg-neutral-800">
+                      <Logo className="w-9" />
+                    </div>
+                  ) : (
+                    <Logo />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-bold text-gray-300">
+                    {SERVER_NAMES[acct.kind]}
+                    {!acct.connected && (
+                      <span className="ml-2 font-normal text-gray-400">
+                        ({intl.formatMessage(messages.notConnected)})
+                      </span>
+                    )}
                   </div>
-                ) : acct.type === LinkedAccountType.Emby ? (
-                  <EmbyLogo />
-                ) : (
-                  <JellyfinLogo />
+                  <div className="truncate text-xl font-semibold text-white">
+                    {acct.username}
+                  </div>
+                </div>
+                <div className="flex-grow" />
+                {mayUnlink(acct) && (
+                  <ConfirmButton
+                    onClick={() => {
+                      deleteRequest(acct.kind);
+                    }}
+                    confirmText={intl.formatMessage(globalMessages.areyousure)}
+                  >
+                    <TrashIcon />
+                    <span>{intl.formatMessage(globalMessages.delete)}</span>
+                  </ConfirmButton>
                 )}
-              </div>
-              <div>
-                <div className="truncate text-sm font-bold text-gray-300">
-                  {acct.type}
-                </div>
-                <div className="text-xl font-semibold text-white">
-                  {acct.username}
-                </div>
-              </div>
-              <div className="flex-grow" />
-              {enableMediaServerUnlink && (
-                <ConfirmButton
-                  onClick={() => {
-                    deleteRequest(
-                      acct.type === LinkedAccountType.Plex ? 'plex' : 'jellyfin'
-                    );
-                  }}
-                  confirmText={intl.formatMessage(globalMessages.areyousure)}
-                >
-                  <TrashIcon />
-                  <span>{intl.formatMessage(globalMessages.delete)}</span>
-                </ConfirmButton>
-              )}
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <div className="mt-4 text-center md:py-12">
@@ -264,14 +286,15 @@ const UserLinkedAccountsSettings = () => {
       )}
 
       <LinkJellyfinModal
-        show={showJellyfinModal}
-        onClose={() => setShowJellyfinModal(false)}
+        show={!!jellyfinModalKind}
+        kind={jellyfinModalKind ?? 'jellyfin'}
+        onClose={() => setJellyfinModalKind(undefined)}
         onSave={() => {
-          setShowJellyfinModal(false);
+          setJellyfinModalKind(undefined);
           revalidateUser();
         }}
         onSwitchToQuickConnect={() => {
-          setShowJellyfinModal(false);
+          setJellyfinModalKind(undefined);
           setShowJellyfinQuickConnectModal(true);
         }}
       />
@@ -285,7 +308,7 @@ const UserLinkedAccountsSettings = () => {
         }}
         onSwitchToPassword={() => {
           setShowJellyfinQuickConnectModal(false);
-          setShowJellyfinModal(true);
+          setJellyfinModalKind('jellyfin');
         }}
       />
     </>

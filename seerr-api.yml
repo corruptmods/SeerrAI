@@ -7481,8 +7481,11 @@ paths:
                 - authToken
   /auth/jellyfin:
     post:
-      summary: Sign in using a Jellyfin username and password
-      description: Takes the user's username and password to log the user in. Generates a session cookie for use in further requests. If the user does not exist, and there are no other users, then a user will be created with full admin privileges. If a user logs in with access to the Jellyfin server, they will also have an account created, but without any permissions.
+      summary: Sign in using a Jellyfin or Emby username and password
+      description: |
+        Takes the user's username and password to log the user in. Generates a session cookie for use in further requests. If the user does not exist, and there are no other users, then a user will be created with full admin privileges. If a user logs in with access to the Jellyfin or Emby server, they will also have an account created, but without any permissions.
+
+        `serverType` picks the server (2 for Jellyfin, 3 for Emby); without it, the first connected one whose sign-in is on. A new account whose email (or name) another account already has is refused with `EXISTING_ACCOUNT`: that person signs in with their account and links this server from their profile.
       security: []
       tags:
         - auth
@@ -7510,6 +7513,7 @@ paths:
                   type: string
                 serverType:
                   type: number
+                  description: 2 for Jellyfin, 3 for Emby.
               required:
                 - username
                 - password
@@ -8290,11 +8294,24 @@ paths:
                       $ref: '#/components/schemas/User'
                   refreshedUsers:
                     type: number
+                  skippedUsers:
+                    type: array
+                    description: People not imported, and why. `EXISTING_ACCOUNT`, when another account already has their email or name; they sign in with it and link this server from their profile.
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        reason:
+                          type: string
+                          example: EXISTING_ACCOUNT
   /user/import-from-jellyfin:
     post:
       summary: Import all users from Jellyfin
       description: |
-        Fetches and imports users from the Jellyfin or Emby server. People already imported are refreshed (their name and picture from the server). If a list of Jellyfin user IDs is provided in the request body, only those of them not yet imported are created; otherwise everyone not yet imported is.
+        Fetches and imports users from the Jellyfin server (or the Emby server, when Emby is connected and Jellyfin is not). People already imported are refreshed (their name and picture from the server). If a list of Jellyfin user IDs is provided in the request body, only those of them not yet imported are created; otherwise everyone not yet imported is.
 
         Requires the `MANAGE_USERS` permission.
       tags:
@@ -8324,6 +8341,66 @@ paths:
                       $ref: '#/components/schemas/User'
                   refreshedUsers:
                     type: number
+                  skippedUsers:
+                    type: array
+                    description: People not imported, and why. `EXISTING_ACCOUNT`, when another account already has their email or name; they sign in with it and link this server from their profile.
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        reason:
+                          type: string
+                          example: EXISTING_ACCOUNT
+  /user/import-from-emby:
+    post:
+      summary: Import all users from Emby
+      description: |
+        Fetches and imports users from the Emby server. People already imported are refreshed (their name and picture from the server). If a list of Emby user IDs is provided in the request body, only those of them not yet imported are created; otherwise everyone not yet imported is.
+
+        Requires the `MANAGE_USERS` permission.
+      tags:
+        - users
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                embyUserIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: The newly created users, how many people already imported were refreshed, and who was left out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  createdUsers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  refreshedUsers:
+                    type: number
+                  skippedUsers:
+                    type: array
+                    description: People not imported, and why. `EXISTING_ACCOUNT`, when another account already has their email or name; they sign in with it and link this server from their profile.
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        reason:
+                          type: string
+                          example: EXISTING_ACCOUNT
   /user/registerPushSubscription:
     post:
       summary: Register a web push /user/registerPushSubscription
@@ -9836,7 +9913,7 @@ paths:
   /user/{userId}/settings/linked-accounts/plex:
     post:
       summary: Link the provided Plex account to the current user
-      description: Logs in to Plex with the provided auth token, then links the associated Plex account with the user's account. Users can only link external accounts to their own account.
+      description: Logs in to Plex with the provided auth token, then links the associated Plex account with the user's account. Users can only link external accounts to their own account. The Plex account must be one the server owner shares the Plex server with, and not linked to anyone else; a Plex or password account links only the Plex account with its own email. A password account becomes a Plex account; any other keeps its kind.
       tags:
         - users
       parameters:
@@ -9859,13 +9936,15 @@ paths:
       responses:
         '204':
           description: Linking account succeeded
+        '401':
+          description: Plex did not accept the token
         '403':
-          description: Invalid credentials
+          description: The Plex server is not shared with this account
         '422':
-          description: Account already linked to a user
+          description: Account already linked to a user, or registered under another email
     delete:
       summary: Remove the linked Plex account for a user
-      description: Removes the linked Plex account for a specific user. Requires `MANAGE_USERS` permission if editing other users.
+      description: Removes the linked Plex account for a specific user. Requires `MANAGE_USERS` permission if editing other users. The user must keep a way to sign in (a password, or another account on a connected server). The owner's Plex account stays while Plex is connected, and the owner's account on the primary server always does.
       tags:
         - users
       parameters:
@@ -9884,7 +9963,7 @@ paths:
   /user/{userId}/settings/linked-accounts/jellyfin:
     post:
       summary: Link the provided Jellyfin account to the current user
-      description: Logs in to Jellyfin with the provided credentials, then links the associated Jellyfin account with the user's account. Users can only link external accounts to their own account.
+      description: Logs in to Jellyfin with the provided credentials, then links the associated Jellyfin account with the user's account. Users can only link external accounts to their own account. The account must not be linked to anyone else, nor switched off. A password account becomes a Jellyfin account; any other keeps its kind. When Emby is connected and Jellyfin is not, this links an Emby account, as before Emby had its own.
       tags:
         - users
       parameters:
@@ -9909,13 +9988,67 @@ paths:
       responses:
         '204':
           description: Linking account succeeded
-        '403':
+        '401':
           description: Invalid credentials
+        '403':
+          description: The account is switched off
         '422':
           description: Account already linked to a user
     delete:
       summary: Remove the linked Jellyfin account for a user
-      description: Removes the linked Jellyfin account for a specific user. Requires `MANAGE_USERS` permission if editing other users.
+      description: Removes the linked Jellyfin account for a specific user. Requires `MANAGE_USERS` permission if editing other users. The same rules as unlinking Plex apply.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '204':
+          description: Unlinking account succeeded
+        '400':
+          description: Unlink request invalid
+        '404':
+          description: User does not exist
+  /user/{userId}/settings/linked-accounts/emby:
+    post:
+      summary: Link the provided Emby account to the current user
+      description: Logs in to Emby with the provided credentials, then links the associated Emby account with the user's account. Users can only link external accounts to their own account. The account must not be linked to anyone else, nor switched off. A password account becomes an Emby account; any other keeps its kind.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: 'Mr User'
+                password:
+                  type: string
+                  example: 'supersecret'
+      responses:
+        '204':
+          description: Linking account succeeded
+        '401':
+          description: Invalid credentials
+        '403':
+          description: The account is switched off
+        '422':
+          description: Account already linked to a user
+    delete:
+      summary: Remove the linked Emby account for a user
+      description: Removes the linked Emby account for a specific user. Requires `MANAGE_USERS` permission if editing other users. The same rules as unlinking Plex apply.
       tags:
         - users
       parameters:
@@ -9933,8 +10066,8 @@ paths:
           description: User does not exist
   /user/{userId}/settings/linked-accounts/jellyfin/quickconnect:
     post:
-      summary: Link Jellyfin/Emby account with Quick Connect
-      description: Links a Jellyfin/Emby account to the user's profile using Quick Connect authentication
+      summary: Link a Jellyfin account with Quick Connect
+      description: Links a Jellyfin account to the user's profile using Quick Connect authentication. Only Jellyfin has Quick Connect.
       tags:
         - users
       parameters:

@@ -1,10 +1,10 @@
-import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import LanguageSelector from '@app/components/LanguageSelector';
 import QuotaSelector from '@app/components/QuotaSelector';
 import RegionSelector from '@app/components/RegionSelector';
+import AccountTypeBadges from '@app/components/UserList/AccountTypeBadges';
 import { availableLanguages } from '@app/context/LanguageContext';
 import useLocale from '@app/hooks/useLocale';
 import useSettings from '@app/hooks/useSettings';
@@ -13,6 +13,7 @@ import { Permission, UserType, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
+import { connectedAccountServers } from '@app/utils/mediaServerAccounts';
 import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
 import { ApiErrorCode } from '@server/constants/error';
 import type { UserSettingsGeneralResponse } from '@server/interfaces/api/userSettingsInterfaces';
@@ -35,10 +36,7 @@ const messages = defineMessages(
     email: 'Email',
     save: 'Save Changes',
     saving: 'Saving…',
-    mediaServerUser: '{mediaServerName} User',
     accounttype: 'Account Type',
-    plexuser: 'Plex User',
-    localuser: 'Local User',
     role: 'Role',
     owner: 'Owner',
     admin: 'Admin',
@@ -134,8 +132,13 @@ const UserGeneralSettings = () => {
           ),
   });
 
-  // The watchlists their switches below apply to.
-  const plexWatchlist = user?.userType === UserType.PLEX;
+  // The watchlists their switches below apply to: Plex's for someone with
+  // a Plex account, while Plex is connected.
+  const plexWatchlist =
+    !!user &&
+    connectedAccountServers(user, currentSettings.mediaServers).includes(
+      'plex'
+    );
   const traktWatchlist = !!currentSettings.traktReady;
   const syncTip = <T,>(plexOnly: T, traktOnly: T, both: T): T =>
     plexWatchlist && traktWatchlist
@@ -277,27 +280,7 @@ const UserGeneralSettings = () => {
                 </label>
                 <div className="mb-1 text-sm font-medium leading-5 text-gray-400 sm:mt-2">
                   <div className="flex max-w-lg items-center">
-                    {user?.userType === UserType.PLEX ? (
-                      <Badge badgeType="warning">
-                        {intl.formatMessage(messages.plexuser)}
-                      </Badge>
-                    ) : user?.userType === UserType.LOCAL ? (
-                      <Badge badgeType="default">
-                        {intl.formatMessage(messages.localuser)}
-                      </Badge>
-                    ) : user?.userType === UserType.EMBY ? (
-                      <Badge badgeType="success">
-                        {intl.formatMessage(messages.mediaServerUser, {
-                          mediaServerName: 'Emby',
-                        })}
-                      </Badge>
-                    ) : user?.userType === UserType.JELLYFIN ? (
-                      <Badge badgeType="default">
-                        {intl.formatMessage(messages.mediaServerUser, {
-                          mediaServerName: 'Jellyfin',
-                        })}
-                      </Badge>
-                    ) : null}
+                    {user && <AccountTypeBadges user={user} />}
                   </div>
                 </div>
               </div>
@@ -354,7 +337,8 @@ const UserGeneralSettings = () => {
                       name="email"
                       type="text"
                       placeholder="example@domain.com"
-                      disabled={user?.plexUsername}
+                      // A Plex account's email is its Plex email.
+                      disabled={user?.userType === UserType.PLEX}
                       className={
                         user?.warnings.find((w) => w === 'userEmailRequired')
                           ? 'border-2 border-red-400 focus:border-blue-600'

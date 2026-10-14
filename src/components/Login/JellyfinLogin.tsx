@@ -35,6 +35,8 @@ const messages = defineMessages('components.Login', {
   forgotpassword: 'Forgot Password?',
   quickconnect: 'Quick Connect',
   quickconnecterror: 'Quick Connect failed. Please try again.',
+  existingaccounterror:
+    'Another account here already has this {mediaServerName} name as its email. Sign in with that account, then link {mediaServerName} from your profile.',
 });
 
 interface JellyfinLoginProps {
@@ -73,11 +75,25 @@ const JellyfinLogin = ({ revalidate, serverType }: JellyfinLoginProps) => {
     ),
     password: Yup.string(),
   });
-  const baseUrl = settings.currentSettings.jellyfinExternalHost
-    ? settings.currentSettings.jellyfinExternalHost
-    : settings.currentSettings.jellyfinHost;
-  const jellyfinForgotPasswordUrl =
-    settings.currentSettings.jellyfinForgotPasswordUrl;
+  // Where people reset their password there. Emby has its own; the
+  // Jellyfin ones are Jellyfin's unless Emby comes first among the
+  // connected servers, when they are Emby's and are not used here.
+  const isEmby = serverType === MediaServerType.EMBY;
+  const firstFamily = settings.currentSettings.mediaServers.find(
+    (server) => server.kind === 'jellyfin' || server.kind === 'emby'
+  )?.kind;
+  const jellyfinOwn = firstFamily !== 'emby';
+  const baseUrl = isEmby
+    ? settings.currentSettings.embyExternalHost
+    : jellyfinOwn
+      ? settings.currentSettings.jellyfinExternalHost ||
+        settings.currentSettings.jellyfinHost
+      : undefined;
+  const jellyfinForgotPasswordUrl = isEmby
+    ? settings.currentSettings.embyForgotPasswordUrl
+    : jellyfinOwn
+      ? settings.currentSettings.jellyfinForgotPasswordUrl
+      : undefined;
 
   return (
     <div>
@@ -94,6 +110,7 @@ const JellyfinLogin = ({ revalidate, serverType }: JellyfinLoginProps) => {
               username: values.username,
               password: values.password,
               email: values.username,
+              serverType,
             });
           } catch (e) {
             let errorMessage = messages.loginerror;
@@ -113,6 +130,9 @@ const JellyfinLogin = ({ revalidate, serverType }: JellyfinLoginProps) => {
                 break;
               case ApiErrorCode.NoAdminUser:
                 errorMessage = messages.noadminerror;
+                break;
+              case ApiErrorCode.ExistingAccount:
+                errorMessage = messages.existingaccounterror;
                 break;
             }
             toasts.addToast(
@@ -188,10 +208,7 @@ const JellyfinLogin = ({ revalidate, serverType }: JellyfinLoginProps) => {
                             jellyfinForgotPasswordUrl
                               ? `${jellyfinForgotPasswordUrl}`
                               : `${baseUrl}/web/index.html#!/${
-                                  settings.currentSettings.mediaServerType ===
-                                  MediaServerType.EMBY
-                                    ? 'startup/'
-                                    : ''
+                                  isEmby ? 'startup/' : ''
                                 }forgotpassword.html`
                           }
                           className="pt-2 text-sm text-indigo-500 hover:text-indigo-400"
@@ -245,6 +262,10 @@ const JellyfinLogin = ({ revalidate, serverType }: JellyfinLoginProps) => {
           }}
           onError={handleQuickConnectError}
           mediaServerName={mediaServerFormatValues.mediaServerName}
+          existingAccountMessage={intl.formatMessage(
+            messages.existingaccounterror,
+            mediaServerFormatValues
+          )}
         />
       )}
     </div>

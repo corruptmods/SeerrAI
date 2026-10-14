@@ -2,9 +2,9 @@ import Button from '@app/components/Common/Button';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import useSettings from '@app/hooks/useSettings';
 import defineMessages from '@app/utils/defineMessages';
+import { SERVER_NAMES } from '@app/utils/mediaServerAccounts';
 import { ArrowLeftOnRectangleIcon } from '@heroicons/react/24/outline';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/solid';
-import { MediaServerType } from '@server/constants/server';
 import axios from 'axios';
 import { Field, Form, Formik } from 'formik';
 import Link from 'next/link';
@@ -47,6 +47,12 @@ const LocalLogin = ({ revalidate }: LocalLoginProps) => {
       intl.formatMessage(messages.validationpasswordrequired)
     ),
   });
+
+  // People from Jellyfin or Emby have their name there as their email
+  // until they set one.
+  const jellyfinFamilyNames = settings.currentSettings.mediaServers
+    .filter((server) => server.kind === 'jellyfin' || server.kind === 'emby')
+    .map((server) => SERVER_NAMES[server.kind]);
 
   const passwordResetEnabled =
     settings.currentSettings.applicationUrl &&
@@ -119,17 +125,12 @@ const LocalLogin = ({ revalidate }: LocalLoginProps) => {
                     typeof errors.email === 'string' && (
                       <div className="error">{errors.email}</div>
                     )}
-                  {(settings.currentSettings.mediaServerType ===
-                    MediaServerType.JELLYFIN ||
-                    settings.currentSettings.mediaServerType ===
-                      MediaServerType.EMBY) && (
+                  {jellyfinFamilyNames.length > 0 && (
                     <div className="mt-1 text-xs text-gray-400">
                       {intl.formatMessage(messages.jellyfinLocalLoginHint, {
-                        mediaServerName:
-                          settings.currentSettings.mediaServerType ===
-                          MediaServerType.JELLYFIN
-                            ? 'Jellyfin'
-                            : 'Emby',
+                        mediaServerName: intl.formatList(jellyfinFamilyNames, {
+                          type: 'disjunction',
+                        }),
                       })}
                     </div>
                   )}

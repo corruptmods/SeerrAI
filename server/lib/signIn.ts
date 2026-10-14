@@ -1,10 +1,18 @@
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
+import type { JellyfinFamilyKind } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { Session } from '@server/entity/Session';
 import { User } from '@server/entity/User';
-import { USER_ID, hostnameFor, jellyfinFamily } from '@server/lib/mediaServers';
+import {
+  USER_ID,
+  hostnameFor,
+  isConnected,
+  jellyfinFamily,
+  linkedServers,
+  signInAllowed,
+} from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
 import type { Request } from 'express';
 import { In, Like } from 'typeorm';
@@ -43,9 +51,14 @@ export const sessionTtlSeconds = (session: { userId?: number }): number =>
  * that has been deleted or switched off there: neither a passkey nor a
  * password is a way around the media server's own decision.
  *
+ * Someone with accounts on several connected servers may sign in while any
+ * one of them still lets them in. A server Seerr is no longer connected to
+ * has no say: someone whose only accounts are there signs in as a password
+ * account does.
+ *
  * A passkey stands in for signing in with the media server, so it also
- * follows that switch. A password has its own switch, checked where it is
- * typed, and the owner can always sign in with theirs.
+ * follows each server's sign-in switch. A password has its own switch,
+ * checked where it is typed, and the owner can always sign in with theirs.
  */
 export const maySignIn = async (
   user: Pick<
@@ -60,70 +73,102 @@ export const maySignIn = async (
     return true;
   }
 
-  if (user.userType === UserType.PLEX) {
-    if (how === 'passkey' && settings.main.mediaServerLogin === false) {
-      return false;
-    }
-    if (user.id === 1) {
-      return true;
-    }
-    const owner = await getRepository(User).findOneOrFail({
-      select: { id: true, plexToken: true, plexId: true },
-      where: { id: 1 },
-    });
-    if (!user.plexId) {
-      return false;
-    }
-    if (user.plexId === owner.plexId) {
-      return true;
-    }
-    if (how === 'passkey') {
-      return new PlexTvAPI(owner.plexToken ?? '').checkUserAccess(user.plexId);
-    }
-    // A password is the way in when Plex itself is down or the owner's
-    // Plex sign-in has lapsed, so it is refused only when Plex answers
-    // that the server is no longer shared with them.
-    return (
-      (await stillSharedOnPlex(owner.plexToken ?? '', user.plexId)) !== false
-    );
-  }
+  const linked = linkedServers(user);
+  const live = linked.filter(isConnected);
 
-  if (user.userType === UserType.LOCAL) {
+  // A password account, or one whose servers are all disconnected.
+  if (
+    user.userType === UserType.LOCAL ||
+    (linked.length > 0 && live.length === 0)
+  ) {
     return (
       how === 'password' || settings.main.localLogin !== false || user.id === 1
     );
   }
 
-  if (how === 'passkey' && settings.main.mediaServerLogin === false) {
+  const servers =
+    how === 'passkey' ? live.filter((kind) => signInAllowed(kind)) : live;
+  if (servers.length === 0) {
     return false;
   }
   if (user.id === 1) {
     return true;
   }
-  // A Jellyfin or Emby account must still exist there, and not be switched
-  // off.
-  const kind = user.userType === UserType.EMBY ? 'emby' : 'jellyfin';
+
+  // Each server answers yes, no, or could not be asked (undefined).
+  let unknown = false;
+  let failure: unknown;
+  for (const kind of servers) {
+    try {
+      const answer =
+        kind === 'plex'
+          ? await plexLetsIn(user, how)
+          : await jellyfinLetsIn(user, kind);
+      if (answer) {
+        return true;
+      }
+      if (answer === undefined) {
+        unknown = true;
+      }
+    } catch (e) {
+      unknown = true;
+      failure ??= e;
+    }
+  }
+
+  // A password is the way in while a media server is down, so a server
+  // that could not be asked does not keep anyone out who typed one.
+  if (how === 'password') {
+    return unknown;
+  }
+  if (failure) {
+    throw failure;
+  }
+  return false;
+};
+
+/** Whether the server owner still shares their Plex server with them. */
+const plexLetsIn = async (
+  user: Pick<User, 'plexId'>,
+  how: 'passkey' | 'password'
+): Promise<boolean | undefined> => {
+  const owner = await getRepository(User).findOneOrFail({
+    select: { id: true, plexToken: true, plexId: true },
+    where: { id: 1 },
+  });
+  if (!user.plexId) {
+    return false;
+  }
+  if (user.plexId === owner.plexId) {
+    return true;
+  }
+  if (how === 'passkey') {
+    return new PlexTvAPI(owner.plexToken ?? '').checkUserAccess(user.plexId);
+  }
+  // Refused only when Plex answers that the server is no longer shared
+  // with them: Plex down, or the owner's Plex sign-in lapsed, is no answer.
+  return stillSharedOnPlex(owner.plexToken ?? '', user.plexId);
+};
+
+/**
+ * Whether their Jellyfin or Emby account still exists there and is not
+ * switched off. Throws when the server could not be asked.
+ */
+const jellyfinLetsIn = async (
+  user: Pick<User, 'jellyfinUserId' | 'embyUserId'>,
+  kind: JellyfinFamilyKind
+): Promise<boolean> => {
   const accountId = user[USER_ID[kind]];
   const { apiKey } = jellyfinFamily(kind);
   if (!accountId || !apiKey) {
     return false;
   }
-  let account;
-  try {
-    account = await new JellyfinAPI(
-      hostnameFor(kind),
-      apiKey,
-      undefined,
-      kind
-    ).getAccount(accountId);
-  } catch (e) {
-    // The server could not be asked: a password still works then, as it
-    // is the way in while the media server is down.
-    if (how === 'password') {
-      return true;
-    }
-    throw e;
-  }
+  const account = await new JellyfinAPI(
+    hostnameFor(kind),
+    apiKey,
+    undefined,
+    kind
+  ).getAccount(accountId);
   return !!account && !account.Policy?.IsDisabled;
 };
 

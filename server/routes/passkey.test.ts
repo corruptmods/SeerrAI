@@ -1,4 +1,6 @@
+import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
+import { MEDIA_SERVER_KINDS, MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import UserPasskey from '@server/entity/UserPasskey';
@@ -211,11 +213,28 @@ before(async () => {
 });
 after(() => app?.close());
 
+/** Jellyfin's answer for whether someone's account there is switched on. */
+let jellyfinEnabled = true;
+Object.defineProperty(JellyfinAPI.prototype, 'getAccount', {
+  configurable: true,
+  set() {},
+  get() {
+    return async () => ({ Policy: { IsDisabled: !jellyfinEnabled } });
+  },
+});
+
 beforeEach(async () => {
   plexAccess = true;
+  jellyfinEnabled = true;
   const settings = getSettings();
   settings.main.applicationUrl = ORIGIN;
   settings.main.mediaServerLogin = true;
+  // A server set up with Plex, and nothing else connected.
+  settings.main.mediaServerType = MediaServerType.PLEX;
+  for (const kind of MEDIA_SERVER_KINDS) {
+    settings[kind].connected = false;
+    settings[kind].signIn = true;
+  }
   // Both seeded accounts are Plex accounts; the friend is on the share list.
   await getRepository(User).update(
     { email: 'admin@seerr.dev' },
@@ -447,6 +466,45 @@ describe('passkeys', () => {
 
     getSettings().main.mediaServerLogin = false;
     assert.equal((await signInWith(device)).status, 403);
+  });
+
+  it('lets someone in while any of their connected servers does', async () => {
+    const settings = getSettings();
+    settings.jellyfin.connected = true;
+    settings.jellyfin.ip = 'jellyfin.local';
+    settings.jellyfin.apiKey = 'jellyfin-key';
+    await getRepository(User).update(
+      { email: 'friend@seerr.dev' },
+      { jellyfinUserId: 'jf-friend' }
+    );
+    const browser = new Browser();
+    await browser.signInAs(await userId('friend@seerr.dev'));
+    const device = new Authenticator();
+    await addPasskey(browser, device);
+
+    // No longer shared on Plex, still on Jellyfin.
+    plexAccess = false;
+    assert.equal((await signInWith(device)).status, 200);
+
+    // Jellyfin's sign-in switched off: a passkey does not stand in for it.
+    settings.jellyfin.signIn = false;
+    assert.equal((await signInWith(device)).status, 403);
+
+    settings.jellyfin.signIn = true;
+    jellyfinEnabled = false;
+    assert.equal((await signInWith(device)).status, 403);
+  });
+
+  it("follows Plex's own sign-in switch", async () => {
+    const browser = new Browser();
+    await browser.signInAs(await userId('friend@seerr.dev'));
+    const device = new Authenticator();
+    await addPasskey(browser, device);
+
+    getSettings().plex.signIn = false;
+    assert.equal((await signInWith(device)).status, 403);
+    getSettings().plex.signIn = true;
+    assert.equal((await signInWith(device)).status, 200);
   });
 
   it('refuses a response made for another site', async () => {

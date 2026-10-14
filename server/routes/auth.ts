@@ -1,8 +1,11 @@
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
 import { ApiErrorCode } from '@server/constants/error';
-import type { JellyfinFamilyKind } from '@server/constants/server';
-import { MediaServerType } from '@server/constants/server';
+import type {
+  JellyfinFamilyKind,
+  MediaServerKind,
+} from '@server/constants/server';
+import { MediaServerType, kindOfType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
@@ -14,14 +17,17 @@ import {
   USER_ID,
   USER_TYPE,
   connectAsPrimary,
+  connectedServers,
   hostnameFor,
   hostnameOf,
   isConnected,
+  isJellyfinFamily,
   jellyfinAccountColumns,
   jellyfinFamily,
   jellyfinFamilyServer,
   primaryServer,
   serverName,
+  signInAllowed,
 } from '@server/lib/mediaServers';
 import { withNewUserDefaults } from '@server/lib/newUserDefaults';
 import { Permission } from '@server/lib/permissions';
@@ -123,10 +129,8 @@ authRoutes.post('/plex', async (req, res, next) => {
     });
   }
 
-  if (
-    primaryServer() &&
-    (settings.main.mediaServerLogin === false || !isConnected('plex'))
-  ) {
+  // Before setup, signing in with Plex is how Plex is set up.
+  if (primaryServer() && !signInAllowed('plex')) {
     return res.status(500).json({ error: 'Plex login is disabled' });
   }
   try {
@@ -190,7 +194,12 @@ authRoutes.post('/plex', async (req, res, next) => {
 
       if (
         account.id === mainUser.plexId ||
-        (account.email === mainUser.email && !mainUser.plexId) ||
+        // The owner signing in with Plex for the first time, on a server
+        // set up with Plex. With another server primary, the owner's email
+        // says nothing about who holds this Plex account.
+        (primaryServer() === 'plex' &&
+          account.email === mainUser.email &&
+          !mainUser.plexId) ||
         (await mainPlexTv.checkUserAccess(account.id))
       ) {
         if (!user && sameEmail) {
@@ -207,7 +216,7 @@ authRoutes.post('/plex', async (req, res, next) => {
             );
             return next({
               status: 403,
-              message: 'Access denied.',
+              message: ApiErrorCode.ExistingAccount,
             });
           }
           user = sameEmail;
@@ -228,16 +237,27 @@ authRoutes.post('/plex', async (req, res, next) => {
             );
           }
 
-          user.plexToken = body.authToken;
-          // A fresh token ends any expired sign-in notice.
-          user.plexTokenExpiredAt = null;
-          user.plexId = account.id;
-          user.avatar = account.thumb;
-          user.email = account.email;
-          user.plexUsername = account.username;
-          user.userType = UserType.PLEX;
-
-          await userRepository.save(user);
+          const changes: Partial<User> = {
+            plexToken: body.authToken,
+            // A fresh token ends any expired sign-in notice.
+            plexTokenExpiredAt: null,
+            plexId: account.id,
+            plexUsername: account.username,
+          };
+          // Their picture, email and kind of account come from Plex only
+          // when Plex is their main account: someone who signs in with
+          // Jellyfin or Emby too keeps what they have.
+          if (mainAccountOn(user, 'plex')) {
+            changes.avatar = account.thumb;
+            changes.userType = UserType.PLEX;
+            if (await emailFree(account.email, user.id)) {
+              changes.email = account.email;
+            }
+          }
+          await userRepository.update(user.id, changes);
+          user = await userRepository.findOneOrFail({
+            where: { id: user.id },
+          });
         } else if (!settings.main.newPlexLogin) {
           logger.warn(
             'Failed sign-in attempt by unimported Plex user with access to the media server',
@@ -313,6 +333,27 @@ authRoutes.post('/plex', async (req, res, next) => {
   }
 });
 
+/**
+ * No account but (optionally) this one has this email. A media server
+ * account is never given an email another account already has.
+ */
+const emailFree = async (email: string, exceptId?: number) => {
+  const holder = await getRepository(User)
+    .createQueryBuilder('user')
+    .select('user.id')
+    .where('user.email = :email', { email: (email ?? '').toLowerCase() })
+    .getOne();
+  return !holder || holder.id === exceptId;
+};
+
+/**
+ * Whether signing in with this server brings someone's picture (and, for
+ * Plex, email) up to date: when it holds their main account, or they have
+ * none but a password.
+ */
+const mainAccountOn = (user: User, kind: MediaServerKind) =>
+  user.userType === USER_TYPE[kind] || user.userType === UserType.LOCAL;
+
 /** A person's avatar from their account on a Jellyfin or Emby server. */
 function getUserAvatarUrl(user: User, kind: JellyfinFamilyKind): string {
   return `/avatarproxy/${user[USER_ID[kind]]}?v=${user.avatarVersion}`;
@@ -332,23 +373,24 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
     serverType?: number;
   };
 
-  // At setup, the server being set up; after it, the connected Jellyfin or
-  // Emby server.
+  // At setup, the server being set up. After it, the server asked for
+  // (serverType), else the first connected Jellyfin or Emby server people
+  // may sign in with.
   const settingUp = !primaryServer();
+  const asked = kindOfType(body.serverType);
   const kind: JellyfinFamilyKind | undefined = settingUp
     ? body.serverType === MediaServerType.EMBY
       ? 'emby'
       : 'jellyfin'
-    : jellyfinFamilyServer();
+    : body.serverType !== undefined
+      ? isJellyfinFamily(asked)
+        ? asked
+        : undefined
+      : (connectedServers().filter(isJellyfinFamily).find(signInAllowed) ??
+        jellyfinFamilyServer());
 
-  //Make sure jellyfin login is enabled, but only if jellyfin && Emby is not already configured
-  if (
-    // media server not configured, allow login for setup
-    !settingUp &&
-    (settings.main.mediaServerLogin === false ||
-      // media server is neither jellyfin or emby
-      !kind)
-  ) {
+  // Setup aside, only a connected server whose sign-in is on.
+  if (!settingUp && (!kind || !signInAllowed(kind))) {
     return res.status(500).json({ error: 'Jellyfin login is disabled' });
   }
   const serverKind = kind ?? 'jellyfin';
@@ -532,14 +574,20 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
         ip: req.ip,
         jellyfinUsername: account.User.Name,
       });
-      user.avatar = getUserAvatarUrl(user, serverKind);
-      user[USERNAME[serverKind]] = account.User.Name;
-
-      if (user.username === account.User.Name) {
-        user.username = '';
+      const changes: Partial<User> = {
+        [USERNAME[serverKind]]: account.User.Name,
+      };
+      // Their picture and name come from this server only when it holds
+      // their main account; someone who signs in with another server too
+      // keeps what they have.
+      if (mainAccountOn(user, serverKind)) {
+        changes.avatar = getUserAvatarUrl(user, serverKind);
+        if (user.username === account.User.Name) {
+          changes.username = '';
+        }
       }
-
-      await userRepository.save(user);
+      await userRepository.update(user.id, changes);
+      Object.assign(user, changes);
     } else if (!settings.main.newPlexLogin) {
       logger.warn(
         'Failed sign-in attempt by unimported Jellyfin user with access to the media server',
@@ -564,9 +612,27 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
         }
       );
 
+      // Their email, or else their name there, is how they sign in with a
+      // password: never one another account already has.
+      const email = body.email || account.User.Name;
+      if (!(await emailFree(email))) {
+        logger.warn(
+          `${name} sign-in refused: another account already has this email or name`,
+          {
+            label: 'API',
+            ip: req.ip,
+            jellyfinUsername: account.User.Name,
+          }
+        );
+        return next({
+          status: 403,
+          message: ApiErrorCode.ExistingAccount,
+        });
+      }
+
       user = withNewUserDefaults(
         new User({
-          email: body.email,
+          email,
           ...jellyfinAccountColumns(serverKind, {
             userId: account.User.Id,
             username: account.User.Name,
@@ -586,13 +652,15 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       await userRepository.save(user);
     }
 
-    if (user && user[USER_ID[serverKind]]) {
+    // Their picture follows this server only when it holds their main
+    // account.
+    if (user && user[USER_ID[serverKind]] && mainAccountOn(user, serverKind)) {
       try {
         const { changed } = await checkAvatarChanged(user, serverKind);
 
         if (changed) {
           user.avatar = getUserAvatarUrl(user, serverKind);
-          await userRepository.save(user);
+          await userRepository.update(user.id, { avatar: user.avatar });
           logger.debug('Avatar updated during login', {
             userId: user.id,
             jellyfinUserId: user[USER_ID[serverKind]],
@@ -713,8 +781,6 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
 });
 
 authRoutes.post('/jellyfin/quickconnect/initiate', async (req, res, next) => {
-  const settings = getSettings();
-
   if (!isConnected('jellyfin')) {
     return next({
       status: 403,
@@ -724,7 +790,7 @@ authRoutes.post('/jellyfin/quickconnect/initiate', async (req, res, next) => {
 
   // With Jellyfin sign-in turned off, Quick Connect is only for someone
   // already signed in linking their Jellyfin account.
-  if (settings.main.mediaServerLogin === false && !req.user) {
+  if (!signInAllowed('jellyfin') && !req.user) {
     return next({
       status: 403,
       message: 'Jellyfin sign-in is disabled.',
@@ -824,7 +890,7 @@ authRoutes.post(
     }
 
     // The same switch as signing in with a Jellyfin password.
-    if (settings.main.mediaServerLogin === false) {
+    if (!signInAllowed('jellyfin')) {
       return next({
         status: 403,
         message: 'Jellyfin sign-in is disabled.',
@@ -857,10 +923,17 @@ authRoutes.post(
           userId: user.id,
         });
 
-        user.jellyfinAuthToken = account.AccessToken;
-        user.jellyfinDeviceId = deviceId;
-        user.avatar = getUserAvatarUrl(user, 'jellyfin');
-        await userRepository.save(user);
+        const changes: Partial<User> = {
+          jellyfinAuthToken: account.AccessToken,
+          jellyfinDeviceId: deviceId,
+        };
+        // Their picture follows Jellyfin only when it holds their main
+        // account.
+        if (mainAccountOn(user, 'jellyfin')) {
+          changes.avatar = getUserAvatarUrl(user, 'jellyfin');
+        }
+        await userRepository.update(user.id, changes);
+        Object.assign(user, changes);
       } else if (!settings.main.newPlexLogin) {
         logger.warn(
           'Failed Quick Connect sign-in attempt by unimported Jellyfin user',
@@ -874,6 +947,19 @@ authRoutes.post(
         return next({
           status: 403,
           message: 'Access denied.',
+        });
+      } else if (!(await emailFree(account.User.Name))) {
+        logger.warn(
+          'Quick Connect sign-in refused: another account already has this name as its email',
+          {
+            label: 'API',
+            ip: req.ip,
+            jellyfinUsername: account.User.Name,
+          }
+        );
+        return next({
+          status: 403,
+          message: ApiErrorCode.ExistingAccount,
         });
       } else {
         logger.info(
@@ -899,13 +985,13 @@ authRoutes.post(
         await userRepository.save(user);
       }
 
-      if (user.jellyfinUserId) {
+      if (user.jellyfinUserId && mainAccountOn(user, 'jellyfin')) {
         try {
           const { changed } = await checkAvatarChanged(user, 'jellyfin');
 
           if (changed) {
             user.avatar = getUserAvatarUrl(user, 'jellyfin');
-            await userRepository.save(user);
+            await userRepository.update(user.id, { avatar: user.avatar });
             logger.debug('Avatar updated during Quick Connect login', {
               userId: user.id,
               jellyfinUserId: user.jellyfinUserId,
@@ -1021,48 +1107,45 @@ authRoutes.post('/logout', async (req, res, next) => {
       return res.status(200).json({ status: 'ok' });
     }
 
-    // Signing out of Seerr also removes the device Seerr signed in to the
-    // Jellyfin or Emby server as.
-    const kind = jellyfinFamilyServer();
+    // Signing out of Seerr also removes the device Seerr signed in to each
+    // connected Jellyfin or Emby server as.
+    const kinds = connectedServers().filter(isJellyfinFamily);
+    const user = kinds.length
+      ? await getRepository(User)
+          .createQueryBuilder('user')
+          .addSelect(
+            kinds.flatMap((kind) => [
+              `user.${USER_ID[kind]}`,
+              `user.${DEVICE_ID[kind]}`,
+            ])
+          )
+          .where('user.id = :id', { id: userId })
+          .getOne()
+      : null;
 
-    if (kind) {
-      const user = await getRepository(User)
-        .createQueryBuilder('user')
-        .addSelect([`user.${USER_ID[kind]}`, `user.${DEVICE_ID[kind]}`])
-        .where('user.id = :id', { id: userId })
-        .getOne();
+    for (const kind of kinds) {
       const accountId = user?.[USER_ID[kind]];
       const deviceId = user?.[DEVICE_ID[kind]];
-
-      if (user && accountId && deviceId) {
-        try {
-          const baseUrl = hostnameFor(kind);
-          try {
-            await axios.delete(`${baseUrl}/Devices`, {
-              timeout: 5000,
-              params: { Id: deviceId },
-              headers: {
-                Authorization: `MediaBrowser Client="Seerr", Device="Seerr", DeviceId="seerr", Version="${
-                  kind === 'emby' ? '1.0.0' : getAppVersion()
-                }", Token="${jellyfinFamily(kind).apiKey}"`,
-              },
-            });
-          } catch (error) {
-            logger.error(`Failed to delete ${serverName(kind)} device`, {
-              label: 'Auth',
-              error: error instanceof Error ? error.message : 'Unknown error',
-              userId: user.id,
-              jellyfinUserId: accountId,
-            });
-          }
-        } catch (error) {
-          logger.error(`Failed to delete ${serverName(kind)} device`, {
-            label: 'Auth',
-            error: error instanceof Error ? error.message : 'Unknown error',
-            userId: user.id,
-            jellyfinUserId: accountId,
-          });
-        }
+      if (!user || !accountId || !deviceId) {
+        continue;
+      }
+      try {
+        await axios.delete(`${hostnameFor(kind)}/Devices`, {
+          timeout: 5000,
+          params: { Id: deviceId },
+          headers: {
+            Authorization: `MediaBrowser Client="Seerr", Device="Seerr", DeviceId="seerr", Version="${
+              kind === 'emby' ? '1.0.0' : getAppVersion()
+            }", Token="${jellyfinFamily(kind).apiKey}"`,
+          },
+        });
+      } catch (error) {
+        logger.error(`Failed to delete ${serverName(kind)} device`, {
+          label: 'Auth',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          userId: user.id,
+          jellyfinUserId: accountId,
+        });
       }
     }
 

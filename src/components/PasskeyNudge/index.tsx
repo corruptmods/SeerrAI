@@ -8,9 +8,15 @@ import {
   preloadPasskeys,
   usePasskeySupport,
 } from '@app/hooks/usePasskeys';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
-import { UserType, useUser } from '@app/hooks/useUser';
+import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
+import {
+  SERVER_NAMES,
+  accountServers,
+  signInServers,
+} from '@app/utils/mediaServerAccounts';
 import { FingerPrintIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { isAxiosError } from 'axios';
 import { useRouter } from 'next/router';
@@ -54,6 +60,7 @@ const snoozed = (userId: number): boolean => {
 const PasskeyNudge = () => {
   const intl = useIntl();
   const { user } = useUser();
+  const { currentSettings } = useSettings();
   const { addToast } = useToasts();
   const { onThisDevice } = usePasskeySupport();
   const on = useFeature('passkeyPrompt');
@@ -108,6 +115,14 @@ const PasskeyNudge = () => {
     return null;
   }
 
+  // The servers they can sign in with now, by an account of theirs.
+  const signInWith = signInServers(currentSettings);
+  const signInNames = user
+    ? accountServers(user)
+        .filter((kind) => signInWith.includes(kind))
+        .map((kind) => SERVER_NAMES[kind])
+    : [];
+
   const add = async () => {
     setAdding(true);
     try {
@@ -139,17 +154,14 @@ const PasskeyNudge = () => {
         </p>
         <p className="mt-1 text-sm text-gray-300">
           {
-            // What they sign in with now: their media server's account, or
-            // a password of their own here.
-            user?.userType === UserType.LOCAL
+            // What they sign in with now: their accounts on the connected
+            // media servers, or a password of their own here.
+            signInNames.length === 0
               ? intl.formatMessage(messages.bodyPassword)
               : intl.formatMessage(messages.body, {
-                  mediaServerName:
-                    user?.userType === UserType.JELLYFIN
-                      ? 'Jellyfin'
-                      : user?.userType === UserType.EMBY
-                        ? 'Emby'
-                        : 'Plex',
+                  mediaServerName: intl.formatList(signInNames, {
+                    type: 'disjunction',
+                  }),
                 })
           }
         </p>

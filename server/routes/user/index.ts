@@ -1,5 +1,6 @@
 import PlexTvAPI from '@server/api/plextv';
 import TautulliAPI from '@server/api/tautulli';
+import { ApiErrorCode } from '@server/constants/error';
 import { MediaType } from '@server/constants/media';
 import { UserType } from '@server/constants/user';
 import dataSource, { getRepository } from '@server/datasource';
@@ -18,6 +19,7 @@ import type {
 } from '@server/interfaces/api/userInterfaces';
 import { linkedJellyfinUsers } from '@server/lib/jellyfinUsers';
 import { mayManageUser, plexAccountMayClaim } from '@server/lib/manageUser';
+import type { JellyfinFamilyKind } from '@server/lib/mediaServers';
 import {
   USERNAME,
   USER_ID,
@@ -26,6 +28,7 @@ import {
   jellyfinAccountColumns,
   jellyfinClient as jellyfinClientFor,
   jellyfinFamilyServer,
+  serverName,
 } from '@server/lib/mediaServers';
 import { withNewUserDefaults } from '@server/lib/newUserDefaults';
 import { Permission, hasPermission } from '@server/lib/permissions';
@@ -790,6 +793,10 @@ router.post(
       const userRepository = getRepository(User);
       const body = req.body as { plexIds: string[] } | undefined;
 
+      if (!isConnected('plex')) {
+        return next({ status: 400, message: 'Plex is not connected.' });
+      }
+
       // taken from auth.ts
       const mainUser = await userRepository.findOneOrFail({
         select: { id: true, plexToken: true },
@@ -799,6 +806,7 @@ router.post(
 
       const plexUsersResponse = await mainPlexTv.getUsers();
       const createdUsers: User[] = [];
+      const skippedUsers: { id: string; name: string; reason: string }[] = [];
       let refreshedUsers = 0;
       for (const rawUser of plexUsersResponse.MediaContainer.User) {
         const account = rawUser.$;
@@ -835,6 +843,13 @@ router.post(
               'Plex user not imported: their email belongs to another account',
               { label: 'API', userId: sameEmail.id, plexId: account.id }
             );
+            if (!body || body.plexIds.includes(account.id)) {
+              skippedUsers.push({
+                id: account.id,
+                name: account.username,
+                reason: ApiErrorCode.ExistingAccount,
+              });
+            }
           } else if (!body || body.plexIds.includes(account.id)) {
             if (await mainPlexTv.checkUserAccess(parseInt(account.id))) {
               const newUser = withNewUserDefaults(
@@ -858,6 +873,7 @@ router.post(
       return res.status(201).json({
         createdUsers: User.filterMany(createdUsers),
         refreshedUsers,
+        skippedUsers,
       });
     } catch (e) {
       next({ status: 500, message: e.message });
@@ -865,78 +881,144 @@ router.post(
   }
 );
 
+/**
+ * Imports people from a Jellyfin or Emby server: those not yet imported
+ * (all of them, or those chosen) get an account, and those already
+ * imported have their name and picture brought up to date. Someone whose
+ * name there is already another account's email or name is left out, with
+ * the reason: they sign in with that account and link this server.
+ */
+const importJellyfinUsers = async (
+  kind: JellyfinFamilyKind,
+  chosenIds: string[] | undefined
+) => {
+  const settings = getSettings();
+  const userRepository = getRepository(User);
+  const jellyfinClient = await jellyfinClientFor(kind, { asAdmin: true });
+
+  const createdUsers: User[] = [];
+  const skippedUsers: { id: string; name: string; reason: string }[] = [];
+  let refreshedUsers = 0;
+
+  const jellyfinUsers = (await jellyfinClient.getUsers()).users.filter(
+    (jellyfinUser) => normalizeJellyfinGuid(jellyfinUser.Id)
+  );
+  const linked = await linkedJellyfinUsers(
+    jellyfinUsers.map((jellyfinUser) => jellyfinUser.Id),
+    kind
+  );
+  // With no list, everyone not yet imported is, as on Import Plex Users.
+  const chosen = chosenIds
+    ? new Set(chosenIds.map((id) => normalizeJellyfinGuid(id)))
+    : null;
+
+  for (const jellyfinUser of jellyfinUsers) {
+    const jellyfinUserId = normalizeJellyfinGuid(jellyfinUser.Id)!;
+    const user = linked.get(jellyfinUserId);
+
+    if (user) {
+      // Already imported: bring what comes from the server up to date (the
+      // name, and the picture if it changed there and is theirs from this
+      // server), as Import Plex Users does. The account's own settings and
+      // permissions are left alone.
+      const ownPicture = user.userType === USER_TYPE[kind];
+      const { changed } = ownPicture
+        ? await checkAvatarChanged(user, kind)
+        : { changed: false };
+      await userRepository.update(user.id, {
+        [USERNAME[kind]]: jellyfinUser.Name,
+        ...(changed && user.avatarVersion
+          ? {
+              avatar: `/avatarproxy/${user[USER_ID[kind]]}?v=${user.avatarVersion}`,
+            }
+          : {}),
+      });
+      refreshedUsers += 1;
+    } else if (!chosen || chosen.has(jellyfinUserId)) {
+      const taken = await userRepository
+        .createQueryBuilder('user')
+        .where('user.email = :email', {
+          email: (jellyfinUser.Name ?? '').toLowerCase(),
+        })
+        .getExists();
+      if (taken) {
+        logger.info(
+          `${serverName(kind)} user not imported: another account already has their name as its email`,
+          { label: 'API', jellyfinUserId: jellyfinUser.Id }
+        );
+        skippedUsers.push({
+          id: jellyfinUser.Id,
+          name: jellyfinUser.Name,
+          reason: ApiErrorCode.ExistingAccount,
+        });
+        continue;
+      }
+
+      const newUser = withNewUserDefaults(
+        new User({
+          ...jellyfinAccountColumns(kind, {
+            username: jellyfinUser.Name,
+            userId: jellyfinUser.Id,
+            deviceId: Buffer.from(
+              `BOT_seerr_${jellyfinUser.Name ?? ''}`
+            ).toString('base64'),
+          }),
+          email: jellyfinUser.Name,
+          permissions: settings.main.defaultPermissions,
+          avatar: `/avatarproxy/${jellyfinUser.Id}`,
+          userType: USER_TYPE[kind],
+        })
+      );
+
+      await userRepository.save(newUser);
+      createdUsers.push(newUser);
+    }
+  }
+
+  return {
+    createdUsers: User.filterMany(createdUsers),
+    refreshedUsers,
+    skippedUsers,
+  };
+};
+
 router.post(
   '/import-from-jellyfin',
   isAuthenticated(Permission.MANAGE_USERS),
   async (req, res, next) => {
     try {
-      const settings = getSettings();
-      const userRepository = getRepository(User);
       const body = req.body as { jellyfinUserIds?: string[] } | undefined;
-      // The connected Jellyfin or Emby server.
-      const kind = jellyfinFamilyServer() ?? 'jellyfin';
-
-      const jellyfinClient = await jellyfinClientFor(kind, { asAdmin: true });
-
-      const createdUsers: User[] = [];
-      let refreshedUsers = 0;
-
-      const jellyfinUsers = (await jellyfinClient.getUsers()).users.filter(
-        (jellyfinUser) => normalizeJellyfinGuid(jellyfinUser.Id)
-      );
-      const linked = await linkedJellyfinUsers(
-        jellyfinUsers.map((jellyfinUser) => jellyfinUser.Id),
-        kind
-      );
-      // With no list, everyone not yet imported is, as on Import Plex Users.
-      const chosen = body?.jellyfinUserIds
-        ? new Set(body.jellyfinUserIds.map((id) => normalizeJellyfinGuid(id)))
-        : null;
-
-      for (const jellyfinUser of jellyfinUsers) {
-        const jellyfinUserId = normalizeJellyfinGuid(jellyfinUser.Id)!;
-        const user = linked.get(jellyfinUserId);
-
-        if (user) {
-          // Already imported: bring what comes from Jellyfin up to date (the
-          // name, and the picture if it changed there), as Import Plex Users
-          // does. The account's own settings and permissions are left alone.
-          const { changed } = await checkAvatarChanged(user, kind);
-          await userRepository.update(user.id, {
-            [USERNAME[kind]]: jellyfinUser.Name,
-            ...(changed && user.avatarVersion
-              ? {
-                  avatar: `/avatarproxy/${user[USER_ID[kind]]}?v=${user.avatarVersion}`,
-                }
-              : {}),
-          });
-          refreshedUsers += 1;
-        } else if (!chosen || chosen.has(jellyfinUserId)) {
-          const newUser = withNewUserDefaults(
-            new User({
-              ...jellyfinAccountColumns(kind, {
-                username: jellyfinUser.Name,
-                userId: jellyfinUser.Id,
-                deviceId: Buffer.from(
-                  `BOT_seerr_${jellyfinUser.Name ?? ''}`
-                ).toString('base64'),
-              }),
-              email: jellyfinUser.Name,
-              permissions: settings.main.defaultPermissions,
-              avatar: `/avatarproxy/${jellyfinUser.Id}`,
-              userType: USER_TYPE[kind],
-            })
-          );
-
-          await userRepository.save(newUser);
-          createdUsers.push(newUser);
-        }
+      // Jellyfin; before Emby had its own import, this also imported from
+      // an Emby server, and still does when Emby is the one connected.
+      const kind = isConnected('jellyfin')
+        ? 'jellyfin'
+        : (jellyfinFamilyServer() ?? 'jellyfin');
+      if (!isConnected(kind)) {
+        return next({ status: 400, message: 'Jellyfin is not connected.' });
       }
 
-      return res.status(201).json({
-        createdUsers: User.filterMany(createdUsers),
-        refreshedUsers,
-      });
+      return res
+        .status(201)
+        .json(await importJellyfinUsers(kind, body?.jellyfinUserIds));
+    } catch (e) {
+      next({ status: 500, message: e.message });
+    }
+  }
+);
+
+router.post(
+  '/import-from-emby',
+  isAuthenticated(Permission.MANAGE_USERS),
+  async (req, res, next) => {
+    try {
+      const body = req.body as { embyUserIds?: string[] } | undefined;
+      if (!isConnected('emby')) {
+        return next({ status: 400, message: 'Emby is not connected.' });
+      }
+
+      return res
+        .status(201)
+        .json(await importJellyfinUsers('emby', body?.embyUserIds));
     } catch (e) {
       next({ status: 500, message: e.message });
     }

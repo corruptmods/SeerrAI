@@ -19,6 +19,7 @@ export interface JellyfinUserResponse {
   };
   Policy: {
     IsAdministrator: boolean;
+    IsDisabled?: boolean;
   };
   PrimaryImageTag?: string;
 }

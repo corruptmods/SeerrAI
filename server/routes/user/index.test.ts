@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
-import { before, describe, it, mock } from 'node:test';
+import { afterEach, before, describe, it, mock } from 'node:test';
 
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
-import { MediaServerType } from '@server/constants/server';
+import type { MediaServerKind } from '@server/constants/server';
+import {
+  MEDIA_SERVER_KINDS,
+  MediaServerType,
+  typeOfKind,
+} from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
@@ -214,6 +219,7 @@ describe('registering for push notifications', () => {
 
 describe('importing Plex users', () => {
   it('leaves a password account with a Plex friend’s email alone', async () => {
+    getSettings().main.mediaServerType = MediaServerType.PLEX;
     const users = getRepository(User);
     const local = new User({
       email: 'taken@seerr.dev',
@@ -246,6 +252,9 @@ describe('importing Plex users', () => {
       const res = await agent.post('/user/import-from-plex').send();
       assert.equal(res.status, 201);
       assert.equal(res.body.refreshedUsers, 0);
+      assert.deepEqual(res.body.skippedUsers, [
+        { id: '9001', name: 'plexfriend', reason: 'EXISTING_ACCOUNT' },
+      ]);
     } finally {
       getUsers.mock.restore();
     }
@@ -406,6 +415,7 @@ describe('watchlist sync for new people', () => {
 
   it('starts people imported from Plex as admins chose, and leaves others be', () =>
     withDefaults(false, true, async () => {
+      getSettings().main.mediaServerType = MediaServerType.PLEX;
       const users = getRepository(User);
       // The seeded friend shares the owner's Plex id; give them their own,
       // so the import refreshes them as someone already here.
@@ -502,5 +512,123 @@ describe('a name to show for someone', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.displayName, `User #${nameless.id}`);
     assert.doesNotMatch(JSON.stringify(res.body), /nameless@seerr\.dev/);
+  });
+});
+
+describe('people on several media servers', () => {
+  const connectServers = (...kinds: MediaServerKind[]) => {
+    const settings = getSettings();
+    settings.main.mediaServerType = typeOfKind(kinds[0]);
+    for (const kind of MEDIA_SERVER_KINDS) {
+      settings[kind].connected = kinds.includes(kind);
+    }
+  };
+  afterEach(() => {
+    for (const kind of MEDIA_SERVER_KINDS) {
+      getSettings()[kind].connected = false;
+    }
+  });
+
+  it('imports from Emby beside Jellyfin, leaving out names already taken', async () => {
+    connectServers('jellyfin', 'emby');
+    const users = getRepository(User);
+    const jellyfinBob = await users.save(
+      new User({
+        email: 'bob',
+        jellyfinUsername: 'bob',
+        jellyfinUserId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        avatar: '',
+        permissions: Permission.REQUEST,
+        userType: UserType.JELLYFIN,
+      })
+    );
+    const asked: string[] = [];
+    const getUsers = mock.method(
+      JellyfinAPI.prototype,
+      'getUsers',
+      async function (this: JellyfinAPI) {
+        asked.push(this.kind);
+        return {
+          users: [
+            { Id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', Name: 'bob' },
+            { Id: 'cccccccccccccccccccccccccccccccc', Name: 'carol' },
+          ],
+        };
+      }
+    );
+    try {
+      const { agent } = await loginAs('admin@seerr.dev');
+      const res = await agent.post('/user/import-from-emby').send({});
+
+      assert.equal(res.status, 201);
+      assert.deepEqual(asked, ['emby']);
+      assert.deepEqual(
+        res.body.createdUsers.map((u: User) => u.embyUsername),
+        ['carol']
+      );
+      assert.deepEqual(res.body.skippedUsers, [
+        {
+          id: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          name: 'bob',
+          reason: 'EXISTING_ACCOUNT',
+        },
+      ]);
+    } finally {
+      getUsers.mock.restore();
+    }
+
+    const carol = await users.findOneByOrFail({ email: 'carol' });
+    assert.equal(carol.userType, UserType.EMBY);
+    assert.equal(carol.embyUserId, 'cccccccccccccccccccccccccccccccc');
+    assert.equal(carol.jellyfinUserId, null);
+    const bob = await users.findOneByOrFail({ id: jellyfinBob.id });
+    assert.equal(bob.embyUserId, null, 'never merged');
+  });
+
+  it('imports only from servers Seerr is connected to', async () => {
+    connectServers('jellyfin');
+    const getUsers = mock.method(PlexTvAPI.prototype, 'getUsers', async () => ({
+      MediaContainer: { User: [] },
+    }));
+    try {
+      const { agent } = await loginAs('admin@seerr.dev');
+      assert.equal(
+        (await agent.post('/user/import-from-emby').send({})).status,
+        400
+      );
+      assert.equal(
+        (await agent.post('/user/import-from-plex').send()).status,
+        400
+      );
+      assert.equal(getUsers.mock.callCount(), 0);
+    } finally {
+      getUsers.mock.restore();
+    }
+  });
+
+  it('finds and sorts people by their Emby name', async () => {
+    const users = getRepository(User);
+    await users.save(
+      new User({
+        email: 'zed-email',
+        embyUsername: 'Aardvark',
+        embyUserId: 'emby-aardvark',
+        avatar: '',
+        permissions: Permission.REQUEST,
+        userType: UserType.EMBY,
+      })
+    );
+    const { agent } = await loginAs('admin@seerr.dev');
+
+    const found = await agent.get('/user').query({ q: 'aardv' });
+    assert.equal(found.status, 200);
+    assert.deepEqual(
+      found.body.results.map((u: User) => u.displayName),
+      ['Aardvark']
+    );
+
+    const sorted = await agent.get('/user').query({ sort: 'displayname' });
+    assert.equal(sorted.body.results[0].displayName, 'Aardvark');
+    assert.deepEqual(sorted.body.results[0].linkedServers, ['emby']);
   });
 });

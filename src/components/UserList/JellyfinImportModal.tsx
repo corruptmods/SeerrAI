@@ -5,25 +5,25 @@ import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import { MediaServerType } from '@server/constants/server';
+import { SERVER_NAMES } from '@app/utils/mediaServerAccounts';
+import type { JellyfinFamilyKind } from '@server/constants/server';
 import axios from 'axios';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
 interface JellyfinImportProps {
+  /** The server whose people are imported. */
+  kind: JellyfinFamilyKind;
   onCancel?: () => void;
   onComplete?: () => void;
-  /**
-   * The server to import from. Left out, it is Emby on a server set up with
-   * Emby, else Jellyfin.
-   */
-  kind?: 'jellyfin' | 'emby';
 }
 
 interface JellyfinImportResponse {
   createdUsers: unknown[];
   refreshedUsers: number;
+  /** People left out, because another account has their name as its email. */
+  skippedUsers?: { id: string; name: string; reason: string }[];
 }
 
 const messages = defineMessages('components.UserList', {
@@ -43,31 +43,23 @@ const messages = defineMessages('components.UserList', {
     'Imported users do not have a {applicationTitle} password set. If you disable {mediaServerName} sign-in, they will need to set a password from their profile or via a password reset link.',
   user: 'User',
   noJellyfinuserstoimport: 'There are no {mediaServerName} users to import.',
+  jellyfinImportSkipped:
+    'Not imported, as another account already has their name as its email: {names}. They can sign in with that account and link {mediaServerName} from their profile.',
   newJellyfinsigninenabled:
     'The <strong>Enable New {mediaServerName} Sign-In</strong> setting is currently enabled. {mediaServerName} users with library access do not need to be imported in order to sign in.',
 });
 
 const JellyfinImportModal: React.FC<JellyfinImportProps> = ({
+  kind,
   onCancel,
   onComplete,
-  kind,
 }) => {
   const intl = useIntl();
   const settings = useSettings();
   const { addToast } = useToasts();
   const [isImporting, setImporting] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const isEmby = kind
-    ? kind === 'emby'
-    : settings.currentSettings.mediaServerType === MediaServerType.EMBY;
-  // The Jellyfin import route imports from the one Jellyfin or Emby server
-  // connected; Emby has its own once Jellyfin is connected beside it.
-  const importRoute =
-    isEmby &&
-    settings.currentSettings.mediaServers.some((s) => s.kind === 'jellyfin')
-      ? '/api/v1/user/import-from-emby'
-      : '/api/v1/user/import-from-jellyfin';
-  const mediaServerName = isEmby ? 'Emby' : 'Jellyfin';
+  const mediaServerName = SERVER_NAMES[kind];
   const { data, error } = useSWR<
     {
       id: string;
@@ -76,7 +68,7 @@ const JellyfinImportModal: React.FC<JellyfinImportProps> = ({
       email: string;
       thumb: string;
     }[]
-  >(`/api/v1/settings/${isEmby ? 'emby' : 'jellyfin'}/users`, {
+  >(`/api/v1/settings/${kind}/users`, {
     revalidateOnMount: true,
   });
 
@@ -87,11 +79,23 @@ const JellyfinImportModal: React.FC<JellyfinImportProps> = ({
       // People already imported are refreshed on every import, so with
       // nobody left to import this is still worth doing, as a sync.
       const { data: importResponse } = await axios.post<JellyfinImportResponse>(
-        importRoute,
-        { jellyfinUserIds: selectedUsers }
+        `/api/v1/user/import-from-${kind}`,
+        kind === 'emby'
+          ? { embyUserIds: selectedUsers }
+          : { jellyfinUserIds: selectedUsers }
       );
 
-      const { createdUsers, refreshedUsers } = importResponse;
+      const { createdUsers, refreshedUsers, skippedUsers } = importResponse;
+
+      if (skippedUsers?.length) {
+        addToast(
+          intl.formatMessage(messages.jellyfinImportSkipped, {
+            names: intl.formatList(skippedUsers.map((user) => user.name)),
+            mediaServerName,
+          }),
+          { autoDismiss: false, appearance: 'warning' }
+        );
+      }
 
       if (createdUsers.length > 0) {
         addToast(

@@ -1,5 +1,6 @@
 import { UserType } from '@server/constants/user';
 import type { User } from '@server/entity/User';
+import { primaryServer } from '@server/lib/mediaServers';
 import { Permission } from '@server/lib/permissions';
 
 /**
@@ -34,6 +35,13 @@ export const mayEditUser = (actor: User | undefined, target: User): boolean =>
  * into their own profile, so a password account, or one linked to another
  * Plex account, is never handed over this way; its owner links Plex from
  * their own settings instead.
+ *
+ * The owner only while Plex is the primary server: on a server set up with
+ * Jellyfin or Emby, the owner's email says nothing about who holds a Plex
+ * account, and the owner links Plex themselves.
  */
 export const plexAccountMayClaim = (user: User): boolean =>
-  !user.plexId && (user.userType === UserType.PLEX || user.id === 1);
+  !user.plexId &&
+  (user.id === 1
+    ? primaryServer() === 'plex'
+    : user.userType === UserType.PLEX);

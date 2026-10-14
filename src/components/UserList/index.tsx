@@ -2,12 +2,14 @@ import Alert from '@app/components/Common/Alert';
 import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
+import Dropdown from '@app/components/Common/Dropdown';
 import Header from '@app/components/Common/Header';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
 import PageTitle from '@app/components/Common/PageTitle';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import Table from '@app/components/Common/Table';
+import AccountTypeBadges from '@app/components/UserList/AccountTypeBadges';
 import BulkEditModal from '@app/components/UserList/BulkEditModal';
 import PlexImportModal from '@app/components/UserList/PlexImportModal';
 import useDebouncedState from '@app/hooks/useDebouncedState';
@@ -15,9 +17,10 @@ import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { useUpdateQueryParams } from '@app/hooks/useUpdateQueryParams';
 import type { User } from '@app/hooks/useUser';
-import { Permission, UserType, useUser } from '@app/hooks/useUser';
+import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { SERVER_NAMES } from '@app/utils/mediaServerAccounts';
 import { Transition } from '@headlessui/react';
 import {
   BarsArrowDownIcon,
@@ -31,7 +34,7 @@ import {
   PencilIcon,
   UserPlusIcon,
 } from '@heroicons/react/24/solid';
-import { MediaServerType } from '@server/constants/server';
+import type { MediaServerKind } from '@server/constants/server';
 import type { UserResultsResponse } from '@server/interfaces/api/userInterfaces';
 import { hasPermission } from '@server/lib/permissions';
 import axios from 'axios';
@@ -50,6 +53,7 @@ const messages = defineMessages('components.UserList', {
   users: 'Users',
   userlist: 'User List',
   importfrommediaserver: 'Import {mediaServerName} Users',
+  importusers: 'Import Users',
   user: 'User',
   totalrequests: 'Requests',
   accounttype: 'Type',
@@ -60,14 +64,11 @@ const messages = defineMessages('components.UserList', {
   nodevices: 'None',
   owner: 'Owner',
   admin: 'Admin',
-  plexuser: 'Plex User',
   deleteuser: 'Delete User',
   userdeleted: 'User deleted successfully!',
   userdeleteerror: 'Something went wrong while deleting the user.',
   deleteconfirm:
     'Are you sure you want to delete this user? All of their request data will be permanently removed.',
-  localuser: 'Local User',
-  mediaServerUser: '{mediaServerName} User',
   createlocaluser: 'Create Local User',
   creating: 'Creating…',
   create: 'Create',
@@ -166,7 +167,11 @@ const UserList = () => {
   };
 
   const [isDeleting, setDeleting] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
+  // The server whose people are being imported.
+  const [importFrom, setImportFrom] = useState<MediaServerKind>();
+  const importServers = settings.currentSettings.mediaServers.map(
+    (server) => server.kind
+  );
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
     user?: User;
@@ -664,25 +669,26 @@ const UserList = () => {
         leave="transition-opacity duration-300"
         leaveFrom="opacity-100"
         leaveTo="opacity-0"
-        show={showImportModal}
+        show={!!importFrom}
       >
-        {settings.currentSettings.mediaServerType === MediaServerType.PLEX ? (
+        {importFrom === 'plex' ? (
           <PlexImportModal
-            onCancel={() => setShowImportModal(false)}
+            onCancel={() => setImportFrom(undefined)}
             onComplete={() => {
-              setShowImportModal(false);
+              setImportFrom(undefined);
               revalidate();
             }}
           />
-        ) : (
+        ) : importFrom ? (
           <JellyfinImportModal
-            onCancel={() => setShowImportModal(false)}
+            kind={importFrom}
+            onCancel={() => setImportFrom(undefined)}
             onComplete={() => {
-              setShowImportModal(false);
+              setImportFrom(undefined);
               revalidate();
             }}
           />
-        )}
+        ) : null}
       </Transition>
 
       <div className="flex flex-col justify-between lg:flex-row lg:items-end">
@@ -697,28 +703,44 @@ const UserList = () => {
               <UserPlusIcon />
               <span>{intl.formatMessage(messages.createlocaluser)}</span>
             </Button>
-            <Button
-              className="flex-grow lg:mr-2"
-              buttonType="primary"
-              onClick={() => setShowImportModal(true)}
-            >
-              <InboxArrowDownIcon />
-              <span>
-                {settings.currentSettings.mediaServerType ===
-                MediaServerType.EMBY
-                  ? intl.formatMessage(messages.importfrommediaserver, {
-                      mediaServerName: 'Emby',
-                    })
-                  : settings.currentSettings.mediaServerType ===
-                      MediaServerType.PLEX
-                    ? intl.formatMessage(messages.importfrommediaserver, {
-                        mediaServerName: 'Plex',
-                      })
-                    : intl.formatMessage(messages.importfrommediaserver, {
-                        mediaServerName: 'Jellyfin',
+            {importServers.length === 1 ? (
+              <Button
+                className="flex-grow lg:mr-2"
+                buttonType="primary"
+                onClick={() => setImportFrom(importServers[0])}
+              >
+                <InboxArrowDownIcon />
+                <span>
+                  {intl.formatMessage(messages.importfrommediaserver, {
+                    mediaServerName: SERVER_NAMES[importServers[0]],
+                  })}
+                </span>
+              </Button>
+            ) : importServers.length > 1 ? (
+              // One import for each connected server.
+              <div className="flex-grow lg:mr-2">
+                <Dropdown
+                  className="w-full justify-center"
+                  text={
+                    <span className="flex items-center gap-2">
+                      <InboxArrowDownIcon className="h-5 w-5" />
+                      {intl.formatMessage(messages.importusers)}
+                    </span>
+                  }
+                >
+                  {importServers.map((kind) => (
+                    <Dropdown.Item
+                      key={kind}
+                      onClick={() => setImportFrom(kind)}
+                    >
+                      {intl.formatMessage(messages.importfrommediaserver, {
+                        mediaServerName: SERVER_NAMES[kind],
                       })}
-              </span>
-            </Button>
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown>
+              </div>
+            ) : null}
           </div>
           <div className="mb-2 flex flex-grow flex-col gap-2 sm:flex-row lg:mb-0 lg:flex-grow-0">
             <div className="flex flex-grow lg:flex-grow-0">
@@ -949,27 +971,7 @@ const UserList = () => {
                 )}
               </Table.TD>
               <Table.TD>
-                {user.userType === UserType.PLEX ? (
-                  <Badge badgeType="warning">
-                    {intl.formatMessage(messages.plexuser)}
-                  </Badge>
-                ) : user.userType === UserType.LOCAL ? (
-                  <Badge badgeType="default">
-                    {intl.formatMessage(messages.localuser)}
-                  </Badge>
-                ) : user.userType === UserType.EMBY ? (
-                  <Badge badgeType="success">
-                    {intl.formatMessage(messages.mediaServerUser, {
-                      mediaServerName: 'Emby',
-                    })}
-                  </Badge>
-                ) : user.userType === UserType.JELLYFIN ? (
-                  <Badge badgeType="default">
-                    {intl.formatMessage(messages.mediaServerUser, {
-                      mediaServerName: 'Jellyfin',
-                    })}
-                  </Badge>
-                ) : null}
+                <AccountTypeBadges user={user} />
               </Table.TD>
               <Table.TD>
                 {user.id === 1

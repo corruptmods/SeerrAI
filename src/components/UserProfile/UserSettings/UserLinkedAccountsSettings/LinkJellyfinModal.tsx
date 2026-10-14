@@ -4,9 +4,10 @@ import Modal from '@app/components/Common/Modal';
 import useSettings from '@app/hooks/useSettings';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
+import { SERVER_NAMES } from '@app/utils/mediaServerAccounts';
 import { Transition } from '@headlessui/react';
 import { QrCodeIcon } from '@heroicons/react/24/outline';
-import { MediaServerType } from '@server/constants/server';
+import type { JellyfinFamilyKind } from '@server/constants/server';
 import axios from 'axios';
 import { Field, Form, Formik } from 'formik';
 import { useState } from 'react';
@@ -28,6 +29,7 @@ const messages = defineMessages(
     errorUnauthorized:
       'Unable to connect to {mediaServerName} using your credentials',
     errorExists: 'This account is already linked to a {applicationName} user',
+    errorDisabled: 'This {mediaServerName} account is switched off.',
     errorUnknown: 'An unknown error occurred',
     quickConnect: 'Use Quick Connect',
   }
@@ -35,6 +37,8 @@ const messages = defineMessages(
 
 interface LinkJellyfinModalProps {
   show: boolean;
+  /** The server the account is on. */
+  kind: JellyfinFamilyKind;
   onClose: () => void;
   onSave: () => void;
   onSwitchToQuickConnect: () => void;
@@ -42,6 +46,7 @@ interface LinkJellyfinModalProps {
 
 const LinkJellyfinModal = ({
   show,
+  kind,
   onClose,
   onSave,
   onSwitchToQuickConnect,
@@ -61,10 +66,7 @@ const LinkJellyfinModal = ({
   });
 
   const applicationName = settings.currentSettings.applicationTitle;
-  const mediaServerName =
-    settings.currentSettings.mediaServerType === MediaServerType.EMBY
-      ? 'Emby'
-      : 'Jellyfin';
+  const mediaServerName = SERVER_NAMES[kind];
 
   return (
     <Transition
@@ -88,7 +90,7 @@ const LinkJellyfinModal = ({
           try {
             setError(null);
             await axios.post(
-              `/api/v1/user/${user?.id}/settings/linked-accounts/jellyfin`,
+              `/api/v1/user/${user?.id}/settings/linked-accounts/${kind}`,
               {
                 username,
                 password,
@@ -101,6 +103,10 @@ const LinkJellyfinModal = ({
                 intl.formatMessage(messages.errorUnauthorized, {
                   mediaServerName,
                 })
+              );
+            } else if (e?.response?.status === 403) {
+              setError(
+                intl.formatMessage(messages.errorDisabled, { mediaServerName })
               );
             } else if (e?.response?.status === 422) {
               setError(
@@ -173,8 +179,7 @@ const LinkJellyfinModal = ({
                     <div className="error">{errors.password}</div>
                   )}
                 </div>
-                {settings.currentSettings.mediaServerType ===
-                  MediaServerType.JELLYFIN && (
+                {kind === 'jellyfin' && (
                   <div className="mt-4">
                     <Button
                       buttonType="ghost"

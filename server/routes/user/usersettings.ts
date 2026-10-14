@@ -1,3 +1,4 @@
+import type { JellyfinLoginResponse } from '@server/api/jellyfin';
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
 import { ApiErrorCode } from '@server/constants/error';
@@ -22,14 +23,21 @@ import {
 } from '@server/lib/discoverNetworks';
 import { cleanFeatureList } from '@server/lib/features';
 import { mayEditUser, mayManageUser } from '@server/lib/manageUser';
+import type {
+  JellyfinFamilyKind,
+  MediaServerKind,
+} from '@server/lib/mediaServers';
 import {
   USERNAME,
   USER_ID,
   USER_TYPE,
+  connectedServers,
   hostnameFor,
   isConnected,
+  isJellyfinFamily,
   jellyfinAccountColumns,
-  jellyfinFamilyServer,
+  primaryServer,
+  serverName,
 } from '@server/lib/mediaServers';
 import { passkeySummary } from '@server/lib/passkeys';
 import { Permission } from '@server/lib/permissions';
@@ -43,8 +51,9 @@ import {
   isOwnProfile,
   isOwnProfileOrAdmin,
 } from '@server/utils/profileMiddleware';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { Router } from 'express';
+import gravatarUrl from 'gravatar-url';
 import net from 'net';
 import { Not } from 'typeorm';
 import { canMakePermissionsChange } from '.';
@@ -314,50 +323,259 @@ userSettingsRoutes.post<
   }
 });
 
-userSettingsRoutes.post<{ authToken: string }>(
+/*
+ * Linked accounts: someone's accounts on the connected media servers, one
+ * per server. Linking takes proof (signing in there), an account nobody
+ * else here has, and one that may use that server. It never changes what
+ * kind of account someone has, unless they only had a password.
+ */
+
+/** The address Jellyfin and Emby are told a sign-in comes from. */
+const clientIpOf = (req: Request): string | undefined => {
+  const ip = req.ip;
+  if (ip && net.isIPv4(ip)) {
+    return ip;
+  }
+  if (ip && net.isIPv6(ip)) {
+    return ip.startsWith('::ffff:') ? ip.substring(7) : ip;
+  }
+  return undefined;
+};
+
+/** The device Seerr signs in to Jellyfin or Emby as, for this person. */
+const deviceIdFor = (user: User): string =>
+  Buffer.from(
+    user.id === 1 ? 'BOT_seerr' : `BOT_seerr_${user.username ?? ''}`
+  ).toString('base64');
+
+/**
+ * The server POST and DELETE /linked-accounts/jellyfin work with. Before
+ * Emby had its own, they also stood for an Emby server, and still do when
+ * Emby is the one connected.
+ */
+const jellyfinRouteKind = (user?: Partial<User>): JellyfinFamilyKind =>
+  user?.jellyfinUserId || isConnected('jellyfin') || !isConnected('emby')
+    ? 'jellyfin'
+    : 'emby';
+
+/** Links a Jellyfin or Emby account someone signed in to. */
+const linkJellyfinAccount = async (
+  user: User,
+  kind: JellyfinFamilyKind,
+  account: JellyfinLoginResponse,
+  deviceId: string
+): Promise<{ status: number; body?: unknown }> => {
+  const userRepository = getRepository(User);
+
+  if (
+    await userRepository.exist({
+      where: { [USER_ID[kind]]: account.User.Id },
+    })
+  ) {
+    return {
+      status: 422,
+      body: {
+        message: 'The specified account is already linked to a Seerr user',
+      },
+    };
+  }
+
+  if (account.User.Policy?.IsDisabled) {
+    return {
+      status: 403,
+      body: {
+        code: ApiErrorCode.AccountDisabled,
+        message: `This ${serverName(kind)} account is switched off.`,
+      },
+    };
+  }
+
+  await userRepository.update(user.id, {
+    ...jellyfinAccountColumns(kind, {
+      userId: account.User.Id,
+      username: account.User.Name,
+      authToken: account.AccessToken,
+      deviceId,
+    }),
+    // Only a password account becomes this server's kind of account.
+    ...(user.userType === UserType.LOCAL ? { userType: USER_TYPE[kind] } : {}),
+  });
+
+  return { status: 204 };
+};
+
+/**
+ * Unlinks someone's account on a media server, if they can still sign in
+ * afterwards: with a password, or another account on a connected server.
+ * The owner keeps their account on the primary server, and their Plex
+ * account while Plex is connected: Seerr reaches Plex with it.
+ */
+const unlinkAccount = async (
+  req: Request,
+  userId: number,
+  kind: MediaServerKind
+): Promise<{ status: number; body?: unknown }> => {
+  const userRepository = getRepository(User);
+  const user = await userRepository
+    .createQueryBuilder('user')
+    .addSelect('user.password')
+    .where({ id: userId })
+    .getOne();
+
+  if (!user) {
+    return { status: 404, body: { message: 'User not found.' } };
+  }
+
+  // Unlinking an admin from someone else's settings is the owner's call.
+  if (!mayEditUser(req.user, user)) {
+    return {
+      status: 403,
+      body: {
+        message: "You do not have permission to modify this user's settings.",
+      },
+    };
+  }
+
+  if (user.id === 1 && kind === primaryServer()) {
+    return {
+      status: 400,
+      body: {
+        message: `The owner's ${serverName(kind)} account cannot be unlinked while ${serverName(kind)} is the primary media server.`,
+      },
+    };
+  }
+  if (user.id === 1 && kind === 'plex' && isConnected('plex')) {
+    return {
+      status: 400,
+      body: {
+        message:
+          "The owner's Plex account cannot be unlinked while Plex is connected: Seerr reaches Plex with it.",
+      },
+    };
+  }
+
+  const others = connectedServers().filter(
+    (other) => other !== kind && !!user[USER_ID[other]]
+  );
+  if (!user.password && others.length === 0) {
+    return {
+      status: 400,
+      body: {
+        message:
+          'Set a password first, or link another media server account: without either this person could not sign in.',
+      },
+    };
+  }
+
+  const changes: Partial<User> =
+    kind === 'plex'
+      ? {
+          plexId: null,
+          plexUsername: null,
+          plexToken: null,
+          plexTokenExpiredAt: null,
+        }
+      : jellyfinAccountColumns(kind, {
+          userId: null,
+          username: null,
+          authToken: null,
+          deviceId: null,
+        });
+
+  // Their kind of account moves to another account they still have,
+  // the primary server's first, else they have a password account.
+  if (user.userType === USER_TYPE[kind]) {
+    const next = others[0];
+    changes.userType = next ? USER_TYPE[next] : UserType.LOCAL;
+    if (next && isJellyfinFamily(next)) {
+      changes.avatar = `/avatarproxy/${user[USER_ID[next]]}`;
+    } else if (!next && user.avatar.startsWith('/avatarproxy/')) {
+      // The picture came from the account being unlinked.
+      changes.avatar = gravatarUrl(user.email || 'none', {
+        default: 'mm',
+        size: 200,
+      });
+    }
+  }
+
+  await userRepository.update(user.id, changes);
+  return { status: 204 };
+};
+
+userSettingsRoutes.post<{ id: string }>(
   '/linked-accounts/plex',
   isOwnProfile(),
   async (req, res) => {
     const userRepository = getRepository(User);
+    const user = req.user;
 
-    if (!req.user) {
+    if (!user) {
       return res.status(404).json({ code: ApiErrorCode.Unauthorized });
     }
-    // Make sure Plex login is enabled
     if (!isConnected('plex')) {
       return res.status(500).json({ message: 'Plex login is disabled' });
     }
 
-    // First we need to use this auth token to get the user's email from plex.tv
-    const plextv = new PlexTvAPI(req.body.authToken);
-    const account = await plextv.getUser();
+    try {
+      // First we need to use this auth token to get the user's email from plex.tv
+      const account = await new PlexTvAPI(req.body.authToken).getUser();
 
-    // Do not allow linking of an already linked account
-    if (await userRepository.exist({ where: { plexId: account.id } })) {
-      return res.status(422).json({
-        message: 'This Plex account is already linked to a Seerr user',
+      // Do not allow linking of an already linked account
+      if (await userRepository.exist({ where: { plexId: account.id } })) {
+        return res.status(422).json({
+          message: 'This Plex account is already linked to a Seerr user',
+        });
+      }
+
+      // A Plex or password account links the Plex account with its own
+      // email. Someone who signs in with Jellyfin or Emby has that server's
+      // name as their email, so theirs cannot be compared.
+      if (
+        (user.userType === UserType.PLEX || user.userType === UserType.LOCAL) &&
+        user.email !== account.email.toLowerCase()
+      ) {
+        return res.status(422).json({
+          message:
+            'This Plex account is registered under a different email address.',
+        });
+      }
+
+      // The owner shares the Plex server with this account.
+      const owner = await userRepository.findOneOrFail({
+        select: { id: true, plexId: true, plexToken: true },
+        where: { id: 1 },
       });
-    }
+      if (
+        account.id !== owner.plexId &&
+        !(await new PlexTvAPI(owner.plexToken ?? '').checkUserAccess(
+          account.id
+        ))
+      ) {
+        return res.status(403).json({
+          message: 'This Plex account does not have access to the Plex server.',
+        });
+      }
 
-    const user = req.user;
-
-    // Emails do not match
-    if (user.email !== account.email) {
-      return res.status(422).json({
-        message:
-          'This Plex account is registered under a different email address.',
+      await userRepository.update(user.id, {
+        plexId: account.id,
+        plexUsername: account.username,
+        plexToken: account.authToken,
+        plexTokenExpiredAt: null,
+        // Only a password account becomes a Plex account.
+        ...(user.userType === UserType.LOCAL
+          ? { userType: UserType.PLEX }
+          : {}),
       });
+
+      return res.status(204).send();
+    } catch (e) {
+      logger.error('Failed to link Plex account to user.', {
+        label: 'API',
+        ip: req.ip,
+        errorMessage: e.message,
+      });
+      return res.status(401).json({ code: ApiErrorCode.InvalidAuthToken });
     }
-
-    // valid plex user found, link to current user
-    user.userType = UserType.PLEX;
-    user.plexId = account.id;
-    user.plexUsername = account.username;
-    user.plexToken = account.authToken;
-    user.plexTokenExpiredAt = null;
-    await userRepository.save(user);
-
-    return res.status(204).send();
   }
 );
 
@@ -365,75 +583,41 @@ userSettingsRoutes.delete<{ id: string }>(
   '/linked-accounts/plex',
   isOwnProfileOrAdmin(),
   async (req, res) => {
-    const userRepository = getRepository(User);
-
-    // Make sure Plex login is enabled
-    if (!isConnected('plex')) {
-      return res.status(500).json({ message: 'Plex login is disabled' });
-    }
-
     try {
-      const user = await userRepository
-        .createQueryBuilder('user')
-        .addSelect('user.password')
-        .where({
-          id: Number(req.params.id),
-        })
-        .getOne();
-
-      if (!user) {
-        return res.status(404).json({ message: 'User not found.' });
-      }
-
-      if (user.id === 1) {
-        return res.status(400).json({
-          message:
-            'Cannot unlink media server accounts for the primary administrator.',
-        });
-      }
-
-      // Unlinking an admin from someone else's settings is the owner's call.
-      if (!mayEditUser(req.user, user)) {
-        return res.status(403).json({
-          message: "You do not have permission to modify this user's settings.",
-        });
-      }
-
-      if (!user.email || !user.password) {
-        return res.status(400).json({
-          message: 'User does not have a local email or password set.',
-        });
-      }
-
-      user.userType = UserType.LOCAL;
-      user.plexId = null;
-      user.plexUsername = null;
-      user.plexToken = null;
-      user.plexTokenExpiredAt = null;
-      await userRepository.save(user);
-
-      return res.status(204).send();
+      const { status, body } = await unlinkAccount(
+        req,
+        Number(req.params.id),
+        'plex'
+      );
+      return body ? res.status(status).json(body) : res.status(status).send();
     } catch (e) {
       return res.status(500).json({ message: e.message });
     }
   }
 );
 
-userSettingsRoutes.post<{ username: string; password: string }>(
-  '/linked-accounts/jellyfin',
-  isOwnProfile(),
-  async (req, res) => {
+/** Linking a Jellyfin or Emby account with its username and password. */
+const linkWithPassword =
+  (kindOf: () => JellyfinFamilyKind) =>
+  async (
+    req: Request<
+      { id: string },
+      unknown,
+      { username: string; password: string }
+    >,
+    res: Response
+  ) => {
     const userRepository = getRepository(User);
+    const user = req.user;
 
-    if (!req.user) {
+    if (!user) {
       return res.status(401).json({ code: ApiErrorCode.Unauthorized });
     }
-    // Make sure jellyfin login is enabled
-    const kind = jellyfinFamilyServer();
-    if (!kind) {
+    const kind = kindOf();
+    if (!isConnected(kind)) {
       return res
         .status(500)
-        .json({ message: 'Jellyfin/Emby login is disabled' });
+        .json({ message: `${serverName(kind)} login is disabled` });
     }
 
     // Do not allow linking of an already linked account
@@ -447,57 +631,27 @@ userSettingsRoutes.post<{ username: string; password: string }>(
       });
     }
 
-    const hostname = hostnameFor(kind);
-    const deviceId = Buffer.from(
-      req.user?.id === 1 ? 'BOT_seerr' : `BOT_seerr_${req.user.username ?? ''}`
-    ).toString('base64');
-
-    const jellyfinserver = new JellyfinAPI(hostname, undefined, deviceId, kind);
-
-    const ip = req.ip;
-    let clientIp: string | undefined;
-    if (ip) {
-      if (net.isIPv4(ip)) {
-        clientIp = ip;
-      } else if (net.isIPv6(ip)) {
-        clientIp = ip.startsWith('::ffff:') ? ip.substring(7) : ip;
-      }
-    }
+    const deviceId = deviceIdFor(user);
+    const jellyfinserver = new JellyfinAPI(
+      hostnameFor(kind),
+      undefined,
+      deviceId,
+      kind
+    );
 
     try {
       const account = await jellyfinserver.login(
         req.body.username,
         req.body.password,
-        clientIp
+        clientIpOf(req)
       );
-
-      // Do not allow linking of an already linked account
-      if (
-        await userRepository.exist({
-          where: { [USER_ID[kind]]: account.User.Id },
-        })
-      ) {
-        return res.status(422).json({
-          message: 'The specified account is already linked to a Seerr user',
-        });
-      }
-
-      const user = req.user;
-
-      // valid jellyfin user found, link to current user
-      user.userType = USER_TYPE[kind];
-      Object.assign(
+      const { status, body } = await linkJellyfinAccount(
         user,
-        jellyfinAccountColumns(kind, {
-          userId: account.User.Id,
-          username: account.User.Name,
-          authToken: account.AccessToken,
-          deviceId,
-        })
+        kind,
+        account,
+        deviceId
       );
-      await userRepository.save(user);
-
-      return res.status(204).send();
+      return body ? res.status(status).json(body) : res.status(status).send();
     } catch (e) {
       logger.error('Failed to link account to user.', {
         label: 'API',
@@ -513,69 +667,52 @@ userSettingsRoutes.post<{ username: string; password: string }>(
 
       return res.status(500).send();
     }
-  }
+  };
+
+userSettingsRoutes.post<{ id: string }>(
+  '/linked-accounts/jellyfin',
+  isOwnProfile(),
+  linkWithPassword(() => jellyfinRouteKind())
+);
+
+userSettingsRoutes.post<{ id: string }>(
+  '/linked-accounts/emby',
+  isOwnProfile(),
+  linkWithPassword(() => 'emby')
 );
 
 userSettingsRoutes.delete<{ id: string }>(
   '/linked-accounts/jellyfin',
   isOwnProfileOrAdmin(),
   async (req, res) => {
-    const userRepository = getRepository(User);
-
-    // Make sure jellyfin login is enabled
-    const kind = jellyfinFamilyServer();
-    if (!kind) {
-      return res
-        .status(500)
-        .json({ message: 'Jellyfin/Emby login is disabled' });
-    }
-
     try {
-      const user = await userRepository
-        .createQueryBuilder('user')
-        .addSelect('user.password')
-        .where({
-          id: Number(req.params.id),
-        })
-        .getOne();
-
-      if (!user) {
-        return res.status(404).json({ message: 'User not found.' });
-      }
-
-      if (user.id === 1) {
-        return res.status(400).json({
-          message:
-            'Cannot unlink media server accounts for the primary administrator.',
-        });
-      }
-
-      // Unlinking an admin from someone else's settings is the owner's call.
-      if (!mayEditUser(req.user, user)) {
-        return res.status(403).json({
-          message: "You do not have permission to modify this user's settings.",
-        });
-      }
-
-      if (!user.email || !user.password) {
-        return res.status(400).json({
-          message: 'User does not have a local email or password set.',
-        });
-      }
-
-      user.userType = UserType.LOCAL;
-      Object.assign(
-        user,
-        jellyfinAccountColumns(kind, {
-          userId: null,
-          username: null,
-          authToken: null,
-          deviceId: null,
-        })
+      const target = await getRepository(User).findOne({
+        select: { id: true, jellyfinUserId: true },
+        where: { id: Number(req.params.id) },
+      });
+      const { status, body } = await unlinkAccount(
+        req,
+        Number(req.params.id),
+        jellyfinRouteKind(target ?? undefined)
       );
-      await userRepository.save(user);
+      return body ? res.status(status).json(body) : res.status(status).send();
+    } catch (e) {
+      return res.status(500).json({ message: e.message });
+    }
+  }
+);
 
-      return res.status(204).send();
+userSettingsRoutes.delete<{ id: string }>(
+  '/linked-accounts/emby',
+  isOwnProfileOrAdmin(),
+  async (req, res) => {
+    try {
+      const { status, body } = await unlinkAccount(
+        req,
+        Number(req.params.id),
+        'emby'
+      );
+      return body ? res.status(status).json(body) : res.status(status).send();
     } catch (e) {
       return res.status(500).json({ message: e.message });
     }
@@ -586,9 +723,8 @@ userSettingsRoutes.post<{ secret: string }>(
   '/linked-accounts/jellyfin/quickconnect',
   isOwnProfile(),
   async (req, res) => {
-    const userRepository = getRepository(User);
-
-    if (!req.user) {
+    const user = req.user;
+    if (!user) {
       return res.status(401).json({ code: ApiErrorCode.Unauthorized });
     }
 
@@ -598,12 +734,6 @@ userSettingsRoutes.post<{ secret: string }>(
     }
 
     const { secret } = result.data;
-
-    if (!jellyfinFamilyServer()) {
-      return res
-        .status(500)
-        .json({ message: 'Jellyfin/Emby login is disabled' });
-    }
 
     if (!isConnected('jellyfin')) {
       return res
@@ -620,30 +750,13 @@ userSettingsRoutes.post<{ secret: string }>(
 
     try {
       const account = await jellyfinServer.authenticateQuickConnect(secret);
-
-      if (
-        await userRepository.exist({
-          where: { jellyfinUserId: account.User.Id },
-        })
-      ) {
-        return res.status(422).json({
-          message: 'The specified account is already linked to a Seerr user',
-        });
-      }
-
-      const user = req.user;
-      const deviceId = Buffer.from(
-        user.id === 1 ? 'BOT_seerr' : `BOT_seerr_${user.username ?? ''}`
-      ).toString('base64');
-
-      user.userType = UserType.JELLYFIN;
-      user.jellyfinUserId = account.User.Id;
-      user.jellyfinUsername = account.User.Name;
-      user.jellyfinAuthToken = account.AccessToken;
-      user.jellyfinDeviceId = deviceId;
-      await userRepository.save(user);
-
-      return res.status(204).send();
+      const { status, body } = await linkJellyfinAccount(
+        user,
+        'jellyfin',
+        account,
+        deviceIdFor(user)
+      );
+      return body ? res.status(status).json(body) : res.status(status).send();
     } catch (e) {
       logger.error('Failed to link account with Quick Connect.', {
         label: 'API',

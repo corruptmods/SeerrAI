@@ -6,9 +6,11 @@ import RequestCard from '@app/components/RequestCard';
 import Slider from '@app/components/Slider';
 import TmdbTitleCard from '@app/components/TitleCard/TmdbTitleCard';
 import ProfileHeader from '@app/components/UserProfile/ProfileHeader';
-import { Permission, UserType, useUser } from '@app/hooks/useUser';
+import useSettings from '@app/hooks/useSettings';
+import { Permission, useUser } from '@app/hooks/useUser';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
+import { connectedAccountServers } from '@app/utils/mediaServerAccounts';
 import { ArrowRightCircleIcon } from '@heroicons/react/24/outline';
 import type { VideoMediaType } from '@server/constants/media';
 import type { WatchlistResponse } from '@server/interfaces/api/discoverInterfaces';
@@ -46,6 +48,7 @@ type MediaTitle = MovieDetails | TvDetails;
 const UserProfile = () => {
   const intl = useIntl();
   const router = useRouter();
+  const settings = useSettings();
   const { user, error } = useUser({
     id: Number(router.query.userId),
   });
@@ -74,9 +77,18 @@ const UserProfile = () => {
       ? `/api/v1/user/${user.id}/quota`
       : null
   );
+  // Their Plex account, while Plex is connected: where their watch history
+  // (Tautulli) and Plex watchlist come from.
+  const hasPlex =
+    !!user &&
+    connectedAccountServers(
+      user,
+      settings.currentSettings.mediaServers
+    ).includes('plex');
   const { data: watchData, error: watchDataError } =
     useSWR<UserWatchDataResponse>(
-      user?.userType === UserType.PLEX &&
+      hasPlex &&
+        user &&
         (user.id === currentUser?.id || currentHasPermission(Permission.ADMIN))
         ? `/api/v1/user/${user.id}/watch_data`
         : null
@@ -121,9 +133,7 @@ const UserProfile = () => {
   }
 
   const watchlistSliderTitle = intl.formatMessage(
-    user.userType === UserType.PLEX
-      ? messages.plexwatchlist
-      : messages.localWatchlist,
+    hasPlex ? messages.plexwatchlist : messages.localWatchlist,
     { username: user.displayName }
   );
 
@@ -376,7 +386,7 @@ const UserProfile = () => {
             />
           </>
         )}
-      {user.userType === UserType.PLEX &&
+      {hasPlex &&
         (user.id === currentUser?.id ||
           currentHasPermission(Permission.ADMIN)) &&
         (!watchData || !!watchData.recentlyWatched?.length) &&

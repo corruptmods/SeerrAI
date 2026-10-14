@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { before, beforeEach, describe, it, mock } from 'node:test';
+import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
@@ -7,7 +7,12 @@ import { DiscoverSliderType } from '@server/constants/discover';
 import { MAX_DISCOVER_NETWORKS } from '@server/constants/discoverNetworks';
 import { ApiErrorCode } from '@server/constants/error';
 import { NAV_ITEMS } from '@server/constants/navigation';
-import { MediaServerType } from '@server/constants/server';
+import type { MediaServerKind } from '@server/constants/server';
+import {
+  MEDIA_SERVER_KINDS,
+  MediaServerType,
+  typeOfKind,
+} from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
@@ -42,9 +47,21 @@ const authenticateQCMock = mock.method(
   async () => ({ ...defaultAuthenticateResponse })
 );
 
-// Plex accounts signing in with a password are checked against the owner's
-// share list; everyone here is on it.
-mock.method(PlexTvAPI.prototype, 'checkUserAccess', async () => true);
+// Plex accounts signing in with a password, or linked, are checked against
+// the owner's share list; everyone here is on it unless a test says not.
+let plexShared = true;
+mock.method(PlexTvAPI.prototype, 'checkUserAccess', async () => plexShared);
+
+/** The Plex account plex.tv answers with when someone links Plex. */
+let plexAccount = { id: 5000, email: 'friend@seerr.dev' };
+mock.method(PlexTvAPI.prototype, 'getUser', async () => ({
+  ...plexAccount,
+  uuid: 'uuid',
+  username: 'plexname',
+  title: 'plexname',
+  thumb: 'https://plex.tv/thumb',
+  authToken: 'plex-token',
+}));
 
 let app: Express;
 
@@ -113,6 +130,11 @@ describe('POST /user/:id/settings/linked-accounts/jellyfin/quickconnect', () => 
   });
 
   it('links the account when the media server is Jellyfin', async () => {
+    // A password account becomes a Jellyfin account.
+    await getRepository(User).update(
+      { email: 'friend@seerr.dev' },
+      { userType: UserType.LOCAL, plexId: null }
+    );
     const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
 
     const res = await agent
@@ -756,5 +778,277 @@ describe('a Trakt username made of dots', () => {
       .post(`/user/${userId}/settings/main`)
       .send({ username: 'friend', traktUsername: '.a.' });
     assert.strictEqual(ok.status, 200);
+  });
+});
+
+/*
+ * Linked accounts with several media servers connected, the first one
+ * named primary. Each test leaves only the primary one connected.
+ */
+describe('linked accounts with several media servers', () => {
+  const connectServers = (...kinds: MediaServerKind[]) => {
+    const settings = getSettings();
+    settings.main.mediaServerType = typeOfKind(kinds[0]);
+    settings.main.localLogin = true;
+    settings.plex.machineId = 'machine-1';
+    for (const kind of MEDIA_SERVER_KINDS) {
+      settings[kind].connected = kinds.includes(kind);
+      settings[kind].signIn = true;
+    }
+    settings.jellyfin.ip = 'jellyfin.local';
+    settings.jellyfin.apiKey = 'jellyfin-key';
+    settings.emby.ip = 'emby.local';
+    settings.emby.apiKey = 'emby-key';
+  };
+
+  let login: ReturnType<typeof mock.method<JellyfinAPI, 'login'>>;
+  let getAccount: { mock: { restore(): void } };
+  const asked: string[] = [];
+  let disabled = false;
+
+  beforeEach(() => {
+    plexShared = true;
+    plexAccount = { id: 5000, email: 'friend@seerr.dev' };
+    disabled = false;
+    asked.length = 0;
+    login = mock.method(
+      JellyfinAPI.prototype,
+      'login',
+      async function (this: JellyfinAPI) {
+        asked.push(this.kind);
+        return {
+          User: {
+            Id: `${this.kind}-friend`,
+            Name: `${this.kind}name`,
+            ServerId: 'server',
+            ServerName: this.kind,
+            Configuration: { GroupedFolders: [] },
+            Policy: { IsAdministrator: false, IsDisabled: disabled },
+          },
+          AccessToken: `${this.kind}-token`,
+        };
+      }
+    );
+    // Someone with a Jellyfin or Emby account is checked there at sign-in.
+    getAccount = mock.method(JellyfinAPI.prototype, 'getAccount', async () => ({
+      Policy: { IsDisabled: false },
+    }));
+  });
+  afterEach(() => {
+    login.mock.restore();
+    getAccount.mock.restore();
+    const settings = getSettings();
+    for (const kind of MEDIA_SERVER_KINDS) {
+      settings[kind].connected = false;
+      settings[kind].signIn = true;
+    }
+  });
+
+  const friend = () =>
+    getRepository(User).findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+
+  const linkWithPassword = (
+    agent: Awaited<ReturnType<typeof loginAs>>['agent'],
+    userId: number,
+    kind: string
+  ) =>
+    agent
+      .post(`/user/${userId}/settings/linked-accounts/${kind}`)
+      .send({ username: 'someone', password: 'secret' });
+
+  it('links an Emby account beside Plex, keeping the kind of account', async () => {
+    connectServers('plex', 'emby');
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+
+    const res = await linkWithPassword(agent, userId, 'emby');
+    assert.strictEqual(res.status, 204);
+    assert.deepStrictEqual(asked, ['emby']);
+
+    const after = await friend();
+    assert.strictEqual(after.embyUserId, 'emby-friend');
+    assert.strictEqual(after.embyUsername, 'embyname');
+    assert.strictEqual(after.jellyfinUserId, null);
+    assert.strictEqual(after.userType, UserType.PLEX);
+    assert.strictEqual(after.email, 'friend@seerr.dev');
+    assert.deepStrictEqual(after.linkedServers, ['plex', 'emby']);
+  });
+
+  it('only links a server Seerr is connected to', async () => {
+    connectServers('plex', 'jellyfin');
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+
+    assert.strictEqual(
+      (await linkWithPassword(agent, userId, 'emby')).status,
+      500
+    );
+    assert.deepStrictEqual(asked, []);
+    assert.strictEqual((await friend()).embyUserId, null);
+  });
+
+  it('refuses an account switched off there, or linked to someone else', async () => {
+    connectServers('plex', 'emby');
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+
+    disabled = true;
+    const off = await linkWithPassword(agent, userId, 'emby');
+    assert.strictEqual(off.status, 403);
+    assert.strictEqual(off.body.code, ApiErrorCode.AccountDisabled);
+    assert.strictEqual((await friend()).embyUserId, null);
+
+    disabled = false;
+    await getRepository(User).update(1, { embyUserId: 'emby-friend' });
+    assert.strictEqual(
+      (await linkWithPassword(agent, userId, 'emby')).status,
+      422
+    );
+    assert.strictEqual((await friend()).embyUserId, null);
+  });
+
+  it('links Emby through the Jellyfin address when Emby is the one connected', async () => {
+    connectServers('emby');
+    await getRepository(User).update(
+      { email: 'friend@seerr.dev' },
+      { userType: UserType.LOCAL, plexId: null }
+    );
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+
+    assert.strictEqual(
+      (await linkWithPassword(agent, userId, 'jellyfin')).status,
+      204
+    );
+    assert.deepStrictEqual(asked, ['emby']);
+    const after = await friend();
+    assert.strictEqual(after.embyUserId, 'emby-friend');
+    assert.strictEqual(after.userType, UserType.EMBY);
+  });
+
+  it('links Plex to a Jellyfin account whatever its email, keeping its kind', async () => {
+    connectServers('jellyfin', 'plex');
+    await getRepository(User).update(
+      { email: 'friend@seerr.dev' },
+      {
+        email: 'jfname',
+        plexId: null,
+        jellyfinUserId: 'jf-friend',
+        userType: UserType.JELLYFIN,
+      }
+    );
+    const { agent, userId } = await loginAs('jfname', 'test1234');
+
+    const res = await agent
+      .post(`/user/${userId}/settings/linked-accounts/plex`)
+      .send({ authToken: 'plex-token' });
+    assert.strictEqual(res.status, 204);
+
+    const after = await getRepository(User).findOneOrFail({
+      where: { id: userId },
+    });
+    assert.strictEqual(after.plexId, 5000);
+    assert.strictEqual(after.userType, UserType.JELLYFIN);
+    assert.strictEqual(after.email, 'jfname');
+  });
+
+  it('links Plex to a password account only with its own email, and only if shared', async () => {
+    connectServers('jellyfin', 'plex');
+    await getRepository(User).update(
+      { email: 'friend@seerr.dev' },
+      { plexId: null, userType: UserType.LOCAL }
+    );
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    const link = () =>
+      agent
+        .post(`/user/${userId}/settings/linked-accounts/plex`)
+        .send({ authToken: 'plex-token' });
+
+    plexAccount = { id: 5000, email: 'someone-else@example.com' };
+    assert.strictEqual((await link()).status, 422);
+
+    plexAccount = { id: 5000, email: 'Friend@seerr.dev' };
+    plexShared = false;
+    assert.strictEqual((await link()).status, 403);
+    assert.strictEqual((await friend()).plexId, null);
+
+    plexShared = true;
+    assert.strictEqual((await link()).status, 204);
+    const after = await friend();
+    assert.strictEqual(after.plexId, 5000);
+    assert.strictEqual(after.userType, UserType.PLEX);
+  });
+
+  it('unlinks one account while another connected one can still sign in', async () => {
+    connectServers('plex', 'emby');
+    const users = getRepository(User);
+    const person = await users.save(
+      new User({
+        email: 'two@seerr.dev',
+        plexId: 6000,
+        plexUsername: 'two',
+        embyUserId: 'emby-two',
+        embyUsername: 'two',
+        avatar: 'https://plex.tv/thumb',
+        userType: UserType.PLEX,
+      })
+    );
+    // An admin does it: this person has no password to sign in with.
+    const { agent } = await loginAs('admin@seerr.dev', 'test1234');
+    const unlink = (kind: string) =>
+      agent.delete(`/user/${person.id}/settings/linked-accounts/${kind}`);
+
+    assert.strictEqual((await unlink('plex')).status, 204);
+    let after = await users.findOneOrFail({ where: { id: person.id } });
+    assert.strictEqual(after.plexId, null);
+    assert.strictEqual(after.userType, UserType.EMBY);
+    assert.strictEqual(after.avatar, '/avatarproxy/emby-two');
+
+    // The last way in stays.
+    assert.strictEqual((await unlink('emby')).status, 400);
+    after = await users.findOneOrFail({ where: { id: person.id } });
+    assert.strictEqual(after.embyUserId, 'emby-two');
+
+    // With a password it can go, and they have a password account.
+    await users.update(person.id, { password: 'set' });
+    assert.strictEqual((await unlink('emby')).status, 204);
+    after = await users.findOneOrFail({ where: { id: person.id } });
+    assert.strictEqual(after.embyUserId, null);
+    assert.strictEqual(after.userType, UserType.LOCAL);
+  });
+
+  it("keeps the owner's primary account, and Plex while it is connected", async () => {
+    connectServers('jellyfin', 'plex', 'emby');
+    await getRepository(User).update(1, {
+      jellyfinUserId: 'jf-owner',
+      embyUserId: 'emby-owner',
+      userType: UserType.JELLYFIN,
+    });
+    const { agent } = await loginAs('admin@seerr.dev', 'test1234');
+    const unlink = (kind: string) =>
+      agent.delete(`/user/1/settings/linked-accounts/${kind}`);
+
+    assert.strictEqual((await unlink('jellyfin')).status, 400);
+    assert.strictEqual((await unlink('plex')).status, 400);
+    assert.strictEqual((await unlink('emby')).status, 204);
+
+    const owner = await getRepository(User).findOneOrFail({
+      where: { id: 1 },
+    });
+    assert.strictEqual(owner.jellyfinUserId, 'jf-owner');
+    assert.strictEqual(owner.plexId, 1);
+    assert.strictEqual(owner.embyUserId, null);
+    assert.strictEqual(owner.userType, UserType.JELLYFIN);
+  });
+
+  it('links Jellyfin with Quick Connect beside Plex, keeping the kind of account', async () => {
+    connectServers('plex', 'jellyfin');
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+
+    const res = await agent
+      .post(`/user/${userId}/settings/linked-accounts/jellyfin/quickconnect`)
+      .send({ secret: 'abc123def456abc123def456' });
+    assert.strictEqual(res.status, 204);
+    const after = await friend();
+    assert.strictEqual(after.jellyfinUserId, 'jf-link-user-001');
+    assert.strictEqual(after.userType, UserType.PLEX);
   });
 });

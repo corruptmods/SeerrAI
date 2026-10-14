@@ -18,6 +18,8 @@ interface PlexImportProps {
 interface PlexImportResponse {
   createdUsers: unknown[];
   refreshedUsers: number;
+  /** People left out, because another account has their email. */
+  skippedUsers?: { id: string; name: string; reason: string }[];
 }
 
 const messages = defineMessages('components.UserList', {
@@ -36,6 +38,8 @@ const messages = defineMessages('components.UserList', {
     'Imported users do not have a {applicationTitle} password set. If you disable Plex sign-in, they will need to set a password from their profile or via a password reset link.',
   user: 'User',
   nouserstoimport: 'There are no Plex users to import.',
+  plexImportSkipped:
+    'Not imported, as another account already has their email: {names}. They can sign in with that account and link Plex from their profile.',
   newplexsigninenabled:
     'The <strong>Enable New Plex Sign-In</strong> setting is currently enabled. Plex users with library access do not need to be imported in order to sign in.',
 });
@@ -67,7 +71,16 @@ const PlexImportModal = ({ onCancel, onComplete }: PlexImportProps) => {
         { plexIds: selectedUsers }
       );
 
-      const { createdUsers, refreshedUsers } = importResponse;
+      const { createdUsers, refreshedUsers, skippedUsers } = importResponse;
+
+      if (skippedUsers?.length) {
+        addToast(
+          intl.formatMessage(messages.plexImportSkipped, {
+            names: intl.formatList(skippedUsers.map((user) => user.name)),
+          }),
+          { autoDismiss: false, appearance: 'warning' }
+        );
+      }
 
       if (isSyncOnly) {
         if (refreshedUsers > 0) {

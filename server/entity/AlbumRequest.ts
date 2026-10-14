@@ -1,3 +1,4 @@
+import type { MediaStatus } from '@server/constants/media';
 import { MediaRequestStatus } from '@server/constants/media';
 import { DbAwareColumn, resolveDbType } from '@server/utils/DbColumnHelper';
 import {
@@ -29,6 +30,12 @@ class AlbumRequest {
 
   @Column({ type: 'int', default: MediaRequestStatus.PENDING })
   public status: MediaRequestStatus;
+
+  /**
+   * Whether the album itself is here yet (its MusicAlbum's status). Not a
+   * column: filled in where requests are listed (lib/music/albumStatuses).
+   */
+  public albumStatus?: MediaStatus;
 
   @ManyToOne(() => MediaRequest, (request) => request.albums, {
     onDelete: 'CASCADE',

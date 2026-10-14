@@ -1,13 +1,20 @@
+import { albumCoverUrl } from '@server/api/coverartarchive';
+import { isMbid } from '@server/api/musicbrainz';
 import TheMovieDb from '@server/api/themoviedb';
 import {
   MediaRequestStatus,
   MediaStatus,
   MediaType,
+  VARIOUS_ARTISTS_MBID,
 } from '@server/constants/media';
 import type { SeriesType } from '@server/constants/seriesType';
 import { toSeriesTypeFor } from '@server/constants/seriesType';
 import { getRepository } from '@server/datasource';
-import type { MediaRequestBody } from '@server/interfaces/api/requestInterfaces';
+import type {
+  MediaRequestBody,
+  MusicRequestBody,
+} from '@server/interfaces/api/requestInterfaces';
+import { resolveRequestAlbums } from '@server/lib/music/requestAlbums';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import type { NotificationEvent } from '@server/lib/notifications/eventTitles';
 import { mediaEvent } from '@server/lib/notifications/eventTitles';
@@ -29,8 +36,10 @@ import {
   AfterUpdate,
   Column,
   Entity,
+  In,
   Index,
   ManyToOne,
+  Not,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -38,6 +47,7 @@ import {
 import AlbumRequest from './AlbumRequest';
 import EpisodeRequest from './EpisodeRequest';
 import Media from './Media';
+import MusicAlbum from './MusicAlbum';
 import SeasonRequest from './SeasonRequest';
 import { User } from './User';
 
@@ -46,6 +56,10 @@ export class QuotaRestrictedError extends Error {}
 export class DuplicateMediaRequestError extends Error {}
 export class NoSeasonsAvailableError extends Error {}
 export class BlocklistedMediaError extends Error {}
+/** Every album asked for is already here or already asked for. */
+export class NoAlbumsAvailableError extends Error {}
+/** A music request that cannot be made as asked: no albums, too many. */
+export class InvalidMusicRequestError extends Error {}
 
 type MediaRequestOptions = {
   isAutoRequest?: boolean;
@@ -75,6 +89,46 @@ const approvalExtra = (
   }
   const expected = expectedOnApproval(request, tmdb);
   return expected ? [{ name: 'Expected', value: expected }] : [];
+};
+
+/**
+ * What a music notification says, from what Seerr kept when the albums were
+ * asked for, so nothing waits on MusicBrainz: "Album — Artist (2003)" for
+ * one album, "Artist — 3 albums" for several, with the albums' titles and
+ * the first one's cover.
+ */
+const musicNotification = async (
+  request: MediaRequest,
+  media: Media
+): Promise<{
+  subject: string;
+  message: string;
+  image?: string;
+  extra: { name: string; value: string }[];
+}> => {
+  const asked = [...(request.albums ?? [])].sort((a, b) => a.id - b.id);
+  const artist = media.foreignTitle || 'Unknown Artist';
+  const titles = asked.map((album) => album.title);
+
+  let subject = `${artist} — ${asked.length} albums`;
+  if (asked.length === 1) {
+    const row = await getRepository(MusicAlbum).findOne({
+      where: { mediaId: media.id, mbId: asked[0].albumMbid },
+    });
+    const year = row?.releaseDate?.slice(0, 4);
+    subject = `${asked[0].title} — ${artist}${year ? ` (${year})` : ''}`;
+  }
+
+  return {
+    subject,
+    message: truncate(titles.join(', '), {
+      length: 500,
+      separator: /,? /,
+      omission: '…',
+    }),
+    image: asked[0] ? albumCoverUrl(asked[0].albumMbid) : undefined,
+    extra: [{ name: 'Requested Albums', value: String(asked.length) }],
+  };
 };
 
 /**
@@ -109,6 +163,257 @@ export class MediaRequest {
         MediaRequest.createRequest(body, user, options)
       )
     );
+  }
+
+  /**
+   * Albums of one artist, as one request: one album, several, or a whole
+   * discography. Sent to Lidarr once approved.
+   */
+  public static async requestMusic(
+    requestBody: MusicRequestBody,
+    user: User
+  ): Promise<MediaRequest> {
+    const lockUserId =
+      requestBody.userId &&
+      user.hasPermission([Permission.MANAGE_USERS, Permission.MANAGE_REQUESTS])
+        ? requestBody.userId
+        : user.id;
+
+    return requestLock.dispatch(userKey(lockUserId), () =>
+      mediaLock.dispatch(
+        mediaKey(MediaType.MUSIC, requestBody.artistMbid),
+        () => MediaRequest.createMusicRequest(requestBody, user)
+      )
+    );
+  }
+
+  private static async createMusicRequest(
+    requestBody: MusicRequestBody,
+    user: User
+  ): Promise<MediaRequest> {
+    const mediaRepository = getRepository(Media);
+    const requestRepository = getRepository(MediaRequest);
+    const albumRepository = getRepository(MusicAlbum);
+    const settings = getSettings();
+
+    let requestUser = user;
+    if (
+      requestBody.userId &&
+      !user.hasPermission([Permission.MANAGE_USERS, Permission.MANAGE_REQUESTS])
+    ) {
+      throw new RequestPermissionError(
+        'You do not have permission to modify the request user.'
+      );
+    } else if (requestBody.userId) {
+      requestUser = await getRepository(User).findOneOrFail({
+        where: { id: requestBody.userId },
+      });
+    }
+
+    // Request covers music as it covers films and series; Request Music is
+    // for someone who should only ask for music.
+    if (
+      !requestUser.hasPermission(
+        [Permission.REQUEST, Permission.REQUEST_MUSIC],
+        { type: 'or' }
+      )
+    ) {
+      throw new RequestPermissionError(
+        'You do not have permission to make music requests.'
+      );
+    }
+
+    const artistMbid = requestBody.artistMbid;
+    if (!isMbid(artistMbid)) {
+      throw new InvalidMusicRequestError('That is not a MusicBrainz artist.');
+    }
+    if (artistMbid === VARIOUS_ARTISTS_MBID) {
+      throw new InvalidMusicRequestError(
+        'Lidarr cannot add Various Artists, so their albums cannot be requested.'
+      );
+    }
+    const asked = [...new Set(requestBody.albums ?? [])];
+    if (!asked.length || !asked.every(isMbid)) {
+      throw new InvalidMusicRequestError('Choose the albums to request.');
+    }
+    const maxAlbums = settings.music.maxAlbumsPerRequest;
+    if (maxAlbums > 0 && asked.length > maxAlbums) {
+      throw new InvalidMusicRequestError(
+        `One request can ask for at most ${maxAlbums} albums.`
+      );
+    }
+
+    const quotas = await requestUser.getQuota();
+    const canBypassQuota = user.hasPermission(Permission.MANAGE_REQUESTS);
+    const ignoreQuota =
+      requestBody.ignoreQuota === true &&
+      canBypassQuota &&
+      (quotas.music.limit ?? 0) > 0;
+
+    if (!ignoreQuota) {
+      if (requestBody.ignoreQuota && !canBypassQuota) {
+        throw new RequestPermissionError(
+          'You do not have permission to bypass user quota limits.'
+        );
+      } else if (quotas.music.restricted) {
+        throw new QuotaRestrictedError('Music Quota exceeded.');
+      }
+    }
+
+    // Loaded on its own: the artist is changed with update(), never saved
+    // with its requests attached.
+    const media = await mediaRepository.findOne({
+      where: { mediaType: MediaType.MUSIC, foreignId: artistMbid },
+    });
+
+    if (media?.status === MediaStatus.BLOCKLISTED) {
+      throw new BlocklistedMediaError('This media is blocklisted.');
+    }
+
+    const knownAlbums = media
+      ? await albumRepository.find({ where: { mediaId: media.id } })
+      : [];
+
+    // Albums someone else is already waiting for, and albums already here
+    // or on their way, are left out; the rest are requested.
+    const openRequests = media
+      ? await requestRepository.find({
+          where: {
+            media: { id: media.id },
+            status: Not(
+              In([MediaRequestStatus.DECLINED, MediaRequestStatus.COMPLETED])
+            ),
+          },
+        })
+      : [];
+    const taken = new Set([
+      ...openRequests.flatMap((request) =>
+        (request.albums ?? []).map((album) => album.albumMbid)
+      ),
+      ...knownAlbums
+        .filter(
+          (album) =>
+            album.mbId &&
+            album.status !== MediaStatus.UNKNOWN &&
+            album.status !== MediaStatus.DELETED
+        )
+        .map((album) => album.mbId as string),
+    ]);
+    const wanted = asked.filter((id) => !taken.has(id));
+
+    if (!wanted.length) {
+      throw new NoAlbumsAvailableError(
+        'Every album asked for is already here or already requested.'
+      );
+    }
+    if (
+      !ignoreQuota &&
+      quotas.music.limit &&
+      wanted.length > (quotas.music.remaining ?? 0)
+    ) {
+      throw new QuotaRestrictedError(
+        `You can request ${quotas.music.remaining ?? 0} more ${
+          quotas.music.remaining === 1 ? 'album' : 'albums'
+        }.`
+      );
+    }
+
+    const { artistName, albums } = await resolveRequestAlbums(
+      artistMbid,
+      wanted,
+      knownAlbums
+    );
+
+    let artist: Media;
+    if (media) {
+      const status =
+        media.status === MediaStatus.UNKNOWN ||
+        media.status === MediaStatus.DELETED
+          ? MediaStatus.PENDING
+          : media.status;
+      await mediaRepository.update(media.id, {
+        status,
+        foreignTitle: artistName,
+      });
+      artist = Object.assign(media, { status, foreignTitle: artistName });
+    } else {
+      artist = await mediaRepository.save(
+        new Media({
+          mediaType: MediaType.MUSIC,
+          tmdbId: 0,
+          foreignId: artistMbid,
+          foreignTitle: artistName,
+          status: MediaStatus.PENDING,
+          status4k: MediaStatus.UNKNOWN,
+        })
+      );
+    }
+
+    // Each album asked for has a row on the artist, waiting like a season.
+    for (const album of albums) {
+      const row = knownAlbums.find((known) => known.mbId === album.mbId);
+      if (row) {
+        if (
+          row.status === MediaStatus.UNKNOWN ||
+          row.status === MediaStatus.DELETED
+        ) {
+          await albumRepository.update(row.id, {
+            status: MediaStatus.PENDING,
+          });
+        }
+      } else {
+        await albumRepository.insert(
+          new MusicAlbum({
+            mediaId: artist.id,
+            mbId: album.mbId,
+            title: album.title,
+            primaryType: album.primaryType ?? null,
+            secondaryTypes: album.secondaryTypes,
+            releaseDate: album.releaseDate ?? null,
+            status: MediaStatus.PENDING,
+          })
+        );
+      }
+    }
+
+    const autoApproved = user.hasPermission(
+      [
+        Permission.AUTO_APPROVE,
+        Permission.AUTO_APPROVE_MUSIC,
+        Permission.MANAGE_REQUESTS,
+      ],
+      { type: 'or' }
+    );
+    const status = autoApproved
+      ? MediaRequestStatus.APPROVED
+      : MediaRequestStatus.PENDING;
+
+    const request = new MediaRequest({
+      type: MediaType.MUSIC,
+      media: artist,
+      requestedBy: requestUser,
+      status,
+      modifiedBy: autoApproved ? user : undefined,
+      is4k: false,
+      serverId: requestBody.serverId,
+      profileId: requestBody.profileId,
+      metadataProfileId: requestBody.metadataProfileId ?? null,
+      rootFolder: requestBody.rootFolder,
+      tags: requestBody.tags,
+      albums: albums.map(
+        (album) =>
+          new AlbumRequest({
+            albumMbid: album.mbId,
+            title: album.title,
+            status,
+          })
+      ),
+      isAutoRequest: false,
+      ignoreQuota,
+    });
+
+    await requestRepository.save(request);
+    return request;
   }
 
   private static async createRequest(
@@ -836,8 +1141,11 @@ export class MediaRequest {
         return;
       }
 
+      // An artist counts as available for the albums it has, not for the
+      // new ones a request asks for.
       if (
         status === MediaRequestStatus.APPROVED &&
+        this.type !== MediaType.MUSIC &&
         media[this.is4k ? 'status4k' : 'status'] === MediaStatus.AVAILABLE
       ) {
         logger.info(
@@ -985,6 +1293,18 @@ export class MediaRequest {
             ...approvalExtra(type, entity, movie),
             ...(extraFields ?? []),
           ],
+        });
+      } else if (entity.type === MediaType.MUSIC) {
+        const music = await musicNotification(entity, media);
+        notificationManager.sendNotification(type, {
+          media,
+          request: entity,
+          notifyAdmin,
+          notifySystem,
+          notifyUser,
+          ...titled,
+          ...music,
+          extra: [...music.extra, ...(extraFields ?? [])],
         });
       } else if (entity.type === MediaType.TV) {
         const tv = await tmdb.getTvShow({ tvId: media.tmdbId });

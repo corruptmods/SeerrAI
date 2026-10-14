@@ -6,6 +6,7 @@ import {
   escapeMarkdown,
 } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
+import { mediaPagePath } from '@server/lib/notifications/mediaPage';
 import type { NotificationAgentGotify } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -119,7 +120,7 @@ class GotifyAgent
     if (applicationUrl && (payload.actionUrl || payload.media)) {
       const actionUrl = payload.actionUrl
         ? `${applicationUrl}${payload.actionUrl}`
-        : `${applicationUrl}/${payload.media!.mediaType}/${payload.media!.tmdbId}`;
+        : `${applicationUrl}${mediaPagePath(payload.media!, payload.request)}`;
       const displayUrl =
         actionUrl.length > 40 ? `${actionUrl.slice(0, 41)}...` : actionUrl;
       message += `\n\n**${intl.formatMessage(globalMessages.openIn, { applicationTitle })}:** [${displayUrl}](${actionUrl})  `;

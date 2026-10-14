@@ -5,6 +5,7 @@ import CachedImage from '@app/components/Common/CachedImage';
 import Tooltip from '@app/components/Common/Tooltip';
 import DeclineReason from '@app/components/DeclineReason';
 import DeclineRequestModal from '@app/components/DeclineRequestModal';
+import MusicRequestCard from '@app/components/Music/MusicRequest/MusicRequestCard';
 import RequestModal from '@app/components/RequestModal';
 import StatusBadge from '@app/components/StatusBadge';
 import usePlayLinks from '@app/hooks/usePlayLinks';
@@ -26,7 +27,11 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/solid';
 import type { VideoMediaType } from '@server/constants/media';
-import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { NonFunctionProperties } from '@server/interfaces/api/common';
 import type { MovieDetails } from '@server/models/Movie';
@@ -660,6 +665,14 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
   );
 };
 
-export default withProperties(RequestCard, {
+/** Music has a card of its own: it has no TMDB title to look up. */
+const RequestCardFor = (props: RequestCardProps) =>
+  props.request.type === MediaType.MUSIC ? (
+    <MusicRequestCard request={props.request} />
+  ) : (
+    <RequestCard {...props} />
+  );
+
+export default withProperties(RequestCardFor, {
   Placeholder: RequestCardPlaceholder,
 });

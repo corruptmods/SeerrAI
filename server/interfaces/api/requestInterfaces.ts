@@ -39,3 +39,18 @@ export type MediaRequestBody = {
   seriesType?: SeriesType | null;
   ignoreQuota?: boolean;
 };
+
+/** A request for albums of one artist, sent to Lidarr. */
+export type MusicRequestBody = {
+  /** The artist's MusicBrainz id. */
+  artistMbid: string;
+  /** The albums' MusicBrainz release-group ids. */
+  albums: string[];
+  serverId?: number;
+  profileId?: number;
+  metadataProfileId?: number;
+  rootFolder?: string;
+  tags?: number[];
+  userId?: number;
+  ignoreQuota?: boolean;
+};

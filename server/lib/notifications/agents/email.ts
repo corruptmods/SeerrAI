@@ -8,6 +8,7 @@ import globalMessages from '@server/i18n/globalMessages';
 import PreparedEmail from '@server/lib/email';
 import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
+import { mediaPagePath } from '@server/lib/notifications/mediaPage';
 import type { NotificationAgentEmail } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -159,7 +160,9 @@ class EmailAgent
     const mediaType = payload.media
       ? payload.media.mediaType === MediaType.MOVIE
         ? intl.formatMessage(globalMessages.movie)
-        : intl.formatMessage(globalMessages.series)
+        : payload.media.mediaType === MediaType.MUSIC
+          ? intl.formatMessage(globalMessages.music)
+          : intl.formatMessage(globalMessages.series)
       : undefined;
     const is4k = payload.request?.is4k;
 
@@ -211,7 +214,9 @@ class EmailAgent
               service:
                 payload.media?.mediaType === MediaType.MOVIE
                   ? 'Radarr'
-                  : 'Sonarr',
+                  : payload.media?.mediaType === MediaType.MUSIC
+                    ? 'Lidarr'
+                    : 'Sonarr',
             }
           );
           break;
@@ -241,7 +246,9 @@ class EmailAgent
           timestamp: new Date().toTimeString(),
           requestedBy: payload.request.requestedBy.displayName,
           actionUrl: applicationUrl
-            ? `${applicationUrl}/${payload.media?.mediaType}/${payload.media?.tmdbId}`
+            ? payload.media
+              ? `${applicationUrl}${mediaPagePath(payload.media, payload.request)}`
+              : undefined
             : undefined,
           applicationUrl,
           applicationTitle,

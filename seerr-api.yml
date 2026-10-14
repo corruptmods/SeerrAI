@@ -561,6 +561,26 @@ components:
           nullable: true
           description: 'Global TV quota days setting'
           example: 14
+        musicQuotaLimit:
+          type: number
+          nullable: true
+          description: 'Maximum number of albums allowed'
+          example: 20
+        musicQuotaDays:
+          type: number
+          nullable: true
+          description: 'Time period in days for the music quota'
+          example: 7
+        globalMusicQuotaLimit:
+          type: number
+          nullable: true
+          description: 'Global music quota limit setting'
+          example: 20
+        globalMusicQuotaDays:
+          type: number
+          nullable: true
+          description: 'Global music quota days setting'
+          example: 7
         watchlistSyncMovies:
           type: boolean
           nullable: true
@@ -2289,9 +2309,39 @@ components:
           readOnly: true
           example: Already on Netflix
           description: Why the request was declined, if whoever declined it gave a reason. Plain text. On a title's page, only the requester and those who can see all requests are sent it.
+        metadataProfileId:
+          type: number
+          nullable: true
+          description: For music, the Lidarr metadata profile chosen for the artist.
+        albums:
+          type: array
+          readOnly: true
+          description: For music, the albums asked for.
+          items:
+            $ref: '#/components/schemas/AlbumRequest'
       required:
         - id
         - status
+    AlbumRequest:
+      type: object
+      properties:
+        id:
+          type: number
+          readOnly: true
+        albumMbid:
+          type: string
+          description: The album's MusicBrainz release-group id.
+          example: b1392450-e666-3926-a536-22c65f834433
+        title:
+          type: string
+          example: Hail to the Thief
+        status:
+          type: number
+          description: As the request's. 1 = PENDING APPROVAL, 2 = APPROVED, 3 = DECLINED, 4 = FAILED, 5 = COMPLETED
+        albumStatus:
+          type: number
+          nullable: true
+          description: Where the request lists are sent it, whether the album itself is here yet, as a title's status.
     MediaInfo:
       type: object
       properties:
@@ -9059,6 +9109,25 @@ paths:
                       restricted:
                         type: boolean
                         example: false
+                  music:
+                    description: Albums, counted as seasons are for series.
+                    type: object
+                    properties:
+                      days:
+                        type: number
+                        example: 7
+                      limit:
+                        type: number
+                        example: 10
+                      used:
+                        type: number
+                        example: 6
+                      remaining:
+                        type: number
+                        example: 4
+                      restricted:
+                        type: boolean
+                        example: false
   /list:
     get:
       summary: Returns the lists visible to the current user
@@ -12010,7 +12079,8 @@ paths:
           name: mediaType
           description: >-
             One value, or several comma-separated, e.g. "movie,tv". Allowed:
-            movie, tv, music, all. "all", or none, lists films and series.
+            movie, tv, music, all. "all", or none, lists films, series and,
+            once Lidarr is set up for someone with music on, music.
           schema:
             type: string
             nullable: true
@@ -12096,6 +12166,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MediaRequest'
+  /request/music:
+    post:
+      summary: Request music
+      description: |
+        Requests albums of one artist, sent to Lidarr once approved: one album, several, or a whole discography, as one request. The `REQUEST` or `REQUEST_MUSIC` permission is required, and music must be set up (a default Lidarr) and on for the person.
+
+        Albums already here or already requested are left out. With the `AUTO_APPROVE`, `AUTO_APPROVE_MUSIC` or `MANAGE_REQUESTS` permission the request is approved at once. Quotas count albums.
+      tags:
+        - request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                artistMbid:
+                  type: string
+                  description: The artist's MusicBrainz id.
+                  example: a74b1b7f-71a5-4011-9441-d0b5e4122711
+                albums:
+                  type: array
+                  description: The albums' MusicBrainz release-group ids.
+                  minItems: 1
+                  items:
+                    type: string
+                serverId:
+                  type: number
+                profileId:
+                  type: number
+                metadataProfileId:
+                  type: number
+                rootFolder:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: number
+                userId:
+                  type: number
+                  nullable: true
+                ignoreQuota:
+                  type: boolean
+                  example: false
+                  description: If true, this request will not count against the user's quota. Requires MANAGE_REQUESTS permission.
+              required:
+                - artistMbid
+                - albums
+      responses:
+        '201':
+          description: Succesfully created the request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaRequest'
+        '400':
+          description: Not an artist's albums, or more than one request may ask for
+        '403':
+          description: Not allowed, over quota, or music is turned off
+        '404':
+          description: Music is not set up
+        '409':
+          description: Every album asked for is already here or already requested
+        '503':
+          description: MusicBrainz is too busy to answer in time
   /request/eta:
     get:
       summary: Roughly when each request should arrive
@@ -12336,12 +12471,21 @@ paths:
               properties:
                 mediaType:
                   type: string
-                  enum: [movie, tv]
+                  enum: [movie, tv, music]
+                  description: Ignored; the request's own type counts.
                 seasons:
                   type: array
                   items:
                     type: number
                     minimum: 0
+                albums:
+                  type: array
+                  description: For music, the albums' MusicBrainz release-group ids the request should ask for.
+                  items:
+                    type: string
+                metadataProfileId:
+                  type: number
+                  nullable: true
                 is4k:
                   type: boolean
                   example: false

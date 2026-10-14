@@ -264,6 +264,16 @@ export const estimateRequest = async (
   if (request.status === MediaRequestStatus.PENDING) {
     return { stage: 'awaiting_approval' };
   }
+  // Music has no release dates or Radarr and Sonarr history to go by; an
+  // artist being here says nothing about the albums a request asked for.
+  if (request.type === MediaType.MUSIC) {
+    return {
+      stage:
+        request.status === MediaRequestStatus.COMPLETED
+          ? 'available'
+          : 'unknown',
+    };
+  }
   if (
     request.status === MediaRequestStatus.COMPLETED ||
     media?.[is4k ? 'status4k' : 'status'] === MediaStatus.AVAILABLE

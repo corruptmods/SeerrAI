@@ -1,11 +1,15 @@
+import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import type { MusicAlbumResult } from '@server/models/Music';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   albumGroup,
+  allowedByProfile,
   artistImageUrl,
   byNewest,
   musicImageSrc,
+  musicRequestStatus,
+  requestable,
   trackLength,
   yearOf,
 } from './musicHelpers';
@@ -91,5 +95,88 @@ describe('dates and lengths', () => {
     assert.equal(trackLength(3_765_000), '1:02:45');
     assert.equal(trackLength(5_000), '0:05');
     assert.equal(trackLength(null), undefined);
+  });
+});
+
+describe('what the request window ticks to begin with', () => {
+  const standard = {
+    primaryTypes: ['Album', 'EP'],
+    secondaryTypes: ['Studio'],
+  };
+
+  it('follows the Lidarr metadata profile', () => {
+    assert.equal(allowedByProfile(album('Album'), standard), true);
+    assert.equal(allowedByProfile(album('ep'), standard), true);
+    assert.equal(allowedByProfile(album('Single'), standard), false);
+    assert.equal(allowedByProfile(album('Album', ['Live']), standard), false);
+    assert.equal(allowedByProfile(album(undefined), standard), false);
+    assert.equal(
+      allowedByProfile(album('Album', ['Live', 'Compilation']), {
+        primaryTypes: ['Album'],
+        secondaryTypes: ['Live', 'Compilation'],
+      }),
+      true
+    );
+    assert.equal(
+      allowedByProfile(album('Album'), {
+        primaryTypes: ['Album'],
+        secondaryTypes: ['Live'],
+      }),
+      false,
+      'a studio album needs Studio allowed'
+    );
+  });
+
+  it('leaves out albums already here or on their way', () => {
+    assert.equal(requestable(undefined), true);
+    assert.equal(requestable(MediaStatus.UNKNOWN), true);
+    assert.equal(requestable(MediaStatus.DELETED), true);
+    assert.equal(requestable(MediaStatus.PENDING), false);
+    assert.equal(requestable(MediaStatus.PROCESSING), false);
+    assert.equal(requestable(MediaStatus.AVAILABLE), false);
+  });
+});
+
+describe('a music request card’s status', () => {
+  const of = (
+    status: MediaRequestStatus,
+    albums: (MediaStatus | undefined)[]
+  ) =>
+    musicRequestStatus({
+      status,
+      albums: albums.map((albumStatus) => ({ albumStatus })),
+    });
+
+  it('follows the albums asked for, not the artist', () => {
+    assert.equal(
+      of(MediaRequestStatus.PENDING, [MediaStatus.PENDING]),
+      MediaStatus.PENDING
+    );
+    assert.equal(
+      of(MediaRequestStatus.APPROVED, [MediaStatus.PROCESSING]),
+      MediaStatus.PROCESSING
+    );
+    assert.equal(
+      of(MediaRequestStatus.APPROVED, [
+        MediaStatus.AVAILABLE,
+        MediaStatus.PROCESSING,
+      ]),
+      MediaStatus.PARTIALLY_AVAILABLE
+    );
+    assert.equal(
+      of(MediaRequestStatus.COMPLETED, [
+        MediaStatus.AVAILABLE,
+        MediaStatus.AVAILABLE,
+      ]),
+      MediaStatus.AVAILABLE
+    );
+    assert.equal(
+      of(MediaRequestStatus.COMPLETED, [MediaStatus.DELETED]),
+      MediaStatus.DELETED
+    );
+    assert.equal(
+      of(MediaRequestStatus.COMPLETED, [undefined]),
+      MediaStatus.AVAILABLE
+    );
   });
 });

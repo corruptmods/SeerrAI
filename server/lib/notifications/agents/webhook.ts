@@ -1,5 +1,5 @@
 import { IssueStatus, IssueType } from '@server/constants/issue';
-import { MediaStatus } from '@server/constants/media';
+import { MediaStatus, MediaType } from '@server/constants/media';
 import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import type { NotificationAgentWebhook } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
@@ -35,6 +35,16 @@ export const KeyMap: Record<string, string | KeyMapFunction> = {
   media_tmdbid: 'media.tmdbId',
   media_tvdbid: 'media.tvdbId',
   media_type: 'media.mediaType',
+  /** For music (whose TMDB id is 0): the artist's MusicBrainz id. */
+  media_mbid: (payload) =>
+    payload.media?.mediaType === MediaType.MUSIC
+      ? (payload.media.foreignId ?? '')
+      : '',
+  /** For music: the titles of the albums asked for, one per line. */
+  music_albums: (payload) =>
+    payload.media?.mediaType === MediaType.MUSIC
+      ? (payload.request?.albums ?? []).map((album) => album.title).join('\n')
+      : '',
   media_jellyfinMediaId: (payload) =>
     payload.media?.jellyfinMediaId ??
     payload.media?.jellyfinMediaId4k ??

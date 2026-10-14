@@ -6,6 +6,7 @@ import {
   escapeMarkdown,
 } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
+import { mediaPagePath } from '@server/lib/notifications/mediaPage';
 import type { NotificationAgentNtfy } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -107,7 +108,7 @@ class NtfyAgent
     if (applicationUrl && payload.actionUrl) {
       click = `${applicationUrl}${payload.actionUrl}`;
     } else if (applicationUrl && payload.media) {
-      click = `${applicationUrl}/${payload.media.mediaType}/${payload.media.tmdbId}`;
+      click = `${applicationUrl}${mediaPagePath(payload.media, payload.request)}`;
     }
 
     const ntfyPayload: Record<string, unknown> = {

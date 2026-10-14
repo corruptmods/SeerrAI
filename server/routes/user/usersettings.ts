@@ -95,10 +95,14 @@ userSettingsRoutes.get<{ id: string }, UserSettingsGeneralResponse>(
         movieQuotaDays: user.movieQuotaDays,
         tvQuotaLimit: user.tvQuotaLimit,
         tvQuotaDays: user.tvQuotaDays,
+        musicQuotaLimit: user.musicQuotaLimit,
+        musicQuotaDays: user.musicQuotaDays,
         globalMovieQuotaDays: defaultQuotas.movie.quotaDays,
         globalMovieQuotaLimit: defaultQuotas.movie.quotaLimit,
         globalTvQuotaDays: defaultQuotas.tv.quotaDays,
         globalTvQuotaLimit: defaultQuotas.tv.quotaLimit,
+        globalMusicQuotaDays: defaultQuotas.music?.quotaDays,
+        globalMusicQuotaLimit: defaultQuotas.music?.quotaLimit,
         watchlistSyncMovies: user.settings?.watchlistSyncMovies,
         watchlistSyncTv: user.settings?.watchlistSyncTv,
         traktUsername: user.settings?.traktUsername ?? null,
@@ -161,6 +165,8 @@ userSettingsRoutes.post<
       user.movieQuotaLimit = req.body.movieQuotaLimit;
       user.tvQuotaDays = req.body.tvQuotaDays;
       user.tvQuotaLimit = req.body.tvQuotaLimit;
+      user.musicQuotaDays = req.body.musicQuotaDays;
+      user.musicQuotaLimit = req.body.musicQuotaLimit;
     }
 
     // A Trakt username as Trakt writes them; blank clears it.

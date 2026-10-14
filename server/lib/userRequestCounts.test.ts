@@ -4,7 +4,8 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
-import { getRepository } from '@server/datasource';
+import dataSource, { getRepository } from '@server/datasource';
+import AlbumRequest from '@server/entity/AlbumRequest';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
@@ -95,6 +96,37 @@ describe('user request counts', () => {
 
     assert.equal(one.requestCount, 2);
     assert.equal(two.requestCount, 1);
+  });
+
+  it('counts music requests too, once each however many albums', async () => {
+    const user = await makeUser('count-music');
+    await addRequest(user);
+    const artist = await dataSource.manager.save(
+      new Media({
+        tmdbId: 0,
+        mediaType: MediaType.MUSIC,
+        foreignId: 'a74b1b7f-71a5-4011-9441-d0b5e4122711',
+        status: MediaStatus.PENDING,
+      }),
+      { listeners: false }
+    );
+    await dataSource.manager.save(
+      new MediaRequest({
+        media: artist,
+        requestedBy: user,
+        type: MediaType.MUSIC,
+        status: MediaRequestStatus.PENDING,
+        is4k: false,
+        albums: ['OK Computer', 'Kid A'].map(
+          (title, i) => new AlbumRequest({ albumMbid: `album-${i}`, title })
+        ),
+      }),
+      { listeners: false }
+    );
+
+    await attachRequestCount(user);
+
+    assert.equal(user.requestCount, 2);
   });
 
   it('reports zero for a user with no requests', async () => {

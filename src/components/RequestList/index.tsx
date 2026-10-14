@@ -6,6 +6,7 @@ import { CardListSkeleton } from '@app/components/Common/PageSkeleton';
 import PageTitle from '@app/components/Common/PageTitle';
 import Tooltip from '@app/components/Common/Tooltip';
 import RequestItem from '@app/components/RequestList/RequestItem';
+import useFeature from '@app/hooks/useFeature';
 import useRequestEtas from '@app/hooks/useRequestEtas';
 import { useUpdateQueryParams } from '@app/hooks/useUpdateQueryParams';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -22,6 +23,7 @@ import {
   FunnelIcon,
   UserIcon,
 } from '@heroicons/react/24/solid';
+import { MediaType } from '@server/constants/media';
 import type { BackfillStatus } from '@server/interfaces/api/backfillStatus';
 import type { RequestResultsResponse } from '@server/interfaces/api/requestInterfaces';
 import Link from 'next/link';
@@ -65,6 +67,7 @@ const RequestList = () => {
     id: Number(router.query.userId),
   });
   const { user: currentUser, hasPermission } = useUser();
+  const musicOn = useFeature('music');
   const [currentFilters, setCurrentFilters] = useState<string[]>([
     Filter.PENDING,
   ]);
@@ -127,8 +130,13 @@ const RequestList = () => {
     data?.results.map((request) => request.id) ?? []
   );
   // Backfill's state for the titles on this page, in one call; admins only.
+  // Films and series only: Backfill knows nothing of music.
   const tmdbIds = [
-    ...new Set((data?.results ?? []).map((request) => request.media.tmdbId)),
+    ...new Set(
+      (data?.results ?? [])
+        .filter((request) => request.type !== MediaType.MUSIC)
+        .map((request) => request.media.tmdbId)
+    ),
   ];
   const { data: backfill } = useSWR<BackfillLookup[]>(
     hasPermission(Permission.ADMIN) && tmdbIds.length
@@ -267,6 +275,14 @@ const RequestList = () => {
                   value: 'tv',
                   label: intl.formatMessage(globalMessages.tvshows),
                 },
+                ...(musicOn
+                  ? [
+                      {
+                        value: 'music',
+                        label: intl.formatMessage(globalMessages.music),
+                      },
+                    ]
+                  : []),
               ]}
               selected={currentMediaTypes}
             />

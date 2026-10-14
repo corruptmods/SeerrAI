@@ -1,3 +1,4 @@
+import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import type { MusicAlbumResult } from '@server/models/Music';
 
 /*
@@ -82,4 +83,70 @@ export const trackLength = (ms?: number | null): string | undefined => {
   return hours
     ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}`
     : `${minutes}:${seconds}`;
+};
+
+/** The kinds of release a Lidarr metadata profile lists, as Lidarr names them. */
+export interface AlbumKinds {
+  primaryTypes: string[];
+  secondaryTypes: string[];
+}
+
+/**
+ * Whether a Lidarr metadata profile lists an album, as Lidarr decides it:
+ * its primary type allowed, and every secondary type too ("Studio" stands
+ * for an album with none). What the request window ticks to begin with.
+ */
+export const allowedByProfile = (
+  album: Pick<MusicAlbumResult, 'primaryType' | 'secondaryTypes'>,
+  kinds: AlbumKinds
+): boolean => {
+  const has = (list: string[], name: string) =>
+    list.some((kind) => kind.toLowerCase() === name.toLowerCase());
+  if (!album.primaryType || !has(kinds.primaryTypes, album.primaryType)) {
+    return false;
+  }
+  return album.secondaryTypes.length
+    ? album.secondaryTypes.every((kind) => has(kinds.secondaryTypes, kind))
+    : has(kinds.secondaryTypes, 'Studio');
+};
+
+/** An album that can still be asked for: not here, and not on its way. */
+export const requestable = (status?: MediaStatus): boolean =>
+  !status || status === MediaStatus.UNKNOWN || status === MediaStatus.DELETED;
+
+/**
+ * How far along a music request is, as a title's status, for its badge:
+ * waiting for approval, on its way, or here as far as its albums are. An
+ * artist being here says nothing about the albums one request asked for.
+ */
+export const musicRequestStatus = (request: {
+  status: MediaRequestStatus;
+  albums?: { albumStatus?: MediaStatus }[];
+}): MediaStatus => {
+  const albums = (request.albums ?? []).map((album) => album.albumStatus);
+  const here = (status?: MediaStatus) =>
+    status === MediaStatus.AVAILABLE ||
+    status === MediaStatus.PARTIALLY_AVAILABLE;
+
+  if (request.status === MediaRequestStatus.PENDING) {
+    return MediaStatus.PENDING;
+  }
+  if (
+    albums.length &&
+    albums.every((status) => status === MediaStatus.DELETED)
+  ) {
+    return MediaStatus.DELETED;
+  }
+  if (
+    albums.length &&
+    albums.every((status) => status === MediaStatus.AVAILABLE)
+  ) {
+    return MediaStatus.AVAILABLE;
+  }
+  if (albums.some(here)) {
+    return MediaStatus.PARTIALLY_AVAILABLE;
+  }
+  return request.status === MediaRequestStatus.COMPLETED
+    ? MediaStatus.AVAILABLE
+    : MediaStatus.PROCESSING;
 };

@@ -18,7 +18,7 @@ import availabilitySync from '@server/lib/availabilitySync';
 import { runHealthCheck, searchableStuckTitles } from '@server/lib/health';
 import notificationReconciler from '@server/lib/notificationReconciler';
 import { NotInServiceError, searchMissing } from '@server/lib/searchMissing';
-import type { SonarrSettings } from '@server/lib/settings';
+import type { LidarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { JellyfinWatchSource } from '@server/lib/watchHistory/jellyfin';
 import { TautulliWatchSource } from '@server/lib/watchHistory/tautulli';
@@ -295,20 +295,39 @@ describe('music stays out of film and series code', () => {
     assert.equal(onlyMusic.body.results.length, 2);
   });
 
-  it('GET /request lists films and series unless music is asked for', async () => {
+  it('GET /request lists music only once Lidarr is set up', async () => {
     const all = await request(app).get('/api/v1/request');
     assert.equal(all.status, 200);
     assert.deepEqual(
       all.body.results.map((r: MediaRequest) => r.id),
       [seriesRequest.id]
     );
+    const notYet = await request(app).get('/api/v1/request?mediaType=music');
+    assert.deepEqual(
+      notYet.body.results.map((r: MediaRequest) => r.id),
+      [seriesRequest.id]
+    );
 
-    const both = await request(app).get('/api/v1/request?mediaType=movie%2Ctv');
-    assert.equal(both.body.results.length, 1);
+    getSettings().lidarr = [
+      { id: 0, name: 'Lidarr', isDefault: true } as LidarrSettings,
+    ];
+    try {
+      const everything = await request(app).get('/api/v1/request?take=20');
+      assert.equal(everything.body.results.length, 6);
 
-    const onlyMusic = await request(app).get('/api/v1/request?mediaType=music');
-    assert.equal(onlyMusic.status, 200);
-    assert.equal(onlyMusic.body.results.length, 5);
+      const both = await request(app).get(
+        '/api/v1/request?mediaType=movie%2Ctv'
+      );
+      assert.equal(both.body.results.length, 1);
+
+      const onlyMusic = await request(app).get(
+        '/api/v1/request?mediaType=music'
+      );
+      assert.equal(onlyMusic.status, 200);
+      assert.equal(onlyMusic.body.results.length, 5);
+    } finally {
+      getSettings().lidarr = [];
+    }
   });
 
   it('GET /request/count counts music on its own', async () => {

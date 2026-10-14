@@ -33,6 +33,12 @@ export const isVideo = (
 ): mediaType is VideoMediaType =>
   mediaType === MediaType.MOVIE || mediaType === MediaType.TV;
 
+/**
+ * MusicBrainz's "Various Artists", credited on compilations. Lidarr cannot
+ * add it, so its albums cannot be requested.
+ */
+export const VARIOUS_ARTISTS_MBID = '89ad4ac3-39f7-470e-963a-56509c546377';
+
 export enum MediaStatus {
   UNKNOWN = 1,
   PENDING,

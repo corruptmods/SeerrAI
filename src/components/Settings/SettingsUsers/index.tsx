@@ -48,6 +48,7 @@ const messages = defineMessages('components.Settings.SettingsUsers', {
     'Every hour, give everyone you share your Plex server with an account, with the default permissions below. Existing accounts are left as they are',
   movieRequestLimitLabel: 'Global Movie Request Limit',
   tvRequestLimitLabel: 'Global Series Request Limit',
+  musicRequestLimitLabel: 'Global Album Request Limit',
   defaultPermissions: 'Default Permissions',
   defaultPermissionsTip: 'Initial permissions assigned to new users',
   defaultWatchlistSync: 'Watchlist Sync for New Users',
@@ -88,6 +89,8 @@ const SettingsUsers = () => {
     mutate: revalidate,
   } = useSWR<MainSettings>('/api/v1/settings/main');
   const settings = useSettings();
+  // Music's quota, once there is music to request.
+  const musicReady = settings.currentSettings.musicReady;
   const [importing, setImporting] = useState<MediaServerKind>();
   const couldNotOpen = () => {
     addToast(intl.formatMessage(messages.couldNotOpen), {
@@ -166,6 +169,8 @@ const SettingsUsers = () => {
             movieQuotaDays: data?.defaultQuotas.movie.quotaDays ?? 7,
             tvQuotaLimit: data?.defaultQuotas.tv.quotaLimit ?? 0,
             tvQuotaDays: data?.defaultQuotas.tv.quotaDays ?? 7,
+            musicQuotaLimit: data?.defaultQuotas.music?.quotaLimit ?? 0,
+            musicQuotaDays: data?.defaultQuotas.music?.quotaDays ?? 7,
             defaultPermissions: data?.defaultPermissions ?? 0,
             defaultWatchlistSyncMovies:
               data?.defaultWatchlistSyncMovies ?? false,
@@ -188,6 +193,10 @@ const SettingsUsers = () => {
                   tv: {
                     quotaLimit: values.tvQuotaLimit,
                     quotaDays: values.tvQuotaDays,
+                  },
+                  music: {
+                    quotaLimit: values.musicQuotaLimit,
+                    quotaDays: values.musicQuotaDays,
                   },
                 },
                 defaultPermissions: values.defaultPermissions,
@@ -370,6 +379,23 @@ const SettingsUsers = () => {
                     />
                   </div>
                 </div>
+                {musicReady && (
+                  <div className="form-row">
+                    <label htmlFor="musicQuotaLimit" className="text-label">
+                      {intl.formatMessage(messages.musicRequestLimitLabel)}
+                    </label>
+                    <div className="form-input-area">
+                      <QuotaSelector
+                        onChange={setFieldValue}
+                        dayFieldName="musicQuotaDays"
+                        limitFieldName="musicQuotaLimit"
+                        mediaType="music"
+                        defaultDays={values.musicQuotaDays}
+                        defaultLimit={values.musicQuotaLimit}
+                      />
+                    </div>
+                  </div>
+                )}
                 <div
                   role="group"
                   aria-labelledby="watchlist-sync-label"

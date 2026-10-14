@@ -1,3 +1,4 @@
+import type LidarrAPI from '@server/api/servarr/lidarr';
 import type { RadarrMovieOptions } from '@server/api/servarr/radarr';
 import RadarrAPI from '@server/api/servarr/radarr';
 import type { AddSeriesOptions } from '@server/api/servarr/sonarr';
@@ -9,12 +10,15 @@ import {
   MediaType,
 } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import AlbumRequest from '@server/entity/AlbumRequest';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
+import MusicAlbum from '@server/entity/MusicAlbum';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import type { User } from '@server/entity/User';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
+import { lidarrApi } from '@server/lib/music/access';
 import {
   claimDelivery,
   notifyRequestWatchers,
@@ -26,6 +30,7 @@ import { requestAvailableEvent } from '@server/lib/notifications/eventTitles';
 import { radarrRouting } from '@server/lib/radarrRouting';
 import { markUndispatchable } from '@server/lib/requestDispatch';
 import { resolveSeasonMonitorTarget } from '@server/lib/seasonMonitorTarget';
+import type { LidarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { sonarrRouting } from '@server/lib/sonarrRouting';
 import logger from '@server/logger';
@@ -38,7 +43,10 @@ import type {
   RemoveEvent,
   UpdateEvent,
 } from 'typeorm';
-import { EventSubscriber, Not } from 'typeorm';
+import { EventSubscriber, In, Not } from 'typeorm';
+
+/** Lidarr could not look something up yet; trying again later may work. */
+class LidarrLookupError extends Error {}
 
 const sanitizeDisplayName = (displayName: string): string => {
   return displayName
@@ -1167,6 +1175,349 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     }
   }
 
+  /**
+   * Sends an approved music request to Lidarr. Which Lidarr is decided here,
+   * in the request's own save; talking to Lidarr then happens behind it
+   * (dispatchToLidarr), as Radarr and Sonarr are sent to, so approving does
+   * not wait on Lidarr and its metadata service.
+   */
+  public async sendToLidarr(
+    entity: MediaRequest,
+    manager: EntityManager
+  ): Promise<void> {
+    if (
+      entity.status !== MediaRequestStatus.APPROVED ||
+      entity.type !== MediaType.MUSIC
+    ) {
+      return;
+    }
+    if (await this.titleBlocklisted(entity, manager)) {
+      return;
+    }
+
+    const servers = getSettings().lidarr;
+    const lidarrSettings =
+      entity.serverId !== null &&
+      entity.serverId !== undefined &&
+      entity.serverId >= 0
+        ? servers.find((server) => server.id === entity.serverId)
+        : servers.find((server) => server.isDefault);
+
+    if (!lidarrSettings) {
+      await markUndispatchable(
+        entity,
+        entity.serverId !== null &&
+          entity.serverId !== undefined &&
+          entity.serverId >= 0
+          ? 'The Lidarr server chosen for this request no longer exists.'
+          : 'There is no default Lidarr server configured. Did you set one of your Lidarr servers as default?',
+        manager
+      );
+      return;
+    }
+
+    // Never rejects: a failure marks the request failed and says why.
+    void this.dispatchToLidarr(entity, lidarrSettings);
+  }
+
+  /**
+   * The Lidarr half of sendToLidarr. Lidarr is only ever told to monitor
+   * and search for what was asked: nothing is unmonitored, and an artist
+   * Lidarr already has keeps its folder, profiles and new-release setting,
+   * so one request never undoes another.
+   *
+   * - An artist Lidarr does not have, for one album: the album is added
+   *   with the artist set up around it, nothing else of theirs monitored.
+   * - For several albums: the artist is added with exactly those albums to
+   *   monitor (Lidarr's albumsToMonitor, which leaves every other album
+   *   unmonitored, so it is only used for a new artist).
+   * - An artist Lidarr has: the albums it has are monitored, the ones it
+   *   lacks are added, the artist is monitored if it was not, and the
+   *   albums it had are searched for.
+   */
+  public async dispatchToLidarr(
+    entity: MediaRequest,
+    lidarrSettings: LidarrSettings
+  ): Promise<void> {
+    const lidarr = lidarrApi(lidarrSettings);
+    const search = !lidarrSettings.preventSearch;
+    const wanted = [...(entity.albums ?? [])]
+      .sort((a, b) => a.id - b.id)
+      .map((album) => album.albumMbid);
+    let media: Media | null = null;
+
+    try {
+      media = await getRepository(Media).findOne({
+        where: { id: entity.media.id },
+      });
+      if (!media?.foreignId || !wanted.length) {
+        throw new Error('The request has no artist or albums to send.');
+      }
+      const artistMbid = media.foreignId;
+
+      const requesterTag = lidarrSettings.tagRequests
+        ? await this.lidarrRequesterTag(lidarr, entity)
+        : undefined;
+      const tags = [...(entity.tags ?? lidarrSettings.tags ?? [])];
+      if (requesterTag !== undefined && !tags.includes(requesterTag)) {
+        tags.push(requesterTag);
+      }
+      const setup = {
+        qualityProfileId: entity.profileId || lidarrSettings.activeProfileId,
+        metadataProfileId:
+          entity.metadataProfileId || lidarrSettings.activeMetadataProfileId,
+        rootFolderPath: entity.rootFolder || lidarrSettings.activeDirectory,
+        tags,
+        monitored: true,
+        monitorNewItems: 'none' as const,
+      };
+
+      const albumIds = new Map<string, number>();
+      let artist = await lidarr.getArtistByMbid(artistMbid);
+
+      if (!artist && wanted.length === 1) {
+        const album = await lidarr.lookupAlbum(wanted[0]);
+        if (!album) {
+          throw new LidarrLookupError(
+            'Lidarr couldn’t look up this album yet. Retry later.'
+          );
+        }
+        const found =
+          album.artist?.foreignArtistId === artistMbid
+            ? album.artist
+            : await lidarr.lookupArtist(artistMbid);
+        if (!found) {
+          throw new LidarrLookupError(
+            'Lidarr couldn’t look up this artist yet. Retry later.'
+          );
+        }
+        const added = await lidarr.addAlbum(album, {
+          artist: {
+            ...found,
+            ...setup,
+            addOptions: { monitor: 'none', searchForMissingAlbums: false },
+          },
+          searchForNewAlbum: search,
+        });
+        albumIds.set(wanted[0], added.id);
+        artist = added.artist ?? {
+          ...found,
+          id: added.artistId,
+        };
+      } else if (!artist) {
+        const found = await lidarr.lookupArtist(artistMbid);
+        if (!found) {
+          throw new LidarrLookupError(
+            'Lidarr couldn’t look up this artist yet. Retry later.'
+          );
+        }
+        // Albums outside the metadata profile are not listed yet; music
+        // sync adds them once Lidarr has refreshed the artist.
+        artist = await lidarr.addArtist(found, {
+          ...setup,
+          addOptions: {
+            monitor: 'none',
+            albumsToMonitor: wanted,
+            searchForMissingAlbums: search,
+          },
+        });
+      } else {
+        const known = new Map(
+          (await lidarr.getAlbums({ artistId: artist.id })).map((album) => [
+            album.foreignAlbumId,
+            album,
+          ])
+        );
+        const present = wanted.flatMap((id) => {
+          const album = known.get(id);
+          return album ? [album] : [];
+        });
+        for (const album of present) {
+          albumIds.set(album.foreignAlbumId, album.id);
+        }
+        await lidarr.monitorAlbums(
+          present.map((album) => album.id),
+          true
+        );
+
+        const waiting: string[] = [];
+        for (const id of wanted.filter((id) => !known.has(id))) {
+          const album = await lidarr.lookupAlbum(id);
+          if (!album) {
+            waiting.push(id);
+            continue;
+          }
+          const added = await lidarr.addAlbum(album, {
+            artist: { id: artist.id },
+            searchForNewAlbum: search,
+          });
+          albumIds.set(id, added.id);
+        }
+        if (!albumIds.size) {
+          throw new LidarrLookupError(
+            'Lidarr couldn’t look up these albums yet. Retry later.'
+          );
+        }
+        if (waiting.length) {
+          logger.info('Lidarr cannot look up some albums yet; they wait', {
+            label: 'Media Request',
+            requestId: entity.id,
+            albums: waiting,
+          });
+        }
+
+        // Lidarr only fetches what both the artist and the album monitor.
+        const addTag =
+          requesterTag !== undefined && !artist.tags.includes(requesterTag);
+        if (!artist.monitored || addTag) {
+          artist = await lidarr.updateArtist({
+            ...artist,
+            monitored: true,
+            tags: addTag ? [...artist.tags, requesterTag] : artist.tags,
+          });
+        }
+
+        if (search && present.length) {
+          await lidarr.searchAlbums(present.map((album) => album.id));
+        }
+      }
+
+      await getRepository(Media).update(media.id, {
+        serviceId: lidarrSettings.id,
+        externalServiceId: artist.id,
+        externalServiceSlug: artist.foreignArtistId || artistMbid,
+      });
+      for (const [mbId, lidarrAlbumId] of albumIds) {
+        await getRepository(MusicAlbum).update(
+          { mediaId: media.id, mbId },
+          { lidarrAlbumId }
+        );
+      }
+
+      logger.info('Sent request to Lidarr', {
+        label: 'Media Request',
+        requestId: entity.id,
+        mediaId: entity.media.id,
+      });
+    } catch (e) {
+      const reason =
+        e instanceof LidarrLookupError
+          ? e.message
+          : `Lidarr could not take the request: ${
+              e instanceof Error ? e.message : String(e)
+            }`;
+      await markUndispatchable(entity, reason);
+
+      if (
+        media &&
+        entity.status === MediaRequestStatus.FAILED &&
+        (await claimDelivery(entity.id, Notification.MEDIA_FAILED))
+      ) {
+        MediaRequest.sendNotification(entity, media, Notification.MEDIA_FAILED);
+      }
+    }
+  }
+
+  /** The requester's tag in Lidarr ("12-alex"), made if it is not there. */
+  private async lidarrRequesterTag(
+    lidarr: LidarrAPI,
+    entity: MediaRequest
+  ): Promise<number | undefined> {
+    const label = `${entity.requestedBy.id}-${sanitizeDisplayName(
+      entity.requestedBy.displayName
+    )}`;
+    const existing = (await lidarr.getTags()).find(
+      (tag) =>
+        tag.label.startsWith(`${entity.requestedBy.id} - `) ||
+        tag.label.startsWith(`${entity.requestedBy.id}-`)
+    );
+    return (existing ?? (await lidarr.createTag({ label }))).id;
+  }
+
+  /**
+   * An approved or declined music request's albums: approved ones are on
+   * their way, declined ones go back to nobody having asked, unless another
+   * request still waits for them.
+   */
+  private async updateMusicAlbums(
+    manager: EntityManager,
+    entity: MediaRequest
+  ): Promise<void> {
+    const albums = entity.albums ?? [];
+    if (!albums.length) {
+      return;
+    }
+    const albumRequests = manager.getRepository(AlbumRequest);
+    const musicAlbums = manager.getRepository(MusicAlbum);
+    const mbIds = albums.map((album) => album.albumMbid);
+
+    if (entity.status === MediaRequestStatus.APPROVED) {
+      await albumRequests.update(
+        { id: In(albums.map((album) => album.id)) },
+        { status: MediaRequestStatus.APPROVED }
+      );
+      albums.forEach((album) => (album.status = MediaRequestStatus.APPROVED));
+      await musicAlbums.update(
+        {
+          mediaId: entity.media.id,
+          mbId: In(mbIds),
+          status: In([
+            MediaStatus.UNKNOWN,
+            MediaStatus.PENDING,
+            MediaStatus.DELETED,
+          ]),
+        },
+        { status: MediaStatus.PROCESSING }
+      );
+    }
+
+    if (entity.status === MediaRequestStatus.DECLINED) {
+      await albumRequests.update(
+        { id: In(albums.map((album) => album.id)) },
+        { status: MediaRequestStatus.DECLINED }
+      );
+      albums.forEach((album) => (album.status = MediaRequestStatus.DECLINED));
+      const stillWanted = await this.albumsStillWanted(
+        manager,
+        entity.media.id,
+        entity.id
+      );
+      const free = mbIds.filter((id) => !stillWanted.has(id));
+      if (free.length) {
+        await musicAlbums.update(
+          {
+            mediaId: entity.media.id,
+            mbId: In(free),
+            status: MediaStatus.PENDING,
+          },
+          { status: MediaStatus.UNKNOWN }
+        );
+      }
+    }
+  }
+
+  /** Albums another open request for the artist is waiting for. */
+  private async albumsStillWanted(
+    manager: EntityManager,
+    mediaId: number,
+    exceptRequestId?: number
+  ): Promise<Set<string>> {
+    const query = manager
+      .getRepository(AlbumRequest)
+      .createQueryBuilder('album')
+      .innerJoin('album.request', 'request')
+      .select('album.albumMbid', 'albumMbid')
+      .where('request.mediaId = :mediaId', { mediaId })
+      .andWhere('request.status NOT IN (:...statuses)', {
+        statuses: [MediaRequestStatus.DECLINED, MediaRequestStatus.COMPLETED],
+      });
+    if (exceptRequestId !== undefined) {
+      query.andWhere('request.id != :exceptRequestId', { exceptRequestId });
+    }
+    const rows = await query.getRawMany<{ albumMbid: string }>();
+    return new Set(rows.map((row) => row.albumMbid));
+  }
+
   public async updateParentStatus(
     manager: EntityManager,
     entity: MediaRequest
@@ -1220,7 +1571,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
      * other requests have yet to be approved)
      */
     if (
-      media.mediaType === MediaType.TV &&
+      (media.mediaType === MediaType.TV ||
+        media.mediaType === MediaType.MUSIC) &&
       entity.status === MediaRequestStatus.DECLINED &&
       media[statusKey] === MediaStatus.PENDING
     ) {
@@ -1299,6 +1651,10 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         await seasonRequestRepository.save(season);
       }
     }
+
+    if (media.mediaType === MediaType.MUSIC) {
+      await this.updateMusicAlbums(manager, entity);
+    }
   }
 
   public async handleRemoveParentUpdate(
@@ -1307,7 +1663,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
   ): Promise<void> {
     const fullMedia = await manager.findOneOrFail(Media, {
       where: { id: entity.media.id },
-      relations: { requests: { seasons: true }, seasons: true },
+      relations: { requests: { seasons: true, albums: true }, seasons: true },
     });
 
     const hasActive = fullMedia.requests.some(
@@ -1394,6 +1750,34 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       }
       if (changedSeasons.length) {
         await manager.save(changedSeasons);
+      }
+    }
+
+    // Albums only this request was waiting for go back to nobody having
+    // asked, so they can be requested again. Lidarr is left as it is.
+    if (fullMedia.mediaType === MediaType.MUSIC) {
+      const removed = (entity.albums ?? []).map((album) => album.albumMbid);
+      const stillWanted = new Set(
+        fullMedia.requests
+          .filter(
+            (request) =>
+              request.status !== MediaRequestStatus.COMPLETED &&
+              request.status !== MediaRequestStatus.DECLINED
+          )
+          .flatMap((request) =>
+            (request.albums ?? []).map((album) => album.albumMbid)
+          )
+      );
+      const free = removed.filter((id) => !stillWanted.has(id));
+      if (free.length) {
+        await manager.getRepository(MusicAlbum).update(
+          {
+            mediaId: fullMedia.id,
+            mbId: In(free),
+            status: In([MediaStatus.PENDING, MediaStatus.PROCESSING]),
+          },
+          { status: MediaStatus.UNKNOWN }
+        );
       }
     }
   }
@@ -1524,6 +1908,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       try {
         await this.sendToRadarr(event.entity as MediaRequest, event.manager);
         await this.sendToSonarr(event.entity as MediaRequest, event.manager);
+        await this.sendToLidarr(event.entity as MediaRequest, event.manager);
       } catch (e) {
         logger.error('Error while sending to *arr in afterUpdate subscriber', {
           label: 'Media Request',
@@ -1570,6 +1955,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     try {
       await this.sendToRadarr(event.entity as MediaRequest, event.manager);
       await this.sendToSonarr(event.entity as MediaRequest, event.manager);
+      await this.sendToLidarr(event.entity as MediaRequest, event.manager);
     } catch (e) {
       logger.error('Error while sending to *arr in afterInsert subscriber', {
         label: 'Media Request',

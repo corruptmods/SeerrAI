@@ -1,7 +1,7 @@
 import PlexTvAPI from '@server/api/plextv';
 import TautulliAPI from '@server/api/tautulli';
 import { ApiErrorCode } from '@server/constants/error';
-import { MediaType } from '@server/constants/media';
+import { MediaType, VIDEO_MEDIA_TYPES } from '@server/constants/media';
 import { UserType } from '@server/constants/user';
 import dataSource, { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
@@ -17,6 +17,7 @@ import type {
   UserResultsResponse,
   UserWatchDataResponse,
 } from '@server/interfaces/api/userInterfaces';
+import { featureEnabled } from '@server/lib/features';
 import { linkedJellyfinUsers } from '@server/lib/jellyfinUsers';
 import { mayManageUser, plexAccountMayClaim } from '@server/lib/manageUser';
 import type { JellyfinFamilyKind } from '@server/lib/mediaServers';
@@ -30,6 +31,8 @@ import {
   jellyfinFamilyServer,
   serverName,
 } from '@server/lib/mediaServers';
+import { musicReady } from '@server/lib/music/access';
+import { attachAlbumStatuses } from '@server/lib/music/albumStatuses';
 import { withNewUserDefaults } from '@server/lib/newUserDefaults';
 import { Permission, hasPermission } from '@server/lib/permissions';
 import { isPushServiceEndpoint } from '@server/lib/pushEndpoint';
@@ -594,19 +597,27 @@ router.get<{ id: string }, UserRequestsResponse>(
         });
       }
 
+      // Music only for a viewer who has it: set up, and not turned off.
+      const types =
+        musicReady() && featureEnabled('music', req.user)
+          ? [...VIDEO_MEDIA_TYPES, MediaType.MUSIC]
+          : [...VIDEO_MEDIA_TYPES];
       const [requests, requestCount] = await getRepository(MediaRequest)
         .createQueryBuilder('request')
         .leftJoinAndSelect('request.media', 'media')
         .leftJoinAndSelect('request.seasons', 'seasons')
+        .leftJoinAndSelect('request.albums', 'albums')
         .leftJoinAndSelect('request.modifiedBy', 'modifiedBy')
         .leftJoinAndSelect('request.requestedBy', 'requestedBy')
         .andWhere('requestedBy.id = :id', {
           id: user.id,
         })
+        .andWhere('request.type IN (:...types)', { types })
         .orderBy('request.id', 'DESC')
         .take(pageSize)
         .skip(skip)
         .getManyAndCount();
+      await attachAlbumStatuses(requests);
 
       return res.status(200).json({
         pageInfo: {

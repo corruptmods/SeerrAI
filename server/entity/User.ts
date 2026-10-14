@@ -448,6 +448,47 @@ export class User {
         )
       : 0;
 
+    const musicQuotaLimit = !canBypass
+      ? (this.musicQuotaLimit ?? defaultQuotas.music?.quotaLimit)
+      : 0;
+    const musicQuotaDays =
+      this.musicQuotaDays ?? defaultQuotas.music?.quotaDays;
+
+    // Count the albums in music requests made during the quota period, as
+    // seasons are counted for series.
+    const musicDate = new Date();
+    if (musicQuotaDays) {
+      musicDate.setDate(musicDate.getDate() - musicQuotaDays);
+    }
+    const musicQuotaUsedQuery = requestRepository
+      .createQueryBuilder('request')
+      .leftJoin('request.requestedBy', 'requestedBy')
+      .where('request.type = :requestType', {
+        requestType: MediaType.MUSIC,
+      })
+      .andWhere('requestedBy.id = :userId', { userId: this.id })
+      .andWhere('request.status != :declinedStatus', {
+        declinedStatus: MediaRequestStatus.DECLINED,
+      })
+      .andWhere('request.ignoreQuota = :ignoreQuota', { ignoreQuota: false });
+
+    if (musicQuotaDays) {
+      musicQuotaUsedQuery.andWhere('request.createdAt > :date', {
+        date: musicDate.toJSON(),
+      });
+    }
+
+    const musicQuotaUsed = musicQuotaLimit
+      ? Number(
+          (
+            await musicQuotaUsedQuery
+              .leftJoin('request.albums', 'quotaAlbum')
+              .select('COUNT(quotaAlbum.id)', 'albumCount')
+              .getRawOne<{ albumCount: string | null }>()
+          )?.albumCount ?? 0
+        )
+      : 0;
+
     return {
       movie: {
         days: movieQuotaDays,
@@ -468,6 +509,17 @@ export class User {
           ? Math.max(0, tvQuotaLimit - tvQuotaUsed)
           : undefined,
         restricted: !!(tvQuotaLimit && tvQuotaLimit - tvQuotaUsed <= 0),
+      },
+      music: {
+        days: musicQuotaDays,
+        limit: musicQuotaLimit ?? undefined,
+        used: musicQuotaUsed,
+        remaining: musicQuotaLimit
+          ? Math.max(0, musicQuotaLimit - musicQuotaUsed)
+          : undefined,
+        restricted: !!(
+          musicQuotaLimit && musicQuotaLimit - musicQuotaUsed <= 0
+        ),
       },
     };
   }

@@ -26,38 +26,47 @@ const loaders = {
   tv: () => import('@app/components/RequestModal/TvRequestModal'),
   collection: () =>
     import('@app/components/RequestModal/CollectionRequestModal'),
+  music: () => import('@app/components/RequestModal/MusicRequestModal'),
 };
 
-interface RequestModalProps {
+interface CommonProps {
   show: boolean;
-  type: 'movie' | 'tv' | 'collection';
-  tmdbId: number;
   is4k?: boolean;
   editRequest?: NonFunctionProperties<MediaRequest>;
   onComplete?: (newStatus: MediaStatus) => void;
   onCancel?: () => void;
   onUpdating?: (isUpdating: boolean) => void;
+}
+
+interface VideoRequestModalProps extends CommonProps {
+  type: 'movie' | 'tv' | 'collection';
+  tmdbId: number;
   /** Series only: open with this season, or one episode of it, ticked. */
   preselect?: RequestPreselect;
 }
 
-const RequestModal = ({
-  type,
-  show,
-  tmdbId,
-  is4k,
-  editRequest,
-  onComplete,
-  onUpdating,
-  onCancel,
-  preselect,
-}: RequestModalProps) => {
+/** Music is asked for by its MusicBrainz ids, not a TMDB id. */
+interface MusicModalProps extends CommonProps {
+  type: 'music';
+  artistMbid: string;
+  /** Opens with only this album ticked. */
+  albumMbid?: string;
+}
+
+type RequestModalProps = VideoRequestModalProps | MusicModalProps;
+
+const RequestModal = (props: RequestModalProps) => {
+  const { type, show, is4k, editRequest, onComplete, onUpdating, onCancel } =
+    props;
   const intl = useIntl();
   const { addToast } = useToasts();
 
-  useEffect(() => preloadModule(loaders[type]), [type]);
+  // Each dialog's own wrapper below knows what its module holds.
+  const loader: () => Promise<unknown> = loaders[type];
 
-  const dialog = useLazyModule(loaders[type], show, () => {
+  useEffect(() => preloadModule(loader), [loader]);
+
+  const dialog = useLazyModule(loader, show, () => {
     addToast(intl.formatMessage(messages.couldNotOpen), {
       appearance: 'error',
       autoDismiss: true,
@@ -76,34 +85,44 @@ const RequestModal = ({
       leaveTo="opacity-0"
       show={show}
     >
-      {dialog &&
-        (type === 'movie' ? (
+      {!!dialog &&
+        (props.type === 'music' ? (
+          <MusicDialog
+            module={dialog}
+            onComplete={onComplete}
+            onCancel={onCancel}
+            onUpdating={onUpdating}
+            artistMbid={props.artistMbid}
+            albumMbid={props.albumMbid}
+            editRequest={editRequest}
+          />
+        ) : props.type === 'movie' ? (
           <MovieDialog
             module={dialog}
             onComplete={onComplete}
             onCancel={onCancel}
-            tmdbId={tmdbId}
+            tmdbId={props.tmdbId}
             onUpdating={onUpdating}
             is4k={is4k}
             editRequest={editRequest}
           />
-        ) : type === 'tv' ? (
+        ) : props.type === 'tv' ? (
           <TvDialog
             module={dialog}
             onComplete={onComplete}
             onCancel={onCancel}
-            tmdbId={tmdbId}
+            tmdbId={props.tmdbId}
             onUpdating={onUpdating}
             is4k={is4k}
             editRequest={editRequest}
-            preselect={preselect}
+            preselect={props.preselect}
           />
         ) : (
           <CollectionDialog
             module={dialog}
             onComplete={onComplete}
             onCancel={onCancel}
-            tmdbId={tmdbId}
+            tmdbId={props.tmdbId}
             onUpdating={onUpdating}
             is4k={is4k}
           />
@@ -131,6 +150,13 @@ const TvDialog = ({
   ...props
 }: PropsOf<'tv'> & { module: unknown }) => {
   const Dialog = (module as Loaded<'tv'>).default;
+  return <Dialog {...props} />;
+};
+const MusicDialog = ({
+  module,
+  ...props
+}: PropsOf<'music'> & { module: unknown }) => {
+  const Dialog = (module as Loaded<'music'>).default;
   return <Dialog {...props} />;
 };
 const CollectionDialog = ({

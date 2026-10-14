@@ -14,16 +14,19 @@ import {
   byNewest,
   yearOf,
 } from '@app/components/Music/musicHelpers';
+import RequestModal from '@app/components/RequestModal';
 import useFeature from '@app/hooks/useFeature';
+import { Permission, useUser } from '@app/hooks/useUser';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
-import { PlayIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, PlayIcon } from '@heroicons/react/24/outline';
+import { VARIOUS_ARTISTS_MBID } from '@server/constants/media';
 import type {
   MusicAlbumResult,
   MusicArtistDetails,
   MusicPage,
 } from '@server/models/Music';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 import useSWRInfinite from 'swr/infinite';
@@ -49,6 +52,9 @@ const messages = defineMessages('components.Music.ArtistDetails', {
   activeBetween: '{begin} to {end}',
   links: 'Links',
   playOn: 'Play on {server}',
+  request: 'Request',
+  variousArtists:
+    'Lidarr cannot add Various Artists, so their compilations cannot be requested.',
 });
 
 const hostOf = (url: string): string => {
@@ -77,17 +83,35 @@ const linkName = (kind: string, url: string): string => {
   }
 };
 
+interface DiscographyProps {
+  artistId: string;
+  /** Changes when something was requested, to show it. */
+  refreshToken: number;
+  /** Told when an album was requested from its card. */
+  onRequested: () => void;
+}
+
 /** The artist's releases, a hundred at a time, grouped by kind. */
-const Discography = ({ artistId }: { artistId: string }) => {
+const Discography = ({
+  artistId,
+  refreshToken,
+  onRequested,
+}: DiscographyProps) => {
   const intl = useIntl();
   const [showOther, setShowOther] = useState(false);
-  const { data, error, size, setSize, isValidating } = useSWRInfinite<
+  const { data, error, size, setSize, isValidating, mutate } = useSWRInfinite<
     MusicPage<MusicAlbumResult>
   >((index, previous: MusicPage<MusicAlbumResult> | null) =>
     previous && index + 1 > previous.totalPages
       ? null
       : `/api/v1/music/artist/${artistId}/albums?page=${index + 1}`
   );
+
+  useEffect(() => {
+    if (refreshToken) {
+      mutate();
+    }
+  }, [refreshToken, mutate]);
 
   if (error && !data) {
     return <MusicUnavailable error={error} onRetry={() => setSize(size)} />;
@@ -117,7 +141,13 @@ const Discography = ({ artistId }: { artistId: string }) => {
     <ul className="cards-vertical mt-4">
       {list.map((album) => (
         <li key={album.id}>
-          <MusicCard album={album} canExpand subtitle="year" />
+          <MusicCard
+            album={album}
+            canExpand
+            subtitle="year"
+            artistId={artistId}
+            onRequested={onRequested}
+          />
         </li>
       ))}
     </ul>
@@ -186,10 +216,19 @@ interface ArtistDetailsProps {
 const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
   const intl = useIntl();
   const musicOn = useFeature('music');
+  const { hasPermission } = useUser();
   const [bioOpen, setBioOpen] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [requested, setRequested] = useState(0);
   const { data, error, mutate } = useSWR<MusicArtistDetails>(
     musicOn ? `/api/v1/music/artist/${artistId}` : null
   );
+  const variousArtists = artistId === VARIOUS_ARTISTS_MBID;
+  const canRequest =
+    !variousArtists &&
+    hasPermission([Permission.REQUEST, Permission.REQUEST_MUSIC], {
+      type: 'or',
+    });
 
   if (!musicOn) {
     return <ErrorPage statusCode={404} />;
@@ -280,6 +319,16 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
           </span>
         </div>
         <div className="media-actions">
+          {canRequest && (
+            <Button
+              buttonType="primary"
+              onClick={() => setRequesting(true)}
+              className="mb-2 sm:mb-0"
+            >
+              <ArrowDownTrayIcon />
+              <span>{intl.formatMessage(messages.request)}</span>
+            </Button>
+          )}
           {(data.mediaInfo?.playLinks ?? [])
             .filter((link) => link.url)
             .map((link) => (
@@ -369,7 +418,30 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
           </div>
         </div>
       </div>
-      <Discography artistId={data.id} />
+      {variousArtists && (
+        <p className="mt-4 text-sm text-gray-400">
+          {intl.formatMessage(messages.variousArtists)}
+        </p>
+      )}
+      <Discography
+        artistId={data.id}
+        refreshToken={requested}
+        // The artist's status may change with an album asked for.
+        onRequested={() => mutate()}
+      />
+      {canRequest && (
+        <RequestModal
+          type="music"
+          show={requesting}
+          artistMbid={data.id}
+          onCancel={() => setRequesting(false)}
+          onComplete={() => {
+            setRequesting(false);
+            setRequested((count) => count + 1);
+            mutate();
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -9,6 +9,7 @@ import CachedImage from '@app/components/Common/CachedImage';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
 import DeclineReason from '@app/components/DeclineReason';
 import DeclineRequestModal from '@app/components/DeclineRequestModal';
+import MusicRequestItem from '@app/components/Music/MusicRequest/MusicRequestItem';
 import RequestEta, {
   describeEta,
   expectedLabel,
@@ -34,7 +35,11 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/solid';
 import type { VideoMediaType } from '@server/constants/media';
-import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { BackfillStatus } from '@server/interfaces/api/backfillStatus';
 import type { NonFunctionProperties } from '@server/interfaces/api/common';
@@ -859,4 +864,15 @@ const RequestItem = ({
   );
 };
 
-export default RequestItem;
+/** Music has a row of its own: it has no TMDB title to look up. */
+const RequestItemFor = (props: RequestItemProps) =>
+  props.request.type === MediaType.MUSIC ? (
+    <MusicRequestItem
+      request={props.request}
+      revalidateList={props.revalidateList}
+    />
+  ) : (
+    <RequestItem {...props} />
+  );
+
+export default RequestItemFor;

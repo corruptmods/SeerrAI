@@ -1,3 +1,4 @@
+import { MusicBrainzBusyError } from '@server/api/musicbrainz';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
 import { REQUEST_BATCH_LIMIT } from '@server/constants/lists';
@@ -10,23 +11,34 @@ import {
 } from '@server/constants/media';
 import { toSeriesTypeFor } from '@server/constants/seriesType';
 import { getRepository } from '@server/datasource';
+import AlbumRequest from '@server/entity/AlbumRequest';
 import Media from '@server/entity/Media';
 import {
   BlocklistedMediaError,
   DuplicateMediaRequestError,
+  InvalidMusicRequestError,
   MediaRequest,
+  NoAlbumsAvailableError,
   NoSeasonsAvailableError,
   QuotaRestrictedError,
   RequestPermissionError,
 } from '@server/entity/MediaRequest';
 import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
+import MusicAlbum from '@server/entity/MusicAlbum';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
 import type {
   MediaRequestBody,
+  MusicRequestBody,
   RequestResultsResponse,
 } from '@server/interfaces/api/requestInterfaces';
 import { featureEnabled } from '@server/lib/features';
+import { musicReady } from '@server/lib/music/access';
+import { attachAlbumStatuses } from '@server/lib/music/albumStatuses';
+import {
+  NotTheArtistsAlbumError,
+  resolveRequestAlbums,
+} from '@server/lib/music/requestAlbums';
 import { getNotificationChannels } from '@server/lib/notificationChannels';
 import { releaseDelivery } from '@server/lib/notificationDelivery';
 import { Notification } from '@server/lib/notifications';
@@ -36,6 +48,11 @@ import { requestMissing } from '@server/lib/requestMissing';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
+import {
+  MUSIC_NOT_SET_UP,
+  MUSIC_OFF,
+  requireMusic,
+} from '@server/middleware/music';
 import { pageOf } from '@server/utils/pagination';
 import requestLock, {
   mediaKey,
@@ -45,7 +62,7 @@ import requestLock, {
 } from '@server/utils/requestLock';
 import { Router } from 'express';
 import type { WhereExpressionBuilder } from 'typeorm';
-import { Brackets, In } from 'typeorm';
+import { Brackets, In, Not } from 'typeorm';
 import { z } from 'zod';
 
 const requestRoutes = Router();
@@ -80,6 +97,21 @@ const withoutAdvancedOptions = (body: MediaRequestBody): MediaRequestBody => {
   return allowed;
 };
 
+const musicWithoutAdvancedOptions = (
+  body: MusicRequestBody
+): MusicRequestBody => {
+  const allowed = { ...body };
+  delete allowed.serverId;
+  delete allowed.profileId;
+  delete allowed.metadataProfileId;
+  delete allowed.rootFolder;
+  delete allowed.tags;
+  return allowed;
+};
+
+/** Music is listed and handled for this person: set up, and on for them. */
+const musicFor = (user?: User) => musicReady() && featureEnabled('music', user);
+
 requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
   '/',
   async (req, res, next) => {
@@ -97,11 +129,12 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         .map(Number)
         .filter((id) => Number.isFinite(id));
 
+      // Music only for someone who has it: set up, and not turned off.
+      const listedTypes = musicFor(req.user)
+        ? [...VIDEO_MEDIA_TYPES, MediaType.MUSIC]
+        : [...VIDEO_MEDIA_TYPES];
       const mediaTypes = splitParam(req.query.mediaType).filter(
-        (type): type is MediaType =>
-          type === MediaType.MOVIE ||
-          type === MediaType.TV ||
-          type === MediaType.MUSIC
+        (type): type is MediaType => listedTypes.includes(type as MediaType)
       );
 
       /**
@@ -220,6 +253,7 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         .createQueryBuilder('request')
         .leftJoinAndSelect('request.media', 'media')
         .leftJoinAndSelect('request.seasons', 'seasons')
+        .leftJoinAndSelect('request.albums', 'albums')
         .leftJoinAndSelect('request.modifiedBy', 'modifiedBy')
         .leftJoinAndSelect('request.requestedBy', 'requestedBy')
         .where(
@@ -269,10 +303,9 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         });
       }
 
-      // Ticking none is films and series: music is only listed when asked
-      // for by name.
+      // Ticking none is everything this person can see.
       query = query.andWhere('request.type IN (:...mediaTypes)', {
-        mediaTypes: mediaTypes.length ? mediaTypes : VIDEO_MEDIA_TYPES,
+        mediaTypes: mediaTypes.length ? mediaTypes : listedTypes,
       });
 
       const [requests, requestCount] = await query
@@ -281,6 +314,8 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         .take(pageSize)
         .skip(skip)
         .getManyAndCount();
+
+      await attachAlbumStatuses(requests);
 
       const settings = getSettings();
 
@@ -493,6 +528,65 @@ requestRoutes.post<never, MediaRequest, MediaRequestBody>(
     }
   }
 );
+
+/*
+ * Albums of one artist, sent to Lidarr once approved. Its own route: a
+ * music request names an artist and albums by MusicBrainz id, not a TMDB
+ * title.
+ */
+requestRoutes.post<never, MediaRequest, MusicRequestBody>(
+  '/music',
+  requireMusic,
+  async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return next({
+          status: 401,
+          message: 'You must be logged in to request media.',
+        });
+      }
+      const request = await MediaRequest.requestMusic(
+        mayChooseAdvancedOptions(req.user)
+          ? req.body
+          : musicWithoutAdvancedOptions(req.body),
+        req.user
+      );
+
+      return res.status(201).json(request);
+    } catch (error) {
+      return next(musicRequestError(error));
+    }
+  }
+);
+
+/** What a music request's failure means for the person making it. */
+const musicRequestError = (
+  error: unknown
+): { status: number; message: string } => {
+  if (!(error instanceof Error)) {
+    return { status: 500, message: 'Something went wrong.' };
+  }
+  switch (error.constructor) {
+    case RequestPermissionError:
+    case QuotaRestrictedError:
+    case BlocklistedMediaError:
+      return { status: 403, message: error.message };
+    case DuplicateMediaRequestError:
+    case NoAlbumsAvailableError:
+      return { status: 409, message: error.message };
+    case InvalidMusicRequestError:
+    case NotTheArtistsAlbumError:
+      return { status: 400, message: error.message };
+    case MusicBrainzBusyError:
+      return { status: 503, message: error.message };
+    default:
+      logger.error('Could not make a music request', {
+        label: 'Media Request',
+        errorMessage: error.message,
+      });
+      return { status: 500, message: error.message };
+  }
+};
 
 /**
  * Roughly when each request should arrive, for a page of request cards in
@@ -833,6 +927,8 @@ requestRoutes.get('/:requestId', async (req, res, next) => {
       });
     }
 
+    await attachAlbumStatuses([request]);
+
     return res.status(200).json(request);
   } catch (e) {
     logger.debug('Failed to retrieve request.', {
@@ -842,6 +938,182 @@ requestRoutes.get('/:requestId', async (req, res, next) => {
     next({ status: 404, message: 'Request not found.' });
   }
 });
+
+/**
+ * Changes a pending music request: its albums, and the server, profiles,
+ * folder and tags it goes to Lidarr with (what the body carries, already
+ * limited to what the person may change). Albums are added or taken off
+ * as rows of their own, and the request itself is only updated, so saving
+ * it cannot send it anywhere.
+ */
+const editMusicRequest = async (
+  request: MediaRequest,
+  body: MediaRequestBody & { albums?: string[]; metadataProfileId?: number },
+  requestUser: User,
+  ownerChanging: boolean
+): Promise<
+  { request: MediaRequest } | { error: { status: number; message: string } }
+> => {
+  const albumRepository = getRepository(MusicAlbum);
+  const albumRequestRepository = getRepository(AlbumRequest);
+  const media = request.media;
+  const current = request.albums ?? [];
+  const asked = [...new Set(body.albums ?? current.map((a) => a.albumMbid))];
+
+  if (!asked.length) {
+    return {
+      error: {
+        status: 400,
+        message:
+          'Choose at least one album. To take back the whole request, delete it.',
+      },
+    };
+  }
+  const maxAlbums = getSettings().music.maxAlbumsPerRequest;
+  if (maxAlbums > 0 && asked.length > maxAlbums) {
+    return {
+      error: {
+        status: 400,
+        message: `One request can ask for at most ${maxAlbums} albums.`,
+      },
+    };
+  }
+
+  // Albums another open request holds, or already here, cannot be added.
+  const others = await getRepository(MediaRequest).find({
+    where: {
+      media: { id: media.id },
+      id: Not(request.id),
+      status: Not(
+        In([MediaRequestStatus.DECLINED, MediaRequestStatus.COMPLETED])
+      ),
+    },
+  });
+  const knownAlbums = await albumRepository.find({
+    where: { mediaId: media.id },
+  });
+  const currentIds = current.map((album) => album.albumMbid);
+  const taken = new Set([
+    ...others.flatMap((other) => other.albums.map((a) => a.albumMbid)),
+    ...knownAlbums
+      .filter(
+        (album) =>
+          album.mbId &&
+          !currentIds.includes(album.mbId) &&
+          album.status !== MediaStatus.UNKNOWN &&
+          album.status !== MediaStatus.DELETED
+      )
+      .map((album) => album.mbId as string),
+  ]);
+  const kept = current.filter((album) => asked.includes(album.albumMbid));
+  const added = asked.filter(
+    (id) => !currentIds.includes(id) && !taken.has(id)
+  );
+  const dropped = current.filter((album) => !asked.includes(album.albumMbid));
+
+  if (!kept.length && !added.length) {
+    return {
+      error: {
+        status: 409,
+        message: 'Every album asked for is already here or already requested.',
+      },
+    };
+  }
+
+  if (!request.ignoreQuota) {
+    const quotas = await requestUser.getQuota();
+    // Albums the owner's quota already counted for this request are paid
+    // for; a new owner is charged for all of them.
+    const windowStart = new Date();
+    if (quotas.music.days) {
+      windowStart.setDate(windowStart.getDate() - quotas.music.days);
+    }
+    const countedAlready =
+      !ownerChanging && (!quotas.music.days || request.createdAt > windowStart);
+    const required =
+      kept.length + added.length - (countedAlready ? current.length : 0);
+    if (quotas.music.limit && required > (quotas.music.remaining ?? 0)) {
+      return { error: { status: 403, message: 'Music Quota exceeded.' } };
+    }
+  }
+
+  let resolved: Awaited<ReturnType<typeof resolveRequestAlbums>> | undefined;
+  if (added.length) {
+    try {
+      resolved = await resolveRequestAlbums(
+        media.foreignId ?? '',
+        added,
+        knownAlbums
+      );
+    } catch (e) {
+      return { error: musicRequestError(e) };
+    }
+  }
+
+  if (dropped.length) {
+    await albumRequestRepository.delete(dropped.map((album) => album.id));
+    // An album nobody else is waiting for is no longer pending.
+    const stillWanted = new Set(
+      others.flatMap((other) => other.albums.map((a) => a.albumMbid))
+    );
+    for (const album of dropped) {
+      const row = knownAlbums.find((known) => known.mbId === album.albumMbid);
+      if (
+        row &&
+        row.status === MediaStatus.PENDING &&
+        !stillWanted.has(album.albumMbid)
+      ) {
+        await albumRepository.update(row.id, { status: MediaStatus.UNKNOWN });
+      }
+    }
+  }
+
+  for (const album of resolved?.albums ?? []) {
+    const row = knownAlbums.find((known) => known.mbId === album.mbId);
+    if (!row) {
+      await albumRepository.insert(
+        new MusicAlbum({
+          mediaId: media.id,
+          mbId: album.mbId,
+          title: album.title,
+          primaryType: album.primaryType ?? null,
+          secondaryTypes: album.secondaryTypes,
+          releaseDate: album.releaseDate ?? null,
+          status: MediaStatus.PENDING,
+        })
+      );
+    } else if (
+      row.status === MediaStatus.UNKNOWN ||
+      row.status === MediaStatus.DELETED
+    ) {
+      await albumRepository.update(row.id, { status: MediaStatus.PENDING });
+    }
+    await albumRequestRepository.insert(
+      new AlbumRequest({
+        request: { id: request.id } as MediaRequest,
+        albumMbid: album.mbId,
+        title: album.title,
+        status: MediaRequestStatus.PENDING,
+      })
+    );
+  }
+
+  await getRepository(MediaRequest).update(request.id, {
+    serverId: body.serverId,
+    profileId: body.profileId,
+    metadataProfileId: body.metadataProfileId ?? null,
+    rootFolder: body.rootFolder,
+    tags: body.tags,
+    requestedBy: { id: requestUser.id },
+  });
+
+  const updated = await getRepository(MediaRequest).findOneOrFail({
+    where: { id: request.id },
+    relations: { requestedBy: true, modifiedBy: true },
+  });
+  await attachAlbumStatuses([updated]);
+  return { request: updated };
+};
 
 requestRoutes.put<{ requestId: string }>(
   '/:requestId',
@@ -864,9 +1136,11 @@ requestRoutes.put<{ requestId: string }>(
 
         // What kind of request this is comes from the request, never from
         // the body: claiming "tv" must not unlock editing a film request.
+        // Whoever made a series or music request may change its seasons or
+        // albums; a film request has only the advanced options to change.
         if (
           (request.requestedBy.id !== req.user?.id ||
-            (request.type !== MediaType.TV &&
+            (request.type === MediaType.MOVIE &&
               !req.user?.hasPermission(Permission.REQUEST_ADVANCED))) &&
           !req.user?.hasPermission(Permission.MANAGE_REQUESTS)
         ) {
@@ -884,6 +1158,7 @@ requestRoutes.put<{ requestId: string }>(
           req.body.profileId = request.profileId;
           req.body.rootFolder = request.rootFolder;
           req.body.languageProfileId = request.languageProfileId;
+          req.body.metadataProfileId = request.metadataProfileId;
           req.body.tags = request.tags;
         }
 
@@ -930,6 +1205,31 @@ requestRoutes.put<{ requestId: string }>(
             );
           }
         };
+
+        if (request.type === MediaType.MUSIC) {
+          if (!featureEnabled('music', req.user)) {
+            return next(MUSIC_OFF);
+          }
+          if (!musicReady()) {
+            return next(MUSIC_NOT_SET_UP);
+          }
+          return requestLock.dispatch(userKey(requestUser.id), () =>
+            mediaLock.dispatch(
+              mediaKey(MediaType.MUSIC, request.media.foreignId ?? ''),
+              async () => {
+                const edited = await editMusicRequest(
+                  request,
+                  req.body,
+                  requestUser,
+                  ownerChanging
+                );
+                return 'error' in edited
+                  ? next(edited.error)
+                  : res.status(200).json(edited.request);
+              }
+            )
+          );
+        }
 
         return requestLock.dispatch(userKey(requestUser.id), async () => {
           if (req.body.mediaType === MediaType.MOVIE) {

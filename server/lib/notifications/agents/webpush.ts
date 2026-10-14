@@ -6,6 +6,7 @@ import { UserPushSubscription } from '@server/entity/UserPushSubscription';
 import { defineMessages, getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
 import { declineReasonOf } from '@server/lib/notifications/declineReason';
+import { mediaPagePath } from '@server/lib/notifications/mediaPage';
 import type { NotificationAgentConfig } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -23,9 +24,11 @@ const messages = defineMessages('notifications.agents.webpush', {
   available: 'Your {quality}{mediaType} request is now available!',
   downloadedTitleMovie: 'Movie Downloaded',
   downloadedTitleTv: 'TV Show Downloaded',
+  downloadedTitleMusic: 'Music Downloaded',
   downloadedBody: '{title} is ready to play.',
   failedTitleMovie: 'Movie Request Failed',
   failedTitleTv: 'TV Show Request Failed',
+  failedTitleMusic: 'Music Request Failed',
   failedBody: '{title} could not be downloaded.',
   declined: 'Your {quality}{mediaType} request was declined.',
   failed: 'Failed to process {quality}{mediaType} request.',
@@ -159,7 +162,9 @@ class WebPushAgent
     const mediaType = payload.media
       ? payload.media.mediaType === MediaType.MOVIE
         ? intl.formatMessage(globalMessages.movie)
-        : intl.formatMessage(globalMessages.series)
+        : payload.media.mediaType === MediaType.MUSIC
+          ? intl.formatMessage(globalMessages.music)
+          : intl.formatMessage(globalMessages.series)
       : undefined;
     const is4k = payload.request?.is4k;
     const quality = is4k ? '4K ' : '';
@@ -282,7 +287,7 @@ class WebPushAgent
       (payload.issue
         ? `/issues/${payload.issue.id}`
         : payload.media
-          ? `/${payload.media.mediaType}/${payload.media.tmdbId}`
+          ? mediaPagePath(payload.media, payload.request)
           : undefined);
 
     const actionUrlTitle = payload.actionUrl
@@ -293,7 +298,7 @@ class WebPushAgent
           )
         : undefined;
 
-    const isTv = payload.media?.mediaType === MediaType.TV;
+    const kind = payload.media?.mediaType;
 
     // Availability and failure notifications lead with what happened and put
     // the title in the body, which reads better in a phone notification than
@@ -302,14 +307,22 @@ class WebPushAgent
 
     if (type === Notification.MEDIA_AVAILABLE && payload.subject) {
       subject = intl.formatMessage(
-        isTv ? messages.downloadedTitleTv : messages.downloadedTitleMovie
+        kind === MediaType.TV
+          ? messages.downloadedTitleTv
+          : kind === MediaType.MUSIC
+            ? messages.downloadedTitleMusic
+            : messages.downloadedTitleMovie
       );
       message = intl.formatMessage(messages.downloadedBody, {
         title: payload.subject,
       });
     } else if (type === Notification.MEDIA_FAILED && payload.subject) {
       subject = intl.formatMessage(
-        isTv ? messages.failedTitleTv : messages.failedTitleMovie
+        kind === MediaType.TV
+          ? messages.failedTitleTv
+          : kind === MediaType.MUSIC
+            ? messages.failedTitleMusic
+            : messages.failedTitleMovie
       );
       message = intl.formatMessage(messages.failedBody, {
         title: payload.subject,

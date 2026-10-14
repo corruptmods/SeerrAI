@@ -10,7 +10,8 @@ export const mediaLock = new AsyncLock();
 
 export const userKey = (userId: number) => `user:${userId}`;
 export const requestKey = (requestId: number) => `request:${requestId}`;
-export const mediaKey = (mediaType: MediaType, mediaId: number) =>
+/** A title's TMDB id, or for music the artist's MusicBrainz id. */
+export const mediaKey = (mediaType: MediaType, mediaId: number | string) =>
   `${mediaType}:${mediaId}`;
 
 export default requestLock;

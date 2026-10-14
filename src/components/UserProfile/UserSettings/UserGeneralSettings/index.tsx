@@ -56,6 +56,7 @@ const messages = defineMessages(
     streamingRegionTip: 'Show streaming sites by regional availability',
     movierequestlimit: 'Movie Request Limit',
     seriesrequestlimit: 'Series Request Limit',
+    musicrequestlimit: 'Album Request Limit',
     enableOverride: 'Override Global Limit',
     applanguage: 'Display Language',
     languageDefault: 'Default ({language})',
@@ -89,6 +90,7 @@ const UserGeneralSettings = () => {
   const { locale, setLocale } = useLocale();
   const [movieQuotaEnabled, setMovieQuotaEnabled] = useState(false);
   const [tvQuotaEnabled, setTvQuotaEnabled] = useState(false);
+  const [musicQuotaEnabled, setMusicQuotaEnabled] = useState(false);
   const router = useRouter();
   const {
     user,
@@ -154,6 +156,9 @@ const UserGeneralSettings = () => {
     setTvQuotaEnabled(
       data?.tvQuotaLimit != undefined && data?.tvQuotaDays != undefined
     );
+    setMusicQuotaEnabled(
+      data?.musicQuotaLimit != undefined && data?.musicQuotaDays != undefined
+    );
   }, [data]);
 
   if (!data && !error) {
@@ -189,6 +194,8 @@ const UserGeneralSettings = () => {
           movieQuotaDays: data?.movieQuotaDays,
           tvQuotaLimit: data?.tvQuotaLimit,
           tvQuotaDays: data?.tvQuotaDays,
+          musicQuotaLimit: data?.musicQuotaLimit ?? undefined,
+          musicQuotaDays: data?.musicQuotaDays ?? undefined,
           watchlistSyncMovies: data?.watchlistSyncMovies,
           watchlistSyncTv: data?.watchlistSyncTv,
           traktUsername: data?.traktUsername ?? '',
@@ -214,6 +221,10 @@ const UserGeneralSettings = () => {
               movieQuotaDays: movieQuotaEnabled ? values.movieQuotaDays : null,
               tvQuotaLimit: tvQuotaEnabled ? values.tvQuotaLimit : null,
               tvQuotaDays: tvQuotaEnabled ? values.tvQuotaDays : null,
+              musicQuotaLimit: musicQuotaEnabled
+                ? values.musicQuotaLimit
+                : null,
+              musicQuotaDays: musicQuotaEnabled ? values.musicQuotaDays : null,
               watchlistSyncMovies: values.watchlistSyncMovies,
               watchlistSyncTv: values.watchlistSyncTv,
               ...(currentSettings.traktReady
@@ -528,6 +539,52 @@ const UserGeneralSettings = () => {
                         </div>
                       </div>
                     </div>
+                    {currentSettings.musicReady && (
+                      <div className="form-row">
+                        <label htmlFor="musicQuotaLimit" className="text-label">
+                          <span>
+                            {intl.formatMessage(messages.musicrequestlimit)}
+                          </span>
+                        </label>
+                        <div className="form-input-area">
+                          <div className="flex flex-col">
+                            <div className="mb-4 flex items-center">
+                              <input
+                                type="checkbox"
+                                id="musicQuotaOverride"
+                                checked={musicQuotaEnabled}
+                                onChange={() => setMusicQuotaEnabled((s) => !s)}
+                              />
+                              <label
+                                htmlFor="musicQuotaOverride"
+                                className="ml-2 text-gray-300"
+                              >
+                                {intl.formatMessage(messages.enableOverride)}
+                              </label>
+                            </div>
+                            <QuotaSelector
+                              isDisabled={!musicQuotaEnabled}
+                              dayFieldName="musicQuotaDays"
+                              limitFieldName="musicQuotaLimit"
+                              mediaType="music"
+                              onChange={setFieldValue}
+                              defaultDays={values.musicQuotaDays}
+                              defaultLimit={values.musicQuotaLimit}
+                              dayOverride={
+                                !musicQuotaEnabled
+                                  ? data?.globalMusicQuotaDays
+                                  : undefined
+                              }
+                              limitOverride={
+                                !musicQuotaEnabled
+                                  ? data?.globalMusicQuotaLimit
+                                  : undefined
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               {traktWatchlist &&

@@ -1,15 +1,27 @@
+import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import Tag from '@app/components/Common/Tag';
 import MusicImage from '@app/components/Music/MusicImage';
 import MusicStatusBadge from '@app/components/Music/MusicStatusBadge';
 import MusicUnavailable from '@app/components/Music/MusicUnavailable';
-import { trackLength, yearOf } from '@app/components/Music/musicHelpers';
+import {
+  requestable,
+  trackLength,
+  yearOf,
+} from '@app/components/Music/musicHelpers';
+import RequestModal from '@app/components/RequestModal';
 import useFeature from '@app/hooks/useFeature';
 import useMediaQuery from '@app/hooks/useMediaQuery';
+import { Permission, useUser } from '@app/hooks/useUser';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
-import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowDownTrayIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from '@heroicons/react/24/outline';
+import { VARIOUS_ARTISTS_MBID } from '@server/constants/media';
 import type { MusicAlbumDetails, MusicTrack } from '@server/models/Music';
 import Link from 'next/link';
 import { Fragment, useState } from 'react';
@@ -26,6 +38,9 @@ const messages = defineMessages('components.Music.AlbumDetails', {
   type: 'Type',
   released: 'Released',
   links: 'Links',
+  requestAlbum: 'Request Album',
+  variousArtists:
+    'Lidarr cannot add Various Artists, so this compilation cannot be requested.',
 });
 
 /** The album's tracks, disc by disc; folded away on a phone at first. */
@@ -125,6 +140,8 @@ interface AlbumDetailsProps {
 const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
   const intl = useIntl();
   const musicOn = useFeature('music');
+  const { hasPermission } = useUser();
+  const [requesting, setRequesting] = useState(false);
   const { data, error, mutate } = useSWR<MusicAlbumDetails>(
     musicOn ? `/api/v1/music/album/${albumId}` : null
   );
@@ -139,6 +156,15 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
     return <LoadingSpinner />;
   }
 
+  const variousArtists = data.artistId === VARIOUS_ARTISTS_MBID;
+  // The album belongs to its first credited artist, as in Lidarr.
+  const canRequest =
+    !!data.artistId &&
+    !variousArtists &&
+    requestable(data.status) &&
+    hasPermission([Permission.REQUEST, Permission.REQUEST_MUSIC], {
+      type: 'or',
+    });
   const year = yearOf(data.releaseDate);
   const kind = [data.primaryType, ...data.secondaryTypes]
     .filter(Boolean)
@@ -188,7 +214,33 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
             )}
           </span>
         </div>
+        {canRequest && (
+          <div className="media-actions">
+            <Button buttonType="primary" onClick={() => setRequesting(true)}>
+              <ArrowDownTrayIcon />
+              <span>{intl.formatMessage(messages.requestAlbum)}</span>
+            </Button>
+          </div>
+        )}
       </div>
+      {variousArtists && (
+        <p className="mt-4 text-sm text-gray-400">
+          {intl.formatMessage(messages.variousArtists)}
+        </p>
+      )}
+      {canRequest && data.artistId && (
+        <RequestModal
+          type="music"
+          show={requesting}
+          artistMbid={data.artistId}
+          albumMbid={data.id}
+          onCancel={() => setRequesting(false)}
+          onComplete={() => {
+            setRequesting(false);
+            mutate();
+          }}
+        />
+      )}
       <div className="media-overview">
         <div className="media-overview-left">
           <TrackList albumId={data.id} />

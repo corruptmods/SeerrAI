@@ -168,6 +168,14 @@ class Media {
   @Column({ type: 'varchar', nullable: true })
   public foreignId?: string | null;
 
+  /**
+   * The name of a title kept outside TMDB, as it was when last asked for:
+   * an artist's name, for music. Request cards and notifications show it
+   * without asking MusicBrainz again. Null for films and series.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  public foreignTitle?: string | null;
+
   @Column({ nullable: true })
   @Index()
   public imdbId?: string;

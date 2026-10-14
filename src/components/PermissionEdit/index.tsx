@@ -25,6 +25,9 @@ export const messages = defineMessages('components.PermissionEdit', {
   requestTv: 'Request Series',
   requestTvDescription:
     'Grant permission to submit requests for non-4K series.',
+  requestMusic: 'Request Music',
+  requestMusicDescription:
+    'Grant permission to submit requests for albums, sent to Lidarr.',
   autoapprove: 'Auto-Approve',
   autoapproveDescription:
     'Grant automatic approval for all non-4K media requests.',
@@ -34,6 +37,8 @@ export const messages = defineMessages('components.PermissionEdit', {
   autoapproveSeries: 'Auto-Approve Series',
   autoapproveSeriesDescription:
     'Grant automatic approval for non-4K series requests.',
+  autoapproveMusic: 'Auto-Approve Music',
+  autoapproveMusicDescription: 'Grant automatic approval for music requests.',
   autoapprove4k: 'Auto-Approve 4K',
   autoapprove4kDescription:
     'Grant automatic approval for all 4K media requests.',
@@ -110,6 +115,9 @@ export const PermissionEdit = ({
     ),
     { type: 'conjunction' }
   );
+  // Music's permissions, once there is music to request. Request and
+  // Auto-Approve cover music as they cover films and series.
+  const musicReady = settings.currentSettings.musicReady;
 
   const permissionList: PermissionItem[] = [
     {
@@ -178,6 +186,18 @@ export const PermissionEdit = ({
           description: intl.formatMessage(messages.requestTvDescription),
           permission: Permission.REQUEST_TV,
         },
+        ...(musicReady
+          ? [
+              {
+                id: 'request-music',
+                name: intl.formatMessage(messages.requestMusic),
+                description: intl.formatMessage(
+                  messages.requestMusicDescription
+                ),
+                permission: Permission.REQUEST_MUSIC,
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -215,6 +235,24 @@ export const PermissionEdit = ({
             },
           ],
         },
+        ...(musicReady
+          ? [
+              {
+                id: 'autoapprovemusic',
+                name: intl.formatMessage(messages.autoapproveMusic),
+                description: intl.formatMessage(
+                  messages.autoapproveMusicDescription
+                ),
+                permission: Permission.AUTO_APPROVE_MUSIC,
+                requires: [
+                  {
+                    permissions: [Permission.REQUEST, Permission.REQUEST_MUSIC],
+                    type: 'or' as const,
+                  },
+                ],
+              },
+            ]
+          : []),
       ],
     },
     {

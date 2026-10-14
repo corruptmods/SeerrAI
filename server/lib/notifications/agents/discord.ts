@@ -12,6 +12,7 @@ import {
   escapeMarkdown,
 } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
+import { mediaPagePath } from '@server/lib/notifications/mediaPage';
 import type { NotificationAgentDiscord } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -222,7 +223,7 @@ class DiscordAgent
         : payload.issue
           ? `${applicationUrl}/issues/${payload.issue.id}`
           : payload.media
-            ? `${applicationUrl}/${payload.media.mediaType}/${payload.media.tmdbId}`
+            ? `${applicationUrl}${mediaPagePath(payload.media, payload.request)}`
             : undefined
       : undefined;
 

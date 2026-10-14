@@ -22,6 +22,8 @@ export interface QuotaStatus {
 export interface QuotaResponse {
   movie: QuotaStatus;
   tv: QuotaStatus;
+  /** Albums, counted as seasons are for series. */
+  music: QuotaStatus;
 }
 
 export interface UserWatchDataResponse {

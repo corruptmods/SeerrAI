@@ -43,6 +43,7 @@ const PermissionOption = ({
     Permission.AUTO_APPROVE_4K,
     Permission.AUTO_APPROVE_4K_MOVIE,
     Permission.AUTO_APPROVE_4K_TV,
+    Permission.AUTO_APPROVE_MUSIC,
   ];
 
   let disabled = false;

@@ -11,6 +11,10 @@ import { Notification } from '.';
  * to one person, the channel's or the server's for a shared channel. The
  * same line in English stays on the notification as `event`, which is what
  * webhooks are sent, so anything reading a webhook sees what it always has.
+ *
+ * Music has lines of its own rather than another choice in the media ones:
+ * a language not yet translated for it would fall back to their "other"
+ * choice and call an album a series.
  */
 const messages = defineMessages('notifications.events', {
   mediaPending:
@@ -30,6 +34,14 @@ const messages = defineMessages('notifications.events', {
   requestAvailable:
     '{kind, select, movie {Movie Request Now Available} movie4k {4K Movie Request Now Available} tv4k {4K Series Request Now Available} other {Series Request Now Available}}',
   seriesReadyToWatch: 'Series Ready to Watch',
+  musicPending: 'New Music Request',
+  musicApproved: 'Music Request Approved',
+  musicAutoApproved: 'Music Request Automatically Approved',
+  musicAutoRequested: 'Music Request Automatically Submitted',
+  musicDeclined: 'Music Request Declined',
+  musicFailed: 'Music Request Failed',
+  musicAvailable: 'Music Now Available',
+  musicRequestAvailable: 'Music Request Now Available',
   issueCreated:
     '{issueType, select, video {New Video Issue Reported} audio {New Audio Issue Reported} subtitles {New Subtitle Issue Reported} other {New Issue Reported}}',
   issueResolved:
@@ -93,6 +105,16 @@ const MEDIA_MESSAGES: Partial<Record<Notification, Message>> = {
   [Notification.MEDIA_AVAILABLE]: messages.mediaAvailable,
 };
 
+const MUSIC_MESSAGES: Partial<Record<Notification, Message>> = {
+  [Notification.MEDIA_PENDING]: messages.musicPending,
+  [Notification.MEDIA_APPROVED]: messages.musicApproved,
+  [Notification.MEDIA_AUTO_APPROVED]: messages.musicAutoApproved,
+  [Notification.MEDIA_AUTO_REQUESTED]: messages.musicAutoRequested,
+  [Notification.MEDIA_DECLINED]: messages.musicDeclined,
+  [Notification.MEDIA_FAILED]: messages.musicFailed,
+  [Notification.MEDIA_AVAILABLE]: messages.musicAvailable,
+};
+
 const kindOf = (mediaType: MediaType, is4k: boolean) =>
   `${mediaType === MediaType.MOVIE ? 'movie' : 'tv'}${is4k ? '4k' : ''}`;
 
@@ -102,6 +124,10 @@ export const mediaEvent = (
   mediaType: MediaType,
   is4k: boolean
 ): NotificationEvent | undefined => {
+  if (mediaType === MediaType.MUSIC) {
+    const message = MUSIC_MESSAGES[type];
+    return message ? titled(message) : undefined;
+  }
   const message = MEDIA_MESSAGES[type];
   return message
     ? titled(message, { kind: kindOf(mediaType, is4k) })
@@ -113,7 +139,9 @@ export const requestAvailableEvent = (
   mediaType: MediaType,
   is4k: boolean
 ): NotificationEvent =>
-  titled(messages.requestAvailable, { kind: kindOf(mediaType, is4k) });
+  mediaType === MediaType.MUSIC
+    ? titled(messages.musicRequestAvailable)
+    : titled(messages.requestAvailable, { kind: kindOf(mediaType, is4k) });
 
 /** An ongoing series that has caught up with what has aired. */
 export const seriesReadyToWatchEvent = (): NotificationEvent =>

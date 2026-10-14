@@ -60,7 +60,21 @@ const useDiscover = <
 >(
   endpoint: string,
   options?: O,
-  { hideAvailable = true, hideBlocklisted = true, hideRequested = true } = {}
+  {
+    hideAvailable = true,
+    hideBlocklisted = true,
+    hideRequested = true,
+    shortPages = false,
+  }: {
+    hideAvailable?: boolean;
+    hideBlocklisted?: boolean;
+    hideRequested?: boolean;
+    /**
+     * The server's pages can hold fewer than 20 titles without being the
+     * last, so only its page count says where the list ends.
+     */
+    shortPages?: boolean;
+  } = {}
 ): DiscoverResult<T, S> => {
   const settings = useSettings();
   const { hasPermission } = useUser();
@@ -171,17 +185,45 @@ const useDiscover = <
     });
   }
 
-  const isEmpty = !isLoadingInitialData && titles?.length === 0;
   const lastPage = data?.[data.length - 1];
-  const isReachingEnd =
-    isEmpty ||
-    // No page past the last one the server counts is ever asked for. A page
-    // can hold more than 20 (search adds collections to each), so the
-    // counts below alone could leave this waiting for a page never asked.
-    (!!data && !!lastPage && data.length >= lastPage.totalPages) ||
-    (!!data && (data[data?.length - 1]?.results.length ?? 0) < 20) ||
-    (!!data && (data[data?.length - 1]?.totalResults ?? 0) <= size * 20) ||
-    (!!data && (data[data?.length - 1]?.totalResults ?? 0) < 41);
+  const onLastPage = !!data && !!lastPage && data.length >= lastPage.totalPages;
+  const isEmpty =
+    !isLoadingInitialData &&
+    titles?.length === 0 &&
+    (!shortPages || onLastPage);
+  const isReachingEnd = shortPages
+    ? isEmpty || onLastPage
+    : isEmpty ||
+      // No page past the last one the server counts is ever asked for. A page
+      // can hold more than 20 (search adds collections to each), so the
+      // counts below alone could leave this waiting for a page never asked.
+      (!!data && !!lastPage && data.length >= lastPage.totalPages) ||
+      (!!data && (data[data?.length - 1]?.results.length ?? 0) < 20) ||
+      (!!data && (data[data?.length - 1]?.totalResults ?? 0) <= size * 20) ||
+      (!!data && (data[data?.length - 1]?.totalResults ?? 0) < 41);
+
+  // Too few titles to scroll by: the next page is asked for straight away,
+  // as scrolling could never ask for it (a few pages at most).
+  useEffect(() => {
+    if (
+      shortPages &&
+      !isReachingEnd &&
+      !isLoadingMore &&
+      !error &&
+      titles.length < 20 &&
+      size < 5
+    ) {
+      setSize(size + 1);
+    }
+  }, [
+    shortPages,
+    isReachingEnd,
+    isLoadingMore,
+    error,
+    titles.length,
+    size,
+    setSize,
+  ]);
 
   useEffect(() => {
     if (error && titles.length) {

@@ -7,6 +7,7 @@ import AnimeChoice, {
 } from '@app/components/RequestModal/AnimeChoice';
 import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
 import RequestListPicker from '@app/components/RequestModal/RequestListPicker';
+import useIsAnime from '@app/hooks/useIsAnime';
 import useToasts from '@app/hooks/useToasts';
 import { useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -18,7 +19,6 @@ import type { NonFunctionProperties } from '@server/interfaces/api/common';
 import type { QuotaResponse } from '@server/interfaces/api/userInterfaces';
 import { Permission } from '@server/lib/permissions';
 import type { MovieDetails } from '@server/models/Movie';
-import { isAnime } from '@server/utils/isAnime';
 import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
@@ -71,6 +71,7 @@ const MovieRequestModal = ({
   });
   const intl = useIntl();
   const { user, hasPermission } = useUser();
+  const isAnime = useIsAnime();
   const animeChoice = useAnimeChoice({
     detected: !!data && isAnime(data),
     animeSetting: data?.mediaInfo?.animeSetting,

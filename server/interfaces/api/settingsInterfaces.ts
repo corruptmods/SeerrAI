@@ -31,6 +31,11 @@ export interface PublicSettingsResponse {
   applicationUrl: string;
   /** Optional features turned off for everyone. */
   disabledFeatures: string[];
+  /**
+   * Countries whose anime does not count as anime unless it is in Japanese
+   * (utils/isAnime).
+   */
+  animeExcludedCountries: string[];
   hideAvailable: boolean;
   hideBlocklisted: boolean;
   hideRequested: boolean;

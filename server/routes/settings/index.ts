@@ -156,6 +156,36 @@ settingsRoutes.post('/features', async (req, res, next) => {
   return res.status(200).json({ disabled });
 });
 
+/*
+ * What counts as anime: the countries whose anime is left out unless it is
+ * in Japanese (utils/isAnime). Set as a whole list, like the features.
+ */
+settingsRoutes.get('/anime', (_req, res) => {
+  return res.status(200).json({
+    excludedCountries: getSettings().main.animeExcludedCountries ?? [],
+  });
+});
+
+settingsRoutes.post('/anime', async (req, res, next) => {
+  const asked = (req.body as { excludedCountries?: unknown }).excludedCountries;
+  if (
+    !Array.isArray(asked) ||
+    asked.some((code) => typeof code !== 'string' || !/^[a-z]{2}$/i.test(code))
+  ) {
+    return next({
+      status: 400,
+      message: 'A list of two-letter country codes is required.',
+    });
+  }
+  const excludedCountries = [
+    ...new Set(asked.map((code: string) => code.toUpperCase())),
+  ].sort();
+  const settings = getSettings();
+  settings.main.animeExcludedCountries = excludedCountries;
+  await settings.save();
+  return res.status(200).json({ excludedCountries });
+});
+
 settingsRoutes.get('/network', (req, res) => {
   const settings = getSettings();
 

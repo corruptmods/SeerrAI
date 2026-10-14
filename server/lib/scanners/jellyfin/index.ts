@@ -14,6 +14,7 @@ import type {
 import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
+import { detectAnime } from '@server/lib/animeDecision';
 import type {
   ProcessableSeason,
   RunnableScanner,
@@ -23,7 +24,6 @@ import BaseScanner from '@server/lib/scanners/baseScanner';
 import type { Library } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { getHostname } from '@server/utils/getHostname';
-import { isAnime } from '@server/utils/isAnime';
 import { uniqWith } from 'lodash';
 
 /**
@@ -220,7 +220,7 @@ class JellyfinScanner
       throw new Error('No ID provided');
     }
 
-    const metadataProvider = isAnime(tvShow)
+    const metadataProvider = detectAnime(tvShow)
       ? await getMetadataProvider('anime')
       : await getMetadataProvider('tv');
 

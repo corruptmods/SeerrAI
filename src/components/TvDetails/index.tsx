@@ -42,6 +42,7 @@ import FutureSeasonsButton from '@app/components/TvDetails/FutureSeasonsButton';
 import Season from '@app/components/TvDetails/Season';
 import WatchedBy from '@app/components/WatchedBy';
 import useDeepLinks from '@app/hooks/useDeepLinks';
+import useIsAnime from '@app/hooks/useIsAnime';
 import useLocale from '@app/hooks/useLocale';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
@@ -82,7 +83,6 @@ import {
 import { MediaServerType } from '@server/constants/server';
 import type { TvDetails as TvDetailsType } from '@server/models/Tv';
 import type { Crew } from '@server/models/common';
-import { isAnime } from '@server/utils/isAnime';
 import axios from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -137,6 +137,7 @@ interface TvDetailsProps {
 
 const TvDetails = ({ tv }: TvDetailsProps) => {
   const settings = useSettings();
+  const isAnime = useIsAnime();
   const { user, hasPermission } = useUser();
   const router = useRouter();
   const intl = useIntl();

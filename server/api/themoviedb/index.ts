@@ -108,6 +108,8 @@ interface DiscoverMovieOptions {
   studio?: string;
   keywords?: string;
   excludeKeywords?: string;
+  /** Films from this country (ISO 3166-1), by TMDB's origin country. */
+  originCountry?: string;
   sortBy?: MovieSortOptions;
   watchRegion?: string;
   watchProviders?: string;
@@ -138,6 +140,8 @@ interface DiscoverTvOptions {
   network?: number;
   keywords?: string;
   excludeKeywords?: string;
+  /** Series from this country (ISO 3166-1), by TMDB's origin country. */
+  originCountry?: string;
   sortBy?: TvSortOptions;
   watchRegion?: string;
   watchProviders?: string;
@@ -721,6 +725,7 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
     studio,
     keywords,
     excludeKeywords,
+    originCountry,
     withRuntimeGte,
     withRuntimeLte,
     voteAverageGte,
@@ -773,6 +778,7 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
           with_companies: studio,
           with_keywords: keywords,
           without_keywords: excludeKeywords,
+          with_origin_country: originCountry,
           'with_runtime.gte': withRuntimeGte,
           'with_runtime.lte': withRuntimeLte,
           'vote_average.gte': voteAverageGte,
@@ -810,6 +816,7 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
     network,
     keywords,
     excludeKeywords,
+    originCountry,
     withRuntimeGte,
     withRuntimeLte,
     voteAverageGte,
@@ -864,6 +871,7 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
           with_networks: network,
           with_keywords: keywords,
           without_keywords: excludeKeywords,
+          with_origin_country: originCountry,
           'with_runtime.gte': withRuntimeGte,
           'with_runtime.lte': withRuntimeLte,
           'vote_average.gte': voteAverageGte,

@@ -14,7 +14,7 @@ import useSWR from 'swr';
 const messages = defineMessages('components.Settings.AnimeCheck', {
   animeCheck: 'Anime Check',
   description:
-    'Titles whose place in Sonarr or Radarr disagrees with what Seerr AI says they are: anime if TMDB has its anime keyword or it is Japanese animation, unless anime or not was chosen on its request or set on its page. Series are checked for root folder and series type, movies for root folder and quality profile. Nothing is changed here: open a title and use Anime in its manage panel to set it and move it.',
+    'Titles whose place in Sonarr or Radarr disagrees with what Seerr AI says they are: anime if TMDB has its anime keyword (apart from the countries left out above) or it is Japanese animation, unless anime or not was chosen on its request or set on its page. Series are checked for root folder and series type, movies for root folder and quality profile. Nothing is changed here: open a title and use Anime in its manage panel to set it and move it.',
   run: 'Run Check',
   running: 'Checking…',
   runFailed: 'The check could not be started.',

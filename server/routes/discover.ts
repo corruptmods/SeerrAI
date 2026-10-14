@@ -3,7 +3,10 @@ import TheMovieDb, {
   MovieSortOptionsIterable,
   TvSortOptionsIterable,
 } from '@server/api/themoviedb';
-import { ANIMATION_GENRE_ID } from '@server/api/themoviedb/constants';
+import {
+  ANIMATION_GENRE_ID,
+  ANIME_KEYWORD_ID,
+} from '@server/api/themoviedb/constants';
 import type { TmdbKeyword } from '@server/api/themoviedb/interfaces';
 import { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
@@ -33,6 +36,8 @@ import {
   seasonDates,
   seasonOf,
 } from '@server/utils/animeSeason';
+import type { AnimeSignals } from '@server/utils/isAnime';
+import { leftOutAsAnime } from '@server/utils/isAnime';
 import { isCollection, isMovie, isPerson } from '@server/utils/typeHelpers';
 import { Router } from 'express';
 import { sortBy } from 'lodash';
@@ -738,17 +743,24 @@ discoverRoutes.get('/tv/upcoming', async (req, res, next) => {
 
 /*
  * Anime: series airing in a season, series premiering in one, the most
- * popular series, or films. Anime here is animation made in Japanese, the
- * way Seerr tells anime apart everywhere else (utils/isAnime), so every
- * title listed is one Seerr would also send to Sonarr or Radarr as anime.
- * TMDB's anime keyword is not used to find them: it is missing from many
- * series, new ones especially, and is also on western cartoons Seerr does
- * not count as anime.
+ * popular series, or films, optionally only those made in one country.
+ * Anime here is what Seerr counts as anime everywhere else (utils/isAnime),
+ * so every title listed is one Seerr would also send to Sonarr or Radarr as
+ * anime: what TMDB tags as anime, from any country but those an admin
+ * leaves out (unless it is in Japanese), and Japanese animation TMDB has
+ * not tagged, as the tag is missing from many series, new ones especially.
+ *
+ * TMDB cannot ask for "tagged, or Japanese animation" at once, so each page
+ * is two of TMDB's pages, the same page of each: the tagged titles, and the
+ * Japanese animation without the tag. The two never share a title, so
+ * nothing is listed twice or missed, and there are as many pages as the
+ * longer of the two has. Each page is sorted by popularity. Titles from a
+ * country left out are taken out of the page they arrive in, so a page can
+ * hold fewer titles than TMDB's twenty without being the last.
  *
  * The person's region is followed, as on every Discover page, but not their
- * Discover Language: these are Japanese titles by definition, so a filter
- * to any other language could only ever leave the page empty. Someone who
- * does not want them hides the row.
+ * Discover Language: a filter to one language could only leave out most of
+ * what counts as anime. Someone who does not want them hides the row.
  */
 discoverRoutes.get('/anime', async (req, res, next) => {
   const tmdb = createTmdbWithRegionLanguage(req.user);
@@ -762,33 +774,74 @@ discoverRoutes.get('/anime', async (req, res, next) => {
   }
 
   const { start, end } = seasonDates(season);
-  const page = Number(req.query.page) || 1;
-  const language = req.locale;
-  const anime = {
-    page,
-    language,
+  const leaveOut = getSettings().main.animeExcludedCountries ?? [];
+  const common = {
+    page: Number(req.query.page) || 1,
+    language: req.locale,
+    sortBy: 'popularity.desc' as const,
+    originCountry: (req.query.country as string | undefined)?.toUpperCase(),
+  };
+  const tagged = {
+    ...common,
+    keywords: String(ANIME_KEYWORD_ID),
+    originalLanguage: 'all',
+  };
+  const untagged = {
+    ...common,
     genre: String(ANIMATION_GENRE_ID),
     originalLanguage: 'ja',
-    sortBy: 'popularity.desc' as const,
+    excludeKeywords: String(ANIME_KEYWORD_ID),
   };
+  const pageOf = <T extends { popularity: number }>(
+    pages: { total_pages: number; total_results: number }[],
+    results: T[]
+  ) => ({
+    page: common.page,
+    totalPages: Math.max(...pages.map((one) => one.total_pages)),
+    totalResults: pages.reduce((sum, one) => sum + one.total_results, 0),
+    results: results.sort((a, b) => b.popularity - a.popularity),
+  });
 
   try {
     if (show === 'films') {
-      const data = await tmdb.getDiscoverMovies(anime);
+      const pages = await Promise.all([
+        tmdb.getDiscoverMovies(tagged),
+        tmdb.getDiscoverMovies(untagged),
+      ]);
+      // TMDB's lists do not say where a film was made, so a tagged film
+      // not in Japanese is looked up when a country is left out. One that
+      // cannot be looked up is kept: TMDB tags it as anime.
+      const kept = await Promise.all(
+        pages[0].results.map(async (result) => {
+          if (!leaveOut.length || result.original_language === 'ja') {
+            return [result];
+          }
+          const details: AnimeSignals | undefined = await tmdb
+            .getMovieForScan({ movieId: result.id })
+            .catch(() => undefined);
+          return details &&
+            leftOutAsAnime(
+              { ...details, original_language: result.original_language },
+              leaveOut
+            )
+            ? []
+            : [result];
+        })
+      );
+      const results = [...kept.flat(), ...pages[1].results];
       const media = await Media.getRelatedMedia(
         req.user,
-        data.results.map((result) => ({
+        results.map((result) => ({
           tmdbId: result.id,
           mediaType: MediaType.MOVIE,
         })),
         { includeActiveRequest: true }
       );
 
+      const listed = pageOf(pages, results);
       return res.status(200).json({
-        page: data.page,
-        totalPages: data.total_pages,
-        totalResults: data.total_results,
-        results: data.results.flatMap((result) => {
+        ...listed,
+        results: listed.results.flatMap((result) => {
           const info = media.find(
             (med) =>
               med.tmdbId === result.id && med.mediaType === MediaType.MOVIE
@@ -801,28 +854,34 @@ discoverRoutes.get('/anime', async (req, res, next) => {
       });
     }
 
-    const data = await tmdb.getDiscoverTv({
-      ...anime,
+    const dates = {
       ...(show === 'airing' && { airDateGte: start, airDateLte: end }),
       ...(show === 'premieres' && {
         firstAirDateGte: start,
         firstAirDateLte: end,
       }),
-    });
+    };
+    const pages = await Promise.all([
+      tmdb.getDiscoverTv({ ...tagged, ...dates }),
+      tmdb.getDiscoverTv({ ...untagged, ...dates }),
+    ]);
+    const results = [
+      ...pages[0].results.filter((result) => !leftOutAsAnime(result, leaveOut)),
+      ...pages[1].results,
+    ];
     const media = await Media.getRelatedMedia(
       req.user,
-      data.results.map((result) => ({
+      results.map((result) => ({
         tmdbId: result.id,
         mediaType: MediaType.TV,
       })),
       { includeActiveRequest: true }
     );
 
+    const listed = pageOf(pages, results);
     return res.status(200).json({
-      page: data.page,
-      totalPages: data.total_pages,
-      totalResults: data.total_results,
-      results: data.results.flatMap((result) => {
+      ...listed,
+      results: listed.results.flatMap((result) => {
         const info = media.find(
           (med) => med.tmdbId === result.id && med.mediaType === MediaType.TV
         );

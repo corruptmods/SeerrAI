@@ -1,6 +1,14 @@
 import type { SeriesType } from '@server/constants/seriesType';
+import { getSettings } from '@server/lib/settings';
 import type { AnimeSignals } from '@server/utils/isAnime';
 import { isAnime } from '@server/utils/isAnime';
+
+/**
+ * Anime detection (utils/isAnime) under this server's setting of which
+ * countries' anime is left out (Settings → Services → Anime).
+ */
+export const detectAnime = (media: AnimeSignals): boolean =>
+  isAnime(media, getSettings().main.animeExcludedCountries ?? []);
 
 /** Who decided whether a title is anime. */
 export type AnimeDecidedBy = 'title' | 'request' | 'detection';
@@ -27,5 +35,5 @@ export const decideAnime = (
   if (animeSetting === true || animeSetting === false) {
     return { anime: animeSetting, decidedBy: 'title' };
   }
-  return { anime: isAnime(media), decidedBy: 'detection' };
+  return { anime: detectAnime(media), decidedBy: 'detection' };
 };

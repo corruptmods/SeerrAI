@@ -210,6 +210,19 @@ components:
             type: string
       required:
         - disabled
+    AnimeSettings:
+      type: object
+      description: What counts as anime.
+      properties:
+        excludedCountries:
+          type: array
+          description: Countries (ISO 3166-1) whose anime does not count as anime unless it is in Japanese. Empty counts anime from everywhere.
+          items:
+            type: string
+            pattern: '^[A-Za-z]{2}$'
+          example: [US]
+      required:
+        - excludedCountries
     Passkey:
       type: object
       properties:
@@ -1394,6 +1407,11 @@ components:
           format: uuid
           description: Instance Plex OAuth client identifier
           example: 6919275e-142a-48d8-be6b-93594cbd4626
+        animeExcludedCountries:
+          type: array
+          description: Countries whose anime does not count as anime unless it is in Japanese. Set through /settings/anime.
+          items:
+            type: string
     MovieResult:
       type: object
       required:
@@ -3059,6 +3077,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MainSettings'
+  /settings/anime:
+    get:
+      summary: What counts as anime
+      tags:
+        - settings
+      responses:
+        '200':
+          description: The anime settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnimeSettings'
+    post:
+      summary: Set what counts as anime
+      description: Replaces the whole list of countries whose anime is left out.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnimeSettings'
+      responses:
+        '200':
+          description: The anime settings, as saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnimeSettings'
+        '400':
+          description: Not a list of country codes
   /settings/features:
     get:
       summary: Optional features turned off for everyone
@@ -10184,13 +10234,17 @@ paths:
     get:
       summary: Discover anime
       description: |
-        Returns anime (animation made in Japanese) in a JSON object: the
-        series airing in a season, the series premiering in one, the most
-        popular series, or films. Seasons are calendar quarters: winter is
-        January to March, spring April to June, summer July to September,
-        fall October to December. Follows the user's Discover region but
-        not their Discover language. Titles an admin has marked as not
-        anime are left out.
+        Returns anime in a JSON object: the series airing in a season, the
+        series premiering in one, the most popular series, or films.
+        Anime is what TMDB tags as anime, apart from titles not in
+        Japanese from the countries left out in /settings/anime, and
+        Japanese animation. Each page holds the same page of both, sorted
+        by popularity; totalPages is the longer of the two, and a page can
+        hold fewer than 20 titles without being the last. Seasons are
+        calendar quarters: winter is January to March, spring April to
+        June, summer July to September, fall October to December. Follows
+        the user's Discover region but not their Discover language. Titles
+        an admin has marked as not anime are left out.
       tags:
         - search
       parameters:
@@ -10214,6 +10268,13 @@ paths:
             type: string
             pattern: '^\d{4}-(winter|spring|summer|fall)$'
             example: 2026-fall
+        - in: query
+          name: country
+          description: Only titles made in this country (ISO 3166-1), by TMDB's origin country.
+          schema:
+            type: string
+            pattern: '^[A-Za-z]{2}$'
+            example: KR
       responses:
         '200':
           description: Results

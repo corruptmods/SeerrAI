@@ -422,6 +422,13 @@ export interface MainSettings {
   };
   /** Optional features (see constants/features) turned off for everyone. */
   disabledFeatures: string[];
+  /**
+   * Countries whose anime does not count as anime unless it is in Japanese
+   * (utils/isAnime), as ISO 3166-1 codes. Empty on a new server; servers
+   * from before the setting start with the United States (settings
+   * migration 0011), the rule they had until then.
+   */
+  animeExcludedCountries: string[];
   /** Give everyone the owner shares the Plex server with an account. */
   autoImportPlexUsers: boolean;
   hideAvailable: boolean;
@@ -479,6 +486,7 @@ interface FullPublicSettings extends PublicSettings {
   applicationTitle: string;
   applicationUrl: string;
   disabledFeatures: string[];
+  animeExcludedCountries: string[];
   hideAvailable: boolean;
   hideBlocklisted: boolean;
   hideRequested: boolean;
@@ -738,6 +746,7 @@ class Settings {
           tv: {},
         },
         disabledFeatures: [],
+        animeExcludedCountries: [],
         autoImportPlexUsers: false,
         hideAvailable: false,
         hideBlocklisted: false,
@@ -1176,6 +1185,7 @@ class Settings {
       applicationTitle: this.data.main.applicationTitle,
       applicationUrl: this.data.main.applicationUrl,
       disabledFeatures: this.data.main.disabledFeatures ?? [],
+      animeExcludedCountries: this.data.main.animeExcludedCountries ?? [],
       hideAvailable: this.data.main.hideAvailable,
       hideBlocklisted: this.data.main.hideBlocklisted,
       hideRequested: this.data.main.hideRequested,

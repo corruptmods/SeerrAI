@@ -71,3 +71,42 @@ describe('discovering series by when their episodes air', () => {
     assert.equal(params['first_air_date.lte'], undefined);
   });
 });
+
+describe('discovering titles by where they were made', () => {
+  const capture = (tmdb: TheMovieDb) => {
+    const asked: Record<string, unknown>[] = [];
+    (
+      tmdb as unknown as {
+        axios: { get: (url: string, config: { params: object }) => unknown };
+      }
+    ).axios = {
+      get: async (_url, config) => {
+        asked.push(config.params as Record<string, unknown>);
+        return { data: { page: 1, total_pages: 1, results: [] } };
+      },
+    };
+    return asked;
+  };
+
+  it('asks TMDB for series and films from one country', async () => {
+    const tmdb = new TheMovieDb();
+    const asked = capture(tmdb);
+    await tmdb.getDiscoverTv({ originCountry: 'KR' });
+    await tmdb.getDiscoverMovies({ originCountry: 'KR' });
+    assert.deepEqual(
+      asked.map((params) => params.with_origin_country),
+      ['KR', 'KR']
+    );
+  });
+
+  it('does not narrow by country unless asked', async () => {
+    const tmdb = new TheMovieDb();
+    const asked = capture(tmdb);
+    await tmdb.getDiscoverTv({});
+    await tmdb.getDiscoverMovies({});
+    assert.deepEqual(
+      asked.map((params) => params.with_origin_country),
+      [undefined, undefined]
+    );
+  });
+});

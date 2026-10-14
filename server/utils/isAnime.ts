@@ -34,26 +34,47 @@ const countriesOf = (media: AnimeSignals): string[] =>
         );
 
 /**
+ * Whether a title should not count as anime because of where it was made:
+ * it is not in Japanese, and one of the countries it comes from is on the
+ * admin's list (Settings → Services → Anime, "Leave out anime made in").
+ * Anime-styled western shows such as Avatar or Castlevania carry TMDB's
+ * anime keyword; an admin who keeps them with the rest of the library lists
+ * the United States. Anything made in Japanese still counts.
+ */
+export const leftOutAsAnime = (
+  media: AnimeSignals,
+  leaveOut: readonly string[]
+): boolean => {
+  if (!leaveOut.length) {
+    return false;
+  }
+  const language = media.original_language ?? media.originalLanguage;
+  return (
+    language !== 'ja' &&
+    countriesOf(media).some((country) => leaveOut.includes(country))
+  );
+};
+
+/**
  * Whether a title is anime: the one test Seerr uses everywhere, so where
  * a request is sent, the metadata a scan reads, and what the pages say all
- * agree.
+ * agree. `leaveOut` is the admin's list of countries whose anime does not
+ * count (see leftOutAsAnime); the server passes its setting, the pages the
+ * same setting from the public settings. An override rule, or the Anime
+ * switch on a request, can still send a left-out title as anime.
  *
- * American titles that are not in Japanese never count: anime-styled
- * western shows such as Avatar or Castlevania carry TMDB's anime keyword
- * but belong with the rest of the library. An override rule, or the Anime
- * switch on a request, can still send one as anime.
- *
- * Otherwise TMDB's "anime" keyword (210024) is the strongest signal, but it
- * is missing from plenty of anime, which then went to Sonarr as standard
- * series (seerr-team/seerr#3244). Failing it, animation whose original
- * language is Japanese counts. Animation in other languages (Korean or
- * Chinese animation, western cartoons) does not; an override rule can
- * route those as anime where wanted.
+ * TMDB's "anime" keyword (210024) is the strongest signal, from any
+ * country, but it is missing from plenty of anime, which then went to
+ * Sonarr as standard series (seerr-team/seerr#3244). Failing it, animation
+ * whose original language is Japanese counts. Animation in other languages
+ * without the keyword (Korean or Chinese animation, western cartoons) does
+ * not; an override rule can route those as anime where wanted.
  */
-export const isAnime = (media: AnimeSignals): boolean => {
-  const language = media.original_language ?? media.originalLanguage;
-
-  if (language !== 'ja' && countriesOf(media).includes('US')) {
+export const isAnime = (
+  media: AnimeSignals,
+  leaveOut: readonly string[]
+): boolean => {
+  if (leftOutAsAnime(media, leaveOut)) {
     return false;
   }
 
@@ -67,7 +88,7 @@ export const isAnime = (media: AnimeSignals): boolean => {
 
   return (
     !!media.genres?.some((genre) => genre.id === ANIMATION_GENRE_ID) &&
-    language === 'ja'
+    (media.original_language ?? media.originalLanguage) === 'ja'
   );
 };
 

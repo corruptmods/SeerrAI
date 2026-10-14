@@ -13,6 +13,7 @@ const defaultSettings = {
   applicationTitle: 'Seerr AI',
   applicationUrl: '',
   disabledFeatures: [] as string[],
+  animeExcludedCountries: [] as string[],
   hideAvailable: false,
   hideBlocklisted: false,
   hideRequested: false,

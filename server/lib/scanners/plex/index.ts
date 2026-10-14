@@ -9,6 +9,7 @@ import type {
 } from '@server/api/themoviedb/interfaces';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
+import { detectAnime } from '@server/lib/animeDecision';
 import type {
   MediaIds,
   ProcessableSeason,
@@ -19,7 +20,6 @@ import BaseScanner from '@server/lib/scanners/baseScanner';
 import { RecentRetries, titleKey } from '@server/lib/scanners/plex/recent';
 import type { Library } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
-import { isAnime } from '@server/utils/isAnime';
 import { uniqWith } from 'lodash';
 
 const imdbRegex = new RegExp(/imdb:\/\/(tt[0-9]+)/);
@@ -366,7 +366,7 @@ class PlexScanner
       throw new Error('No ID provided');
     }
 
-    const metadataProvider = isAnime(tvShow)
+    const metadataProvider = detectAnime(tvShow)
       ? await getMetadataProvider('anime')
       : await getMetadataProvider('tv');
 

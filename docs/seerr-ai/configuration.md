@@ -18,6 +18,7 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | **Settings → Services → Maintainerr** | One or more servers. Per server: show Deleting Soon badges, include in the Deleting Soon row, allow Keep for everyone, days Keep adds (0 restarts the rule's grace period), what counts as "soon". | Port 6246; badges, row and Keep on; 0 days; 14 days |
 | **Settings → Services → Radarr** | **Anime Quality Profile**, **Anime Root Folder**, **Anime Tags** for anime movies. | Unset (anime movies use the regular ones) |
 | **Settings → Services → Override Rules** | Sonarr rules can set **Series Type**; Radarr rules can set **Anime**. | Left to detection |
+| **Settings → Services → Anime** | **Leave out anime made in**: countries whose anime-styled titles don't count as anime unless they're in Japanese. | Empty (United States on servers from before the setting) |
 | **Settings → Services** | **Anime Check** report and **Run Check**. | |
 | **Settings → AI** | Provider, key, model, per-feature models (Advanced), **Daily Limit per Person**, credit. See [AI](./ai.md). | Off; 20 answers a day |
 | **Settings → Backfill** | Prowlarr, download clients, category, when a title is stuck, approval, the admin agent; limits under Advanced. See [Backfill](./backfill-and-agent.md). | Off; see below |

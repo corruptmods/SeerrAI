@@ -13,6 +13,7 @@ import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
 import RequestListPicker from '@app/components/RequestModal/RequestListPicker';
 import SearchByNameModal from '@app/components/RequestModal/SearchByNameModal';
 import useFeature from '@app/hooks/useFeature';
+import useIsAnime from '@app/hooks/useIsAnime';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import { useUser } from '@app/hooks/useUser';
@@ -27,7 +28,6 @@ import type { NonFunctionProperties } from '@server/interfaces/api/common';
 import type { QuotaResponse } from '@server/interfaces/api/userInterfaces';
 import { Permission } from '@server/lib/permissions';
 import type { TvDetails } from '@server/models/Tv';
-import { isAnime } from '@server/utils/isAnime';
 import axios from 'axios';
 import { Fragment, useState } from 'react';
 import { useIntl } from 'react-intl';
@@ -106,6 +106,7 @@ const TvRequestModal = ({
   preselect,
 }: RequestModalProps) => {
   const settings = useSettings();
+  const isAnime = useIsAnime();
   const { addToast } = useToasts();
   const { mutate: globalMutate } = useSWRConfig();
   const [listIds, setListIds] = useState<number[]>([]);

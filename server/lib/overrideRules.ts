@@ -10,8 +10,8 @@ import { toSeriesTypeFor } from '@server/constants/seriesType';
 import { getRepository } from '@server/datasource';
 import OverrideRule from '@server/entity/OverrideRule';
 import type { User } from '@server/entity/User';
+import { detectAnime } from '@server/lib/animeDecision';
 import { getSettings } from '@server/lib/settings';
-import { isAnime } from '@server/utils/isAnime';
 import type { RuleCertification } from '@server/utils/ruleCertification';
 import { parseRuleCertifications } from '@server/utils/ruleCertification';
 
@@ -107,7 +107,7 @@ async function overrideRules({
     mediaType === MediaType.TV ||
     !!radarrServer?.activeAnimeDirectory ||
     !!radarrServer?.activeAnimeProfileId;
-  const anime = animeSettings && (animeSetting ?? isAnime(tmdbMedia));
+  const anime = animeSettings && (animeSetting ?? detectAnime(tmdbMedia));
 
   // Read for the server's Discover region, as the title's page reads it for
   // anyone who has not chosen a region of their own.

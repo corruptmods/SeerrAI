@@ -13,6 +13,7 @@ import Episode from '@server/entity/Episode';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { Watchlist } from '@server/entity/Watchlist';
+import { detectAnime } from '@server/lib/animeDecision';
 import { featureEnabled } from '@server/lib/features';
 import {
   SeriesFinishedError,
@@ -26,7 +27,6 @@ import logger from '@server/logger';
 import { mapTvResult } from '@server/models/Search';
 import type { SeasonRequestCoverage } from '@server/models/Tv';
 import { mapSeasonWithEpisodes, mapTvDetails } from '@server/models/Tv';
-import { isAnime } from '@server/utils/isAnime';
 import { Router } from 'express';
 import { In } from 'typeorm';
 
@@ -39,7 +39,7 @@ tvRoutes.get('/:id', async (req, res, next) => {
     const tmdbTv = await tmdb.getTvShow({
       tvId: Number(req.params.id),
     });
-    const metadataProvider = isAnime(tmdbTv)
+    const metadataProvider = detectAnime(tmdbTv)
       ? await getMetadataProvider('anime')
       : await getMetadataProvider('tv');
     const tv = await metadataProvider.getTvShow({
@@ -92,7 +92,7 @@ tvRoutes.get('/:id/season/:seasonNumber', async (req, res, next) => {
     const tmdbTv = await tmdb.getTvShow({
       tvId: Number(req.params.id),
     });
-    const metadataProvider = isAnime(tmdbTv)
+    const metadataProvider = detectAnime(tmdbTv)
       ? await getMetadataProvider('anime')
       : await getMetadataProvider('tv');
 

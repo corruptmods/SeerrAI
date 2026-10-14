@@ -1,7 +1,8 @@
 import { radarrRouting } from '@server/lib/radarrRouting';
 import type { RadarrSettings } from '@server/lib/settings';
+import { getSettings } from '@server/lib/settings';
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, describe, it } from 'node:test';
 
 /* Where a movie goes in Radarr, before a request's own folder or profile. */
 
@@ -53,20 +54,34 @@ describe('radarrRouting', () => {
     });
   });
 
-  it('sends American titles with the usual settings, anime keyword or not', () => {
+  describe('an American anime-styled film', () => {
     const americanAnimeStyle = {
       keywords: { keywords: [{ id: 210024 }] },
       genres: [{ id: 16 }],
       original_language: 'en',
       origin_country: ['US'],
     };
-    assert.deepEqual(
-      [
+    afterEach(() => {
+      getSettings().main.animeExcludedCountries = [];
+    });
+
+    it('goes as anime when no country is left out', () => {
+      assert.equal(
         radarrRouting(americanAnimeStyle, settings).rootFolder,
-        radarrRouting(americanAnimeStyle, settings, 'anime').rootFolder,
-      ],
-      ['/movies', '/anime-movies']
-    );
+        '/anime-movies'
+      );
+    });
+
+    it('goes with the usual settings when American anime is left out', () => {
+      getSettings().main.animeExcludedCountries = ['US'];
+      assert.deepEqual(
+        [
+          radarrRouting(americanAnimeStyle, settings).rootFolder,
+          radarrRouting(americanAnimeStyle, settings, 'anime').rootFolder,
+        ],
+        ['/movies', '/anime-movies']
+      );
+    });
   });
 
   it('lets anime or not chosen for the request decide either way', () => {

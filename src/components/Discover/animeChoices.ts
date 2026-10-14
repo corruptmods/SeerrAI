@@ -12,6 +12,12 @@ export const ANIME_CHOICES = [
 
 export type AnimeChoice = (typeof ANIME_CHOICES)[number];
 
+/**
+ * The countries the Anime page offers first, where most anime comes from.
+ * Any other country can be chosen too.
+ */
+export const ANIME_COUNTRIES = ['JP', 'KR', 'CN', 'US'] as const;
+
 /** The choice in the address, or this season for anything else. */
 export const readAnimeChoice = (value: unknown): AnimeChoice =>
   ANIME_CHOICES.includes(value as AnimeChoice)
@@ -37,20 +43,36 @@ export const choiceSeason = (
 };
 
 /**
+ * The country in the address (`?country=`), or undefined for every country
+ * (and for anything that is not a country code).
+ */
+export const readAnimeCountry = (value: unknown): string | undefined =>
+  typeof value === 'string' && /^[a-z]{2}$/i.test(value)
+    ? value.toUpperCase()
+    : undefined;
+
+/**
  * What to ask the server for. The season is worked out here, from the
  * person's own calendar, so the page always lists the season it names.
  * Next season is what premieres then: nothing of it has aired yet.
  */
 export const animeQuery = (
   choice: AnimeChoice,
-  today = new Date()
-): { show: 'airing' | 'premieres' | 'popular' | 'films'; season?: string } => {
+  today = new Date(),
+  country?: string
+): {
+  show: 'airing' | 'premieres' | 'popular' | 'films';
+  season?: string;
+  country?: string;
+} => {
   const season = choiceSeason(choice, today);
+  const where = country ? { country } : {};
   if (!season) {
-    return { show: choice === 'films' ? 'films' : 'popular' };
+    return { show: choice === 'films' ? 'films' : 'popular', ...where };
   }
   return {
     show: choice === 'next' ? 'premieres' : 'airing',
     season: seasonKey(season),
+    ...where,
   };
 };

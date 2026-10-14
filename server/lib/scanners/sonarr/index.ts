@@ -9,6 +9,7 @@ import type {
 import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
+import { detectAnime } from '@server/lib/animeDecision';
 import type {
   ProcessableSeason,
   RunnableScanner,
@@ -17,7 +18,6 @@ import type {
 import BaseScanner from '@server/lib/scanners/baseScanner';
 import type { SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
-import { isAnime } from '@server/utils/isAnime';
 import { uniqWith } from 'lodash';
 
 type SyncStatus = StatusBase & {
@@ -187,7 +187,7 @@ class SonarrScanner
       }
 
       const tmdbId = tvShow.id;
-      const metadataProvider = isAnime(tvShow)
+      const metadataProvider = detectAnime(tvShow)
         ? await getMetadataProvider('anime')
         : await getMetadataProvider('tv');
 

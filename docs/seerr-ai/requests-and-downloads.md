@@ -51,7 +51,9 @@ An admin can link SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorren
 
 ## Anime
 
-Seerr AI decides what counts as anime the same way everywhere: TMDB's anime keyword, or animation in Japanese. A US title not in Japanese is never anime.
+Seerr AI decides what counts as anime the same way everywhere (requests, scans, title pages, the Anime page on Discover and the Anime Check): anything TMDB tags with its anime keyword, from any country, and animation in Japanese.
+
+- **Leave out anime made in** (**Settings → Services → Anime**): countries whose anime-styled titles don't count as anime unless they're in Japanese. List the United States to keep shows like Avatar: The Last Airbender and Castlevania with your regular series. Empty on a new server; a server that ran Seerr AI before this setting starts with the United States, the rule it always had.
 
 - **When requesting:** "Request as anime" in the request window starts from that decision. Changing it switches the advanced options to the anime folder, profile and tags (or back).
 - **On a title:** admins can set **Anime** in the title's Manage panel to Automatic, Anime or Not anime. **Save and Move** moves it in Sonarr or Radarr to the matching folder, profile and series type.

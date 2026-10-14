@@ -14,12 +14,11 @@ import {
   judgeSeries,
 } from '@server/lib/animeCheck';
 import type { AnimeDecidedBy } from '@server/lib/animeDecision';
-import { decideAnime } from '@server/lib/animeDecision';
+import { decideAnime, detectAnime } from '@server/lib/animeDecision';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import type { AnimeSignals } from '@server/utils/isAnime';
-import { isAnime } from '@server/utils/isAnime';
 import { In } from 'typeorm';
 
 /*
@@ -275,7 +274,7 @@ const place = async (media: Media) => {
   );
   return {
     animeSetting: media.animeSetting ?? null,
-    detected: isAnime(details),
+    detected: detectAnime(details),
     anime,
     decidedBy,
     automatic: decideAnime(details, requestType, null).anime,

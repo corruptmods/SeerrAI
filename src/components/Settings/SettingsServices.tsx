@@ -4,6 +4,7 @@ import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
 import PageTitle from '@app/components/Common/PageTitle';
 import AnimeCheck from '@app/components/Settings/AnimeCheck';
+import AnimeSettings from '@app/components/Settings/AnimeSettings';
 import OverrideRuleModal from '@app/components/Settings/OverrideRule/OverrideRuleModal';
 import OverrideRuleTiles from '@app/components/Settings/OverrideRule/OverrideRuleTiles';
 import RadarrModal from '@app/components/Settings/RadarrModal';
@@ -422,6 +423,7 @@ const SettingsServices = () => {
           </li>
         </ul>
       </div>
+      <AnimeSettings />
       {!!sonarrData?.length && <AnimeCheck />}
       {overrideRuleModal.open && radarrData && sonarrData && (
         <OverrideRuleModal

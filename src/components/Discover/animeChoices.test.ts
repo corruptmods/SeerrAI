@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { animeQuery, choiceSeason, readAnimeChoice } from './animeChoices';
+import {
+  animeQuery,
+  choiceSeason,
+  readAnimeChoice,
+  readAnimeCountry,
+} from './animeChoices';
 
 /*
  * The Anime page's choices, as the page asks the server for them: seasons
@@ -55,5 +60,25 @@ describe('the Anime page', () => {
     assert.equal(readAnimeChoice(['next', 'last']), 'this');
     assert.equal(readAnimeChoice('next'), 'next');
     assert.equal(readAnimeChoice('films'), 'films');
+  });
+
+  it('narrows to the country chosen, with any choice', () => {
+    assert.deepEqual(animeQuery('this', today, 'KR'), {
+      show: 'airing',
+      season: '2026-fall',
+      country: 'KR',
+    });
+    assert.deepEqual(animeQuery('films', today, 'JP'), {
+      show: 'films',
+      country: 'JP',
+    });
+  });
+
+  it('reads a country from the address, or every country for anything else', () => {
+    assert.equal(readAnimeCountry('kr'), 'KR');
+    assert.equal(readAnimeCountry('FR'), 'FR');
+    assert.equal(readAnimeCountry(undefined), undefined);
+    assert.equal(readAnimeCountry('Japan'), undefined);
+    assert.equal(readAnimeCountry(['JP', 'KR']), undefined);
   });
 });

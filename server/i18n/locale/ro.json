@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Solicitarea filmului a eșuat} movie4k {Solicitarea filmului 4K a eșuat} tv4k {Solicitarea serialului 4K a eșuat} other {Solicitarea serialului a eșuat}}",
   "notifications.events.mediaPending": "{kind, select, movie {Solicitare nouă de film} movie4k {Solicitare nouă de film 4K} tv4k {Solicitare nouă de serial 4K} other {Solicitare nouă de serial}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Filmul solicitat este disponibil acum} movie4k {Filmul 4K solicitat este disponibil acum} tv4k {Serialul 4K solicitat este disponibil acum} other {Serialul solicitat este disponibil acum}}",
-  "notifications.events.seriesReadyToWatch": "Serial gata de vizionat"
+  "notifications.events.seriesReadyToWatch": "Serial gata de vizionat",
+  "notifications.agents.webpush.downloadedTitleMusic": "Muzică descărcată",
+  "notifications.agents.webpush.failedTitleMusic": "Solicitarea de muzică a eșuat",
+  "notifications.common.declineReason": "Motiv",
+  "notifications.common.music": "muzică",
+  "notifications.events.musicApproved": "Solicitare de muzică aprobată",
+  "notifications.events.musicAutoApproved": "Solicitare de muzică aprobată automat",
+  "notifications.events.musicAutoRequested": "Solicitare de muzică trimisă automat",
+  "notifications.events.musicAvailable": "Muzică disponibilă acum",
+  "notifications.events.musicDeclined": "Solicitare de muzică respinsă",
+  "notifications.events.musicFailed": "Solicitarea de muzică a eșuat",
+  "notifications.events.musicPending": "Solicitare nouă de muzică",
+  "notifications.events.musicRequestAvailable": "Muzica solicitată este disponibilă acum"
 }

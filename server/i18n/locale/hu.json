@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Sikertelen filmkérés} movie4k {Sikertelen 4K filmkérés} tv4k {Sikertelen 4K sorozatkérés} other {Sikertelen sorozatkérés}}",
   "notifications.events.mediaPending": "{kind, select, movie {Új filmkérés} movie4k {Új 4K filmkérés} tv4k {Új 4K sorozatkérés} other {Új sorozatkérés}}",
   "notifications.events.requestAvailable": "{kind, select, movie {A kért film már elérhető} movie4k {A kért 4K film már elérhető} tv4k {A kért 4K sorozat már elérhető} other {A kért sorozat már elérhető}}",
-  "notifications.events.seriesReadyToWatch": "A sorozat megnézhető"
+  "notifications.events.seriesReadyToWatch": "A sorozat megnézhető",
+  "notifications.agents.webpush.downloadedTitleMusic": "Zene letöltve",
+  "notifications.agents.webpush.failedTitleMusic": "Sikertelen zenei kérés",
+  "notifications.common.declineReason": "Indok",
+  "notifications.common.music": "zene",
+  "notifications.events.musicApproved": "Zenei kérés jóváhagyva",
+  "notifications.events.musicAutoApproved": "Zenei kérés automatikusan jóváhagyva",
+  "notifications.events.musicAutoRequested": "Zenei kérés automatikusan elküldve",
+  "notifications.events.musicAvailable": "A zene már elérhető",
+  "notifications.events.musicDeclined": "Zenei kérés elutasítva",
+  "notifications.events.musicFailed": "Sikertelen zenei kérés",
+  "notifications.events.musicPending": "Új zenei kérés",
+  "notifications.events.musicRequestAvailable": "A kért zene már elérhető"
 }

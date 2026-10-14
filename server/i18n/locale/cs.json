@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Žádost o film selhala} movie4k {Žádost o film ve 4K selhala} tv4k {Žádost o seriál ve 4K selhala} other {Žádost o seriál selhala}}",
   "notifications.events.mediaPending": "{kind, select, movie {Nová žádost o film} movie4k {Nová žádost o film ve 4K} tv4k {Nová žádost o seriál ve 4K} other {Nová žádost o seriál}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Zažádaný film je nyní dostupný} movie4k {Zažádaný film ve 4K je nyní dostupný} tv4k {Zažádaný seriál ve 4K je nyní dostupný} other {Zažádaný seriál je nyní dostupný}}",
-  "notifications.events.seriesReadyToWatch": "Seriál je připraven ke sledování"
+  "notifications.events.seriesReadyToWatch": "Seriál je připraven ke sledování",
+  "notifications.agents.webpush.downloadedTitleMusic": "Hudba stažena",
+  "notifications.agents.webpush.failedTitleMusic": "Žádost o hudbu selhala",
+  "notifications.common.declineReason": "Důvod",
+  "notifications.common.music": "hudba",
+  "notifications.events.musicApproved": "Žádost o hudbu schválena",
+  "notifications.events.musicAutoApproved": "Žádost o hudbu automaticky schválena",
+  "notifications.events.musicAutoRequested": "Žádost o hudbu automaticky odeslána",
+  "notifications.events.musicAvailable": "Hudba je nyní dostupná",
+  "notifications.events.musicDeclined": "Žádost o hudbu zamítnuta",
+  "notifications.events.musicFailed": "Žádost o hudbu selhala",
+  "notifications.events.musicPending": "Nová žádost o hudbu",
+  "notifications.events.musicRequestAvailable": "Zažádaná hudba je nyní dostupná"
 }

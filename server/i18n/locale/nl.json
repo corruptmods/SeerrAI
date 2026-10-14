@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Filmaanvraag mislukt} movie4k {4K-filmaanvraag mislukt} tv4k {4K-serie-aanvraag mislukt} other {Serie-aanvraag mislukt}}",
   "notifications.events.mediaPending": "{kind, select, movie {Nieuwe filmaanvraag} movie4k {Nieuwe 4K-filmaanvraag} tv4k {Nieuwe 4K-serie-aanvraag} other {Nieuwe serie-aanvraag}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Aangevraagde film nu beschikbaar} movie4k {Aangevraagde 4K-film nu beschikbaar} tv4k {Aangevraagde 4K-serie nu beschikbaar} other {Aangevraagde serie nu beschikbaar}}",
-  "notifications.events.seriesReadyToWatch": "Serie klaar om te kijken"
+  "notifications.events.seriesReadyToWatch": "Serie klaar om te kijken",
+  "notifications.agents.webpush.downloadedTitleMusic": "Muziek gedownload",
+  "notifications.agents.webpush.failedTitleMusic": "Muziekaanvraag mislukt",
+  "notifications.common.declineReason": "Reden",
+  "notifications.common.music": "muziek",
+  "notifications.events.musicApproved": "Muziekaanvraag goedgekeurd",
+  "notifications.events.musicAutoApproved": "Muziekaanvraag automatisch goedgekeurd",
+  "notifications.events.musicAutoRequested": "Muziekaanvraag automatisch ingediend",
+  "notifications.events.musicAvailable": "Muziek nu beschikbaar",
+  "notifications.events.musicDeclined": "Muziekaanvraag afgewezen",
+  "notifications.events.musicFailed": "Muziekaanvraag mislukt",
+  "notifications.events.musicPending": "Nieuwe muziekaanvraag",
+  "notifications.events.musicRequestAvailable": "Aangevraagde muziek nu beschikbaar"
 }

@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Asuter n usaru yecceḍ} movie4k {Asuter n usaru 4K yecceḍ} tv4k {Asuter n tesnasla 4K yecceḍ} other {Asuter n tesnasla yecceḍ}}",
   "notifications.events.mediaPending": "{kind, select, movie {Asuter amaynut n usaru} movie4k {Asuter amaynut n usaru 4K} tv4k {Asuter amaynut n tesnasla 4K} other {Asuter amaynut n tesnasla}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Asaru yettwasutren yella tura} movie4k {Asaru 4K yettwasutren yella tura} tv4k {Tasnasla 4K yettwasutren tella tura} other {Tasnasla yettwasutren tella tura}}",
-  "notifications.events.seriesReadyToWatch": "Tasnasla tewjed i tmuɣli"
+  "notifications.events.seriesReadyToWatch": "Tasnasla tewjed i tmuɣli",
+  "notifications.agents.webpush.downloadedTitleMusic": "Aẓawan yettwasider",
+  "notifications.agents.webpush.failedTitleMusic": "Asuter n uẓawan yecceḍ",
+  "notifications.common.declineReason": "Tamentilt",
+  "notifications.common.music": "aẓawan",
+  "notifications.events.musicApproved": "Asuter n uẓawan yettwaqbel",
+  "notifications.events.musicAutoApproved": "Asuter n uẓawan yettwaqbel s wudem awurman",
+  "notifications.events.musicAutoRequested": "Asuter n uẓawan yettwazen s wudem awurman",
+  "notifications.events.musicAvailable": "Aẓawan yella tura",
+  "notifications.events.musicDeclined": "Asuter n uẓawan yettwagi",
+  "notifications.events.musicFailed": "Asuter n uẓawan yecceḍ",
+  "notifications.events.musicPending": "Asuter amaynut n uẓawan",
+  "notifications.events.musicRequestAvailable": "Aẓawan yettwasutren yella tura"
 }

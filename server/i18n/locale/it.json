@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Richiesta del film non riuscita} movie4k {Richiesta del film in 4K non riuscita} tv4k {Richiesta della serie in 4K non riuscita} other {Richiesta della serie non riuscita}}",
   "notifications.events.mediaPending": "{kind, select, movie {Nuova richiesta di film} movie4k {Nuova richiesta di film in 4K} tv4k {Nuova richiesta di serie in 4K} other {Nuova richiesta di serie}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Film richiesto ora disponibile} movie4k {Film in 4K richiesto ora disponibile} tv4k {Serie in 4K richiesta ora disponibile} other {Serie richiesta ora disponibile}}",
-  "notifications.events.seriesReadyToWatch": "Serie pronta da guardare"
+  "notifications.events.seriesReadyToWatch": "Serie pronta da guardare",
+  "notifications.agents.webpush.downloadedTitleMusic": "Musica scaricata",
+  "notifications.agents.webpush.failedTitleMusic": "Richiesta di musica non riuscita",
+  "notifications.common.declineReason": "Motivo",
+  "notifications.common.music": "musica",
+  "notifications.events.musicApproved": "Richiesta di musica approvata",
+  "notifications.events.musicAutoApproved": "Richiesta di musica approvata automaticamente",
+  "notifications.events.musicAutoRequested": "Richiesta di musica inviata automaticamente",
+  "notifications.events.musicAvailable": "Musica ora disponibile",
+  "notifications.events.musicDeclined": "Richiesta di musica rifiutata",
+  "notifications.events.musicFailed": "Richiesta di musica non riuscita",
+  "notifications.events.musicPending": "Nuova richiesta di musica",
+  "notifications.events.musicRequestAvailable": "Musica richiesta ora disponibile"
 }

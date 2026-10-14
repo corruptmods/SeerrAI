@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {映画のリクエスト失敗} movie4k {4K映画のリクエスト失敗} tv4k {4Kシリーズのリクエスト失敗} other {シリーズのリクエスト失敗}}",
   "notifications.events.mediaPending": "{kind, select, movie {新しい映画のリクエスト} movie4k {新しい4K映画のリクエスト} tv4k {新しい4Kシリーズのリクエスト} other {新しいシリーズのリクエスト}}",
   "notifications.events.requestAvailable": "{kind, select, movie {リクエストした映画が視聴可能になりました} movie4k {リクエストした4K映画が視聴可能になりました} tv4k {リクエストした4Kシリーズが視聴可能になりました} other {リクエストしたシリーズが視聴可能になりました}}",
-  "notifications.events.seriesReadyToWatch": "シリーズの視聴準備ができました"
+  "notifications.events.seriesReadyToWatch": "シリーズの視聴準備ができました",
+  "notifications.agents.webpush.downloadedTitleMusic": "音楽のダウンロード完了",
+  "notifications.agents.webpush.failedTitleMusic": "音楽のリクエスト失敗",
+  "notifications.common.declineReason": "理由",
+  "notifications.common.music": "音楽",
+  "notifications.events.musicApproved": "音楽のリクエスト承認",
+  "notifications.events.musicAutoApproved": "音楽のリクエストを自動承認",
+  "notifications.events.musicAutoRequested": "音楽のリクエストを自動送信",
+  "notifications.events.musicAvailable": "音楽が視聴可能になりました",
+  "notifications.events.musicDeclined": "音楽のリクエスト却下",
+  "notifications.events.musicFailed": "音楽のリクエスト失敗",
+  "notifications.events.musicPending": "新しい音楽のリクエスト",
+  "notifications.events.musicRequestAvailable": "リクエストした音楽が視聴可能になりました"
 }

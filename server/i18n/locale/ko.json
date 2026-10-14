@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {영화 요청 실패} movie4k {4K 영화 요청 실패} tv4k {4K 시리즈 요청 실패} other {시리즈 요청 실패}}",
   "notifications.events.mediaPending": "{kind, select, movie {새 영화 요청} movie4k {새 4K 영화 요청} tv4k {새 4K 시리즈 요청} other {새 시리즈 요청}}",
   "notifications.events.requestAvailable": "{kind, select, movie {요청한 영화 이제 시청 가능} movie4k {요청한 4K 영화 이제 시청 가능} tv4k {요청한 4K 시리즈 이제 시청 가능} other {요청한 시리즈 이제 시청 가능}}",
-  "notifications.events.seriesReadyToWatch": "시리즈 시청 준비 완료"
+  "notifications.events.seriesReadyToWatch": "시리즈 시청 준비 완료",
+  "notifications.agents.webpush.downloadedTitleMusic": "음악 다운로드 완료",
+  "notifications.agents.webpush.failedTitleMusic": "음악 요청 실패",
+  "notifications.common.declineReason": "사유",
+  "notifications.common.music": "음악",
+  "notifications.events.musicApproved": "음악 요청 승인됨",
+  "notifications.events.musicAutoApproved": "음악 요청 자동 승인됨",
+  "notifications.events.musicAutoRequested": "음악 요청 자동 제출됨",
+  "notifications.events.musicAvailable": "이제 음악 이용 가능",
+  "notifications.events.musicDeclined": "음악 요청 거절됨",
+  "notifications.events.musicFailed": "음악 요청 실패",
+  "notifications.events.musicPending": "새 음악 요청",
+  "notifications.events.musicRequestAvailable": "요청한 음악 이제 이용 가능"
 }

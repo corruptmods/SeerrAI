@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Film-eskaerak huts egin du} movie4k {4K film-eskaerak huts egin du} tv4k {4K telesail-eskaerak huts egin du} other {Telesail-eskaerak huts egin du}}",
   "notifications.events.mediaPending": "{kind, select, movie {Film-eskaera berria} movie4k {4K film-eskaera berria} tv4k {4K telesail-eskaera berria} other {Telesail-eskaera berria}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Eskatutako filma eskuragarri dago orain} movie4k {Eskatutako 4K filma eskuragarri dago orain} tv4k {Eskatutako 4K telesaila eskuragarri dago orain} other {Eskatutako telesaila eskuragarri dago orain}}",
-  "notifications.events.seriesReadyToWatch": "Telesaila ikusteko prest"
+  "notifications.events.seriesReadyToWatch": "Telesaila ikusteko prest",
+  "notifications.agents.webpush.downloadedTitleMusic": "Musika deskargatu da",
+  "notifications.agents.webpush.failedTitleMusic": "Musika-eskaerak huts egin du",
+  "notifications.common.declineReason": "Arrazoia",
+  "notifications.common.music": "musika",
+  "notifications.events.musicApproved": "Musika-eskaera onartuta",
+  "notifications.events.musicAutoApproved": "Musika-eskaera automatikoki onartuta",
+  "notifications.events.musicAutoRequested": "Musika-eskaera automatikoki bidalita",
+  "notifications.events.musicAvailable": "Musika eskuragarri dago orain",
+  "notifications.events.musicDeclined": "Musika-eskaera baztertuta",
+  "notifications.events.musicFailed": "Musika-eskaerak huts egin du",
+  "notifications.events.musicPending": "Musika-eskaera berria",
+  "notifications.events.musicRequestAvailable": "Eskatutako musika eskuragarri dago orain"
 }

@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Prośba o film nie powiodła się} movie4k {Prośba o film 4K nie powiodła się} tv4k {Prośba o serial 4K nie powiodła się} other {Prośba o serial nie powiodła się}}",
   "notifications.events.mediaPending": "{kind, select, movie {Nowa prośba o film} movie4k {Nowa prośba o film 4K} tv4k {Nowa prośba o serial 4K} other {Nowa prośba o serial}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Film, o który proszono, jest już dostępny} movie4k {Film 4K, o który proszono, jest już dostępny} tv4k {Serial 4K, o który proszono, jest już dostępny} other {Serial, o który proszono, jest już dostępny}}",
-  "notifications.events.seriesReadyToWatch": "Serial gotowy do oglądania"
+  "notifications.events.seriesReadyToWatch": "Serial gotowy do oglądania",
+  "notifications.agents.webpush.downloadedTitleMusic": "Pobrano muzykę",
+  "notifications.agents.webpush.failedTitleMusic": "Prośba o muzykę nie powiodła się",
+  "notifications.common.declineReason": "Powód",
+  "notifications.common.music": "muzyka",
+  "notifications.events.musicApproved": "Zatwierdzono prośbę o muzykę",
+  "notifications.events.musicAutoApproved": "Automatycznie zatwierdzono prośbę o muzykę",
+  "notifications.events.musicAutoRequested": "Automatycznie wysłano prośbę o muzykę",
+  "notifications.events.musicAvailable": "Muzyka jest już dostępna",
+  "notifications.events.musicDeclined": "Odrzucono prośbę o muzykę",
+  "notifications.events.musicFailed": "Prośba o muzykę nie powiodła się",
+  "notifications.events.musicPending": "Nowa prośba o muzykę",
+  "notifications.events.musicRequestAvailable": "Muzyka, o którą proszono, jest już dostępna"
 }

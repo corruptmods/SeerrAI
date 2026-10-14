@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Elokuvapyyntö epäonnistui} movie4k {4K-elokuvapyyntö epäonnistui} tv4k {4K-sarjapyyntö epäonnistui} other {Sarjapyyntö epäonnistui}}",
   "notifications.events.mediaPending": "{kind, select, movie {Uusi elokuvapyyntö} movie4k {Uusi 4K-elokuvapyyntö} tv4k {Uusi 4K-sarjapyyntö} other {Uusi sarjapyyntö}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Pyydetty elokuva nyt saatavilla} movie4k {Pyydetty 4K-elokuva nyt saatavilla} tv4k {Pyydetty 4K-sarja nyt saatavilla} other {Pyydetty sarja nyt saatavilla}}",
-  "notifications.events.seriesReadyToWatch": "Sarja valmiina katsottavaksi"
+  "notifications.events.seriesReadyToWatch": "Sarja valmiina katsottavaksi",
+  "notifications.agents.webpush.downloadedTitleMusic": "Musiikki ladattu",
+  "notifications.agents.webpush.failedTitleMusic": "Musiikkipyyntö epäonnistui",
+  "notifications.common.declineReason": "Syy",
+  "notifications.common.music": "musiikki",
+  "notifications.events.musicApproved": "Musiikkipyyntö hyväksytty",
+  "notifications.events.musicAutoApproved": "Musiikkipyyntö hyväksytty automaattisesti",
+  "notifications.events.musicAutoRequested": "Musiikkipyyntö lähetetty automaattisesti",
+  "notifications.events.musicAvailable": "Musiikki nyt saatavilla",
+  "notifications.events.musicDeclined": "Musiikkipyyntö hylätty",
+  "notifications.events.musicFailed": "Musiikkipyyntö epäonnistui",
+  "notifications.events.musicPending": "Uusi musiikkipyyntö",
+  "notifications.events.musicRequestAvailable": "Pyydetty musiikki nyt saatavilla"
 }

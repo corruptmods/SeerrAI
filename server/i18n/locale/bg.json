@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Неуспешна заявка за филм} movie4k {Неуспешна заявка за филм в 4K} tv4k {Неуспешна заявка за сериал в 4K} other {Неуспешна заявка за сериал}}",
   "notifications.events.mediaPending": "{kind, select, movie {Нова заявка за филм} movie4k {Нова заявка за филм в 4K} tv4k {Нова заявка за сериал в 4K} other {Нова заявка за сериал}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Заявеният филм вече е наличен} movie4k {Заявеният филм в 4K вече е наличен} tv4k {Заявеният сериал в 4K вече е наличен} other {Заявеният сериал вече е наличен}}",
-  "notifications.events.seriesReadyToWatch": "Сериалът е готов за гледане"
+  "notifications.events.seriesReadyToWatch": "Сериалът е готов за гледане",
+  "notifications.agents.webpush.downloadedTitleMusic": "Музиката е изтеглена",
+  "notifications.agents.webpush.failedTitleMusic": "Неуспешна заявка за музика",
+  "notifications.common.declineReason": "Причина",
+  "notifications.common.music": "музика",
+  "notifications.events.musicApproved": "Заявката за музика е одобрена",
+  "notifications.events.musicAutoApproved": "Заявката за музика е одобрена автоматично",
+  "notifications.events.musicAutoRequested": "Автоматично е подадена заявка за музика",
+  "notifications.events.musicAvailable": "Музиката вече е налична",
+  "notifications.events.musicDeclined": "Заявката за музика е отхвърлена",
+  "notifications.events.musicFailed": "Неуспешна заявка за музика",
+  "notifications.events.musicPending": "Нова заявка за музика",
+  "notifications.events.musicRequestAvailable": "Заявената музика вече е налична"
 }

@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Filmo rezervacija nepavyko} movie4k {4K filmo rezervacija nepavyko} tv4k {4K serialo rezervacija nepavyko} other {Serialo rezervacija nepavyko}}",
   "notifications.events.mediaPending": "{kind, select, movie {Nauja filmo rezervacija} movie4k {Nauja 4K filmo rezervacija} tv4k {Nauja 4K serialo rezervacija} other {Nauja serialo rezervacija}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Rezervuotas filmas jau pasiekiamas} movie4k {Rezervuotas 4K filmas jau pasiekiamas} tv4k {Rezervuotas 4K serialas jau pasiekiamas} other {Rezervuotas serialas jau pasiekiamas}}",
-  "notifications.events.seriesReadyToWatch": "Serialas paruoštas žiūrėti"
+  "notifications.events.seriesReadyToWatch": "Serialas paruoštas žiūrėti",
+  "notifications.agents.webpush.downloadedTitleMusic": "Muzika atsisiųsta",
+  "notifications.agents.webpush.failedTitleMusic": "Muzikos rezervacija nepavyko",
+  "notifications.common.declineReason": "Priežastis",
+  "notifications.common.music": "muzika",
+  "notifications.events.musicApproved": "Muzikos rezervacija patvirtinta",
+  "notifications.events.musicAutoApproved": "Muzikos rezervacija patvirtinta automatiškai",
+  "notifications.events.musicAutoRequested": "Muzikos rezervacija pateikta automatiškai",
+  "notifications.events.musicAvailable": "Muzika jau pasiekiama",
+  "notifications.events.musicDeclined": "Muzikos rezervacija atmesta",
+  "notifications.events.musicFailed": "Muzikos rezervacija nepavyko",
+  "notifications.events.musicPending": "Nauja muzikos rezervacija",
+  "notifications.events.musicRequestAvailable": "Rezervuota muzika jau pasiekiama"
 }

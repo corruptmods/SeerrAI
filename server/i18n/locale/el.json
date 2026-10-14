@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Το αίτημα ταινίας απέτυχε} movie4k {Το αίτημα ταινίας 4K απέτυχε} tv4k {Το αίτημα σειράς 4K απέτυχε} other {Το αίτημα σειράς απέτυχε}}",
   "notifications.events.mediaPending": "{kind, select, movie {Νέο αίτημα ταινίας} movie4k {Νέο αίτημα ταινίας 4K} tv4k {Νέο αίτημα σειράς 4K} other {Νέο αίτημα σειράς}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Η ταινία που ζητήθηκε είναι πλέον διαθέσιμη} movie4k {Η ταινία 4K που ζητήθηκε είναι πλέον διαθέσιμη} tv4k {Η σειρά 4K που ζητήθηκε είναι πλέον διαθέσιμη} other {Η σειρά που ζητήθηκε είναι πλέον διαθέσιμη}}",
-  "notifications.events.seriesReadyToWatch": "Η σειρά είναι έτοιμη για προβολή"
+  "notifications.events.seriesReadyToWatch": "Η σειρά είναι έτοιμη για προβολή",
+  "notifications.agents.webpush.downloadedTitleMusic": "Η μουσική κατέβηκε",
+  "notifications.agents.webpush.failedTitleMusic": "Το αίτημα μουσικής απέτυχε",
+  "notifications.common.declineReason": "Αιτία",
+  "notifications.common.music": "μουσική",
+  "notifications.events.musicApproved": "Το αίτημα μουσικής εγκρίθηκε",
+  "notifications.events.musicAutoApproved": "Το αίτημα μουσικής εγκρίθηκε αυτόματα",
+  "notifications.events.musicAutoRequested": "Το αίτημα μουσικής υποβλήθηκε αυτόματα",
+  "notifications.events.musicAvailable": "Η μουσική είναι πλέον διαθέσιμη",
+  "notifications.events.musicDeclined": "Το αίτημα μουσικής απορρίφθηκε",
+  "notifications.events.musicFailed": "Το αίτημα μουσικής απέτυχε",
+  "notifications.events.musicPending": "Νέο αίτημα μουσικής",
+  "notifications.events.musicRequestAvailable": "Η μουσική που ζητήθηκε είναι πλέον διαθέσιμη"
 }

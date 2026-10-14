@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {فشل طلب الفيلم} movie4k {فشل طلب الفيلم بدقة 4K} tv4k {فشل طلب المسلسل بدقة 4K} other {فشل طلب المسلسل}}",
   "notifications.events.mediaPending": "{kind, select, movie {طلب فيلم جديد} movie4k {طلب فيلم جديد بدقة 4K} tv4k {طلب مسلسل جديد بدقة 4K} other {طلب مسلسل جديد}}",
   "notifications.events.requestAvailable": "{kind, select, movie {طلب الفيلم متوفر الآن} movie4k {طلب الفيلم بدقة 4K متوفر الآن} tv4k {طلب المسلسل بدقة 4K متوفر الآن} other {طلب المسلسل متوفر الآن}}",
-  "notifications.events.seriesReadyToWatch": "المسلسل جاهز للمشاهدة"
+  "notifications.events.seriesReadyToWatch": "المسلسل جاهز للمشاهدة",
+  "notifications.agents.webpush.downloadedTitleMusic": "نُزّلت الموسيقى",
+  "notifications.agents.webpush.failedTitleMusic": "فشل طلب الموسيقى",
+  "notifications.common.declineReason": "السبب",
+  "notifications.common.music": "موسيقى",
+  "notifications.events.musicApproved": "تمت الموافقة على طلب الموسيقى",
+  "notifications.events.musicAutoApproved": "تمت الموافقة تلقائيًا على طلب الموسيقى",
+  "notifications.events.musicAutoRequested": "تم تقديم طلب الموسيقى تلقائيًا",
+  "notifications.events.musicAvailable": "الموسيقى متوفرة الآن",
+  "notifications.events.musicDeclined": "تم رفض طلب الموسيقى",
+  "notifications.events.musicFailed": "فشل طلب الموسيقى",
+  "notifications.events.musicPending": "طلب موسيقى جديد",
+  "notifications.events.musicRequestAvailable": "طلب الموسيقى متوفر الآن"
 }

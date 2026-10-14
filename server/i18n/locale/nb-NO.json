@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Filmforespørselen feilet} movie4k {4K-filmforespørselen feilet} tv4k {4K-serieforespørselen feilet} other {Serieforespørselen feilet}}",
   "notifications.events.mediaPending": "{kind, select, movie {Ny filmforespørsel} movie4k {Ny 4K-filmforespørsel} tv4k {Ny 4K-serieforespørsel} other {Ny serieforespørsel}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Forespurt film nå tilgjengelig} movie4k {Forespurt 4K-film nå tilgjengelig} tv4k {Forespurt 4K-serie nå tilgjengelig} other {Forespurt serie nå tilgjengelig}}",
-  "notifications.events.seriesReadyToWatch": "Serie klar til å ses"
+  "notifications.events.seriesReadyToWatch": "Serie klar til å ses",
+  "notifications.agents.webpush.downloadedTitleMusic": "Musikk lastet ned",
+  "notifications.agents.webpush.failedTitleMusic": "Musikkforespørselen feilet",
+  "notifications.common.declineReason": "Årsak",
+  "notifications.common.music": "musikk",
+  "notifications.events.musicApproved": "Musikkforespørsel godkjent",
+  "notifications.events.musicAutoApproved": "Musikkforespørsel automatisk godkjent",
+  "notifications.events.musicAutoRequested": "Musikkforespørsel automatisk sendt",
+  "notifications.events.musicAvailable": "Musikk nå tilgjengelig",
+  "notifications.events.musicDeclined": "Musikkforespørsel avslått",
+  "notifications.events.musicFailed": "Musikkforespørselen feilet",
+  "notifications.events.musicPending": "Ny musikkforespørsel",
+  "notifications.events.musicRequestAvailable": "Forespurt musikk nå tilgjengelig"
 }

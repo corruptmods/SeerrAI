@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Film-Ufro feelgeschloen} movie4k {4K-Film-Ufro feelgeschloen} tv4k {4K-Serien-Ufro feelgeschloen} other {Serien-Ufro feelgeschloen}}",
   "notifications.events.mediaPending": "{kind, select, movie {Nei Film-Ufro} movie4k {Nei 4K-Film-Ufro} tv4k {Nei 4K-Serien-Ufro} other {Nei Serien-Ufro}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Ugefrote Film elo disponibel} movie4k {Ugefrote 4K-Film elo disponibel} tv4k {Ugefroten 4K-Serie elo disponibel} other {Ugefroten Serie elo disponibel}}",
-  "notifications.events.seriesReadyToWatch": "Serie prett zum Kucken"
+  "notifications.events.seriesReadyToWatch": "Serie prett zum Kucken",
+  "notifications.agents.webpush.downloadedTitleMusic": "Musek erofgelueden",
+  "notifications.agents.webpush.failedTitleMusic": "Musekufro feelgeschloen",
+  "notifications.common.declineReason": "Grond",
+  "notifications.common.music": "Musek",
+  "notifications.events.musicApproved": "Musekufro guttgeheescht",
+  "notifications.events.musicAutoApproved": "Musekufro automatesch guttgeheescht",
+  "notifications.events.musicAutoRequested": "Musekufro automatesch ofgeschéckt",
+  "notifications.events.musicAvailable": "Musek elo disponibel",
+  "notifications.events.musicDeclined": "Musekufro ofgeleent",
+  "notifications.events.musicFailed": "Musekufro feelgeschloen",
+  "notifications.events.musicPending": "Nei Musekufro",
+  "notifications.events.musicRequestAvailable": "Ugefrot Musek elo disponibel"
 }

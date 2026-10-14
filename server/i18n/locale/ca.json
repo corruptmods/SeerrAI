@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Ha fallat la sol·licitud de la pel·lícula} movie4k {Ha fallat la sol·licitud de la pel·lícula en 4K} tv4k {Ha fallat la sol·licitud de la sèrie en 4K} other {Ha fallat la sol·licitud de la sèrie}}",
   "notifications.events.mediaPending": "{kind, select, movie {Sol·licitud de pel·lícula nova} movie4k {Sol·licitud de pel·lícula en 4K nova} tv4k {Sol·licitud de sèrie en 4K nova} other {Sol·licitud de sèrie nova}}",
   "notifications.events.requestAvailable": "{kind, select, movie {La pel·lícula sol·licitada ja està disponible} movie4k {La pel·lícula en 4K sol·licitada ja està disponible} tv4k {La sèrie en 4K sol·licitada ja està disponible} other {La sèrie sol·licitada ja està disponible}}",
-  "notifications.events.seriesReadyToWatch": "Sèrie a punt per veure"
+  "notifications.events.seriesReadyToWatch": "Sèrie a punt per veure",
+  "notifications.agents.webpush.downloadedTitleMusic": "Música baixada",
+  "notifications.agents.webpush.failedTitleMusic": "Ha fallat la sol·licitud de música",
+  "notifications.common.declineReason": "Motiu",
+  "notifications.common.music": "música",
+  "notifications.events.musicApproved": "Sol·licitud de música aprovada",
+  "notifications.events.musicAutoApproved": "Sol·licitud de música aprovada automàticament",
+  "notifications.events.musicAutoRequested": "Sol·licitud de música enviada automàticament",
+  "notifications.events.musicAvailable": "Música ja disponible",
+  "notifications.events.musicDeclined": "Sol·licitud de música rebutjada",
+  "notifications.events.musicFailed": "Ha fallat la sol·licitud de música",
+  "notifications.events.musicPending": "Sol·licitud de música nova",
+  "notifications.events.musicRequestAvailable": "La música sol·licitada ja està disponible"
 }

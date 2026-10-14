@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {O Pedido do Filme Falhou} movie4k {O Pedido do Filme em 4K Falhou} tv4k {O Pedido da Série em 4K Falhou} other {O Pedido da Série Falhou}}",
   "notifications.events.mediaPending": "{kind, select, movie {Novo Pedido de Filme} movie4k {Novo Pedido de Filme em 4K} tv4k {Novo Pedido de Série em 4K} other {Novo Pedido de Série}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Filme Pedido Já Disponível} movie4k {Filme em 4K Pedido Já Disponível} tv4k {Série em 4K Pedida Já Disponível} other {Série Pedida Já Disponível}}",
-  "notifications.events.seriesReadyToWatch": "Série Pronta para Ver"
+  "notifications.events.seriesReadyToWatch": "Série Pronta para Ver",
+  "notifications.agents.webpush.downloadedTitleMusic": "Música Transferida",
+  "notifications.agents.webpush.failedTitleMusic": "O Pedido de Música Falhou",
+  "notifications.common.declineReason": "Motivo",
+  "notifications.common.music": "música",
+  "notifications.events.musicApproved": "Pedido de Música Aprovado",
+  "notifications.events.musicAutoApproved": "Pedido de Música Aprovado Automaticamente",
+  "notifications.events.musicAutoRequested": "Pedido de Música Enviado Automaticamente",
+  "notifications.events.musicAvailable": "Música Já Disponível",
+  "notifications.events.musicDeclined": "Pedido de Música Recusado",
+  "notifications.events.musicFailed": "O Pedido de Música Falhou",
+  "notifications.events.musicPending": "Novo Pedido de Música",
+  "notifications.events.musicRequestAvailable": "Música Pedida Já Disponível"
 }

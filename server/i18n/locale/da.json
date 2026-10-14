@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Filmanmodning mislykkedes} movie4k {4K-filmanmodning mislykkedes} tv4k {4K-serieanmodning mislykkedes} other {Serieanmodning mislykkedes}}",
   "notifications.events.mediaPending": "{kind, select, movie {Ny filmanmodning} movie4k {Ny 4K-filmanmodning} tv4k {Ny 4K-serieanmodning} other {Ny serieanmodning}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Anmodet film nu tilgængelig} movie4k {Anmodet 4K-film nu tilgængelig} tv4k {Anmodet 4K-serie nu tilgængelig} other {Anmodet serie nu tilgængelig}}",
-  "notifications.events.seriesReadyToWatch": "Serie klar til at blive set"
+  "notifications.events.seriesReadyToWatch": "Serie klar til at blive set",
+  "notifications.agents.webpush.downloadedTitleMusic": "Musik downloadet",
+  "notifications.agents.webpush.failedTitleMusic": "Musikanmodning mislykkedes",
+  "notifications.common.declineReason": "Årsag",
+  "notifications.common.music": "musik",
+  "notifications.events.musicApproved": "Musikanmodning godkendt",
+  "notifications.events.musicAutoApproved": "Musikanmodning automatisk godkendt",
+  "notifications.events.musicAutoRequested": "Musikanmodning automatisk sendt",
+  "notifications.events.musicAvailable": "Musik nu tilgængelig",
+  "notifications.events.musicDeclined": "Musikanmodning afvist",
+  "notifications.events.musicFailed": "Musikanmodning mislykkedes",
+  "notifications.events.musicPending": "Ny musikanmodning",
+  "notifications.events.musicRequestAvailable": "Anmodet musik nu tilgængelig"
 }

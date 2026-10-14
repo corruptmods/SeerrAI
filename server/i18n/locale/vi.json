@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Yêu cầu phim thất bại} movie4k {Yêu cầu phim 4K thất bại} tv4k {Yêu cầu phim bộ 4K thất bại} other {Yêu cầu phim bộ thất bại}}",
   "notifications.events.mediaPending": "{kind, select, movie {Yêu cầu phim mới} movie4k {Yêu cầu phim 4K mới} tv4k {Yêu cầu phim bộ 4K mới} other {Yêu cầu phim bộ mới}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Phim đã yêu cầu nay đã có sẵn} movie4k {Phim 4K đã yêu cầu nay đã có sẵn} tv4k {Phim bộ 4K đã yêu cầu nay đã có sẵn} other {Phim bộ đã yêu cầu nay đã có sẵn}}",
-  "notifications.events.seriesReadyToWatch": "Phim bộ đã sẵn sàng để xem"
+  "notifications.events.seriesReadyToWatch": "Phim bộ đã sẵn sàng để xem",
+  "notifications.agents.webpush.downloadedTitleMusic": "Đã tải nhạc",
+  "notifications.agents.webpush.failedTitleMusic": "Yêu cầu nhạc thất bại",
+  "notifications.common.declineReason": "Lý do",
+  "notifications.common.music": "nhạc",
+  "notifications.events.musicApproved": "Yêu cầu nhạc đã được phê duyệt",
+  "notifications.events.musicAutoApproved": "Yêu cầu nhạc đã được tự động phê duyệt",
+  "notifications.events.musicAutoRequested": "Yêu cầu nhạc đã được tự động gửi",
+  "notifications.events.musicAvailable": "Nhạc đã có sẵn",
+  "notifications.events.musicDeclined": "Yêu cầu nhạc đã bị từ chối",
+  "notifications.events.musicFailed": "Yêu cầu nhạc thất bại",
+  "notifications.events.musicPending": "Yêu cầu nhạc mới",
+  "notifications.events.musicRequestAvailable": "Nhạc đã yêu cầu nay đã có sẵn"
 }

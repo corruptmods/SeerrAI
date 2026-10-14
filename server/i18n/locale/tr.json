@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Film Talebi Başarısız} movie4k {4K Film Talebi Başarısız} tv4k {4K Dizi Talebi Başarısız} other {Dizi Talebi Başarısız}}",
   "notifications.events.mediaPending": "{kind, select, movie {Yeni Film Talebi} movie4k {Yeni 4K Film Talebi} tv4k {Yeni 4K Dizi Talebi} other {Yeni Dizi Talebi}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Talep Edilen Film Artık Mevcut} movie4k {Talep Edilen 4K Film Artık Mevcut} tv4k {Talep Edilen 4K Dizi Artık Mevcut} other {Talep Edilen Dizi Artık Mevcut}}",
-  "notifications.events.seriesReadyToWatch": "Dizi İzlemeye Hazır"
+  "notifications.events.seriesReadyToWatch": "Dizi İzlemeye Hazır",
+  "notifications.agents.webpush.downloadedTitleMusic": "Müzik İndirildi",
+  "notifications.agents.webpush.failedTitleMusic": "Müzik Talebi Başarısız",
+  "notifications.common.declineReason": "Neden",
+  "notifications.common.music": "müzik",
+  "notifications.events.musicApproved": "Müzik Talebi Onaylandı",
+  "notifications.events.musicAutoApproved": "Müzik Talebi Otomatik Olarak Onaylandı",
+  "notifications.events.musicAutoRequested": "Müzik Talebi Otomatik Olarak Gönderildi",
+  "notifications.events.musicAvailable": "Müzik Artık Mevcut",
+  "notifications.events.musicDeclined": "Müzik Talebi Reddedildi",
+  "notifications.events.musicFailed": "Müzik Talebi Başarısız",
+  "notifications.events.musicPending": "Yeni Müzik Talebi",
+  "notifications.events.musicRequestAvailable": "Talep Edilen Müzik Artık Mevcut"
 }

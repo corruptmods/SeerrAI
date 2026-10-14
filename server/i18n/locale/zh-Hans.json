@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {电影请求失败} movie4k {4K 电影请求失败} tv4k {4K 电视节目请求失败} other {电视节目请求失败}}",
   "notifications.events.mediaPending": "{kind, select, movie {新的电影请求} movie4k {新的 4K 电影请求} tv4k {新的 4K 电视节目请求} other {新的电视节目请求}}",
   "notifications.events.requestAvailable": "{kind, select, movie {请求的电影现已可观看} movie4k {请求的 4K 电影现已可观看} tv4k {请求的 4K 电视节目现已可观看} other {请求的电视节目现已可观看}}",
-  "notifications.events.seriesReadyToWatch": "电视节目可以观看了"
+  "notifications.events.seriesReadyToWatch": "电视节目可以观看了",
+  "notifications.agents.webpush.downloadedTitleMusic": "音乐已下载",
+  "notifications.agents.webpush.failedTitleMusic": "音乐请求失败",
+  "notifications.common.declineReason": "原因",
+  "notifications.common.music": "音乐",
+  "notifications.events.musicApproved": "音乐请求已批准",
+  "notifications.events.musicAutoApproved": "音乐请求已自动批准",
+  "notifications.events.musicAutoRequested": "音乐请求已自动提交",
+  "notifications.events.musicAvailable": "音乐现已可用",
+  "notifications.events.musicDeclined": "音乐请求已被拒绝",
+  "notifications.events.musicFailed": "音乐请求失败",
+  "notifications.events.musicPending": "新的音乐请求",
+  "notifications.events.musicRequestAvailable": "请求的音乐现已可用"
 }

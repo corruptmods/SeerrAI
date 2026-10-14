@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Zahteva za film ni uspela} movie4k {Zahteva za film v 4K ni uspela} tv4k {Zahteva za serijo v 4K ni uspela} other {Zahteva za serijo ni uspela}}",
   "notifications.events.mediaPending": "{kind, select, movie {Nova zahteva za film} movie4k {Nova zahteva za film v 4K} tv4k {Nova zahteva za serijo v 4K} other {Nova zahteva za serijo}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Zahtevani film je zdaj na voljo} movie4k {Zahtevani film v 4K je zdaj na voljo} tv4k {Zahtevana serija v 4K je zdaj na voljo} other {Zahtevana serija je zdaj na voljo}}",
-  "notifications.events.seriesReadyToWatch": "Serija je pripravljena za ogled"
+  "notifications.events.seriesReadyToWatch": "Serija je pripravljena za ogled",
+  "notifications.agents.webpush.downloadedTitleMusic": "Glasba je prenesena",
+  "notifications.agents.webpush.failedTitleMusic": "Zahteva za glasbo ni uspela",
+  "notifications.common.declineReason": "Razlog",
+  "notifications.common.music": "glasba",
+  "notifications.events.musicApproved": "Zahteva za glasbo odobrena",
+  "notifications.events.musicAutoApproved": "Zahteva za glasbo samodejno odobrena",
+  "notifications.events.musicAutoRequested": "Zahteva za glasbo samodejno oddana",
+  "notifications.events.musicAvailable": "Glasba je zdaj na voljo",
+  "notifications.events.musicDeclined": "Zahteva za glasbo zavrnjena",
+  "notifications.events.musicFailed": "Zahteva za glasbo ni uspela",
+  "notifications.events.musicPending": "Nova zahteva za glasbo",
+  "notifications.events.musicRequestAvailable": "Zahtevana glasba je zdaj na voljo"
 }

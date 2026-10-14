@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {בקשת הסרט נכשלה} movie4k {בקשת הסרט ב-4K נכשלה} tv4k {בקשת הסדרה ב-4K נכשלה} other {בקשת הסדרה נכשלה}}",
   "notifications.events.mediaPending": "{kind, select, movie {בקשת סרט חדשה} movie4k {בקשת סרט חדשה ב-4K} tv4k {בקשת סדרה חדשה ב-4K} other {בקשת סדרה חדשה}}",
   "notifications.events.requestAvailable": "{kind, select, movie {הסרט שהתבקש זמין עכשיו} movie4k {הסרט ב-4K שהתבקש זמין עכשיו} tv4k {הסדרה ב-4K שהתבקשה זמינה עכשיו} other {הסדרה שהתבקשה זמינה עכשיו}}",
-  "notifications.events.seriesReadyToWatch": "הסדרה מוכנה לצפייה"
+  "notifications.events.seriesReadyToWatch": "הסדרה מוכנה לצפייה",
+  "notifications.agents.webpush.downloadedTitleMusic": "המוזיקה הורדה",
+  "notifications.agents.webpush.failedTitleMusic": "בקשת המוזיקה נכשלה",
+  "notifications.common.declineReason": "סיבה",
+  "notifications.common.music": "מוזיקה",
+  "notifications.events.musicApproved": "בקשת המוזיקה אושרה",
+  "notifications.events.musicAutoApproved": "בקשת המוזיקה אושרה אוטומטית",
+  "notifications.events.musicAutoRequested": "בקשת מוזיקה נשלחה אוטומטית",
+  "notifications.events.musicAvailable": "המוזיקה זמינה עכשיו",
+  "notifications.events.musicDeclined": "בקשת המוזיקה נדחתה",
+  "notifications.events.musicFailed": "בקשת המוזיקה נכשלה",
+  "notifications.events.musicPending": "בקשת מוזיקה חדשה",
+  "notifications.events.musicRequestAvailable": "המוזיקה שהתבקשה זמינה עכשיו"
 }

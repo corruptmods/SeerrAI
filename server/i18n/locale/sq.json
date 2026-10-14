@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Kërkesa për filmin dështoi} movie4k {Kërkesa për filmin 4K dështoi} tv4k {Kërkesa për serialin 4K dështoi} other {Kërkesa për serialin dështoi}}",
   "notifications.events.mediaPending": "{kind, select, movie {Kërkesë e re për film} movie4k {Kërkesë e re për film 4K} tv4k {Kërkesë e re për serial 4K} other {Kërkesë e re për serial}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Filmi i kërkuar tani është i disponueshëm} movie4k {Filmi 4K i kërkuar tani është i disponueshëm} tv4k {Seriali 4K i kërkuar tani është i disponueshëm} other {Seriali i kërkuar tani është i disponueshëm}}",
-  "notifications.events.seriesReadyToWatch": "Seriali është gati për t’u parë"
+  "notifications.events.seriesReadyToWatch": "Seriali është gati për t’u parë",
+  "notifications.agents.webpush.downloadedTitleMusic": "Muzika u shkarkua",
+  "notifications.agents.webpush.failedTitleMusic": "Kërkesa për muzikë dështoi",
+  "notifications.common.declineReason": "Arsyeja",
+  "notifications.common.music": "muzikë",
+  "notifications.events.musicApproved": "Kërkesa për muzikë u miratua",
+  "notifications.events.musicAutoApproved": "Kërkesa për muzikë u miratua automatikisht",
+  "notifications.events.musicAutoRequested": "Kërkesa për muzikë u dërgua automatikisht",
+  "notifications.events.musicAvailable": "Muzika tani është e disponueshme",
+  "notifications.events.musicDeclined": "Kërkesa për muzikë u refuzua",
+  "notifications.events.musicFailed": "Kërkesa për muzikë dështoi",
+  "notifications.events.musicPending": "Kërkesë e re për muzikë",
+  "notifications.events.musicRequestAvailable": "Muzika e kërkuar tani është e disponueshme"
 }

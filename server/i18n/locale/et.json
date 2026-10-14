@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Filmi taotlus ebaõnnestus} movie4k {4K-filmi taotlus ebaõnnestus} tv4k {4K-sarja taotlus ebaõnnestus} other {Sarja taotlus ebaõnnestus}}",
   "notifications.events.mediaPending": "{kind, select, movie {Uus filmi taotlus} movie4k {Uus 4K-filmi taotlus} tv4k {Uus 4K-sarja taotlus} other {Uus sarja taotlus}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Taotletud film on nüüd saadaval} movie4k {Taotletud 4K-film on nüüd saadaval} tv4k {Taotletud 4K-sari on nüüd saadaval} other {Taotletud sari on nüüd saadaval}}",
-  "notifications.events.seriesReadyToWatch": "Sari on vaatamiseks valmis"
+  "notifications.events.seriesReadyToWatch": "Sari on vaatamiseks valmis",
+  "notifications.agents.webpush.downloadedTitleMusic": "Muusika alla laaditud",
+  "notifications.agents.webpush.failedTitleMusic": "Muusika taotlus ebaõnnestus",
+  "notifications.common.declineReason": "Põhjus",
+  "notifications.common.music": "muusika",
+  "notifications.events.musicApproved": "Muusika taotlus kinnitatud",
+  "notifications.events.musicAutoApproved": "Muusika taotlus automaatselt kinnitatud",
+  "notifications.events.musicAutoRequested": "Muusika taotlus automaatselt esitatud",
+  "notifications.events.musicAvailable": "Muusika on nüüd saadaval",
+  "notifications.events.musicDeclined": "Muusika taotlus tagasi lükatud",
+  "notifications.events.musicFailed": "Muusika taotlus ebaõnnestus",
+  "notifications.events.musicPending": "Uus muusika taotlus",
+  "notifications.events.musicRequestAvailable": "Taotletud muusika on nüüd saadaval"
 }

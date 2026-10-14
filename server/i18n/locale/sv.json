@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Filmförfrågan misslyckades} movie4k {4K-filmförfrågan misslyckades} tv4k {4K-serieförfrågan misslyckades} other {Serieförfrågan misslyckades}}",
   "notifications.events.mediaPending": "{kind, select, movie {Ny filmförfrågan} movie4k {Ny 4K-filmförfrågan} tv4k {Ny 4K-serieförfrågan} other {Ny serieförfrågan}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Begärd film nu tillgänglig} movie4k {Begärd 4K-film nu tillgänglig} tv4k {Begärd 4K-serie nu tillgänglig} other {Begärd serie nu tillgänglig}}",
-  "notifications.events.seriesReadyToWatch": "Serie redo att ses"
+  "notifications.events.seriesReadyToWatch": "Serie redo att ses",
+  "notifications.agents.webpush.downloadedTitleMusic": "Musik nedladdad",
+  "notifications.agents.webpush.failedTitleMusic": "Musikförfrågan misslyckades",
+  "notifications.common.declineReason": "Anledning",
+  "notifications.common.music": "musik",
+  "notifications.events.musicApproved": "Musikförfrågan godkänd",
+  "notifications.events.musicAutoApproved": "Musikförfrågan automatiskt godkänd",
+  "notifications.events.musicAutoRequested": "Musikförfrågan automatiskt skickad",
+  "notifications.events.musicAvailable": "Musik nu tillgänglig",
+  "notifications.events.musicDeclined": "Musikförfrågan avslagen",
+  "notifications.events.musicFailed": "Musikförfrågan misslyckades",
+  "notifications.events.musicPending": "Ny musikförfrågan",
+  "notifications.events.musicRequestAvailable": "Begärd musik nu tillgänglig"
 }

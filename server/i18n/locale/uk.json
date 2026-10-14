@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {Запит на фільм не виконано} movie4k {Запит на фільм у 4K не виконано} tv4k {Запит на серіал у 4K не виконано} other {Запит на серіал не виконано}}",
   "notifications.events.mediaPending": "{kind, select, movie {Новий запит на фільм} movie4k {Новий запит на фільм у 4K} tv4k {Новий запит на серіал у 4K} other {Новий запит на серіал}}",
   "notifications.events.requestAvailable": "{kind, select, movie {Запитаний фільм уже доступний} movie4k {Запитаний фільм у 4K уже доступний} tv4k {Запитаний серіал у 4K уже доступний} other {Запитаний серіал уже доступний}}",
-  "notifications.events.seriesReadyToWatch": "Серіал готовий до перегляду"
+  "notifications.events.seriesReadyToWatch": "Серіал готовий до перегляду",
+  "notifications.agents.webpush.downloadedTitleMusic": "Музику завантажено",
+  "notifications.agents.webpush.failedTitleMusic": "Запит на музику не виконано",
+  "notifications.common.declineReason": "Причина",
+  "notifications.common.music": "музика",
+  "notifications.events.musicApproved": "Запит на музику схвалено",
+  "notifications.events.musicAutoApproved": "Запит на музику схвалено автоматично",
+  "notifications.events.musicAutoRequested": "Запит на музику надіслано автоматично",
+  "notifications.events.musicAvailable": "Музика тепер доступна",
+  "notifications.events.musicDeclined": "Запит на музику відхилено",
+  "notifications.events.musicFailed": "Запит на музику не виконано",
+  "notifications.events.musicPending": "Новий запит на музику",
+  "notifications.events.musicRequestAvailable": "Запитана музика тепер доступна"
 }

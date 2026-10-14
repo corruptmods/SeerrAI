@@ -80,5 +80,17 @@
   "notifications.events.mediaFailed": "{kind, select, movie {फिल्म का अनुरोध विफल रहा} movie4k {4K फिल्म का अनुरोध विफल रहा} tv4k {4K शृंखला का अनुरोध विफल रहा} other {शृंखला का अनुरोध विफल रहा}}",
   "notifications.events.mediaPending": "{kind, select, movie {फिल्म का नया अनुरोध} movie4k {4K फिल्म का नया अनुरोध} tv4k {4K शृंखला का नया अनुरोध} other {शृंखला का नया अनुरोध}}",
   "notifications.events.requestAvailable": "{kind, select, movie {अनुरोधित फिल्म अब उपलब्ध है} movie4k {अनुरोधित 4K फिल्म अब उपलब्ध है} tv4k {अनुरोधित 4K शृंखला अब उपलब्ध है} other {अनुरोधित शृंखला अब उपलब्ध है}}",
-  "notifications.events.seriesReadyToWatch": "शृंखला देखने के लिए तैयार है"
+  "notifications.events.seriesReadyToWatch": "शृंखला देखने के लिए तैयार है",
+  "notifications.agents.webpush.downloadedTitleMusic": "संगीत डाउनलोड हो गया",
+  "notifications.agents.webpush.failedTitleMusic": "संगीत अनुरोध विफल रहा",
+  "notifications.common.declineReason": "कारण",
+  "notifications.common.music": "संगीत",
+  "notifications.events.musicApproved": "संगीत अनुरोध मंज़ूर हुआ",
+  "notifications.events.musicAutoApproved": "संगीत अनुरोध अपने-आप मंज़ूर हुआ",
+  "notifications.events.musicAutoRequested": "संगीत अनुरोध अपने-आप भेजा गया",
+  "notifications.events.musicAvailable": "संगीत अब उपलब्ध है",
+  "notifications.events.musicDeclined": "संगीत अनुरोध अस्वीकार किया गया",
+  "notifications.events.musicFailed": "संगीत अनुरोध विफल रहा",
+  "notifications.events.musicPending": "नया संगीत अनुरोध",
+  "notifications.events.musicRequestAvailable": "अनुरोधित संगीत अब उपलब्ध है"
 }

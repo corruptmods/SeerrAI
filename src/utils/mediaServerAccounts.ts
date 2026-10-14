@@ -43,6 +43,12 @@ export const accountServers = (user: PersonWithAccounts): MediaServerKind[] => {
   ];
 };
 
+/** Someone has an account on this server linked, connected or not. */
+export const hasAccountOn = (
+  user: PersonWithAccounts | undefined,
+  kind: MediaServerKind
+): boolean => !!user && accountServers(user).includes(kind);
+
 /** Of someone's accounts, those on servers Seerr is connected to now. */
 export const connectedAccountServers = (
   user: PersonWithAccounts,

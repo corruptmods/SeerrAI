@@ -1,9 +1,9 @@
 import useSettings from '@app/hooks/useSettings';
 import type { SubtitlesKind } from '@app/hooks/useSubtitles';
 import defineMessages from '@app/utils/defineMessages';
+import { SERVER_NAMES } from '@app/utils/mediaServerAccounts';
 import { formatOf, formatSize, providerName } from '@app/utils/subtitles';
 import { ArrowPathIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { MediaServerType } from '@server/constants/server';
 import type {
   SubtitleError,
   SubtitleTrack,
@@ -56,17 +56,18 @@ export const messages = defineMessages('components.Subtitles', {
   reasonNoPlexSignIn: 'There is no Plex sign-in to use for you.',
 });
 
-/** The media server's name, for wording that is not Plex's alone. */
+/**
+ * The connected media servers' names, for wording that is not Plex's
+ * alone: "Plex", or "Plex and Jellyfin" with both connected, since each
+ * picks up a subtitle file beside the title.
+ */
 export const useMediaServerName = (): string => {
+  const intl = useIntl();
   const { currentSettings } = useSettings();
-  switch (currentSettings.mediaServerType) {
-    case MediaServerType.EMBY:
-      return 'Emby';
-    case MediaServerType.PLEX:
-      return 'Plex';
-    default:
-      return 'Jellyfin';
-  }
+  return intl.formatList(
+    currentSettings.mediaServers.map((server) => SERVER_NAMES[server.kind]),
+    { type: 'conjunction' }
+  );
 };
 
 /**

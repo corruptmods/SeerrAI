@@ -206,6 +206,8 @@ empty one.
 | `src/components/MediaLists/` | list UI |
 | `src/hooks/useListDetail.ts`, `useMediaMarkers.ts` | list data and poster badges |
 | `public/sw.js` | service worker |
+| `server/lib/mediaServers.ts` | which media servers are connected, their settings, ids and clients |
+| `src/utils/mediaServerAccounts.ts`, `src/utils/playLinks.ts` | people's server accounts, and which play link to offer them |
 | `server/lib/ai/` | AI: providers, limit and cache, credit, each feature's prompt |
 | `src/components/Ai/`, `src/components/AiChat/` | AI panels and the AI button |
 
@@ -226,7 +228,28 @@ Do not undo these without reading why first — each was tried the other way.
 - **Passkeys belong to the Application URL.** With it set (Settings →
   General), passkeys work only at that address and no Host header is trusted;
   a passkey made there cannot be used from a LAN IP. Changing the URL's host
-  strands every passkey, so people sign in with Plex once and add a new one.
+  strands every passkey, so people sign in with a media server (or a
+  password) once and add a new one.
+- **Several media servers, one of each kind.** Plex, Jellyfin and Emby can
+  be connected at once (Settings → Media Servers), at most one of each.
+  `main.mediaServerType` is kept and means the primary server: the one
+  whose links fill `mediaUrl`, `iOSPlexUrl` and `tautulliUrl` exactly as
+  before, for API readers; `playLinks` has every server's. Every other
+  question about servers goes through `server/lib/mediaServers.ts`, not
+  `mediaServerType`. Emby has its own settings and columns rather than
+  sharing Jellyfin's, so both can be connected. Accounts are matched only
+  by each server's own id, never by email across servers: an email match
+  let a Plex account take over the owner's account on a Jellyfin-first
+  install. A new account whose email or name is taken is refused, not
+  merged. Plex is reached through the owner's Plex token, so the owner
+  links Plex to connect it. Episodes are counted per server, so a season
+  split across two servers shows as partly available; that is a known
+  limitation, told to admins in the guide.
+- **Pages pick a play link for the viewer.** A title's page shows Play on
+  each server; badges, request cards and issues show one, on a server the
+  viewer has an account on (the primary one first), else the first that
+  has it (`pickPlayLink` in `src/utils/playLinks.ts`). Notifications link
+  to Seerr's own page, which is the same for everyone.
 - **One GitHub Actions workflow: images.** `release.yml` builds and
   publishes the image (amd64 and arm64) for an `ai-v*` tag, and `:develop`
   when run by hand from `dev` (pushes to `dev` publish nothing), so Seerr AI

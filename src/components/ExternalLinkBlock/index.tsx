@@ -9,9 +9,18 @@ import TmdbLogo from '@app/assets/services/tmdb.svg';
 import TraktLogo from '@app/assets/services/trakt.svg';
 import TvdbLogo from '@app/assets/services/tvdb.svg';
 import useLocale from '@app/hooks/useLocale';
-import useSettings from '@app/hooks/useSettings';
+import type { PlayLink } from '@app/utils/playLinks';
 import { MediaType } from '@server/constants/media';
-import { MediaServerType } from '@server/constants/server';
+import type { MediaServerKind } from '@server/constants/server';
+
+const SERVER_LOGOS: Record<
+  MediaServerKind,
+  React.FC<React.SVGProps<SVGSVGElement>>
+> = {
+  plex: PlexLogo,
+  jellyfin: JellyfinLogo,
+  emby: EmbyLogo,
+};
 
 type ExternalLinkType = 'movie' | 'tv' | 'person';
 
@@ -21,7 +30,8 @@ interface ExternalLinkBlockProps {
   tvdbId?: number;
   imdbId?: string;
   rtUrl?: string;
-  mediaUrl?: string;
+  /** The title on each media server that has it (usePlayLinks). */
+  playLinks?: PlayLink[];
 }
 
 const ExternalLinkBlock = ({
@@ -30,38 +40,31 @@ const ExternalLinkBlock = ({
   tvdbId,
   imdbId,
   rtUrl,
-  mediaUrl,
+  playLinks = [],
 }: ExternalLinkBlockProps) => {
-  const settings = useSettings();
   const { locale } = useLocale();
 
   return (
     <div className="flex w-full items-center justify-center space-x-2 sm:space-x-5">
-      {mediaUrl && (
-        <a
-          href={mediaUrl}
-          aria-label={
-            settings.currentSettings.mediaServerType === MediaServerType.PLEX
-              ? 'Plex'
-              : settings.currentSettings.mediaServerType ===
-                  MediaServerType.EMBY
-                ? 'Emby'
-                : 'Jellyfin'
-          }
-          className="w-12 opacity-50 transition duration-300 hover:opacity-100"
-          target="_blank"
-          rel="noreferrer"
-        >
-          {settings.currentSettings.mediaServerType === MediaServerType.PLEX ? (
-            <PlexLogo />
-          ) : settings.currentSettings.mediaServerType ===
-            MediaServerType.EMBY ? (
-            <EmbyLogo />
-          ) : (
-            <JellyfinLogo />
-          )}
-        </a>
-      )}
+      {playLinks.map((link) => {
+        const url = link.url ?? link.url4k;
+        if (!url) {
+          return null;
+        }
+        const Logo = SERVER_LOGOS[link.server];
+        return (
+          <a
+            key={link.server}
+            href={url}
+            aria-label={link.name}
+            className="w-12 opacity-50 transition duration-300 hover:opacity-100"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Logo />
+          </a>
+        );
+      })}
       {tmdbId && (
         <a
           aria-label="TMDB"

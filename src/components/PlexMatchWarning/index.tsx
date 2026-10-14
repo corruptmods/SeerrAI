@@ -36,33 +36,17 @@ const named = (t: { title: string; year?: number }) =>
 const label = (m?: { name: string; id: number }) =>
   m ? `${m.name.toUpperCase()} ${m.id}` : undefined;
 
-/**
- * On a title's page, for admins: the last Match Check found that the media
- * server's match for this title's folder disagrees with Sonarr's or
- * Radarr's.
- */
-const PlexMatchWarning = ({
-  mediaType,
+/** One server's problem with this title, as a warning. */
+const MatchProblem = ({
+  problem,
   tmdbId,
   tvdbId,
-  itemKey,
 }: {
-  mediaType: 'movie' | 'tv';
+  problem: PlexMatchProblem;
   tmdbId: number;
   tvdbId?: number | null;
-  /** The media server's id for this title. */
-  itemKey?: string | null;
 }) => {
   const intl = useIntl();
-  const query = new URLSearchParams({ mediaType, tmdbId: String(tmdbId) });
-  if (tvdbId) query.set('tvdbId', String(tvdbId));
-  if (itemKey) query.set('key', itemKey);
-  const { data } = useSWR<{ problem: PlexMatchProblem | null }>(
-    `/api/v1/settings/plex-match-check/title?${query}`
-  );
-  const problem = data?.problem;
-  if (!problem) return null;
-
   const mediaServer = problem.mediaServer ?? 'Plex';
   // This page is the title the server wrongly matched the folder to, rather
   // than the one Sonarr or Radarr has in it. It was found by one of the
@@ -123,6 +107,47 @@ const PlexMatchWarning = ({
         {intl.formatMessage(fix, values)}
       </p>
     </section>
+  );
+};
+
+/**
+ * On a title's page, for admins: the last Match Check found that a media
+ * server's match for this title's folder disagrees with Sonarr's or
+ * Radarr's. With several servers connected, each one that has it wrong
+ * gets its own warning.
+ */
+const PlexMatchWarning = ({
+  mediaType,
+  tmdbId,
+  tvdbId,
+  itemKey,
+}: {
+  mediaType: 'movie' | 'tv';
+  tmdbId: number;
+  tvdbId?: number | null;
+  /** A media server's id for this title. */
+  itemKey?: string | null;
+}) => {
+  const query = new URLSearchParams({ mediaType, tmdbId: String(tmdbId) });
+  if (tvdbId) query.set('tvdbId', String(tvdbId));
+  if (itemKey) query.set('key', itemKey);
+  const { data } = useSWR<{
+    problem: PlexMatchProblem | null;
+    problems?: PlexMatchProblem[];
+  }>(`/api/v1/settings/plex-match-check/title?${query}`);
+  const problems = data?.problems ?? (data?.problem ? [data.problem] : []);
+
+  return (
+    <>
+      {problems.map((problem, index) => (
+        <MatchProblem
+          key={`${problem.mediaServer ?? 'Plex'}-${index}`}
+          problem={problem}
+          tmdbId={tmdbId}
+          tvdbId={tvdbId}
+        />
+      ))}
+    </>
   );
 };
 

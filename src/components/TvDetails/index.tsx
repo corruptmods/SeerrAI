@@ -41,17 +41,18 @@ import SubtitlesCard from '@app/components/Subtitles/SubtitlesCard';
 import FutureSeasonsButton from '@app/components/TvDetails/FutureSeasonsButton';
 import Season from '@app/components/TvDetails/Season';
 import WatchedBy from '@app/components/WatchedBy';
-import useDeepLinks from '@app/hooks/useDeepLinks';
 import useIsAnime from '@app/hooks/useIsAnime';
 import useLocale from '@app/hooks/useLocale';
+import usePlayLinks from '@app/hooks/usePlayLinks';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
-import { Permission, UserType, useUser } from '@app/hooks/useUser';
+import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import blocklistAction from '@app/utils/blocklistAction';
 import { sortCrewPriority } from '@app/utils/creditHelpers';
 import defineMessages from '@app/utils/defineMessages';
+import { hasAccountOn } from '@app/utils/mediaServerAccounts';
 import {
   refreshIntervalHelper,
   watchMedia,
@@ -195,12 +196,11 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     []
   );
 
-  const { mediaUrl: plexUrl, mediaUrl4k: plexUrl4k } = useDeepLinks({
-    mediaUrl: data?.mediaInfo?.mediaUrl,
-    mediaUrl4k: data?.mediaInfo?.mediaUrl4k,
-    iOSPlexUrl: data?.mediaInfo?.iOSPlexUrl,
-    iOSPlexUrl4k: data?.mediaInfo?.iOSPlexUrl4k,
-  });
+  const {
+    links: playLinks,
+    playLink,
+    playLink4k,
+  } = usePlayLinks(data?.mediaInfo);
 
   if (!data && !error) {
     return <MediaPageSkeleton />;
@@ -212,30 +212,42 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
 
   const mediaLinks: PlayButtonLink[] = [];
 
+  // A Play button for each server that has the series, the viewer's own
+  // servers first.
   if (
-    plexUrl &&
     hasPermission([Permission.REQUEST, Permission.REQUEST_TV], {
       type: 'or',
     })
   ) {
-    mediaLinks.push({
-      text: getAvailableMediaServerName(),
-      url: plexUrl,
-      svg: <PlayIcon />,
+    playLinks.forEach((link) => {
+      if (link.url) {
+        mediaLinks.push({
+          text: intl.formatMessage(messages.play, {
+            mediaServerName: link.name,
+          }),
+          url: link.url,
+          svg: <PlayIcon />,
+        });
+      }
     });
   }
 
   if (
     settings.currentSettings.series4kEnabled &&
-    plexUrl4k &&
     hasPermission([Permission.REQUEST_4K, Permission.REQUEST_4K_TV], {
       type: 'or',
     })
   ) {
-    mediaLinks.push({
-      text: getAvailable4kMediaServerName(),
-      url: plexUrl4k,
-      svg: <PlayIcon />,
+    playLinks.forEach((link) => {
+      if (link.url4k) {
+        mediaLinks.push({
+          text: intl.formatMessage(messages.play4k, {
+            mediaServerName: link.name,
+          }),
+          url: link.url4k,
+          svg: <PlayIcon />,
+        });
+      }
     });
   }
 
@@ -366,30 +378,6 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
     data?.watchProviders?.find(
       (provider) => provider.iso_3166_1 === streamingRegion
     )?.flatrate ?? [];
-
-  function getAvailableMediaServerName() {
-    if (settings.currentSettings.mediaServerType === MediaServerType.EMBY) {
-      return intl.formatMessage(messages.play, { mediaServerName: 'Emby' });
-    }
-
-    if (settings.currentSettings.mediaServerType === MediaServerType.PLEX) {
-      return intl.formatMessage(messages.play, { mediaServerName: 'Plex' });
-    }
-
-    return intl.formatMessage(messages.play, { mediaServerName: 'Jellyfin' });
-  }
-
-  function getAvailable4kMediaServerName() {
-    if (settings.currentSettings.mediaServerType === MediaServerType.EMBY) {
-      return intl.formatMessage(messages.play4k, { mediaServerName: 'Emby' });
-    }
-
-    if (settings.currentSettings.mediaServerType === MediaServerType.PLEX) {
-      return intl.formatMessage(messages.play4k, { mediaServerName: 'Plex' });
-    }
-
-    return intl.formatMessage(messages.play4k, { mediaServerName: 'Jellyfin' });
-  }
 
   const onClickWatchlistBtn = async (): Promise<void> => {
     setIsUpdating(true);
@@ -666,7 +654,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
               inProgress={(data.mediaInfo?.downloadStatus ?? []).length > 0}
               tmdbId={data.mediaInfo?.tmdbId}
               mediaType="tv"
-              plexUrl={plexUrl}
+              playLink={playLink}
               serviceUrl={data.mediaInfo?.serviceUrl}
             />
             {settings.currentSettings.series4kEnabled &&
@@ -690,7 +678,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                   }
                   tmdbId={data.mediaInfo?.tmdbId}
                   mediaType="tv"
-                  plexUrl={plexUrl4k}
+                  playLink={playLink4k}
                   serviceUrl={data.mediaInfo?.serviceUrl4k}
                 />
               )}
@@ -737,7 +725,8 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
             </Tooltip>
           )}
           {data?.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
-            user?.userType !== UserType.PLEX && (
+            // Someone with Plex keeps their watchlist on Plex.
+            !hasAccountOn(user, 'plex') && (
               <>
                 {toggleWatchlist ? (
                   <Tooltip
@@ -1532,7 +1521,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                 tvdbId={data.externalIds.tvdbId}
                 imdbId={data.externalIds.imdbId}
                 rtUrl={ratingData?.url}
-                mediaUrl={plexUrl ?? plexUrl4k}
+                playLinks={playLinks}
               />
             </div>
           </div>

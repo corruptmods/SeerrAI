@@ -13,9 +13,10 @@ import { useIsTouch } from '@app/hooks/useIsTouch';
 import useMediaMarkers, { MARKERS_KEY } from '@app/hooks/useMediaMarkers';
 import { announceTitleChanged } from '@app/hooks/useTitleChanged';
 import useToasts from '@app/hooks/useToasts';
-import { Permission, UserType, useUser } from '@app/hooks/useUser';
+import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { hasAccountOn } from '@app/utils/mediaServerAccounts';
 import { withProperties } from '@app/utils/typeHelpers';
 import { Transition } from '@headlessui/react';
 import {
@@ -523,7 +524,8 @@ const TitleCard = ({
               </div>
               {showDetail && currentStatus !== MediaStatus.BLOCKLISTED && (
                 <div className="flex flex-col gap-1">
-                  {user?.userType !== UserType.PLEX &&
+                  {/* Someone with Plex keeps their watchlist on Plex. */}
+                  {!hasAccountOn(user, 'plex') &&
                     (toggleWatchlist ? (
                       <Button
                         buttonType={'ghost'}

@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   accountServers,
   connectedAccountServers,
+  hasAccountOn,
   mainServerOf,
   signInServers,
 } from './mediaServerAccounts';
@@ -29,6 +30,22 @@ describe('someone’s media server accounts', () => {
       'jellyfin',
     ]);
     assert.deepEqual(accountServers({ userType: UserType.LOCAL }), []);
+  });
+
+  it('says whether they have an account on a server', () => {
+    assert.equal(
+      hasAccountOn(
+        { userType: UserType.JELLYFIN, linkedServers: ['jellyfin', 'plex'] },
+        'plex'
+      ),
+      true
+    );
+    assert.equal(
+      hasAccountOn({ userType: UserType.JELLYFIN, linkedServers: [] }, 'plex'),
+      false
+    );
+    assert.equal(hasAccountOn({ userType: UserType.PLEX }, 'plex'), true);
+    assert.equal(hasAccountOn(undefined, 'plex'), false);
   });
 
   it('keeps those on servers Seerr is connected to', () => {

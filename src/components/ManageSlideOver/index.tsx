@@ -16,6 +16,7 @@ import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { releasesOf } from '@app/utils/downloadSummary';
+import { SERVER_NAMES } from '@app/utils/mediaServerAccounts';
 import { Bars4Icon, ServerIcon } from '@heroicons/react/24/outline';
 import {
   CheckCircleIcon,
@@ -28,7 +29,6 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
-import { MediaServerType } from '@server/constants/server';
 import type { MediaWatchDataResponse } from '@server/interfaces/api/mediaInterfaces';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import type { MovieDetails } from '@server/models/Movie';
@@ -107,7 +107,10 @@ const ManageSlideOver = ({
   const { addToast } = useToasts();
   const settings = useSettings();
   const { data: watchData } = useSWR<MediaWatchDataResponse>(
-    settings.currentSettings.mediaServerType === MediaServerType.PLEX &&
+    // Plays come from Tautulli, which only knows Plex.
+    settings.currentSettings.mediaServers.some(
+      (server) => server.kind === 'plex'
+    ) &&
       data.mediaInfo &&
       hasPermission(Permission.ADMIN)
       ? `/api/v1/media/${data.mediaInfo.id}/watch_data`
@@ -752,14 +755,12 @@ const ManageSlideOver = ({
                       mediaType: intl.formatMessage(
                         mediaType === 'movie' ? messages.movie : messages.tvshow
                       ),
-                      mediaServerName:
-                        settings.currentSettings.mediaServerType ===
-                        MediaServerType.EMBY
-                          ? 'Emby'
-                          : settings.currentSettings.mediaServerType ===
-                              MediaServerType.PLEX
-                            ? 'Plex'
-                            : 'Jellyfin',
+                      mediaServerName: intl.formatList(
+                        settings.currentSettings.mediaServers.map(
+                          (server) => SERVER_NAMES[server.kind]
+                        ),
+                        { type: 'disjunction' }
+                      ),
                     })}
                   </div>
                 </div>

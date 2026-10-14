@@ -14,8 +14,10 @@ import {
   isOneRelease,
   summarizeDownloads,
 } from '@app/utils/downloadSummary';
+import { SERVER_NAMES } from '@app/utils/mediaServerAccounts';
+import type { PlayTarget } from '@app/utils/playLinks';
+import { viewerServer } from '@app/utils/playLinks';
 import { MediaStatus } from '@server/constants/media';
-import { MediaServerType } from '@server/constants/server';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
 import Link from 'next/link';
 import { useIntl } from 'react-intl';
@@ -56,7 +58,8 @@ interface StatusBadgeProps {
   downloadItem?: DownloadingItem[];
   is4k?: boolean;
   inProgress?: boolean;
-  plexUrl?: string;
+  /** Where the viewer can play this version of the title (usePlayLinks). */
+  playLink?: PlayTarget;
   serviceUrl?: string;
   tmdbId?: number;
   mediaType?: 'movie' | 'tv';
@@ -69,7 +72,7 @@ const StatusBadge = ({
   downloadItem = [],
   is4k = false,
   inProgress = false,
-  plexUrl,
+  playLink,
   serviceUrl,
   tmdbId,
   mediaType,
@@ -77,7 +80,7 @@ const StatusBadge = ({
   statusLabelOverride,
 }: StatusBadgeProps) => {
   const intl = useIntl();
-  const { hasPermission } = useUser();
+  const { user, hasPermission } = useUser();
   const settings = useSettings();
   // On a touchscreen there is no hover to show a download's details, so a
   // pill that is downloading opens them when tapped, rather than following
@@ -87,12 +90,10 @@ const StatusBadge = ({
   let mediaLink: string | undefined;
   let mediaLinkDescription: string | undefined;
 
-  const mediaServerName =
-    settings.currentSettings.mediaServerType === MediaServerType.EMBY
-      ? 'Emby'
-      : settings.currentSettings.mediaServerType === MediaServerType.PLEX
-        ? 'Plex'
-        : 'Jellyfin';
+  // The server a finished download is being added to, as far as the viewer
+  // is concerned: the one they would play it on.
+  const watchServer = viewerServer(user, settings.currentSettings.mediaServers);
+  const mediaServerName = watchServer ? SERVER_NAMES[watchServer] : '';
 
   // What is actually happening to its downloads, all of them together.
   const download = summarizeDownloads(downloadItem);
@@ -136,7 +137,7 @@ const StatusBadge = ({
 
   if (
     mediaType &&
-    plexUrl &&
+    playLink &&
     hasPermission(
       is4k
         ? [
@@ -160,9 +161,9 @@ const StatusBadge = ({
         ? settings.currentSettings.movie4kEnabled
         : settings.currentSettings.series4kEnabled))
   ) {
-    mediaLink = plexUrl;
+    mediaLink = playLink.url;
     mediaLinkDescription = intl.formatMessage(messages.playonplex, {
-      mediaServerName,
+      mediaServerName: playLink.name,
     });
   } else if (hasPermission(Permission.MANAGE_REQUESTS)) {
     if (mediaType && tmdbId) {

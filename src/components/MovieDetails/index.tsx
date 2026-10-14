@@ -27,22 +27,23 @@ import MediaSlider from '@app/components/MediaSlider';
 import PersonCard from '@app/components/PersonCard';
 import PlexMatchWarning from '@app/components/PlexMatchWarning';
 import RequestButton from '@app/components/RequestButton';
-import RequestedBy from '@app/components/RequestedBy';
 import TitleEta from '@app/components/RequestEta/TitleEta';
+import RequestedBy from '@app/components/RequestedBy';
 import Slider from '@app/components/Slider';
 import StatusBadge from '@app/components/StatusBadge';
 import SubtitlesCard from '@app/components/Subtitles/SubtitlesCard';
 import WatchedBy from '@app/components/WatchedBy';
-import useDeepLinks from '@app/hooks/useDeepLinks';
 import useLocale from '@app/hooks/useLocale';
+import usePlayLinks from '@app/hooks/usePlayLinks';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
-import { Permission, UserType, useUser } from '@app/hooks/useUser';
+import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import blocklistAction from '@app/utils/blocklistAction';
 import { sortCrewPriority } from '@app/utils/creditHelpers';
 import defineMessages from '@app/utils/defineMessages';
+import { hasAccountOn } from '@app/utils/mediaServerAccounts';
 import {
   refreshIntervalHelper,
   watchMedia,
@@ -180,12 +181,11 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
     []
   );
 
-  const { mediaUrl: plexUrl, mediaUrl4k: plexUrl4k } = useDeepLinks({
-    mediaUrl: data?.mediaInfo?.mediaUrl,
-    mediaUrl4k: data?.mediaInfo?.mediaUrl4k,
-    iOSPlexUrl: data?.mediaInfo?.iOSPlexUrl,
-    iOSPlexUrl4k: data?.mediaInfo?.iOSPlexUrl4k,
-  });
+  const {
+    links: playLinks,
+    playLink,
+    playLink4k,
+  } = usePlayLinks(data?.mediaInfo);
 
   if (!data && !error) {
     return <MediaPageSkeleton />;
@@ -198,30 +198,42 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
   const showAllStudios = data.productionCompanies.length <= minStudios + 1;
   const mediaLinks: PlayButtonLink[] = [];
 
+  // A Play button for each server that has the movie, the viewer's own
+  // servers first.
   if (
-    plexUrl &&
     hasPermission([Permission.REQUEST, Permission.REQUEST_MOVIE], {
       type: 'or',
     })
   ) {
-    mediaLinks.push({
-      text: getAvailableMediaServerName(),
-      url: plexUrl,
-      svg: <PlayIcon />,
+    playLinks.forEach((link) => {
+      if (link.url) {
+        mediaLinks.push({
+          text: intl.formatMessage(messages.play, {
+            mediaServerName: link.name,
+          }),
+          url: link.url,
+          svg: <PlayIcon />,
+        });
+      }
     });
   }
 
   if (
     settings.currentSettings.movie4kEnabled &&
-    plexUrl4k &&
     hasPermission([Permission.REQUEST_4K, Permission.REQUEST_4K_MOVIE], {
       type: 'or',
     })
   ) {
-    mediaLinks.push({
-      text: getAvailable4kMediaServerName(),
-      url: plexUrl4k,
-      svg: <PlayIcon />,
+    playLinks.forEach((link) => {
+      if (link.url4k) {
+        mediaLinks.push({
+          text: intl.formatMessage(messages.play4k, {
+            mediaServerName: link.name,
+          }),
+          url: link.url4k,
+          svg: <PlayIcon />,
+        });
+      }
     });
   }
 
@@ -312,30 +324,6 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
     data?.watchProviders?.find(
       (provider) => provider.iso_3166_1 === streamingRegion
     )?.flatrate ?? [];
-
-  function getAvailableMediaServerName() {
-    if (settings.currentSettings.mediaServerType === MediaServerType.EMBY) {
-      return intl.formatMessage(messages.play, { mediaServerName: 'Emby' });
-    }
-
-    if (settings.currentSettings.mediaServerType === MediaServerType.PLEX) {
-      return intl.formatMessage(messages.play, { mediaServerName: 'Plex' });
-    }
-
-    return intl.formatMessage(messages.play, { mediaServerName: 'Jellyfin' });
-  }
-
-  function getAvailable4kMediaServerName() {
-    if (settings.currentSettings.mediaServerType === MediaServerType.EMBY) {
-      return intl.formatMessage(messages.play4k, { mediaServerName: 'Emby' });
-    }
-
-    if (settings.currentSettings.mediaServerType === MediaServerType.PLEX) {
-      return intl.formatMessage(messages.play4k, { mediaServerName: 'Plex' });
-    }
-
-    return intl.formatMessage(messages.play4k, { mediaServerName: 'Jellyfin' });
-  }
 
   const onClickWatchlistBtn = async (): Promise<void> => {
     setIsUpdating(true);
@@ -547,7 +535,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
               inProgress={(data.mediaInfo?.downloadStatus ?? []).length > 0}
               tmdbId={data.mediaInfo?.tmdbId}
               mediaType="movie"
-              plexUrl={plexUrl}
+              playLink={playLink}
               serviceUrl={data.mediaInfo?.serviceUrl}
             />
             {settings.currentSettings.movie4kEnabled &&
@@ -571,7 +559,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                   }
                   tmdbId={data.mediaInfo?.tmdbId}
                   mediaType="movie"
-                  plexUrl={plexUrl4k}
+                  playLink={playLink4k}
                   serviceUrl={data.mediaInfo?.serviceUrl4k}
                 />
               )}
@@ -618,7 +606,8 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
             </Tooltip>
           )}
           {data?.mediaInfo?.status !== MediaStatus.BLOCKLISTED &&
-            user?.userType !== UserType.PLEX && (
+            // Someone with Plex keeps their watchlist on Plex.
+            !hasAccountOn(user, 'plex') && (
               <>
                 {toggleWatchlist ? (
                   <Tooltip
@@ -1183,9 +1172,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                 tvdbId={data.externalIds.tvdbId}
                 imdbId={data.externalIds.imdbId}
                 rtUrl={ratingData?.rt?.url}
-                mediaUrl={
-                  data.mediaInfo?.mediaUrl ?? data.mediaInfo?.mediaUrl4k
-                }
+                playLinks={playLinks}
               />
             </div>
           </div>

@@ -47,7 +47,7 @@ const messages = defineMessages('components.Subtitles.SubtitleSearchModal', {
   transcribeDetail: 'Transcribe the audio into subtitles',
   showAll: 'Show all {count}',
   downloaded:
-    'Subtitle downloaded. {mediaServerName} shows it after its next library scan.',
+    'Subtitle downloaded. It shows in {mediaServerName} after the next library scan.',
   transcribing:
     'Transcribing. It shows here when Whisper is done, which can take a while.',
   couldNot: 'Could not get that subtitle: {reason}',

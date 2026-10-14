@@ -4,7 +4,7 @@ import useSettings from '@app/hooks/useSettings';
 import type { User } from '@app/hooks/useUser';
 import { Permission } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
-import { MediaServerType } from '@server/constants/server';
+import { SERVER_NAMES } from '@app/utils/mediaServerAccounts';
 import { useIntl } from 'react-intl';
 
 export const messages = defineMessages('components.PermissionEdit', {
@@ -102,6 +102,14 @@ export const PermissionEdit = ({
 }: PermissionEditProps) => {
   const intl = useIntl();
   const settings = useSettings();
+  // Watchlists are kept on Plex for people with Plex and here for everyone
+  // else, so they are named after every connected server.
+  const watchlistServers = intl.formatList(
+    settings.currentSettings.mediaServers.map(
+      (server) => SERVER_NAMES[server.kind]
+    ),
+    { type: 'conjunction' }
+  );
 
   const permissionList: PermissionItem[] = [
     {
@@ -143,22 +151,10 @@ export const PermissionEdit = ({
         {
           id: 'viewwatchlists',
           name: intl.formatMessage(messages.viewwatchlists, {
-            mediaServerName:
-              settings.currentSettings.mediaServerType === MediaServerType.PLEX
-                ? 'Plex'
-                : settings.currentSettings.mediaServerType ===
-                    MediaServerType.JELLYFIN
-                  ? 'Jellyfin'
-                  : 'Emby',
+            mediaServerName: watchlistServers,
           }),
           description: intl.formatMessage(messages.viewwatchlistsDescription, {
-            mediaServerName:
-              settings.currentSettings.mediaServerType === MediaServerType.PLEX
-                ? 'Plex'
-                : settings.currentSettings.mediaServerType ===
-                    MediaServerType.JELLYFIN
-                  ? 'Jellyfin'
-                  : 'Emby',
+            mediaServerName: watchlistServers,
           }),
           permission: Permission.WATCHLIST_VIEW,
         },

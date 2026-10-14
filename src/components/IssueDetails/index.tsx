@@ -8,8 +8,7 @@ import PageTitle from '@app/components/Common/PageTitle';
 import IssueComment from '@app/components/IssueDetails/IssueComment';
 import IssueDescription from '@app/components/IssueDetails/IssueDescription';
 import { issueOptions } from '@app/components/IssueModal/constants';
-import useDeepLinks from '@app/hooks/useDeepLinks';
-import useSettings from '@app/hooks/useSettings';
+import usePlayLinks from '@app/hooks/usePlayLinks';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -25,7 +24,6 @@ import {
 import { ArrowPathIcon } from '@heroicons/react/24/solid';
 import { IssueStatus } from '@server/constants/issue';
 import { MediaType } from '@server/constants/media';
-import { MediaServerType } from '@server/constants/server';
 import type Issue from '@server/entity/Issue';
 import type { MovieDetails } from '@server/models/Movie';
 import type { TvDetails } from '@server/models/Tv';
@@ -93,12 +91,7 @@ const IssueDetails = () => {
       : null
   );
 
-  const { mediaUrl, mediaUrl4k } = useDeepLinks({
-    mediaUrl: data?.mediaInfo?.mediaUrl,
-    mediaUrl4k: data?.mediaInfo?.mediaUrl4k,
-    iOSPlexUrl: data?.mediaInfo?.iOSPlexUrl,
-    iOSPlexUrl4k: data?.mediaInfo?.iOSPlexUrl4k,
-  });
+  const { playLink, playLink4k } = usePlayLinks(data?.mediaInfo);
 
   const CommentSchema = Yup.object().shape({
     message: Yup.string().required(),
@@ -107,7 +100,6 @@ const IssueDetails = () => {
   const issueOption = issueOptions.find(
     (opt) => opt.issueType === issueData?.issueType
   );
-  const settings = useSettings();
 
   if (!data && !error) {
     return <LoadingSpinner />;
@@ -372,10 +364,10 @@ const IssueDetails = () => {
               </div>
             </div>
             <div className="mb-6 mt-4 flex flex-col space-y-2">
-              {issueData?.media.mediaUrl && (
+              {playLink && (
                 <Button
                   as="a"
-                  href={mediaUrl}
+                  href={playLink.url}
                   target="_blank"
                   rel="noreferrer"
                   className="w-full"
@@ -383,19 +375,9 @@ const IssueDetails = () => {
                 >
                   <PlayIcon />
                   <span>
-                    {settings.currentSettings.mediaServerType ===
-                    MediaServerType.EMBY
-                      ? intl.formatMessage(messages.playonplex, {
-                          mediaServerName: 'Emby',
-                        })
-                      : settings.currentSettings.mediaServerType ===
-                          MediaServerType.PLEX
-                        ? intl.formatMessage(messages.playonplex, {
-                            mediaServerName: 'Plex',
-                          })
-                        : intl.formatMessage(messages.playonplex, {
-                            mediaServerName: 'Jellyfin',
-                          })}
+                    {intl.formatMessage(messages.playonplex, {
+                      mediaServerName: playLink.name,
+                    })}
                   </span>
                 </Button>
               )}
@@ -420,10 +402,10 @@ const IssueDetails = () => {
                     </span>
                   </Button>
                 )}
-              {issueData?.media.mediaUrl4k && (
+              {playLink4k && (
                 <Button
                   as="a"
-                  href={mediaUrl4k}
+                  href={playLink4k.url}
                   target="_blank"
                   rel="noreferrer"
                   className="w-full"
@@ -431,19 +413,9 @@ const IssueDetails = () => {
                 >
                   <PlayIcon />
                   <span>
-                    {settings.currentSettings.mediaServerType ===
-                    MediaServerType.EMBY
-                      ? intl.formatMessage(messages.play4konplex, {
-                          mediaServerName: 'Emby',
-                        })
-                      : settings.currentSettings.mediaServerType ===
-                          MediaServerType.PLEX
-                        ? intl.formatMessage(messages.play4konplex, {
-                            mediaServerName: 'Plex',
-                          })
-                        : intl.formatMessage(messages.play4konplex, {
-                            mediaServerName: 'Jellyfin',
-                          })}
+                    {intl.formatMessage(messages.play4konplex, {
+                      mediaServerName: playLink4k.name,
+                    })}
                   </span>
                 </Button>
               )}
@@ -639,10 +611,10 @@ const IssueDetails = () => {
             </div>
           </div>
           <div className="mb-6 mt-4 flex flex-col space-y-2">
-            {issueData?.media.mediaUrl && (
+            {playLink && (
               <Button
                 as="a"
-                href={mediaUrl}
+                href={playLink.url}
                 target="_blank"
                 rel="noreferrer"
                 className="w-full"
@@ -650,19 +622,9 @@ const IssueDetails = () => {
               >
                 <PlayIcon />
                 <span>
-                  {settings.currentSettings.mediaServerType ===
-                  MediaServerType.EMBY
-                    ? intl.formatMessage(messages.playonplex, {
-                        mediaServerName: 'Emby',
-                      })
-                    : settings.currentSettings.mediaServerType ===
-                        MediaServerType.PLEX
-                      ? intl.formatMessage(messages.playonplex, {
-                          mediaServerName: 'Plex',
-                        })
-                      : intl.formatMessage(messages.playonplex, {
-                          mediaServerName: 'Jellyfin',
-                        })}
+                  {intl.formatMessage(messages.playonplex, {
+                    mediaServerName: playLink.name,
+                  })}
                 </span>
               </Button>
             )}
@@ -686,10 +648,10 @@ const IssueDetails = () => {
                 </span>
               </Button>
             )}
-            {issueData?.media.mediaUrl4k && (
+            {playLink4k && (
               <Button
                 as="a"
-                href={mediaUrl4k}
+                href={playLink4k.url}
                 target="_blank"
                 rel="noreferrer"
                 className="w-full"
@@ -697,19 +659,9 @@ const IssueDetails = () => {
               >
                 <PlayIcon />
                 <span>
-                  {settings.currentSettings.mediaServerType ===
-                  MediaServerType.EMBY
-                    ? intl.formatMessage(messages.play4konplex, {
-                        mediaServerName: 'Emby',
-                      })
-                    : settings.currentSettings.mediaServerType ===
-                        MediaServerType.PLEX
-                      ? intl.formatMessage(messages.play4konplex, {
-                          mediaServerName: 'Plex',
-                        })
-                      : intl.formatMessage(messages.play4konplex, {
-                          mediaServerName: 'Jellyfin',
-                        })}
+                  {intl.formatMessage(messages.play4konplex, {
+                    mediaServerName: playLink4k.name,
+                  })}
                 </span>
               </Button>
             )}

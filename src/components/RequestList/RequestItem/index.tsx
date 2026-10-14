@@ -15,7 +15,7 @@ import RequestEta, {
 } from '@app/components/RequestEta';
 import RequestModal from '@app/components/RequestModal';
 import StatusBadge from '@app/components/StatusBadge';
-import useDeepLinks from '@app/hooks/useDeepLinks';
+import usePlayLinks from '@app/hooks/usePlayLinks';
 import type { RequestEta as RequestEtaData } from '@app/hooks/useRequestEtas';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -90,12 +90,7 @@ const RequestItemError = ({
     mutate('/api/v1/request/count');
   };
 
-  const { mediaUrl: plexUrl, mediaUrl4k: plexUrl4k } = useDeepLinks({
-    mediaUrl: requestData?.media?.mediaUrl,
-    mediaUrl4k: requestData?.media?.mediaUrl4k,
-    iOSPlexUrl: requestData?.media?.iOSPlexUrl,
-    iOSPlexUrl4k: requestData?.media?.iOSPlexUrl4k,
-  });
+  const { playLink, playLink4k } = usePlayLinks(requestData?.media);
 
   const requestDownloadStatus = getRequestDownloadStatus(
     requestData?.media?.[
@@ -170,7 +165,7 @@ const RequestItemError = ({
                     inProgress={requestDownloadStatus.length > 0}
                     is4k={requestData.is4k}
                     mediaType={requestData.type as VideoMediaType}
-                    plexUrl={requestData.is4k ? plexUrl4k : plexUrl}
+                    playLink={requestData.is4k ? playLink4k : playLink}
                     serviceUrl={
                       requestData.is4k
                         ? requestData.media.serviceUrl4k
@@ -422,12 +417,7 @@ const RequestItem = ({
     }
   };
 
-  const { mediaUrl: plexUrl, mediaUrl4k: plexUrl4k } = useDeepLinks({
-    mediaUrl: requestData?.media?.mediaUrl,
-    mediaUrl4k: requestData?.media?.mediaUrl4k,
-    iOSPlexUrl: requestData?.media?.iOSPlexUrl,
-    iOSPlexUrl4k: requestData?.media?.iOSPlexUrl4k,
-  });
+  const { playLink, playLink4k } = usePlayLinks(requestData?.media);
 
   if (!title && !error) {
     return (
@@ -613,7 +603,7 @@ const RequestItem = ({
                   is4k={requestData.is4k}
                   tmdbId={requestData.media.tmdbId}
                   mediaType={requestData.type as VideoMediaType}
-                  plexUrl={requestData.is4k ? plexUrl4k : plexUrl}
+                  playLink={requestData.is4k ? playLink4k : playLink}
                   serviceUrl={
                     requestData.is4k
                       ? requestData.media.serviceUrl4k

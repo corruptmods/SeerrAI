@@ -9,6 +9,7 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | Where | What | Defaults |
 |---|---|---|
 | **Settings → General** | **Image Cache Size Limit**, with Enable Image Caching: posters and backdrops are also kept as AVIF and WebP at three sizes; the least recently viewed go first past the limit. | 2048 MB (at least 256) |
+| **Settings → Media Servers** | Connect, edit and remove Plex, Jellyfin and Emby, choose the primary one, and whether people may sign in with each. See [Plex, Jellyfin and Emby together](./media-servers.md). | The server chosen at setup, as primary |
 | **Settings → Users** | **Auto-Import Plex Users**: an account for everyone the Plex server is shared with, hourly. Only adds; someone deleted isn't brought back. | Off |
 | **Settings → Features** | Turns optional features off for everyone. See [Feature switches](#feature-switches). | All on |
 | **Settings → Services → Download Clients** | SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent, read for live progress, and for Backfill to send what it finds to. Keys and passwords are never sent back to the browser. | None |
@@ -51,14 +52,14 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 
 ## Plex, Jellyfin and Emby
 
-Seerr AI works with all three, as Seerr does. Its own features work with all three too, with a few exceptions:
+Seerr AI works with all three, as Seerr does, and with more than one at once (see [Plex, Jellyfin and Emby together](./media-servers.md)). Its own features work with all three too, with a few exceptions:
 
 | Feature | Plex | Jellyfin and Emby |
 |---|---|---|
 | Suggested for You, Who Watched, Pick for the Room, Catch Me Up, "up next" and watch sync on lists, AI Search knowing what you watched | Needs Tautulli | Read from the server itself; nothing to set up |
 | Match Check (wrong matches on Health and title pages) | Yes, fixed with **Fix Match** | Yes, fixed with **Identify** |
 | Health: the media server answering, and its version | Yes | Yes |
-| Passkeys | Refused once the server owner stops sharing with the account | Refused once the account is deleted or switched off on the server |
+| Passkeys | Refused once the server owner stops sharing with the account (and no other linked account still lets them in) | Refused once the account is deleted or switched off on the server (likewise) |
 | Your default subtitle on the Subtitles card | Yes | No: Jellyfin and Emby choose subtitles by language preference rather than per title |
 | Plex watchlist sync, Plex user import, expired Plex sign-ins on Health | Yes | Not applicable |
 | Trakt watchlist sync and Trakt list import | Yes | Yes |
@@ -79,7 +80,7 @@ Seerr AI adds these to **Settings → Jobs & Cache**, where each can be reschedu
 | Backfill Downloads | every minute | Moves approved Backfill downloads along: picks files, imports, cleans up. |
 | Health Alerts | every 10 minutes | Tells admins when a connected service newly has a problem. |
 | Anime Check | daily, 04:15 | Report: series and movies in the wrong anime folder, type or profile. |
-| Match Check | daily, 04:20 | Report: folders your media server (Plex, Jellyfin or Emby) matched to another title. |
+| Match Check | daily, 04:20 | Report: folders a connected media server (Plex, Jellyfin or Emby) matched to another title. |
 | Database Maintenance | daily, 03:45 | Clears rows nothing reads any more, then compacts the database. |
 
 ## Feature switches

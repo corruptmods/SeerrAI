@@ -30,6 +30,10 @@ Use the pencil button on Discover. See [Discover and lists](./discover-and-lists
 
 Once an admin has set up Trakt, anyone allowed to auto-request can enter their Trakt username in **Profile → Settings → General**. What they add to their public Trakt watchlist is then requested for them, every few minutes, with **Auto-Request Movies** and **Auto-Request Series**, the same way a Plex watchlist is. It works on Plex, Jellyfin and Emby. Only the 20 most recently added titles are looked at, so turning it on doesn't request a whole long-kept watchlist at once. Taking a title off the watchlist and adding it back requests it again; something you deleted isn't requested again just because it is still on the watchlist.
 
+## Accounts on several media servers
+
+When Seerr AI is connected to more than one of Plex, Jellyfin and Emby, link your accounts on the others in **Profile → Settings → Linked Accounts**, and sign in with whichever you like. Title pages then put Play on your own servers first. See [Plex, Jellyfin and Emby together](./media-servers.md#linking-accounts).
+
 ## Plex sign-in
 
 If Plex stops accepting your sign-in, your Plex watchlist stops syncing. You get one notification and a banner saying so; signing out and back in with Plex fixes it.

@@ -2,6 +2,7 @@ import Slider from '@app/components/Slider';
 import TmdbTitleCard from '@app/components/TitleCard/TmdbTitleCard';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
+import { hasAccountOn } from '@app/utils/mediaServerAccounts';
 import { ArrowRightCircleIcon } from '@heroicons/react/24/outline';
 import type { WatchlistItem } from '@server/interfaces/api/discoverInterfaces';
 import Link from 'next/link';
@@ -12,6 +13,7 @@ const messages = defineMessages('components.Discover.PlexWatchlistSlider', {
   plexwatchlist: 'Your Watchlist',
   emptywatchlist:
     'Media added to your <PlexWatchlistSupportLink>Plex Watchlist</PlexWatchlistSupportLink> will appear here.',
+  emptywatchlistSeerr: 'Titles you add to your watchlist will appear here.',
 });
 
 const PlexWatchlistSlider = () => {
@@ -49,18 +51,24 @@ const PlexWatchlistSlider = () => {
         sliderKey="watchlist"
         isLoading={!watchlistItems}
         isEmpty={!!watchlistItems && watchlistItems.results.length === 0}
-        emptyMessage={intl.formatMessage(messages.emptywatchlist, {
-          PlexWatchlistSupportLink: (msg: React.ReactNode) => (
-            <a
-              href="https://support.plex.tv/articles/universal-watchlist/"
-              className="text-white transition duration-300 hover:underline"
-              target="_blank"
-              rel="noreferrer"
-            >
-              {msg}
-            </a>
-          ),
-        })}
+        emptyMessage={
+          // The row is someone's Plex watchlist when they have Plex, and
+          // the one they keep here otherwise.
+          hasAccountOn(user, 'plex')
+            ? intl.formatMessage(messages.emptywatchlist, {
+                PlexWatchlistSupportLink: (msg: React.ReactNode) => (
+                  <a
+                    href="https://support.plex.tv/articles/universal-watchlist/"
+                    className="text-white transition duration-300 hover:underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {msg}
+                  </a>
+                ),
+              })
+            : intl.formatMessage(messages.emptywatchlistSeerr)
+        }
         items={watchlistItems?.results.map((item) => (
           <TmdbTitleCard
             id={item.tmdbId}

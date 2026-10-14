@@ -7,7 +7,7 @@ import DeclineReason from '@app/components/DeclineReason';
 import DeclineRequestModal from '@app/components/DeclineRequestModal';
 import RequestModal from '@app/components/RequestModal';
 import StatusBadge from '@app/components/StatusBadge';
-import useDeepLinks from '@app/hooks/useDeepLinks';
+import usePlayLinks from '@app/hooks/usePlayLinks';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -75,12 +75,7 @@ const RequestCardError = ({ requestData }: RequestCardErrorProps) => {
   const { hasPermission } = useUser();
   const intl = useIntl();
 
-  const { mediaUrl: plexUrl, mediaUrl4k: plexUrl4k } = useDeepLinks({
-    mediaUrl: requestData?.media?.mediaUrl,
-    mediaUrl4k: requestData?.media?.mediaUrl4k,
-    iOSPlexUrl: requestData?.media?.iOSPlexUrl,
-    iOSPlexUrl4k: requestData?.media?.iOSPlexUrl4k,
-  });
+  const { playLink, playLink4k } = usePlayLinks(requestData?.media);
 
   const requestDownloadStatus = getRequestDownloadStatus(
     requestData?.media?.[
@@ -170,7 +165,7 @@ const RequestCardError = ({ requestData }: RequestCardErrorProps) => {
                       inProgress={requestDownloadStatus.length > 0}
                       is4k={requestData.is4k}
                       mediaType={requestData.type as VideoMediaType}
-                      plexUrl={requestData.is4k ? plexUrl4k : plexUrl}
+                      playLink={requestData.is4k ? playLink4k : playLink}
                       serviceUrl={
                         requestData.is4k
                           ? requestData.media.serviceUrl4k
@@ -266,12 +261,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
     }
   );
 
-  const { mediaUrl: plexUrl, mediaUrl4k: plexUrl4k } = useDeepLinks({
-    mediaUrl: requestData?.media?.mediaUrl,
-    mediaUrl4k: requestData?.media?.mediaUrl4k,
-    iOSPlexUrl: requestData?.media?.iOSPlexUrl,
-    iOSPlexUrl4k: requestData?.media?.iOSPlexUrl4k,
-  });
+  const { playLink, playLink4k } = usePlayLinks(requestData?.media);
 
   const approveRequest = async () => {
     setIsApproving(true);
@@ -493,7 +483,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                 is4k={requestData.is4k}
                 tmdbId={requestData.media.tmdbId}
                 mediaType={requestData.type as VideoMediaType}
-                plexUrl={requestData.is4k ? plexUrl4k : plexUrl}
+                playLink={requestData.is4k ? playLink4k : playLink}
                 serviceUrl={
                   requestData.is4k
                     ? requestData.media.serviceUrl4k

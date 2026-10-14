@@ -13,6 +13,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 ## For admins
 
 - **[Installing and updating](./install.md)**: building, updating with patches, migrations, backups.
+- **[Plex, Jellyfin and Emby together](./media-servers.md)**: connecting several media servers, the primary one, sign-in, linking accounts, removing a server.
 - **[Backfill and the admin agent](./backfill-and-agent.md)**: getting what Sonarr and Radarr can't find.
 - **[Keeping it healthy](./health.md)**: the Health page and alerts, Plex Match Check, Anime Check, the offline page.
 - **[Configuration reference](./configuration.md)**: every setting the fork adds, its default, the jobs and the feature switches.
@@ -31,6 +32,7 @@ Almost everything here is an optional feature. An admin can turn one off for eve
 | **Admin agent** | An AI that looks further when Backfill finds nothing, within limits you set. On its own it never replaces a file on disk; when you ask, it can replace files, block release groups and more, once you approve. |
 | **Status that says why** | Waiting on a delay profile (and for how long), queued, stalled, verifying, unpacking, importing, adding to Plex. Live progress from SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent. |
 | **Arrival estimates** | "Digital release expected 3 Nov", "Released — searching, usually arrives within 2 days here", or time left while downloading. |
+| **Several media servers** | Plex, Jellyfin and Emby connected at once: available on any, sign in with any, Play on each. |
 | **Health** | Every connected service checked, problems listed with how to fix them, and an alert when something newly breaks. |
 | **Plex Match Check** | Nightly: folders Plex matched to a different title than Sonarr or Radarr has in them. |
 | **AI** | Claude, OpenAI or a model on your own server. Search, group picks, recaps, deletion reviews, issue fixes, log explanations. |

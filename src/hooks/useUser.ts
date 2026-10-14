@@ -46,6 +46,10 @@ export interface UserSettings {
   hiddenSliders?: number[];
   /** Their own Networks row, as JSON; null for the usual list. */
   discoverNetworks?: string | null;
+  /** Their own order for the sidebar and phone menu; empty for the usual. */
+  sidebarOrder?: string[];
+  /** Sidebar and phone menu items they hid for themselves. */
+  sidebarHidden?: string[];
 }
 
 interface UserHookResponse {

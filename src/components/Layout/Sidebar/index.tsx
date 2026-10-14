@@ -1,8 +1,10 @@
 import Badge from '@app/components/Common/Badge';
 import BrandLogo from '@app/components/Layout/Sidebar/BrandLogo';
 import VersionStatus from '@app/components/Layout/VersionStatus';
+import { loadNavEditor, useNavLayout } from '@app/context/NavLayoutContext';
 import useClickOutside from '@app/hooks/useClickOutside';
 import { useFeatureCheck } from '@app/hooks/useFeature';
+import useLazyModule from '@app/hooks/useLazyModule';
 import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition, TransitionChild } from '@headlessui/react';
@@ -21,6 +23,8 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import type { Feature } from '@server/constants/features';
+import type { NavItem } from '@server/constants/navigation';
+import { sortByNavOrder, withoutHiddenNav } from '@server/constants/navigation';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Fragment, useEffect, useRef } from 'react';
@@ -51,6 +55,8 @@ interface SidebarProps {
 }
 
 interface SidebarLinkProps {
+  /** Its name in each person's own order (server/constants/navigation). */
+  id: NavItem;
   href: string;
   svgIcon: React.ReactNode;
   messagesKey: keyof typeof menuMessages;
@@ -63,32 +69,38 @@ interface SidebarLinkProps {
   dataTestId?: string;
 }
 
+/** In the usual order; each person can arrange their own. */
 const SidebarLinks: SidebarLinkProps[] = [
   {
+    id: 'discover',
     href: '/',
     messagesKey: 'dashboard',
     svgIcon: <SparklesIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/(discover\/?)?$/,
   },
   {
+    id: 'movies',
     href: '/discover/movies',
     messagesKey: 'browsemovies',
     svgIcon: <FilmIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/discover\/movies$/,
   },
   {
+    id: 'series',
     href: '/discover/tv',
     messagesKey: 'browsetv',
     svgIcon: <TvIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/discover\/tv$/,
   },
   {
+    id: 'requests',
     href: '/requests',
     messagesKey: 'requests',
     svgIcon: <ClockIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/requests/,
   },
   {
+    id: 'calendar',
     href: '/calendar',
     messagesKey: 'calendar',
     feature: 'releaseCalendar',
@@ -96,12 +108,14 @@ const SidebarLinks: SidebarLinkProps[] = [
     activeRegExp: /^\/calendar/,
   },
   {
+    id: 'lists',
     href: '/lists',
     messagesKey: 'watchlists',
     svgIcon: <BookmarkIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/lists/,
   },
   {
+    id: 'blocklist',
     href: '/blocklist',
     messagesKey: 'blocklist',
     svgIcon: <EyeSlashIcon className="mr-3 h-6 w-6" />,
@@ -113,6 +127,7 @@ const SidebarLinks: SidebarLinkProps[] = [
     permissionType: 'or',
   },
   {
+    id: 'issues',
     href: '/issues',
     messagesKey: 'issues',
     svgIcon: <ExclamationTriangleIcon className="mr-3 h-6 w-6" />,
@@ -125,6 +140,7 @@ const SidebarLinks: SidebarLinkProps[] = [
     permissionType: 'or',
   },
   {
+    id: 'users',
     href: '/users',
     messagesKey: 'users',
     svgIcon: <UsersIcon className="mr-3 h-6 w-6" />,
@@ -133,6 +149,7 @@ const SidebarLinks: SidebarLinkProps[] = [
     dataTestId: 'sidebar-menu-users',
   },
   {
+    id: 'backfill',
     href: '/backfill',
     messagesKey: 'backfill',
     svgIcon: <DocumentMagnifyingGlassIcon className="mr-3 h-6 w-6" />,
@@ -141,6 +158,7 @@ const SidebarLinks: SidebarLinkProps[] = [
     dataTestId: 'sidebar-menu-backfill',
   },
   {
+    id: 'settings',
     href: '/settings',
     messagesKey: 'settings',
     svgIcon: <CogIcon className="mr-3 h-6 w-6" />,
@@ -163,7 +181,39 @@ const Sidebar = ({
   const intl = useIntl();
   const { hasPermission } = useUser();
   const featureIsOn = useFeatureCheck();
+  const { draft, setDraft, order, hidden } = useNavLayout();
+  // Discover loads it as customizing starts, and says so if it can't.
+  const NavEditor = useLazyModule(loadNavEditor, !!draft, () => undefined);
   useClickOutside(navRef, () => setClosed());
+
+  // The items this person can use, in their order. Items they cannot use
+  // (a permission, a feature switched off) keep their place in it, and are
+  // left out here whatever they chose.
+  const usable = sortByNavOrder(SidebarLinks, order)
+    .filter((link) => !link.feature || featureIsOn(link.feature))
+    .filter((link) =>
+      link.requiredPermission
+        ? hasPermission(link.requiredPermission, {
+            type: link.permissionType ?? 'and',
+          })
+        : true
+    );
+  const links = withoutHiddenNav(usable, hidden);
+
+  // While they arrange their menu (from Discover), the editor takes the
+  // links' place.
+  const editor =
+    draft && NavEditor ? (
+      <NavEditor
+        items={usable.map((link) => ({
+          id: link.id,
+          name: intl.formatMessage(menuMessages[link.messagesKey]),
+          icon: link.svgIcon as React.ReactElement<{ className?: string }>,
+        }))}
+        draft={draft}
+        onChange={setDraft}
+      />
+    ) : null;
 
   useEffect(() => {
     if (openIssuesCount) {
@@ -230,17 +280,8 @@ const Sidebar = ({
                       </span>
                     </div>
                     <nav className="mt-10 flex-1 space-y-4 px-4">
-                      {SidebarLinks.filter(
-                        (link) => !link.feature || featureIsOn(link.feature)
-                      )
-                        .filter((link) =>
-                          link.requiredPermission
-                            ? hasPermission(link.requiredPermission, {
-                                type: link.permissionType ?? 'and',
-                              })
-                            : true
-                        )
-                        .map((sidebarLink) => {
+                      {editor ??
+                        links.map((sidebarLink) => {
                           return (
                             <Link
                               key={`mobile-${sidebarLink.messagesKey}`}
@@ -297,17 +338,8 @@ const Sidebar = ({
                 </span>
               </div>
               <nav className="mt-8 flex-1 space-y-4 px-4">
-                {SidebarLinks.filter(
-                  (link) => !link.feature || featureIsOn(link.feature)
-                )
-                  .filter((link) =>
-                    link.requiredPermission
-                      ? hasPermission(link.requiredPermission, {
-                          type: link.permissionType ?? 'and',
-                        })
-                      : true
-                  )
-                  .map((sidebarLink) => {
+                {editor ??
+                  links.map((sidebarLink) => {
                     return (
                       <Link
                         key={`desktop-${sidebarLink.messagesKey}`}

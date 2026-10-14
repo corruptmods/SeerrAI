@@ -105,6 +105,8 @@ authRoutes.get('/me', isAuthenticated(), async (req, res) => {
       disabledFeatures: user.settings.disabledFeatures,
       hiddenSliders: user.settings.hiddenSliders,
       discoverNetworks: user.settings.discoverNetworks ?? null,
+      sidebarOrder: user.settings.sidebarOrder,
+      sidebarHidden: user.settings.sidebarHidden,
     },
   });
 });

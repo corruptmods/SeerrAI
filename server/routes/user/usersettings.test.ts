@@ -6,6 +6,7 @@ import PlexTvAPI from '@server/api/plextv';
 import { DiscoverSliderType } from '@server/constants/discover';
 import { MAX_DISCOVER_NETWORKS } from '@server/constants/discoverNetworks';
 import { ApiErrorCode } from '@server/constants/error';
+import { NAV_ITEMS } from '@server/constants/navigation';
 import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
@@ -13,6 +14,7 @@ import DiscoverSlider from '@server/entity/DiscoverSlider';
 import { User } from '@server/entity/User';
 import UserPasskey from '@server/entity/UserPasskey';
 import { UserPushSubscription } from '@server/entity/UserPushSubscription';
+import { UserSettings } from '@server/entity/UserSettings';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
@@ -423,6 +425,102 @@ describe('a person’s own Networks row', () => {
       (await agent.post(`/user/${userId}/settings/discover`).send({})).status,
       400
     );
+  });
+});
+
+describe('a person’s own sidebar', () => {
+  it('is the usual one until they arrange it', async () => {
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.get(`/user/${userId}/settings/sidebar`);
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(res.body, { order: [], hidden: [] });
+    const me = (await agent.get('/auth/me')).body;
+    assert.deepStrictEqual(me.settings?.sidebarOrder ?? [], []);
+    assert.deepStrictEqual(me.settings?.sidebarHidden ?? [], []);
+  });
+
+  it('keeps their order and hidden items, cleaned, for them alone', async () => {
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    const saved = await agent.post(`/user/${userId}/settings/sidebar`).send({
+      order: ['lists', 'discover', 'music', 'lists'],
+      // Discover and Settings can't be hidden; unknown names are dropped.
+      hidden: ['issues', 'settings', 'discover', 'music', 'issues'],
+    });
+    assert.strictEqual(saved.status, 200);
+    assert.deepStrictEqual(saved.body, {
+      order: ['lists', 'discover'],
+      hidden: ['issues'],
+    });
+
+    const me = (await agent.get('/auth/me')).body;
+    assert.deepStrictEqual(me.settings.sidebarOrder, ['lists', 'discover']);
+    assert.deepStrictEqual(me.settings.sidebarHidden, ['issues']);
+    assert.deepStrictEqual(
+      (await agent.get(`/user/${userId}/settings/sidebar`)).body,
+      saved.body
+    );
+
+    // Nobody else's changes.
+    const admin = await loginAs('admin@seerr.dev', 'test1234');
+    assert.deepStrictEqual(
+      (await admin.agent.get('/user/1/settings/sidebar')).body,
+      { order: [], hidden: [] }
+    );
+    const adminMe = (await admin.agent.get('/auth/me')).body;
+    assert.deepStrictEqual(adminMe.settings?.sidebarOrder ?? [], []);
+    assert.deepStrictEqual(adminMe.settings?.sidebarHidden ?? [], []);
+  });
+
+  it('changes only what is sent, and keeps the default order as none', async () => {
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    await agent
+      .post(`/user/${userId}/settings/sidebar`)
+      .send({ order: ['requests', 'discover'], hidden: ['blocklist'] });
+
+    const onlyHidden = await agent
+      .post(`/user/${userId}/settings/sidebar`)
+      .send({ hidden: ['calendar'] });
+    assert.deepStrictEqual(onlyHidden.body, {
+      order: ['requests', 'discover'],
+      hidden: ['calendar'],
+    });
+
+    // The default order, sent in full, is kept as no order at all, so items
+    // added in later versions take their usual place.
+    const reset = await agent
+      .post(`/user/${userId}/settings/sidebar`)
+      .send({ order: [...NAV_ITEMS], hidden: [] });
+    assert.deepStrictEqual(reset.body, { order: [], hidden: [] });
+    const stored = await getRepository(UserSettings).findOneOrFail({
+      where: { user: { id: userId } },
+    });
+    assert.deepStrictEqual(stored.sidebarOrder, []);
+    assert.deepStrictEqual(stored.sidebarHidden, []);
+  });
+
+  it('refuses someone else’s, and anything that is not a list of names', async () => {
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    assert.strictEqual(
+      (await agent.post('/user/1/settings/sidebar').send({ order: [] })).status,
+      403
+    );
+    assert.strictEqual(
+      (await agent.get('/user/1/settings/sidebar')).status,
+      403
+    );
+    for (const body of [
+      {},
+      { order: 'lists' },
+      { hidden: [1] },
+      { order: ['lists'], hidden: null },
+    ]) {
+      assert.strictEqual(
+        (await agent.post(`/user/${userId}/settings/sidebar`).send(body))
+          .status,
+        400,
+        JSON.stringify(body)
+      );
+    }
   });
 });
 

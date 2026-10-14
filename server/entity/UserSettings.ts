@@ -115,6 +115,17 @@ export class UserSettings {
   public discoverNetworks?: string | null;
 
   /**
+   * Their own order for the sidebar and the phone menu, as item names (see
+   * server/constants/navigation.ts); empty for the usual order.
+   */
+  @Column({ type: 'text', nullable: true, transformer: jsonArrayTransformer })
+  public sidebarOrder: string[];
+
+  /** Sidebar and phone menu items this person hid for themselves. */
+  @Column({ type: 'text', nullable: true, transformer: jsonArrayTransformer })
+  public sidebarHidden: string[];
+
+  /**
    * Their Trakt username, for requesting what is on their public Trakt
    * watchlist (with watchlistSyncMovies / watchlistSyncTv, as for Plex).
    */

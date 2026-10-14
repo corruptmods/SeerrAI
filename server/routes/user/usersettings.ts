@@ -1,6 +1,11 @@
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
 import { ApiErrorCode } from '@server/constants/error';
+import {
+  cleanNavHidden,
+  cleanNavOrder,
+  isDefaultNavOrder,
+} from '@server/constants/navigation';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
@@ -1002,6 +1007,93 @@ userSettingsRoutes.post<{ id: string }>(
           networks !== undefined
             ? networks
             : (user.settings?.discoverNetworks ?? null),
+      });
+    } catch (e) {
+      return next({ status: 500, message: e.message });
+    }
+  }
+);
+
+/*
+ * The order a person put their sidebar and phone menu in, and the items
+ * they hid, by item name (server/constants/navigation.ts). Arranged from
+ * their home page; nobody else's sidebar changes.
+ */
+userSettingsRoutes.get<{ id: string }>(
+  '/sidebar',
+  isOwnProfileOrAdmin(),
+  async (req, res, next) => {
+    try {
+      const user = await getRepository(User).findOne({
+        where: { id: Number(req.params.id) },
+      });
+      if (!user) {
+        return next({ status: 404, message: 'User not found.' });
+      }
+      return res.status(200).json({
+        order: user.settings?.sidebarOrder ?? [],
+        hidden: user.settings?.sidebarHidden ?? [],
+      });
+    } catch (e) {
+      return next({ status: 500, message: e.message });
+    }
+  }
+);
+
+userSettingsRoutes.post<{ id: string }>(
+  '/sidebar',
+  isOwnProfileOrAdmin(),
+  async (req, res, next) => {
+    const body = req.body as { order?: unknown; hidden?: unknown };
+    const isNames = (value: unknown) =>
+      Array.isArray(value) && value.every((name) => typeof name === 'string');
+    if (
+      (body.order === undefined && body.hidden === undefined) ||
+      (body.order !== undefined && !isNames(body.order)) ||
+      (body.hidden !== undefined && !isNames(body.hidden))
+    ) {
+      return next({
+        status: 400,
+        message: 'A list of sidebar items to order, or to hide, is required.',
+      });
+    }
+    // Names that are not items are dropped. The usual order is kept as no
+    // order at all, so items added later take their usual place and the
+    // phone menu keeps its own order.
+    const order =
+      body.order === undefined
+        ? undefined
+        : isDefaultNavOrder(cleanNavOrder(body.order) ?? [])
+          ? []
+          : (cleanNavOrder(body.order) ?? []);
+    const hidden =
+      body.hidden === undefined ? undefined : cleanNavHidden(body.hidden);
+    const changes: Partial<UserSettings> = {
+      ...(order !== undefined && { sidebarOrder: order }),
+      ...(hidden !== undefined && { sidebarHidden: hidden }),
+    };
+    try {
+      const user = await getRepository(User).findOne({
+        where: { id: Number(req.params.id) },
+      });
+      if (!user) {
+        return next({ status: 404, message: 'User not found.' });
+      }
+      if (user.id === 1 && req.user?.id !== 1) {
+        return next({
+          status: 403,
+          message: "You do not have permission to modify this user's settings.",
+        });
+      }
+      const repository = getRepository(UserSettings);
+      if (user.settings) {
+        await repository.update(user.settings.id, changes);
+      } else {
+        await repository.save(new UserSettings({ user, ...changes }));
+      }
+      return res.status(200).json({
+        order: order ?? user.settings?.sidebarOrder ?? [],
+        hidden: hidden ?? user.settings?.sidebarHidden ?? [],
       });
     } catch (e) {
       return next({ status: 500, message: e.message });

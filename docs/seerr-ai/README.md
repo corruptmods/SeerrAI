@@ -35,7 +35,7 @@ Almost everything here is an optional feature. An admin can turn one off for eve
 | **Plex Match Check** | Nightly: folders Plex matched to a different title than Sonarr or Radarr has in them. |
 | **AI** | Claude, OpenAI or a model on your own server. Search, group picks, recaps, deletion reviews, issue fixes, log explanations. |
 | **Watch lists** | Shared lists with "up next" for each series, list activity, import from text, Roulette, "Finished watching?". |
-| **Your home page** | Hide rows for yourself; Suggested for You; Deleting Soon; filter any poster grid; request several titles at once. |
+| **Your home page** | Hide rows for yourself; arrange your own sidebar and phone menu; Suggested for You; Deleting Soon; filter any poster grid; request several titles at once. |
 | **Series** | Request one episode; get each new season as it premieres; see which episodes are here. |
 | **Anime** | One rule for what counts as anime; anime folders, profiles and series type in Sonarr and Radarr; a nightly check. |
 | **Subtitles** | See and replace subtitles through Bazarr, or transcribe them with Whisper. |

@@ -68,6 +68,22 @@ components:
           description: |
             This user's own list for the Networks row: a JSON list of `{ id, name, logoPath }` (at most
             50), or `null` for the usual list. Left out, it is unchanged.
+    SidebarLayout:
+      type: object
+      description: How a user arranged their own sidebar and phone menu.
+      properties:
+        order:
+          type: array
+          description: Item names, in order (discover, movies, series, requests, calendar, lists, blocklist, issues, users, backfill, settings). Unknown names are left out; items not named keep their usual place. Empty for the usual order.
+          items:
+            type: string
+          example: [discover, lists, requests, movies, series]
+        hidden:
+          type: array
+          description: Items the user hid for themselves. Discover and Settings are never hidden; unknown names are left out.
+          items:
+            type: string
+          example: [blocklist, calendar]
     PlexMatchProblem:
       type: object
       properties:
@@ -9374,6 +9390,45 @@ paths:
                 $ref: '#/components/schemas/HiddenSliders'
         '400':
           description: Nothing to save, or the Networks list was refused (`TOO_MANY_NETWORKS` or `INVALID_NETWORK_LIST`); nothing was saved
+  /user/{userId}/settings/sidebar:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: number
+    get:
+      summary: How a user arranged their sidebar
+      description: Their own order and hidden items, for the sidebar and the phone menu. Items they cannot use stay hidden whatever this says. Requires `MANAGE_USERS` permission if viewing other users.
+      tags:
+        - users
+      responses:
+        '200':
+          description: Their sidebar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SidebarLayout'
+    post:
+      summary: Arrange a user's sidebar
+      description: Replaces the order, the hidden items, or both (whichever is sent). Unknown names are dropped, Discover and Settings are never hidden, and the usual order is kept as an empty list. Requires `MANAGE_USERS` permission if editing other users.
+      tags:
+        - users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SidebarLayout'
+      responses:
+        '200':
+          description: Their sidebar, as saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SidebarLayout'
+        '400':
+          description: Nothing to save, or not a list of item names
   /user/{userId}/settings/passkeys:
     parameters:
       - in: path

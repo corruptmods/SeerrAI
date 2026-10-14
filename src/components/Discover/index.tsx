@@ -15,9 +15,10 @@ import TvGenreSlider from '@app/components/Discover/TvGenreSlider';
 import { animeQuery } from '@app/components/Discover/animeChoices';
 import { sliderTitles } from '@app/components/Discover/constants';
 import MediaSlider from '@app/components/MediaSlider';
+import { loadNavEditor, useNavLayout } from '@app/context/NavLayoutContext';
 import { encodeURIExtraParams } from '@app/hooks/useDiscover';
 import { useFeatureCheck } from '@app/hooks/useFeature';
-import useLazyModule from '@app/hooks/useLazyModule';
+import useLazyModule, { loadModule } from '@app/hooks/useLazyModule';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -33,6 +34,11 @@ import {
 import { DiscoverSliderType } from '@server/constants/discover';
 import { MAX_DISCOVER_NETWORKS } from '@server/constants/discoverNetworks';
 import { ApiErrorCode } from '@server/constants/error';
+import {
+  editableNavLayout,
+  isDefaultNavOrder,
+  sameNavLayout,
+} from '@server/constants/navigation';
 import type DiscoverSlider from '@server/entity/DiscoverSlider';
 import axios from 'axios';
 import { useEffect, useState } from 'react';
@@ -41,11 +47,13 @@ import useSWR from 'swr';
 
 // Only someone customizing the page needs these, and they bring drag-and-drop
 // and select libraries with them: load them when editing starts, not with
-// the page everyone opens first.
+// the page everyone opens first. The sidebar's editor comes with them, so a
+// failed download is said once, here.
 const loadEditor = () =>
   Promise.all([
     import('@app/components/Discover/CreateSlider'),
     import('@app/components/Discover/DiscoverSliderEdit'),
+    loadModule(loadNavEditor),
   ]).then(([create, edit]) => ({
     CreateSlider: create.default,
     DiscoverSliderEdit: edit.default,
@@ -123,6 +131,10 @@ const Discover = () => {
   } = useSWR<DiscoverSlider[]>('/api/v1/settings/discover');
   const [sliders, setSliders] = useState<Partial<DiscoverSlider>[]>([]);
   const [isEditing, setIsEditing] = useState(false);
+  // Their sidebar and phone menu, arranged while customizing: shown in the
+  // menus themselves, saved (or dropped) with the rest of the page.
+  const nav = useNavLayout();
+  const { setDraft: setNavDraft } = nav;
   const editor = useLazyModule(loadEditor, isEditing, () => {
     addToast(intl.formatMessage(messages.couldnotedit), {
       appearance: 'error',
@@ -151,12 +163,24 @@ const Discover = () => {
       setMyNetworks(savedNetworks);
     }
   }, [savedNetworks, isEditing]);
+  // The menus show their editors from the moment customizing starts, until
+  // it ends or this page is left.
+  const savedNav = nav.saved;
+  useEffect(() => {
+    setNavDraft(isEditing ? editableNavLayout(savedNav) : undefined);
+    // Only as customizing starts or ends: what was saved meanwhile is the
+    // draft itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, setNavDraft]);
+  useEffect(() => () => setNavDraft(undefined), [setNavDraft]);
 
   const layoutChanged = () => isAdmin && !Object.is(discoverData, sliders);
   const hiddenChanged = () =>
     [...myHidden].sort().join(',') !== [...savedHidden].sort().join(',');
   const networksChanged = () => myNetworks !== savedNetworks;
-  const mineChanged = () => hiddenChanged() || networksChanged();
+  const navChanged = () => !!nav.draft && !sameNavLayout(nav.draft, nav.saved);
+  const mineChanged = () =>
+    hiddenChanged() || networksChanged() || navChanged();
   const hasChanged = () => layoutChanged() || mineChanged();
   const hiddenForMe = (id?: number) =>
     id !== undefined && myHidden.includes(id);
@@ -173,11 +197,21 @@ const Discover = () => {
       if (layoutChanged()) {
         await axios.post('/api/v1/settings/discover', sliders);
       }
-      if (mineChanged() && user) {
+      if ((hiddenChanged() || networksChanged()) && user) {
         await axios.post(`/api/v1/user/${user.id}/settings/discover`, {
           hidden: myHidden,
           networks: myNetworks,
         });
+      }
+      if (navChanged() && nav.draft && user) {
+        await axios.post(`/api/v1/user/${user.id}/settings/sidebar`, {
+          // The usual order is kept as none, so items added later take
+          // their usual place.
+          order: isDefaultNavOrder(nav.draft.order) ? [] : nav.draft.order,
+          hidden: nav.draft.hidden,
+        });
+      }
+      if (mineChanged()) {
         await revalidateUser();
       }
 

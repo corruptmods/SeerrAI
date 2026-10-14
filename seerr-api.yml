@@ -7204,6 +7204,16 @@ paths:
                           imageCount:
                             type: number
                             example: 123
+                      music:
+                        type: object
+                        description: Album covers and pictures of artists, from every host they come from.
+                        properties:
+                          size:
+                            type: number
+                            example: 123456
+                          imageCount:
+                            type: number
+                            example: 123
                   imageCacheTotal:
                     type: object
                     description: The whole image cache on disk against its limit, in bytes, and whether images can be converted to AVIF and WebP here.

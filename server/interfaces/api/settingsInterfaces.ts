@@ -91,8 +91,9 @@ export interface CacheItem {
 
 export interface CacheResponse {
   apiCaches: CacheItem[];
+  /** Each image cache; music's covers and artists' pictures as one. */
   imageCache: Record<
-    'tmdb' | 'tvdb' | 'avatar',
+    'tmdb' | 'tvdb' | 'avatar' | 'music',
     { size: number; imageCount: number }
   >;
   /**

@@ -1,4 +1,5 @@
-import { warmTmdbImages } from '@server/lib/imageproxy';
+import { COVER_ART_ARCHIVE_URL, COVER_PATH } from '@server/api/coverartarchive';
+import { warmCovers, warmTmdbImages } from '@server/lib/imageproxy';
 import { getSettings } from '@server/lib/settings';
 import type { NextFunction, Request, Response } from 'express';
 
@@ -7,7 +8,8 @@ import type { NextFunction, Request, Response } from 'express';
  * every poster on it. Starting those posters into the image cache as the
  * page is sent means each is fetched from TMDB and converted while the
  * browser is still drawing the page, so they are there, or nearly, when it
- * asks, and scrolling meets posters rather than empty cards.
+ * asks, and scrolling meets posters rather than empty cards. A page of
+ * albums does the same with their covers.
  */
 
 /** The poster size the cards ask for. */
@@ -37,7 +39,35 @@ export const posterPathsOf = (body: unknown): string[] => {
   return paths;
 };
 
-/** Warms the posters of any page of titles a GET answers with. */
+/**
+ * The cover paths of a page of music: albums in its `results`, or in a
+ * search's `albums`, as the image proxy takes them.
+ */
+export const coverPathsOf = (body: unknown): string[] => {
+  const page = body as { results?: unknown; albums?: unknown } | null;
+  const albums = Array.isArray(page?.results)
+    ? page.results
+    : Array.isArray(page?.albums)
+      ? page.albums
+      : [];
+  const paths: string[] = [];
+  for (const album of albums) {
+    const url = (album as { coverUrl?: unknown } | null)?.coverUrl;
+    const path =
+      typeof url === 'string' && url.startsWith(`${COVER_ART_ARCHIVE_URL}/`)
+        ? url.slice(COVER_ART_ARCHIVE_URL.length)
+        : undefined;
+    if (path && COVER_PATH.test(path)) {
+      paths.push(path);
+      if (paths.length >= MAX_WARMED) {
+        break;
+      }
+    }
+  }
+  return paths;
+};
+
+/** Warms the posters or covers of any page a GET answers with. */
 const warmPosters = (req: Request, res: Response, next: NextFunction) => {
   if (req.method !== 'GET') {
     return next();
@@ -46,9 +76,13 @@ const warmPosters = (req: Request, res: Response, next: NextFunction) => {
   res.json = (body: unknown) => {
     if (res.statusCode === 200 && getSettings().main.cacheImages) {
       const paths = posterPathsOf(body);
+      const covers = coverPathsOf(body);
+      // After the answer is on its way, never holding it up.
       if (paths.length) {
-        // After the answer is on its way, never holding it up.
         setImmediate(() => warmTmdbImages(paths));
+      }
+      if (covers.length) {
+        setImmediate(() => warmCovers(covers));
       }
     }
     return json(body);

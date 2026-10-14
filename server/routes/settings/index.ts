@@ -32,6 +32,8 @@ import {
   MEDIA_SERVER_KINDS,
   serverName,
 } from '@server/lib/mediaServers';
+import type { MusicImageSource } from '@server/lib/music/imageSources';
+import { MUSIC_IMAGE_ORIGINS } from '@server/lib/music/imageSources';
 import { Permission } from '@server/lib/permissions';
 import type { MediaServerName } from '@server/lib/plexMatchCheck';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
@@ -901,14 +903,26 @@ settingsRoutes.get('/cache', async (_req, res) => {
     stats: cache.getStats(),
   }));
 
-  const [tmdbImageCache, tvdbImageCache, avatarImageCache, total, conversion] =
-    await Promise.all([
-      ImageProxy.getImageStats('tmdb'),
-      ImageProxy.getImageStats('tvdb'),
-      ImageProxy.getImageStats('avatar'),
-      ImageProxy.getTotalSize(),
-      imageConversionAvailable(),
-    ]);
+  const [
+    tmdbImageCache,
+    tvdbImageCache,
+    avatarImageCache,
+    musicImageCaches,
+    total,
+    conversion,
+  ] = await Promise.all([
+    ImageProxy.getImageStats('tmdb'),
+    ImageProxy.getImageStats('tvdb'),
+    ImageProxy.getImageStats('avatar'),
+    // Music's covers and pictures of artists, from their three hosts, as one.
+    Promise.all(
+      (Object.keys(MUSIC_IMAGE_ORIGINS) as MusicImageSource[]).map((source) =>
+        ImageProxy.getImageStats(source)
+      )
+    ),
+    ImageProxy.getTotalSize(),
+    imageConversionAvailable(),
+  ]);
 
   const stats: DnsStats | undefined = dnsCache?.getStats();
   const entries: DnsEntries | undefined = dnsCache?.getCacheEntries();
@@ -919,6 +933,13 @@ settingsRoutes.get('/cache', async (_req, res) => {
       tmdb: tmdbImageCache,
       tvdb: tvdbImageCache,
       avatar: avatarImageCache,
+      music: musicImageCaches.reduce(
+        (sum, cache) => ({
+          size: sum.size + cache.size,
+          imageCount: sum.imageCount + cache.imageCount,
+        }),
+        { size: 0, imageCount: 0 }
+      ),
     },
     imageCacheTotal: {
       size: total,

@@ -18,15 +18,21 @@ import Media from '@server/entity/Media';
 import MusicMetadata from '@server/entity/MusicMetadata';
 import { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
+import { musicImageProxy } from '@server/lib/imageproxy';
 import type { LidarrSettings } from '@server/lib/settings';
 import { getSettings, musicDefaults } from '@server/lib/settings';
 import discoverMusicRoutes from '@server/routes/discoverMusic';
+import imageproxy, { useSessionForImages } from '@server/routes/imageproxy';
 import musicRoutes from '@server/routes/music';
 import { setupTestDb } from '@server/test/db';
 import { MUSIC_FIXTURE_IDS, seedMusicFixtures } from '@server/utils/seedTestDb';
+import cookieParser from 'cookie-parser';
 import express from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
+import session from 'express-session';
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
+import { promises } from 'node:fs';
 import type { Server } from 'node:http';
 import http from 'node:http';
 import path from 'node:path';
@@ -39,6 +45,7 @@ import {
   it,
   mock,
 } from 'node:test';
+import sharp from 'sharp';
 
 /*
  * Browsing music: the routes behind the real OpenAPI validator, with
@@ -86,6 +93,18 @@ let lidarrPort = 0;
 let app: Server;
 let port = 0;
 let actingAs: User | undefined;
+
+// What the image proxy fetched from fanart.tv, and a session to ask with.
+let fetchedPictures: string[] = [];
+let pictureJpeg: Buffer;
+const PICTURE_CACHE = path.join(__dirname, '../../config/cache/images/fanart');
+const SECRET = 'test-secret';
+const SIGNED_IN = `connect.sid=${encodeURIComponent(
+  `s:signed-in.${createHmac('sha256', SECRET)
+    .update('signed-in')
+    .digest('base64')
+    .replace(/=+$/, '')}`
+)}`;
 
 const lidarrServer = (): LidarrSettings =>
   ({
@@ -165,6 +184,29 @@ let admin: User;
 let friend: User;
 
 before(async () => {
+  pictureJpeg = await sharp({
+    create: { width: 1000, height: 1000, channels: 3, background: '#a53a6e' },
+  })
+    .jpeg({ quality: 95 })
+    .toBuffer();
+  await promises.rm(PICTURE_CACHE, { recursive: true, force: true });
+  Object.defineProperty(musicImageProxy('fanart'), 'axios', {
+    configurable: true,
+    value: {
+      get: async (picture: string) => {
+        fetchedPictures.push(picture);
+        return {
+          data: pictureJpeg,
+          headers: { 'content-type': 'image/jpeg' },
+        };
+      },
+    },
+  });
+  const store = new session.MemoryStore();
+  await new Promise<void>((resolve) =>
+    store.set('signed-in', { cookie: {}, userId: 2 } as never, () => resolve())
+  );
+  useSessionForImages({ store, secret: SECRET });
   await new Promise<void>((r) => lidarr.listen(0, '127.0.0.1', () => r()));
   lidarrPort = (lidarr.address() as { port: number }).port;
   const ex = express();
@@ -182,6 +224,7 @@ before(async () => {
   });
   ex.use('/api/v1/music', musicRoutes);
   ex.use('/api/v1/discover/music', discoverMusicRoutes);
+  ex.use('/imageproxy', cookieParser(), imageproxy);
   ex.use(
     (
       err: { status?: number; message: string },
@@ -197,9 +240,10 @@ before(async () => {
   port = (app.address() as { port: number }).port;
 });
 
-after(() => {
+after(async () => {
   app?.close();
   lidarr.close();
+  await promises.rm(PICTURE_CACHE, { recursive: true, force: true });
 });
 
 beforeEach(async () => {
@@ -507,6 +551,78 @@ describe('an artist’s picture', () => {
     assert.equal((await get(`/music/artist/${IDS.artist}/image`)).status, 404);
     lidarrUp = true;
     assert.equal((await get(`/music/artist/${IDS.artist}/image`)).status, 302);
+  });
+});
+
+describe('an artist’s picture, from the image proxy', () => {
+  const picture = (address: string, cookie: string | null = SIGNED_IN) =>
+    fetch(`http://127.0.0.1:${port}/imageproxy/artist/${address}`, {
+      headers: cookie ? { cookie } : {},
+      redirect: 'manual',
+    });
+
+  it('is the one Lidarr has, served and kept as an image', async () => {
+    fetchedPictures = [];
+    const res = await picture(IDS.artist);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'image/jpeg');
+    // Which picture this is can change, so a browser keeps it for a day.
+    assert.equal(res.headers.get('cache-control'), 'public, max-age=86400');
+    assert.equal((await res.arrayBuffer()).byteLength, pictureJpeg.length);
+
+    const backdrop = await picture(`${IDS.artist}/backdrop`);
+    assert.equal(backdrop.status, 200);
+
+    const avif = await picture(`${IDS.artist}?f=avif`);
+    assert.equal(avif.headers.get('content-type'), 'image/avif');
+    assert.equal(avif.headers.get('cache-control'), 'public, max-age=86400');
+    assert.ok((await avif.arrayBuffer()).byteLength < pictureJpeg.length);
+
+    // Asked again, the browser is told it already has it.
+    const again = await fetch(
+      `http://127.0.0.1:${port}/imageproxy/artist/${IDS.artist}`,
+      {
+        headers: {
+          cookie: SIGNED_IN,
+          'if-none-match': res.headers.get('etag') ?? '',
+        },
+      }
+    );
+    assert.equal(again.status, 304);
+    assert.deepEqual(fetchedPictures, [
+      `/fanart/music/${IDS.artist}/artistthumb/radiohead-5.jpg`,
+      `/fanart/music/${IDS.artist}/artistbackground/radiohead-6.jpg`,
+    ]);
+    assert.deepEqual(lookups, [`lidarr:${IDS.artist}`], 'asked Lidarr once');
+  });
+
+  it('is not looked for for someone signed out, or while music is off', async () => {
+    assert.equal((await picture(IDS.artist, null)).status, 403);
+    getSettings().main.disabledFeatures = ['music'];
+    assert.equal((await picture(IDS.artist)).status, 403);
+    getSettings().main.disabledFeatures = [];
+    getSettings().lidarr = [{ ...lidarrServer(), isDefault: false }];
+    assert.equal((await picture(IDS.artist)).status, 404);
+    assert.deepEqual(lookups, []);
+  });
+
+  it('is missing for an hour when the artist has none', async () => {
+    lookupImages = [];
+    const res = await picture(IDS.artist);
+    assert.equal(res.status, 404);
+    assert.equal(res.headers.get('cache-control'), 'public, max-age=3600');
+  });
+
+  it('is only a MusicBrainz id, with or without the backdrop', async () => {
+    for (const address of [
+      'radiohead',
+      `${IDS.artist}/photo`,
+      `${IDS.artist}/backdrop/x`,
+      `${IDS.artist}?w=480`,
+    ]) {
+      assert.equal((await picture(address)).status, 400, address);
+    }
+    assert.deepEqual(lookups, []);
   });
 });
 

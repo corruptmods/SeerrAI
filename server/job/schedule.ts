@@ -7,7 +7,7 @@ import downloadTracker from '@server/lib/downloadtracker';
 import episodeSync from '@server/lib/episodeSync';
 import futureSeasons from '@server/lib/futureSeasons';
 import healthAlerts from '@server/lib/healthAlerts';
-import ImageProxy from '@server/lib/imageproxy';
+import ImageProxy, { IMAGE_CACHES } from '@server/lib/imageproxy';
 import type { MediaServerKind } from '@server/lib/mediaServers';
 import { connectedServers, serverName } from '@server/lib/mediaServers';
 import { musicReady } from '@server/lib/music/access';
@@ -515,7 +515,7 @@ export const startJobs = (): void => {
         // Expired images seen since are kept: they are revalidated with the
         // host, not downloaded again, when next asked for.
         return (async () => {
-          for (const source of ['tmdb', 'tvdb', 'avatar']) {
+          for (const source of IMAGE_CACHES) {
             await ImageProxy.clearCache(source);
           }
           await ImageProxy.trimToLimit();

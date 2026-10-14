@@ -14,9 +14,16 @@ const PROXIED = [
   ['tadb', 'https://r2.theaudiodb.com/'],
 ] as const;
 
+/** The server's address for a picture of an artist (see artistImageUrl). */
+const ARTIST_IMAGE =
+  /^\/api\/v1\/music\/artist\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/image(\?kind=backdrop)?$/;
+
 /**
  * A cover or picture's address: through the image proxy when the server
- * caches images (Settings → General), else straight from its host.
+ * caches images (Settings → General), else straight from its host. A
+ * picture of an artist has an address of its own at the proxy, kept like
+ * any other picture; without caching, the server sends the browser to the
+ * picture's host.
  */
 export const musicImageSrc = (url: string, cacheImages: boolean): string => {
   if (!cacheImages) {
@@ -26,6 +33,10 @@ export const musicImageSrc = (url: string, cacheImages: boolean): string => {
     if (url.startsWith(host)) {
       return `/imageproxy/${source}/${url.slice(host.length)}`;
     }
+  }
+  const artist = ARTIST_IMAGE.exec(url);
+  if (artist) {
+    return `/imageproxy/artist/${artist[1]}${artist[2] ? '/backdrop' : ''}`;
   }
   return url;
 };

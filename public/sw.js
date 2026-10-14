@@ -395,38 +395,72 @@ const staleWhileRevalidate = async (
   throw new Error('No cached or network response available');
 };
 
+/**
+ * Whether a stored copy may still be served as it is. Most never go out of
+ * date: immutable ones, and those the server gave no lifetime. One the server
+ * said can change at its address (an album's cover, which picture stands for
+ * an artist) is good for its max-age from when it was sent.
+ */
+const stillFresh = (response) => {
+  const cacheControl = response.headers.get('Cache-Control') ?? '';
+  const maxAge = /(?:^|,)\s*max-age=(\d+)/i.exec(cacheControl);
+  const sentAt = Date.parse(response.headers.get('Date') ?? '');
+  if (/immutable/i.test(cacheControl) || !maxAge || Number.isNaN(sentAt)) {
+    return true;
+  }
+  return Date.now() < sentAt + Number(maxAge[1]) * 1000;
+};
+
 const cacheFirst = async (request, cacheName, maxEntries, keepAlive) => {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
 
   if (cached) {
     markUsed(cacheName, request.url);
+    if (!stillFresh(cached)) {
+      // Shown as it is this time, and fetched again for next time.
+      keepAlive?.(
+        fetchAndStore(request, cache, cacheName, maxEntries).catch(
+          () => undefined
+        )
+      );
+    }
     return cached;
   }
 
   const response = await fetch(request);
-
-  // no-store: a stand-in for now (an image proxy still converting the real
-  // one), never to be kept under this address.
-  if (
-    response &&
-    response.ok &&
-    !/no-store/i.test(response.headers.get('Cache-Control') ?? '')
-  ) {
-    markUsed(cacheName, request.url);
+  const store = keep(response, request, cache, cacheName, maxEntries);
+  if (store) {
     // The worker can be stopped as soon as the response is handed over; keep
     // it alive until the copy is stored, or the next view downloads it again.
-    const store = cache
-      .put(request, response.clone())
-      .then(() =>
-        maxEntries ? trimCacheSoon(cacheName, maxEntries) : undefined
-      )
-      .catch(() => undefined);
     keepAlive?.(store);
   }
 
   return response;
 };
+
+/**
+ * Stores a copy of a response, unless it is an error or says not to: a
+ * no-store image is a stand-in for now (an image proxy still converting the
+ * real one), never to be kept under this address. The storing, or nothing.
+ */
+const keep = (response, request, cache, cacheName, maxEntries) => {
+  if (
+    !response ||
+    !response.ok ||
+    /no-store/i.test(response.headers.get('Cache-Control') ?? '')
+  ) {
+    return undefined;
+  }
+  markUsed(cacheName, request.url);
+  return cache
+    .put(request, response.clone())
+    .then(() => (maxEntries ? trimCacheSoon(cacheName, maxEntries) : undefined))
+    .catch(() => undefined);
+};
+
+const fetchAndStore = async (request, cache, cacheName, maxEntries) =>
+  keep(await fetchWithTimeout(request), request, cache, cacheName, maxEntries);
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;

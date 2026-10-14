@@ -3,6 +3,12 @@ import {
   DEFAULT_IMAGE_CACHE_MAX_MB,
   MIN_IMAGE_CACHE_MAX_MB,
 } from '@server/constants/images';
+import type { MusicImageSource } from '@server/lib/music/imageSources';
+import {
+  MUSIC_IMAGE_KEPT_S,
+  MUSIC_IMAGE_MISSING_MS,
+  MUSIC_IMAGE_ORIGINS,
+} from '@server/lib/music/imageSources';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { proxyRequestInterceptor } from '@server/utils/customProxyAgent';
@@ -55,7 +61,10 @@ const UPSTREAM_TIMEOUT_MS = 15000;
 /** Kept this long when the upstream does not say. */
 const DEFAULT_MAX_AGE_S = 86400;
 
-/** An image the upstream says does not exist is not asked for again for this long. */
+/**
+ * An image the upstream says does not exist is not asked for again for this
+ * long, unless the cache is told otherwise (see missingForMs).
+ */
 const MISSING_FOR_MS = 10 * 60 * 1000;
 const MISSING_LIMIT = 5000;
 
@@ -445,6 +454,9 @@ class ImageProxy {
   private axios: AxiosInstance;
   private cacheVersion;
   private key;
+  private keptForS: number | undefined;
+  /** How long an image the upstream does not have is not asked for again. */
+  public readonly missingForMs: number;
 
   constructor(
     key: string,
@@ -453,10 +465,19 @@ class ImageProxy {
       cacheVersion?: number;
       rateLimitOptions?: rateLimitOptions;
       headers?: Record<string, string>;
+      /**
+       * How long an image is kept before the host is asked again, in
+       * seconds, whatever the host's own headers say. Without it, the host's
+       * max-age is used.
+       */
+      keptForS?: number;
+      missingForMs?: number;
     } = {}
   ) {
     this.cacheVersion = options.cacheVersion ?? 1;
     this.key = key;
+    this.keptForS = options.keptForS;
+    this.missingForMs = options.missingForMs ?? MISSING_FOR_MS;
     this.axios = axios.create({
       baseURL: baseUrl,
       headers: options.headers,
@@ -718,7 +739,8 @@ class ImageProxy {
       );
 
       const maxAge =
-        maxAgeOf(response.headers['cache-control']) || DEFAULT_MAX_AGE_S;
+        this.keptForS ??
+        (maxAgeOf(response.headers['cache-control']) || DEFAULT_MAX_AGE_S);
       const expireAt = Date.now() + maxAge * 1000;
       const etag = (response.headers.etag ?? '').replace(/[^\w-]/g, '');
 
@@ -754,7 +776,7 @@ class ImageProxy {
         if (ImageProxy.missing.size >= MISSING_LIMIT) {
           ImageProxy.missing.clear();
         }
-        ImageProxy.missing.set(cacheKey, Date.now() + MISSING_FOR_MS);
+        ImageProxy.missing.set(cacheKey, Date.now() + this.missingForMs);
         logger.debug('Image not found upstream', {
           label: 'Image Cache',
           path,
@@ -780,7 +802,8 @@ class ImageProxy {
     headers: Record<string, unknown>
   ): Promise<ImageResponse> {
     const maxAge =
-      maxAgeOf(headers['cache-control']) || previous.meta.curRevalidate;
+      this.keptForS ??
+      (maxAgeOf(headers['cache-control']) || previous.meta.curRevalidate);
     const expireAt = Date.now() + maxAge * 1000;
     const { etag, extension } = previous.meta;
     const fileName = `${maxAge}.${expireAt}.${etag}.${extension}`;
@@ -999,14 +1022,41 @@ export const tmdbImageProxy = () =>
     },
   }));
 
+const musicProxies: Partial<Record<MusicImageSource, ImageProxy>> = {};
+
 /**
- * Starts fetching posters into the image cache before the browser asks for
+ * Music's pictures, one cache for each place they come from: album covers
+ * from the Cover Art Archive, pictures of artists from fanart.tv and
+ * TheAudioDB. Each kept as long as its host's addresses allow (see
+ * MUSIC_IMAGE_KEPT_S), and a missing cover remembered for hours, as many
+ * albums have none.
+ */
+export const musicImageProxy = (source: MusicImageSource) =>
+  (musicProxies[source] ??= new ImageProxy(
+    source,
+    MUSIC_IMAGE_ORIGINS[source],
+    {
+      rateLimitOptions: { maxRequests: 10, maxRPS: 20 },
+      keptForS: MUSIC_IMAGE_KEPT_S[source],
+      missingForMs: MUSIC_IMAGE_MISSING_MS,
+    }
+  ));
+
+/** Every image cache, by the name of its folder: what cleanup goes through. */
+export const IMAGE_CACHES = [
+  'tmdb',
+  'tvdb',
+  'avatar',
+  ...(Object.keys(MUSIC_IMAGE_ORIGINS) as MusicImageSource[]),
+] as const;
+
+/**
+ * Starts fetching pictures into an image cache before the browser asks for
  * them, so they are there, or on their way, when it does. A browser asking
  * while one is still being fetched shares that fetch. Never waited on, and
- * a poster that fails is simply fetched again when asked for.
+ * a picture that fails is simply fetched again when asked for.
  */
-export const warmTmdbImages = (paths: string[]) => {
-  const proxy = tmdbImageProxy();
+const warmImages = (proxy: ImageProxy, paths: string[]) => {
   for (const path of paths) {
     proxy
       .getImage(path)
@@ -1022,5 +1072,13 @@ export const warmTmdbImages = (paths: string[]) => {
       .catch(() => undefined);
   }
 };
+
+/** Starts the posters of a page of titles into the TMDB cache. */
+export const warmTmdbImages = (paths: string[]) =>
+  warmImages(tmdbImageProxy(), paths);
+
+/** Starts the album covers of a page of music into the cover cache. */
+export const warmCovers = (paths: string[]) =>
+  warmImages(musicImageProxy('caa'), paths);
 
 export default ImageProxy;

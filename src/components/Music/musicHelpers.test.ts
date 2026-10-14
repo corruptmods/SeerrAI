@@ -45,10 +45,23 @@ describe('music pictures', () => {
       musicImageSrc('https://assets.fanart.tv/fanart/music/x/a/b.jpg', true),
       '/imageproxy/fanart/fanart/music/x/a/b.jpg'
     );
-    // The artist picture route already decides for itself.
+  });
+
+  it('of an artist come from the image proxy’s own address for them', () => {
+    const ID = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
     assert.equal(
-      musicImageSrc('/api/v1/music/artist/x/image', true),
-      '/api/v1/music/artist/x/image'
+      musicImageSrc(artistImageUrl(ID), true),
+      `/imageproxy/artist/${ID}`
+    );
+    assert.equal(
+      musicImageSrc(artistImageUrl(ID, 'backdrop'), true),
+      `/imageproxy/artist/${ID}/backdrop`
+    );
+    // Not cached: the server sends the browser to the picture's own host.
+    assert.equal(musicImageSrc(artistImageUrl(ID), false), artistImageUrl(ID));
+    assert.equal(
+      musicImageSrc('/api/v1/music/artist/not-an-id/image', true),
+      '/api/v1/music/artist/not-an-id/image'
     );
   });
 

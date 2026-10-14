@@ -1,11 +1,6 @@
-import { musicImageSrc } from '@app/components/Music/musicHelpers';
-import useSettings from '@app/hooks/useSettings';
+import CachedImage from '@app/components/Common/CachedImage';
 import { MusicalNoteIcon, UserIcon } from '@heroicons/react/24/outline';
-import type { ImageLoader } from 'next/image';
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
-
-const imageLoader: ImageLoader = ({ src }) => src;
 
 interface MusicImageProps {
   /** A cover, a picture of an artist, or none. */
@@ -14,15 +9,22 @@ interface MusicImageProps {
   fallback: 'album' | 'artist' | 'none';
   priority?: boolean;
   sizes?: string;
+  className?: string;
 }
 
 /**
  * An album cover or a picture of an artist, filling its box (which must be
- * positioned). Many albums have no cover and many artists no picture: the
- * archive answers 404, and a plain icon takes its place.
+ * positioned). Cached and converted as posters are. Many albums have no
+ * cover and many artists no picture: the archive answers 404, and a plain
+ * icon takes its place.
  */
-const MusicImage = ({ src, fallback, priority, sizes }: MusicImageProps) => {
-  const { currentSettings } = useSettings();
+const MusicImage = ({
+  src,
+  fallback,
+  priority,
+  sizes,
+  className,
+}: MusicImageProps) => {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -42,18 +44,16 @@ const MusicImage = ({ src, fallback, priority, sizes }: MusicImageProps) => {
   }
 
   return (
-    <Image
-      unoptimized
-      loader={imageLoader}
-      src={musicImageSrc(src, currentSettings.cacheImages)}
+    <CachedImage
+      type="music"
+      src={src}
       alt=""
       fill
       sizes={sizes}
+      className={className}
       style={{ objectFit: 'cover' }}
       onError={() => setFailed(true)}
-      {...(priority
-        ? { loading: 'eager', fetchPriority: 'high' }
-        : { loading: 'lazy' })}
+      {...(priority ? { priority: true } : { loading: 'lazy' })}
     />
   );
 };

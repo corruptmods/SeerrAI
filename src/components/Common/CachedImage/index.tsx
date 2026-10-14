@@ -1,5 +1,6 @@
+import { musicImageSrc } from '@app/components/Music/musicHelpers';
 import useSettings from '@app/hooks/useSettings';
-import { sourcesFor } from '@app/utils/imageSources';
+import { convertible, sourcesFor } from '@app/utils/imageSources';
 import type { ImageLoader, ImageProps } from 'next/image';
 import Image from 'next/image';
 
@@ -7,7 +8,12 @@ const imageLoader: ImageLoader = ({ src }) => src;
 
 export type CachedImageProps = ImageProps & {
   src: string;
-  type: 'tmdb' | 'avatar' | 'tvdb';
+  /**
+   * Where the picture comes from. 'music' is an album cover (Cover Art
+   * Archive), a picture from fanart.tv or TheAudioDB, or the server's
+   * address for a picture of an artist.
+   */
+  type: 'tmdb' | 'avatar' | 'tvdb' | 'music';
 };
 
 /**
@@ -33,6 +39,8 @@ const CachedImage = ({ src, type, ...props }: CachedImageProps) => {
             '/imageproxy/tvdb/'
           )
         : src;
+  } else if (type === 'music') {
+    imageUrl = musicImageSrc(src, currentSettings.cacheImages);
   } else if (type === 'avatar') {
     // jellyfin avatar (if any)
     imageUrl = src;
@@ -40,11 +48,8 @@ const CachedImage = ({ src, type, ...props }: CachedImageProps) => {
     return null;
   }
 
-  // Only what the proxy can convert: its JPEG and PNG pictures.
-  if (
-    !imageUrl.startsWith('/imageproxy/') ||
-    !/\.(jpe?g|png)$/i.test(imageUrl)
-  ) {
+  // Only what the proxy can convert.
+  if (!convertible(imageUrl)) {
     return <Image unoptimized loader={imageLoader} src={imageUrl} {...props} />;
   }
 

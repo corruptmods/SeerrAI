@@ -191,3 +191,119 @@ describe('the words on a request waiting for approval', () => {
     assert.equal(worker.shown[0].options.body, actionLabels.failedBody);
   });
 });
+
+/*
+ * The image cache: the worker with a cache standing in for the browser's,
+ * and a server whose answers each test sets.
+ */
+const loadImageWorker = () => {
+  const handlers: Record<string, Handler> = {};
+  const stored = new Map<string, Response>();
+  const fetched: string[] = [];
+  const answer = {
+    cacheControl: 'public, max-age=31536000, immutable',
+    sentAt: new Date(),
+  };
+
+  class WorkerRequest extends Request {
+    constructor(input: string, init?: RequestInit) {
+      super(new URL(input, ORIGIN), init);
+    }
+  }
+
+  const urlOf = (request: Request | string) =>
+    typeof request === 'string' ? request : request.url;
+  const cache = {
+    match: async (request: Request) => stored.get(urlOf(request))?.clone(),
+    put: async (request: Request, response: Response) => {
+      stored.set(urlOf(request), response);
+    },
+    keys: async () => [...stored.keys()].map((url) => new Request(url)),
+    delete: async (request: Request) => stored.delete(urlOf(request)),
+  };
+
+  runInNewContext(source, {
+    self: {
+      location: { origin: ORIGIN },
+      addEventListener: (type: string, handler: Handler) => {
+        handlers[type] = handler;
+      },
+    },
+    clients: { matchAll: async () => [], openWindow: async () => null },
+    caches: { open: async () => cache },
+    navigator: {},
+    Request: WorkerRequest,
+    Response,
+    URL,
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    fetch: async (request: Request) => {
+      fetched.push(new URL(request.url).pathname);
+      return new Response(new Uint8Array([0xff, 0xd8]), {
+        headers: {
+          'Content-Type': 'image/jpeg',
+          'Cache-Control': answer.cacheControl,
+          Date: answer.sentAt.toUTCString(),
+        },
+      });
+    },
+  });
+
+  /** The page showing an image: what it is handed, once all is stored. */
+  const view = async (path: string) => {
+    let response: Promise<Response> | undefined;
+    const waits: Promise<unknown>[] = [];
+    handlers.fetch({
+      request: new WorkerRequest(path),
+      respondWith: (promise: Promise<Response>) => {
+        response = promise;
+      },
+      waitUntil: (promise: Promise<unknown>) => waits.push(promise),
+    });
+    const shown = await response;
+    await Promise.all(waits);
+    return shown;
+  };
+
+  return { view, fetched, answer };
+};
+
+describe('images kept on the device', () => {
+  const HOUR_AGO = () => new Date(Date.now() - 60 * 60 * 1000);
+
+  it('are kept for good when they never change', async () => {
+    const worker = loadImageWorker();
+    worker.answer.sentAt = HOUR_AGO();
+    const poster = '/imageproxy/tmdb/t/p/w300_and_h450_face/a.jpg';
+    await worker.view(poster);
+    await worker.view(poster);
+    assert.deepEqual(worker.fetched, [poster]);
+  });
+
+  it('are shown once more when out of date, and fetched again for next time', async () => {
+    const worker = loadImageWorker();
+    const cover =
+      '/imageproxy/caa/release-group/b1392450-e666-3926-a536-22c65f834433/front-500';
+    worker.answer.cacheControl = 'public, max-age=60';
+    worker.answer.sentAt = HOUR_AGO();
+    await worker.view(cover);
+
+    worker.answer.sentAt = new Date();
+    const shown = await worker.view(cover);
+    assert.equal(shown?.status, 200, 'the copy it had, at once');
+    assert.equal(worker.fetched.length, 2, 'and a fresh one fetched');
+
+    await worker.view(cover);
+    assert.equal(worker.fetched.length, 2, 'which is kept while fresh');
+  });
+
+  it('are never kept when the server says not to', async () => {
+    const worker = loadImageWorker();
+    worker.answer.cacheControl = 'no-store';
+    const converting = '/imageproxy/tmdb/t/p/w1280/b.jpg?f=avif';
+    await worker.view(converting);
+    await worker.view(converting);
+    assert.equal(worker.fetched.length, 2);
+  });
+});

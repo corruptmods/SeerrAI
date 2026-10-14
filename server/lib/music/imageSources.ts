@@ -15,6 +15,40 @@ export const MUSIC_IMAGE_ORIGINS = {
 
 export type MusicImageSource = keyof typeof MUSIC_IMAGE_ORIGINS;
 
+const DAY_S = 24 * 60 * 60;
+
+/**
+ * How long each source's pictures are kept before the host is asked again,
+ * whatever it says (the archive's own headers describe archive.org's copy,
+ * not the cover). fanart.tv and TheAudioDB give every new picture a new
+ * file name, so theirs are kept as long as TMDB's posters: a year. A Cover
+ * Art Archive address is an album's cover, whichever that is now: someone
+ * can upload a better one to the same address, so covers are checked
+ * monthly, which costs a quick "unchanged" when nothing did.
+ */
+export const MUSIC_IMAGE_KEPT_S: Record<MusicImageSource, number> = {
+  caa: 30 * DAY_S,
+  fanart: 365 * DAY_S,
+  tadb: 365 * DAY_S,
+};
+
+/**
+ * Pictures whose address stays the same when the picture changes, which a
+ * browser must check again once they expire rather than keep for good.
+ */
+export const MUSIC_IMAGE_CHANGEABLE: Record<MusicImageSource, boolean> = {
+  caa: true,
+  fanart: false,
+  tadb: false,
+};
+
+/**
+ * Many albums have no cover, and a page of them would otherwise ask the
+ * archive for each one again every few minutes. A cover added later shows
+ * within this.
+ */
+export const MUSIC_IMAGE_MISSING_MS = 6 * 60 * 60 * 1000;
+
 /** fanart.tv's music pictures: /fanart/music/<artist>/<kind>/<file>. */
 export const FANART_PATH =
   /^\/fanart\/music\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[a-z]+\/[\w.-]+\.(?:jpe?g|png)$/i;

@@ -6,11 +6,36 @@ import { IMAGE_FORMATS, IMAGE_WIDTHS } from '@server/constants/images';
  */
 const RESPONSIVE_FROM = 1000;
 
-/** The width TMDB was asked for in a /t/p/w1920_and_h800... address. */
-const tmdbWidthOf = (url: string) => {
-  const match = /\/t\/p\/w(\d+)/.exec(url);
-  return match ? Number(match[1]) : null;
+/**
+ * An artist's backdrop: fanart.tv's are 1920 wide, TheAudioDB's 1280. The
+ * proxy never makes a copy wider than the picture, so taking the wider of
+ * the two costs nothing.
+ */
+const ARTIST_BACKDROP_WIDTH = 1920;
+
+/**
+ * The width a proxied picture was asked for: TMDB's /t/p/w1920_and_h800...,
+ * a cover's front-1200, or an artist's backdrop. Null when it is unknown.
+ */
+const widthOf = (url: string) => {
+  const match =
+    /^\/imageproxy\/tmdb\/t\/p\/w(\d+)/.exec(url) ??
+    /^\/imageproxy\/caa\/.*\/front-(\d+)$/.exec(url);
+  if (match) {
+    return Number(match[1]);
+  }
+  return /^\/imageproxy\/artist\/[^/?]+\/backdrop$/.test(url)
+    ? ARTIST_BACKDROP_WIDTH
+    : null;
 };
+
+/**
+ * Whether the image proxy can convert a picture: its JPEGs and PNGs, album
+ * covers (whose addresses have no file name), and pictures of artists.
+ */
+export const convertible = (url: string): boolean =>
+  url.startsWith('/imageproxy/') &&
+  (/\.(jpe?g|png)$/i.test(url) || /^\/imageproxy\/(caa|artist)\//.test(url));
 
 /**
  * The <source> list for a proxied picture: AVIF, then WebP, which the image
@@ -19,7 +44,7 @@ const tmdbWidthOf = (url: string) => {
  * screen; one that supports neither takes the <img> and its original.
  */
 export const sourcesFor = (url: string) => {
-  const width = tmdbWidthOf(url);
+  const width = widthOf(url);
   const widths =
     width && width >= RESPONSIVE_FROM
       ? IMAGE_WIDTHS.filter((w) => w < width)

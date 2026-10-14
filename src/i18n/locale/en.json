@@ -2568,6 +2568,7 @@
   "components.Settings.SettingsJobsCache.misses": "Misses",
   "components.Settings.SettingsJobsCache.music-full-scan": "Music Full Scan",
   "components.Settings.SettingsJobsCache.music-sync": "Music Sync",
+  "components.Settings.SettingsJobsCache.musiccache": "Music covers and artist pictures",
   "components.Settings.SettingsJobsCache.nextexecution": "Next Execution",
   "components.Settings.SettingsJobsCache.notification-reconcile": "Notification Reconcile",
   "components.Settings.SettingsJobsCache.plex-full-scan": "Plex Full Library Scan",

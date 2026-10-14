@@ -139,6 +139,7 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     usersavatars: "Users' Avatars",
     tmdbcache: 'The Movie Database (tmdb)',
     tvdbcache: 'TheTVDB (tvdb)',
+    musiccache: 'Music covers and artist pictures',
   }
 );
 
@@ -900,6 +901,17 @@ const SettingsJobs = () => {
               </Table.TD>
               <Table.TD>
                 {formatBytes(cacheData?.imageCache.avatar.size ?? 0)}
+              </Table.TD>
+            </tr>
+            <tr>
+              <Table.TD>{intl.formatMessage(messages.musiccache)}</Table.TD>
+              <Table.TD>
+                {intl.formatNumber(
+                  cacheData?.imageCache.music?.imageCount ?? 0
+                )}
+              </Table.TD>
+              <Table.TD>
+                {formatBytes(cacheData?.imageCache.music?.size ?? 0)}
               </Table.TD>
             </tr>
             {cacheData?.imageCacheTotal && (

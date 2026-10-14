@@ -1,19 +1,25 @@
 import { COVER_PATH } from '@server/api/coverartarchive';
 import type { ImageFormat, ImageWidth } from '@server/constants/images';
 import { IMAGE_FORMATS, IMAGE_WIDTHS } from '@server/constants/images';
+import { featureEnabled } from '@server/lib/features';
 import type { ImageVariant } from '@server/lib/imageproxy';
 import ImageProxy, {
   ImageNotFoundError,
+  musicImageProxy,
   tmdbImageProxy,
 } from '@server/lib/imageproxy';
+import { musicReady } from '@server/lib/music/access';
+import { artistImages } from '@server/lib/music/artistImage';
 import {
   FANART_PATH,
+  MUSIC_IMAGE_CHANGEABLE,
   MUSIC_IMAGE_ORIGINS,
   TADB_PATH,
 } from '@server/lib/music/imageSources';
 import logger from '@server/logger';
+import { MUSIC_NOT_SET_UP, MUSIC_OFF } from '@server/middleware/music';
 import cookieParser from 'cookie-parser';
-import type { Request } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import type { Store } from 'express-session';
 import { createHash } from 'node:crypto';
@@ -33,48 +39,72 @@ function initTvdbImageProxy() {
   return _tvdbImageProxy;
 }
 
-// Music's pictures: album covers, and pictures of artists. Each its own
-// cache, made on first use.
-const musicProxies: Partial<
-  Record<keyof typeof MUSIC_IMAGE_ORIGINS, ImageProxy>
-> = {};
-const musicImageProxy = (key: keyof typeof MUSIC_IMAGE_ORIGINS) => () =>
-  (musicProxies[key] ??= new ImageProxy(key, MUSIC_IMAGE_ORIGINS[key], {
-    rateLimitOptions: { maxRequests: 10, maxRPS: 20 },
-  }));
+interface Source {
+  origin: string;
+  proxy: () => ImageProxy;
+  /** The only paths fetched there. */
+  path: RegExp;
+  /**
+   * Whether a picture can change at the same address, so a browser checks
+   * again once it expires rather than keeping it for good.
+   */
+  changeable: boolean;
+}
 
-const sources = {
+const sources: Record<string, Source> = {
   tmdb: {
     origin: 'https://image.tmdb.org',
     proxy: tmdbImageProxy,
     // /t/p/<size, maybe with a filter>/<file>: w300_and_h450_face,
     // w780_filter(duotone,ffffff,bababa), original...
     path: /^\/t\/p\/[\w(),]+\/[\w-]+\.(?:jpe?g|png|svg|webp)$/i,
+    changeable: false,
   },
   tvdb: {
     origin: 'https://artworks.thetvdb.com',
     proxy: initTvdbImageProxy,
     path: /^\/banners\/(?:[\w-]+\/)*[\w-]+\.(?:jpe?g|png|webp)$/i,
+    changeable: false,
   },
-  // The Cover Art Archive, which redirects each cover to archive.org.
+  // Music's pictures. The Cover Art Archive redirects each cover to
+  // archive.org, which the fetch follows.
   caa: {
     origin: MUSIC_IMAGE_ORIGINS.caa,
-    proxy: musicImageProxy('caa'),
+    proxy: () => musicImageProxy('caa'),
     path: COVER_PATH,
+    changeable: MUSIC_IMAGE_CHANGEABLE.caa,
   },
   fanart: {
     origin: MUSIC_IMAGE_ORIGINS.fanart,
-    proxy: musicImageProxy('fanart'),
+    proxy: () => musicImageProxy('fanart'),
     path: FANART_PATH,
+    changeable: MUSIC_IMAGE_CHANGEABLE.fanart,
   },
   tadb: {
     origin: MUSIC_IMAGE_ORIGINS.tadb,
-    proxy: musicImageProxy('tadb'),
+    proxy: () => musicImageProxy('tadb'),
     path: TADB_PATH,
+    changeable: MUSIC_IMAGE_CHANGEABLE.tadb,
   },
-} as const;
+};
 
-const isSource = (type: string): type is keyof typeof sources =>
+/**
+ * A picture of an artist, by their MusicBrainz id: /artist/<id>, or
+ * /artist/<id>/backdrop for the wide one behind their page.
+ */
+const ARTIST_PATH =
+  /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/backdrop)?$/;
+
+/**
+ * Which picture stands for an artist is decided again each week (see
+ * artistImages), so a browser keeps the one it has for a day.
+ */
+const ARTIST_PICTURE_KEPT_S = 24 * 60 * 60;
+
+/** An artist with no picture is asked about again after this. */
+const NO_ARTIST_PICTURE_KEPT_S = 60 * 60;
+
+const isSource = (type: string) =>
   Object.prototype.hasOwnProperty.call(sources, type);
 
 /*
@@ -168,46 +198,28 @@ const signedOutMayConvert = () => {
   return true;
 };
 
-router.get<{
-  type: string;
-  path: string[];
-}>('/:type/*path', async (req, res, next) => {
-  // Most backdrop addresses in the app put a slash between the size and a
-  // path that already starts with one ("/w1920_and_h800_multi_faces//x.jpg").
-  // TMDB takes either, so they are read as one.
-  const imagePath = ('/' + req.params.path.join('/')).replace(/\/{2,}/g, '/');
-  const source = isSource(req.params.type)
-    ? sources[req.params.type]
-    : undefined;
-
-  if (!source) {
-    return next({ status: 400, message: 'Unsupported image type.' });
-  }
-
-  // Image files only, in the shapes the app asks for.
-  if (!source.path.test(imagePath) || imagePath.includes('..')) {
-    logger.debug('Refused an image path', {
-      label: 'Image Cache',
-      type: req.params.type,
-      imagePath,
-    });
-    return next({ status: 400, message: 'Not an image path.' });
-  }
-
-  const variant = variantAsked(req.query);
-  if (variant === null) {
-    return next({ status: 400, message: 'Unsupported image options.' });
-  }
-
+/**
+ * Sends an image from a source's cache: fetched and kept first for someone
+ * signed in, converted when a format or width is asked for.
+ */
+const serve = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  source: Source,
+  imagePath: string,
+  variant: ImageVariant | undefined,
+  options: { maxAgeS?: number; isSignedIn?: boolean } = {}
+) => {
+  const proxy = source.proxy();
   try {
-    const proxy = source.proxy();
     let imageData = await proxy.peek(imagePath);
-    let isSignedIn: boolean | undefined;
+    let isSignedIn = options.isSignedIn;
 
     if (!imageData) {
       // Not cached: fetched and kept for someone signed in; anyone else is
       // sent to the image where it is.
-      isSignedIn = await signedIn(req);
+      isSignedIn ??= await signedIn(req);
       if (!isSignedIn) {
         res.setHeader('Cache-Control', 'no-store');
         return res.redirect(302, `${source.origin}${imagePath}`);
@@ -215,9 +227,15 @@ router.get<{
       imageData = await proxy.getImage(imagePath);
     }
 
-    // Images at these addresses never change (TMDB and TVDB give a changed
-    // picture a new file name), so a browser need not even ask again.
-    let cacheControl = `public, max-age=${imageData.meta.curRevalidate}, immutable`;
+    // Most images at these addresses never change (TMDB and TVDB give a
+    // changed picture a new file name), so a browser need not even ask
+    // again. One that can is kept as long, then checked.
+    let cacheControl =
+      options.maxAgeS !== undefined
+        ? `public, max-age=${options.maxAgeS}`
+        : source.changeable
+          ? `public, max-age=${imageData.meta.curRevalidate}`
+          : `public, max-age=${imageData.meta.curRevalidate}, immutable`;
 
     if (variant) {
       // Converting is for those signed in, as fetching is; anyone else gets
@@ -269,6 +287,11 @@ router.get<{
     res.end(imageData.imageBuffer);
   } catch (e) {
     if (e instanceof ImageNotFoundError) {
+      // Not asked for again upstream for a while; nor by the browser.
+      res.setHeader(
+        'Cache-Control',
+        `public, max-age=${Math.round(proxy.missingForMs / 1000)}`
+      );
       return next({ status: 404, message: 'No such image.' });
     }
     logger.error('Failed to proxy image', {
@@ -280,6 +303,98 @@ router.get<{
     }
     next(e);
   }
+};
+
+/**
+ * A picture of an artist, served at an address of its own so browsers and
+ * the service worker keep it as they keep any other image: which picture
+ * that is (from Lidarr, TheAudioDB or their newest album) is decided here.
+ * Deciding may ask Lidarr, so it is only done for someone signed in, while
+ * music is on.
+ */
+const artistPicture = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  imagePath: string,
+  variant: ImageVariant | undefined
+) => {
+  const [, mbid, backdrop] = ARTIST_PATH.exec(imagePath) ?? [];
+  if (!mbid) {
+    return next({ status: 400, message: 'Not an image path.' });
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  if (!(await signedIn(req))) {
+    return next({ status: 403, message: 'Sign in to see this picture.' });
+  }
+  if (!featureEnabled('music')) {
+    return next(MUSIC_OFF);
+  }
+  if (!musicReady()) {
+    return next(MUSIC_NOT_SET_UP);
+  }
+
+  let image;
+  try {
+    const images = await artistImages(mbid);
+    image = backdrop ? images.backdrop : images.photo;
+  } catch (e) {
+    logger.warn('Could not find an artist’s picture', {
+      label: 'Image Cache',
+      errorMessage: e instanceof Error ? e.message : String(e),
+    });
+    return next({ status: 404, message: 'No picture of this artist.' });
+  }
+  if (!image) {
+    res.setHeader(
+      'Cache-Control',
+      `public, max-age=${NO_ARTIST_PICTURE_KEPT_S}`
+    );
+    return next({ status: 404, message: 'No picture of this artist.' });
+  }
+
+  res.removeHeader('Cache-Control');
+  return serve(req, res, next, sources[image.source], image.path, variant, {
+    maxAgeS: ARTIST_PICTURE_KEPT_S,
+    isSignedIn: true,
+  });
+};
+
+router.get<{
+  type: string;
+  path: string[];
+}>('/:type/*path', async (req, res, next) => {
+  // Most backdrop addresses in the app put a slash between the size and a
+  // path that already starts with one ("/w1920_and_h800_multi_faces//x.jpg").
+  // TMDB takes either, so they are read as one.
+  const imagePath = ('/' + req.params.path.join('/')).replace(/\/{2,}/g, '/');
+  const isArtist = req.params.type === 'artist';
+  const source = isSource(req.params.type)
+    ? sources[req.params.type]
+    : undefined;
+
+  if (!source && !isArtist) {
+    return next({ status: 400, message: 'Unsupported image type.' });
+  }
+
+  // Image files only, in the shapes the app asks for.
+  if ((source && !source.path.test(imagePath)) || imagePath.includes('..')) {
+    logger.debug('Refused an image path', {
+      label: 'Image Cache',
+      type: req.params.type,
+      imagePath,
+    });
+    return next({ status: 400, message: 'Not an image path.' });
+  }
+
+  const variant = variantAsked(req.query);
+  if (variant === null) {
+    return next({ status: 400, message: 'Unsupported image options.' });
+  }
+
+  return source
+    ? serve(req, res, next, source, imagePath, variant)
+    : artistPicture(req, res, next, imagePath, variant);
 });
 
 export default router;

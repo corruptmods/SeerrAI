@@ -1,5 +1,6 @@
 import TautulliAPI from '@server/api/tautulli';
 import TheMovieDb from '@server/api/themoviedb';
+import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import type AgentRun from '@server/entity/AgentRun';
 import AiUsage from '@server/entity/AiUsage';
@@ -969,6 +970,8 @@ describe('the AI chat', () => {
     });
 
     beforeEach(async () => {
+      // Tautulli is Plex's watch history, read while Plex is connected.
+      getSettings().main.mediaServerType = MediaServerType.PLEX;
       getSettings().tautulli = {
         ...getSettings().tautulli,
         hostname: 'tautulli.test',
@@ -1010,6 +1013,7 @@ describe('the AI chat', () => {
     });
 
     after(() => {
+      getSettings().main.mediaServerType = MediaServerType.NOT_CONFIGURED;
       getSettings().tautulli = {
         ...getSettings().tautulli,
         hostname: '',

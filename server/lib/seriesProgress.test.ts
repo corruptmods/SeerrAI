@@ -1,6 +1,7 @@
 import type { TautulliHistoryRecord } from '@server/api/tautulli';
 import TautulliAPI from '@server/api/tautulli';
 import { MediaStatus, MediaType } from '@server/constants/media';
+import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Episode from '@server/entity/Episode';
 import Media from '@server/entity/Media';
@@ -152,6 +153,8 @@ describe('series progress from Tautulli', () => {
   beforeEach(async () => {
     plays = [];
     tautulliDown = false;
+    // Tautulli is Plex's watch history, read while Plex is connected.
+    getSettings().main.mediaServerType = MediaServerType.PLEX;
     getSettings().tautulli = {
       hostname: 'tautulli.invalid',
       port: 8181,

@@ -7,10 +7,9 @@ import type { JellyfinFamilyKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import {
-  isJellyfinFamily,
+  connectedServers,
   jellyfinClient,
   jellyfinFamily,
-  primaryServer,
   serverName,
 } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
@@ -19,9 +18,10 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 /*
- * Match Check: which folders the media server (Plex, Jellyfin or Emby) has
- * matched to a different title than Sonarr or Radarr has in them, or not
- * matched at all.
+ * Match Check: which folders each connected media server (Plex, Jellyfin,
+ * Emby) has matched to a different title than Sonarr or Radarr has in
+ * them, or not matched at all. One report covers every server; each
+ * problem says which server it is on.
  *
  * The media server matches by folder and file names, Sonarr and Radarr by
  * their own ids, and when the two disagree nothing says so: "Carrie" (2026)
@@ -328,20 +328,34 @@ class PlexMatchCheck {
     return { ...(this.report as PlexMatchReport), running: this.running };
   }
 
-  /** The problem for one title, if the last report found one. */
+  /**
+   * The problems the last report found for one title: one per server at
+   * most, as each server matches it on its own. `key` is any server's id
+   * for the title; `keys` are ids known to be a given server's (Emby's
+   * ids and Plex's can look alike).
+   */
   public async problemFor(
     kind: 'movie' | 'series',
-    ids: { tmdbId?: number; tvdbId?: number; key?: string | null }
-  ): Promise<PlexMatchProblem | undefined> {
+    ids: {
+      tmdbId?: number;
+      tvdbId?: number;
+      key?: string | null;
+      keys?: { mediaServer: MediaServerName; key: string }[];
+    }
+  ): Promise<PlexMatchProblem[]> {
     const report = await this.lastReport();
-    return report.problems.find(
+    return report.problems.filter(
       (p) =>
         p.kind === kind &&
         // The title Sonarr or Radarr has, which the server matched wrongly...
         ((ids.tmdbId && p.expected.tmdbId === ids.tmdbId) ||
           (ids.tvdbId && p.expected.tvdbId === ids.tvdbId) ||
           // ...or the title it matched it to, wrongly shown as available.
-          (ids.key && p.matched.key === ids.key))
+          (ids.key && p.matched.key === ids.key) ||
+          ids.keys?.some(
+            ({ mediaServer, key }) =>
+              p.matched.key === key && (p.mediaServer ?? 'Plex') === mediaServer
+          ))
     );
   }
 
@@ -480,22 +494,44 @@ class PlexMatchCheck {
       problems: [],
     };
     try {
-      const primary = primaryServer();
-      const { series, movies } = await this.expectedFolders();
-      if (isJellyfinFamily(primary)) {
-        await this.checkJellyfin(report, primary, { series, movies });
-      } else if (primary === 'plex') {
-        await this.checkPlex(report, { series, movies });
-      } else {
+      const servers = connectedServers();
+      if (!servers.length) {
         throw new Error('No media server is set up.');
+      }
+      const { series, movies } = await this.expectedFolders();
+      // Every connected server, each on its own: one that cannot be read
+      // leaves the others' findings, and the report says which it was.
+      const failed: string[] = [];
+      for (const server of servers) {
+        if (this.cancelled) break;
+        try {
+          if (server === 'plex') {
+            await this.checkPlex(report, { series, movies });
+          } else {
+            await this.checkJellyfin(report, server, { series, movies });
+          }
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          failed.push(
+            servers.length > 1 ? `${serverName(server)}: ${message}` : message
+          );
+        }
       }
       report.problems.sort((a, b) =>
         a.expected.title.localeCompare(b.expected.title)
       );
-      logger.info(
-        `Match Check: ${report.problems.length} folder(s) matched to another title or none, of ${report.checked} checked`,
-        { label: 'Match Check', notChecked: report.notChecked }
-      );
+      if (failed.length) {
+        report.error = failed.join('; ');
+        logger.warn('Match Check could not finish', {
+          label: 'Match Check',
+          errorMessage: report.error,
+        });
+      } else {
+        logger.info(
+          `Match Check: ${report.problems.length} folder(s) matched to another title or none, of ${report.checked} checked`,
+          { label: 'Match Check', notChecked: report.notChecked }
+        );
+      }
     } catch (e) {
       report.error = e instanceof Error ? e.message : String(e);
       logger.warn('Match Check could not finish', {

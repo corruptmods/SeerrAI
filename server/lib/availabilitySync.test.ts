@@ -23,7 +23,8 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
-import { MediaServerType } from '@server/constants/server';
+import type { MediaServerKind } from '@server/constants/server';
+import { MEDIA_SERVER_KINDS, typeOfKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import MediaRequest from '@server/entity/MediaRequest';
@@ -36,7 +37,9 @@ import { setupTestDb } from '@server/test/db';
 import { ApiError } from '@server/types/error';
 
 // --- Mock JellyfinAPI ---
-let getSystemInfoImpl: () => Promise<Record<string, unknown>> = async () => ({
+let getSystemInfoImpl: (
+  kind: JellyfinAPI['kind']
+) => Promise<Record<string, unknown>> = async () => ({
   ServerName: 'Test',
 });
 let getItemDataImpl: (
@@ -52,7 +55,8 @@ let getEpisodesImpl: (
 
 Object.defineProperty(JellyfinAPI.prototype, 'getSystemInfo', {
   get() {
-    return async () => getSystemInfoImpl();
+    const kind = (this as JellyfinAPI).kind;
+    return async () => getSystemInfoImpl(kind);
   },
   set() {},
   configurable: true,
@@ -300,18 +304,25 @@ function configureRadarr(overrides: Partial<RadarrSettings>[] = [{}]): void {
   settings.sonarr = [];
 }
 
-function configureJellyfin(): void {
+/**
+ * Connects the servers given, the first as the primary one, and no others.
+ */
+function connectServers(...kinds: MediaServerKind[]): void {
   const settings = getSettings();
-  settings.main.mediaServerType = MediaServerType.JELLYFIN;
-  settings.jellyfin = {
-    ...settings.jellyfin,
-    apiKey: 'test-api-key',
-  };
+  settings.main.mediaServerType = typeOfKind(kinds[0]);
+  for (const kind of MEDIA_SERVER_KINDS) {
+    settings[kind].connected = kinds.includes(kind);
+  }
+  settings.jellyfin = { ...settings.jellyfin, apiKey: 'test-api-key' };
+  settings.emby = { ...settings.emby, apiKey: 'test-emby-key' };
+}
+
+function configureJellyfin(): void {
+  connectServers('jellyfin');
 }
 
 function configurePlex(): void {
-  const settings = getSettings();
-  settings.main.mediaServerType = MediaServerType.PLEX;
+  connectServers('plex');
 }
 
 // --- Jellyfin helpers ---
@@ -2573,6 +2584,197 @@ describe('AvailabilitySync', () => {
         tmdbId: 4801,
       });
       assert.strictEqual(updated.status, MediaStatus.AVAILABLE);
+    });
+  });
+
+  describe('several media servers', () => {
+    const saveMovie = async (tmdbId: number, fields: Partial<Media>) => {
+      const media = new Media();
+      media.tmdbId = tmdbId;
+      media.mediaType = MediaType.MOVIE;
+      media.status = MediaStatus.AVAILABLE;
+      Object.assign(media, fields);
+      await getRepository(Media).save(media);
+    };
+
+    const reload = (tmdbId: number) =>
+      getRepository(Media).findOneByOrFail({ tmdbId });
+
+    const jellyfinMovie = (id: string): JellyfinLibraryItemExtended => ({
+      ...fakeJellyfinShow(id, '0'),
+      Type: 'Movie',
+    });
+
+    it('keeps a movie another server still has, without the dead link', async () => {
+      connectServers('plex', 'jellyfin');
+      configureRadarr([{ syncEnabled: true }]);
+      await saveMovie(4900, {
+        ratingKey: 'plex-gone-rk',
+        jellyfinMediaId: 'jf-here-id',
+      });
+      // Plex answers 404 for its id; Jellyfin has the movie.
+      getItemDataImpl = async (id) =>
+        id === 'jf-here-id' ? jellyfinMovie(id) : undefined;
+
+      await availabilitySync.run();
+
+      const media = await reload(4900);
+      assert.equal(media.status, MediaStatus.AVAILABLE);
+      assert.equal(media.ratingKey, null);
+      assert.equal(media.jellyfinMediaId, 'jf-here-id');
+    });
+
+    it('marks a movie no server has deleted, and forgets every id', async () => {
+      connectServers('jellyfin', 'plex');
+      configureRadarr([{ syncEnabled: true }]);
+      await saveMovie(4901, {
+        ratingKey: 'plex-gone-rk',
+        jellyfinMediaId: 'jf-gone-id',
+      });
+
+      await availabilitySync.run();
+
+      const media = await reload(4901);
+      assert.equal(media.status, MediaStatus.DELETED);
+      assert.equal(media.ratingKey, null);
+      assert.equal(media.jellyfinMediaId, null);
+    });
+
+    it('keeps the id of a server that could not answer for the title', async () => {
+      connectServers('plex', 'jellyfin');
+      configureRadarr([{ syncEnabled: true }]);
+      await saveMovie(4902, {
+        ratingKey: 'plex-busy-rk',
+        jellyfinMediaId: 'jf-here-id',
+      });
+      getMetadataImpl = async () => {
+        throw new Error('Request failed with status code 503');
+      };
+      getItemDataImpl = async (id) =>
+        id === 'jf-here-id' ? jellyfinMovie(id) : undefined;
+
+      await availabilitySync.run();
+
+      const media = await reload(4902);
+      assert.equal(media.status, MediaStatus.AVAILABLE);
+      assert.equal(media.ratingKey, 'plex-busy-rk');
+    });
+
+    it('counts a season on any server', async () => {
+      connectServers('plex', 'jellyfin');
+      configureSonarr([{ syncEnabled: true }]);
+      const media = new Media();
+      media.tmdbId = 4910;
+      media.mediaType = MediaType.TV;
+      media.status = MediaStatus.AVAILABLE;
+      media.ratingKey = 'plex-show-rk';
+      media.jellyfinMediaId = 'jf-show-id';
+      media.seasons = [1, 2, 3, 4].map(
+        (seasonNumber) =>
+          new Season({
+            seasonNumber,
+            status: MediaStatus.AVAILABLE,
+            status4k: MediaStatus.UNKNOWN,
+          })
+      );
+      await getRepository(Media).save(media);
+
+      // Plex has seasons 1 and 2, Jellyfin season 3, nobody season 4.
+      getMetadataImpl = async (key) => {
+        if (key === 'plex-show-rk') return fakePlexShow(key);
+        throw new Error('404');
+      };
+      getChildrenMetadataImpl = async (key) =>
+        key === 'plex-show-rk'
+          ? [1, 2, 3, 4].map((n) => fakePlexSeason(n, `plex-s${n}`))
+          : key === 'plex-s1' || key === 'plex-s2'
+            ? fakePlexEpisodes(5)
+            : [];
+      getItemDataImpl = async (id) =>
+        id === 'jf-show-id' ? fakeJellyfinShow(id, '4910') : undefined;
+      getSeasonsImpl = async () => [
+        fakeJellyfinSeason(3, 'jf-s3'),
+        fakeJellyfinSeason(4, 'jf-s4'),
+      ];
+      getEpisodesImpl = async (_series, season) =>
+        season === 'jf-s3' ? fakeJellyfinEpisodes(3) : [];
+
+      await availabilitySync.run();
+
+      const updated = await getRepository(Media).findOneOrFail({
+        where: { tmdbId: 4910 },
+        relations: ['seasons'],
+      });
+      assert.equal(updated.status, MediaStatus.PARTIALLY_AVAILABLE);
+      assert.deepEqual(
+        updated.seasons
+          .sort((a, b) => a.seasonNumber - b.seasonNumber)
+          .map((season) => season.status),
+        [
+          MediaStatus.AVAILABLE,
+          MediaStatus.AVAILABLE,
+          MediaStatus.AVAILABLE,
+          MediaStatus.DELETED,
+        ]
+      );
+      assert.equal(updated.ratingKey, 'plex-show-rk');
+      assert.equal(updated.jellyfinMediaId, 'jf-show-id');
+    });
+
+    it('keeps a movie on Emby alone, dropping Plex and Jellyfin links', async () => {
+      connectServers('plex', 'jellyfin', 'emby');
+      configureRadarr([{ syncEnabled: true }]);
+      await saveMovie(4920, {
+        ratingKey: 'plex-gone-rk',
+        jellyfinMediaId: 'jf-gone-id',
+        embyMediaId: '4920',
+      });
+      getItemDataImpl = async (id) =>
+        id === '4920' ? jellyfinMovie(id) : undefined;
+
+      await availabilitySync.run();
+
+      const media = await reload(4920);
+      assert.equal(media.status, MediaStatus.AVAILABLE);
+      assert.equal(media.ratingKey, null);
+      assert.equal(media.jellyfinMediaId, null);
+      assert.equal(media.embyMediaId, '4920');
+    });
+
+    it('checks nothing while any connected server cannot be reached', async () => {
+      connectServers('plex', 'jellyfin', 'emby');
+      configureRadarr([{ syncEnabled: true }]);
+      await saveMovie(4921, { embyMediaId: 'emby-id' });
+      getSystemInfoImpl = async (kind) => {
+        if (kind === 'emby') {
+          throw new ApiError(502, ApiErrorCode.ConnectionError);
+        }
+        return { ServerName: 'Test' };
+      };
+
+      await availabilitySync.run();
+
+      const media = await reload(4921);
+      assert.equal(media.status, MediaStatus.AVAILABLE);
+      assert.equal(media.embyMediaId, 'emby-id');
+      assert.equal(availabilitySync.running, false);
+    });
+
+    it('leaves a single server’s id alone while Radarr has the file', async () => {
+      connectServers('plex');
+      configureRadarr([{ syncEnabled: true }]);
+      await saveMovie(4930, {
+        ratingKey: 'plex-gone-rk',
+        externalServiceId: 49,
+      });
+      getMovieImpl = async () =>
+        ({ id: 49, tmdbId: 4930, hasFile: true }) as RadarrMovie;
+
+      await availabilitySync.run();
+
+      const media = await reload(4930);
+      assert.equal(media.status, MediaStatus.AVAILABLE);
+      assert.equal(media.ratingKey, 'plex-gone-rk');
     });
   });
 });

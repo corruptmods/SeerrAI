@@ -7,6 +7,7 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
+import { MediaServerType } from '@server/constants/server';
 import dataSource, { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import {
@@ -1115,7 +1116,10 @@ describe('watch lists', () => {
         const kept = getSettings().tautulli;
         t.after(() => {
           getSettings().tautulli = kept;
+          getSettings().main.mediaServerType = MediaServerType.NOT_CONFIGURED;
         });
+        // Tautulli is Plex's watch history, read while Plex is connected.
+        getSettings().main.mediaServerType = MediaServerType.PLEX;
         getSettings().tautulli = {
           hostname: 'tautulli.invalid',
           port: 8181,

@@ -1,6 +1,16 @@
-import { MediaServerType } from '@server/constants/server';
+import type { MediaServerKind } from '@server/constants/server';
+import {
+  MEDIA_SERVER_KINDS,
+  MediaServerType,
+  typeOfKind,
+} from '@server/constants/server';
 import blocklistedTagsProcessor from '@server/job/blocklistedTagsProcessor';
-import { runJob, scheduledJobs, startJobs } from '@server/job/schedule';
+import {
+  refreshMediaServerJobs,
+  runJob,
+  scheduledJobs,
+  startJobs,
+} from '@server/job/schedule';
 import animeCheck from '@server/lib/animeCheck';
 import availabilitySync from '@server/lib/availabilitySync';
 import backfill from '@server/lib/backfill/engine';
@@ -15,6 +25,8 @@ import plexMatchCheck from '@server/lib/plexMatchCheck';
 import plexUserImport from '@server/lib/plexUserImport';
 import refreshToken from '@server/lib/refreshToken';
 import {
+  embyFullScanner,
+  embyRecentScanner,
   jellyfinFullScanner,
   jellyfinRecentScanner,
 } from '@server/lib/scanners/jellyfin';
@@ -49,6 +61,8 @@ const stubEveryJob = () => {
     [plexFullScanner, 'run'],
     [jellyfinRecentScanner, 'run'],
     [jellyfinFullScanner, 'run'],
+    [embyRecentScanner, 'run'],
+    [embyFullScanner, 'run'],
     [refreshToken, 'run'],
     [watchlistSync, 'syncWatchlist'],
     [radarrScanner, 'run'],
@@ -84,8 +98,20 @@ afterEach(async () => {
   scheduledJobs.length = 0;
   process.off('unhandledRejection', onUnhandled);
   getSettings().main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+  for (const kind of MEDIA_SERVER_KINDS) getSettings()[kind].connected = false;
   mock.restoreAll();
 });
+
+/** Connects the servers given, the first as the primary one. */
+const connect = (...kinds: MediaServerKind[]) => {
+  const settings = getSettings();
+  settings.main.mediaServerType = typeOfKind(kinds[0]);
+  for (const kind of MEDIA_SERVER_KINDS) {
+    settings[kind].connected = kinds.includes(kind);
+  }
+};
+
+const ids = (): string[] => scheduledJobs.map((job) => job.id);
 
 describe('scheduled jobs', () => {
   for (const serverType of [
@@ -154,5 +180,128 @@ describe('scheduled jobs', () => {
       'label',
       'stack',
     ]);
+  });
+
+  it('runs every connected server’s scans, and its jobs only', () => {
+    connect('jellyfin', 'plex');
+    stubEveryJob();
+
+    startJobs();
+
+    for (const id of [
+      'jellyfin-recently-added-scan',
+      'jellyfin-full-scan',
+      'plex-recently-added-scan',
+      'plex-full-scan',
+      'plex-refresh-token',
+      'plex-user-import',
+      'plex-match-check',
+    ]) {
+      assert.ok(ids().includes(id), `${id} is not scheduled`);
+    }
+    assert.ok(!ids().some((id) => id.startsWith('emby-')));
+    assert.equal(
+      scheduledJobs.find((job) => job.id === 'plex-match-check')?.name,
+      'Match Check'
+    );
+  });
+
+  it('runs Match Check on Jellyfin alone too', () => {
+    connect('jellyfin');
+    stubEveryJob();
+
+    startJobs();
+
+    assert.ok(ids().includes('plex-match-check'));
+    assert.ok(
+      !ids().some(
+        (id) =>
+          id.startsWith('plex-') &&
+          id !== 'plex-match-check' &&
+          id !== 'plex-watchlist-sync'
+      )
+    );
+  });
+
+  it('adds and drops a server’s jobs as it is connected and removed', () => {
+    connect('plex');
+    stubEveryJob();
+    startJobs();
+    const others = scheduledJobs.length - 4;
+    const plexScan = scheduledJobs.find(
+      (job) => job.id === 'plex-recently-added-scan'
+    );
+    const scanCancelled = mock.method(plexRecentScanner, 'cancel', () => {});
+
+    connect('plex', 'emby');
+    refreshMediaServerJobs();
+    assert.ok(ids().includes('emby-recently-added-scan'));
+    assert.ok(ids().includes('emby-full-scan'));
+    assert.ok(ids().includes('plex-recently-added-scan'));
+    assert.equal(scanCancelled.mock.callCount(), 0);
+
+    connect('emby');
+    refreshMediaServerJobs();
+    assert.ok(
+      !ids().some(
+        (id) =>
+          id.startsWith('plex-') &&
+          id !== 'plex-match-check' &&
+          id !== 'plex-watchlist-sync'
+      )
+    );
+    assert.ok(ids().includes('emby-recently-added-scan'));
+    // The old schedule is gone, and a scan under way stops.
+    assert.equal(plexScan?.job.nextInvocation(), null);
+    assert.equal(scanCancelled.mock.callCount(), 1);
+    // Everything else is there once, as it was.
+    assert.equal(scheduledJobs.length - 2, others);
+    assert.equal(new Set(ids()).size, scheduledJobs.length);
+  });
+
+  it('keeps an edited schedule when a server’s jobs are registered again', (t) => {
+    connect('plex');
+    stubEveryJob();
+    startJobs();
+    const jobs = getSettings().jobs;
+    const saved = jobs['plex-full-scan'].schedule;
+    t.after(() => {
+      jobs['plex-full-scan'].schedule = saved;
+    });
+    jobs['plex-full-scan'].schedule = '0 0 4 * * *';
+
+    refreshMediaServerJobs();
+
+    assert.equal(
+      scheduledJobs.find((job) => job.id === 'plex-full-scan')?.cronSchedule,
+      '0 0 4 * * *'
+    );
+  });
+
+  it('scans every connected server once downloads are imported', async () => {
+    connect('plex', 'jellyfin', 'emby');
+    stubEveryJob();
+    let onImport: () => unknown = () => undefined;
+    mock.method(downloadTracker, 'whenImported', (run: () => unknown) => {
+      onImport = run;
+    });
+    const ran: string[] = [];
+    for (const [name, scanner] of [
+      ['plex', plexRecentScanner],
+      ['jellyfin', jellyfinRecentScanner],
+      ['emby', embyRecentScanner],
+    ] as const) {
+      mock.method(scanner, 'run', async () => {
+        ran.push(name);
+        if (name === 'plex') throw new Error('Plex is down');
+      });
+      mock.method(scanner, 'status', () => ({ running: name === 'jellyfin' }));
+    }
+
+    startJobs();
+    await onImport();
+
+    // Jellyfin's was already running; Plex failing does not stop Emby's.
+    assert.deepEqual(ran.sort(), ['emby', 'plex']);
   });
 });

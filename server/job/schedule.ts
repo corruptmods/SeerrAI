@@ -8,11 +8,8 @@ import episodeSync from '@server/lib/episodeSync';
 import futureSeasons from '@server/lib/futureSeasons';
 import healthAlerts from '@server/lib/healthAlerts';
 import ImageProxy from '@server/lib/imageproxy';
-import {
-  isJellyfinFamily,
-  primaryServer,
-  serverName,
-} from '@server/lib/mediaServers';
+import type { MediaServerKind } from '@server/lib/mediaServers';
+import { connectedServers, serverName } from '@server/lib/mediaServers';
 import notificationReconciler from '@server/lib/notificationReconciler';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import plexUserImport from '@server/lib/plexUserImport';
@@ -29,6 +26,11 @@ import schedule from 'node-schedule';
 
 interface ScheduledJob {
   id: JobId;
+  /**
+   * The media server the job works with: it is registered while that server
+   * is connected (refreshMediaServerJobs).
+   */
+  server?: MediaServerKind;
   job: schedule.Job;
   name: string;
   type: 'process' | 'command';
@@ -60,76 +62,104 @@ export const runJob =
     }
   };
 
-export const startJobs = (): void => {
+/** A server's recently added scan. */
+const recentScanner = (kind: MediaServerKind) =>
+  kind === 'plex' ? plexRecentScanner : jellyfinScanners(kind).recent;
+
+/** The jobs that work with one media server, for while it is connected. */
+const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
   const jobs = getSettings().jobs;
-  const mediaServer = primaryServer();
 
-  if (mediaServer === 'plex') {
-    // Run recently added plex scan every 5 minutes
-    scheduledJobs.push({
-      id: 'plex-recently-added-scan',
-      name: 'Plex Recently Added Scan',
-      type: 'process',
-      interval: 'minutes',
-      cronSchedule: jobs['plex-recently-added-scan'].schedule,
-      job: schedule.scheduleJob(
-        jobs['plex-recently-added-scan'].schedule,
-        runJob('Plex Recently Added Scan', () => {
-          logger.info('Starting scheduled job: Plex Recently Added Scan', {
-            label: 'Jobs',
-          });
-          return plexRecentScanner.run();
-        })
-      ),
-      running: () => plexRecentScanner.status().running,
-      cancelFn: () => plexRecentScanner.cancel(),
-    });
+  if (kind === 'plex') {
+    return [
+      // Run recently added plex scan every 5 minutes
+      {
+        id: 'plex-recently-added-scan',
+        server: 'plex',
+        name: 'Plex Recently Added Scan',
+        type: 'process',
+        interval: 'minutes',
+        cronSchedule: jobs['plex-recently-added-scan'].schedule,
+        job: schedule.scheduleJob(
+          jobs['plex-recently-added-scan'].schedule,
+          runJob('Plex Recently Added Scan', () => {
+            logger.info('Starting scheduled job: Plex Recently Added Scan', {
+              label: 'Jobs',
+            });
+            return plexRecentScanner.run();
+          })
+        ),
+        running: () => plexRecentScanner.status().running,
+        cancelFn: () => plexRecentScanner.cancel(),
+      },
+      // Run full plex scan every 24 hours
+      {
+        id: 'plex-full-scan',
+        server: 'plex',
+        name: 'Plex Full Library Scan',
+        type: 'process',
+        interval: 'hours',
+        cronSchedule: jobs['plex-full-scan'].schedule,
+        job: schedule.scheduleJob(
+          jobs['plex-full-scan'].schedule,
+          runJob('Plex Full Library Scan', () => {
+            logger.info('Starting scheduled job: Plex Full Library Scan', {
+              label: 'Jobs',
+            });
+            return plexFullScanner.run();
+          })
+        ),
+        running: () => plexFullScanner.status().running,
+        cancelFn: () => plexFullScanner.cancel(),
+      },
+      {
+        id: 'plex-refresh-token',
+        server: 'plex',
+        name: 'Plex Refresh Token',
+        type: 'process',
+        interval: 'fixed',
+        cronSchedule: jobs['plex-refresh-token'].schedule,
+        job: schedule.scheduleJob(
+          jobs['plex-refresh-token'].schedule,
+          runJob('Plex Refresh Token', () => {
+            logger.info('Starting scheduled job: Plex Refresh Token', {
+              label: 'Jobs',
+            });
+            return refreshToken.run();
+          })
+        ),
+      },
+      // Give new Plex friends an account, when Auto-Import Plex Users is on
+      {
+        id: 'plex-user-import',
+        server: 'plex',
+        name: 'Plex User Import',
+        type: 'process',
+        interval: 'hours',
+        cronSchedule: jobs['plex-user-import'].schedule,
+        job: schedule.scheduleJob(
+          jobs['plex-user-import'].schedule,
+          runJob('Plex User Import', () => {
+            logger.debug('Starting scheduled job: Plex User Import', {
+              label: 'Jobs',
+            });
+            return plexUserImport.run();
+          })
+        ),
+      },
+    ];
+  }
 
-    // Run full plex scan every 24 hours
-    scheduledJobs.push({
-      id: 'plex-full-scan',
-      name: 'Plex Full Library Scan',
-      type: 'process',
-      interval: 'hours',
-      cronSchedule: jobs['plex-full-scan'].schedule,
-      job: schedule.scheduleJob(
-        jobs['plex-full-scan'].schedule,
-        runJob('Plex Full Library Scan', () => {
-          logger.info('Starting scheduled job: Plex Full Library Scan', {
-            label: 'Jobs',
-          });
-          return plexFullScanner.run();
-        })
-      ),
-      running: () => plexFullScanner.status().running,
-      cancelFn: () => plexFullScanner.cancel(),
-    });
+  const name = serverName(kind);
+  const scanners = jellyfinScanners(kind);
+  const recentId = `${kind}-recently-added-scan` as const;
+  const fullId = `${kind}-full-scan` as const;
 
-    scheduledJobs.push({
-      id: 'plex-refresh-token',
-      name: 'Plex Refresh Token',
-      type: 'process',
-      interval: 'fixed',
-      cronSchedule: jobs['plex-refresh-token'].schedule,
-      job: schedule.scheduleJob(
-        jobs['plex-refresh-token'].schedule,
-        runJob('Plex Refresh Token', () => {
-          logger.info('Starting scheduled job: Plex Refresh Token', {
-            label: 'Jobs',
-          });
-          return refreshToken.run();
-        })
-      ),
-    });
-  } else if (isJellyfinFamily(mediaServer)) {
-    const name = serverName(mediaServer);
-    const scanners = jellyfinScanners(mediaServer);
-    const recentId = `${mediaServer}-recently-added-scan` as const;
-    const fullId = `${mediaServer}-full-scan` as const;
-
+  return [
     // Run the recently added scan every 5 minutes
-    scheduledJobs.push({
+    {
       id: recentId,
+      server: kind,
       name: `${name} Recently Added Scan`,
       type: 'process',
       interval: 'minutes',
@@ -145,11 +175,11 @@ export const startJobs = (): void => {
       ),
       running: () => scanners.recent.status().running,
       cancelFn: () => scanners.recent.cancel(),
-    });
-
+    },
     // Run the full scan every 24 hours
-    scheduledJobs.push({
+    {
       id: fullId,
+      server: kind,
       name: `${name} Full Library Scan`,
       type: 'process',
       interval: 'hours',
@@ -165,8 +195,38 @@ export const startJobs = (): void => {
       ),
       running: () => scanners.full.status().running,
       cancelFn: () => scanners.full.cancel(),
-    });
+    },
+  ];
+};
+
+/**
+ * Registers the jobs of every connected media server, and only theirs: run
+ * when a server is connected or removed, so its scans start or stop without
+ * a restart. Jobs already registered are scheduled afresh from their saved
+ * schedules; a scan under way on a server still connected carries on, and
+ * one on a server no longer connected is stopped.
+ */
+export const refreshMediaServerJobs = (): void => {
+  const servers = connectedServers();
+
+  for (let i = scheduledJobs.length - 1; i >= 0; i--) {
+    const job = scheduledJobs[i];
+    if (!job.server) continue;
+    job.job.cancel();
+    if (!servers.includes(job.server)) {
+      job.cancelFn?.();
+    }
+    scheduledJobs.splice(i, 1);
   }
+
+  scheduledJobs.unshift(...servers.flatMap(mediaServerJobs));
+};
+
+export const startJobs = (): void => {
+  const jobs = getSettings().jobs;
+
+  // Each connected media server's scans, the primary one's first.
+  refreshMediaServerJobs();
 
   // Watchlist sync: Plex watchlists, and public Trakt watchlists on any
   // media server. The id stays as it was, so saved schedules carry over.
@@ -263,22 +323,20 @@ export const startJobs = (): void => {
     ),
   });
 
-  // A minute after Radarr or Sonarr imports something, the media server's
-  // recently added scan runs (and again each minute, a few times, until the
-  // media server lists it), so the title shows as available then rather
-  // than at the next scheduled scan.
-  downloadTracker.whenImported(() => {
-    const scanner =
-      mediaServer === 'plex'
-        ? plexRecentScanner
-        : isJellyfinFamily(mediaServer)
-          ? jellyfinScanners(mediaServer).recent
-          : undefined;
-    if (!scanner || scanner.status().running) return;
+  // A minute after Radarr or Sonarr imports something, every connected
+  // media server's recently added scan runs (and again each minute, a few
+  // times, until the media server lists it), so the title shows as
+  // available then rather than at the next scheduled scan. One server's scan
+  // failing does not hold up the others'.
+  downloadTracker.whenImported(async () => {
+    const scanners = connectedServers()
+      .map(recentScanner)
+      .filter((scanner) => !scanner.status().running);
+    if (!scanners.length) return;
     logger.info('Downloads were imported; running the recently added scan', {
       label: 'Jobs',
     });
-    return scanner.run();
+    await Promise.allSettled(scanners.map((scanner) => scanner.run()));
   });
 
   // Track per-episode availability from Sonarr
@@ -296,26 +354,6 @@ export const startJobs = (): void => {
       })
     ),
   });
-
-  // Give new Plex friends an account, when Auto-Import Plex Users is on
-  if (mediaServer === 'plex') {
-    scheduledJobs.push({
-      id: 'plex-user-import',
-      name: 'Plex User Import',
-      type: 'process',
-      interval: 'hours',
-      cronSchedule: jobs['plex-user-import'].schedule,
-      job: schedule.scheduleJob(
-        jobs['plex-user-import'].schedule,
-        runJob('Plex User Import', () => {
-          logger.debug('Starting scheduled job: Plex User Import', {
-            label: 'Jobs',
-          });
-          return plexUserImport.run();
-        })
-      ),
-    });
-  }
 
   // Request each followed series' new seasons as they premiere
   scheduledJobs.push({
@@ -471,19 +509,20 @@ export const startJobs = (): void => {
     running: () => backfill.monitorStatus().running,
   });
 
-  // Report only: folders Plex matched to a different title than Sonarr or
-  // Radarr has in them (Settings → Health). Plex only.
-  if (mediaServer === 'plex') {
+  // Report only: folders a media server matched to a different title than
+  // Sonarr or Radarr has in them (Settings → Health), on every connected
+  // server. The id stays as it was, so saved schedules carry over.
+  if (connectedServers().length) {
     scheduledJobs.push({
       id: 'plex-match-check',
-      name: 'Plex Match Check',
+      name: 'Match Check',
       type: 'process',
       interval: 'days',
       cronSchedule: jobs['plex-match-check'].schedule,
       job: schedule.scheduleJob(
         jobs['plex-match-check'].schedule,
-        runJob('Plex Match Check', () => {
-          logger.info('Starting scheduled job: Plex Match Check', {
+        runJob('Match Check', () => {
+          logger.info('Starting scheduled job: Match Check', {
             label: 'Jobs',
           });
           return plexMatchCheck.run();

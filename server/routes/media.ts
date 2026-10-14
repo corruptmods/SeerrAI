@@ -18,6 +18,7 @@ import { NoArrServerError, removeFromArr } from '@server/lib/arrRemoval';
 import { featureEnabled } from '@server/lib/features';
 import { recordMediaDeletion } from '@server/lib/mediaDeletions';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
+import { isConnected } from '@server/lib/mediaServers';
 import { Permission } from '@server/lib/permissions';
 import { defaultRegion, estimateTitle } from '@server/lib/requestEta';
 import {
@@ -516,7 +517,13 @@ mediaRoutes.get<{ id: string }, MediaWatchDataResponse>(
   async (req, res, next) => {
     const settings = getSettings().tautulli;
 
-    if (!settings.hostname || !settings.port || !settings.apiKey) {
+    // Tautulli is Plex's watch history: read only while Plex is connected.
+    if (
+      !isConnected('plex') ||
+      !settings.hostname ||
+      !settings.port ||
+      !settings.apiKey
+    ) {
       return next({
         status: 404,
         message: 'Tautulli API not configured.',

@@ -65,10 +65,9 @@ const PlexMatchWarning = ({
 
   const mediaServer = problem.mediaServer ?? 'Plex';
   // This page is the title the server wrongly matched the folder to, rather
-  // than the one Sonarr or Radarr has in it.
+  // than the one Sonarr or Radarr has in it. It was found by one of the
+  // servers' ids for this title, not necessarily the one this page passed.
   const isServerSide =
-    !!itemKey &&
-    problem.matched.key === itemKey &&
     problem.expected.tmdbId !== tmdbId &&
     (!tvdbId || problem.expected.tvdbId !== tvdbId);
   const want = mainId(problem.kind, problem.expected);

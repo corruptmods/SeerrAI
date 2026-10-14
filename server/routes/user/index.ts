@@ -22,6 +22,7 @@ import {
   USERNAME,
   USER_ID,
   USER_TYPE,
+  isConnected,
   jellyfinAccountColumns,
   jellyfinClient as jellyfinClientFor,
   jellyfinFamilyServer,
@@ -981,7 +982,13 @@ router.get<{ id: string }, UserWatchDataResponse>(
   async (req, res, next) => {
     const settings = getSettings().tautulli;
 
-    if (!settings.hostname || !settings.port || !settings.apiKey) {
+    // Tautulli is Plex's watch history: read only while Plex is connected.
+    if (
+      !isConnected('plex') ||
+      !settings.hostname ||
+      !settings.port ||
+      !settings.apiKey
+    ) {
       return next({
         status: 404,
         message: 'Tautulli API not configured.',

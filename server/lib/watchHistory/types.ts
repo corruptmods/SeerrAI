@@ -38,7 +38,8 @@ export interface Play {
 }
 
 export interface WatchSource {
-  readonly kind: 'tautulli' | 'jellyfin' | 'emby';
+  /** Where it comes from; 'multi' for several servers' history at once. */
+  readonly kind: 'tautulli' | 'jellyfin' | 'emby' | 'multi';
   /** What people call where the history comes from, for messages. */
   readonly label: string;
   /** The id the server knows this person by; undefined when not linked. */

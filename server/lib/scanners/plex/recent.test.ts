@@ -1,5 +1,6 @@
 import type { PlexLibraryItem } from '@server/api/plexapi';
 import PlexAPI from '@server/api/plexapi';
+import { MediaServerType } from '@server/constants/server';
 import { plexRecentScanner } from '@server/lib/scanners/plex';
 import { RETRY_FOR_MS, RecentRetries } from '@server/lib/scanners/plex/recent';
 import { getSettings } from '@server/lib/settings';
@@ -87,6 +88,8 @@ describe('the recently added scan', () => {
     plexRecentScanner.retries.clear();
     mock.timers.enable({ apis: ['Date'], now });
     const settings = getSettings();
+    // The scan runs only while Seerr is connected to Plex.
+    settings.main.mediaServerType = MediaServerType.PLEX;
     settings.plex = {
       ...settings.plex,
       libraries: [
@@ -180,5 +183,16 @@ describe('the recently added scan', () => {
       getSettings().plex.libraries[0].lastScan,
       first + 5 * 60 * 1000
     );
+  });
+
+  it('does nothing while Seerr is not connected to Plex', async () => {
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.JELLYFIN;
+    settings.plex.connected = false;
+    added = [movie('plex://movie/501')];
+    await scan(now);
+    assert.deepEqual(asked, []);
+    assert.deepEqual(processed, []);
+    assert.equal(plexRecentScanner.status().running, false);
   });
 });

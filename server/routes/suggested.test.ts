@@ -1,6 +1,7 @@
 import TheMovieDb from '@server/api/themoviedb';
 import { DiscoverSliderType, defaultSliders } from '@server/constants/discover';
 import { MediaStatus, MediaType } from '@server/constants/media';
+import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
 import Media from '@server/entity/Media';
@@ -127,6 +128,8 @@ beforeEach(async () => {
   movieRecs = {};
   tvRecs = {};
   tmdbAsks = 0;
+  // Tautulli is Plex's watch history, read while Plex is connected.
+  getSettings().main.mediaServerType = MediaServerType.PLEX;
   getSettings().tautulli = {
     hostname: '127.0.0.1',
     port: (fake.address() as { port: number }).port,

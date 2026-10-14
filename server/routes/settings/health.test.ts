@@ -6,6 +6,7 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
+import { MediaServerType } from '@server/constants/server';
 import dataSource, { getRepository } from '@server/datasource';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
@@ -473,6 +474,50 @@ describe('services', () => {
     const database = byId(await health(), 'database');
     assert.equal(database.status, 'ok');
     assert.match(database.detail!, /\d+ of \d+ connections/);
+  });
+});
+
+describe('media servers', () => {
+  it('checks each connected media server, and only those', async (t) => {
+    const settings = getSettings();
+    const kept = {
+      type: settings.main.mediaServerType,
+      plex: settings.plex,
+      jellyfin: settings.jellyfin,
+      emby: settings.emby,
+    };
+    t.after(() => {
+      settings.main.mediaServerType = kept.type;
+      settings.plex = kept.plex;
+      settings.jellyfin = kept.jellyfin;
+      settings.emby = kept.emby;
+    });
+    // Nothing answers on port 1: each is listed, as not answering.
+    const nowhere = { ip: '127.0.0.1', port: 1, useSsl: false };
+    settings.main.mediaServerType = MediaServerType.JELLYFIN;
+    settings.plex = { ...settings.plex, ...nowhere, connected: true };
+    settings.jellyfin = { ...settings.jellyfin, ...nowhere, apiKey: 'jk' };
+    settings.emby = {
+      ...settings.emby,
+      ...nowhere,
+      apiKey: 'ek',
+      connected: true,
+    };
+
+    const names = async () =>
+      (await health())
+        .filter((c) => ['plex', 'jellyfin', 'emby'].includes(c.id))
+        .map((c) => `${c.name}:${c.status}`)
+        .sort();
+
+    assert.deepEqual(await names(), [
+      'Emby:error',
+      'Jellyfin:error',
+      'Plex:error',
+    ]);
+
+    settings.emby.connected = false;
+    assert.deepEqual(await names(), ['Jellyfin:error', 'Plex:error']);
   });
 });
 

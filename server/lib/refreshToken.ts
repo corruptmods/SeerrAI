@@ -1,10 +1,16 @@
 import PlexTvAPI from '@server/api/plextv';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
+import { isConnected } from '@server/lib/mediaServers';
 import logger from '@server/logger';
 
 class RefreshToken {
   public async run() {
+    // Plex sign-ins only matter while Seerr is connected to Plex.
+    if (!isConnected('plex')) {
+      return;
+    }
+
     const userRepository = getRepository(User);
 
     const users = await userRepository

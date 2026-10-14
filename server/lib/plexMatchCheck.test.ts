@@ -1,3 +1,4 @@
+import JellyfinAPI from '@server/api/jellyfin';
 import type { PlexLibraryItem } from '@server/api/plexapi';
 import PlexAPI from '@server/api/plexapi';
 import SonarrAPI from '@server/api/servarr/sonarr';
@@ -289,18 +290,22 @@ describe('Plex Match Check, the whole library', () => {
       report.problems.map((p) => [p.expected.title, p.matched.title]),
       [['Carrie', 'The Carrie Diaries']]
     );
-    assert.equal(
-      (await plexMatchCheck.problemFor('series', { tvdbId: 455755 }))?.folder,
-      'Carrie'
+    assert.deepEqual(
+      (await plexMatchCheck.problemFor('series', { tvdbId: 455755 })).map(
+        (p) => p.folder
+      ),
+      ['Carrie']
     );
-    assert.equal(
-      (await plexMatchCheck.problemFor('series', { key: '126741' }))?.reason,
-      'other',
+    assert.deepEqual(
+      (await plexMatchCheck.problemFor('series', { key: '126741' })).map(
+        (p) => p.reason
+      ),
+      ['other'],
       'found from the side Plex matched it to'
     );
-    assert.equal(
+    assert.deepEqual(
       await plexMatchCheck.problemFor('series', { tvdbId: 353546 }),
-      undefined
+      []
     );
   });
 
@@ -358,6 +363,115 @@ describe('Plex Match Check, the whole library', () => {
         .checked,
       251,
       'nor in the kept file'
+    );
+  });
+});
+
+describe('Match Check on several servers', () => {
+  const setUp = (t: { after: (fn: () => unknown) => void }) => {
+    t.after(async () => {
+      await fs.rm(REPORT_PATH, { force: true });
+      const settings = getSettings();
+      settings.main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+      settings.jellyfin.connected = false;
+    });
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.PLEX;
+    settings.jellyfin = {
+      ...settings.jellyfin,
+      connected: true,
+      ip: 'jf.invalid',
+      apiKey: 'jk',
+      libraries: [{ id: 'jtv', name: 'TV', enabled: true, type: 'show' }],
+    };
+    settings.plex.libraries = [
+      { id: '1', name: 'TV Shows', enabled: true, type: 'show' },
+    ];
+    settings.sonarr = [
+      { id: 0, name: 'Sonarr', hostname: 's', port: 1, apiKey: 'k' },
+    ] as unknown as SonarrSettings[];
+    settings.radarr = [];
+  };
+
+  it('checks every connected server, in one report', async (t) => {
+    setUp(t);
+    t.mock.method(SonarrAPI.prototype, 'getSeries', async () => [
+      { ...carrie, path: '/tv/Carrie' },
+    ]);
+    t.mock.method(PlexAPI.prototype, 'getLibraryContents', async () => ({
+      totalSize: 1,
+      items: [
+        show('126741', 'The Carrie Diaries', 'Carrie', ['tvdb://257454']),
+      ],
+    }));
+    t.mock.method(JellyfinAPI.prototype, 'getLibraryPage', async () => ({
+      TotalRecordCount: 1,
+      Items: [
+        {
+          Id: 'jf-carrie',
+          Name: 'The Carrie Diaries',
+          Type: 'Series',
+          Path: '/data/tv/Carrie',
+          ProviderIds: { Tvdb: '257454' },
+        },
+      ],
+    }));
+
+    await plexMatchCheck.run();
+
+    const report = await plexMatchCheck.lastReport();
+    assert.equal(report.error, undefined);
+    assert.equal(report.checked, 2);
+    assert.deepEqual(
+      report.problems.map((p) => [p.mediaServer, p.matched.key]).sort(),
+      [
+        ['Jellyfin', 'jf-carrie'],
+        ['Plex', '126741'],
+      ]
+    );
+    assert.equal(
+      (await plexMatchCheck.problemFor('series', { tvdbId: 455755 })).length,
+      2
+    );
+    // Found from the title it was wrongly matched to, by that server's id.
+    assert.deepEqual(
+      (
+        await plexMatchCheck.problemFor('series', {
+          keys: [{ mediaServer: 'Jellyfin', key: 'jf-carrie' }],
+        })
+      ).map((p) => p.mediaServer),
+      ['Jellyfin']
+    );
+    assert.deepEqual(
+      await plexMatchCheck.problemFor('series', {
+        keys: [{ mediaServer: 'Emby', key: 'jf-carrie' }],
+      }),
+      []
+    );
+  });
+
+  it('keeps what one server found when another cannot be read', async (t) => {
+    setUp(t);
+    t.mock.method(SonarrAPI.prototype, 'getSeries', async () => [
+      { ...carrie, path: '/tv/Carrie' },
+    ]);
+    t.mock.method(PlexAPI.prototype, 'getLibraryContents', async () => ({
+      totalSize: 1,
+      items: [
+        show('126741', 'The Carrie Diaries', 'Carrie', ['tvdb://257454']),
+      ],
+    }));
+    t.mock.method(JellyfinAPI.prototype, 'getLibraryPage', async () => {
+      throw new Error('connect ECONNREFUSED');
+    });
+
+    await plexMatchCheck.run();
+
+    const report = await plexMatchCheck.lastReport();
+    assert.equal(report.error, 'Jellyfin: connect ECONNREFUSED');
+    assert.deepEqual(
+      report.problems.map((p) => p.mediaServer),
+      ['Plex']
     );
   });
 });

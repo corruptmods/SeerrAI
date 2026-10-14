@@ -6064,9 +6064,15 @@ paths:
                 type: object
                 properties:
                   problem:
+                    description: The first of `problems`
                     allOf:
                       - $ref: '#/components/schemas/PlexMatchProblem'
                     nullable: true
+                  problems:
+                    description: Every problem found for the title, at most one per media server
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PlexMatchProblem'
   /settings/anime-check:
     get:
       summary: The last Anime Check

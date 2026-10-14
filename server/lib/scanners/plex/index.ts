@@ -10,6 +10,7 @@ import type {
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { detectAnime } from '@server/lib/animeDecision';
+import { isConnected } from '@server/lib/mediaServers';
 import type {
   MediaIds,
   ProcessableSeason,
@@ -68,6 +69,11 @@ class PlexScanner
   }
 
   public async run(): Promise<void> {
+    // Plex's libraries are scanned only while Seerr is connected to Plex.
+    if (!isConnected('plex')) {
+      return;
+    }
+
     const settings = getSettings();
     const sessionId = this.startRun();
     try {

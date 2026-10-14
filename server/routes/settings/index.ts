@@ -2,6 +2,7 @@ import PlexAPI from '@server/api/plexapi';
 import PlexTvAPI from '@server/api/plextv';
 import { ApiErrorCode } from '@server/constants/error';
 import { MIN_IMAGE_CACHE_MAX_MB } from '@server/constants/images';
+import { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
@@ -25,8 +26,14 @@ import {
 } from '@server/lib/health';
 import ImageProxy, { imageConversionAvailable } from '@server/lib/imageproxy';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
-import { connectedServers } from '@server/lib/mediaServers';
+import {
+  MEDIA_ID,
+  MEDIA_SERVER_KINDS,
+  connectedServers,
+  serverName,
+} from '@server/lib/mediaServers';
 import { Permission } from '@server/lib/permissions';
+import type { MediaServerName } from '@server/lib/plexMatchCheck';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import { plexFullScanner } from '@server/lib/scanners/plex';
 import { searchAllMissing } from '@server/lib/searchMissing';
@@ -716,15 +723,39 @@ settingsRoutes.get<
     key?: string;
   }
 >('/plex-match-check/title', async (req, res) => {
-  const problem = await plexMatchCheck.problemFor(
+  const tmdbId = req.query.tmdbId ? Number(req.query.tmdbId) : undefined;
+  // Every server's id for the title Seerr has, so a server that matched a
+  // folder to it wrongly is found whichever server's id the page passed.
+  const media = tmdbId
+    ? await getRepository(Media).findOne({
+        where: {
+          tmdbId,
+          mediaType:
+            req.query.mediaType === 'tv' ? MediaType.TV : MediaType.MOVIE,
+        },
+      })
+    : null;
+  const keys = media
+    ? MEDIA_SERVER_KINDS.flatMap((kind) =>
+        MEDIA_ID[kind].flatMap((column) => {
+          const key = media[column];
+          return key
+            ? [{ mediaServer: serverName(kind) as MediaServerName, key }]
+            : [];
+        })
+      )
+    : [];
+  const problems = await plexMatchCheck.problemFor(
     req.query.mediaType === 'tv' ? 'series' : 'movie',
     {
-      tmdbId: req.query.tmdbId ? Number(req.query.tmdbId) : undefined,
+      tmdbId,
       tvdbId: req.query.tvdbId ? Number(req.query.tvdbId) : undefined,
       key: req.query.key,
+      keys,
     }
   );
-  return res.status(200).json({ problem: problem ?? null });
+  // `problem` is the first, for pages that show one.
+  return res.status(200).json({ problem: problems[0] ?? null, problems });
 });
 
 /** The last Anime Check: series and movies that disagree with Seerr. */

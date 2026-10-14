@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Премести {item} надолу",
   "components.Layout.NavEditor.moveUp": "Премести {item} нагоре",
   "components.Layout.NavEditor.moved": "{item} е преместено на място {place} от {count}.",
-  "components.Layout.NavEditor.phoneTip": "Плъзнете елемент или използвайте стрелките му, за да го преместите. Скрийте тези, които не използвате. Първите отиват в лентата в долната част на екрана.",
+  "components.Layout.NavEditor.phoneTip": "Плъзнете елемент или използвайте стрелките му, за да го преместите. Скрийте тези, които не използвате. Първите {count} показани отиват в лентата в долната част на екрана.",
   "components.Layout.NavEditor.reset": "Нулирай менюто",
   "components.Layout.NavEditor.resetDone": "Менюто е с обичайния ред и всичко се показва.",
   "components.Layout.NavEditor.show": "Покажи {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Не е свързан",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Този Plex акаунт няма достъп до Plex сървъра.",
   "components.UserProfile.musicrequests": "Заявки за албуми",
-  "i18n.music": "Музика"
+  "i18n.music": "Музика",
+  "components.Layout.NavEditor.inMenu": "В менюто",
+  "components.Layout.NavEditor.onBar": "В лентата",
+  "components.Music.ArtistCard.artist": "Изпълнител",
+  "components.Music.MusicCard.album": "Албум",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Издание",
+  "components.Music.MusicCard.single": "Сингъл",
+  "components.Settings.SettingsJobsCache.musiccache": "Музикални обложки и снимки на изпълнители"
 }

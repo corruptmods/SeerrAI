@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "將 {item} 下移",
   "components.Layout.NavEditor.moveUp": "將 {item} 上移",
   "components.Layout.NavEditor.moved": "{item} 已移至第 {place} 位（共 {count} 位）。",
-  "components.Layout.NavEditor.phoneTip": "拖曳項目或使用其箭頭來移動。隱藏您用不到的項目。排在最前面的幾項會顯示在螢幕底部的列上。",
+  "components.Layout.NavEditor.phoneTip": "拖曳項目或使用其箭頭來移動。隱藏您用不到的項目。顯示的前 {count} 項會出現在螢幕底部的列上。",
   "components.Layout.NavEditor.reset": "重設選單",
   "components.Layout.NavEditor.resetDone": "選單已恢復預設順序，所有項目皆已顯示。",
   "components.Layout.NavEditor.show": "顯示 {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "未連線",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "此 Plex 帳號沒有該 Plex 伺服器的存取權。",
   "components.UserProfile.musicrequests": "專輯請求",
-  "i18n.music": "音樂"
+  "i18n.music": "音樂",
+  "components.Layout.NavEditor.inMenu": "在選單中",
+  "components.Layout.NavEditor.onBar": "在底部列中",
+  "components.Music.ArtistCard.artist": "藝人",
+  "components.Music.MusicCard.album": "專輯",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "發行",
+  "components.Music.MusicCard.single": "單曲",
+  "components.Settings.SettingsJobsCache.musiccache": "音樂封面與藝人圖片"
 }

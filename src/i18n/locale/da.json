@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Flyt {item} ned",
   "components.Layout.NavEditor.moveUp": "Flyt {item} op",
   "components.Layout.NavEditor.moved": "{item} flyttet til plads {place} af {count}.",
-  "components.Layout.NavEditor.phoneTip": "Træk et punkt, eller brug dets pile, for at flytte det. Skjul dem, du ikke bruger. De første kommer på bjælken nederst på skærmen.",
+  "components.Layout.NavEditor.phoneTip": "Træk et punkt, eller brug dets pile, for at flytte det. Skjul dem, du ikke bruger. De første {count} viste kommer på bjælken nederst på skærmen.",
   "components.Layout.NavEditor.reset": "Nulstil menu",
   "components.Layout.NavEditor.resetDone": "Menuen er tilbage i den sædvanlige rækkefølge, og alt vises.",
   "components.Layout.NavEditor.show": "Vis {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Ikke forbundet",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Denne Plex-konto har ikke adgang til Plex-serveren.",
   "components.UserProfile.musicrequests": "Albumanmodninger",
-  "i18n.music": "Musik"
+  "i18n.music": "Musik",
+  "components.Layout.NavEditor.inMenu": "I menuen",
+  "components.Layout.NavEditor.onBar": "På bjælken",
+  "components.Music.ArtistCard.artist": "Kunstner",
+  "components.Music.MusicCard.album": "Album",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Udgivelse",
+  "components.Music.MusicCard.single": "Single",
+  "components.Settings.SettingsJobsCache.musiccache": "Musikcovers og kunstnerbilleder"
 }

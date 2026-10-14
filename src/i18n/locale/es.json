@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Bajar {item}",
   "components.Layout.NavEditor.moveUp": "Subir {item}",
   "components.Layout.NavEditor.moved": "{item} movido al puesto {place} de {count}.",
-  "components.Layout.NavEditor.phoneTip": "Arrastra un elemento, o usa sus flechas, para moverlo. Oculta los que no uses. Los primeros van en la barra de la parte inferior de la pantalla.",
+  "components.Layout.NavEditor.phoneTip": "Arrastra un elemento, o usa sus flechas, para moverlo. Oculta los que no uses. Los primeros {count} visibles van en la barra de la parte inferior de la pantalla.",
   "components.Layout.NavEditor.reset": "Restablecer menú",
   "components.Layout.NavEditor.resetDone": "El menú ha vuelto al orden habitual, con todo visible.",
   "components.Layout.NavEditor.show": "Mostrar {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Sin conectar",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Esta cuenta de Plex no tiene acceso al servidor de Plex.",
   "components.UserProfile.musicrequests": "Peticiones de álbumes",
-  "i18n.music": "Música"
+  "i18n.music": "Música",
+  "components.Layout.NavEditor.inMenu": "En el menú",
+  "components.Layout.NavEditor.onBar": "En la barra",
+  "components.Music.ArtistCard.artist": "Artista",
+  "components.Music.MusicCard.album": "Álbum",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Lanzamiento",
+  "components.Music.MusicCard.single": "Sencillo",
+  "components.Settings.SettingsJobsCache.musiccache": "Portadas de música e imágenes de artistas"
 }

@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "הזז את {item} למטה",
   "components.Layout.NavEditor.moveUp": "הזז את {item} למעלה",
   "components.Layout.NavEditor.moved": "{item} הועבר למקום {place} מתוך {count}.",
-  "components.Layout.NavEditor.phoneTip": "גרור פריט, או השתמש בחצים שלו, כדי להזיז אותו. הסתר את אלה שאינך משתמש בהם. הראשונים מופיעים בסרגל שבתחתית המסך.",
+  "components.Layout.NavEditor.phoneTip": "גרור פריט, או השתמש בחצים שלו, כדי להזיז אותו. הסתר את אלה שאינך משתמש בהם. {count} הפריטים הראשונים המוצגים מופיעים בסרגל שבתחתית המסך.",
   "components.Layout.NavEditor.reset": "איפוס התפריט",
   "components.Layout.NavEditor.resetDone": "התפריט חזר לסדר הרגיל, וכל הפריטים מוצגים.",
   "components.Layout.NavEditor.show": "הצג את {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "לא מחובר",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "לחשבון ה-Plex הזה אין גישה לשרת ה-Plex.",
   "components.UserProfile.musicrequests": "בקשות אלבומים",
-  "i18n.music": "מוזיקה"
+  "i18n.music": "מוזיקה",
+  "components.Layout.NavEditor.inMenu": "בתפריט",
+  "components.Layout.NavEditor.onBar": "בסרגל",
+  "components.Music.ArtistCard.artist": "אמן",
+  "components.Music.MusicCard.album": "אלבום",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "הוצאה",
+  "components.Music.MusicCard.single": "סינגל",
+  "components.Settings.SettingsJobsCache.musiccache": "עטיפות מוזיקה ותמונות אמנים"
 }

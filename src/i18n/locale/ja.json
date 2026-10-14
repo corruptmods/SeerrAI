@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "{item}を下へ移動",
   "components.Layout.NavEditor.moveUp": "{item}を上へ移動",
   "components.Layout.NavEditor.moved": "{item}を{count}個中{place}番目に移動しました。",
-  "components.Layout.NavEditor.phoneTip": "項目をドラッグするか矢印を使って移動します。使わない項目は非表示にできます。先頭の項目は画面下部のバーに表示されます。",
+  "components.Layout.NavEditor.phoneTip": "項目をドラッグするか矢印を使って移動します。使わない項目は非表示にできます。表示中の項目のうち先頭の {count} 件は画面下部のバーに表示されます。",
   "components.Layout.NavEditor.reset": "メニューをリセット",
   "components.Layout.NavEditor.resetDone": "メニューを元の順序に戻し、すべて表示しました。",
   "components.Layout.NavEditor.show": "{item}を表示",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "未接続",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "この Plex アカウントは Plex サーバーにアクセスできません。",
   "components.UserProfile.musicrequests": "アルバムのリクエスト",
-  "i18n.music": "音楽"
+  "i18n.music": "音楽",
+  "components.Layout.NavEditor.inMenu": "メニューに表示",
+  "components.Layout.NavEditor.onBar": "バーに表示",
+  "components.Music.ArtistCard.artist": "アーティスト",
+  "components.Music.MusicCard.album": "アルバム",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "リリース",
+  "components.Music.MusicCard.single": "シングル",
+  "components.Settings.SettingsJobsCache.musiccache": "音楽のカバー画像とアーティスト画像"
 }

@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "{item} omlaag verplaatsen",
   "components.Layout.NavEditor.moveUp": "{item} omhoog verplaatsen",
   "components.Layout.NavEditor.moved": "{item} verplaatst naar plaats {place} van {count}.",
-  "components.Layout.NavEditor.phoneTip": "Sleep een onderdeel, of gebruik de pijltjes, om het te verplaatsen. Verberg wat je niet gebruikt. De eerste komen in de balk onder in het scherm.",
+  "components.Layout.NavEditor.phoneTip": "Sleep een onderdeel, of gebruik de pijltjes, om het te verplaatsen. Verberg wat je niet gebruikt. De eerste {count} zichtbare komen in de balk onder in het scherm.",
   "components.Layout.NavEditor.reset": "Menu herstellen",
   "components.Layout.NavEditor.resetDone": "Menu staat weer in de gewone volgorde, met alles zichtbaar.",
   "components.Layout.NavEditor.show": "{item} tonen",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Niet verbonden",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Dit Plex-account heeft geen toegang tot de Plex-server.",
   "components.UserProfile.musicrequests": "Albumaanvragen",
-  "i18n.music": "Muziek"
+  "i18n.music": "Muziek",
+  "components.Layout.NavEditor.inMenu": "In het menu",
+  "components.Layout.NavEditor.onBar": "In de balk",
+  "components.Music.ArtistCard.artist": "Artiest",
+  "components.Music.MusicCard.album": "Album",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Uitgave",
+  "components.Music.MusicCard.single": "Single",
+  "components.Settings.SettingsJobsCache.musiccache": "Muziekhoezen en artiestafbeeldingen"
 }

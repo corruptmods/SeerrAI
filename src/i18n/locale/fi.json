@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Siirrä {item} alas",
   "components.Layout.NavEditor.moveUp": "Siirrä {item} ylös",
   "components.Layout.NavEditor.moved": "{item} siirretty paikalle {place}/{count}.",
-  "components.Layout.NavEditor.phoneTip": "Siirrä kohdetta vetämällä tai sen nuolilla. Piilota ne, joita et käytä. Ensimmäiset näkyvät näytön alareunan palkissa.",
+  "components.Layout.NavEditor.phoneTip": "Siirrä kohdetta vetämällä tai sen nuolilla. Piilota ne, joita et käytä. Ensimmäiset {count} näytettyä kohdetta sijoittuvat näytön alareunan palkkiin.",
   "components.Layout.NavEditor.reset": "Palauta valikko",
   "components.Layout.NavEditor.resetDone": "Valikko palautettu tavalliseen järjestykseen, ja kaikki näytetään.",
   "components.Layout.NavEditor.show": "Näytä {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Ei yhdistetty",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Tällä Plex-tilillä ei ole pääsyä Plex-palvelimelle.",
   "components.UserProfile.musicrequests": "Albumipyynnöt",
-  "i18n.music": "Musiikki"
+  "i18n.music": "Musiikki",
+  "components.Layout.NavEditor.inMenu": "Valikossa",
+  "components.Layout.NavEditor.onBar": "Palkissa",
+  "components.Music.ArtistCard.artist": "Artisti",
+  "components.Music.MusicCard.album": "Albumi",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Julkaisu",
+  "components.Music.MusicCard.single": "Single",
+  "components.Settings.SettingsJobsCache.musiccache": "Musiikin kansikuvat ja artistikuvat"
 }

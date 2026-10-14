@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Premakni {item} navzdol",
   "components.Layout.NavEditor.moveUp": "Premakni {item} navzgor",
   "components.Layout.NavEditor.moved": "{item} je premaknjeno na mesto {place} od {count}.",
-  "components.Layout.NavEditor.phoneTip": "Element premaknete tako, da ga povlečete ali uporabite njegove puščice. Skrijte tiste, ki jih ne uporabljate. Prvi so prikazani v vrstici na dnu zaslona.",
+  "components.Layout.NavEditor.phoneTip": "Element premaknete tako, da ga povlečete ali uporabite njegove puščice. Skrijte tiste, ki jih ne uporabljate. Prvi vidni elementi (največ {count}) so prikazani v vrstici na dnu zaslona.",
   "components.Layout.NavEditor.reset": "Ponastavi meni",
   "components.Layout.NavEditor.resetDone": "Meni je spet v običajnem vrstnem redu in vse je prikazano.",
   "components.Layout.NavEditor.show": "Prikaži {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Ni povezano",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Ta račun Plex nima dostopa do strežnika Plex.",
   "components.UserProfile.musicrequests": "Zahteve za albume",
-  "i18n.music": "Glasba"
+  "i18n.music": "Glasba",
+  "components.Layout.NavEditor.inMenu": "V meniju",
+  "components.Layout.NavEditor.onBar": "V vrstici",
+  "components.Music.ArtistCard.artist": "Izvajalec",
+  "components.Music.MusicCard.album": "Album",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Izdaja",
+  "components.Music.MusicCard.single": "Singel",
+  "components.Settings.SettingsJobsCache.musiccache": "Glasbene naslovnice in slike izvajalcev"
 }

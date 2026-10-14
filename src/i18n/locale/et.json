@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Liiguta {item} alla",
   "components.Layout.NavEditor.moveUp": "Liiguta {item} üles",
   "components.Layout.NavEditor.moved": "{item} liigutati kohale {place}/{count}.",
-  "components.Layout.NavEditor.phoneTip": "Liigutamiseks lohista üksust või kasuta selle nooli. Peida need, mida sa ei kasuta. Esimesed lähevad ekraani allserva ribale.",
+  "components.Layout.NavEditor.phoneTip": "Liigutamiseks lohista üksust või kasuta selle nooli. Peida need, mida sa ei kasuta. Esimesed {count} nähtavat lähevad ekraani allserva ribale.",
   "components.Layout.NavEditor.reset": "Lähtesta menüü",
   "components.Layout.NavEditor.resetDone": "Menüü on tagasi tavapärases järjekorras ja kõik on nähtav.",
   "components.Layout.NavEditor.show": "Näita: {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Pole ühendatud",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Sellel Plexi kontol pole juurdepääsu Plexi serverile.",
   "components.UserProfile.musicrequests": "Albumitaotlused",
-  "i18n.music": "Muusika"
+  "i18n.music": "Muusika",
+  "components.Layout.NavEditor.inMenu": "Menüüs",
+  "components.Layout.NavEditor.onBar": "Ribal",
+  "components.Music.ArtistCard.artist": "Esitaja",
+  "components.Music.MusicCard.album": "Album",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Väljaanne",
+  "components.Music.MusicCard.single": "Singel",
+  "components.Settings.SettingsJobsCache.musiccache": "Muusika kaanepildid ja esitajate pildid"
 }

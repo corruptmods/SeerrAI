@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Senkez {item} ɣer wadda",
   "components.Layout.NavEditor.moveUp": "Senkez {item} ɣer ufella",
   "components.Layout.NavEditor.moved": "{item} yettwasenkez ɣer wadeg {place} seg {count}.",
-  "components.Layout.NavEditor.phoneTip": "Zuɣer aferdis, neɣ seqdec ineccaben-is, akken ad t-tesnekzeḍ. Ffer wid ur tesseqdaceḍ ara. Imezwura ttruḥun ɣer ufeggag n wadda n ugdil.",
+  "components.Layout.NavEditor.phoneTip": "Zuɣer aferdis, neɣ seqdec ineccaben-is, akken ad t-tesnekzeḍ. Ffer wid ur tesseqdaceḍ ara. {count} imezwura i d-yettbanen ttruḥun ɣer ufeggag n wadda n ugdil.",
   "components.Layout.NavEditor.reset": "Ales awennez n wumuɣ",
   "components.Layout.NavEditor.resetDone": "Umuɣ yuɣal ɣer umizzwer-is n yal ass, s akk iferdisen ttbanen.",
   "components.Layout.NavEditor.show": "Sken {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Ur yeqqin ara",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Amiḍan-a n Plex ur yesɛi ara anekcum ɣer uqeddac n Plex.",
   "components.UserProfile.musicrequests": "Isuturen n yilbumen",
-  "i18n.music": "Aẓawan"
+  "i18n.music": "Aẓawan",
+  "components.Layout.NavEditor.inMenu": "Deg wumuɣ",
+  "components.Layout.NavEditor.onBar": "Ɣef ufeggag",
+  "components.Music.ArtistCard.artist": "Anaẓur",
+  "components.Music.MusicCard.album": "Albom",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Tuffɣa",
+  "components.Music.MusicCard.single": "Asingli",
+  "components.Settings.SettingsJobsCache.musiccache": "Iɣlafen n uẓawan d tugniwin n yinaẓuren"
 }

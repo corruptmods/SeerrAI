@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "{item} öğesini aşağı taşı",
   "components.Layout.NavEditor.moveUp": "{item} öğesini yukarı taşı",
   "components.Layout.NavEditor.moved": "{item}, {count} sıradan {place}. sıraya taşındı.",
-  "components.Layout.NavEditor.phoneTip": "Bir öğeyi taşımak için sürükleyin ya da oklarını kullanın. Kullanmadıklarınızı gizleyin. İlk öğeler ekranın altındaki çubukta yer alır.",
+  "components.Layout.NavEditor.phoneTip": "Bir öğeyi taşımak için sürükleyin ya da oklarını kullanın. Kullanmadıklarınızı gizleyin. Gösterilen ilk {count} öğe ekranın altındaki çubukta yer alır.",
   "components.Layout.NavEditor.reset": "Menüyü Sıfırla",
   "components.Layout.NavEditor.resetDone": "Menü her şey gösterilerek olağan sırasına döndü.",
   "components.Layout.NavEditor.show": "{item} öğesini göster",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Bağlı değil",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Bu Plex hesabının Plex sunucusuna erişimi yok.",
   "components.UserProfile.musicrequests": "Albüm Talepleri",
-  "i18n.music": "Müzik"
+  "i18n.music": "Müzik",
+  "components.Layout.NavEditor.inMenu": "Menüde",
+  "components.Layout.NavEditor.onBar": "Çubukta",
+  "components.Music.ArtistCard.artist": "Sanatçı",
+  "components.Music.MusicCard.album": "Albüm",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Yayın",
+  "components.Music.MusicCard.single": "Single",
+  "components.Settings.SettingsJobsCache.musiccache": "Müzik kapakları ve sanatçı görselleri"
 }

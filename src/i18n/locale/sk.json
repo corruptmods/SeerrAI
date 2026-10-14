@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Posunúť položku {item} nadol",
   "components.Layout.NavEditor.moveUp": "Posunúť položku {item} nahor",
   "components.Layout.NavEditor.moved": "Položka {item} je teraz na {place}. mieste z {count}.",
-  "components.Layout.NavEditor.phoneTip": "Položku presuniete potiahnutím alebo pomocou jej šípok. Tie, ktoré nepoužívate, skryte. Prvé položky sa zobrazia na lište v dolnej časti obrazovky.",
+  "components.Layout.NavEditor.phoneTip": "Položku presuniete potiahnutím alebo pomocou jej šípok. Tie, ktoré nepoužívate, skryte. Prvé viditeľné položky (najviac {count}) sa zobrazia na lište v dolnej časti obrazovky.",
   "components.Layout.NavEditor.reset": "Obnoviť ponuku",
   "components.Layout.NavEditor.resetDone": "Ponuka je späť v pôvodnom poradí a zobrazuje sa všetko.",
   "components.Layout.NavEditor.show": "Zobraziť položku {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Nepripojené",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Tento účet Plex nemá prístup k serveru Plex.",
   "components.UserProfile.musicrequests": "Žiadosti o albumy",
-  "i18n.music": "Hudba"
+  "i18n.music": "Hudba",
+  "components.Layout.NavEditor.inMenu": "V ponuke",
+  "components.Layout.NavEditor.onBar": "Na lište",
+  "components.Music.ArtistCard.artist": "Interpret",
+  "components.Music.MusicCard.album": "Album",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Vydanie",
+  "components.Music.MusicCard.single": "Singel",
+  "components.Settings.SettingsJobsCache.musiccache": "Hudobné obaly a obrázky interpretov"
 }

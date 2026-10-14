@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "{item} mozgatása lefelé",
   "components.Layout.NavEditor.moveUp": "{item} mozgatása felfelé",
   "components.Layout.NavEditor.moved": "{item} áthelyezve a(z) {place}. helyre ({count} közül).",
-  "components.Layout.NavEditor.phoneTip": "Egy elem áthelyezéséhez húzza el, vagy használja a nyilait. Rejtse el azokat, amelyeket nem használ. Az elsők a képernyő alján lévő sávra kerülnek.",
+  "components.Layout.NavEditor.phoneTip": "Egy elem áthelyezéséhez húzza el, vagy használja a nyilait. Rejtse el azokat, amelyeket nem használ. Az első {count} megjelenített elem a képernyő alján lévő sávra kerül.",
   "components.Layout.NavEditor.reset": "Menü visszaállítása",
   "components.Layout.NavEditor.resetDone": "A menü visszaállt a szokásos sorrendre, minden elem látható.",
   "components.Layout.NavEditor.show": "{item} megjelenítése",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Nincs csatlakoztatva",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Ennek a Plex-fióknak nincs hozzáférése a Plex-szerverhez.",
   "components.UserProfile.musicrequests": "Albumkérések",
-  "i18n.music": "Zene"
+  "i18n.music": "Zene",
+  "components.Layout.NavEditor.inMenu": "A menüben",
+  "components.Layout.NavEditor.onBar": "A sávon",
+  "components.Music.ArtistCard.artist": "Előadó",
+  "components.Music.MusicCard.album": "Album",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Kiadás",
+  "components.Music.MusicCard.single": "Kislemez",
+  "components.Settings.SettingsJobsCache.musiccache": "Zenei borítók és előadóképek"
 }

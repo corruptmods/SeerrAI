@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Mou {item} avall",
   "components.Layout.NavEditor.moveUp": "Mou {item} amunt",
   "components.Layout.NavEditor.moved": "{item} s'ha mogut a la posició {place} de {count}.",
-  "components.Layout.NavEditor.phoneTip": "Arrossegueu un element, o feu servir les seves fletxes, per moure'l. Amagueu els que no feu servir. Els primers van a la barra de la part inferior de la pantalla.",
+  "components.Layout.NavEditor.phoneTip": "Arrossegueu un element, o feu servir les seves fletxes, per moure'l. Amagueu els que no feu servir. Els {count} primers que es mostren van a la barra de la part inferior de la pantalla.",
   "components.Layout.NavEditor.reset": "Restableix el menú",
   "components.Layout.NavEditor.resetDone": "El menú torna a l'ordre habitual, amb tot visible.",
   "components.Layout.NavEditor.show": "Mostra {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "No connectat",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Aquest compte de Plex no té accés al servidor Plex.",
   "components.UserProfile.musicrequests": "Sol·licituds d'àlbums",
-  "i18n.music": "Música"
+  "i18n.music": "Música",
+  "components.Layout.NavEditor.inMenu": "Al menú",
+  "components.Layout.NavEditor.onBar": "A la barra",
+  "components.Music.ArtistCard.artist": "Artista",
+  "components.Music.MusicCard.album": "Àlbum",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Publicació",
+  "components.Music.MusicCard.single": "Senzill",
+  "components.Settings.SettingsJobsCache.musiccache": "Portades de música i imatges d'artistes"
 }

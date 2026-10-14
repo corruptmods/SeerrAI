@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Pomeri {item} nadole",
   "components.Layout.NavEditor.moveUp": "Pomeri {item} nagore",
   "components.Layout.NavEditor.moved": "{item} je pomereno na mesto {place} od {count}.",
-  "components.Layout.NavEditor.phoneTip": "Prevucite stavku ili koristite njene strelice da biste je pomerili. Sakrijte one koje ne koristite. Prve idu na traku na dnu ekrana.",
+  "components.Layout.NavEditor.phoneTip": "Prevucite stavku ili koristite njene strelice da biste je pomerili. Sakrijte one koje ne koristite. Prve prikazane stavke (najviše {count}) idu na traku na dnu ekrana.",
   "components.Layout.NavEditor.reset": "Resetuj meni",
   "components.Layout.NavEditor.resetDone": "Meni je vraćen na uobičajeni redosled, sa svim stavkama prikazanim.",
   "components.Layout.NavEditor.show": "Prikaži {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Nije povezano",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Ovaj Plex nalog nema pristup Plex serveru.",
   "components.UserProfile.musicrequests": "Zahtevi za albume",
-  "i18n.music": "Muzika"
+  "i18n.music": "Muzika",
+  "components.Layout.NavEditor.inMenu": "U meniju",
+  "components.Layout.NavEditor.onBar": "Na traci",
+  "components.Music.ArtistCard.artist": "Izvođač",
+  "components.Music.MusicCard.album": "Album",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Izdanje",
+  "components.Music.MusicCard.single": "Singl",
+  "components.Settings.SettingsJobsCache.musiccache": "Muzički omoti i slike izvođača"
 }

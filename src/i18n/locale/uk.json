@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Перемістити «{item}» нижче",
   "components.Layout.NavEditor.moveUp": "Перемістити «{item}» вище",
   "components.Layout.NavEditor.moved": "«{item}» переміщено на місце {place} з {count}.",
-  "components.Layout.NavEditor.phoneTip": "Перетягніть пункт або скористайтеся його стрілками, щоб перемістити його. Приховайте ті, якими не користуєтеся. Перші пункти потрапляють на панель унизу екрана.",
+  "components.Layout.NavEditor.phoneTip": "Перетягніть пункт або скористайтеся його стрілками, щоб перемістити його. Приховайте ті, якими не користуєтеся. Перші видимі пункти (до {count}) потрапляють на панель унизу екрана.",
   "components.Layout.NavEditor.reset": "Скинути меню",
   "components.Layout.NavEditor.resetDone": "Меню повернуто до звичайного порядку, усі пункти показано.",
   "components.Layout.NavEditor.show": "Показати «{item}»",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Не підключено",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Цей обліковий запис Plex не має доступу до сервера Plex.",
   "components.UserProfile.musicrequests": "Запити на альбоми",
-  "i18n.music": "Музика"
+  "i18n.music": "Музика",
+  "components.Layout.NavEditor.inMenu": "У меню",
+  "components.Layout.NavEditor.onBar": "На панелі",
+  "components.Music.ArtistCard.artist": "Виконавець",
+  "components.Music.MusicCard.album": "Альбом",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Реліз",
+  "components.Music.MusicCard.single": "Сингл",
+  "components.Settings.SettingsJobsCache.musiccache": "Музичні обкладинки й фото виконавців"
 }

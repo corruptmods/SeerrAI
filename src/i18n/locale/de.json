@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "{item} nach unten verschieben",
   "components.Layout.NavEditor.moveUp": "{item} nach oben verschieben",
   "components.Layout.NavEditor.moved": "{item} auf Position {place} von {count} verschoben.",
-  "components.Layout.NavEditor.phoneTip": "Zieh einen Eintrag oder nutze seine Pfeile, um ihn zu verschieben. Blende aus, was du nicht nutzt. Die ersten landen in der Leiste unten am Bildschirm.",
+  "components.Layout.NavEditor.phoneTip": "Zieh einen Eintrag oder nutze seine Pfeile, um ihn zu verschieben. Blende aus, was du nicht nutzt. Die ersten {count} sichtbaren landen in der Leiste unten am Bildschirm.",
   "components.Layout.NavEditor.reset": "Menü zurücksetzen",
   "components.Layout.NavEditor.resetDone": "Menü wieder in der üblichen Reihenfolge, mit allen Einträgen.",
   "components.Layout.NavEditor.show": "{item} anzeigen",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Nicht verbunden",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Dieses Plex-Konto hat keinen Zugriff auf den Plex-Server.",
   "components.UserProfile.musicrequests": "Albumanfragen",
-  "i18n.music": "Musik"
+  "i18n.music": "Musik",
+  "components.Layout.NavEditor.inMenu": "Im Menü",
+  "components.Layout.NavEditor.onBar": "In der Leiste",
+  "components.Music.ArtistCard.artist": "Künstler",
+  "components.Music.MusicCard.album": "Album",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Release",
+  "components.Music.MusicCard.single": "Single",
+  "components.Settings.SettingsJobsCache.musiccache": "Musik-Cover und Künstlerbilder"
 }

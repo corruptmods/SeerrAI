@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Eraman {item} behera",
   "components.Layout.NavEditor.moveUp": "Eraman {item} gora",
   "components.Layout.NavEditor.moved": "{item} orain {place}. lekuan dago ({count} guztira).",
-  "components.Layout.NavEditor.phoneTip": "Elementu bat mugitzeko, arrastatu edo erabili bere geziak. Ezkutatu erabiltzen ez dituzunak. Lehenengoak pantailaren beheko barran agertzen dira.",
+  "components.Layout.NavEditor.phoneTip": "Elementu bat mugitzeko, arrastatu edo erabili bere geziak. Ezkutatu erabiltzen ez dituzunak. Ikusgai dauden lehen {count} elementuak pantailaren beheko barran agertzen dira.",
   "components.Layout.NavEditor.reset": "Berrezarri menua",
   "components.Layout.NavEditor.resetDone": "Menua ohiko ordenara itzuli da, dena erakutsita.",
   "components.Layout.NavEditor.show": "Erakutsi {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Konektatu gabe",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Plex kontu honek ez du Plex zerbitzarirako sarbiderik.",
   "components.UserProfile.musicrequests": "Album-eskaerak",
-  "i18n.music": "Musika"
+  "i18n.music": "Musika",
+  "components.Layout.NavEditor.inMenu": "Menuan",
+  "components.Layout.NavEditor.onBar": "Barran",
+  "components.Music.ArtistCard.artist": "Artista",
+  "components.Music.MusicCard.album": "Albuma",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Argitalpena",
+  "components.Music.MusicCard.single": "Singlea",
+  "components.Settings.SettingsJobsCache.musiccache": "Musika-azalak eta artisten irudiak"
 }

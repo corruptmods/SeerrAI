@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Mută {item} în jos",
   "components.Layout.NavEditor.moveUp": "Mută {item} în sus",
   "components.Layout.NavEditor.moved": "{item} a fost mutat pe locul {place} din {count}.",
-  "components.Layout.NavEditor.phoneTip": "Trageți un element sau folosiți săgețile lui pentru a-l muta. Ascundeți-le pe cele pe care nu le folosiți. Primele ajung în bara din partea de jos a ecranului.",
+  "components.Layout.NavEditor.phoneTip": "Trageți un element sau folosiți săgețile lui pentru a-l muta. Ascundeți-le pe cele pe care nu le folosiți. Primele {count} afișate ajung în bara din partea de jos a ecranului.",
   "components.Layout.NavEditor.reset": "Resetează meniul",
   "components.Layout.NavEditor.resetDone": "Meniul a revenit la ordinea obișnuită, cu toate elementele afișate.",
   "components.Layout.NavEditor.show": "Afișează {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Neconectat",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Acest cont Plex nu are acces la serverul Plex.",
   "components.UserProfile.musicrequests": "Solicitări de albume",
-  "i18n.music": "Muzică"
+  "i18n.music": "Muzică",
+  "components.Layout.NavEditor.inMenu": "În meniu",
+  "components.Layout.NavEditor.onBar": "În bară",
+  "components.Music.ArtistCard.artist": "Artist",
+  "components.Music.MusicCard.album": "Album",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Lansare",
+  "components.Music.MusicCard.single": "Single",
+  "components.Settings.SettingsJobsCache.musiccache": "Coperți muzicale și imagini cu artiști"
 }

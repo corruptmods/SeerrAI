@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "{item} को नीचे ले जाएँ",
   "components.Layout.NavEditor.moveUp": "{item} को ऊपर ले जाएँ",
   "components.Layout.NavEditor.moved": "{item} को {count} में से {place} स्थान पर ले जाया गया।",
-  "components.Layout.NavEditor.phoneTip": "किसी आइटम को खिसकाने के लिए उसे खींचें, या उसके तीर इस्तेमाल करें। जिन्हें आप इस्तेमाल नहीं करते, उन्हें छिपा दें। शुरुआती आइटम स्क्रीन के नीचे वाली पट्टी में जाते हैं।",
+  "components.Layout.NavEditor.phoneTip": "किसी आइटम को खिसकाने के लिए उसे खींचें, या उसके तीर इस्तेमाल करें। जिन्हें आप इस्तेमाल नहीं करते, उन्हें छिपा दें। दिखाए गए पहले {count} आइटम स्क्रीन के नीचे वाली पट्टी में जाते हैं।",
   "components.Layout.NavEditor.reset": "मेन्यू रीसेट करें",
   "components.Layout.NavEditor.resetDone": "मेन्यू अपने सामान्य क्रम में लौट आया, और सब कुछ दिखाया जा रहा है।",
   "components.Layout.NavEditor.show": "{item} दिखाएँ",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "कनेक्ट नहीं है",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "इस Plex खाते को Plex सर्वर का एक्सेस नहीं है।",
   "components.UserProfile.musicrequests": "एल्बम अनुरोध",
-  "i18n.music": "संगीत"
+  "i18n.music": "संगीत",
+  "components.Layout.NavEditor.inMenu": "मेन्यू में",
+  "components.Layout.NavEditor.onBar": "पट्टी में",
+  "components.Music.ArtistCard.artist": "कलाकार",
+  "components.Music.MusicCard.album": "एल्बम",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "रिलीज़",
+  "components.Music.MusicCard.single": "सिंगल",
+  "components.Settings.SettingsJobsCache.musiccache": "संगीत कवर और कलाकारों की तस्वीरें"
 }

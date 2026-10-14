@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Zhvendos {item} poshtë",
   "components.Layout.NavEditor.moveUp": "Zhvendos {item} lart",
   "components.Layout.NavEditor.moved": "{item} u zhvendos në vendin {place} nga {count}.",
-  "components.Layout.NavEditor.phoneTip": "Tërhiqni një element, ose përdorni shigjetat e tij, për ta zhvendosur. Fshihni ato që nuk i përdorni. Të parat shkojnë në shiritin në fund të ekranit.",
+  "components.Layout.NavEditor.phoneTip": "Tërhiqni një element, ose përdorni shigjetat e tij, për ta zhvendosur. Fshihni ato që nuk i përdorni. {count} të parat që shfaqen shkojnë në shiritin në fund të ekranit.",
   "components.Layout.NavEditor.reset": "Rikthe menynë",
   "components.Layout.NavEditor.resetDone": "Menyja u kthye në rendin e zakonshëm, me gjithçka të shfaqur.",
   "components.Layout.NavEditor.show": "Shfaq {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "I palidhur",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Kjo llogari Plex nuk ka qasje në serverin Plex.",
   "components.UserProfile.musicrequests": "Kërkesat për albume",
-  "i18n.music": "Muzika"
+  "i18n.music": "Muzika",
+  "components.Layout.NavEditor.inMenu": "Në meny",
+  "components.Layout.NavEditor.onBar": "Në shirit",
+  "components.Music.ArtistCard.artist": "Artist",
+  "components.Music.MusicCard.album": "Album",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Publikim",
+  "components.Music.MusicCard.single": "Single",
+  "components.Settings.SettingsJobsCache.musiccache": "Kopertina muzikore dhe foto artistësh"
 }

@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "نقل {item} إلى الأسفل",
   "components.Layout.NavEditor.moveUp": "نقل {item} إلى الأعلى",
   "components.Layout.NavEditor.moved": "نُقل {item} إلى الموضع {place} من {count}.",
-  "components.Layout.NavEditor.phoneTip": "اسحب عنصرًا، أو استخدم أسهمه، لنقله. أخفِ ما لا تستخدمه. تظهر العناصر الأولى في الشريط أسفل الشاشة.",
+  "components.Layout.NavEditor.phoneTip": "اسحب عنصرًا، أو استخدم أسهمه، لنقله. أخفِ ما لا تستخدمه. تظهر العناصر الأولى المعروضة (حتى {count}) في الشريط أسفل الشاشة.",
   "components.Layout.NavEditor.reset": "إعادة ضبط القائمة",
   "components.Layout.NavEditor.resetDone": "عادت القائمة إلى ترتيبها المعتاد، مع عرض كل العناصر.",
   "components.Layout.NavEditor.show": "إظهار {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "غير متصل",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "لا يملك حساب Plex هذا صلاحية الوصول إلى خادم Plex.",
   "components.UserProfile.musicrequests": "طلبات الألبومات",
-  "i18n.music": "الموسيقى"
+  "i18n.music": "الموسيقى",
+  "components.Layout.NavEditor.inMenu": "في القائمة",
+  "components.Layout.NavEditor.onBar": "في الشريط",
+  "components.Music.ArtistCard.artist": "فنان",
+  "components.Music.MusicCard.album": "ألبوم",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "إصدار",
+  "components.Music.MusicCard.single": "أغنية منفردة",
+  "components.Settings.SettingsJobsCache.musiccache": "أغلفة الموسيقى وصور الفنانين"
 }

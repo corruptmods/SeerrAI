@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Μετακίνηση του {item} προς τα κάτω",
   "components.Layout.NavEditor.moveUp": "Μετακίνηση του {item} προς τα πάνω",
   "components.Layout.NavEditor.moved": "Το {item} μετακινήθηκε στη θέση {place} από {count}.",
-  "components.Layout.NavEditor.phoneTip": "Σύρετε ένα στοιχείο ή χρησιμοποιήστε τα βέλη του για να το μετακινήσετε. Αποκρύψτε όσα δεν χρησιμοποιείτε. Τα πρώτα μπαίνουν στη γραμμή στο κάτω μέρος της οθόνης.",
+  "components.Layout.NavEditor.phoneTip": "Σύρετε ένα στοιχείο ή χρησιμοποιήστε τα βέλη του για να το μετακινήσετε. Αποκρύψτε όσα δεν χρησιμοποιείτε. Τα πρώτα {count} που εμφανίζονται μπαίνουν στη γραμμή στο κάτω μέρος της οθόνης.",
   "components.Layout.NavEditor.reset": "Επαναφορά μενού",
   "components.Layout.NavEditor.resetDone": "Το μενού επανήλθε στη συνηθισμένη σειρά, με όλα να εμφανίζονται.",
   "components.Layout.NavEditor.show": "Εμφάνιση του {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Δεν έχει συνδεθεί",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Αυτός ο λογαριασμός Plex δεν έχει πρόσβαση στον server Plex.",
   "components.UserProfile.musicrequests": "Αιτήματα άλμπουμ",
-  "i18n.music": "Μουσική"
+  "i18n.music": "Μουσική",
+  "components.Layout.NavEditor.inMenu": "Στο μενού",
+  "components.Layout.NavEditor.onBar": "Στη γραμμή",
+  "components.Music.ArtistCard.artist": "Καλλιτέχνης",
+  "components.Music.MusicCard.album": "Άλμπουμ",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Κυκλοφορία",
+  "components.Music.MusicCard.single": "Single",
+  "components.Settings.SettingsJobsCache.musiccache": "Εξώφυλλα μουσικής και εικόνες καλλιτεχνών"
 }

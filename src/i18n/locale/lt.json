@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Perkelti {item} žemyn",
   "components.Layout.NavEditor.moveUp": "Perkelti {item} aukštyn",
   "components.Layout.NavEditor.moved": "{item} perkeltas į {place} vietą iš {count}.",
-  "components.Layout.NavEditor.phoneTip": "Norėdami perkelti elementą, vilkite jį arba naudokite jo rodykles. Paslėpkite tuos, kurių nenaudojate. Pirmieji atsiduria juostoje ekrano apačioje.",
+  "components.Layout.NavEditor.phoneTip": "Norėdami perkelti elementą, vilkite jį arba naudokite jo rodykles. Paslėpkite tuos, kurių nenaudojate. Pirmieji rodomi elementai (iki {count}) atsiduria juostoje ekrano apačioje.",
   "components.Layout.NavEditor.reset": "Atstatyti meniu",
   "components.Layout.NavEditor.resetDone": "Meniu grąžintas į įprastą tvarką, rodomi visi elementai.",
   "components.Layout.NavEditor.show": "Rodyti {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Neprijungta",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Ši Plex paskyra neturi prieigos prie Plex serverio.",
   "components.UserProfile.musicrequests": "Albumų rezervacijos",
-  "i18n.music": "Muzika"
+  "i18n.music": "Muzika",
+  "components.Layout.NavEditor.inMenu": "Meniu",
+  "components.Layout.NavEditor.onBar": "Juostoje",
+  "components.Music.ArtistCard.artist": "Atlikėjas",
+  "components.Music.MusicCard.album": "Albumas",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Leidimas",
+  "components.Music.MusicCard.single": "Singlas",
+  "components.Settings.SettingsJobsCache.musiccache": "Muzikos viršeliai ir atlikėjų nuotraukos"
 }

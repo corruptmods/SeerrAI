@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "{item} no ënne réckelen",
   "components.Layout.NavEditor.moveUp": "{item} no uewe réckelen",
   "components.Layout.NavEditor.moved": "{item} op d’Plaz {place} vun {count} geréckelt.",
-  "components.Layout.NavEditor.phoneTip": "Zitt en Element oder benotzt seng Feiler, fir et ze réckelen. Verstoppt déi, déi Dir net benotzt. Déi éischt kommen an d’Leescht ënnen um Bildschierm.",
+  "components.Layout.NavEditor.phoneTip": "Zitt en Element oder benotzt seng Feiler, fir et ze réckelen. Verstoppt déi, déi Dir net benotzt. Déi éischt {count} ugewisen kommen an d’Leescht ënnen um Bildschierm.",
   "components.Layout.NavEditor.reset": "Menü zrécksetzen",
   "components.Layout.NavEditor.resetDone": "De Menü ass nees an der gewéinlecher Reiefolleg, mat allem ugewisen.",
   "components.Layout.NavEditor.show": "{item} weisen",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Net verbonnen",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Dëse Plex-Kont huet keen Zougang zum Plex-Server.",
   "components.UserProfile.musicrequests": "Albumufroen",
-  "i18n.music": "Musek"
+  "i18n.music": "Musek",
+  "components.Layout.NavEditor.inMenu": "Am Menü",
+  "components.Layout.NavEditor.onBar": "An der Leescht",
+  "components.Music.ArtistCard.artist": "Artist",
+  "components.Music.MusicCard.album": "Album",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Verëffentlechung",
+  "components.Music.MusicCard.single": "Single",
+  "components.Settings.SettingsJobsCache.musiccache": "Musekscoveren an Artistebiller"
 }

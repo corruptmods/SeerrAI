@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Flytt {item} ned",
   "components.Layout.NavEditor.moveUp": "Flytt {item} opp",
   "components.Layout.NavEditor.moved": "{item} flyttet til plass {place} av {count}.",
-  "components.Layout.NavEditor.phoneTip": "Dra et element, eller bruk pilene, for å flytte det. Skjul dem du ikke bruker. De første havner i linjen nederst på skjermen.",
+  "components.Layout.NavEditor.phoneTip": "Dra et element, eller bruk pilene, for å flytte det. Skjul dem du ikke bruker. De første {count} som vises, havner i linjen nederst på skjermen.",
   "components.Layout.NavEditor.reset": "Tilbakestill menyen",
   "components.Layout.NavEditor.resetDone": "Menyen er tilbake i vanlig rekkefølge, med alt synlig.",
   "components.Layout.NavEditor.show": "Vis {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Ikke tilkoblet",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Denne Plex-kontoen har ikke tilgang til Plex-serveren.",
   "components.UserProfile.musicrequests": "Albumforespørsler",
-  "i18n.music": "Musikk"
+  "i18n.music": "Musikk",
+  "components.Layout.NavEditor.inMenu": "I menyen",
+  "components.Layout.NavEditor.onBar": "I linjen",
+  "components.Music.ArtistCard.artist": "Artist",
+  "components.Music.MusicCard.album": "Album",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Utgivelse",
+  "components.Music.MusicCard.single": "Singel",
+  "components.Settings.SettingsJobsCache.musiccache": "Musikkomslag og artistbilder"
 }

@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "{item} 아래로 이동",
   "components.Layout.NavEditor.moveUp": "{item} 위로 이동",
   "components.Layout.NavEditor.moved": "{item}을(를) {count}개 중 {place}번째로 옮겼습니다.",
-  "components.Layout.NavEditor.phoneTip": "항목을 끌거나 화살표를 눌러 옮기세요. 사용하지 않는 항목은 숨기세요. 앞쪽 항목은 화면 아래쪽 바에 표시됩니다.",
+  "components.Layout.NavEditor.phoneTip": "항목을 끌거나 화살표를 눌러 옮기세요. 사용하지 않는 항목은 숨기세요. 표시된 항목 중 앞쪽 {count}개는 화면 아래쪽 바에 표시됩니다.",
   "components.Layout.NavEditor.reset": "메뉴 초기화",
   "components.Layout.NavEditor.resetDone": "메뉴를 기본 순서로 되돌리고 모든 항목을 표시했습니다.",
   "components.Layout.NavEditor.show": "{item} 표시",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "연결되지 않음",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "이 Plex 계정은 Plex 서버에 접근할 수 없습니다.",
   "components.UserProfile.musicrequests": "앨범 요청",
-  "i18n.music": "음악"
+  "i18n.music": "음악",
+  "components.Layout.NavEditor.inMenu": "메뉴에 표시",
+  "components.Layout.NavEditor.onBar": "바에 표시",
+  "components.Music.ArtistCard.artist": "아티스트",
+  "components.Music.MusicCard.album": "앨범",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "발매",
+  "components.Music.MusicCard.single": "싱글",
+  "components.Settings.SettingsJobsCache.musiccache": "음악 커버 및 아티스트 사진"
 }

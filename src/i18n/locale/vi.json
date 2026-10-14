@@ -3396,7 +3396,7 @@
   "components.Layout.NavEditor.moveDown": "Chuyển {item} xuống",
   "components.Layout.NavEditor.moveUp": "Chuyển {item} lên",
   "components.Layout.NavEditor.moved": "Đã chuyển {item} đến vị trí {place} trên {count}.",
-  "components.Layout.NavEditor.phoneTip": "Kéo một mục, hoặc dùng các mũi tên của nó, để di chuyển. Ẩn những mục bạn không dùng. Các mục đầu tiên sẽ nằm trên thanh ở cuối màn hình.",
+  "components.Layout.NavEditor.phoneTip": "Kéo một mục, hoặc dùng các mũi tên của nó, để di chuyển. Ẩn những mục bạn không dùng. {count} mục đầu tiên đang hiển thị sẽ nằm trên thanh ở cuối màn hình.",
   "components.Layout.NavEditor.reset": "Đặt lại menu",
   "components.Layout.NavEditor.resetDone": "Menu đã về thứ tự mặc định, mọi mục đều được hiển thị.",
   "components.Layout.NavEditor.show": "Hiện {item}",
@@ -3747,5 +3747,13 @@
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.notConnected": "Chưa kết nối",
   "components.UserProfile.UserSettings.UserLinkedAccountsSettings.plexErrorNoAccess": "Tài khoản Plex này không có quyền truy cập máy chủ Plex.",
   "components.UserProfile.musicrequests": "Yêu cầu album",
-  "i18n.music": "Nhạc"
+  "i18n.music": "Nhạc",
+  "components.Layout.NavEditor.inMenu": "Trong menu",
+  "components.Layout.NavEditor.onBar": "Trên thanh",
+  "components.Music.ArtistCard.artist": "Nghệ sĩ",
+  "components.Music.MusicCard.album": "Album",
+  "components.Music.MusicCard.ep": "EP",
+  "components.Music.MusicCard.release": "Bản phát hành",
+  "components.Music.MusicCard.single": "Đĩa đơn",
+  "components.Settings.SettingsJobsCache.musiccache": "Ảnh bìa nhạc và ảnh nghệ sĩ"
 }

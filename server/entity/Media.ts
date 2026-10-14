@@ -1,3 +1,4 @@
+import LidarrAPI from '@server/api/servarr/lidarr';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
 import {
@@ -15,9 +16,8 @@ import downloadTracker from '@server/lib/downloadtracker';
 import {
   MEDIA_ID,
   connectedServers,
-  externalHostFor,
-  jellyfinFamily,
   primaryServer,
+  serverItemLinks,
   serverName,
 } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
@@ -331,37 +331,15 @@ class Media {
     const id = this[idColumn];
     const id4k = this[idColumn4k];
     const link: PlayLink = { server: kind, name: serverName(kind) };
-
-    if (kind === 'plex') {
-      const { machineId, webAppUrl } = getSettings().plex;
-      const web = (key: string) =>
-        `${
-          webAppUrl ? webAppUrl : 'https://app.plex.tv/desktop'
-        }#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${key}`;
-      const ios = (key: string) =>
-        `plex://preplay/?metadataKey=%2Flibrary%2Fmetadata%2F${key}&server=${machineId}`;
-      if (id) {
-        link.url = web(id);
-        link.iosUrl = ios(id);
-      }
-      if (id4k) {
-        link.url4k = web(id4k);
-        link.iosUrl4k = ios(id4k);
-      }
-      return link;
-    }
-
-    // Jellyfin and Emby name their item page differently.
-    const pageName = kind === 'emby' ? 'item' : 'details';
-    const { serverId } = jellyfinFamily(kind);
-    const host = externalHostFor(kind);
-    const web = (itemId: string) =>
-      `${host}/web/index.html#!/${pageName}?id=${itemId}&context=home&serverId=${serverId}`;
     if (id) {
-      link.url = web(id);
+      const { url, iosUrl } = serverItemLinks(kind, id);
+      link.url = url;
+      if (iosUrl) link.iosUrl = iosUrl;
     }
     if (id4k) {
-      link.url4k = web(id4k);
+      const { url, iosUrl } = serverItemLinks(kind, id4k);
+      link.url4k = url;
+      if (iosUrl) link.iosUrl4k = iosUrl;
     }
     return link;
   }
@@ -409,6 +387,21 @@ class Media {
 
   @AfterLoad()
   public setServiceUrl(): void {
+    // An artist: their page in Lidarr, by their MusicBrainz id.
+    if (this.mediaType === MediaType.MUSIC) {
+      if (this.serviceId !== null && this.externalServiceSlug) {
+        const server = getSettings().lidarr.find(
+          (lidarr) => lidarr.id === this.serviceId
+        );
+        if (server) {
+          this.serviceUrl = server.externalUrl
+            ? `${server.externalUrl}/artist/${this.externalServiceSlug}`
+            : LidarrAPI.buildUrl(server, `/artist/${this.externalServiceSlug}`);
+        }
+      }
+      return;
+    }
+
     if (this.mediaType === MediaType.MOVIE) {
       if (this.serviceId !== null && this.externalServiceSlug !== null) {
         const settings = getSettings();

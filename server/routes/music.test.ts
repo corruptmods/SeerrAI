@@ -11,6 +11,7 @@ import {
   defaultSliders,
 } from '@server/constants/discover';
 import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
+import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
 import MusicMetadata from '@server/entity/MusicMetadata';
@@ -530,6 +531,65 @@ describe('an album', () => {
     assert.equal(details.artistId, IDS.artist);
     assert.deepEqual(details.genres, ['art rock']);
     assert.equal(details.mediaInfo.requests.length, 5);
+  });
+
+  it('says where to play it, and where its artist is in Lidarr', async () => {
+    await seedMusicFixtures();
+    const settings = getSettings();
+    const saved = {
+      type: settings.main.mediaServerType,
+      plex: { ...settings.plex },
+      emby: { ...settings.emby },
+      lidarr: settings.lidarr,
+    };
+    settings.main.mediaServerType = MediaServerType.PLEX;
+    Object.assign(settings.plex, {
+      connected: true,
+      machineId: 'plex-machine',
+      webAppUrl: '',
+    });
+    Object.assign(settings.emby, {
+      connected: true,
+      serverId: 'emby-server',
+      externalHostname: 'https://emby.example.com',
+    });
+    settings.lidarr = [
+      { ...lidarrServer(), externalUrl: 'https://lidarr.example.com' },
+    ];
+    try {
+      mock.method(MusicBrainz.prototype, 'getReleaseGroup', async () =>
+        album(IDS.album, 'Hail to the Thief', '2003-06-09')
+      );
+      const { status, body } = await get(`/music/album/${IDS.album}`);
+      assert.equal(status, 200);
+      const details = body as {
+        playLinks: { server: string; url: string; iosUrl?: string }[];
+        mediaInfo: { serviceUrl?: string };
+      };
+      assert.deepEqual(details.playLinks, [
+        {
+          server: 'plex',
+          name: 'Plex',
+          url: 'https://app.plex.tv/desktop#!/server/plex-machine/details?key=%2Flibrary%2Fmetadata%2F9002',
+          iosUrl:
+            'plex://preplay/?metadataKey=%2Flibrary%2Fmetadata%2F9002&server=plex-machine',
+        },
+        {
+          server: 'emby',
+          name: 'Emby',
+          url: 'https://emby.example.com/web/index.html#!/item?id=emby-album&context=home&serverId=emby-server',
+        },
+      ]);
+      assert.equal(
+        details.mediaInfo.serviceUrl,
+        `https://lidarr.example.com/artist/${IDS.artist}`
+      );
+    } finally {
+      settings.main.mediaServerType = saved.type;
+      Object.assign(settings.plex, saved.plex);
+      Object.assign(settings.emby, saved.emby);
+      settings.lidarr = saved.lidarr;
+    }
   });
 
   it('lists its tracks, disc by disc', async () => {

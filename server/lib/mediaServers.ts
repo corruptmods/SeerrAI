@@ -17,6 +17,8 @@ import {
 } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
+import type { PlayLink } from '@server/entity/Media';
+import type MusicAlbum from '@server/entity/MusicAlbum';
 import { User } from '@server/entity/User';
 import type { JellyfinSettings } from '@server/lib/settings';
 import { connectedKindsOf, getSettings } from '@server/lib/settings';
@@ -108,6 +110,54 @@ export const hostnameFor = (kind: MediaServerKind): string =>
  */
 export const externalHostFor = (kind: JellyfinFamilyKind): string =>
   jellyfinFamily(kind).externalHostname || hostnameFor(kind);
+
+/**
+ * Where people open one item on a server: its page in the server's web
+ * app, and for Plex the iPhone and iPad app too.
+ */
+export const serverItemLinks = (
+  kind: MediaServerKind,
+  itemId: string
+): { url: string; iosUrl?: string } => {
+  if (kind === 'plex') {
+    const { machineId, webAppUrl } = getSettings().plex;
+    return {
+      url: `${
+        webAppUrl ? webAppUrl : 'https://app.plex.tv/desktop'
+      }#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${itemId}`,
+      iosUrl: `plex://preplay/?metadataKey=%2Flibrary%2Fmetadata%2F${itemId}&server=${machineId}`,
+    };
+  }
+  // Jellyfin and Emby name their item page differently.
+  const pageName = kind === 'emby' ? 'item' : 'details';
+  const { serverId } = jellyfinFamily(kind);
+  return {
+    url: `${externalHostFor(kind)}/web/index.html#!/${pageName}?id=${itemId}&context=home&serverId=${serverId}`,
+  };
+};
+
+/**
+ * Where to play an album: one link for each connected server that has it,
+ * the primary server first. An album is kept once per artist it is under;
+ * every row's ids count.
+ */
+export const albumPlayLinks = (
+  albums: Pick<MusicAlbum, 'ratingKey' | 'jellyfinItemId' | 'embyItemId'>[]
+): PlayLink[] =>
+  connectedServers().flatMap((kind) => {
+    const column = MUSIC_ALBUM_ID[kind];
+    const itemId = albums.find((album) => album[column])?.[column];
+    if (!itemId) return [];
+    const { url, iosUrl } = serverItemLinks(kind, itemId);
+    return [
+      {
+        server: kind,
+        name: serverName(kind),
+        url,
+        ...(iosUrl ? { iosUrl } : {}),
+      },
+    ];
+  });
 
 /**
  * People may sign in with their account on this server: it is connected

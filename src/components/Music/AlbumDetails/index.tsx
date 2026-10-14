@@ -20,6 +20,7 @@ import {
   ArrowDownTrayIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  PlayIcon,
 } from '@heroicons/react/24/outline';
 import { VARIOUS_ARTISTS_MBID } from '@server/constants/media';
 import type { MusicAlbumDetails, MusicTrack } from '@server/models/Music';
@@ -41,6 +42,7 @@ const messages = defineMessages('components.Music.AlbumDetails', {
   requestAlbum: 'Request Album',
   variousArtists:
     'Lidarr cannot add Various Artists, so this compilation cannot be requested.',
+  playOn: 'Play on {server}',
 });
 
 /** The album's tracks, disc by disc; folded away on a phone at first. */
@@ -214,14 +216,31 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
             )}
           </span>
         </div>
-        {canRequest && (
-          <div className="media-actions">
+        <div className="media-actions">
+          {(data.playLinks ?? [])
+            .filter((link) => link.url)
+            .map((link) => (
+              <Button
+                key={link.server}
+                as="a"
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                buttonType="ghost"
+              >
+                <PlayIcon />
+                <span>
+                  {intl.formatMessage(messages.playOn, { server: link.name })}
+                </span>
+              </Button>
+            ))}
+          {canRequest && (
             <Button buttonType="primary" onClick={() => setRequesting(true)}>
               <ArrowDownTrayIcon />
               <span>{intl.formatMessage(messages.requestAlbum)}</span>
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
       {variousArtists && (
         <p className="mt-4 text-sm text-gray-400">

@@ -11,9 +11,10 @@ import {
   serverName,
 } from '@server/lib/mediaServers';
 import { jellyfinScanners } from '@server/lib/scanners/jellyfin';
-import type { Library } from '@server/lib/settings';
+import type { Library, MusicLibrary } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import { requireMusicSettings } from '@server/middleware/music';
 import { ApiError } from '@server/types/error';
 import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 import { Router } from 'express';
@@ -128,11 +129,12 @@ const jellyfinSettingsRoutes = (kind: JellyfinFamilyKind): Router => {
     const client = await jellyfinClient(kind, { asAdmin: true });
 
     let libraries: JellyfinLibrary[];
+    let musicLibraries: JellyfinLibrary[];
 
     try {
-      libraries = await client.getLibraries();
+      ({ libraries, musicLibraries } = await client.getAllLibraries());
 
-      if (libraries.length === 0) {
+      if (libraries.length === 0 && musicLibraries.length === 0) {
         // Check if no libraries are found due to the fallback to user views
         // This only affects LDAP users
         const account = await client.getUser();
@@ -166,16 +168,59 @@ const jellyfinSettingsRoutes = (kind: JellyfinFamilyKind): Router => {
         id: library.key,
         name: library.title,
         enabled: existing?.enabled ?? false,
-        type: library.type,
+        type: library.type as Library['type'],
         lastScan: existing?.lastScan,
       };
     });
 
     settings[kind].libraries = newLibraries;
+    // Music libraries are kept apart, so film and series scans never walk
+    // them; they are switched on under Music Libraries.
+    settings[kind].musicLibraries = musicLibraries.map(
+      (library): MusicLibrary => {
+        const existing = (settings[kind].musicLibraries ?? []).find(
+          (l) => l.id === library.key
+        );
+        return {
+          id: library.key,
+          name: library.title,
+          enabled: existing?.enabled ?? false,
+          type: 'music',
+          lastScan: existing?.lastScan,
+        };
+      }
+    );
     await settings.save();
 
     return res.status(200).json(settings[kind].libraries);
   });
+
+  // The music libraries, listed by the sync above. Only while music is on
+  // for everyone.
+  routes.get('/music-library', requireMusicSettings, (_req, res) => {
+    return res.status(200).json(jellyfinFamily(kind).musicLibraries ?? []);
+  });
+
+  routes.put(
+    '/music-library/:libraryId',
+    requireMusicSettings,
+    async (req, res, next) => {
+      const settings = getSettings();
+      const bodyResult = libraryUpdateSchema.safeParse(req.body);
+      if (!bodyResult.success) {
+        return next({ status: 400, message: 'Invalid request body.' });
+      }
+      const library = (settings[kind].musicLibraries ?? []).find(
+        (l) => l.id === req.params.libraryId
+      );
+      if (!library) {
+        return next({ status: 404, message: 'Library does not exist.' });
+      }
+      library.enabled = bodyResult.data.enabled;
+      await settings.save();
+      return res.status(200).json(library);
+    }
+  );
 
   routes.get('/users', async (_req, res) => {
     const client = await jellyfinClient(kind, { asAdmin: true });

@@ -7,6 +7,7 @@ import {
 import blocklistedTagsProcessor from '@server/job/blocklistedTagsProcessor';
 import {
   refreshMediaServerJobs,
+  refreshMusicJobs,
   runJob,
   scheduledJobs,
   startJobs,
@@ -30,9 +31,11 @@ import {
   jellyfinFullScanner,
   jellyfinRecentScanner,
 } from '@server/lib/scanners/jellyfin';
+import { musicFullScan, musicSync } from '@server/lib/scanners/music';
 import { plexFullScanner, plexRecentScanner } from '@server/lib/scanners/plex';
 import { radarrScanner } from '@server/lib/scanners/radarr';
 import { sonarrScanner } from '@server/lib/scanners/sonarr';
+import type { LidarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import watchlistSync from '@server/lib/watchlistsync';
 import logger from '@server/logger';
@@ -63,6 +66,8 @@ const stubEveryJob = () => {
     [jellyfinFullScanner, 'run'],
     [embyRecentScanner, 'run'],
     [embyFullScanner, 'run'],
+    [musicSync, 'run'],
+    [musicFullScan, 'run'],
     [refreshToken, 'run'],
     [watchlistSync, 'syncWatchlist'],
     [radarrScanner, 'run'],
@@ -303,5 +308,108 @@ describe('scheduled jobs', () => {
 
     // Jellyfin's was already running; Plex failing does not stop Emby's.
     assert.deepEqual(ran.sort(), ['emby', 'plex']);
+  });
+
+  describe('music', () => {
+    const setUpMusic = (t: { after: (fn: () => void) => void }) => {
+      const settings = getSettings();
+      settings.lidarr = [{ id: 0, isDefault: true } as LidarrSettings];
+      t.after(() => {
+        settings.lidarr = [];
+        settings.main.disabledFeatures = [];
+      });
+    };
+
+    it('registers the music jobs only once music is set up', (t) => {
+      connect('plex');
+      stubEveryJob();
+      startJobs();
+      assert.ok(!ids().some((id) => id.startsWith('music-')));
+
+      setUpMusic(t);
+      refreshMusicJobs();
+      assert.equal(
+        scheduledJobs.find((job) => job.id === 'music-sync')?.name,
+        'Music Sync'
+      );
+      assert.equal(
+        scheduledJobs.find((job) => job.id === 'music-full-scan')?.cronSchedule,
+        getSettings().jobs['music-full-scan'].schedule
+      );
+      assert.equal(new Set(ids()).size, scheduledJobs.length);
+
+      // Registered again (a Lidarr edited), still once each.
+      refreshMusicJobs();
+      assert.equal(ids().filter((id) => id === 'music-sync').length, 1);
+      // A server connected or removed leaves them be.
+      connect('plex', 'jellyfin');
+      refreshMediaServerJobs();
+      assert.ok(ids().includes('music-full-scan'));
+    });
+
+    it('drops the music jobs, and stops a scan, when music is turned off', (t) => {
+      connect('plex');
+      stubEveryJob();
+      setUpMusic(t);
+      startJobs();
+      const job = scheduledJobs.find((j) => j.id === 'music-sync');
+      assert.ok(job);
+      const cancelled = mock.method(musicSync, 'cancel', () => {});
+
+      getSettings().main.disabledFeatures = ['music'];
+      refreshMusicJobs();
+
+      assert.ok(!ids().some((id) => id.startsWith('music-')));
+      assert.equal(job.job.nextInvocation(), null);
+      assert.equal(cancelled.mock.callCount(), 1);
+    });
+
+    it('logs a failed music job and keeps the server up', async (t) => {
+      connect('plex');
+      stubEveryJob();
+      setUpMusic(t);
+      const errors = mock.method(logger, 'error');
+      startJobs();
+
+      for (const job of scheduledJobs.filter((j) => j.music)) {
+        job.job.invoke();
+      }
+      await settle();
+      await settle();
+
+      assert.deepEqual(unhandled, []);
+      for (const name of ['Music Sync', 'Music Full Scan']) {
+        assert.ok(
+          errors.mock.calls.some((c) => String(c.arguments[0]).includes(name))
+        );
+      }
+    });
+
+    it('runs Music Sync with the scans once downloads are imported', async (t) => {
+      connect('plex');
+      stubEveryJob();
+      setUpMusic(t);
+      let onImport: () => unknown = () => undefined;
+      mock.method(downloadTracker, 'whenImported', (run: () => unknown) => {
+        onImport = run;
+      });
+      const ran: string[] = [];
+      mock.method(plexRecentScanner, 'run', async () => {
+        ran.push('plex');
+      });
+      mock.method(musicSync, 'run', async () => {
+        ran.push('music');
+      });
+
+      startJobs();
+      await onImport();
+      assert.deepEqual(ran.sort(), ['music', 'plex']);
+
+      // Not while music is off.
+      ran.length = 0;
+      getSettings().main.disabledFeatures = ['music'];
+      await onImport();
+      assert.deepEqual(ran, ['plex']);
+    });
   });
 });

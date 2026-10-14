@@ -728,6 +728,26 @@ components:
         - id
         - name
         - enabled
+    MusicLibrary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          example: Music
+        enabled:
+          type: boolean
+          example: false
+        type:
+          type: string
+          enum: [artist, music]
+        lastScan:
+          type: number
+      required:
+        - id
+        - name
+        - enabled
     PlexSettings:
       type: object
       properties:
@@ -753,6 +773,12 @@ components:
           readOnly: true
           items:
             $ref: '#/components/schemas/PlexLibrary'
+        musicLibraries:
+          type: array
+          readOnly: true
+          description: Music libraries, kept apart from the others.
+          items:
+            $ref: '#/components/schemas/MusicLibrary'
         webAppUrl:
           type: string
           nullable: true
@@ -932,6 +958,12 @@ components:
           readOnly: true
           items:
             $ref: '#/components/schemas/JellyfinLibrary'
+        musicLibraries:
+          type: array
+          readOnly: true
+          description: Music libraries, kept apart from the others.
+          items:
+            $ref: '#/components/schemas/MusicLibrary'
         serverID:
           type: string
           readOnly: true
@@ -3632,10 +3664,64 @@ paths:
           description: 'Invalid request body'
         '404':
           description: 'Library does not exist'
+  /settings/jellyfin/music-library:
+    get:
+      summary: Get Jellyfin music libraries
+      description: Returns the Jellyfin music libraries the last library sync found, in a JSON array. Only while music is on for everyone.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: 'Jellyfin music libraries returned'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MusicLibrary'
+        '403':
+          description: Music is turned off
+  /settings/jellyfin/music-library/{libraryId}:
+    put:
+      summary: Switch a Jellyfin music library on or off
+      description: Whether Seerr reads this music library to find music that is here.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: libraryId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enabled
+              properties:
+                enabled:
+                  type: boolean
+                  example: true
+      responses:
+        '200':
+          description: 'Jellyfin music library returned'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicLibrary'
+        '400':
+          description: 'Invalid request body'
+        '403':
+          description: Music is turned off
+        '404':
+          description: 'Library does not exist'
   /settings/jellyfin/library/sync:
     post:
       summary: Sync Jellyfin libraries
-      description: Syncs the current libraries with the current Jellyfin server. Enabled flags are preserved.
+      description: Syncs the current libraries with the current Jellyfin server, music libraries (listed apart) included. Enabled flags are preserved.
       tags:
         - settings
       responses:
@@ -3826,10 +3912,64 @@ paths:
           description: 'Invalid request body'
         '404':
           description: 'Library does not exist'
+  /settings/emby/music-library:
+    get:
+      summary: Get Emby music libraries
+      description: Returns the Emby music libraries the last library sync found, in a JSON array. Only while music is on for everyone.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: 'Emby music libraries returned'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MusicLibrary'
+        '403':
+          description: Music is turned off
+  /settings/emby/music-library/{libraryId}:
+    put:
+      summary: Switch a Emby music library on or off
+      description: Whether Seerr reads this music library to find music that is here.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: libraryId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enabled
+              properties:
+                enabled:
+                  type: boolean
+                  example: true
+      responses:
+        '200':
+          description: 'Emby music library returned'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicLibrary'
+        '400':
+          description: 'Invalid request body'
+        '403':
+          description: Music is turned off
+        '404':
+          description: 'Library does not exist'
   /settings/emby/library/sync:
     post:
       summary: Sync Emby libraries
-      description: Syncs the current libraries with the current Emby server. Enabled flags are preserved.
+      description: Syncs the current libraries with the current Emby server, music libraries (listed apart) included. Enabled flags are preserved.
       tags:
         - settings
       responses:
@@ -4020,10 +4160,64 @@ paths:
           description: 'Invalid request body'
         '404':
           description: 'Library does not exist'
+  /settings/plex/music-library:
+    get:
+      summary: Get Plex music libraries
+      description: Returns the Plex music libraries the last library sync found, in a JSON array. Only while music is on for everyone.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: 'Plex music libraries returned'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MusicLibrary'
+        '403':
+          description: Music is turned off
+  /settings/plex/music-library/{libraryId}:
+    put:
+      summary: Switch a Plex music library on or off
+      description: Whether Seerr reads this music library to find music that is here.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: libraryId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enabled
+              properties:
+                enabled:
+                  type: boolean
+                  example: true
+      responses:
+        '200':
+          description: 'Plex music library returned'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicLibrary'
+        '400':
+          description: 'Invalid request body'
+        '403':
+          description: Music is turned off
+        '404':
+          description: 'Library does not exist'
   /settings/plex/library/sync:
     post:
       summary: Sync Plex libraries
-      description: Syncs the current libraries with the current Plex server. Enabled flags are preserved.
+      description: Syncs the current libraries with the current Plex server, music libraries (listed apart) included. Enabled flags are preserved.
       tags:
         - settings
       responses:
@@ -10873,7 +11067,7 @@ paths:
   /music/album/{mbid}:
     get:
       summary: An album
-      description: The album (a MusicBrainz release group), its status here, and its artist's record here (mediaInfo).
+      description: The album (a MusicBrainz release group), its status here, its artist's record here (mediaInfo), and where to play it (playLinks, one entry per connected media server that has it).
       tags:
         - music
       parameters:

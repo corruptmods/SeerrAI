@@ -19,7 +19,11 @@ import useFeature from '@app/hooks/useFeature';
 import { Permission, useUser } from '@app/hooks/useUser';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
-import { ArrowDownTrayIcon, PlayIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowDownTrayIcon,
+  ArrowTopRightOnSquareIcon,
+  PlayIcon,
+} from '@heroicons/react/24/outline';
 import { VARIOUS_ARTISTS_MBID } from '@server/constants/media';
 import type {
   MusicAlbumResult,
@@ -55,6 +59,7 @@ const messages = defineMessages('components.Music.ArtistDetails', {
   request: 'Request',
   variousArtists:
     'Lidarr cannot add Various Artists, so their compilations cannot be requested.',
+  openInLidarr: 'Open in Lidarr',
 });
 
 const hostOf = (url: string): string => {
@@ -346,6 +351,18 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
                 </span>
               </Button>
             ))}
+          {data.mediaInfo?.serviceUrl && hasPermission(Permission.ADMIN) && (
+            <Button
+              as="a"
+              href={data.mediaInfo.serviceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              buttonType="ghost"
+            >
+              <ArrowTopRightOnSquareIcon />
+              <span>{intl.formatMessage(messages.openInLidarr)}</span>
+            </Button>
+          )}
         </div>
       </div>
       <div className="media-overview">

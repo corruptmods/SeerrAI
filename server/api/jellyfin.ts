@@ -75,7 +75,8 @@ interface JellyfinMediaFolder {
 }
 
 export interface JellyfinLibrary {
-  type: 'show' | 'movie';
+  /** 'music' only from getAllLibraries, apart from the others. */
+  type: 'show' | 'movie' | 'music';
   key: string;
   title: string;
   agent: string;
@@ -135,6 +136,24 @@ export interface JellyfinLibraryItemExtended extends JellyfinLibraryItem {
 type EpisodeReturn<T> = T extends { includeMediaInfo: true }
   ? JellyfinLibraryItemExtended[]
   : JellyfinLibraryItem[];
+
+/**
+ * An album or artist in a music library. Its MusicBrainz ids come from the
+ * files' tags: MusicBrainzReleaseGroup is the album's, MusicBrainzAlbum one
+ * release's, MusicBrainzAlbumArtist and MusicBrainzArtist the artist's.
+ */
+export interface JellyfinMusicItem {
+  Id: string;
+  Name: string;
+  Type: 'MusicAlbum' | 'MusicArtist';
+  ProviderIds?: Record<string, string | undefined>;
+  /** The album's or artist's folder. */
+  Path?: string;
+  DateCreated?: string;
+  ProductionYear?: number;
+  AlbumArtist?: string;
+  AlbumArtists?: { Name: string; Id: string }[];
+}
 
 export interface JellyfinItemsReponse {
   Items: JellyfinLibraryItemExtended[];
@@ -433,11 +452,12 @@ class JellyfinAPI extends ExternalAPI {
     }
   }
 
-  public async getLibraries(): Promise<JellyfinLibrary[]> {
+  /** The server's libraries, as folders with their kind. */
+  private async getMediaFolders(): Promise<JellyfinMediaFolder[]> {
     try {
       const mediaFolderResponse = await this.get<any>(`/Library/MediaFolders`);
 
-      return this.mapLibraries(mediaFolderResponse.Items);
+      return mediaFolderResponse.Items;
     } catch {
       // fallback to user views to get libraries
       // this only and maybe/depending on factors affects LDAP users
@@ -446,7 +466,7 @@ class JellyfinAPI extends ExternalAPI {
           `/Users/${this.userId ?? 'Me'}/Views`
         );
 
-        return this.mapLibraries(mediaFolderResponse.Items);
+        return mediaFolderResponse.Items;
       } catch (e) {
         logger.error(
           `Something went wrong while getting libraries from the Jellyfin server: ${e.message}`,
@@ -463,6 +483,36 @@ class JellyfinAPI extends ExternalAPI {
         return [];
       }
     }
+  }
+
+  public async getLibraries(): Promise<JellyfinLibrary[]> {
+    return this.mapLibraries(await this.getMediaFolders());
+  }
+
+  /**
+   * The film and series libraries, and apart from them the music ones,
+   * from one look at the server.
+   */
+  public async getAllLibraries(): Promise<{
+    libraries: JellyfinLibrary[];
+    musicLibraries: JellyfinLibrary[];
+  }> {
+    const folders = await this.getMediaFolders();
+    return {
+      libraries: this.mapLibraries(folders),
+      musicLibraries: folders
+        .filter(
+          (folder) =>
+            folder.Type === 'CollectionFolder' &&
+            folder.CollectionType === 'music'
+        )
+        .map((folder) => ({
+          key: folder.Id,
+          title: folder.Name,
+          type: 'music',
+          agent: 'jellyfin',
+        })),
+    };
   }
 
   private mapLibraries(mediaFolders: JellyfinMediaFolder[]): JellyfinLibrary[] {
@@ -663,6 +713,39 @@ class JellyfinAPI extends ExternalAPI {
         IncludeItemTypes: type,
         Fields: 'Path,ProviderIds,ProductionYear',
         SortBy: 'SortName',
+        StartIndex: start,
+        Limit: limit,
+      },
+    });
+    return {
+      Items: response?.Items ?? [],
+      TotalRecordCount: response?.TotalRecordCount ?? 0,
+    };
+  }
+
+  /**
+   * One page of a music library's albums and artists, with their folders
+   * and MusicBrainz ids. Newest first when asked, for what was just added.
+   */
+  public async getMusicItems(
+    libraryId: string,
+    {
+      start,
+      limit,
+      newestFirst = false,
+    }: { start: number; limit: number; newestFirst?: boolean }
+  ): Promise<{ Items: JellyfinMusicItem[]; TotalRecordCount: number }> {
+    const response = await this.get<{
+      Items?: JellyfinMusicItem[];
+      TotalRecordCount?: number;
+    }>('/Items', {
+      params: {
+        ParentId: libraryId,
+        Recursive: true,
+        IncludeItemTypes: 'MusicAlbum,MusicArtist',
+        Fields: 'ProviderIds,Path,DateCreated,ChildCount',
+        SortBy: newestFirst ? 'DateCreated,SortName' : 'SortName',
+        SortOrder: newestFirst ? 'Descending' : 'Ascending',
         StartIndex: start,
         Limit: limit,
       },

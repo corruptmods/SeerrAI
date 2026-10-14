@@ -4,6 +4,9 @@ import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import LibraryItem from '@app/components/Settings/LibraryItem';
+import MusicLibraries, {
+  musicLibrariesKey,
+} from '@app/components/Settings/MusicLibraries';
 import SettingsBadge from '@app/components/Settings/SettingsBadge';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
@@ -22,7 +25,7 @@ import orderBy from 'lodash/orderBy';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 import * as Yup from 'yup';
 
 const messages = defineMessages('components.Settings', {
@@ -186,6 +189,7 @@ const SettingsPlex = ({ isSetupSettings }: SettingsPlexProps) => {
     } finally {
       setIsSyncing(false);
       revalidate();
+      mutate(musicLibrariesKey('/api/v1/settings/plex'));
     }
   };
 
@@ -603,6 +607,7 @@ const SettingsPlex = ({ isSetupSettings }: SettingsPlexProps) => {
           ))}
         </ul>
       </div>
+      {!isSetupSettings && <MusicLibraries endpoint="/api/v1/settings/plex" />}
       <div className="mb-6 mt-10">
         <h3 className="heading">{intl.formatMessage(messages.manualscan)}</h3>
         <p className="description">

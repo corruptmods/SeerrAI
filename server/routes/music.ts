@@ -2,6 +2,7 @@ import { MusicBrainzBusyError, musicBrainz } from '@server/api/musicbrainz';
 import mediaForViewer from '@server/lib/mediaForViewer';
 import { artistImages, musicImageUrl } from '@server/lib/music/artistImage';
 import {
+  albumLinks,
   albumStatuses,
   artistMedia,
   artistStatuses,
@@ -160,14 +161,16 @@ musicRoutes.get<{ mbid: string }>('/album/:mbid', async (req, res, next) => {
   try {
     const group = await musicBrainz().getReleaseGroup(req.params.mbid);
     const artistId = group['artist-credit']?.[0]?.artist.id;
-    const [statuses, media] = await Promise.all([
+    const [statuses, media, playLinks] = await Promise.all([
       albumStatuses([group.id]),
       artistId ? artistMedia(artistId) : undefined,
+      albumLinks(group.id),
     ]);
     return res.status(200).json(
       mapAlbumDetails(group, {
         status: statuses.get(group.id),
         mediaInfo: mediaForViewer(media, req.user),
+        playLinks,
       })
     );
   } catch (e) {

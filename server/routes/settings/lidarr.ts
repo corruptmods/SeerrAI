@@ -1,4 +1,5 @@
 import LidarrAPI from '@server/api/servarr/lidarr';
+import { refreshMusicJobs } from '@server/job/schedule';
 import type { LidarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -48,6 +49,8 @@ lidarrRoutes.post('/', async (req, res) => {
   }
   settings.lidarr = [...settings.lidarr, newLidarr];
   await settings.save();
+  // The music jobs run once there is a default Lidarr.
+  refreshMusicJobs();
   return res.status(201).json(newLidarr);
 });
 
@@ -110,6 +113,7 @@ lidarrRoutes.put<{ id: string }, LidarrSettings, LidarrSettings>(
     }
     settings.lidarr[index] = asSaved(req.body, id);
     await settings.save();
+    refreshMusicJobs();
     return res.status(200).json(settings.lidarr[index]);
   }
 );
@@ -124,6 +128,7 @@ lidarrRoutes.delete<{ id: string }>('/:id', async (req, res, next) => {
   }
   const [removed] = settings.lidarr.splice(index, 1);
   await settings.save();
+  refreshMusicJobs();
   return res.status(200).json(removed);
 });
 

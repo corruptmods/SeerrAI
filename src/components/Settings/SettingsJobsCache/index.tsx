@@ -109,6 +109,8 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     'backfill-monitor': 'Backfill Downloads',
     'health-watch': 'Health Alerts',
     'plex-match-check': 'Match Check',
+    'music-sync': 'Music Sync',
+    'music-full-scan': 'Music Full Scan',
     'database-maintenance': 'Database Maintenance',
     editJobSchedule: 'Modify Job',
     jobScheduleEditSaved: 'Job edited successfully!',

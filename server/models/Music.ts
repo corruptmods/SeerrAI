@@ -17,6 +17,7 @@ import type {
 } from '@server/api/musicbrainz/interfaces';
 import type { MediaStatus } from '@server/constants/media';
 import type Media from '@server/entity/Media';
+import type { PlayLink } from '@server/entity/Media';
 
 /*
  * Artists and albums as the pages show them, shaped from MusicBrainz and
@@ -85,6 +86,8 @@ export interface MusicAlbumDetails extends MusicAlbumResult {
   artists: { id: string; name: string; joinphrase?: string }[];
   /** The artist's own record here. */
   mediaInfo?: Media;
+  /** Where to play the album: each connected server that has it. */
+  playLinks: PlayLink[];
 }
 
 export interface MusicTrack {
@@ -197,7 +200,11 @@ export const mapArtistDetails = (
 
 export const mapAlbumDetails = (
   group: MbReleaseGroup,
-  { status, mediaInfo }: { status?: MediaStatus; mediaInfo?: Media }
+  {
+    status,
+    mediaInfo,
+    playLinks = [],
+  }: { status?: MediaStatus; mediaInfo?: Media; playLinks?: PlayLink[] }
 ): MusicAlbumDetails => ({
   ...mapAlbumResult(group),
   status,
@@ -211,6 +218,7 @@ export const mapAlbumDetails = (
     joinphrase: credit.joinphrase || undefined,
   })),
   mediaInfo,
+  playLinks,
 });
 
 export const mapTracks = (media: MbMedium[]): MusicTrack[] =>

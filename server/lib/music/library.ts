@@ -1,7 +1,9 @@
 import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import type { PlayLink } from '@server/entity/Media';
 import Media from '@server/entity/Media';
 import MusicAlbum from '@server/entity/MusicAlbum';
+import { albumPlayLinks } from '@server/lib/mediaServers';
 import type { Statuses } from '@server/models/Music';
 import { In } from 'typeorm';
 
@@ -83,3 +85,17 @@ export const artistMedia = async (
     where: { mediaType: MediaType.MUSIC, foreignId: artistMbid },
     relations: { requests: true },
   })) ?? undefined;
+
+/** Where to play an album, from the ids each server gave it. */
+export const albumLinks = async (albumMbid: string): Promise<PlayLink[]> =>
+  albumPlayLinks(
+    await getRepository(MusicAlbum).find({
+      select: {
+        id: true,
+        ratingKey: true,
+        jellyfinItemId: true,
+        embyItemId: true,
+      },
+      where: { mbId: albumMbid },
+    })
+  );

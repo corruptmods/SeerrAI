@@ -2,7 +2,7 @@ import ExternalAPI, {
   DEFAULT_REQUEST_TIMEOUT_MS,
 } from '@server/api/externalapi';
 import { ApiErrorCode } from '@server/constants/error';
-import type { Library, PlexSettings } from '@server/lib/settings';
+import type { Library, MusicLibrary, PlexSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { ApiError } from '@server/types/error';
@@ -44,7 +44,8 @@ interface PlexLibraryResponse {
 }
 
 export interface PlexLibrary {
-  type: 'show' | 'movie';
+  /** 'artist' is a music library. */
+  type: 'show' | 'movie' | 'artist';
   key: string;
   title: string;
   agent: string;
@@ -102,6 +103,39 @@ interface PlexMetadataResponse {
   };
 }
 
+/** An artist, album or track in a music library. */
+export interface PlexMusicItem {
+  ratingKey: string;
+  /** An album's artist; a track's album. */
+  parentRatingKey?: string;
+  type: 'artist' | 'album' | 'track';
+  title: string;
+  /** An album's artist, by name. */
+  parentTitle?: string;
+  year?: number;
+  addedAt?: number;
+  /**
+   * The ids its agent matched it to. With Plex's music agent an artist has
+   * `mbid://<artist>` and an album `mbid://<id>`, which may be the album's
+   * (release group) or one release's.
+   */
+  Guid?: { id: string }[];
+  /** An artist's folders on disk, when Plex gives them. */
+  Location?: { path: string }[];
+  /** A track's files. */
+  Media?: { Part?: { file?: string }[] }[];
+}
+
+interface PlexMusicResponse {
+  MediaContainer: {
+    totalSize?: number;
+    Metadata?: PlexMusicItem[];
+  };
+}
+
+/** Plex's numbers for the kinds of music item, in its listings. */
+const PLEX_MUSIC_TYPE = { artist: 8, album: 9 } as const;
+
 const RECENT_PAGE_SIZE = 500;
 /** A bound on one recently added read, should a window be very wide. */
 const RECENT_MAX_ITEMS = 5000;
@@ -154,14 +188,14 @@ class PlexAPI extends ExternalAPI {
     try {
       const libraries = await this.getLibraries();
 
-      const newLibraries: Library[] = libraries
+      const newLibraries = libraries
         // Remove libraries that are not movie or show
         .filter(
           (library) => library.type === 'movie' || library.type === 'show'
         )
         // Remove libraries that do not have a metadata agent set (usually personal video libraries)
         .filter((library) => library.agent !== 'com.plexapp.agents.none')
-        .map((library) => {
+        .map((library): Library => {
           const existing = settings.plex.libraries.find(
             (l) => l.id === library.key
           );
@@ -170,12 +204,28 @@ class PlexAPI extends ExternalAPI {
             id: library.key,
             name: library.title,
             enabled: existing?.enabled ?? false,
-            type: library.type,
+            type: library.type as Library['type'],
             lastScan: existing?.lastScan,
           };
         });
 
       settings.plex.libraries = newLibraries;
+      // Music libraries are kept apart. Any agent counts, none included:
+      // albums are found by folder and title too.
+      settings.plex.musicLibraries = libraries
+        .filter((library) => library.type === 'artist')
+        .map((library): MusicLibrary => {
+          const existing = (settings.plex.musicLibraries ?? []).find(
+            (l) => l.id === library.key
+          );
+          return {
+            id: library.key,
+            name: library.title,
+            enabled: existing?.enabled ?? false,
+            type: 'artist',
+            lastScan: existing?.lastScan,
+          };
+        });
     } catch (e) {
       logger.error('Failed to fetch Plex libraries', {
         label: 'Plex API',
@@ -264,6 +314,72 @@ class PlexAPI extends ExternalAPI {
       if (page.length < RECENT_PAGE_SIZE) break;
     }
     return items;
+  }
+
+  /**
+   * One page of a music library's artists or albums, with the ids Plex
+   * matched them to.
+   */
+  public async getMusicItems(
+    sectionId: string,
+    type: 'artist' | 'album',
+    { offset = 0, size = RECENT_PAGE_SIZE }: { offset?: number; size?: number }
+  ): Promise<{ totalSize: number; items: PlexMusicItem[] }> {
+    const response = await this.get<PlexMusicResponse>(
+      `/library/sections/${sectionId}/all?type=${PLEX_MUSIC_TYPE[type]}&includeGuids=1`,
+      {
+        headers: {
+          'X-Plex-Container-Start': String(offset),
+          'X-Plex-Container-Size': String(size),
+        },
+      }
+    );
+    const items = response.MediaContainer.Metadata ?? [];
+    return {
+      totalSize: response.MediaContainer.totalSize ?? items.length,
+      items,
+    };
+  }
+
+  /** Albums added to a music library since a time, newest first. */
+  public async getRecentlyAddedAlbums(
+    sectionId: string,
+    addedAt: number
+  ): Promise<PlexMusicItem[]> {
+    const items: PlexMusicItem[] = [];
+    for (let start = 0; start < RECENT_MAX_ITEMS; start += RECENT_PAGE_SIZE) {
+      const response = await this.get<PlexMusicResponse>(
+        `/library/sections/${sectionId}/all?type=${PLEX_MUSIC_TYPE.album}&includeGuids=1&sort=addedAt%3Adesc&addedAt>>=${Math.floor(addedAt / 1000)}`,
+        {
+          headers: {
+            'X-Plex-Container-Start': String(start),
+            'X-Plex-Container-Size': String(RECENT_PAGE_SIZE),
+          },
+        }
+      );
+      const page = response.MediaContainer.Metadata ?? [];
+      items.push(...page);
+      if (page.length < RECENT_PAGE_SIZE) break;
+    }
+    return items;
+  }
+
+  /** One artist, album or track, with the ids Plex matched it to. */
+  public async getMusicItem(
+    ratingKey: string
+  ): Promise<PlexMusicItem | undefined> {
+    const response = await this.get<PlexMusicResponse>(
+      `/library/metadata/${ratingKey}?includeGuids=1`
+    );
+    return response.MediaContainer.Metadata?.[0];
+  }
+
+  /** An album's tracks, with their files. */
+  public async getAlbumTracks(ratingKey: string): Promise<PlexMusicItem[]> {
+    const response = await this.get<PlexMusicResponse>(
+      `/library/metadata/${ratingKey}/children`
+    );
+    return response.MediaContainer.Metadata ?? [];
   }
 }
 

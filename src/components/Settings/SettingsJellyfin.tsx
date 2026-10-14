@@ -4,6 +4,9 @@ import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import LibraryItem from '@app/components/Settings/LibraryItem';
+import MusicLibraries, {
+  musicLibrariesKey,
+} from '@app/components/Settings/MusicLibraries';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
@@ -18,7 +21,7 @@ import { Field, Formik } from 'formik';
 import Link from 'next/link';
 import { useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 import * as Yup from 'yup';
 
 const messages = defineMessages('components.Settings', {
@@ -189,6 +192,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
       await axios.post(`${endpoint}/library/sync`);
       setIsSyncing(false);
       revalidate();
+      mutate(musicLibrariesKey(endpoint));
     } catch (e) {
       if (e?.response?.data?.message === 'SYNC_ERROR_GROUPED_FOLDERS') {
         addToast(
@@ -329,6 +333,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
           ))}
         </ul>
       </div>
+      {!isSetupSettings && <MusicLibraries endpoint={endpoint} />}
       <div className="mb-6 mt-10">
         <h3 className="heading">
           <FormattedMessage {...messages.manualscanJellyfin} />

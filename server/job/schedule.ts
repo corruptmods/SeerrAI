@@ -10,11 +10,13 @@ import healthAlerts from '@server/lib/healthAlerts';
 import ImageProxy from '@server/lib/imageproxy';
 import type { MediaServerKind } from '@server/lib/mediaServers';
 import { connectedServers, serverName } from '@server/lib/mediaServers';
+import { musicReady } from '@server/lib/music/access';
 import notificationReconciler from '@server/lib/notificationReconciler';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import plexUserImport from '@server/lib/plexUserImport';
 import refreshToken from '@server/lib/refreshToken';
 import { jellyfinScanners } from '@server/lib/scanners/jellyfin';
+import { musicFullScan, musicSync } from '@server/lib/scanners/music';
 import { plexFullScanner, plexRecentScanner } from '@server/lib/scanners/plex';
 import { radarrScanner } from '@server/lib/scanners/radarr';
 import { sonarrScanner } from '@server/lib/scanners/sonarr';
@@ -31,6 +33,8 @@ interface ScheduledJob {
    * is connected (refreshMediaServerJobs).
    */
   server?: MediaServerKind;
+  /** A music job: registered while music is set up and on. */
+  music?: boolean;
   job: schedule.Job;
   name: string;
   type: 'process' | 'command';
@@ -200,6 +204,57 @@ const mediaServerJobs = (kind: MediaServerKind): ScheduledJob[] => {
 };
 
 /**
+ * The music jobs, for while music is set up and on. Each run reads every
+ * connected server's music libraries, and Lidarr.
+ */
+const musicJobs = (): ScheduledJob[] => {
+  if (!musicReady()) {
+    return [];
+  }
+  const jobs = getSettings().jobs;
+  return [
+    {
+      id: 'music-sync',
+      music: true,
+      name: 'Music Sync',
+      type: 'process',
+      interval: 'minutes',
+      cronSchedule: jobs['music-sync'].schedule,
+      job: schedule.scheduleJob(
+        jobs['music-sync'].schedule,
+        runJob('Music Sync', () => {
+          logger.debug('Starting scheduled job: Music Sync', {
+            label: 'Jobs',
+          });
+          return musicSync.run();
+        })
+      ),
+      running: () => musicSync.status().running,
+      cancelFn: () => musicSync.cancel(),
+    },
+    {
+      id: 'music-full-scan',
+      music: true,
+      name: 'Music Full Scan',
+      type: 'process',
+      interval: 'hours',
+      cronSchedule: jobs['music-full-scan'].schedule,
+      job: schedule.scheduleJob(
+        jobs['music-full-scan'].schedule,
+        runJob('Music Full Scan', () => {
+          logger.info('Starting scheduled job: Music Full Scan', {
+            label: 'Jobs',
+          });
+          return musicFullScan.run();
+        })
+      ),
+      running: () => musicFullScan.status().running,
+      cancelFn: () => musicFullScan.cancel(),
+    },
+  ];
+};
+
+/**
  * Registers the jobs of every connected media server, and only theirs: run
  * when a server is connected or removed, so its scans start or stop without
  * a restart. Jobs already registered are scheduled afresh from their saved
@@ -222,11 +277,40 @@ export const refreshMediaServerJobs = (): void => {
   scheduledJobs.unshift(...servers.flatMap(mediaServerJobs));
 };
 
+/** The jobs have been started (startJobs); until then none are registered. */
+let started = false;
+
+/**
+ * Registers the music jobs while music is set up and on, and only then: run
+ * when a Lidarr is added, changed or removed, or music is switched on or
+ * off for everyone. A music scan under way stops when music does.
+ */
+export const refreshMusicJobs = (): void => {
+  if (!started) {
+    return;
+  }
+  const music = musicReady();
+  for (let i = scheduledJobs.length - 1; i >= 0; i--) {
+    const job = scheduledJobs[i];
+    if (!job.music) continue;
+    job.job.cancel();
+    if (!music) {
+      job.cancelFn?.();
+    }
+    scheduledJobs.splice(i, 1);
+  }
+  scheduledJobs.push(...musicJobs());
+};
+
 export const startJobs = (): void => {
   const jobs = getSettings().jobs;
+  started = true;
 
   // Each connected media server's scans, the primary one's first.
   refreshMediaServerJobs();
+
+  // Music's scans, once music is set up.
+  refreshMusicJobs();
 
   // Watchlist sync: Plex watchlists, and public Trakt watchlists on any
   // media server. The id stays as it was, so saved schedules carry over.
@@ -326,12 +410,16 @@ export const startJobs = (): void => {
   // A minute after Radarr or Sonarr imports something, every connected
   // media server's recently added scan runs (and again each minute, a few
   // times, until the media server lists it), so the title shows as
-  // available then rather than at the next scheduled scan. One server's scan
-  // failing does not hold up the others'.
+  // available then rather than at the next scheduled scan. Music Sync runs
+  // with them. One server's scan failing does not hold up the others'.
   downloadTracker.whenImported(async () => {
-    const scanners = connectedServers()
+    const scanners: { run: () => Promise<void> }[] = connectedServers()
       .map(recentScanner)
       .filter((scanner) => !scanner.status().running);
+    // Music Sync reads every server's newly added music, and Lidarr's.
+    if (musicReady() && !musicSync.status().running) {
+      scanners.push(musicSync);
+    }
     if (!scanners.length) return;
     logger.info('Downloads were imported; running the recently added scan', {
       label: 'Jobs',

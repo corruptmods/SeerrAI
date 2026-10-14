@@ -13,7 +13,7 @@ import type {
   LogsResultsResponse,
   SettingsAboutResponse,
 } from '@server/interfaces/api/settingsInterfaces';
-import { scheduledJobs } from '@server/job/schedule';
+import { refreshMusicJobs, scheduledJobs } from '@server/job/schedule';
 import animeCheck from '@server/lib/animeCheck';
 import type { AvailableCacheIds } from '@server/lib/cache';
 import cacheManager from '@server/lib/cache';
@@ -41,6 +41,7 @@ import type { JobId, MainSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
+import { requireMusicSettings } from '@server/middleware/music';
 import { perUserRateLimit } from '@server/middleware/perUserRateLimit';
 import discoverSettingRoutes from '@server/routes/settings/discover';
 import { appDataPath } from '@server/utils/appDataVolume';
@@ -168,6 +169,8 @@ settingsRoutes.post('/features', async (req, res, next) => {
   const settings = getSettings();
   settings.main.disabledFeatures = disabled;
   await settings.save();
+  // The music jobs stop while music is off for everyone.
+  refreshMusicJobs();
   return res.status(200).json({ disabled });
 });
 
@@ -378,6 +381,33 @@ settingsRoutes.put('/plex/library/:libraryId', async (req, res, next) => {
 
   return res.status(200).json(library);
 });
+
+// Plex's music libraries, listed by the sync below. Only while music is on
+// for everyone.
+settingsRoutes.get('/plex/music-library', requireMusicSettings, (_req, res) => {
+  return res.status(200).json(getSettings().plex.musicLibraries ?? []);
+});
+
+settingsRoutes.put(
+  '/plex/music-library/:libraryId',
+  requireMusicSettings,
+  async (req, res, next) => {
+    const settings = getSettings();
+    const bodyResult = libraryUpdateSchema.safeParse(req.body);
+    if (!bodyResult.success) {
+      return next({ status: 400, message: 'Invalid request body.' });
+    }
+    const library = (settings.plex.musicLibraries ?? []).find(
+      (l) => l.id === req.params.libraryId
+    );
+    if (!library) {
+      return next({ status: 404, message: 'Library does not exist.' });
+    }
+    library.enabled = bodyResult.data.enabled;
+    await settings.save();
+    return res.status(200).json(library);
+  }
+);
 
 settingsRoutes.post('/plex/library/sync', async (_req, res, next) => {
   const settings = getSettings();

@@ -11,11 +11,13 @@ import {
 } from '@heroicons/react/24/solid';
 import type { NavItem } from '@server/constants/navigation';
 import {
+  NAV_BAR_SIZE,
   NAV_ITEMS,
   canHideNavItem,
   moveNavItem,
+  splitAtNavBar,
 } from '@server/constants/navigation';
-import { cloneElement, useEffect, useRef, useState } from 'react';
+import { cloneElement, useEffect, useId, useRef, useState } from 'react';
 import { useDrag, useDrop } from 'react-aria';
 import { useIntl } from 'react-intl';
 
@@ -23,7 +25,9 @@ const messages = defineMessages('components.Layout.NavEditor', {
   arrange: 'Arrange your menu',
   tip: 'Drag an item, or use its arrows, to move it. Hide the ones you don’t use.',
   phoneTip:
-    'Drag an item, or use its arrows, to move it. Hide the ones you don’t use. The first ones go on the bar at the bottom of the screen.',
+    'Drag an item, or use its arrows, to move it. Hide the ones you don’t use. The first {count} shown go on the bar at the bottom of the screen.',
+  onBar: 'On the bar',
+  inMenu: 'In the menu',
   moveUp: 'Move {item} up',
   moveDown: 'Move {item} down',
   show: 'Show {item}',
@@ -168,6 +172,7 @@ const Row = ({
       {hideable ? (
         <button
           type="button"
+          ref={(el) => buttonRef(`${item.id}-show`, el)}
           className={`${buttonBase} flex-shrink-0 ${
             hidden ? 'text-gray-500' : 'text-indigo-400'
           } ${phone ? 'p-2' : 'p-1'}`}
@@ -221,31 +226,38 @@ const NavEditor = ({
   phone = false,
 }: NavEditorProps) => {
   const intl = useIntl();
+  const groupId = useId();
   const [announcement, setAnnouncement] = useState('');
   const buttons = useRef(new Map<string, HTMLButtonElement>());
-  const [focusAfterMove, setFocusAfterMove] = useState<{
-    id: NavItem;
-    by: 'up' | 'down';
-  }>();
+  // The buttons to give the focus back to once the menu has changed, the
+  // first one there and enabled.
+  const [focusAfter, setFocusAfter] = useState<string[]>();
 
   const byId = new Map(items.map((item) => [item.id, item]));
   const shown = draft.order.flatMap((id) => {
     const item = byId.get(id);
     return item ? [item] : [];
   });
+  // On a phone, the items on the bar along the bottom, and those in the
+  // menu behind its button: the same split the bar itself makes.
+  const [onBar, inMenu] = phone
+    ? splitAtNavBar(shown, draft.hidden)
+    : [shown, []];
 
   // An arrow pressed by keyboard keeps the focus on the item moved, on the
-  // other arrow once it reaches the top or the bottom.
+  // other arrow once it reaches the top or the bottom. On a phone an item
+  // can also move between the bar's group and the menu's, which draws its
+  // row afresh, so a focused eye button gets the focus back too.
   useEffect(() => {
-    if (!focusAfterMove) {
+    if (!focusAfter) {
       return;
     }
-    const { id, by } = focusAfterMove;
-    const pressed = buttons.current.get(`${id}-${by}`);
-    const other = buttons.current.get(`${id}-${by === 'up' ? 'down' : 'up'}`);
-    (pressed && !pressed.disabled ? pressed : other)?.focus();
-    setFocusAfterMove(undefined);
-  }, [focusAfterMove, draft.order]);
+    focusAfter
+      .map((key) => buttons.current.get(key))
+      .find((button) => button && !button.disabled)
+      ?.focus();
+    setFocusAfter(undefined);
+  }, [focusAfter, draft]);
 
   const place = (id: NavItem, target: NavItem, side: 'before' | 'after') => {
     const order = moveNavItem(draft.order, id, target, side);
@@ -272,11 +284,14 @@ const NavEditor = ({
       return;
     }
     place(id, neighbour.id, by === 'up' ? 'before' : 'after');
-    setFocusAfterMove({ id, by });
+    setFocusAfter([`${id}-${by}`, `${id}-${by === 'up' ? 'down' : 'up'}`]);
   };
 
   const toggle = (id: NavItem) => {
     const hiding = !draft.hidden.includes(id);
+    if (buttons.current.get(`${id}-show`) === document.activeElement) {
+      setFocusAfter([`${id}-show`]);
+    }
     onChange({
       ...draft,
       hidden: hiding
@@ -290,6 +305,37 @@ const NavEditor = ({
     );
   };
 
+  // Rows numbered from `start` in the whole order, so the arrows know the
+  // first and the last item whichever group they are in.
+  const list = (items: NavEditorItem[], start: number, labelledBy?: string) => (
+    <ul
+      className="space-y-2"
+      aria-label={labelledBy ? undefined : intl.formatMessage(messages.arrange)}
+      aria-labelledby={labelledBy}
+    >
+      {items.map((item, index) => (
+        <Row
+          key={item.id}
+          item={item}
+          index={start + index}
+          count={shown.length}
+          hidden={canHideNavItem(item.id) && draft.hidden.includes(item.id)}
+          phone={phone}
+          onMove={move}
+          onDrop={place}
+          onToggle={toggle}
+          buttonRef={(key, button) => {
+            if (button) {
+              buttons.current.set(key, button);
+            } else {
+              buttons.current.delete(key);
+            }
+          }}
+        />
+      ))}
+    </ul>
+  );
+
   return (
     // In the sidebar, room to scroll the last items clear of Discover's
     // Save bar along the bottom of the screen.
@@ -302,34 +348,37 @@ const NavEditor = ({
           {intl.formatMessage(messages.arrange)}
         </h2>
         <p className="mt-1 text-xs text-gray-400">
-          {intl.formatMessage(phone ? messages.phoneTip : messages.tip)}
+          {phone
+            ? intl.formatMessage(messages.phoneTip, { count: NAV_BAR_SIZE })
+            : intl.formatMessage(messages.tip)}
         </p>
       </div>
-      <ul
-        className="space-y-2"
-        aria-label={intl.formatMessage(messages.arrange)}
-      >
-        {shown.map((item, index) => (
-          <Row
-            key={item.id}
-            item={item}
-            index={index}
-            count={shown.length}
-            hidden={canHideNavItem(item.id) && draft.hidden.includes(item.id)}
-            phone={phone}
-            onMove={move}
-            onDrop={place}
-            onToggle={toggle}
-            buttonRef={(key, button) => {
-              if (button) {
-                buttons.current.set(key, button);
-              } else {
-                buttons.current.delete(key);
-              }
-            }}
-          />
-        ))}
-      </ul>
+      {phone ? (
+        <>
+          <div className="space-y-2">
+            <h3
+              id={`${groupId}-bar`}
+              className="text-xs font-semibold text-gray-400"
+            >
+              {intl.formatMessage(messages.onBar)}
+            </h3>
+            {list(onBar, 0, `${groupId}-bar`)}
+          </div>
+          {inMenu.length > 0 && (
+            <div className="space-y-2 border-t border-gray-700 pt-3">
+              <h3
+                id={`${groupId}-menu`}
+                className="text-xs font-semibold text-gray-400"
+              >
+                {intl.formatMessage(messages.inMenu)}
+              </h3>
+              {list(inMenu, onBar.length, `${groupId}-menu`)}
+            </div>
+          )}
+        </>
+      ) : (
+        list(shown, 0)
+      )}
       <button
         type="button"
         className="flex items-center gap-2 rounded-md border border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-200 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"

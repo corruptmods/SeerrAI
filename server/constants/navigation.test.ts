@@ -1,5 +1,6 @@
 import {
   NAV_ALWAYS_SHOWN,
+  NAV_BAR_SIZE,
   NAV_ITEMS,
   canHideNavItem,
   cleanNavHidden,
@@ -10,6 +11,7 @@ import {
   orderNavItems,
   sameNavLayout,
   sortByNavOrder,
+  splitAtNavBar,
   withoutHiddenNav,
 } from '@server/constants/navigation';
 import assert from 'node:assert/strict';
@@ -18,6 +20,29 @@ import { describe, it } from 'node:test';
 /* How each person arranges their sidebar and phone menu (Discover, Customize). */
 
 describe('a sidebar order', () => {
+  it('starts with what the phone bar has always shown', () => {
+    // One usual order for the sidebar and the phone. Its first five are
+    // the phone bar of 1.1.0, so nobody's bar changes; the sidebar's only
+    // change is Watch Lists moving up after Series. Music came after.
+    assert.deepEqual(
+      [...NAV_ITEMS],
+      [
+        'discover',
+        'movies',
+        'series',
+        'lists',
+        'requests',
+        'music',
+        'calendar',
+        'blocklist',
+        'issues',
+        'users',
+        'backfill',
+        'settings',
+      ]
+    );
+  });
+
   it('is the default order until one is saved', () => {
     assert.deepEqual(orderNavItems(undefined), [...NAV_ITEMS]);
     assert.deepEqual(orderNavItems([]), [...NAV_ITEMS]);
@@ -29,22 +54,23 @@ describe('a sidebar order', () => {
   });
 
   it('puts an item the saved order does not name in its default place', () => {
-    // Saved before Calendar and Backfill existed, with Requests moved first.
+    // Saved before Music, Calendar and Backfill existed, with Requests
+    // moved first.
     const saved = NAV_ITEMS.filter(
-      (id) => id !== 'calendar' && id !== 'backfill' && id !== 'requests'
+      (id) => !['music', 'calendar', 'backfill', 'requests'].includes(id)
     );
     const order = orderNavItems(['requests', ...saved]);
     assert.equal(order.length, NAV_ITEMS.length);
-    // Calendar follows Requests by default, wherever Requests now is.
-    assert.equal(order.indexOf('calendar'), order.indexOf('requests') + 1);
+    // Music follows Requests by default, wherever Requests now is, and
+    // Calendar follows Music.
+    assert.deepEqual(order.slice(0, 3), ['requests', 'music', 'calendar']);
     assert.equal(order.indexOf('backfill'), order.indexOf('users') + 1);
-    assert.equal(order[0], 'requests');
   });
 
-  it('gives Music its place after Series in an order saved before it', () => {
+  it('gives Music its place after Requests in an order saved before it', () => {
     const saved = NAV_ITEMS.filter((id) => id !== 'music').reverse();
     const order = orderNavItems(saved);
-    assert.equal(order.indexOf('music'), order.indexOf('series') + 1);
+    assert.equal(order.indexOf('music'), order.indexOf('requests') + 1);
     assert.equal(canHideNavItem('music'), true);
   });
 
@@ -153,7 +179,8 @@ describe('the menus', () => {
       sortByNavOrder(links, ['settings', 'lists', 'users', 'discover']).map(
         (link) => link.id
       ),
-      ['lists', 'discover', 'requests']
+      // Requests is not named, so it follows Watch Lists, as by default.
+      ['lists', 'requests', 'discover']
     );
   });
 });
@@ -195,5 +222,103 @@ describe('arranging the menu', () => {
       }),
       false
     );
+  });
+});
+
+describe('the bar along the bottom of a phone', () => {
+  const links = (ids: readonly string[]) =>
+    orderNavItems(ids).map((id) => ({ id }));
+  const ids = (items: { id: string }[]) => items.map((item) => item.id);
+  const bar = (items: { id: (typeof NAV_ITEMS)[number] }[], hidden: string[]) =>
+    ids(withoutHiddenNav(splitAtNavBar(items, hidden)[0], hidden));
+
+  it('holds five items before its menu button', () => {
+    assert.equal(NAV_BAR_SIZE, 5);
+  });
+
+  it('shows what it always has to someone who never arranged their menu', () => {
+    assert.deepEqual(bar(links([]), []), [
+      'discover',
+      'movies',
+      'series',
+      'lists',
+      'requests',
+    ]);
+  });
+
+  it('takes the first items of the order the menu editor lists', () => {
+    // Watch Lists moved up one: the bar changes just as the list does.
+    const order = moveNavItem(NAV_ITEMS, 'lists', 'series', 'before');
+    assert.deepEqual(bar(links(order), []), ids(links(order)).slice(0, 5));
+    assert.deepEqual(bar(links(order), []), [
+      'discover',
+      'movies',
+      'lists',
+      'series',
+      'requests',
+    ]);
+  });
+
+  it('gives no place to an item someone hid', () => {
+    assert.deepEqual(bar(links([]), ['lists', 'movies']), [
+      'discover',
+      'series',
+      'requests',
+      'music',
+      'calendar',
+    ]);
+  });
+
+  it('gives no place to an item someone cannot use', () => {
+    // Music and Calendar switched off, no Blocklist or Issues permission.
+    const usable = links([]).filter(
+      (link) =>
+        !['requests', 'music', 'calendar', 'blocklist'].includes(link.id)
+    );
+    assert.deepEqual(bar(usable, ['lists']), [
+      'discover',
+      'movies',
+      'series',
+      'issues',
+      'users',
+    ]);
+  });
+
+  it('splits the order where the bar ends, hidden items keeping their place', () => {
+    const [onBar, rest] = splitAtNavBar(links([]), ['series']);
+    // Series is hidden but stays where it is in the order.
+    assert.deepEqual(ids(onBar), [
+      'discover',
+      'movies',
+      'series',
+      'lists',
+      'requests',
+      'music',
+    ]);
+    assert.deepEqual(ids(rest), NAV_ITEMS.slice(6));
+  });
+
+  it('has no menu after it when everything shown fits on it', () => {
+    // Four items shown, two more hidden after them: all on the bar.
+    const usable = links([]).filter((link) =>
+      [
+        'discover',
+        'movies',
+        'series',
+        'lists',
+        'requests',
+        'settings',
+      ].includes(link.id)
+    );
+    const [onBar, rest] = splitAtNavBar(usable, ['requests', 'lists']);
+    assert.deepEqual(ids(onBar), ids(usable));
+    assert.deepEqual(rest, []);
+  });
+
+  it('has a menu after it when one more item is shown', () => {
+    const usable = links([]).slice(0, 6);
+    const [onBar, rest] = splitAtNavBar(usable, []);
+    assert.equal(onBar.length, 5);
+    assert.deepEqual(ids(rest), ['music']);
   });
 });

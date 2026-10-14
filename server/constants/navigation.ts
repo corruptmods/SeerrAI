@@ -1,20 +1,24 @@
 /*
  * The items of the sidebar and the phone menu, by names that never change,
- * in the sidebar's default order. Each person can put them in their own
- * order and hide the ones they don't want (Discover, Customize), kept in
- * their user settings. An item added here later takes its default place in
- * any order saved before it existed, and is shown, so nobody has to save
- * again to see it.
+ * in their default order. The sidebar and the phone use the same order, so
+ * the menu editor lists exactly what both show; the first ones shown go on
+ * the bar along the bottom of a phone (NAV_BAR_SIZE). Each person can put
+ * them in their own order and hide the ones they don't want (Discover,
+ * Customize), kept in their user settings. An item added here later takes
+ * its default place in any order saved before it existed, and is shown, so
+ * nobody has to save again to see it.
  */
 export const NAV_ITEMS = [
+  // The phone bar's five, as it has always been.
   'discover',
   'movies',
   'series',
-  // Shown once Lidarr is set up, to people with music on.
-  'music',
-  'requests',
-  'calendar',
   'lists',
+  'requests',
+  // Shown once Lidarr is set up, to people with music on. After the bar's
+  // five, so the bar stays as it was.
+  'music',
+  'calendar',
   'blocklist',
   'issues',
   'users',
@@ -107,6 +111,12 @@ export const sortByNavOrder = <T extends { id: NavItem }>(
   return [...items].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
 };
 
+/**
+ * How many items the bar along the bottom of a phone holds, before its menu
+ * button.
+ */
+export const NAV_BAR_SIZE = 5;
+
 /** Things that are items, without those someone hid. */
 export const withoutHiddenNav = <T extends { id: NavItem }>(
   items: readonly T[],
@@ -115,6 +125,26 @@ export const withoutHiddenNav = <T extends { id: NavItem }>(
   items.filter(
     (item) => !canHideNavItem(item.id) || !(hidden ?? []).includes(item.id)
   );
+
+/**
+ * Things that are items, in someone's order, split where the phone's bar
+ * ends: up to and including the last item on the bar, and the rest, which
+ * are in the menu behind its button. The bar takes the first items shown;
+ * a hidden one takes no place on it, and one before the bar's end stays in
+ * the first part, so the order reads the same. When everything shown fits
+ * on the bar, there is no menu, and the rest is empty.
+ */
+export const splitAtNavBar = <T extends { id: NavItem }>(
+  items: readonly T[],
+  hidden: readonly string[] | undefined
+): [T[], T[]] => {
+  const shown = withoutHiddenNav(items, hidden);
+  if (shown.length <= NAV_BAR_SIZE) {
+    return [[...items], []];
+  }
+  const end = items.indexOf(shown[NAV_BAR_SIZE - 1]) + 1;
+  return [items.slice(0, end), items.slice(end)];
+};
 
 /** How someone arranged their menu, as saved in their user settings. */
 export interface NavLayout {

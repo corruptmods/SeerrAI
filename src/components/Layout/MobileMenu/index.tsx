@@ -42,8 +42,8 @@ import {
 import type { Feature } from '@server/constants/features';
 import type { NavItem } from '@server/constants/navigation';
 import {
-  isDefaultNavOrder,
   sortByNavOrder,
+  splitAtNavBar,
   withoutHiddenNav,
 } from '@server/constants/navigation';
 import Link from 'next/link';
@@ -150,8 +150,7 @@ const MobileMenu = ({
       id: 'music',
       href: '/discover/music',
       content: intl.formatMessage(menuMessages.music),
-      // Only once Lidarr is set up, and for people with music on. After
-      // the bar's five, so the bar stays as it was.
+      // Only once Lidarr is set up, and for people with music on.
       feature: 'music',
       svgIcon: <MusicalNoteIcon className="h-6 w-6" />,
       svgIconSelected: <FilledMusicalNoteIcon className="h-6 w-6" />,
@@ -227,12 +226,10 @@ const MobileMenu = ({
     },
   ];
 
-  // The phone keeps its own order, with Watch Lists on the bar, until a
-  // person puts their menu in an order of their own; then it follows that.
-  // Items they cannot use are left out whatever they chose.
-  const usableLinks = (
-    isDefaultNavOrder(order) ? menuLinks : sortByNavOrder(menuLinks, order)
-  ).filter(
+  // The same order as the sidebar, and as the menu editor lists it: the
+  // person's own, or the usual one. Items they cannot use are left out
+  // whatever they chose.
+  const usableLinks = sortByNavOrder(menuLinks, order).filter(
     (link) =>
       (!link.feature || featureIsOn(link.feature)) &&
       (!link.requiredPermission ||
@@ -241,6 +238,11 @@ const MobileMenu = ({
         }))
   );
   const filteredLinks = withoutHiddenNav(usableLinks, hidden);
+  // The first ones shown go on the bar, and the menu button is there when
+  // more are shown than fit on it.
+  const [barPart, menuPart] = splitAtNavBar(usableLinks, hidden);
+  const barLinks = withoutHiddenNav(barPart, hidden);
+  const hasMenu = menuPart.length > 0;
 
   // Customizing ends (saved or not): the editor closes with it.
   useEffect(() => {
@@ -342,7 +344,7 @@ const MobileMenu = ({
       </Transition>
       <div className="padding-bottom-safe border-t border-gray-600 bg-gray-800/90 backdrop-blur">
         <div className="flex h-full items-center justify-between px-3 py-4 text-gray-100 sm:px-6">
-          {filteredLinks.slice(0, 5).map((link) => {
+          {barLinks.map((link) => {
             const isActive =
               router.pathname.match(link.activeRegExp) && !isOpen;
             return (
@@ -402,8 +404,7 @@ const MobileMenu = ({
               )}
             </button>
           ) : (
-            filteredLinks.length > 4 &&
-            filteredLinks.length !== 5 && (
+            hasMenu && (
               <button
                 className={`flex flex-col items-center space-y-1 ${
                   isOpen ? 'text-indigo-500' : ''

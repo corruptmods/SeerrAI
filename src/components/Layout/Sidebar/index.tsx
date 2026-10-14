@@ -95,13 +95,11 @@ const SidebarLinks: SidebarLinkProps[] = [
     activeRegExp: /^\/discover\/tv$/,
   },
   {
-    id: 'music',
-    href: '/discover/music',
-    messagesKey: 'music',
-    // Only once Lidarr is set up, and for people with music on.
-    feature: 'music',
-    svgIcon: <MusicalNoteIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /^\/(discover\/music|music\/)/,
+    id: 'lists',
+    href: '/lists',
+    messagesKey: 'watchlists',
+    svgIcon: <BookmarkIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/lists/,
   },
   {
     id: 'requests',
@@ -111,19 +109,21 @@ const SidebarLinks: SidebarLinkProps[] = [
     activeRegExp: /^\/requests/,
   },
   {
+    id: 'music',
+    href: '/discover/music',
+    messagesKey: 'music',
+    // Only once Lidarr is set up, and for people with music on.
+    feature: 'music',
+    svgIcon: <MusicalNoteIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/(discover\/music|music\/)/,
+  },
+  {
     id: 'calendar',
     href: '/calendar',
     messagesKey: 'calendar',
     feature: 'releaseCalendar',
     svgIcon: <CalendarDaysIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/calendar/,
-  },
-  {
-    id: 'lists',
-    href: '/lists',
-    messagesKey: 'watchlists',
-    svgIcon: <BookmarkIcon className="mr-3 h-6 w-6" />,
-    activeRegExp: /^\/lists/,
   },
   {
     id: 'blocklist',

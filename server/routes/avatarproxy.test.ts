@@ -25,15 +25,17 @@ const JELLYFIN_ID = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const EMBY_ID = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
 const asked: string[] = [];
+/** The picture the server's cache holds, and the ETag its host sent. */
+const held = { bytes: 'avatar', etag: 'etag' };
 mock.method(ImageProxy.prototype, 'getImage', async (path: string) => {
   asked.push(path);
   return {
-    imageBuffer: Buffer.from('avatar'),
+    imageBuffer: Buffer.from(held.bytes),
     meta: {
       revalidateAfter: 3600,
       curRevalidate: 3600,
       isStale: false,
-      etag: 'etag',
+      etag: held.etag,
       contentType: 'image/jpeg',
       extension: 'jpg',
       cacheKey: 'key',
@@ -75,6 +77,8 @@ const person = (columns: Partial<User>) =>
 
 beforeEach(() => {
   asked.length = 0;
+  held.bytes = 'avatar';
+  held.etag = 'etag';
   headMock.mock.resetCalls();
   const settings = getSettings();
   settings.main.mediaServerType = MediaServerType.EMBY;
@@ -122,6 +126,37 @@ describe('avatars from Jellyfin and Emby', () => {
     assert.equal(res.status, 200);
     assert.equal(asked.length, 1);
     assert.match(asked[0], /gravatar/);
+  });
+
+  it('tells a changed picture from the old one when its host sends no ETag', async () => {
+    held.etag = '';
+    held.bytes = 'first picture';
+    const first = await request(app).get(`/avatarproxy/${JELLYFIN_ID}`);
+    assert.equal(first.status, 200);
+    const etag = first.headers.etag;
+    assert.match(etag, /^"[0-9a-f]{64}"$/);
+
+    for (const tag of [etag, `W/${etag}`, `"other", ${etag}`]) {
+      const again = await request(app)
+        .get(`/avatarproxy/${JELLYFIN_ID}`)
+        .set('If-None-Match', tag);
+      assert.equal(again.status, 304, tag);
+      assert.equal(again.headers.etag, etag);
+      assert.match(again.headers['cache-control'], /max-age=3600/);
+    }
+
+    held.bytes = 'second picture';
+    const changed = await request(app)
+      .get(`/avatarproxy/${JELLYFIN_ID}`)
+      .set('If-None-Match', etag);
+    assert.equal(changed.status, 200);
+    assert.notEqual(changed.headers.etag, etag);
+  });
+
+  it('keeps a picture a picture when opened on its own', async () => {
+    const res = await request(app).get(`/avatarproxy/${JELLYFIN_ID}`);
+    assert.match(res.headers['content-security-policy'], /sandbox/);
+    assert.equal(res.headers['x-content-type-options'], 'nosniff');
   });
 
   it('names the server in what it refuses', async () => {

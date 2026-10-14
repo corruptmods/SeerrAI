@@ -18,6 +18,16 @@ export const cardWidth = (canExpand?: boolean) =>
   canExpand ? 'w-full' : 'w-36 sm:w-36 md:w-44';
 
 /**
+ * How wide a card's picture is drawn, for a picture offered in several
+ * widths (see sourcesFor): as cardWidth in a row; in a grid, half a phone's
+ * screen, and never as wide as two of the grid's narrowest cells.
+ */
+export const cardImageSizes = (canExpand?: boolean) =>
+  canExpand
+    ? '(max-width: 639px) 50vw, 20rem'
+    : '(min-width: 768px) 11rem, 9rem';
+
+/**
  * Whether a card's details are showing, and the handlers that show and
  * hide them: on hover with a mouse, on a tap or Enter otherwise.
  */

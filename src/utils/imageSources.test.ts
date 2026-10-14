@@ -93,9 +93,20 @@ describe('music’s pictures', () => {
     const [avif] = sourcesFor('/imageproxy/artist/a74b1b7f/backdrop');
     assert.equal(avif.responsive, true);
     assert.match(avif.srcSet, /backdrop\?f=avif&w=480 480w/);
-    // Its photo is shown small.
+  });
+
+  it('offer a picture of an artist smaller too, for the tiles it fills', () => {
+    // fanart.tv's are 1000 square; a tile is a few hundred pixels wide.
     const [photo] = sourcesFor('/imageproxy/artist/a74b1b7f');
-    assert.equal(photo.srcSet, '/imageproxy/artist/a74b1b7f?f=avif');
+    assert.equal(photo.responsive, true);
+    assert.equal(
+      photo.srcSet,
+      [
+        '/imageproxy/artist/a74b1b7f?f=avif&w=480 480w',
+        '/imageproxy/artist/a74b1b7f?f=avif&w=780 780w',
+        '/imageproxy/artist/a74b1b7f?f=avif 1000w',
+      ].join(', ')
+    );
   });
 });
 

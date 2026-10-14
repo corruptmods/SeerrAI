@@ -99,7 +99,10 @@ const precacheRouteChunks = async () => {
 
         try {
           if (!(await cache.match(url))) {
-            await cache.add(url);
+            const response = await fetchWithTimeout(new Request(url));
+            if (response.ok && fitsCache(STATIC_CACHE, response)) {
+              await cache.put(url, response);
+            }
           }
         } catch {
           // One missing chunk is not a reason to stop warming the rest.
@@ -411,9 +414,33 @@ const stillFresh = (response) => {
   return Date.now() < sentAt + Number(maxAge[1]) * 1000;
 };
 
+/**
+ * Whether a response is what its cache is for: an image in the image cache,
+ * and anything but a page among the app's code. A sign-in page put in front
+ * of Seerr (a proxy's single sign-on whose session ran out) answers a chunk
+ * or a poster with itself, after a redirect. Kept, it would be served in
+ * their place for good: the app would not start again, nor the poster show,
+ * until the cache was emptied by hand.
+ */
+const fitsCache = (cacheName, response) => {
+  if (response.redirected) {
+    return false;
+  }
+  const type = response.headers.get('Content-Type') ?? '';
+  return cacheName === IMAGE_CACHE
+    ? /^image\//i.test(type)
+    : !/^text\/html/i.test(type);
+};
+
 const cacheFirst = async (request, cacheName, maxEntries, keepAlive) => {
   const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
+  let cached = await cache.match(request);
+
+  // One stored before such answers were refused goes, and is fetched again.
+  if (cached && !fitsCache(cacheName, cached)) {
+    await cache.delete(request).catch(() => undefined);
+    cached = undefined;
+  }
 
   if (cached) {
     markUsed(cacheName, request.url);
@@ -448,7 +475,8 @@ const keep = (response, request, cache, cacheName, maxEntries) => {
   if (
     !response ||
     !response.ok ||
-    /no-store/i.test(response.headers.get('Cache-Control') ?? '')
+    /no-store/i.test(response.headers.get('Cache-Control') ?? '') ||
+    !fitsCache(cacheName, response)
   ) {
     return undefined;
   }
@@ -625,8 +653,28 @@ const setBadge = async (count) => {
   }
 };
 
+/**
+ * What a push says. Seerr sends JSON; anything else is shown as its text,
+ * since a push must always show something (see below).
+ */
+const pushPayload = (data) => {
+  if (!data) {
+    return {};
+  }
+  try {
+    const payload = data.json();
+    return payload && typeof payload === 'object' ? payload : {};
+  } catch {
+    try {
+      return { message: data.text() };
+    } catch {
+      return {};
+    }
+  }
+};
+
 self.addEventListener('push', (event) => {
-  const payload = event.data ? event.data.json() : {};
+  const payload = pushPayload(event.data);
 
   const options = {
     body: payload.message,

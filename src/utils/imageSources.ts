@@ -14,8 +14,15 @@ const RESPONSIVE_FROM = 1000;
 const ARTIST_BACKDROP_WIDTH = 1920;
 
 /**
+ * A picture of an artist: fanart.tv's are 1000 square. Shown in tiles a few
+ * hundred pixels wide, so smaller copies are offered too; the proxy makes
+ * none wider than the picture, should one be smaller.
+ */
+const ARTIST_PHOTO_WIDTH = 1000;
+
+/**
  * The width a proxied picture was asked for: TMDB's /t/p/w1920_and_h800...,
- * a cover's front-1200, or an artist's backdrop. Null when it is unknown.
+ * a cover's front-1200, or a picture of an artist. Null when it is unknown.
  */
 const widthOf = (url: string) => {
   const match =
@@ -24,9 +31,11 @@ const widthOf = (url: string) => {
   if (match) {
     return Number(match[1]);
   }
-  return /^\/imageproxy\/artist\/[^/?]+\/backdrop$/.test(url)
-    ? ARTIST_BACKDROP_WIDTH
-    : null;
+  const artist = /^\/imageproxy\/artist\/[^/?]+(\/backdrop)?$/.exec(url);
+  if (artist) {
+    return artist[1] ? ARTIST_BACKDROP_WIDTH : ARTIST_PHOTO_WIDTH;
+  }
+  return null;
 };
 
 /**

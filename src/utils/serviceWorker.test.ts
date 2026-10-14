@@ -98,7 +98,7 @@ const loadWorker = (
     await Promise.all(waits);
   };
 
-  return { tap, push, sent, shown };
+  return { tap, push, sent, shown, handlers };
 };
 
 const actionOn = (sent: Request[]) =>
@@ -203,6 +203,11 @@ const loadImageWorker = () => {
   const answer = {
     cacheControl: 'public, max-age=31536000, immutable',
     sentAt: new Date(),
+    contentType: 'image/jpeg',
+    /** Whether it came by way of a redirect (a sign-in page in front). */
+    redirected: false,
+    /** The chunks /sw-precache.json lists. */
+    precache: [] as string[],
   };
 
   class WorkerRequest extends Request {
@@ -211,8 +216,9 @@ const loadImageWorker = () => {
     }
   }
 
+  // A path is taken against the worker's own address, as the Cache API does.
   const urlOf = (request: Request | string) =>
-    typeof request === 'string' ? request : request.url;
+    typeof request === 'string' ? new URL(request, ORIGIN).href : request.url;
   const cache = {
     match: async (request: Request) => stored.get(urlOf(request))?.clone(),
     put: async (request: Request, response: Response) => {
@@ -238,15 +244,29 @@ const loadImageWorker = () => {
     AbortController,
     setTimeout,
     clearTimeout,
-    fetch: async (request: Request) => {
-      fetched.push(new URL(request.url).pathname);
-      return new Response(new Uint8Array([0xff, 0xd8]), {
-        headers: {
-          'Content-Type': 'image/jpeg',
-          'Cache-Control': answer.cacheControl,
-          Date: answer.sentAt.toUTCString(),
-        },
+    fetch: async (request: Request | string) => {
+      const path = new URL(urlOf(request)).pathname;
+      if (path === '/sw-precache.json') {
+        return new Response(JSON.stringify({ files: answer.precache }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      fetched.push(path);
+      const html = /\bpage\b/.test(path) || answer.contentType === 'text/html';
+      const response = new Response(
+        html ? '<html>Sign in</html>' : new Uint8Array([0xff, 0xd8]),
+        {
+          headers: {
+            'Content-Type': html ? 'text/html' : answer.contentType,
+            'Cache-Control': answer.cacheControl,
+            Date: answer.sentAt.toUTCString(),
+          },
+        }
+      );
+      Object.defineProperty(response, 'redirected', {
+        value: html || answer.redirected,
       });
+      return response;
     },
   });
 
@@ -266,7 +286,17 @@ const loadImageWorker = () => {
     return shown;
   };
 
-  return { view, fetched, answer };
+  /** The page, settled, asking the worker to fetch the app's code ahead. */
+  const precache = async () => {
+    const waits: Promise<unknown>[] = [];
+    handlers.message({
+      data: { type: 'PRECACHE_ROUTES' },
+      waitUntil: (promise: Promise<unknown>) => waits.push(promise),
+    });
+    await Promise.all(waits);
+  };
+
+  return { view, precache, fetched, answer, stored };
 };
 
 describe('images kept on the device', () => {
@@ -305,5 +335,87 @@ describe('images kept on the device', () => {
     await worker.view(converting);
     await worker.view(converting);
     assert.equal(worker.fetched.length, 2);
+  });
+});
+
+describe('what the worker never keeps', () => {
+  it('a sign-in page answered in a poster’s place', async () => {
+    // A proxy's single sign-on whose session ran out redirects every
+    // request to its own page.
+    const worker = loadImageWorker();
+    worker.answer.contentType = 'text/html';
+    const poster = '/imageproxy/tmdb/t/p/w300_and_h450_face/a.jpg';
+    await worker.view(poster);
+    await worker.view(poster);
+    assert.equal(worker.fetched.length, 2, 'asked again each time');
+
+    worker.answer.contentType = 'image/jpeg';
+    await worker.view(poster);
+    await worker.view(poster);
+    assert.equal(worker.fetched.length, 3, 'the real poster is kept');
+  });
+
+  it('a picture that came by way of a redirect', async () => {
+    const worker = loadImageWorker();
+    worker.answer.redirected = true;
+    const poster = '/imageproxy/tmdb/t/p/w300_and_h450_face/b.jpg';
+    await worker.view(poster);
+    await worker.view(poster);
+    assert.equal(worker.fetched.length, 2);
+  });
+
+  it('a page in place of the app’s code, nor serves one kept before', async () => {
+    const worker = loadImageWorker();
+    const chunk = '/_next/static/chunks/page-abc.js';
+    await worker.view(chunk);
+    await worker.view(chunk);
+    assert.equal(worker.fetched.length, 2);
+
+    // A copy stored by an earlier worker is dropped and fetched again.
+    const kept = '/_next/static/chunks/main-abc.js';
+    worker.stored.set(
+      `${ORIGIN}${kept}`,
+      new Response('<html>Sign in</html>', {
+        headers: { 'Content-Type': 'text/html' },
+      })
+    );
+    worker.answer.contentType = 'application/javascript';
+    const shown = await worker.view(kept);
+    assert.equal(shown?.headers.get('Content-Type'), 'application/javascript');
+    assert.deepEqual(worker.fetched.slice(2), [kept]);
+  });
+
+  it('a page among the code it fetches ahead', async () => {
+    const worker = loadImageWorker();
+    worker.answer.contentType = 'application/javascript';
+    worker.answer.precache = [
+      '/_next/static/chunks/main-abc.js',
+      '/_next/static/chunks/page-def.js',
+    ];
+    await worker.precache();
+    assert.deepEqual(
+      [...worker.stored.keys()],
+      [`${ORIGIN}/_next/static/chunks/main-abc.js`]
+    );
+  });
+});
+
+describe('a push that is not what Seerr sends', () => {
+  it('still shows a notification, with its text', async () => {
+    const worker = loadWorker({});
+    const waits: Promise<unknown>[] = [];
+    worker.handlers.push({
+      data: {
+        json: () => {
+          throw new SyntaxError('Unexpected token');
+        },
+        text: () => 'Something arrived',
+      },
+      waitUntil: (promise: Promise<unknown>) => waits.push(promise),
+    });
+    await Promise.all(waits);
+    assert.equal(worker.shown.length, 1);
+    assert.equal(worker.shown[0].title, 'Seerr AI');
+    assert.equal(worker.shown[0].options.body, 'Something arrived');
   });
 });

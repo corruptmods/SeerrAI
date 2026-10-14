@@ -1,9 +1,12 @@
 import ImageProxy, {
   ImageNotFoundError,
   maxAgeOf,
+  redirectGuard,
 } from '@server/lib/imageproxy';
 import assert from 'node:assert/strict';
 import { promises } from 'node:fs';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -313,5 +316,77 @@ describe('what the image cache keeps, and how it serves it', () => {
     await proxy.getImage(path('unseen', 'png'));
     assert.ok(await proxy.peek(path('unseen', 'png')));
     assert.equal(calls.length, 1);
+  });
+});
+
+/*
+ * A host's pictures are fetched from that host. A redirect elsewhere (a
+ * host that was taken over, or one answering for another) is not followed
+ * onto the server's own network.
+ */
+describe('image redirects', () => {
+  const unique = `${process.pid}-${Date.now()}`;
+  let elsewhere: string[] = [];
+  let upstream: http.Server;
+  let other: http.Server;
+
+  before(async () => {
+    other = http.createServer((req, res) => {
+      elsewhere.push(req.url ?? '');
+      res.writeHead(200, { 'Content-Type': 'image/jpeg' });
+      res.end(Buffer.from([0xff, 0xd8, 0xff, 0xe0]));
+    });
+    await new Promise<void>((r) => other.listen(0, '127.0.0.1', () => r()));
+    const otherPort = (other.address() as AddressInfo).port;
+    upstream = http.createServer((req, res) => {
+      const host = req.url?.includes('away') ? 'localhost' : '127.0.0.1';
+      res.writeHead(302, {
+        Location: `http://${host}:${otherPort}/moved.jpg`,
+      });
+      res.end();
+    });
+    await new Promise<void>((r) => upstream.listen(0, '127.0.0.1', () => r()));
+  });
+
+  after(async () => {
+    upstream.close();
+    other.close();
+    const dir = join(__dirname, '../../config/cache/images/redirect-test');
+    await promises.rm(dir, { recursive: true, force: true });
+  });
+
+  it('follows one on the same host, and refuses one to another', async () => {
+    const proxy = new ImageProxy(
+      'redirect-test',
+      `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`
+    );
+    elsewhere = [];
+    const image = await proxy.getImage(`/t/p/w500/${unique}-home.jpg`);
+    assert.equal(image.meta.contentType, 'image/jpeg');
+    assert.deepEqual(elsewhere, ['/moved.jpg']);
+
+    elsewhere = [];
+    await assert.rejects(() => proxy.getImage(`/t/p/w500/${unique}-away.jpg`));
+    assert.deepEqual(elsewhere, [], 'the other host was never asked');
+  });
+
+  it('lets album covers go on to archive.org, over https only', () => {
+    const guard = redirectGuard('https://coverartarchive.org', ['archive.org']);
+    for (const hostname of [
+      'coverartarchive.org',
+      'archive.org',
+      'ia800309.us.archive.org',
+    ]) {
+      assert.doesNotThrow(() => guard({ protocol: 'https:', hostname }));
+    }
+    for (const [protocol, hostname] of [
+      ['http:', 'archive.org'],
+      ['https:', 'notarchive.org'],
+      ['https:', 'archive.org.example.com'],
+      ['https:', '169.254.169.254'],
+      ['http:', 'coverartarchive.org'],
+    ]) {
+      assert.throws(() => guard({ protocol, hostname }), hostname);
+    }
   });
 });

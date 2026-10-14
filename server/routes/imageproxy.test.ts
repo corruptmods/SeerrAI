@@ -169,6 +169,30 @@ describe('GET /imageproxy/tmdb/...', () => {
     assert.deepEqual(upstream, []);
   });
 
+  it('knows the browser has it however its ETag comes back', async () => {
+    // A CDN that compressed the response hands its ETag back weak; a
+    // browser may list several.
+    for (const tag of ['W/"poster1"', '"older", "poster1"']) {
+      const res = await get(poster('b'), { 'if-none-match': tag });
+      assert.equal(res.status, 304, tag);
+      assert.equal(res.headers.get('etag'), '"poster1"');
+    }
+    assert.equal(
+      (await get(poster('b'), { 'if-none-match': '"older"' })).status,
+      200
+    );
+  });
+
+  it('keeps a picture a picture when opened on its own', async () => {
+    // TMDB serves some logos as SVG, which can carry script.
+    const res = await get(poster('b'));
+    assert.equal(
+      res.headers.get('content-security-policy'),
+      "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+    );
+    assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+  });
+
   it('answers 404 for an image TMDB does not have, for a while', async () => {
     const res = await get(poster('gone'), SIGNED_IN);
     assert.equal(res.status, 404);

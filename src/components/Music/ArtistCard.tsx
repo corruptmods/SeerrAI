@@ -8,6 +8,7 @@ import {
 import RequestModal from '@app/components/RequestModal';
 import CardShell, {
   NoPicture,
+  cardImageSizes,
   useCardDetail,
 } from '@app/components/TitleCard/CardShell';
 import useFeature from '@app/hooks/useFeature';
@@ -88,6 +89,7 @@ const ArtistCard = ({ artist, canExpand }: ArtistCardProps) => {
           <MusicImage
             src={artistImageUrl(artist.id)}
             fallback="none"
+            sizes={cardImageSizes(canExpand)}
             onMissing={() => setMissing(true)}
           />
         )

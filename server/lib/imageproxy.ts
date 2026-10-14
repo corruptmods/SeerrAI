@@ -8,6 +8,7 @@ import {
   MUSIC_IMAGE_KEPT_S,
   MUSIC_IMAGE_MISSING_MS,
   MUSIC_IMAGE_ORIGINS,
+  MUSIC_IMAGE_REDIRECT_HOSTS,
 } from '@server/lib/music/imageSources';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -205,6 +206,59 @@ const conditionalHeaders = (meta: ImageResponse['meta']) => ({
 
 /** The upstream has no such image (404 or 410). */
 export class ImageNotFoundError extends Error {}
+
+/**
+ * Whether a browser's If-None-Match names this ETag. It may list several,
+ * and a CDN that compressed the response hands its ETag on as a weak one
+ * (W/"…"), which still means the same picture.
+ */
+export const etagMatches = (header: unknown, etag: string): boolean => {
+  if (typeof header !== 'string' || !header) {
+    return false;
+  }
+  const bare = (tag: string) => tag.trim().replace(/^W\//, '');
+  return (
+    header.trim() === '*' ||
+    header.split(',').some((tag) => bare(tag) === bare(etag))
+  );
+};
+
+/**
+ * Sent with every picture served from Seerr's own address. A picture opened
+ * on its own is a page of this site, and an SVG can carry script: these
+ * keep it a picture, whatever the host it came from put in it.
+ */
+export const PICTURE_HEADERS = {
+  'Content-Security-Policy':
+    "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+  'X-Content-Type-Options': 'nosniff',
+} as const;
+
+/** The largest picture fetched from a host; anything bigger is refused. */
+const MAX_IMAGE_BYTES = 30 * 1024 * 1024;
+
+/**
+ * Which redirects a host's pictures may follow: to the same host, or to
+ * one of the others named for it, over https (or the host's own protocol).
+ * Anything else is refused rather than fetched from wherever it points.
+ */
+export const redirectGuard =
+  (baseUrl: string, otherHosts: readonly string[] = []) =>
+  (options: { protocol?: string | null; hostname?: string | null }) => {
+    const base = new URL(baseUrl);
+    const host = (options.hostname ?? '').toLowerCase();
+    const allowed =
+      (host === base.hostname && options.protocol === base.protocol) ||
+      (options.protocol === 'https:' &&
+        otherHosts.some(
+          (other) => host === other || host.endsWith(`.${other}`)
+        ));
+    if (!allowed) {
+      throw new Error(
+        `Refused to follow an image to ${options.protocol ?? ''}//${host}`
+      );
+    }
+  };
 
 const baseCacheDirectory = process.env.CONFIG_DIRECTORY
   ? `${process.env.CONFIG_DIRECTORY}/cache/images`
@@ -472,6 +526,12 @@ class ImageProxy {
        */
       keptForS?: number;
       missingForMs?: number;
+      /**
+       * Other hosts the pictures may be redirected to. Without a base URL
+       * (avatars, fetched by full address from the admin's own servers)
+       * redirects are not limited.
+       */
+      redirectHosts?: readonly string[];
     } = {}
   ) {
     this.cacheVersion = options.cacheVersion ?? 1;
@@ -482,6 +542,10 @@ class ImageProxy {
       baseURL: baseUrl,
       headers: options.headers,
       timeout: UPSTREAM_TIMEOUT_MS,
+      maxContentLength: MAX_IMAGE_BYTES,
+      ...(baseUrl
+        ? { beforeRedirect: redirectGuard(baseUrl, options.redirectHosts) }
+        : {}),
     });
     this.axios.interceptors.request.use(proxyRequestInterceptor);
     this.axios.interceptors.request.use(userAgentRequestInterceptor);
@@ -1039,6 +1103,7 @@ export const musicImageProxy = (source: MusicImageSource) =>
       rateLimitOptions: { maxRequests: 10, maxRPS: 20 },
       keptForS: MUSIC_IMAGE_KEPT_S[source],
       missingForMs: MUSIC_IMAGE_MISSING_MS,
+      redirectHosts: MUSIC_IMAGE_REDIRECT_HOSTS[source],
     }
   ));
 

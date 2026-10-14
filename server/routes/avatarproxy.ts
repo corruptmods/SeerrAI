@@ -1,13 +1,16 @@
 import type { JellyfinFamilyKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
-import ImageProxy from '@server/lib/imageproxy';
+import ImageProxy, {
+  etagMatches,
+  PICTURE_HEADERS,
+} from '@server/lib/imageproxy';
 import {
-  USER_ID,
   connectedServers,
   hostnameFor,
   isJellyfinFamily,
   jellyfinFamilyServer,
+  USER_ID,
 } from '@server/lib/mediaServers';
 import logger from '@server/logger';
 import axios from 'axios';
@@ -182,15 +185,28 @@ router.get('/:jellyfinUserId', async (req, res, next) => {
       imageData = await avatarImageCache.getImage(fallbackUrl);
     }
 
-    if (userEtag && userEtag === `"${imageData.meta.etag}"` && !versionParam) {
-      return res.status(304).end();
+    // A host that sends no ETag of its own (Jellyfin) would leave every
+    // avatar with the same empty one, and a browser asking whether its old
+    // picture is still good would always be told yes: the picture's own
+    // fingerprint stands in.
+    const etag = `"${
+      imageData.meta.etag || computeImageHash(imageData.imageBuffer)
+    }"`;
+    const headers = {
+      'Cache-Control': `public, max-age=${imageData.meta.curRevalidate}`,
+      ETag: etag,
+    };
+
+    if (etagMatches(userEtag, etag) && !versionParam) {
+      res.writeHead(304, headers);
+      return res.end();
     }
 
     res.writeHead(200, {
+      ...headers,
+      ...PICTURE_HEADERS,
       'Content-Type': imageData.meta.contentType,
       'Content-Length': imageData.imageBuffer.length,
-      'Cache-Control': `public, max-age=${imageData.meta.curRevalidate}`,
-      ETag: `"${imageData.meta.etag}"`,
       'OS-Cache-Key': imageData.meta.cacheKey,
       'OS-Cache-Status': imageData.meta.cacheMiss ? 'MISS' : 'HIT',
     });

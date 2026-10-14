@@ -32,6 +32,47 @@ const PWAHeader = ({ applicationTitle = 'Seerr AI' }: PWAHeaderProps) => {
         href="/apple-splash-2732-2048.jpg"
         media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"
       />
+      {/* iPad Pro 13" and 11" (M4), iPad Air 11" and iPad, iPad mini */}
+      <link
+        rel="apple-touch-startup-image"
+        href="/apple-splash-2064-2752.jpg"
+        media="(device-width: 1032px) and (device-height: 1376px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+      />
+      <link
+        rel="apple-touch-startup-image"
+        href="/apple-splash-2752-2064.jpg"
+        media="(device-width: 1032px) and (device-height: 1376px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"
+      />
+      <link
+        rel="apple-touch-startup-image"
+        href="/apple-splash-1668-2420.jpg"
+        media="(device-width: 834px) and (device-height: 1210px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+      />
+      <link
+        rel="apple-touch-startup-image"
+        href="/apple-splash-2420-1668.jpg"
+        media="(device-width: 834px) and (device-height: 1210px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"
+      />
+      <link
+        rel="apple-touch-startup-image"
+        href="/apple-splash-1640-2360.jpg"
+        media="(device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+      />
+      <link
+        rel="apple-touch-startup-image"
+        href="/apple-splash-2360-1640.jpg"
+        media="(device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"
+      />
+      <link
+        rel="apple-touch-startup-image"
+        href="/apple-splash-1488-2266.jpg"
+        media="(device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"
+      />
+      <link
+        rel="apple-touch-startup-image"
+        href="/apple-splash-2266-1488.jpg"
+        media="(device-width: 744px) and (device-height: 1133px) and (-webkit-device-pixel-ratio: 2) and (orientation: landscape)"
+      />
       <link
         rel="apple-touch-startup-image"
         href="/apple-splash-1668-2388.jpg"

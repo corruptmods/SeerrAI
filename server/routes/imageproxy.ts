@@ -5,6 +5,8 @@ import { featureEnabled } from '@server/lib/features';
 import type { ImageVariant } from '@server/lib/imageproxy';
 import ImageProxy, {
   ImageNotFoundError,
+  PICTURE_HEADERS,
+  etagMatches,
   musicImageProxy,
   tmdbImageProxy,
 } from '@server/lib/imageproxy';
@@ -271,13 +273,14 @@ const serve = async (
     };
 
     // The browser already has this one.
-    if (req.headers['if-none-match'] === etag) {
+    if (etagMatches(req.headers['if-none-match'], etag)) {
       res.writeHead(304, headers);
       return res.end();
     }
 
     res.writeHead(200, {
       ...headers,
+      ...PICTURE_HEADERS,
       'Content-Type': imageData.meta.contentType,
       'Content-Length': imageData.imageBuffer.length,
       'OS-Cache-Key': imageData.meta.cacheKey,

@@ -15,6 +15,20 @@ export const MUSIC_IMAGE_ORIGINS = {
 
 export type MusicImageSource = keyof typeof MUSIC_IMAGE_ORIGINS;
 
+/**
+ * Where each source's pictures may be redirected, besides its own host:
+ * the Cover Art Archive keeps its covers at archive.org (whose servers are
+ * its subdomains). The others answer from their own host.
+ */
+export const MUSIC_IMAGE_REDIRECT_HOSTS: Record<
+  MusicImageSource,
+  readonly string[]
+> = {
+  caa: ['archive.org'],
+  fanart: [],
+  tadb: [],
+};
+
 const DAY_S = 24 * 60 * 60;
 
 /**

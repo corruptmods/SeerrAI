@@ -15,6 +15,12 @@ import TvGenreSlider from '@app/components/Discover/TvGenreSlider';
 import { animeQuery } from '@app/components/Discover/animeChoices';
 import { sliderTitles } from '@app/components/Discover/constants';
 import MediaSlider from '@app/components/MediaSlider';
+import MusicSlider from '@app/components/Music/MusicSlider';
+import {
+  musicRowFor,
+  musicRowLink,
+  musicRowUrl,
+} from '@app/components/Music/musicRows';
 import { loadNavEditor, useNavLayout } from '@app/context/NavLayoutContext';
 import { encodeURIExtraParams } from '@app/hooks/useDiscover';
 import { useFeatureCheck } from '@app/hooks/useFeature';
@@ -386,6 +392,23 @@ const Discover = () => {
         : discoverData
       )?.map((slider, index) => {
         let sliderComponent: React.ReactNode;
+
+        // Music's rows exist once Lidarr is set up, for people with music
+        // on; for anyone else they are not there at all, even to arrange.
+        const musicRow = musicRowFor(slider.type);
+        if (musicRow && !featureIsOn('music')) {
+          return null;
+        }
+        if (musicRow) {
+          sliderComponent = (
+            <MusicSlider
+              sliderKey={`music-${musicRow.show}`}
+              title={intl.formatMessage(musicRow.title)}
+              url={musicRowUrl(musicRow)}
+              linkUrl={musicRowLink(musicRow)}
+            />
+          );
+        }
 
         switch (slider.type) {
           case DiscoverSliderType.DELETING_SOON:

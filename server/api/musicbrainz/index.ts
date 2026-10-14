@@ -7,6 +7,7 @@ import cacheManager from '@server/lib/cache';
 import { MUSICBRAINZ_URL, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { getAppVersion } from '@server/utils/appVersion';
+import { Like } from 'typeorm';
 import type {
   MbArtist,
   MbArtistSearchResponse,
@@ -377,6 +378,32 @@ export class MusicBrainz extends ExternalAPI {
         offset: page * MB_PAGE_SIZE,
       })
     );
+  }
+
+  /**
+   * The artist's albums MusicBrainz has already been asked for (any page,
+   * any kinds), without asking again: for an artist picture to fall back
+   * on, where a request in the queue would be one too many.
+   */
+  public async keptArtistReleaseGroups(
+    artistId: string
+  ): Promise<MbReleaseGroup[]> {
+    requireMbid(artistId);
+    try {
+      const rows = await getRepository(MusicMetadata).find({
+        where: { key: Like(`rg-list:${artistId}:%`) },
+      });
+      const seen = new Set<string>();
+      return rows.flatMap((row) =>
+        (
+          (JSON.parse(row.data) as MbReleaseGroupBrowseResponse)[
+            'release-groups'
+          ] ?? []
+        ).filter((group) => !seen.has(group.id) && !!seen.add(group.id))
+      );
+    } catch {
+      return [];
+    }
   }
 
   public async getReleaseGroup(

@@ -1,3 +1,4 @@
+import { COVER_PATH } from '@server/api/coverartarchive';
 import type { ImageFormat, ImageWidth } from '@server/constants/images';
 import { IMAGE_FORMATS, IMAGE_WIDTHS } from '@server/constants/images';
 import type { ImageVariant } from '@server/lib/imageproxy';
@@ -5,6 +6,11 @@ import ImageProxy, {
   ImageNotFoundError,
   tmdbImageProxy,
 } from '@server/lib/imageproxy';
+import {
+  FANART_PATH,
+  MUSIC_IMAGE_ORIGINS,
+  TADB_PATH,
+} from '@server/lib/music/imageSources';
 import logger from '@server/logger';
 import cookieParser from 'cookie-parser';
 import type { Request } from 'express';
@@ -27,6 +33,16 @@ function initTvdbImageProxy() {
   return _tvdbImageProxy;
 }
 
+// Music's pictures: album covers, and pictures of artists. Each its own
+// cache, made on first use.
+const musicProxies: Partial<
+  Record<keyof typeof MUSIC_IMAGE_ORIGINS, ImageProxy>
+> = {};
+const musicImageProxy = (key: keyof typeof MUSIC_IMAGE_ORIGINS) => () =>
+  (musicProxies[key] ??= new ImageProxy(key, MUSIC_IMAGE_ORIGINS[key], {
+    rateLimitOptions: { maxRequests: 10, maxRPS: 20 },
+  }));
+
 const sources = {
   tmdb: {
     origin: 'https://image.tmdb.org',
@@ -40,7 +56,26 @@ const sources = {
     proxy: initTvdbImageProxy,
     path: /^\/banners\/(?:[\w-]+\/)*[\w-]+\.(?:jpe?g|png|webp)$/i,
   },
+  // The Cover Art Archive, which redirects each cover to archive.org.
+  caa: {
+    origin: MUSIC_IMAGE_ORIGINS.caa,
+    proxy: musicImageProxy('caa'),
+    path: COVER_PATH,
+  },
+  fanart: {
+    origin: MUSIC_IMAGE_ORIGINS.fanart,
+    proxy: musicImageProxy('fanart'),
+    path: FANART_PATH,
+  },
+  tadb: {
+    origin: MUSIC_IMAGE_ORIGINS.tadb,
+    proxy: musicImageProxy('tadb'),
+    path: TADB_PATH,
+  },
 } as const;
+
+const isSource = (type: string): type is keyof typeof sources =>
+  Object.prototype.hasOwnProperty.call(sources, type);
 
 /*
  * Whether the request comes from someone signed in. Only they may add new
@@ -141,10 +176,9 @@ router.get<{
   // path that already starts with one ("/w1920_and_h800_multi_faces//x.jpg").
   // TMDB takes either, so they are read as one.
   const imagePath = ('/' + req.params.path.join('/')).replace(/\/{2,}/g, '/');
-  const source =
-    req.params.type === 'tmdb' || req.params.type === 'tvdb'
-      ? sources[req.params.type]
-      : undefined;
+  const source = isSource(req.params.type)
+    ? sources[req.params.type]
+    : undefined;
 
   if (!source) {
     return next({ status: 400, message: 'Unsupported image type.' });

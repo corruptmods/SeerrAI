@@ -11,6 +11,7 @@ import RadarrModal from '@app/components/Settings/RadarrModal';
 import ServerInstance from '@app/components/Settings/ServerInstance';
 import SettingsBazarr from '@app/components/Settings/SettingsBazarr';
 import SettingsDownloadClients from '@app/components/Settings/SettingsDownloadClients';
+import SettingsLidarr from '@app/components/Settings/SettingsLidarr';
 import SettingsMaintainerr from '@app/components/Settings/SettingsMaintainerr';
 import SettingsTautulli from '@app/components/Settings/SettingsTautulli';
 import SettingsTrakt from '@app/components/Settings/SettingsTrakt';
@@ -382,6 +383,7 @@ const SettingsServices = () => {
           </>
         )}
       </div>
+      <SettingsLidarr />
       <div className="mb-6 mt-10">
         <h3 className="heading">
           {intl.formatMessage(messages.overrideRules)}

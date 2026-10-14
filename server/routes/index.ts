@@ -43,11 +43,13 @@ import blocklistRoutes from './blocklist';
 import calendarRoutes from './calendar';
 import collectionRoutes from './collection';
 import discoverRoutes, { createTmdbWithRegionLanguage } from './discover';
+import discoverMusicRoutes from './discoverMusic';
 import issueRoutes from './issue';
 import issueCommentRoutes from './issueComment';
 import maintainerrRoutes from './maintainerr';
 import mediaRoutes from './media';
 import movieRoutes from './movie';
+import musicRoutes from './music';
 import personRoutes from './person';
 import requestRoutes from './request';
 import searchRoutes from './search';
@@ -160,6 +162,8 @@ router.get(
 );
 router.use('/settings', isAuthenticated(Permission.ADMIN), settingsRoutes);
 router.use('/search', isAuthenticated(), searchRoutes);
+// Before Discover's own routes, which it is part of.
+router.use('/discover/music', isAuthenticated(), discoverMusicRoutes);
 router.use('/discover', isAuthenticated(), discoverRoutes);
 router.use('/request', isAuthenticated(), requestRoutes);
 router.use('/watchlist', isAuthenticated(), watchlistRoutes);
@@ -176,6 +180,7 @@ router.use(
 );
 router.use('/movie', isAuthenticated(), movieRoutes);
 router.use('/tv', isAuthenticated(), tvRoutes);
+router.use('/music', isAuthenticated(), musicRoutes);
 router.use('/media', isAuthenticated(), mediaRoutes);
 router.use('/calendar', isAuthenticated(), calendarRoutes);
 router.use('/person', isAuthenticated(), personRoutes);

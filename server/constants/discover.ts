@@ -27,7 +27,24 @@ export enum DiscoverSliderType {
   DELETING_SOON,
   /** Anime airing this season; its own page also has other seasons. */
   ANIME,
+  /*
+   * Music, shown only once Lidarr is set up and to people with music on.
+   * New albums and what is popular come from ListenBrainz; Recently Added
+   * from Seerr's own scans.
+   */
+  MUSIC_RECENTLY_ADDED,
+  MUSIC_NEW_RELEASES,
+  MUSIC_POPULAR_ALBUMS,
+  MUSIC_POPULAR_ARTISTS,
 }
+
+/** Music's rows, which only show once music is ready. */
+export const MUSIC_SLIDERS: readonly DiscoverSliderType[] = [
+  DiscoverSliderType.MUSIC_RECENTLY_ADDED,
+  DiscoverSliderType.MUSIC_NEW_RELEASES,
+  DiscoverSliderType.MUSIC_POPULAR_ALBUMS,
+  DiscoverSliderType.MUSIC_POPULAR_ARTISTS,
+];
 
 export const defaultSliders: Partial<DiscoverSlider>[] = [
   // First: the one row that is time-sensitive.
@@ -120,5 +137,30 @@ export const defaultSliders: Partial<DiscoverSlider>[] = [
     enabled: true,
     isBuiltIn: true,
     order: 14,
+  },
+  // Music, after everything else; they show once Lidarr is set up.
+  {
+    type: DiscoverSliderType.MUSIC_RECENTLY_ADDED,
+    enabled: true,
+    isBuiltIn: true,
+    order: 15,
+  },
+  {
+    type: DiscoverSliderType.MUSIC_NEW_RELEASES,
+    enabled: true,
+    isBuiltIn: true,
+    order: 16,
+  },
+  {
+    type: DiscoverSliderType.MUSIC_POPULAR_ALBUMS,
+    enabled: true,
+    isBuiltIn: true,
+    order: 17,
+  },
+  {
+    type: DiscoverSliderType.MUSIC_POPULAR_ARTISTS,
+    enabled: true,
+    isBuiltIn: true,
+    order: 18,
   },
 ];

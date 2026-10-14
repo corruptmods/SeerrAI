@@ -20,6 +20,7 @@ import {
   EyeSlashIcon,
   BookmarkIcon as FilledBookmarkIcon,
   FilmIcon,
+  MusicalNoteIcon,
   SparklesIcon,
   TvIcon,
   UsersIcon,
@@ -32,6 +33,7 @@ import {
   ExclamationTriangleIcon as FilledExclamationTriangleIcon,
   EyeSlashIcon as FilledEyeSlashIcon,
   FilmIcon as FilledFilmIcon,
+  MusicalNoteIcon as FilledMusicalNoteIcon,
   SparklesIcon as FilledSparklesIcon,
   TvIcon as FilledTvIcon,
   UsersIcon as FilledUsersIcon,
@@ -143,6 +145,17 @@ const MobileMenu = ({
       svgIcon: <ClockIcon className="h-6 w-6" />,
       svgIconSelected: <FilledClockIcon className="h-6 w-6" />,
       activeRegExp: /^\/requests/,
+    },
+    {
+      id: 'music',
+      href: '/discover/music',
+      content: intl.formatMessage(menuMessages.music),
+      // Only once Lidarr is set up, and for people with music on. After
+      // the bar's five, so the bar stays as it was.
+      feature: 'music',
+      svgIcon: <MusicalNoteIcon className="h-6 w-6" />,
+      svgIconSelected: <FilledMusicalNoteIcon className="h-6 w-6" />,
+      activeRegExp: /^\/(discover\/music|music\/)/,
     },
     {
       id: 'calendar',

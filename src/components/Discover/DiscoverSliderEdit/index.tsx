@@ -170,6 +170,14 @@ const DiscoverSliderEdit = ({
         return intl.formatMessage(sliderTitles.networks);
       case DiscoverSliderType.ANIME:
         return intl.formatMessage(sliderTitles.anime);
+      case DiscoverSliderType.MUSIC_RECENTLY_ADDED:
+        return intl.formatMessage(sliderTitles.musicRecentlyAdded);
+      case DiscoverSliderType.MUSIC_NEW_RELEASES:
+        return intl.formatMessage(sliderTitles.musicNewReleases);
+      case DiscoverSliderType.MUSIC_POPULAR_ALBUMS:
+        return intl.formatMessage(sliderTitles.musicPopularAlbums);
+      case DiscoverSliderType.MUSIC_POPULAR_ARTISTS:
+        return intl.formatMessage(sliderTitles.musicPopularArtists);
       case DiscoverSliderType.TMDB_MOVIE_KEYWORD:
         return intl.formatMessage(sliderTitles.tmdbmoviekeyword);
       case DiscoverSliderType.TMDB_TV_KEYWORD:

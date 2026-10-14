@@ -17,7 +17,7 @@ import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
-import type { RadarrSettings } from '@server/lib/settings';
+import type { LidarrSettings, RadarrSettings } from '@server/lib/settings';
 import { BACKFILL_DEFAULTS, getSettings } from '@server/lib/settings';
 import mediaRoutes from '@server/routes/media';
 import settingsRoutes from '@server/routes/settings';
@@ -237,6 +237,7 @@ beforeEach(() => {
   settings.plex = { ...settings.plex, ip: '' };
   settings.radarr = [radarr(0, 'Radarr', fakePort), radarr(1, 'Radarr 4K', 1)];
   settings.sonarr = [];
+  settings.lidarr = [];
   settings.tautulli = {};
   settings.maintainerr = [
     {
@@ -282,6 +283,26 @@ describe('services', () => {
     ]);
     assert.match(byId(checks, 'radarr:0').detail!, /^\d+ ms · 500 GB free$/);
     assert.ok(byId(checks, 'radarr:1').detail, 'says why it failed');
+  });
+
+  it('checks Lidarr like Radarr, unless music is turned off for everyone', async () => {
+    const settings = getSettings();
+    settings.lidarr = [
+      {
+        ...radarr(0, 'Lidarr', fakePort),
+        activeMetadataProfileId: 1,
+        activeMetadataProfileName: 'Standard',
+      } as unknown as LidarrSettings,
+    ];
+    try {
+      const lidarr = byId(await health(), 'lidarr:0');
+      assert.equal(lidarr.name, 'Lidarr');
+      assert.equal(lidarr.status, 'ok');
+      settings.main.disabledFeatures = ['music'];
+      assert.equal(byId(await health(), 'lidarr:0'), undefined);
+    } finally {
+      settings.main.disabledFeatures = [];
+    }
   });
 
   it('names the subtitle providers Bazarr has paused, such as WhisperAI', async () => {

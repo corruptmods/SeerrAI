@@ -32,6 +32,8 @@ tags:
     description: Endpoints related to retrieving movies and their details.
   - name: tv
     description: Endpoints related to retrieving TV series and their details.
+  - name: music
+    description: Music from MusicBrainz, ListenBrainz and Lidarr, once Lidarr is set up and music is on.
   - name: other
     description: Endpoints related to other TMDB data
   - name: person
@@ -1462,6 +1464,9 @@ components:
           description: Countries whose anime does not count as anime unless it is in Japanese. Set through /settings/anime.
           items:
             type: string
+        musicReady:
+          type: boolean
+          description: A default Lidarr is set up and music is not turned off for everyone.
         mediaServers:
           type: array
           description: The connected media servers, the primary one first.
@@ -1529,6 +1534,161 @@ components:
         - libraries
         - enabledLibraries
         - address
+    LidarrSettings:
+      type: object
+      description: A Lidarr server, for music. There is no 4K Lidarr; one server is the default.
+      properties:
+        id:
+          type: number
+          example: 0
+          readOnly: true
+        name:
+          type: string
+          example: 'Lidarr'
+        hostname:
+          type: string
+          example: '127.0.0.1'
+        port:
+          type: number
+          example: 8686
+        apiKey:
+          type: string
+          example: 'exampleapikey'
+        useSsl:
+          type: boolean
+          example: false
+        baseUrl:
+          type: string
+        activeProfileId:
+          type: number
+          example: 1
+        activeProfileName:
+          type: string
+          example: Lossless
+        activeDirectory:
+          type: string
+          example: '/music'
+        activeMetadataProfileId:
+          type: number
+          example: 1
+          description: Which kinds of release (albums, EPs, live albums) Lidarr lists for an artist it adds.
+        activeMetadataProfileName:
+          type: string
+          example: Standard
+        tags:
+          type: array
+          items:
+            type: number
+        is4k:
+          type: boolean
+          description: Always false.
+        isDefault:
+          type: boolean
+          example: false
+        externalUrl:
+          type: string
+          example: http://lidarr.example.com
+        syncEnabled:
+          type: boolean
+          example: false
+        preventSearch:
+          type: boolean
+          example: false
+        tagRequests:
+          type: boolean
+          example: false
+      required:
+        - name
+        - hostname
+        - port
+        - apiKey
+        - useSsl
+        - activeProfileId
+        - activeDirectory
+        - activeMetadataProfileId
+        - isDefault
+    MusicArtistResult:
+      type: object
+      properties:
+        mediaType:
+          type: string
+          enum: [artist]
+        id:
+          type: string
+          description: The artist's MusicBrainz id.
+        name:
+          type: string
+        disambiguation:
+          type: string
+        type:
+          type: string
+          example: Group
+        country:
+          type: string
+        status:
+          type: number
+          description: The artist's status here, when Seerr has them.
+    MusicAlbumResult:
+      type: object
+      properties:
+        mediaType:
+          type: string
+          enum: [album]
+        id:
+          type: string
+          description: The album's MusicBrainz release-group id.
+        title:
+          type: string
+        primaryType:
+          type: string
+          example: Album
+        secondaryTypes:
+          type: array
+          items:
+            type: string
+        releaseDate:
+          type: string
+          example: '2003-06-09'
+        artistId:
+          type: string
+        artistName:
+          type: string
+        coverUrl:
+          type: string
+          description: Its front cover at the Cover Art Archive, which may not exist.
+        status:
+          type: number
+          description: The album's status here, when Seerr has it.
+    MusicPage:
+      type: object
+      properties:
+        page:
+          type: number
+        totalPages:
+          type: number
+        totalResults:
+          type: number
+        results:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/MusicAlbumResult'
+              - $ref: '#/components/schemas/MusicArtistResult'
+    MusicSettings:
+      type: object
+      properties:
+        musicbrainzUrl:
+          type: string
+          example: https://musicbrainz.org
+        contactEmail:
+          type: string
+        listenBrainz:
+          type: boolean
+        maxAlbumsPerRequest:
+          type: number
+          example: 100
+        hasTheAudioDbApiKey:
+          type: boolean
     MovieResult:
       type: object
       required:
@@ -6281,6 +6441,190 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SonarrSettings'
+  /settings/lidarr:
+    get:
+      summary: Get Lidarr settings
+      description: Returns every Lidarr server. Refused (403) while music is turned off for everyone.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: 'Values were returned'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LidarrSettings'
+    post:
+      summary: Add a Lidarr server
+      description: Adds a Lidarr server. A new default takes over from the old one.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LidarrSettings'
+      responses:
+        '201':
+          description: 'Lidarr server added'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LidarrSettings'
+  /settings/lidarr/test:
+    post:
+      summary: Test a Lidarr server
+      description: Connects to Lidarr and returns its quality profiles, metadata profiles, root folders and tags.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hostname:
+                  type: string
+                  example: '127.0.0.1'
+                port:
+                  type: number
+                  example: 8686
+                apiKey:
+                  type: string
+                useSsl:
+                  type: boolean
+                baseUrl:
+                  type: string
+              required:
+                - hostname
+                - port
+                - apiKey
+                - useSsl
+      responses:
+        '200':
+          description: Connected to Lidarr
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profiles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceProfile'
+                  metadataProfiles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceProfile'
+                  rootFolders:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: number
+                        path:
+                          type: string
+                  tags:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServarrTag'
+                  urlBase:
+                    type: string
+  /settings/lidarr/{lidarrId}:
+    put:
+      summary: Change a Lidarr server
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: lidarrId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LidarrSettings'
+      responses:
+        '200':
+          description: 'Lidarr server changed'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LidarrSettings'
+    delete:
+      summary: Remove a Lidarr server
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: lidarrId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Lidarr server removed'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LidarrSettings'
+  /settings/music:
+    get:
+      summary: Get music settings
+      description: Where music's details come from (Settings → Metadata → Music). TheAudioDB's key is never returned, only whether one is set. Refused (403) while music is turned off for everyone.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Music settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicSettings'
+    post:
+      summary: Save music settings
+      description: Saves them. Without a TheAudioDB key the saved one is kept; `removeTheAudioDbApiKey` clears it.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                musicbrainzUrl:
+                  type: string
+                  description: MusicBrainz or a mirror of it. Blank is the public MusicBrainz.
+                contactEmail:
+                  type: string
+                  description: Sent to MusicBrainz with each request, so it can reach whoever runs this server.
+                listenBrainz:
+                  type: boolean
+                  description: New releases and what is popular, for Discover.
+                theAudioDbApiKey:
+                  type: string
+                removeTheAudioDbApiKey:
+                  type: boolean
+                maxAlbumsPerRequest:
+                  type: number
+                  minimum: 1
+                  maximum: 1000
+      responses:
+        '200':
+          description: Music settings saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicSettings'
   /settings/public:
     get:
       summary: Get public settings
@@ -10355,6 +10699,250 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Company'
+  /music/search:
+    get:
+      summary: Search music
+      description: Artists (up to 8) and albums (up to 12) from MusicBrainz. Refused while music is off for the person (403) or before Lidarr is set up (404); 503 when MusicBrainz is too busy to answer in time.
+      tags:
+        - music
+      parameters:
+        - in: query
+          name: query
+          required: true
+          schema:
+            type: string
+            maxLength: 200
+      responses:
+        '200':
+          description: Results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artists:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MusicArtistResult'
+                  albums:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MusicAlbumResult'
+  /music/artist/{mbid}:
+    get:
+      summary: An artist
+      description: The artist from MusicBrainz, the start of their Wikipedia article, and Seerr's own record of them (mediaInfo) with their requests as the viewer may see them.
+      tags:
+        - music
+      parameters:
+        - in: path
+          name: mbid
+          required: true
+          description: A MusicBrainz id.
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      responses:
+        '200':
+          description: The artist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicArtistResult'
+  /music/artist/{mbid}/albums:
+    get:
+      summary: An artist's albums
+      description: Every kind of release the artist has (albums, EPs, singles and the rest), a hundred a page, each with its status here.
+      tags:
+        - music
+      parameters:
+        - in: path
+          name: mbid
+          required: true
+          description: A MusicBrainz id.
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        - in: query
+          name: page
+          schema:
+            type: number
+            example: 1
+            default: 1
+      responses:
+        '200':
+          description: One page of albums
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicPage'
+  /music/artist/{mbid}/image:
+    get:
+      summary: A picture of an artist
+      description: Redirects to a picture of the artist (through the image proxy when images are cached), from Lidarr's lookup, TheAudioDB, or their newest album's cover. 404 when there is none.
+      tags:
+        - music
+      parameters:
+        - in: path
+          name: mbid
+          required: true
+          description: A MusicBrainz id.
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        - in: query
+          name: kind
+          schema:
+            type: string
+            enum: [photo, backdrop]
+            default: photo
+      responses:
+        '302':
+          description: Where the picture is
+        '404':
+          description: No picture of this artist
+  /music/album/{mbid}:
+    get:
+      summary: An album
+      description: The album (a MusicBrainz release group), its status here, and its artist's record here (mediaInfo).
+      tags:
+        - music
+      parameters:
+        - in: path
+          name: mbid
+          required: true
+          description: A MusicBrainz id.
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      responses:
+        '200':
+          description: The album
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicAlbumResult'
+  /music/album/{mbid}/tracks:
+    get:
+      summary: An album's tracks
+      description: The track list of one of the album's releases, an official one, the earliest.
+      tags:
+        - music
+      parameters:
+        - in: path
+          name: mbid
+          required: true
+          description: A MusicBrainz id.
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      responses:
+        '200':
+          description: Its tracks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tracks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        disc:
+                          type: number
+                        discTitle:
+                          type: string
+                        position:
+                          type: number
+                        number:
+                          type: string
+                        title:
+                          type: string
+                        length:
+                          type: number
+                          nullable: true
+                          description: Milliseconds.
+  /discover/music/new-releases:
+    get:
+      summary: New music
+      description: Albums released in the last two weeks, from ListenBrainz, newest first. Empty with ListenBrainz switched off. Twenty a page. Refused while music is off for the person (403) or before Lidarr is set up (404).
+      tags:
+        - music
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: number
+            example: 1
+            default: 1
+      responses:
+        '200':
+          description: One page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicPage'
+  /discover/music/popular-albums:
+    get:
+      summary: Popular albums
+      description: The albums ListenBrainz's listeners played most this week. Empty with ListenBrainz switched off. Twenty a page. Refused while music is off for the person (403) or before Lidarr is set up (404).
+      tags:
+        - music
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: number
+            example: 1
+            default: 1
+      responses:
+        '200':
+          description: One page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicPage'
+  /discover/music/popular-artists:
+    get:
+      summary: Popular artists
+      description: The artists ListenBrainz's listeners played most this week. Empty with ListenBrainz switched off. Twenty a page. Refused while music is off for the person (403) or before Lidarr is set up (404).
+      tags:
+        - music
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: number
+            example: 1
+            default: 1
+      responses:
+        '200':
+          description: One page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicPage'
+  /discover/music/recently-added:
+    get:
+      summary: Recently added music
+      description: Albums a media server has, newest first. Twenty a page. Refused while music is off for the person (403) or before Lidarr is set up (404).
+      tags:
+        - music
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: number
+            example: 1
+            default: 1
+      responses:
+        '200':
+          description: One page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicPage'
   /discover/movies:
     get:
       summary: Discover movies
@@ -12989,6 +13577,74 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/SonarrSeries'
+  /service/lidarr:
+    get:
+      summary: Get the Lidarr servers
+      description: Each Lidarr server's id, name and defaults, for the music request window. Refused while music is off for the person.
+      tags:
+        - service
+      responses:
+        '200':
+          description: Request successful
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LidarrSettings'
+  /service/lidarr/{lidarrId}:
+    get:
+      summary: Get a Lidarr server's profiles and folders
+      description: Its quality and metadata profiles (with the kinds of release each lists), root folders and tags. With `artist`, also whether Lidarr has that artist already, and with which folder and profiles.
+      tags:
+        - service
+      parameters:
+        - in: path
+          name: lidarrId
+          required: true
+          schema:
+            type: number
+            example: 0
+        - in: query
+          name: artist
+          description: An artist's MusicBrainz id.
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      responses:
+        '200':
+          description: Request successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  server:
+                    $ref: '#/components/schemas/LidarrSettings'
+                  profiles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceProfile'
+                  metadataProfiles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: number
+                        name:
+                          type: string
+                        primaryTypes:
+                          type: array
+                          items:
+                            type: string
+                        secondaryTypes:
+                          type: array
+                          items:
+                            type: string
+                  artist:
+                    type: object
+                    nullable: true
   /regions:
     get:
       summary: Regions supported by TMDB

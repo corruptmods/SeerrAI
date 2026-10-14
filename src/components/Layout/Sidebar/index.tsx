@@ -17,6 +17,7 @@ import {
   ExclamationTriangleIcon,
   EyeSlashIcon,
   FilmIcon,
+  MusicalNoteIcon,
   SparklesIcon,
   TvIcon,
   UsersIcon,
@@ -34,6 +35,7 @@ export const menuMessages = defineMessages('components.Layout.Sidebar', {
   dashboard: 'Discover',
   browsemovies: 'Movies',
   browsetv: 'Series',
+  music: 'Music',
   requests: 'Requests',
   calendar: 'Calendar',
   blocklist: 'Blocklist',
@@ -91,6 +93,15 @@ const SidebarLinks: SidebarLinkProps[] = [
     messagesKey: 'browsetv',
     svgIcon: <TvIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/discover\/tv$/,
+  },
+  {
+    id: 'music',
+    href: '/discover/music',
+    messagesKey: 'music',
+    // Only once Lidarr is set up, and for people with music on.
+    feature: 'music',
+    svgIcon: <MusicalNoteIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/(discover\/music|music\/)/,
   },
   {
     id: 'requests',

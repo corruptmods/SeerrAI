@@ -5,6 +5,7 @@ import PageTitle from '@app/components/Common/PageTitle';
 import MetadataSelector, {
   MetadataProviderType,
 } from '@app/components/MetadataSelector';
+import SettingsMusic from '@app/components/Settings/SettingsMusic';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -472,6 +473,7 @@ const SettingsMetadata = () => {
           }}
         </Formik>
       </div>
+      <SettingsMusic />
     </>
   );
 };

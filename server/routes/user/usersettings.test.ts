@@ -464,9 +464,9 @@ describe('a person’s own sidebar', () => {
   it('keeps their order and hidden items, cleaned, for them alone', async () => {
     const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
     const saved = await agent.post(`/user/${userId}/settings/sidebar`).send({
-      order: ['lists', 'discover', 'music', 'lists'],
+      order: ['lists', 'discover', 'books', 'lists'],
       // Discover and Settings can't be hidden; unknown names are dropped.
-      hidden: ['issues', 'settings', 'discover', 'music', 'issues'],
+      hidden: ['issues', 'settings', 'discover', 'books', 'issues'],
     });
     assert.strictEqual(saved.status, 200);
     assert.deepStrictEqual(saved.body, {

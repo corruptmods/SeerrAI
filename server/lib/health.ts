@@ -7,6 +7,7 @@ import JellyfinAPI from '@server/api/jellyfin';
 import MaintainerrAPI from '@server/api/maintainerr';
 import PlexAPI from '@server/api/plexapi';
 import ProwlarrAPI from '@server/api/prowlarr';
+import type LidarrAPI from '@server/api/servarr/lidarr';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
 import TautulliAPI from '@server/api/tautulli';
@@ -26,12 +27,14 @@ import { User } from '@server/entity/User';
 import { listModels } from '@server/lib/ai/providers';
 import { getCollectionGaps } from '@server/lib/collectionGaps';
 import { getMaintainerrStatus } from '@server/lib/deletingSoon';
+import { featureEnabled } from '@server/lib/features';
 import {
   connectedServers,
   hostnameFor,
   isJellyfinFamily,
   jellyfinFamily,
 } from '@server/lib/mediaServers';
+import { lidarrApi } from '@server/lib/music/access';
 import type { PlexMatchProblem } from '@server/lib/plexMatchCheck';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import type { DownloadClientSettings } from '@server/lib/settings';
@@ -225,14 +228,14 @@ const reported = (
 });
 
 /**
- * Radarr or Sonarr: whether it answers, what its own health page says is
+ * Radarr, Sonarr or Lidarr: whether it answers, what its own health page says is
  * wrong (indexers or a download client it cannot reach, a missing root
  * folder, failed imports), and how full its disks are.
  */
 const arrCheck = async (
   id: string,
   name: string,
-  api: RadarrAPI | SonarrAPI
+  api: RadarrAPI | SonarrAPI | LidarrAPI
 ): Promise<HealthCheck> => {
   const started = Date.now();
   try {
@@ -646,6 +649,15 @@ export const serviceChecks = async (): Promise<HealthCheck[]> => {
         })
       )
     );
+  }
+
+  // Music's Lidarr, unless music is turned off for everyone.
+  if (featureEnabled('music')) {
+    for (const lidarr of settings.lidarr) {
+      pending.push(
+        arrCheck(`lidarr:${lidarr.id}`, lidarr.name, lidarrApi(lidarr))
+      );
+    }
   }
 
   const { prowlarr } = settings.backfill;

@@ -1,6 +1,7 @@
 import Header from '@app/components/Common/Header';
 import ListView from '@app/components/Common/ListView';
 import PageTitle from '@app/components/Common/PageTitle';
+import MusicSearchResults from '@app/components/Music/MusicSearchResults';
 import useDiscover from '@app/hooks/useDiscover';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
@@ -48,6 +49,9 @@ const Search = () => {
       <div className="mb-5 mt-1">
         <Header>{intl.formatMessage(messages.searchresults)}</Header>
       </div>
+      <MusicSearchResults
+        query={typeof router.query.query === 'string' ? router.query.query : ''}
+      />
       <ListView
         items={titles}
         isEmpty={isEmpty}

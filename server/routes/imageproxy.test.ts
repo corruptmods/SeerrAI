@@ -289,3 +289,46 @@ describe('GET /imageproxy/tmdb/...', () => {
     assert.equal(again.status, 304);
   });
 });
+
+describe('music’s pictures', () => {
+  const ALBUM = 'b1392450-e666-3926-a536-22c65f834433';
+  const ARTIST = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
+  const music = (path: string) =>
+    fetch(base.replace(/\/tmdb$/, path), { redirect: 'manual' });
+
+  it('come from the Cover Art Archive, fanart.tv and TheAudioDB', async () => {
+    for (const [path, origin] of [
+      [`/caa/release-group/${ALBUM}/front-500`, 'https://coverartarchive.org'],
+      [`/caa/release/${ALBUM}/front`, 'https://coverartarchive.org'],
+      [
+        `/fanart/fanart/music/${ARTIST}/artistthumb/radiohead-5.jpg`,
+        'https://assets.fanart.tv',
+      ],
+      ['/tadb/images/media/artist/thumb/abc.jpg', 'https://r2.theaudiodb.com'],
+    ]) {
+      // Someone signed out is sent to the picture where it is.
+      const res = await music(path);
+      assert.equal(res.status, 302, path);
+      assert.equal(
+        res.headers.get('location'),
+        `${origin}${path.replace(/^\/\w+/, '')}`
+      );
+    }
+  });
+
+  it('are only the pictures those hosts keep', async () => {
+    for (const path of [
+      `/caa/release-group/${ALBUM}/back`,
+      `/caa/release-group/${ALBUM}/front-999`,
+      '/caa/release-group/not-an-id/front-500',
+      `/caa/artist/${ARTIST}/front-500`,
+      `/fanart/fanart/movies/${ARTIST}/poster/x.jpg`,
+      `/fanart/fanart/music/${ARTIST}/artistthumb/x.html`,
+      '/tadb/api/v1/json/key/artist-mb.php',
+      '/tadb/images/media/artist/thumb/x.svg',
+      '/lastfm/i/u/300x300/x.jpg',
+    ]) {
+      assert.equal((await music(path)).status, 400, path);
+    }
+  });
+});

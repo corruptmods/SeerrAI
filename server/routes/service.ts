@@ -1,12 +1,18 @@
+import { isMbid } from '@server/api/musicbrainz';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
 import TheMovieDb from '@server/api/themoviedb';
 import type {
+  LidarrServer,
+  LidarrServerWithDetails,
   ServiceCommonServer,
   ServiceCommonServerWithDetails,
 } from '@server/interfaces/api/serviceInterfaces';
+import { lidarrApi } from '@server/lib/music/access';
+import type { LidarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import { requireMusic } from '@server/middleware/music';
 import type { NextFunction } from 'express';
 import { Router } from 'express';
 
@@ -239,6 +245,100 @@ serviceRoutes.get<{ tmdbId: string }>(
         status: 500,
         message: 'Something went wrong trying to fetch series information',
       });
+    }
+  }
+);
+
+/** A Lidarr server as the request window needs it: nothing secret. */
+const lidarrServer = (lidarr: LidarrSettings): LidarrServer => ({
+  id: lidarr.id,
+  name: lidarr.name,
+  is4k: false,
+  isDefault: lidarr.isDefault,
+  activeDirectory: lidarr.activeDirectory,
+  activeProfileId: lidarr.activeProfileId,
+  activeMetadataProfileId: lidarr.activeMetadataProfileId,
+  activeTags: lidarr.tags ?? [],
+});
+
+/*
+ * Lidarr, for the music request window: only for people with music on.
+ * Given `?artist=<MusicBrainz id>`, it also says whether that artist is in
+ * this Lidarr already, and where: an artist's folder and profiles are its
+ * own in Lidarr, and a request does not change them.
+ */
+serviceRoutes.get('/lidarr', requireMusic, async (_req, res) => {
+  return res.status(200).json(getSettings().lidarr.map(lidarrServer));
+});
+
+serviceRoutes.get<{ lidarrId: string }>(
+  '/lidarr/:lidarrId',
+  requireMusic,
+  async (req, res, next) => {
+    const lidarrSettings = getSettings().lidarr.find(
+      (lidarr) => lidarr.id === Number(req.params.lidarrId)
+    );
+
+    if (!lidarrSettings) {
+      return next({
+        status: 404,
+        message: 'Lidarr server with provided ID does not exist.',
+      });
+    }
+
+    const lidarr = lidarrApi(lidarrSettings);
+    const artistMbid =
+      typeof req.query.artist === 'string' && isMbid(req.query.artist)
+        ? req.query.artist
+        : undefined;
+
+    try {
+      const [profiles, metadataProfiles, rootFolders, tags, artist] =
+        await Promise.all([
+          lidarr.getProfiles(),
+          lidarr.getMetadataProfiles(),
+          lidarr.getRootFolders(),
+          lidarr.getTags(),
+          artistMbid ? lidarr.getArtistByMbid(artistMbid) : undefined,
+        ]);
+
+      const allowed = (
+        types: { albumType: { name: string }; allowed: boolean }[] = []
+      ) => types.filter((type) => type.allowed).map((t) => t.albumType.name);
+
+      return res.status(200).json({
+        server: lidarrServer(lidarrSettings),
+        profiles: profiles.map((profile) => ({
+          id: profile.id,
+          name: profile.name,
+        })),
+        metadataProfiles: metadataProfiles.map((profile) => ({
+          id: profile.id,
+          name: profile.name,
+          primaryTypes: allowed(profile.primaryAlbumTypes),
+          secondaryTypes: allowed(profile.secondaryAlbumTypes),
+        })),
+        rootFolders: rootFolders.map((folder) => ({
+          id: folder.id,
+          freeSpace: folder.freeSpace,
+          path: folder.path,
+          totalSpace: folder.totalSpace,
+        })),
+        tags,
+        artist: artist
+          ? {
+              id: artist.id,
+              path: artist.path,
+              rootFolderPath: artist.rootFolderPath,
+              qualityProfileId: artist.qualityProfileId,
+              metadataProfileId: artist.metadataProfileId,
+              tags: artist.tags ?? [],
+              monitored: artist.monitored,
+            }
+          : null,
+      } satisfies LidarrServerWithDetails);
+    } catch (e) {
+      return serverFailed(next, 'Lidarr', lidarrSettings.name, e);
     }
   }
 );

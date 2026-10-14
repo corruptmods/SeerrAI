@@ -41,6 +41,13 @@ describe('a sidebar order', () => {
     assert.equal(order[0], 'requests');
   });
 
+  it('gives Music its place after Series in an order saved before it', () => {
+    const saved = NAV_ITEMS.filter((id) => id !== 'music').reverse();
+    const order = orderNavItems(saved);
+    assert.equal(order.indexOf('music'), order.indexOf('series') + 1);
+    assert.equal(canHideNavItem('music'), true);
+  });
+
   it('puts a new first item first', () => {
     const order = orderNavItems(['settings', 'lists']);
     assert.equal(order[0], 'discover');
@@ -50,14 +57,14 @@ describe('a sidebar order', () => {
   it('passes over names it does not know, and repeats', () => {
     // A name from a later version (or an earlier one) is no item here.
     assert.deepEqual(
-      orderNavItems(['music', 'settings', 'settings', ...NAV_ITEMS]),
+      orderNavItems(['books', 'settings', 'settings', ...NAV_ITEMS]),
       ['settings', ...NAV_ITEMS.filter((id) => id !== 'settings')]
     );
   });
 
   it('is saved as the items it knows, each once, and only as a list', () => {
     assert.deepEqual(
-      cleanNavOrder(['lists', 'music', 'lists', 7, 'discover']),
+      cleanNavOrder(['lists', 'books', 'lists', 7, 'discover']),
       ['lists', 'discover']
     );
     assert.deepEqual(cleanNavOrder([]), []);
@@ -95,7 +102,7 @@ describe('moving an item', () => {
 
   it('leaves the order alone for an item it does not know', () => {
     assert.deepEqual(
-      moveNavItem(order, 'music' as never, 'discover', 'before'),
+      moveNavItem(order, 'books' as never, 'discover', 'before'),
       order
     );
     assert.deepEqual(
@@ -116,7 +123,7 @@ describe('hiding items', () => {
 
   it('keeps the items it knows that can be hidden, each once', () => {
     assert.deepEqual(
-      cleanNavHidden(['issues', 'settings', 'music', 'issues', 3, 'discover']),
+      cleanNavHidden(['issues', 'settings', 'books', 'issues', 3, 'discover']),
       ['issues']
     );
     assert.equal(cleanNavHidden('issues'), undefined);
@@ -125,7 +132,7 @@ describe('hiding items', () => {
   it('leaves out what someone hid, but never Discover or Settings', () => {
     const links = NAV_ITEMS.map((id) => ({ id }));
     assert.deepEqual(
-      withoutHiddenNav(links, ['blocklist', 'settings', 'music']).map(
+      withoutHiddenNav(links, ['blocklist', 'settings', 'books']).map(
         (link) => link.id
       ),
       NAV_ITEMS.filter((id) => id !== 'blocklist')
@@ -161,7 +168,7 @@ describe('arranging the menu', () => {
     const layout = editableNavLayout({
       // Saved before Backfill existed.
       order: listsFirst.filter((id) => id !== 'backfill'),
-      hidden: ['issues', 'settings', 'music'],
+      hidden: ['issues', 'settings', 'books'],
     });
     assert.deepEqual(layout.order, listsFirst);
     assert.deepEqual(layout.hidden, ['issues']);

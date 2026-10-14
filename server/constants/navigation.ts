@@ -10,6 +10,8 @@ export const NAV_ITEMS = [
   'discover',
   'movies',
   'series',
+  // Shown once Lidarr is set up, to people with music on.
+  'music',
   'requests',
   'calendar',
   'lists',

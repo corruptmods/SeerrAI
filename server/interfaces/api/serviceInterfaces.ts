@@ -23,3 +23,39 @@ export interface ServiceCommonServerWithDetails {
   languageProfiles?: LanguageProfile[];
   tags: Tag[];
 }
+
+/** A Lidarr server, for the music request window. */
+export interface LidarrServer extends ServiceCommonServer {
+  activeMetadataProfileId: number;
+}
+
+/** Which kinds of release a metadata profile has Lidarr list. */
+export interface LidarrMetadataProfileSummary {
+  id: number;
+  name: string;
+  /** Album, EP, Single, Broadcast, Other: the allowed ones. */
+  primaryTypes: string[];
+  /** Live, Compilation, Studio and so on: the allowed ones. */
+  secondaryTypes: string[];
+}
+
+/** An artist already in Lidarr: its folder and profiles stay its own. */
+export interface LidarrArtistSummary {
+  id: number;
+  path?: string;
+  rootFolderPath?: string;
+  qualityProfileId: number;
+  metadataProfileId: number;
+  tags: number[];
+  monitored: boolean;
+}
+
+export interface LidarrServerWithDetails {
+  server: LidarrServer;
+  profiles: QualityProfile[];
+  metadataProfiles: LidarrMetadataProfileSummary[];
+  rootFolders: Partial<RootFolder>[];
+  tags: Tag[];
+  /** With `?artist=`: the artist, if this Lidarr has them. */
+  artist: LidarrArtistSummary | null;
+}

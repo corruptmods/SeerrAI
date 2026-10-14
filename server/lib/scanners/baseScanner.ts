@@ -4,6 +4,8 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
+import type { MediaServerKind } from '@server/constants/server';
+import { MEDIA_ID, MEDIA_SERVER_KINDS } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import MediaRequest from '@server/entity/MediaRequest';
@@ -39,8 +41,11 @@ export interface MediaIds {
 interface ProcessOptions {
   is4k?: boolean;
   mediaAddedAt?: Date;
+  /** The media server that listed the title, and its id for it there. */
+  mediaServer?: MediaServerKind;
+  itemId?: string;
+  /** Plex's id for the title: the same as mediaServer 'plex' and itemId. */
   ratingKey?: string;
-  jellyfinMediaId?: string;
   imdbId?: string;
   serviceId?: number;
   externalServiceId?: number;
@@ -71,6 +76,25 @@ export const isBlocklisted = (media: Media): boolean =>
   media.status === MediaStatus.BLOCKLISTED ||
   media.status4k === MediaStatus.BLOCKLISTED;
 
+/** The media server item a scan found, if it came from a media server. */
+const serverItemOf = ({
+  mediaServer,
+  itemId,
+  ratingKey,
+}: ProcessOptions): { kind: MediaServerKind; id: string } | undefined => {
+  if (mediaServer) {
+    return itemId ? { kind: mediaServer, id: itemId } : undefined;
+  }
+  return ratingKey ? { kind: 'plex', id: ratingKey } : undefined;
+};
+
+/**
+ * One lock for every scanner: the Plex, Jellyfin, Emby, Radarr and Sonarr
+ * scans can each find the same title at the same moment, and two of them
+ * creating it at once would leave it in the library twice.
+ */
+const sharedLock = new AsyncLock();
+
 class BaseScanner<T> {
   private bundleSize;
   private updateRate;
@@ -88,7 +112,7 @@ class BaseScanner<T> {
     string,
     { mediaId: number; is4k: boolean }
   >();
-  readonly asyncLock = new AsyncLock();
+  readonly asyncLock = sharedLock;
   readonly tmdb = new TheMovieDb();
 
   protected constructor(
@@ -118,11 +142,11 @@ class BaseScanner<T> {
 
   protected async processMovie(
     tmdbId: number,
-    {
+    options: ProcessOptions = {}
+  ): Promise<void> {
+    const {
       is4k = false,
       mediaAddedAt,
-      ratingKey,
-      jellyfinMediaId,
       imdbId,
       serviceId,
       externalServiceId,
@@ -130,8 +154,8 @@ class BaseScanner<T> {
       processing = false,
       title = 'Unknown Title',
       hasFile = true,
-    }: ProcessOptions = {}
-  ): Promise<void> {
+    } = options;
+    const item = serverItemOf(options);
     const mediaRepository = getRepository(Media);
 
     await this.asyncLock.dispatch(tmdbId, async () => {
@@ -140,7 +164,7 @@ class BaseScanner<T> {
       if (existing && isBlocklisted(existing)) {
         return;
       }
-      this.listed(existing, 'movie', is4k, !!(ratingKey || jellyfinMediaId));
+      this.listed(existing, 'movie', is4k, !!item);
 
       if (existing) {
         let changedExisting = false;
@@ -182,22 +206,12 @@ class BaseScanner<T> {
           changedExisting = true;
         }
 
-        if (
-          ratingKey &&
-          existing[is4k ? 'ratingKey4k' : 'ratingKey'] !== ratingKey
-        ) {
-          existing[is4k ? 'ratingKey4k' : 'ratingKey'] = ratingKey;
-          changedExisting = true;
-        }
-
-        if (
-          jellyfinMediaId &&
-          existing[is4k ? 'jellyfinMediaId4k' : 'jellyfinMediaId'] !==
-            jellyfinMediaId
-        ) {
-          existing[is4k ? 'jellyfinMediaId4k' : 'jellyfinMediaId'] =
-            jellyfinMediaId;
-          changedExisting = true;
+        if (item) {
+          const idColumn = MEDIA_ID[item.kind][is4k ? 1 : 0];
+          if (existing[idColumn] !== item.id) {
+            existing[idColumn] = item.id;
+            changedExisting = true;
+          }
         }
 
         if (imdbId && !existing.imdbId) {
@@ -279,16 +293,11 @@ class BaseScanner<T> {
           newMedia.mediaAddedAt = mediaAddedAt;
         }
 
-        if (ratingKey) {
-          newMedia.ratingKey = !is4k ? ratingKey : undefined;
-          newMedia.ratingKey4k =
-            is4k && this.enable4kMovie ? ratingKey : undefined;
-        }
-
-        if (jellyfinMediaId) {
-          newMedia.jellyfinMediaId = !is4k ? jellyfinMediaId : undefined;
-          newMedia.jellyfinMediaId4k =
-            is4k && this.enable4kMovie ? jellyfinMediaId : undefined;
+        if (item) {
+          const [idColumn, idColumn4k] = MEDIA_ID[item.kind];
+          newMedia[idColumn] = !is4k ? item.id : undefined;
+          newMedia[idColumn4k] =
+            is4k && this.enable4kMovie ? item.id : undefined;
         }
 
         await mediaRepository.save(newMedia);
@@ -312,17 +321,17 @@ class BaseScanner<T> {
     tmdbId: number,
     tvdbId: number | undefined,
     seasons: ProcessableSeason[],
-    {
+    options: ProcessOptions = {}
+  ): Promise<void> {
+    const {
       mediaAddedAt,
-      ratingKey,
-      jellyfinMediaId,
       serviceId,
       externalServiceId,
       externalServiceSlug,
       is4k = false,
       title = 'Unknown Title',
-    }: ProcessOptions = {}
-  ): Promise<void> {
+    } = options;
+    const item = serverItemOf(options);
     const mediaRepository = getRepository(Media);
 
     await this.asyncLock.dispatch(tmdbId, async () => {
@@ -331,7 +340,7 @@ class BaseScanner<T> {
       if (media && isBlocklisted(media)) {
         return;
       }
-      this.listed(media, 'series', is4k, !!(ratingKey || jellyfinMediaId));
+      this.listed(media, 'series', is4k, !!item);
 
       const newSeasons: Season[] = [];
 
@@ -359,35 +368,21 @@ class BaseScanner<T> {
           (es) => es.seasonNumber === season.seasonNumber
         );
 
-        // We update the rating keys and jellyfinMediaId in the seasons loop because we need episode counts
-        if (media && season.episodes > 0 && media.ratingKey !== ratingKey) {
-          media.ratingKey = ratingKey;
-        }
-
-        if (
-          media &&
-          season.episodes4k > 0 &&
-          this.enable4kShow &&
-          media.ratingKey4k !== ratingKey
-        ) {
-          media.ratingKey4k = ratingKey;
-        }
-
-        if (
-          media &&
-          season.episodes > 0 &&
-          media.jellyfinMediaId !== jellyfinMediaId
-        ) {
-          media.jellyfinMediaId = jellyfinMediaId;
-        }
-
-        if (
-          media &&
-          season.episodes4k > 0 &&
-          this.enable4kShow &&
-          media.jellyfinMediaId4k !== jellyfinMediaId
-        ) {
-          media.jellyfinMediaId4k = jellyfinMediaId;
+        // The server's id is set here, as it needs the episode counts. Only
+        // the server that listed the show is written: another server's id,
+        // or Sonarr's scan (which has none), leaves the ids as they are.
+        if (media && item) {
+          const [idColumn, idColumn4k] = MEDIA_ID[item.kind];
+          if (season.episodes > 0 && media[idColumn] !== item.id) {
+            media[idColumn] = item.id;
+          }
+          if (
+            season.episodes4k > 0 &&
+            this.enable4kShow &&
+            media[idColumn4k] !== item.id
+          ) {
+            media[idColumn4k] = item.id;
+          }
         }
 
         if (existingSeason) {
@@ -641,38 +636,24 @@ class BaseScanner<T> {
           externalServiceId4k: is4k ? externalServiceId : undefined,
           externalServiceSlug: !is4k ? externalServiceSlug : undefined,
           externalServiceSlug4k: is4k ? externalServiceSlug : undefined,
-          ratingKey: newSeasons.some(
-            (sn) =>
-              sn.status === MediaStatus.PARTIALLY_AVAILABLE ||
-              sn.status === MediaStatus.AVAILABLE
-          )
-            ? ratingKey
-            : undefined,
-          ratingKey4k:
-            this.enable4kShow &&
-            newSeasons.some(
+          ...(item && {
+            [MEDIA_ID[item.kind][0]]: newSeasons.some(
               (sn) =>
-                sn.status4k === MediaStatus.PARTIALLY_AVAILABLE ||
-                sn.status4k === MediaStatus.AVAILABLE
+                sn.status === MediaStatus.PARTIALLY_AVAILABLE ||
+                sn.status === MediaStatus.AVAILABLE
             )
-              ? ratingKey
+              ? item.id
               : undefined,
-          jellyfinMediaId: newSeasons.some(
-            (sn) =>
-              sn.status === MediaStatus.PARTIALLY_AVAILABLE ||
-              sn.status === MediaStatus.AVAILABLE
-          )
-            ? jellyfinMediaId
-            : undefined,
-          jellyfinMediaId4k:
-            this.enable4kShow &&
-            newSeasons.some(
-              (sn) =>
-                sn.status4k === MediaStatus.PARTIALLY_AVAILABLE ||
-                sn.status4k === MediaStatus.AVAILABLE
-            )
-              ? jellyfinMediaId
-              : undefined,
+            [MEDIA_ID[item.kind][1]]:
+              this.enable4kShow &&
+              newSeasons.some(
+                (sn) =>
+                  sn.status4k === MediaStatus.PARTIALLY_AVAILABLE ||
+                  sn.status4k === MediaStatus.AVAILABLE
+              )
+                ? item.id
+                : undefined,
+          }),
           status: isAllStandardSeasonsAvailable
             ? MediaStatus.AVAILABLE
             : newSeasons.some(
@@ -831,12 +812,12 @@ class BaseScanner<T> {
    * availability sync to judge from them.
    */
   private async releaseElsewhere(media: Media, is4k: boolean) {
-    const plexKey = is4k ? 'ratingKey4k' : 'ratingKey';
-    const jellyfinKey = is4k ? 'jellyfinMediaId4k' : 'jellyfinMediaId';
     const statusKey = is4k ? 'status4k' : 'status';
     const serviceKey = is4k ? 'serviceId4k' : 'serviceId';
     const repository = getRepository(Media);
-    for (const key of [plexKey, jellyfinKey] as const) {
+    for (const key of MEDIA_SERVER_KINDS.map(
+      (kind) => MEDIA_ID[kind][is4k ? 1 : 0]
+    )) {
       const id = media[key];
       if (!id) continue;
       const others = await repository.find({

@@ -5,17 +5,24 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
-import { MediaServerType } from '@server/constants/server';
+import type { MediaServerKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import { Blocklist } from '@server/entity/Blocklist';
 import type { User } from '@server/entity/User';
 import { Watchlist } from '@server/entity/Watchlist';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
 import downloadTracker from '@server/lib/downloadtracker';
+import {
+  MEDIA_ID,
+  connectedServers,
+  externalHostFor,
+  jellyfinFamily,
+  primaryServer,
+  serverName,
+} from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { DbAwareColumn, resolveDbType } from '@server/utils/DbColumnHelper';
-import { getHostname } from '@server/utils/getHostname';
 import {
   AfterLoad,
   Column,
@@ -29,6 +36,18 @@ import {
 import Issue from './Issue';
 import { MediaRequest } from './MediaRequest';
 import Season from './Season';
+
+/** Where a title can be played on one media server. */
+export interface PlayLink {
+  server: MediaServerKind;
+  /** The server's kind, as people know it: Plex, Jellyfin, Emby. */
+  name: string;
+  url?: string;
+  url4k?: string;
+  /** Plex's app on iPhone and iPad. */
+  iosUrl?: string;
+  iosUrl4k?: string;
+}
 
 @Entity()
 @Index(['tmdbId', 'mediaType'])
@@ -230,6 +249,12 @@ class Media {
   @Column({ nullable: true, type: 'varchar' })
   public jellyfinMediaId4k?: string | null;
 
+  @Column({ nullable: true, type: 'varchar' })
+  public embyMediaId?: string | null;
+
+  @Column({ nullable: true, type: 'varchar' })
+  public embyMediaId4k?: string | null;
+
   /**
    * Whether the title is anime, as set on its page by an admin: true or
    * false stands over anime detection and override rules, and null leaves
@@ -253,6 +278,9 @@ class Media {
   public tautulliUrl?: string;
   public tautulliUrl4k?: string;
 
+  /** Where to play the title: one entry per connected server that has it. */
+  public playLinks?: PlayLink[];
+
   constructor(init?: Partial<Media>) {
     Object.assign(this, init);
   }
@@ -264,6 +292,7 @@ class Media {
       this.externalServiceSlug = null;
       this.ratingKey = null;
       this.jellyfinMediaId = null;
+      this.embyMediaId = null;
     }
     if (is4k === undefined || is4k) {
       this.serviceId4k = null;
@@ -271,58 +300,88 @@ class Media {
       this.externalServiceSlug4k = null;
       this.ratingKey4k = null;
       this.jellyfinMediaId4k = null;
+      this.embyMediaId4k = null;
     }
   }
 
-  @AfterLoad()
-  public setPlexUrls(): void {
-    const { machineId, webAppUrl } = getSettings().plex;
-    const { externalUrl: tautulliUrl } = getSettings().tautulli;
+  /** A server's links to the title, from the ids it has for it. */
+  private playLinkFor(kind: MediaServerKind): PlayLink {
+    const [idColumn, idColumn4k] = MEDIA_ID[kind];
+    const id = this[idColumn];
+    const id4k = this[idColumn4k];
+    const link: PlayLink = { server: kind, name: serverName(kind) };
 
-    if (getSettings().main.mediaServerType == MediaServerType.PLEX) {
-      if (this.ratingKey) {
-        this.mediaUrl = `${
+    if (kind === 'plex') {
+      const { machineId, webAppUrl } = getSettings().plex;
+      const web = (key: string) =>
+        `${
           webAppUrl ? webAppUrl : 'https://app.plex.tv/desktop'
-        }#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${
-          this.ratingKey
-        }`;
-
-        this.iOSPlexUrl = `plex://preplay/?metadataKey=%2Flibrary%2Fmetadata%2F${this.ratingKey}&server=${machineId}`;
-
-        if (tautulliUrl) {
-          this.tautulliUrl = `${tautulliUrl}/info?rating_key=${this.ratingKey}`;
-        }
+        }#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${key}`;
+      const ios = (key: string) =>
+        `plex://preplay/?metadataKey=%2Flibrary%2Fmetadata%2F${key}&server=${machineId}`;
+      if (id) {
+        link.url = web(id);
+        link.iosUrl = ios(id);
       }
+      if (id4k) {
+        link.url4k = web(id4k);
+        link.iosUrl4k = ios(id4k);
+      }
+      return link;
+    }
 
-      if (this.ratingKey4k) {
-        this.mediaUrl4k = `${
-          webAppUrl ? webAppUrl : 'https://app.plex.tv/desktop'
-        }#!/server/${machineId}/details?key=%2Flibrary%2Fmetadata%2F${
-          this.ratingKey4k
-        }`;
+    // Jellyfin and Emby name their item page differently.
+    const pageName = kind === 'emby' ? 'item' : 'details';
+    const { serverId } = jellyfinFamily(kind);
+    const host = externalHostFor(kind);
+    const web = (itemId: string) =>
+      `${host}/web/index.html#!/${pageName}?id=${itemId}&context=home&serverId=${serverId}`;
+    if (id) {
+      link.url = web(id);
+    }
+    if (id4k) {
+      link.url4k = web(id4k);
+    }
+    return link;
+  }
 
-        this.iOSPlexUrl4k = `plex://preplay/?metadataKey=%2Flibrary%2Fmetadata%2F${this.ratingKey4k}&server=${machineId}`;
+  /**
+   * Play links for each connected server that has the title, and the
+   * single links (mediaUrl, iOSPlexUrl, tautulliUrl) for the primary
+   * server, which API readers have always had.
+   */
+  @AfterLoad()
+  public setPlayLinks(): void {
+    this.playLinks = connectedServers()
+      .map((kind) => this.playLinkFor(kind))
+      .filter((link) => link.url || link.url4k);
 
-        if (tautulliUrl) {
-          this.tautulliUrl4k = `${tautulliUrl}/info?rating_key=${this.ratingKey4k}`;
-        }
+    const primary = primaryServer();
+
+    if (primary === 'plex') {
+      const { externalUrl: tautulliUrl } = getSettings().tautulli;
+      const link = this.playLinkFor('plex');
+      if (link.url) {
+        this.mediaUrl = link.url;
+        this.iOSPlexUrl = link.iosUrl;
+      }
+      if (link.url4k) {
+        this.mediaUrl4k = link.url4k;
+        this.iOSPlexUrl4k = link.iosUrl4k;
+      }
+      if (tautulliUrl && this.ratingKey) {
+        this.tautulliUrl = `${tautulliUrl}/info?rating_key=${this.ratingKey}`;
+      }
+      if (tautulliUrl && this.ratingKey4k) {
+        this.tautulliUrl4k = `${tautulliUrl}/info?rating_key=${this.ratingKey4k}`;
       }
     } else {
-      const pageName =
-        getSettings().main.mediaServerType == MediaServerType.EMBY
-          ? 'item'
-          : 'details';
-      const { serverId, externalHostname } = getSettings().jellyfin;
-      const jellyfinHost =
-        externalHostname && externalHostname.length > 0
-          ? externalHostname
-          : getHostname();
-
-      if (this.jellyfinMediaId) {
-        this.mediaUrl = `${jellyfinHost}/web/index.html#!/${pageName}?id=${this.jellyfinMediaId}&context=home&serverId=${serverId}`;
+      const link = this.playLinkFor(primary === 'emby' ? 'emby' : 'jellyfin');
+      if (link.url) {
+        this.mediaUrl = link.url;
       }
-      if (this.jellyfinMediaId4k) {
-        this.mediaUrl4k = `${jellyfinHost}/web/index.html#!/${pageName}?id=${this.jellyfinMediaId4k}&context=home&serverId=${serverId}`;
+      if (link.url4k) {
+        this.mediaUrl4k = link.url4k;
       }
     }
   }

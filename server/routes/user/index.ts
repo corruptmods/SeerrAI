@@ -1,8 +1,6 @@
-import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
 import TautulliAPI from '@server/api/tautulli';
 import { MediaType } from '@server/constants/media';
-import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import dataSource, { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
@@ -20,6 +18,14 @@ import type {
 } from '@server/interfaces/api/userInterfaces';
 import { linkedJellyfinUsers } from '@server/lib/jellyfinUsers';
 import { mayManageUser, plexAccountMayClaim } from '@server/lib/manageUser';
+import {
+  USERNAME,
+  USER_ID,
+  USER_TYPE,
+  jellyfinAccountColumns,
+  jellyfinClient as jellyfinClientFor,
+  jellyfinFamilyServer,
+} from '@server/lib/mediaServers';
 import { withNewUserDefaults } from '@server/lib/newUserDefaults';
 import { Permission, hasPermission } from '@server/lib/permissions';
 import { isPushServiceEndpoint } from '@server/lib/pushEndpoint';
@@ -31,7 +37,6 @@ import {
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { checkAvatarChanged } from '@server/routes/avatarproxy';
-import { getHostname } from '@server/utils/getHostname';
 import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 import { pageOf } from '@server/utils/pagination';
 import { isOwnProfileOrAdmin } from '@server/utils/profileMiddleware';
@@ -94,6 +99,7 @@ router.get('/', async (req, res, next) => {
         'user.username',
         'user.plexUsername',
         'user.jellyfinUsername',
+        'user.embyUsername',
         ...(req.user?.hasPermission(Permission.MANAGE_USERS)
           ? ['user.email']
           : []),
@@ -120,8 +126,12 @@ router.get('/', async (req, res, next) => {
           .addSelect(
             `CASE WHEN (user.username IS NULL OR user.username = '') THEN (
                 CASE WHEN (user.plexUsername IS NULL OR user.plexUsername = '') THEN (
-                  CASE WHEN (user.jellyfinUsername IS NULL OR user.jellyfinUsername = '') THEN
-                    "user"."email"
+                  CASE WHEN (user.jellyfinUsername IS NULL OR user.jellyfinUsername = '') THEN (
+                    CASE WHEN (user.embyUsername IS NULL OR user.embyUsername = '') THEN
+                      "user"."email"
+                    ELSE
+                      LOWER(user.embyUsername)
+                    END)
                   ELSE
                     LOWER(user.jellyfinUsername)
                   END)
@@ -536,8 +546,10 @@ router.get<{ jellyfinUserId: string }>(
         return next({ status: 400, message: 'Invalid Jellyfin User ID.' });
       }
 
+      // An Emby account's id is looked for too: Emby's ids were kept with
+      // Jellyfin's before Emby had its own.
       const user = await userRepository.findOneOrFail({
-        where: { jellyfinUserId },
+        where: [{ jellyfinUserId }, { embyUserId: jellyfinUserId }],
       });
 
       return res
@@ -860,21 +872,10 @@ router.post(
       const settings = getSettings();
       const userRepository = getRepository(User);
       const body = req.body as { jellyfinUserIds?: string[] } | undefined;
+      // The connected Jellyfin or Emby server.
+      const kind = jellyfinFamilyServer() ?? 'jellyfin';
 
-      // taken from auth.ts
-      const admin = await userRepository.findOneOrFail({
-        where: { id: 1 },
-        select: ['id', 'jellyfinDeviceId', 'jellyfinUserId'],
-        order: { id: 'ASC' },
-      });
-
-      const hostname = getHostname();
-      const jellyfinClient = new JellyfinAPI(
-        hostname,
-        settings.jellyfin.apiKey,
-        admin.jellyfinDeviceId ?? ''
-      );
-      jellyfinClient.setUserId(admin.jellyfinUserId ?? '');
+      const jellyfinClient = await jellyfinClientFor(kind, { asAdmin: true });
 
       const createdUsers: User[] = [];
       let refreshedUsers = 0;
@@ -883,7 +884,8 @@ router.post(
         (jellyfinUser) => normalizeJellyfinGuid(jellyfinUser.Id)
       );
       const linked = await linkedJellyfinUsers(
-        jellyfinUsers.map((jellyfinUser) => jellyfinUser.Id)
+        jellyfinUsers.map((jellyfinUser) => jellyfinUser.Id),
+        kind
       );
       // With no list, everyone not yet imported is, as on Import Plex Users.
       const chosen = body?.jellyfinUserIds
@@ -898,12 +900,12 @@ router.post(
           // Already imported: bring what comes from Jellyfin up to date (the
           // name, and the picture if it changed there), as Import Plex Users
           // does. The account's own settings and permissions are left alone.
-          const { changed } = await checkAvatarChanged(user);
+          const { changed } = await checkAvatarChanged(user, kind);
           await userRepository.update(user.id, {
-            jellyfinUsername: jellyfinUser.Name,
+            [USERNAME[kind]]: jellyfinUser.Name,
             ...(changed && user.avatarVersion
               ? {
-                  avatar: `/avatarproxy/${user.jellyfinUserId}?v=${user.avatarVersion}`,
+                  avatar: `/avatarproxy/${user[USER_ID[kind]]}?v=${user.avatarVersion}`,
                 }
               : {}),
           });
@@ -911,18 +913,17 @@ router.post(
         } else if (!chosen || chosen.has(jellyfinUserId)) {
           const newUser = withNewUserDefaults(
             new User({
-              jellyfinUsername: jellyfinUser.Name,
-              jellyfinUserId: jellyfinUser.Id,
-              jellyfinDeviceId: Buffer.from(
-                `BOT_seerr_${jellyfinUser.Name ?? ''}`
-              ).toString('base64'),
+              ...jellyfinAccountColumns(kind, {
+                username: jellyfinUser.Name,
+                userId: jellyfinUser.Id,
+                deviceId: Buffer.from(
+                  `BOT_seerr_${jellyfinUser.Name ?? ''}`
+                ).toString('base64'),
+              }),
               email: jellyfinUser.Name,
               permissions: settings.main.defaultPermissions,
               avatar: `/avatarproxy/${jellyfinUser.Id}`,
-              userType:
-                settings.main.mediaServerType === MediaServerType.JELLYFIN
-                  ? UserType.JELLYFIN
-                  : UserType.EMBY,
+              userType: USER_TYPE[kind],
             })
           );
 

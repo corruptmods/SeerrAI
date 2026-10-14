@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import ExternalAPI from '@server/api/externalapi';
 import { ApiErrorCode } from '@server/constants/error';
+import type { JellyfinFamilyKind } from '@server/constants/server';
 import { MediaServerType } from '@server/constants/server';
 import availabilitySync from '@server/lib/availabilitySync';
 import { getSettings } from '@server/lib/settings';
@@ -177,23 +178,31 @@ export interface JellyfinAccount {
 
 class JellyfinAPI extends ExternalAPI {
   private userId?: string;
-  private mediaServerType: MediaServerType;
+  /** Jellyfin and Emby differ in a few places; this says which it is. */
+  public readonly kind: JellyfinFamilyKind;
 
+  /**
+   * `kind` is the server being spoken to. Left out, it is the primary
+   * server's when that is Emby, else Jellyfin.
+   */
   constructor(
     jellyfinHost: string,
     authToken?: string | null,
-    deviceId?: string | null
+    deviceId?: string | null,
+    kind?: JellyfinFamilyKind
   ) {
     const settings = getSettings();
+    const serverKind: JellyfinFamilyKind =
+      kind ??
+      (settings.main.mediaServerType === MediaServerType.EMBY
+        ? 'emby'
+        : 'jellyfin');
     const safeDeviceId =
       deviceId && deviceId.length > 0
         ? deviceId
         : Buffer.from('BOT_seerr').toString('base64');
 
-    const version =
-      settings.main.mediaServerType === MediaServerType.EMBY
-        ? '1.0.0'
-        : getAppVersion();
+    const version = serverKind === 'emby' ? '1.0.0' : getAppVersion();
 
     let authHeaderVal = `MediaBrowser Client="Seerr", Device="Seerr", DeviceId="${safeDeviceId}", Version="${version}"`;
     if (authToken) {
@@ -212,7 +221,7 @@ class JellyfinAPI extends ExternalAPI {
       }
     );
 
-    this.mediaServerType = settings.main.mediaServerType;
+    this.kind = serverKind;
   }
 
   public async login(
@@ -507,14 +516,12 @@ class JellyfinAPI extends ExternalAPI {
   public async getRecentlyAdded(id: string): Promise<JellyfinLibraryItem[]> {
     try {
       const endpoint =
-        this.mediaServerType === MediaServerType.JELLYFIN
+        this.kind === 'jellyfin'
           ? `/Items/Latest`
           : `/Users/${this.userId}/Items/Latest`;
       const itemResponse = await this.get<any>(
         `${endpoint}?Limit=12&ParentId=${id}${
-          this.mediaServerType === MediaServerType.JELLYFIN
-            ? `&userId=${this.userId ?? 'Me'}`
-            : ''
+          this.kind === 'jellyfin' ? `&userId=${this.userId ?? 'Me'}` : ''
         }`
       );
 

@@ -9,6 +9,8 @@ import { startJobs } from '@server/job/schedule';
 import agent from '@server/lib/agent';
 import backfillNotices from '@server/lib/backfill/notices';
 import resourceMonitor from '@server/lib/containerResources';
+import { splitEmbyData } from '@server/lib/embySplit';
+import { isConnected } from '@server/lib/mediaServers';
 import notificationManager from '@server/lib/notifications';
 import DiscordAgent from '@server/lib/notifications/agents/discord';
 import EmailAgent from '@server/lib/notifications/agents/email';
@@ -125,8 +127,13 @@ app
       );
     }
 
+    // On a server set up with Emby, Emby's ids move to its own columns
+    // once, before anything reads them.
+    await splitEmbyData();
+
     // Migrate library types
     if (
+      isConnected('plex') &&
       settings.plex.libraries.length > 1 &&
       !settings.plex.libraries[0].type
     ) {

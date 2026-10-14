@@ -351,9 +351,25 @@ describe('watch history from Jellyfin and Emby', () => {
       [1]
     );
 
+    // The same on an Emby server, which keeps its own settings, and its
+    // own ids on people and titles.
+    await getRepository(User).update(jordan.id, {
+      jellyfinUserId: null,
+      embyUserId: 'j2',
+    });
+    await getRepository(User).update(alex.id, {
+      jellyfinUserId: null,
+      embyUserId: 'a1',
+    });
+    series.jellyfinMediaId = null;
+    series.embyMediaId = 's1';
+    await getRepository(Media).update(series.id, {
+      jellyfinMediaId: null,
+      embyMediaId: 's1',
+    });
     getSettings().main.mediaServerType = MediaServerType.EMBY;
-    getSettings().jellyfin = {
-      ...getSettings().jellyfin,
+    getSettings().emby = {
+      ...getSettings().emby,
       ip: '127.0.0.1',
       port,
       useSsl: false,
@@ -395,9 +411,16 @@ describe('watch history from Jellyfin and Emby', () => {
   });
 
   it('works out where someone is in a series', async () => {
+    // On an Emby server, people's and titles' ids are Emby's own.
+    await getRepository(User).update(alex.id, {
+      jellyfinUserId: null,
+      embyUserId: 'a1',
+    });
+    alex.jellyfinUserId = null;
+    alex.embyUserId = 'a1';
     getSettings().main.mediaServerType = MediaServerType.EMBY;
-    getSettings().jellyfin = {
-      ...getSettings().jellyfin,
+    getSettings().emby = {
+      ...getSettings().emby,
       ip: '127.0.0.1',
       port,
       useSsl: false,
@@ -409,7 +432,7 @@ describe('watch history from Jellyfin and Emby', () => {
       const media = await saveMedia({
         tmdbId: 220544,
         mediaType: MediaType.TV,
-        jellyfinMediaId: 's1',
+        embyMediaId: 's1',
       });
       const season = await getRepository(Season).save(
         new Season({

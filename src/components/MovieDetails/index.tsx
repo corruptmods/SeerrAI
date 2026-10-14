@@ -709,6 +709,8 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
             data.mediaInfo &&
             (data.mediaInfo.jellyfinMediaId ||
               data.mediaInfo.jellyfinMediaId4k ||
+              data.mediaInfo.embyMediaId ||
+              data.mediaInfo.embyMediaId4k ||
               data.mediaInfo.status !== MediaStatus.UNKNOWN ||
               data.mediaInfo.status4k !== MediaStatus.UNKNOWN) && (
               <Tooltip content={intl.formatMessage(messages.managemovie)}>
@@ -794,7 +796,9 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                 mediaType="movie"
                 tmdbId={data.id}
                 itemKey={
-                  data.mediaInfo.ratingKey ?? data.mediaInfo.jellyfinMediaId
+                  data.mediaInfo.ratingKey ??
+                  data.mediaInfo.jellyfinMediaId ??
+                  data.mediaInfo.embyMediaId
                 }
               />
             )}

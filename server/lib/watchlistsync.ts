@@ -2,7 +2,6 @@ import PlexTvAPI from '@server/api/plextv';
 import TheMovieDb from '@server/api/themoviedb';
 import TraktAPI, { TraktError } from '@server/api/trakt';
 import { MediaStatus, MediaType } from '@server/constants/media';
-import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import {
@@ -18,6 +17,7 @@ import type { WatchlistSource } from '@server/entity/WatchlistSyncEntry';
 import { WatchlistSyncEntry } from '@server/entity/WatchlistSyncEntry';
 import { WatchlistSyncEntrySeason } from '@server/entity/WatchlistSyncEntrySeason';
 import { getDeletionTimes } from '@server/lib/mediaDeletions';
+import { isConnected, primaryServer } from '@server/lib/mediaServers';
 import {
   clearPlexTokenRejected,
   markPlexTokenRejected,
@@ -72,13 +72,11 @@ const sourceOf = (item: WatchItem): WatchlistSource =>
   item.traktListedAt !== undefined ? 'trakt' : 'plex';
 
 /**
- * Plex watchlists are read on a Plex server only: someone signed in with
- * Plex on a Jellyfin or Emby server once is not synced from Plex for it.
+ * Plex watchlists are read only while Seerr is connected to Plex: someone
+ * who signed in with Plex once is not synced from Plex on a server that
+ * only has Jellyfin or Emby.
  */
-const onPlex = () => {
-  const type = getSettings().main.mediaServerType;
-  return type !== MediaServerType.JELLYFIN && type !== MediaServerType.EMBY;
-};
+const onPlex = () => isConnected('plex') || !primaryServer();
 
 /**
  * How often a user whose Plex sign-in has expired is tried again. They have

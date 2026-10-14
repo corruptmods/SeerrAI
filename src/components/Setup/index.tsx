@@ -70,7 +70,7 @@ const Setup = () => {
 
   const mediaServerSettingsEndpoint: Record<MediaServerType, string | null> = {
     [MediaServerType.JELLYFIN]: '/api/v1/settings/jellyfin',
-    [MediaServerType.EMBY]: '/api/v1/settings/jellyfin',
+    [MediaServerType.EMBY]: '/api/v1/settings/emby',
     [MediaServerType.PLEX]: '/api/v1/settings/plex',
     [MediaServerType.NOT_CONFIGURED]: null,
   };
@@ -246,7 +246,14 @@ const Setup = () => {
               {mediaServerType === MediaServerType.PLEX ? (
                 <SettingsPlex isSetupSettings />
               ) : (
-                <SettingsJellyfin isSetupSettings />
+                <SettingsJellyfin
+                  isSetupSettings
+                  kind={
+                    mediaServerType === MediaServerType.EMBY
+                      ? 'emby'
+                      : 'jellyfin'
+                  }
+                />
               )}
               <div className="actions">
                 <div className="flex justify-end">

@@ -429,6 +429,21 @@ components:
         plexUsername:
           type: string
           readOnly: true
+        jellyfinUsername:
+          type: string
+          nullable: true
+          readOnly: true
+        embyUsername:
+          type: string
+          nullable: true
+          readOnly: true
+        linkedServers:
+          type: array
+          readOnly: true
+          description: The media servers this person has an account linked from.
+          items:
+            type: string
+            enum: [plex, jellyfin, emby]
         plexToken:
           type: string
           readOnly: true
@@ -704,6 +719,13 @@ components:
           type: string
           nullable: true
           example: 'https://app.plex.tv/desktop'
+        connected:
+          type: boolean
+          readOnly: true
+          description: Seerr is connected to this server.
+        signIn:
+          type: boolean
+          description: People may sign in with their Plex account.
       required:
         - name
         - machineId
@@ -874,6 +896,16 @@ components:
         serverID:
           type: string
           readOnly: true
+        connected:
+          type: boolean
+          readOnly: true
+          description: Seerr is connected to this server.
+        signIn:
+          type: boolean
+          description: People may sign in with their account on this server.
+        adminUserId:
+          type: string
+          description: The account Seerr reads libraries as; the owner's linked account when not set.
     MetadataSettings:
       type: object
       properties:
@@ -1412,6 +1444,21 @@ components:
           description: Countries whose anime does not count as anime unless it is in Japanese. Set through /settings/anime.
           items:
             type: string
+        mediaServers:
+          type: array
+          description: The connected media servers, the primary one first.
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+                enum: [plex, jellyfin, emby]
+              name:
+                type: string
+              primary:
+                type: boolean
+              signIn:
+                type: boolean
     MovieResult:
       type: object
       required:
@@ -2050,6 +2097,47 @@ components:
           nullable: true
           readOnly: true
           description: Whether the title is anime as set on its page; null leaves it to override rules and anime detection.
+        jellyfinMediaId:
+          type: string
+          nullable: true
+          readOnly: true
+        jellyfinMediaId4k:
+          type: string
+          nullable: true
+          readOnly: true
+        embyMediaId:
+          type: string
+          nullable: true
+          readOnly: true
+        embyMediaId4k:
+          type: string
+          nullable: true
+          readOnly: true
+        mediaUrl:
+          type: string
+          readOnly: true
+          description: Where to play the title on the primary media server.
+        playLinks:
+          type: array
+          readOnly: true
+          description: Where to play the title, one entry per connected media server that has it.
+          items:
+            type: object
+            properties:
+              server:
+                type: string
+                enum: [plex, jellyfin, emby]
+              name:
+                type: string
+                example: Plex
+              url:
+                type: string
+              url4k:
+                type: string
+              iosUrl:
+                type: string
+              iosUrl4k:
+                type: string
     AnimePlacementChanges:
       type: object
       description: What would put a title where it belongs; empty when it is there.
@@ -3357,6 +3445,200 @@ paths:
       responses:
         '200':
           description: Status of Jellyfin sync
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  running:
+                    type: boolean
+                    example: false
+                  progress:
+                    type: number
+                    example: 0
+                  total:
+                    type: number
+                    example: 100
+                  currentLibrary:
+                    $ref: '#/components/schemas/JellyfinLibrary'
+                  libraries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JellyfinLibrary'
+  /settings/emby:
+    get:
+      summary: Get Emby settings
+      description: Retrieves current Emby settings.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JellyfinSettings'
+    post:
+      summary: Update Emby settings
+      description: Updates Emby settings with the provided values.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JellyfinSettings'
+      responses:
+        '200':
+          description: 'Values were successfully updated'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JellyfinSettings'
+  /settings/emby/library:
+    get:
+      summary: Get Emby libraries
+      description: Returns a list of Emby libraries in a JSON array.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: 'Emby libraries returned'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JellyfinLibrary'
+  /settings/emby/library/{libraryId}:
+    put:
+      summary: Update a single Emby library
+      description: Updates a single Emby library with the provided values.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: libraryId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enabled
+              properties:
+                enabled:
+                  type: boolean
+                  example: true
+      responses:
+        '200':
+          description: 'Emby library returned'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JellyfinLibrary'
+        '400':
+          description: 'Invalid request body'
+        '404':
+          description: 'Library does not exist'
+  /settings/emby/library/sync:
+    post:
+      summary: Sync Emby libraries
+      description: Syncs the current libraries with the current Emby server. Enabled flags are preserved.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: 'Emby libraries returned'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JellyfinLibrary'
+        '404':
+          description: 'No libraries found'
+        '501':
+          description: 'Automatic library grouping is not supported'
+  /settings/emby/users:
+    get:
+      summary: Get Emby Users
+      description: Returns the Emby users not yet imported, sorted by name, in a JSON array.
+      tags:
+        - settings
+        - users
+      responses:
+        '200':
+          description: Emby users returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    username:
+                      type: string
+                    id:
+                      type: string
+                    thumb:
+                      type: string
+                    email:
+                      type: string
+  /settings/emby/sync:
+    get:
+      summary: Get status of full Emby library sync
+      description: Returns sync progress in a JSON array.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Status of Emby sync
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  running:
+                    type: boolean
+                    example: false
+                  progress:
+                    type: number
+                    example: 0
+                  total:
+                    type: number
+                    example: 100
+                  currentLibrary:
+                    $ref: '#/components/schemas/JellyfinLibrary'
+                  libraries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JellyfinLibrary'
+    post:
+      summary: Start full Emby library sync
+      description: Runs a full Emby library sync and returns the progress in a JSON array.
+      tags:
+        - settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cancel:
+                  type: boolean
+                  example: false
+                start:
+                  type: boolean
+                  example: false
+      responses:
+        '200':
+          description: Status of Emby sync
           content:
             application/json:
               schema:

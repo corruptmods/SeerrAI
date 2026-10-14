@@ -1,4 +1,8 @@
-import { MediaServerType } from '@server/constants/server';
+import {
+  isJellyfinFamily,
+  jellyfinFamily,
+  primaryServer,
+} from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
 import { JellyfinWatchSource } from '@server/lib/watchHistory/jellyfin';
 import { TautulliWatchSource } from '@server/lib/watchHistory/tautulli';
@@ -17,15 +21,10 @@ export type { Play, WatchSource } from '@server/lib/watchHistory/types';
  */
 export const watchSource = (): WatchSource | undefined => {
   const settings = getSettings();
-  const type = settings.main.mediaServerType;
-  if (type === MediaServerType.JELLYFIN || type === MediaServerType.EMBY) {
-    const { ip, apiKey } = settings.jellyfin;
-    return ip && apiKey
-      ? new JellyfinWatchSource(
-          type === MediaServerType.EMBY ? 'emby' : 'jellyfin',
-          apiKey
-        )
-      : undefined;
+  const primary = primaryServer();
+  if (isJellyfinFamily(primary)) {
+    const { ip, apiKey } = jellyfinFamily(primary);
+    return ip && apiKey ? new JellyfinWatchSource(primary, apiKey) : undefined;
   }
   // Plex, through Tautulli (only ever set up alongside Plex).
   const { hostname, apiKey } = settings.tautulli;

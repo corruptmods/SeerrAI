@@ -51,10 +51,9 @@ const JellyfinImportModal: React.FC<JellyfinImportProps> = ({
   const { addToast } = useToasts();
   const [isImporting, setImporting] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const mediaServerName =
-    settings.currentSettings.mediaServerType === MediaServerType.EMBY
-      ? 'Emby'
-      : 'Jellyfin';
+  const isEmby =
+    settings.currentSettings.mediaServerType === MediaServerType.EMBY;
+  const mediaServerName = isEmby ? 'Emby' : 'Jellyfin';
   const { data, error } = useSWR<
     {
       id: string;
@@ -63,7 +62,7 @@ const JellyfinImportModal: React.FC<JellyfinImportProps> = ({
       email: string;
       thumb: string;
     }[]
-  >(`/api/v1/settings/jellyfin/users`, {
+  >(`/api/v1/settings/${isEmby ? 'emby' : 'jellyfin'}/users`, {
     revalidateOnMount: true,
   });
 

@@ -1,4 +1,6 @@
 import { MediaRequestStatus, MediaType } from '@server/constants/media';
+import type { MediaServerKind } from '@server/constants/server';
+import { MEDIA_SERVER_KINDS, USER_ID } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { Watchlist } from '@server/entity/Watchlist';
@@ -45,6 +47,8 @@ export class User {
     'resetPasswordGuid',
     'jellyfinDeviceId',
     'jellyfinAuthToken',
+    'embyDeviceId',
+    'embyAuthToken',
     'plexToken',
     'settings',
     // Whether someone's Plex sign-in lapsed is their business (and admins').
@@ -52,6 +56,9 @@ export class User {
   ];
 
   public displayName: string;
+
+  /** The media servers this person has an account linked from. */
+  public linkedServers?: MediaServerKind[];
 
   @PrimaryGeneratedColumn()
   public id: number;
@@ -70,6 +77,9 @@ export class User {
 
   @Column({ type: 'varchar', nullable: true })
   public jellyfinUsername?: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  public embyUsername?: string | null;
 
   @Column({ nullable: true })
   public username?: string;
@@ -97,6 +107,15 @@ export class User {
 
   @Column({ type: 'varchar', nullable: true, select: false })
   public jellyfinAuthToken?: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  public embyUserId?: string | null;
+
+  @Column({ type: 'varchar', nullable: true, select: false })
+  public embyDeviceId?: string | null;
+
+  @Column({ type: 'varchar', nullable: true, select: false })
+  public embyAuthToken?: string | null;
 
   @Column({ type: 'varchar', nullable: true, select: false })
   public plexToken?: string | null;
@@ -324,7 +343,15 @@ export class User {
       this.username ||
       this.plexUsername ||
       this.jellyfinUsername ||
+      this.embyUsername ||
       `User #${this.id}`;
+  }
+
+  @AfterLoad()
+  public setLinkedServers(): void {
+    this.linkedServers = MEDIA_SERVER_KINDS.filter(
+      (kind) => !!this[USER_ID[kind]]
+    );
   }
 
   public async getQuota(): Promise<QuotaResponse> {

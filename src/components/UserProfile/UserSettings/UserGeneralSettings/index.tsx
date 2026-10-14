@@ -197,7 +197,10 @@ const UserGeneralSettings = () => {
             await axios.post(`/api/v1/user/${user?.id}/settings/main`, {
               username: values.displayName,
               email:
-                values.email || user?.jellyfinUsername || user?.plexUsername,
+                values.email ||
+                user?.jellyfinUsername ||
+                user?.embyUsername ||
+                user?.plexUsername,
               locale: values.locale,
               discoverRegion: values.discoverRegion,
               streamingRegion: values.streamingRegion,
@@ -324,6 +327,7 @@ const UserGeneralSettings = () => {
                       type="text"
                       placeholder={
                         user?.jellyfinUsername ||
+                        user?.embyUsername ||
                         user?.plexUsername ||
                         user?.email
                       }

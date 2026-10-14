@@ -1,9 +1,9 @@
 import PlexTvAPI from '@server/api/plextv';
-import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import RemovedPlexAccount from '@server/entity/RemovedPlexAccount';
 import { User } from '@server/entity/User';
+import { isConnected } from '@server/lib/mediaServers';
 import { withNewUserDefaults } from '@server/lib/newUserDefaults';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -25,7 +25,7 @@ class PlexUserImport {
     if (
       this.running ||
       !settings.main.autoImportPlexUsers ||
-      settings.main.mediaServerType !== MediaServerType.PLEX ||
+      !isConnected('plex') ||
       !settings.plex.machineId
     ) {
       return [];

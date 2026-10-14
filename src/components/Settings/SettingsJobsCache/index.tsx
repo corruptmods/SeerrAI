@@ -7,7 +7,6 @@ import PageTitle from '@app/components/Common/PageTitle';
 import Table from '@app/components/Common/Table';
 import useLocale from '@app/hooks/useLocale';
 import useMediaQuery from '@app/hooks/useMediaQuery';
-import useSettings from '@app/hooks/useSettings';
 
 import type { ScheduleInterval } from '@app/components/Settings/SettingsJobsCache/schedule';
 import {
@@ -22,7 +21,6 @@ import { formatBytes } from '@app/utils/numberHelpers';
 import { Transition } from '@headlessui/react';
 import { PlayIcon, StopIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { PencilIcon } from '@heroicons/react/24/solid';
-import { MediaServerType } from '@server/constants/server';
 import type {
   CacheItem,
   CacheResponse,
@@ -93,6 +91,8 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     'plex-refresh-token': 'Plex Refresh Token',
     'jellyfin-full-scan': 'Jellyfin Full Library Scan',
     'jellyfin-recently-added-scan': 'Jellyfin Recently Added Scan',
+    'emby-full-scan': 'Emby Full Library Scan',
+    'emby-recently-added-scan': 'Emby Recently Added Scan',
     'availability-sync': 'Media Availability Sync',
     'radarr-scan': 'Radarr Scan',
     'sonarr-scan': 'Sonarr Scan',
@@ -239,21 +239,6 @@ const SettingsJobs = () => {
     scheduleSeconds: 30,
   });
   const [isSaving, setIsSaving] = useState(false);
-  const settings = useSettings();
-
-  if (settings.currentSettings.mediaServerType === MediaServerType.EMBY) {
-    messages['jellyfin-recently-added-scan'] = {
-      id: 'jellyfin-recently-added-scan',
-      defaultMessage: 'Emby Recently Added Scan',
-    };
-  }
-
-  if (settings.currentSettings.mediaServerType === MediaServerType.EMBY) {
-    messages['jellyfin-full-scan'] = {
-      id: 'jellyfin-full-scan',
-      defaultMessage: 'Emby Full Library Scan',
-    };
-  }
 
   if (!data && !error) {
     return <LoadingSpinner />;

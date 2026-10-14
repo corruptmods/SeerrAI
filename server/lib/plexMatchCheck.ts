@@ -1,15 +1,20 @@
 import type { JellyfinUserItem } from '@server/api/jellyfin';
-import JellyfinAPI from '@server/api/jellyfin';
 import type { PlexLibraryItem } from '@server/api/plexapi';
 import PlexAPI from '@server/api/plexapi';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
-import { MediaServerType } from '@server/constants/server';
+import type { JellyfinFamilyKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
+import {
+  isJellyfinFamily,
+  jellyfinClient,
+  jellyfinFamily,
+  primaryServer,
+  serverName,
+} from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
-import { getHostname } from '@server/utils/getHostname';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
@@ -415,18 +420,19 @@ class PlexMatchCheck {
 
   private async checkJellyfin(
     report: PlexMatchReport,
-    mediaServer: 'Jellyfin' | 'Emby',
+    server: JellyfinFamilyKind,
     expected: {
       series: Map<string, Expected[]>;
       movies: Map<string, Expected[]>;
     }
   ): Promise<void> {
-    const settings = getSettings();
-    if (!settings.jellyfin.apiKey) {
+    const mediaServer = serverName(server) as 'Jellyfin' | 'Emby';
+    const settings = jellyfinFamily(server);
+    if (!settings.apiKey) {
       throw new Error(`${mediaServer} has no API key set.`);
     }
-    const api = new JellyfinAPI(getHostname(), settings.jellyfin.apiKey);
-    for (const library of settings.jellyfin.libraries) {
+    const api = await jellyfinClient(server);
+    for (const library of settings.libraries) {
       if (!library.enabled || this.cancelled) continue;
       const kind = library.type === 'show' ? 'series' : 'movie';
       const byFolder = kind === 'series' ? expected.series : expected.movies;
@@ -474,16 +480,11 @@ class PlexMatchCheck {
       problems: [],
     };
     try {
-      const settings = getSettings();
-      const type = settings.main.mediaServerType;
+      const primary = primaryServer();
       const { series, movies } = await this.expectedFolders();
-      if (type === MediaServerType.JELLYFIN || type === MediaServerType.EMBY) {
-        await this.checkJellyfin(
-          report,
-          type === MediaServerType.EMBY ? 'Emby' : 'Jellyfin',
-          { series, movies }
-        );
-      } else if (type === MediaServerType.PLEX) {
+      if (isJellyfinFamily(primary)) {
+        await this.checkJellyfin(report, primary, { series, movies });
+      } else if (primary === 'plex') {
         await this.checkPlex(report, { series, movies });
       } else {
         throw new Error('No media server is set up.');

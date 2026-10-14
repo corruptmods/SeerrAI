@@ -88,26 +88,39 @@ interface SyncStatus {
 
 interface SettingsJellyfinProps {
   isSetupSettings?: boolean;
+  /**
+   * The server these settings are for. Left out, it is Emby on a server set
+   * up with Emby, else Jellyfin.
+   */
+  kind?: 'jellyfin' | 'emby';
 }
 
 const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
   isSetupSettings,
+  kind: kindProp,
 }) => {
+  const settings = useSettings();
+  const kind =
+    kindProp ??
+    (settings.currentSettings.mediaServerType === MediaServerType.EMBY
+      ? 'emby'
+      : 'jellyfin');
+  const endpoint = `/api/v1/settings/${kind}`;
+  const mediaServerName = kind === 'emby' ? 'Emby' : 'Jellyfin';
   const [isSyncing, setIsSyncing] = useState(false);
   const {
     data,
     error,
     mutate: revalidate,
-  } = useSWR<JellyfinSettings>('/api/v1/settings/jellyfin');
+  } = useSWR<JellyfinSettings>(endpoint);
   const { data: dataSync, mutate: revalidateSync } = useSWR<SyncStatus>(
-    '/api/v1/settings/jellyfin/sync',
+    `${endpoint}/sync`,
     {
       refreshInterval: (latestData) => (latestData?.running ? 1000 : 10000),
     }
   );
   const intl = useIntl();
   const { addToast } = useToasts();
-  const settings = useSettings();
 
   const JellyfinSettingsSchema = Yup.object().shape({
     hostname: Yup.string()
@@ -163,7 +176,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
     setIsSyncing(true);
 
     try {
-      await axios.post('/api/v1/settings/jellyfin/library/sync');
+      await axios.post(`${endpoint}/library/sync`);
       setIsSyncing(false);
       revalidate();
     } catch (e) {
@@ -180,10 +193,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
       } else if (e?.response?.data?.message === 'CONNECTION_ERROR') {
         addToast(
           intl.formatMessage(messages.jellyfinSyncFailedConnectionError, {
-            mediaServerName:
-              settings.currentSettings.mediaServerType === MediaServerType.EMBY
-                ? 'Emby'
-                : 'Jellyfin',
+            mediaServerName,
           }),
           {
             autoDismiss: true,
@@ -210,14 +220,14 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
   };
 
   const startScan = async () => {
-    await axios.post('/api/v1/settings/jellyfin/sync', {
+    await axios.post(`${endpoint}/sync`, {
       start: true,
     });
     revalidateSync();
   };
 
   const cancelScan = async () => {
-    await axios.post('/api/v1/settings/jellyfin/sync', {
+    await axios.post(`${endpoint}/sync`, {
       cancel: true,
     });
     revalidateSync();
@@ -226,7 +236,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
   const toggleLibrary = async (libraryId: string) => {
     setIsSyncing(true);
     try {
-      await axios.put(`/api/v1/settings/jellyfin/library/${libraryId}`, {
+      await axios.put(`${endpoint}/library/${libraryId}`, {
         enabled: !activeLibraries.includes(libraryId),
       });
     } catch {
@@ -244,14 +254,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
     return <LoadingSpinner />;
   }
 
-  const mediaServerFormatValues = {
-    mediaServerName:
-      settings.currentSettings.mediaServerType === MediaServerType.JELLYFIN
-        ? 'Jellyfin'
-        : settings.currentSettings.mediaServerType === MediaServerType.EMBY
-          ? 'Emby'
-          : undefined,
-  };
+  const mediaServerFormatValues = { mediaServerName };
 
   return (
     <>
@@ -441,7 +444,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
         validationSchema={JellyfinSettingsSchema}
         onSubmit={async (values) => {
           try {
-            await axios.post('/api/v1/settings/jellyfin', {
+            await axios.post(endpoint, {
               ip: values.hostname,
               port: Number(values.port),
               useSsl: values.useSsl,

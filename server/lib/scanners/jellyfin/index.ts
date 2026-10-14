@@ -11,10 +11,15 @@ import type {
   TmdbTvDetails,
   TmdbTvScanDetails,
 } from '@server/api/themoviedb/interfaces';
-import { MediaServerType } from '@server/constants/server';
-import { getRepository } from '@server/datasource';
-import { User } from '@server/entity/User';
+import type { JellyfinFamilyKind } from '@server/constants/server';
 import { detectAnime } from '@server/lib/animeDecision';
+import {
+  hostnameFor,
+  isConnected,
+  jellyfinAdmin,
+  jellyfinFamily,
+  serverName,
+} from '@server/lib/mediaServers';
 import type {
   ProcessableSeason,
   RunnableScanner,
@@ -23,7 +28,6 @@ import type {
 import BaseScanner from '@server/lib/scanners/baseScanner';
 import type { Library } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
-import { getHostname } from '@server/utils/getHostname';
 import { uniqWith } from 'lodash';
 
 /**
@@ -57,10 +61,16 @@ class JellyfinScanner
   private currentLibrary: Library;
   private isRecentOnly = false;
   private processedAnidbSeason: Map<number, Map<number, number>>;
+  /** Jellyfin or Emby: the server this scanner reads. */
+  public readonly kind: JellyfinFamilyKind;
 
-  constructor({ isRecentOnly }: { isRecentOnly?: boolean } = {}) {
-    super('Jellyfin Sync');
+  constructor({
+    isRecentOnly,
+    kind = 'jellyfin',
+  }: { isRecentOnly?: boolean; kind?: JellyfinFamilyKind } = {}) {
+    super(`${serverName(kind)} Sync`);
     this.isRecentOnly = isRecentOnly ?? false;
+    this.kind = kind;
   }
 
   private async extractMovieIds(jellyfinitem: JellyfinLibraryItem): Promise<{
@@ -172,7 +182,8 @@ class JellyfinScanner
         await this.processMovie(tmdbId, {
           is4k: false,
           mediaAddedAt,
-          jellyfinMediaId: metadata.Id,
+          mediaServer: this.kind,
+          itemId: metadata.Id,
           imdbId,
           title: metadata.Name,
         });
@@ -182,7 +193,8 @@ class JellyfinScanner
         await this.processMovie(tmdbId, {
           is4k: true,
           mediaAddedAt,
-          jellyfinMediaId: metadata.Id,
+          mediaServer: this.kind,
+          itemId: metadata.Id,
           imdbId,
           title: metadata.Name,
         });
@@ -440,7 +452,8 @@ class JellyfinScanner
             mediaAddedAt: metadata.DateCreated
               ? new Date(metadata.DateCreated)
               : undefined,
-            jellyfinMediaId: Id,
+            mediaServer: this.kind,
+            itemId: Id,
             title: tvShow.name,
           }
         );
@@ -478,40 +491,33 @@ class JellyfinScanner
   }
 
   public async run(): Promise<void> {
-    const settings = getSettings();
-
-    if (
-      settings.main.mediaServerType != MediaServerType.JELLYFIN &&
-      settings.main.mediaServerType != MediaServerType.EMBY
-    ) {
+    if (!isConnected(this.kind)) {
       return;
     }
 
     const sessionId = this.startRun();
 
     try {
-      const userRepository = getRepository(User);
-      const admin = await userRepository.findOne({
-        where: { id: 1 },
-        select: ['id', 'jellyfinUserId', 'jellyfinDeviceId'],
-        order: { id: 'ASC' },
-      });
+      const admin = await jellyfinAdmin(this.kind);
 
       if (!admin) {
-        return this.log('No admin configured. Jellyfin sync skipped.', 'warn');
+        return this.log(
+          `No admin configured. ${serverName(this.kind)} sync skipped.`,
+          'warn'
+        );
       }
 
+      const server = jellyfinFamily(this.kind);
       this.jfClient = new JellyfinAPI(
-        getHostname(),
-        settings.jellyfin.apiKey,
-        admin.jellyfinDeviceId
+        hostnameFor(this.kind),
+        server.apiKey,
+        admin.deviceId,
+        this.kind
       );
 
-      this.jfClient.setUserId(admin.jellyfinUserId ?? '');
+      this.jfClient.setUserId(admin.userId);
 
-      this.libraries = settings.jellyfin.libraries.filter(
-        (library) => library.enabled
-      );
+      this.libraries = server.libraries.filter((library) => library.enabled);
 
       await animeList.sync();
 
@@ -580,3 +586,17 @@ export const jellyfinFullScanner = new JellyfinScanner();
 export const jellyfinRecentScanner = new JellyfinScanner({
   isRecentOnly: true,
 });
+
+export const embyFullScanner = new JellyfinScanner({ kind: 'emby' });
+export const embyRecentScanner = new JellyfinScanner({
+  isRecentOnly: true,
+  kind: 'emby',
+});
+
+/** A Jellyfin or Emby server's full and recently added scanners. */
+export const jellyfinScanners = (
+  kind: JellyfinFamilyKind
+): { full: JellyfinScanner; recent: JellyfinScanner } =>
+  kind === 'emby'
+    ? { full: embyFullScanner, recent: embyRecentScanner }
+    : { full: jellyfinFullScanner, recent: jellyfinRecentScanner };

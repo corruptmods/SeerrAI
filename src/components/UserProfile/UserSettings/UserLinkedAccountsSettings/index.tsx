@@ -78,10 +78,10 @@ const UserLinkedAccountsSettings = () => {
         type: LinkedAccountType.Plex,
         username: user.plexUsername,
       });
-    if (user.userType === UserType.EMBY && user.jellyfinUsername)
+    if (user.userType === UserType.EMBY && user.embyUsername)
       accounts.push({
         type: LinkedAccountType.Emby,
-        username: user.jellyfinUsername,
+        username: user.embyUsername,
       });
     if (user.userType === UserType.JELLYFIN && user.jellyfinUsername)
       accounts.push({

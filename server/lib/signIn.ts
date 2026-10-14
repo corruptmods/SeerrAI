@@ -4,8 +4,8 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { Session } from '@server/entity/Session';
 import { User } from '@server/entity/User';
+import { USER_ID, hostnameFor, jellyfinFamily } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
-import { getHostname } from '@server/utils/getHostname';
 import type { Request } from 'express';
 import { In, Like } from 'typeorm';
 
@@ -48,7 +48,10 @@ export const sessionTtlSeconds = (session: { userId?: number }): number =>
  * typed, and the owner can always sign in with theirs.
  */
 export const maySignIn = async (
-  user: Pick<User, 'id' | 'userType' | 'plexId' | 'jellyfinUserId'>,
+  user: Pick<
+    User,
+    'id' | 'userType' | 'plexId' | 'jellyfinUserId' | 'embyUserId'
+  >,
   how: 'passkey' | 'password'
 ): Promise<boolean> => {
   const settings = getSettings();
@@ -99,15 +102,20 @@ export const maySignIn = async (
   }
   // A Jellyfin or Emby account must still exist there, and not be switched
   // off.
-  if (!user.jellyfinUserId || !settings.jellyfin.apiKey) {
+  const kind = user.userType === UserType.EMBY ? 'emby' : 'jellyfin';
+  const accountId = user[USER_ID[kind]];
+  const { apiKey } = jellyfinFamily(kind);
+  if (!accountId || !apiKey) {
     return false;
   }
   let account;
   try {
     account = await new JellyfinAPI(
-      getHostname(),
-      settings.jellyfin.apiKey
-    ).getAccount(user.jellyfinUserId);
+      hostnameFor(kind),
+      apiKey,
+      undefined,
+      kind
+    ).getAccount(accountId);
   } catch (e) {
     // The server could not be asked: a password still works then, as it
     // is the way in while the media server is down.

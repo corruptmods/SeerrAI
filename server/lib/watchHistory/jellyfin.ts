@@ -1,12 +1,18 @@
 import type { JellyfinAccount, JellyfinUserItem } from '@server/api/jellyfin';
 import JellyfinAPI from '@server/api/jellyfin';
 import { MediaType } from '@server/constants/media';
+import type { JellyfinFamilyKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { User } from '@server/entity/User';
+import {
+  MEDIA_ID,
+  USER_ID,
+  hostnameFor,
+  serverName,
+} from '@server/lib/mediaServers';
 import type { Play, WatchSource } from '@server/lib/watchHistory/types';
 import { COMPLETE_PERCENT } from '@server/lib/watchHistory/types';
-import { getHostname } from '@server/utils/getHostname';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 import { In } from 'typeorm';
 
@@ -71,32 +77,31 @@ export class JellyfinWatchSource implements WatchSource {
   private api: JellyfinAPI;
 
   constructor(
-    public readonly kind: 'jellyfin' | 'emby',
+    public readonly kind: JellyfinFamilyKind,
     apiKey: string,
-    hostname: string = getHostname()
+    hostname: string = hostnameFor(kind)
   ) {
-    this.label = kind === 'emby' ? 'Emby' : 'Jellyfin';
-    this.api = new JellyfinAPI(hostname, apiKey);
+    this.label = serverName(kind);
+    this.api = new JellyfinAPI(hostname, apiKey, undefined, kind);
   }
 
   public viewerOf(user: User): string | undefined {
-    return user.jellyfinUserId || undefined;
+    return user[USER_ID[this.kind]] || undefined;
   }
 
   public titleIdsOf(media: Media): string[] {
-    return [media.jellyfinMediaId, media.jellyfinMediaId4k].filter(
-      (id): id is string => !!id
-    );
+    return MEDIA_ID[this.kind]
+      .map((column) => media[column])
+      .filter((id): id is string => !!id);
   }
 
   public async mediaFor(titleIds: string[]): Promise<Map<string, Media>> {
     const found = new Map<string, Media>();
     if (!titleIds.length) return found;
     const media = await getRepository(Media).find({
-      where: [
-        { jellyfinMediaId: In(titleIds) },
-        { jellyfinMediaId4k: In(titleIds) },
-      ],
+      where: MEDIA_ID[this.kind].map((column) => ({
+        [column]: In(titleIds),
+      })),
     });
     for (const item of media) {
       for (const id of this.titleIdsOf(item)) found.set(id, item);
@@ -106,10 +111,11 @@ export class JellyfinWatchSource implements WatchSource {
 
   public async usersFor(viewerIds: string[]): Promise<Map<string, User>> {
     if (!viewerIds.length) return new Map();
+    const column = USER_ID[this.kind];
     const users = await getRepository(User).find({
-      where: { jellyfinUserId: In(viewerIds) },
+      where: { [column]: In(viewerIds) },
     });
-    return new Map(users.map((user) => [user.jellyfinUserId as string, user]));
+    return new Map(users.map((user) => [user[column] as string, user]));
   }
 
   public async history(user: User, limit: number): Promise<Play[]> {

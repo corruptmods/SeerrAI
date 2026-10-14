@@ -1,11 +1,11 @@
 import PlexTvAPI from '@server/api/plextv';
-import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import type {
   PlexSubtitleDefault,
   PlexSubtitleOption,
 } from '@server/interfaces/api/subtitlesInterfaces';
+import { isConnected } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import type { AxiosInstance } from 'axios';
@@ -63,10 +63,7 @@ const tokens = new Map<number, { at: number; token: string }>();
 /** The person's own token for this Plex server, if they have one. */
 const serverToken = async (userId: number): Promise<string | undefined> => {
   const settings = getSettings();
-  if (
-    settings.main.mediaServerType !== MediaServerType.PLEX ||
-    !settings.plex.machineId
-  ) {
+  if (!isConnected('plex') || !settings.plex.machineId) {
     return undefined;
   }
   const cached = tokens.get(userId);

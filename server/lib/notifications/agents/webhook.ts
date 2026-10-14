@@ -15,7 +15,12 @@ type KeyMapFunction = (
   type: Notification
 ) => string;
 
-const KeyMap: Record<string, string | KeyMapFunction> = {
+/**
+ * The variables a webhook's payload can use. The Jellyfin ones keep their
+ * meaning on a server set up with Emby, whose ids they carried before Emby
+ * had its own; the Emby ones are Emby's alone.
+ */
+export const KeyMap: Record<string, string | KeyMapFunction> = {
   notification_type: (_payload, type) => Notification[type],
   event: 'event',
   subject: 'subject',
@@ -31,7 +36,13 @@ const KeyMap: Record<string, string | KeyMapFunction> = {
   media_tvdbid: 'media.tvdbId',
   media_type: 'media.mediaType',
   media_jellyfinMediaId: (payload) =>
-    payload.media?.jellyfinMediaId ?? payload.media?.jellyfinMediaId4k ?? '',
+    payload.media?.jellyfinMediaId ??
+    payload.media?.jellyfinMediaId4k ??
+    payload.media?.embyMediaId ??
+    payload.media?.embyMediaId4k ??
+    '',
+  media_embyMediaId: (payload) =>
+    payload.media?.embyMediaId ?? payload.media?.embyMediaId4k ?? '',
   media_status: (payload) =>
     payload.media ? MediaStatus[payload.media.status] : '',
   media_status4k: (payload) =>
@@ -39,7 +50,12 @@ const KeyMap: Record<string, string | KeyMapFunction> = {
   media_plexRatingKey: (payload) => payload.media?.ratingKey ?? '',
   media_plexRatingKey4k: (payload) => payload.media?.ratingKey4k ?? '',
   request_id: 'request.id',
-  requestedBy_jellyfinUserId: 'request.requestedBy.jellyfinUserId',
+  requestedBy_jellyfinUserId: (payload) =>
+    payload.request?.requestedBy?.jellyfinUserId ??
+    payload.request?.requestedBy?.embyUserId ??
+    '',
+  requestedBy_embyUserId: (payload) =>
+    payload.request?.requestedBy?.embyUserId ?? '',
   requestedBy_username: 'request.requestedBy.displayName',
   requestedBy_email: 'request.requestedBy.email',
   requestedBy_avatar: 'request.requestedBy.avatar',

@@ -1,3 +1,4 @@
+import type { MediaServerKind } from '@server/constants/server';
 import type { DnsEntries, DnsStats } from 'dns-caching';
 import type { PaginatedResponse } from './common';
 
@@ -26,6 +27,8 @@ export interface PublicSettingsResponse {
   jellyfinExternalHost?: string;
   jellyfinServerName?: string;
   jellyfinForgotPasswordUrl?: string;
+  embyExternalHost?: string;
+  embyForgotPasswordUrl?: string;
   initialized: boolean;
   applicationTitle: string;
   applicationUrl: string;
@@ -41,6 +44,13 @@ export interface PublicSettingsResponse {
   hideRequested: boolean;
   localLogin: boolean;
   mediaServerLogin: boolean;
+  /** The connected media servers, the primary one first. */
+  mediaServers: {
+    kind: MediaServerKind;
+    name: string;
+    primary: boolean;
+    signIn: boolean;
+  }[];
   movie4kEnabled: boolean;
   series4kEnabled: boolean;
   discoverRegion: string;

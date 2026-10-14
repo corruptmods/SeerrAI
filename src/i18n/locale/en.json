@@ -2311,6 +2311,8 @@
   "components.Settings.SettingsJobsCache.editJobScheduleSelectorHours": "Every {jobScheduleHours, plural, one {hour} other {{jobScheduleHours} hours}}",
   "components.Settings.SettingsJobsCache.editJobScheduleSelectorMinutes": "Every {jobScheduleMinutes, plural, one {minute} other {{jobScheduleMinutes} minutes}}",
   "components.Settings.SettingsJobsCache.editJobScheduleSelectorSeconds": "Every {jobScheduleSeconds, plural, one {second} other {{jobScheduleSeconds} seconds}}",
+  "components.Settings.SettingsJobsCache.emby-full-scan": "Emby Full Library Scan",
+  "components.Settings.SettingsJobsCache.emby-recently-added-scan": "Emby Recently Added Scan",
   "components.Settings.SettingsJobsCache.episode-sync": "Episode Sync",
   "components.Settings.SettingsJobsCache.failures": "Failures",
   "components.Settings.SettingsJobsCache.flushcache": "Flush Cache",

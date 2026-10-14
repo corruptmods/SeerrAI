@@ -15,6 +15,9 @@ export interface User {
   warnings: string[];
   plexUsername?: string | null;
   jellyfinUsername?: string | null;
+  embyUsername?: string | null;
+  /** The media servers this person has an account linked from. */
+  linkedServers?: ('plex' | 'jellyfin' | 'emby')[];
   username?: string;
   displayName: string;
   email: string;

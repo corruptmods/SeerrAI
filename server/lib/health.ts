@@ -16,7 +16,6 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
-import { MediaServerType } from '@server/constants/server';
 import dataSource, { getRepository } from '@server/datasource';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
@@ -26,11 +25,16 @@ import { User } from '@server/entity/User';
 import { listModels } from '@server/lib/ai/providers';
 import { getCollectionGaps } from '@server/lib/collectionGaps';
 import { getMaintainerrStatus } from '@server/lib/deletingSoon';
+import {
+  connectedServers,
+  hostnameFor,
+  isJellyfinFamily,
+  jellyfinFamily,
+} from '@server/lib/mediaServers';
 import type { PlexMatchProblem } from '@server/lib/plexMatchCheck';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import type { DownloadClientSettings } from '@server/lib/settings';
 import { aiReady, getSettings } from '@server/lib/settings';
-import { getHostname } from '@server/utils/getHostname';
 import { mainId, sameName } from '@server/utils/plexMatch';
 import { In, IsNull, LessThan, MoreThanOrEqual, Not } from 'typeorm';
 
@@ -587,10 +591,9 @@ export const serviceChecks = async (): Promise<HealthCheck[]> => {
   const settings = getSettings();
   const pending: Promise<HealthCheck>[] = [];
 
-  if (
-    settings.main.mediaServerType === MediaServerType.PLEX &&
-    settings.plex.ip
-  ) {
+  const mediaServers = connectedServers();
+
+  if (mediaServers.includes('plex') && settings.plex.ip) {
     pending.push(
       serviceCheck('plex', 'Plex', async () => {
         const admin = await getRepository(User).findOne({
@@ -606,20 +609,16 @@ export const serviceChecks = async (): Promise<HealthCheck[]> => {
     );
   }
 
-  if (
-    (settings.main.mediaServerType === MediaServerType.JELLYFIN ||
-      settings.main.mediaServerType === MediaServerType.EMBY) &&
-    settings.jellyfin.ip &&
-    settings.jellyfin.apiKey
-  ) {
-    pending.push(
-      mediaServerCheck(
-        settings.main.mediaServerType === MediaServerType.EMBY
-          ? 'emby'
-          : 'jellyfin',
-        new JellyfinAPI(getHostname(), settings.jellyfin.apiKey)
-      )
-    );
+  for (const kind of mediaServers.filter(isJellyfinFamily)) {
+    const { ip, apiKey } = jellyfinFamily(kind);
+    if (ip && apiKey) {
+      pending.push(
+        mediaServerCheck(
+          kind,
+          new JellyfinAPI(hostnameFor(kind), apiKey, undefined, kind)
+        )
+      );
+    }
   }
 
   for (const radarr of settings.radarr) {

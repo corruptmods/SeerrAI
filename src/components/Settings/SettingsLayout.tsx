@@ -55,11 +55,17 @@ const SettingsLayout = ({ children }: SettingsLayoutProps) => {
           route: '/settings/plex',
           regex: /^\/settings\/plex/,
         }
-      : {
-          text: getAvailableMediaServerName(),
-          route: '/settings/jellyfin',
-          regex: /^\/settings\/jellyfin/,
-        },
+      : settings.currentSettings.mediaServerType === MediaServerType.EMBY
+        ? {
+            text: getAvailableMediaServerName(),
+            route: '/settings/emby',
+            regex: /^\/settings\/emby/,
+          }
+        : {
+            text: getAvailableMediaServerName(),
+            route: '/settings/jellyfin',
+            regex: /^\/settings\/jellyfin/,
+          },
     {
       text: intl.formatMessage(messages.menuServices),
       route: '/settings/services',

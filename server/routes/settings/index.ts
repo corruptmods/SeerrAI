@@ -1,5 +1,3 @@
-import type { JellyfinLibrary } from '@server/api/jellyfin';
-import JellyfinAPI from '@server/api/jellyfin';
 import PlexAPI from '@server/api/plexapi';
 import PlexTvAPI from '@server/api/plextv';
 import { ApiErrorCode } from '@server/constants/error';
@@ -26,25 +24,21 @@ import {
   searchableStuckTitles,
 } from '@server/lib/health';
 import ImageProxy, { imageConversionAvailable } from '@server/lib/imageproxy';
-import { linkedJellyfinUsers } from '@server/lib/jellyfinUsers';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
+import { connectedServers } from '@server/lib/mediaServers';
 import { Permission } from '@server/lib/permissions';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
-import { jellyfinFullScanner } from '@server/lib/scanners/jellyfin';
 import { plexFullScanner } from '@server/lib/scanners/plex';
 import { searchAllMissing } from '@server/lib/searchMissing';
-import type { JobId, Library, MainSettings } from '@server/lib/settings';
+import type { JobId, MainSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { perUserRateLimit } from '@server/middleware/perUserRateLimit';
 import discoverSettingRoutes from '@server/routes/settings/discover';
-import { ApiError } from '@server/types/error';
 import { appDataPath } from '@server/utils/appDataVolume';
 import { getAppVersion } from '@server/utils/appVersion';
 import { dnsCache } from '@server/utils/dnsCache';
-import { getHostname } from '@server/utils/getHostname';
-import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 import type { DnsEntries, DnsStats } from 'dns-caching';
 import { Router } from 'express';
 import fs from 'fs';
@@ -57,6 +51,7 @@ import aiSettingsRoutes from './ai';
 import backfillSettingsRoutes from './backfill';
 import bazarrSettingsRoutes from './bazarr';
 import downloadClientRoutes from './downloadClients';
+import jellyfinSettingsRoutes from './jellyfin';
 import maintainerrSettingsRoutes from './maintainerr';
 import metadataRoutes from './metadata';
 import notificationRoutes from './notifications';
@@ -79,6 +74,8 @@ settingsRoutes.use('/ai', aiSettingsRoutes);
 settingsRoutes.use('/sonarr', sonarrRoutes);
 settingsRoutes.use('/discover', discoverSettingRoutes);
 settingsRoutes.use('/metadatas', metadataRoutes);
+settingsRoutes.use('/jellyfin', jellyfinSettingsRoutes('jellyfin'));
+settingsRoutes.use('/emby', jellyfinSettingsRoutes('emby'));
 
 const libraryUpdateSchema = z.object({
   enabled: z.boolean(),
@@ -122,7 +119,16 @@ settingsRoutes.post('/main', async (req, res, next) => {
   }
   const limitBefore = ImageProxy.sizeLimit();
 
-  settings.main = merge(settings.main, req.body);
+  // The primary media server is set up once and is not changed here.
+  const update = omit(req.body, 'mediaServerType');
+  settings.main = merge(settings.main, update);
+  // The one switch for media server sign-in shown here stands for each
+  // connected server's own.
+  if (typeof update.mediaServerLogin === 'boolean') {
+    for (const kind of connectedServers()) {
+      settings[kind].signIn = update.mediaServerLogin;
+    }
+  }
   await settings.save();
 
   // A lower limit takes effect now, not at the next cleanup.
@@ -228,7 +234,8 @@ settingsRoutes.post('/plex', async (req, res, next) => {
       where: { id: 1 },
     });
 
-    Object.assign(settings.plex, req.body);
+    // Whether Plex is connected is changed only by connecting or removing it.
+    Object.assign(settings.plex, omit(req.body, 'connected'));
 
     const plexClient = new PlexAPI({ plexToken: admin.plexToken });
 
@@ -397,207 +404,6 @@ settingsRoutes.post('/plex/sync', (req, res) => {
   return res.status(200).json(plexFullScanner.status());
 });
 
-settingsRoutes.get('/jellyfin', (_req, res) => {
-  const settings = getSettings();
-
-  res.status(200).json(settings.jellyfin);
-});
-
-settingsRoutes.post('/jellyfin', async (req, res, next) => {
-  const userRepository = getRepository(User);
-  const settings = getSettings();
-
-  try {
-    const admin = await userRepository.findOneOrFail({
-      where: { id: 1 },
-      select: ['id', 'jellyfinUserId', 'jellyfinDeviceId'],
-      order: { id: 'ASC' },
-    });
-
-    const tempJellyfinSettings = { ...settings.jellyfin, ...req.body };
-
-    const jellyfinClient = new JellyfinAPI(
-      getHostname(tempJellyfinSettings),
-      tempJellyfinSettings.apiKey,
-      admin.jellyfinDeviceId ?? ''
-    );
-
-    const result = await jellyfinClient.getSystemInfo();
-
-    if (!result?.Id) {
-      throw new ApiError(result?.status, ApiErrorCode.InvalidUrl);
-    }
-
-    Object.assign(settings.jellyfin, req.body);
-    settings.jellyfin.serverId = result.Id;
-    settings.jellyfin.name = result.ServerName;
-    await settings.save();
-  } catch (e) {
-    if (e instanceof ApiError) {
-      logger.error('Something went wrong testing Jellyfin connection', {
-        label: 'API',
-        status: e.statusCode,
-        errorMessage: ApiErrorCode.InvalidUrl,
-      });
-
-      return next({
-        status: e.statusCode,
-        message: ApiErrorCode.InvalidUrl,
-      });
-    } else {
-      logger.error('Something went wrong', {
-        label: 'API',
-        errorMessage: e.message,
-      });
-
-      return next({
-        status: e.statusCode ?? 500,
-        message: ApiErrorCode.Unknown,
-      });
-    }
-  }
-
-  return res.status(200).json(settings.jellyfin);
-});
-
-settingsRoutes.get('/jellyfin/library', (_req, res) => {
-  const settings = getSettings();
-
-  return res.status(200).json(settings.jellyfin.libraries);
-});
-
-settingsRoutes.put('/jellyfin/library/:libraryId', async (req, res, next) => {
-  const settings = getSettings();
-
-  const bodyResult = libraryUpdateSchema.safeParse(req.body);
-
-  if (!bodyResult.success) {
-    return next({ status: 400, message: 'Invalid request body.' });
-  }
-
-  const library = settings.jellyfin.libraries.find(
-    (l) => l.id === req.params.libraryId
-  );
-
-  if (!library) {
-    return next({ status: 404, message: 'Library does not exist.' });
-  }
-
-  library.enabled = bodyResult.data.enabled;
-  await settings.save();
-
-  return res.status(200).json(library);
-});
-
-settingsRoutes.post('/jellyfin/library/sync', async (_req, res, next) => {
-  const settings = getSettings();
-
-  const userRepository = getRepository(User);
-  const admin = await userRepository.findOneOrFail({
-    select: ['id', 'jellyfinDeviceId', 'jellyfinUserId'],
-    where: { id: 1 },
-    order: { id: 'ASC' },
-  });
-  const jellyfinClient = new JellyfinAPI(
-    getHostname(),
-    settings.jellyfin.apiKey,
-    admin.jellyfinDeviceId ?? ''
-  );
-
-  jellyfinClient.setUserId(admin.jellyfinUserId ?? '');
-
-  let libraries: JellyfinLibrary[];
-
-  try {
-    libraries = await jellyfinClient.getLibraries();
-
-    if (libraries.length === 0) {
-      // Check if no libraries are found due to the fallback to user views
-      // This only affects LDAP users
-      const account = await jellyfinClient.getUser();
-
-      // Automatic Library grouping is not supported when user views are used to get library
-      if (account.Configuration.GroupedFolders?.length > 0) {
-        return next({
-          status: 501,
-          message: ApiErrorCode.SyncErrorGroupedFolders,
-        });
-      }
-
-      return next({ status: 404, message: ApiErrorCode.SyncErrorNoLibraries });
-    }
-  } catch (e) {
-    return next({
-      status: e.statusCode ?? 500,
-      message: e.errorCode ?? ApiErrorCode.Unknown,
-    });
-  }
-
-  const newLibraries: Library[] = libraries.map((library) => {
-    const existing = settings.jellyfin.libraries.find(
-      (l) => l.id === library.key
-    );
-
-    return {
-      id: library.key,
-      name: library.title,
-      enabled: existing?.enabled ?? false,
-      type: library.type,
-      lastScan: existing?.lastScan,
-    };
-  });
-
-  settings.jellyfin.libraries = newLibraries;
-  await settings.save();
-
-  return res.status(200).json(settings.jellyfin.libraries);
-});
-
-settingsRoutes.get('/jellyfin/users', async (req, res) => {
-  const settings = getSettings();
-
-  const userRepository = getRepository(User);
-  const admin = await userRepository.findOneOrFail({
-    select: ['id', 'jellyfinDeviceId', 'jellyfinUserId'],
-    where: { id: 1 },
-    order: { id: 'ASC' },
-  });
-  const jellyfinClient = new JellyfinAPI(
-    getHostname(),
-    settings.jellyfin.apiKey,
-    admin.jellyfinDeviceId ?? ''
-  );
-
-  jellyfinClient.setUserId(admin.jellyfinUserId ?? '');
-  const resp = await jellyfinClient.getUsers();
-
-  // People already imported are left out, as on Import Plex Users: they
-  // are refreshed on every import instead.
-  const linked = await linkedJellyfinUsers(resp.users.map((user) => user.Id));
-  const users = resp.users
-    .filter((user) => !linked.has(normalizeJellyfinGuid(user.Id) ?? ''))
-    .map((user) => ({
-      username: user.Name,
-      id: user.Id,
-      thumb: `/avatarproxy/${user.Id}`,
-      email: user.Name,
-    }));
-
-  return res.status(200).json(sortBy(users, 'username'));
-});
-
-settingsRoutes.get('/jellyfin/sync', (_req, res) => {
-  return res.status(200).json(jellyfinFullScanner.status());
-});
-
-settingsRoutes.post('/jellyfin/sync', (req, res) => {
-  if (req.body.cancel) {
-    jellyfinFullScanner.cancel();
-  } else if (req.body.start) {
-    jellyfinFullScanner.run();
-  }
-  return res.status(200).json(jellyfinFullScanner.status());
-});
 settingsRoutes.get('/health', async (_req, res, next) => {
   try {
     return res.status(200).json(await runHealthChecks());

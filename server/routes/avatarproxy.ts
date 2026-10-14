@@ -1,10 +1,15 @@
-import { MediaServerType } from '@server/constants/server';
+import type { JellyfinFamilyKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import ImageProxy from '@server/lib/imageproxy';
-import { getSettings } from '@server/lib/settings';
+import {
+  USER_ID,
+  connectedServers,
+  hostnameFor,
+  isJellyfinFamily,
+  jellyfinFamilyServer,
+} from '@server/lib/mediaServers';
 import logger from '@server/logger';
-import { getHostname } from '@server/utils/getHostname';
 import axios from 'axios';
 import { Router } from 'express';
 import gravatarUrl from 'gravatar-url';
@@ -21,26 +26,46 @@ function initAvatarImageProxy() {
   return _avatarImageProxy;
 }
 
-function getJellyfinAvatarUrl(userId: string) {
-  const settings = getSettings();
-  return settings.main.mediaServerType === MediaServerType.JELLYFIN
-    ? `${getHostname()}/UserImage?UserId=${userId}`
-    : `${getHostname()}/Users/${userId}/Images/Primary?quality=90`;
+function getJellyfinAvatarUrl(userId: string, kind: JellyfinFamilyKind) {
+  return kind === 'jellyfin'
+    ? `${hostnameFor(kind)}/UserImage?UserId=${userId}`
+    : `${hostnameFor(kind)}/Users/${userId}/Images/Primary?quality=90`;
 }
+
+/**
+ * The Jellyfin or Emby server a person's avatar comes from: a connected one
+ * they have an account on (the primary one first), else any they have an
+ * account on.
+ */
+const avatarServerOf = (
+  user: Pick<User, 'jellyfinUserId' | 'embyUserId'>
+): JellyfinFamilyKind | undefined => {
+  const linked = (['jellyfin', 'emby'] as const).filter(
+    (kind) => !!user[USER_ID[kind]]
+  );
+  return (
+    connectedServers()
+      .filter(isJellyfinFamily)
+      .find((kind) => linked.includes(kind)) ?? linked[0]
+  );
+};
 
 function computeImageHash(buffer: Buffer): string {
   return createHash('sha256').update(buffer).digest('hex');
 }
 
 export async function checkAvatarChanged(
-  user: User
+  user: User,
+  server?: JellyfinFamilyKind
 ): Promise<{ changed: boolean; etag?: string }> {
   try {
-    if (!user || !user.jellyfinUserId) {
+    const kind = user ? (server ?? avatarServerOf(user)) : undefined;
+    const accountId = kind ? user[USER_ID[kind]] : undefined;
+    if (!kind || !accountId) {
       return { changed: false };
     }
 
-    const jellyfinAvatarUrl = getJellyfinAvatarUrl(user.jellyfinUserId);
+    const jellyfinAvatarUrl = getJellyfinAvatarUrl(accountId, kind);
 
     let headResponse;
     try {
@@ -52,19 +77,17 @@ export async function checkAvatarChanged(
       return { changed: false };
     }
 
-    const settings = getSettings();
+    // Jellyfin dates its pictures, Emby tags them.
     let remoteVersion: string;
-    if (settings.main.mediaServerType === MediaServerType.JELLYFIN) {
+    if (kind === 'jellyfin') {
       const remoteLastModifiedStr = headResponse.headers['last-modified'] || '';
       remoteVersion = (
         Date.parse(remoteLastModifiedStr) || Date.now()
       ).toString();
-    } else if (settings.main.mediaServerType === MediaServerType.EMBY) {
+    } else {
       remoteVersion =
         headResponse.headers['etag']?.replace(/"/g, '') ||
         Date.now().toString();
-    } else {
-      remoteVersion = Date.now().toString();
     }
 
     if (user.avatarVersion && user.avatarVersion === remoteVersion) {
@@ -98,13 +121,22 @@ export async function checkAvatarChanged(
   }
 }
 
+/**
+ * A Jellyfin or Emby account's picture, by the account's id. The server is
+ * the one whose column holds the id (people's stored avatar URLs carry only
+ * the id); `?server=jellyfin|emby` says which for an id no one has yet.
+ */
 router.get('/:jellyfinUserId', async (req, res, next) => {
+  const hint =
+    req.query.server === 'jellyfin' || req.query.server === 'emby'
+      ? req.query.server
+      : undefined;
   if (!req.params.jellyfinUserId.match(/^[a-f0-9]{32}$/)) {
-    const mediaServerType = getSettings().main.mediaServerType;
+    const kind = hint ?? jellyfinFamilyServer();
     return next({
       status: 400,
       message: `Provided URL is not ${
-        mediaServerType === MediaServerType.JELLYFIN ? 'a Jellyfin' : 'an Emby'
+        kind === 'jellyfin' ? 'a Jellyfin' : 'an Emby'
       } avatar.`,
     });
   }
@@ -114,17 +146,28 @@ router.get('/:jellyfinUserId', async (req, res, next) => {
     const userEtag = req.headers['if-none-match'];
 
     const versionParam = req.query.v;
+    const accountId = req.params.jellyfinUserId;
 
-    const user = await getRepository(User).findOne({
-      where: { jellyfinUserId: req.params.jellyfinUserId },
+    const users = await getRepository(User).find({
+      where: [{ jellyfinUserId: accountId }, { embyUserId: accountId }],
     });
+    const owner = (kind: JellyfinFamilyKind) =>
+      users.find((u) => u[USER_ID[kind]] === accountId);
+    const kind: JellyfinFamilyKind =
+      (hint && owner(hint) ? hint : undefined) ??
+      (owner('jellyfin') ? 'jellyfin' : undefined) ??
+      (owner('emby') ? 'emby' : undefined) ??
+      hint ??
+      jellyfinFamilyServer() ??
+      'jellyfin';
+    const user = owner(kind);
 
     const fallbackUrl = gravatarUrl(user?.email || 'none', {
       default: 'mm',
       size: 200,
     });
 
-    const jellyfinAvatarUrl = getJellyfinAvatarUrl(req.params.jellyfinUserId);
+    const jellyfinAvatarUrl = getJellyfinAvatarUrl(accountId, kind);
 
     let imageData;
     if (user?.avatarVersion) {

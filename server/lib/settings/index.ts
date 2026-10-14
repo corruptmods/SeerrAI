@@ -1,6 +1,11 @@
 import type { AiFeature } from '@server/constants/features';
 import { DEFAULT_IMAGE_CACHE_MAX_MB } from '@server/constants/images';
-import { MediaServerType } from '@server/constants/server';
+import type { MediaServerKind } from '@server/constants/server';
+import {
+  MEDIA_SERVER_KINDS,
+  MediaServerType,
+  kindOfType,
+} from '@server/constants/server';
 import { Permission } from '@server/lib/permissions';
 import { runMigrations } from '@server/lib/settings/migrator';
 import type { AvailableLocale } from '@server/types/languages';
@@ -44,8 +49,13 @@ export interface PlexSettings {
   useSsl?: boolean;
   libraries: Library[];
   webAppUrl?: string;
+  /** Seerr is connected to this server (see lib/mediaServers). */
+  connected?: boolean;
+  /** People may sign in with their account on this server. */
+  signIn?: boolean;
 }
 
+/** A Jellyfin or an Emby server: both are set up the same way. */
 export interface JellyfinSettings {
   name: string;
   ip: string;
@@ -57,7 +67,50 @@ export interface JellyfinSettings {
   libraries: Library[];
   serverId: string;
   apiKey: string;
+  /** Seerr is connected to this server (see lib/mediaServers). */
+  connected?: boolean;
+  /** People may sign in with their account on this server. */
+  signIn?: boolean;
+  /**
+   * The server's account Seerr reads libraries as; the owner's (user 1's)
+   * linked account when not set.
+   */
+  adminUserId?: string;
 }
+
+/** A Jellyfin or Emby server that has not been set up. */
+export const jellyfinDefaults = (): JellyfinSettings => ({
+  name: '',
+  ip: '',
+  port: 8096,
+  useSsl: false,
+  urlBase: '',
+  externalHostname: '',
+  jellyfinForgotPasswordUrl: '',
+  libraries: [],
+  serverId: '',
+  apiKey: '',
+  connected: false,
+  signIn: true,
+});
+
+/**
+ * The media servers Seerr is connected to, the primary one (the one chosen
+ * at setup, main.mediaServerType) first. The primary one always counts as
+ * connected. lib/mediaServers has the helpers built on this.
+ */
+export const connectedKindsOf = (
+  settings: Pick<AllSettings, 'main' | 'plex' | 'jellyfin' | 'emby'>
+): MediaServerKind[] => {
+  const primary = kindOfType(settings.main.mediaServerType);
+  return [
+    ...(primary ? [primary] : []),
+    ...MEDIA_SERVER_KINDS.filter(
+      (kind) => kind !== primary && !!settings[kind]?.connected
+    ),
+  ];
+};
+
 /**
  * One Maintainerr server. Seerr reads what it will delete, to warn people,
  * and lets them keep a title by postponing it. Each server carries its own
@@ -482,6 +535,15 @@ interface PublicSettings {
   initialized: boolean;
 }
 
+/** A connected media server, as anyone may see it. */
+export interface PublicMediaServer {
+  kind: MediaServerKind;
+  /** The server's own name. */
+  name: string;
+  primary: boolean;
+  signIn: boolean;
+}
+
 interface FullPublicSettings extends PublicSettings {
   applicationTitle: string;
   applicationUrl: string;
@@ -492,6 +554,8 @@ interface FullPublicSettings extends PublicSettings {
   hideRequested: boolean;
   localLogin: boolean;
   mediaServerLogin: boolean;
+  /** The connected media servers, the primary one first. */
+  mediaServers: PublicMediaServer[];
   movie4kEnabled: boolean;
   series4kEnabled: boolean;
   discoverRegion: string;
@@ -501,6 +565,8 @@ interface FullPublicSettings extends PublicSettings {
   jellyfinExternalHost?: string;
   jellyfinForgotPasswordUrl?: string;
   jellyfinServerName?: string;
+  embyExternalHost?: string;
+  embyForgotPasswordUrl?: string;
   partialRequestsEnabled: boolean;
   enableSpecialEpisodes: boolean;
   cacheImages: boolean;
@@ -673,6 +739,8 @@ export type JobId =
   | 'plex-user-import'
   | 'jellyfin-recently-added-scan'
   | 'jellyfin-full-scan'
+  | 'emby-recently-added-scan'
+  | 'emby-full-scan'
   | 'image-cache-cleanup'
   | 'availability-sync'
   | 'process-blocklisted-tags'
@@ -691,6 +759,7 @@ export interface AllSettings {
   main: MainSettings;
   plex: PlexSettings;
   jellyfin: JellyfinSettings;
+  emby: JellyfinSettings;
   tautulli: TautulliSettings;
   trakt: TraktSettings;
   maintainerr: MaintainerrSettings[];
@@ -708,6 +777,11 @@ export interface AllSettings {
   aiCredit: AiCreditSettings;
   /** The next id for each list of servers; see `newId`. */
   nextIds?: Partial<Record<ServerList, number>>;
+  /**
+   * An Emby server's ids still sit in the Jellyfin columns, from before
+   * Emby had its own; they are moved once at startup (lib/embySplit).
+   */
+  pendingEmbySplit?: boolean;
   migrations: string[];
 }
 
@@ -774,19 +848,11 @@ class Settings {
         port: 32400,
         useSsl: false,
         libraries: [],
+        connected: false,
+        signIn: true,
       },
-      jellyfin: {
-        name: '',
-        ip: '',
-        port: 8096,
-        useSsl: false,
-        urlBase: '',
-        externalHostname: '',
-        jellyfinForgotPasswordUrl: '',
-        libraries: [],
-        serverId: '',
-        apiKey: '',
-      },
+      jellyfin: jellyfinDefaults(),
+      emby: jellyfinDefaults(),
       tautulli: {},
       trakt: {},
       maintainerr: [],
@@ -983,6 +1049,14 @@ class Settings {
         'jellyfin-full-scan': {
           schedule: '0 0 3 * * *',
         },
+        // A couple of minutes after Jellyfin's, so the two servers' scans
+        // do not start together.
+        'emby-recently-added-scan': {
+          schedule: '0 2-59/5 * * * *',
+        },
+        'emby-full-scan': {
+          schedule: '0 10 3 * * *',
+        },
         'image-cache-cleanup': {
           schedule: '0 0 5 * * *',
         },
@@ -1038,7 +1112,10 @@ class Settings {
         },
         apiRequestTimeout: 10000,
       },
-      migrations: [],
+      // A new install starts with each server's connection set up the way
+      // migration 0010 would leave it, so it is not run on it later (where
+      // it would disconnect a server connected since setup).
+      migrations: ['0010_media_servers'],
     };
     if (initialSettings) {
       this.data = mergeSettings(this.data, initialSettings);
@@ -1067,6 +1144,26 @@ class Settings {
 
   set jellyfin(data: JellyfinSettings) {
     this.data.jellyfin = mergeSettings(this.data.jellyfin, data);
+  }
+
+  get emby(): JellyfinSettings {
+    return this.data.emby;
+  }
+
+  set emby(data: JellyfinSettings) {
+    this.data.emby = mergeSettings(this.data.emby, data);
+  }
+
+  get pendingEmbySplit(): boolean {
+    return !!this.data.pendingEmbySplit;
+  }
+
+  set pendingEmbySplit(pending: boolean) {
+    if (pending) {
+      this.data.pendingEmbySplit = true;
+    } else {
+      delete this.data.pendingEmbySplit;
+    }
   }
 
   get maintainerr(): MaintainerrSettings[] {
@@ -1191,8 +1288,19 @@ class Settings {
       hideRequested: this.data.main.hideRequested,
       localLogin: this.data.main.localLogin,
       mediaServerLogin: this.data.main.mediaServerLogin,
-      jellyfinExternalHost: this.data.jellyfin.externalHostname,
-      jellyfinForgotPasswordUrl: this.data.jellyfin.jellyfinForgotPasswordUrl,
+      mediaServers: connectedKindsOf(this.data).map((kind, index) => ({
+        kind,
+        name: this.data[kind]?.name ?? '',
+        primary: index === 0 && kind === kindOfType(this.main.mediaServerType),
+        signIn: this.data[kind]?.signIn !== false,
+      })),
+      // For the pages that know one Jellyfin or Emby server: Emby's when
+      // Emby is the one connected.
+      jellyfinExternalHost: this.jellyfinFamilyPublic().externalHostname,
+      jellyfinForgotPasswordUrl:
+        this.jellyfinFamilyPublic().jellyfinForgotPasswordUrl,
+      embyExternalHost: this.data.emby?.externalHostname,
+      embyForgotPasswordUrl: this.data.emby?.jellyfinForgotPasswordUrl,
       movie4kEnabled: this.data.radarr.some(
         (radarr) => radarr.is4k && radarr.isDefault
       ),
@@ -1222,6 +1330,18 @@ class Settings {
       ),
       traktReady: !!this.data.trakt?.clientId,
     };
+  }
+
+  /**
+   * The Jellyfin-family server the single-server pages show: Jellyfin
+   * unless Emby is connected and Jellyfin is not.
+   */
+  private jellyfinFamilyPublic(): JellyfinSettings {
+    const kinds = connectedKindsOf(this.data);
+    const kind = kinds.find((k) => k === 'jellyfin' || k === 'emby');
+    return kind === 'emby' && this.data.emby
+      ? this.data.emby
+      : this.data.jellyfin;
   }
 
   get notifications(): NotificationSettings {

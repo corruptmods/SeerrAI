@@ -915,12 +915,14 @@ const UserList = () => {
                     >
                       {user.username ||
                         user.jellyfinUsername ||
+                        user.embyUsername ||
                         user.plexUsername ||
                         user.email}
                     </Link>
                     {(
                       user.username ||
                       user.jellyfinUsername ||
+                      user.embyUsername ||
                       user.plexUsername
                     )?.toLowerCase() !== user.email && (
                       <div className="text-sm leading-5 text-gray-300">

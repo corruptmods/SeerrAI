@@ -1,4 +1,3 @@
-import { MediaServerType } from '@server/constants/server';
 import blocklistedTagsProcessor from '@server/job/blocklistedTagsProcessor';
 import animeCheck from '@server/lib/animeCheck';
 import availabilitySync from '@server/lib/availabilitySync';
@@ -9,14 +8,16 @@ import episodeSync from '@server/lib/episodeSync';
 import futureSeasons from '@server/lib/futureSeasons';
 import healthAlerts from '@server/lib/healthAlerts';
 import ImageProxy from '@server/lib/imageproxy';
+import {
+  isJellyfinFamily,
+  primaryServer,
+  serverName,
+} from '@server/lib/mediaServers';
 import notificationReconciler from '@server/lib/notificationReconciler';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import plexUserImport from '@server/lib/plexUserImport';
 import refreshToken from '@server/lib/refreshToken';
-import {
-  jellyfinFullScanner,
-  jellyfinRecentScanner,
-} from '@server/lib/scanners/jellyfin';
+import { jellyfinScanners } from '@server/lib/scanners/jellyfin';
 import { plexFullScanner, plexRecentScanner } from '@server/lib/scanners/plex';
 import { radarrScanner } from '@server/lib/scanners/radarr';
 import { sonarrScanner } from '@server/lib/scanners/sonarr';
@@ -61,9 +62,9 @@ export const runJob =
 
 export const startJobs = (): void => {
   const jobs = getSettings().jobs;
-  const mediaServerType = getSettings().main.mediaServerType;
+  const mediaServer = primaryServer();
 
-  if (mediaServerType === MediaServerType.PLEX) {
+  if (mediaServer === 'plex') {
     // Run recently added plex scan every 5 minutes
     scheduledJobs.push({
       id: 'plex-recently-added-scan',
@@ -120,48 +121,50 @@ export const startJobs = (): void => {
         })
       ),
     });
-  } else if (
-    mediaServerType === MediaServerType.JELLYFIN ||
-    mediaServerType === MediaServerType.EMBY
-  ) {
-    // Run recently added jellyfin sync every 5 minutes
+  } else if (isJellyfinFamily(mediaServer)) {
+    const name = serverName(mediaServer);
+    const scanners = jellyfinScanners(mediaServer);
+    const recentId = `${mediaServer}-recently-added-scan` as const;
+    const fullId = `${mediaServer}-full-scan` as const;
+
+    // Run the recently added scan every 5 minutes
     scheduledJobs.push({
-      id: 'jellyfin-recently-added-scan',
-      name: 'Jellyfin Recently Added Scan',
+      id: recentId,
+      name: `${name} Recently Added Scan`,
       type: 'process',
       interval: 'minutes',
-      cronSchedule: jobs['jellyfin-recently-added-scan'].schedule,
+      cronSchedule: jobs[recentId].schedule,
       job: schedule.scheduleJob(
-        jobs['jellyfin-recently-added-scan'].schedule,
-        runJob('Jellyfin Recently Added Scan', () => {
-          logger.info('Starting scheduled job: Jellyfin Recently Added Scan', {
+        jobs[recentId].schedule,
+        runJob(`${name} Recently Added Scan`, () => {
+          logger.info(`Starting scheduled job: ${name} Recently Added Scan`, {
             label: 'Jobs',
           });
-          return jellyfinRecentScanner.run();
+          return scanners.recent.run();
         })
       ),
-      running: () => jellyfinRecentScanner.status().running,
-      cancelFn: () => jellyfinRecentScanner.cancel(),
+      running: () => scanners.recent.status().running,
+      cancelFn: () => scanners.recent.cancel(),
     });
 
-    // Run full jellyfin sync every 24 hours
+    // Run the full scan every 24 hours
     scheduledJobs.push({
-      id: 'jellyfin-full-scan',
-      name: 'Jellyfin Full Library Scan',
+      id: fullId,
+      name: `${name} Full Library Scan`,
       type: 'process',
       interval: 'hours',
-      cronSchedule: jobs['jellyfin-full-scan'].schedule,
+      cronSchedule: jobs[fullId].schedule,
       job: schedule.scheduleJob(
-        jobs['jellyfin-full-scan'].schedule,
-        runJob('Jellyfin Full Library Scan', () => {
-          logger.info('Starting scheduled job: Jellyfin Full Scan', {
+        jobs[fullId].schedule,
+        runJob(`${name} Full Library Scan`, () => {
+          logger.info(`Starting scheduled job: ${name} Full Scan`, {
             label: 'Jobs',
           });
-          return jellyfinFullScanner.run();
+          return scanners.full.run();
         })
       ),
-      running: () => jellyfinFullScanner.status().running,
-      cancelFn: () => jellyfinFullScanner.cancel(),
+      running: () => scanners.full.status().running,
+      cancelFn: () => scanners.full.cancel(),
     });
   }
 
@@ -266,11 +269,10 @@ export const startJobs = (): void => {
   // than at the next scheduled scan.
   downloadTracker.whenImported(() => {
     const scanner =
-      mediaServerType === MediaServerType.PLEX
+      mediaServer === 'plex'
         ? plexRecentScanner
-        : mediaServerType === MediaServerType.JELLYFIN ||
-            mediaServerType === MediaServerType.EMBY
-          ? jellyfinRecentScanner
+        : isJellyfinFamily(mediaServer)
+          ? jellyfinScanners(mediaServer).recent
           : undefined;
     if (!scanner || scanner.status().running) return;
     logger.info('Downloads were imported; running the recently added scan', {
@@ -296,7 +298,7 @@ export const startJobs = (): void => {
   });
 
   // Give new Plex friends an account, when Auto-Import Plex Users is on
-  if (mediaServerType === MediaServerType.PLEX) {
+  if (mediaServer === 'plex') {
     scheduledJobs.push({
       id: 'plex-user-import',
       name: 'Plex User Import',
@@ -471,7 +473,7 @@ export const startJobs = (): void => {
 
   // Report only: folders Plex matched to a different title than Sonarr or
   // Radarr has in them (Settings → Health). Plex only.
-  if (mediaServerType === MediaServerType.PLEX) {
+  if (mediaServer === 'plex') {
     scheduledJobs.push({
       id: 'plex-match-check',
       name: 'Plex Match Check',

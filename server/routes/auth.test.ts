@@ -16,6 +16,7 @@ import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
 import PreparedEmail from '@server/lib/email';
 import ImageProxy from '@server/lib/imageproxy';
+import { applyMediaServerLogin } from '@server/lib/mediaServerAdmin';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import { checkUser } from '@server/middleware/auth';
@@ -27,6 +28,13 @@ import express from 'express';
 import session from 'express-session';
 import request from 'supertest';
 import authRoutes from './auth';
+
+// Settings → Users' media server sign-in switch, which turns every
+// connected server's own switch on or off.
+const setMediaServerLogin = (on: boolean): void => {
+  getSettings().main.mediaServerLogin = on;
+  applyMediaServerLogin(on);
+};
 
 const emailMock = mock.method(PreparedEmail.prototype, 'send', async () => {
   return undefined;
@@ -1046,7 +1054,7 @@ describe('signing in with Plex', () => {
   beforeEach(() => {
     const settings = getSettings();
     settings.main.mediaServerType = MediaServerType.PLEX;
-    settings.main.mediaServerLogin = true;
+    setMediaServerLogin(true);
     settings.main.newPlexLogin = true;
     plexAccount = { id: 3000, email: 'plexfriend@example.com' };
     plexShared = true;
@@ -1163,7 +1171,7 @@ describe('Quick Connect while Jellyfin sign-in is turned off', () => {
     initiateQCMock.mock.mockImplementation(async () => ({
       ...defaultInitiateResponse,
     }));
-    getSettings().main.mediaServerLogin = false;
+    setMediaServerLogin(false);
   });
 
   it('does not sign anyone in', async () => {
@@ -1185,7 +1193,7 @@ describe('Quick Connect while Jellyfin sign-in is turned off', () => {
       assert.strictEqual(authenticateQCMock.mock.callCount(), 0);
       assert.strictEqual((await agent.get('/auth/me')).status, 403);
     } finally {
-      getSettings().main.mediaServerLogin = true;
+      setMediaServerLogin(true);
     }
   });
 
@@ -1201,7 +1209,7 @@ describe('Quick Connect while Jellyfin sign-in is turned off', () => {
       const signedIn = await agent.post('/auth/jellyfin/quickconnect/initiate');
       assert.strictEqual(signedIn.status, 200);
     } finally {
-      getSettings().main.mediaServerLogin = true;
+      setMediaServerLogin(true);
     }
   });
 });
@@ -1253,7 +1261,7 @@ describe('guessing passwords', () => {
 
   it('stops after ten wrong Jellyfin passwords', async () => {
     configureJellyfin();
-    getSettings().main.mediaServerLogin = true;
+    setMediaServerLogin(true);
     const login = mock.method(JellyfinAPI.prototype, 'login', async () => {
       throw new ApiError(401, ApiErrorCode.InvalidCredentials);
     });
@@ -1365,7 +1373,7 @@ describe('signing in with a password, for someone the media server dropped', () 
 
   it('always lets the owner in, and password accounts, with Plex sign-in off', async () => {
     plexShared = false;
-    getSettings().main.mediaServerLogin = false;
+    setMediaServerLogin(false);
     try {
       await passwordUser({ email: 'local@seerr.dev', username: 'local' });
       for (const email of ['admin@seerr.dev', 'local@seerr.dev']) {
@@ -1375,7 +1383,7 @@ describe('signing in with a password, for someone the media server dropped', () 
         assert.strictEqual(res.status, 200, email);
       }
     } finally {
-      getSettings().main.mediaServerLogin = true;
+      setMediaServerLogin(true);
     }
   });
 });
@@ -1437,7 +1445,7 @@ describe('waiting on Jellyfin', () => {
 const connectServers = (...kinds: MediaServerKind[]) => {
   const settings = getSettings();
   settings.main.mediaServerType = typeOfKind(kinds[0]);
-  settings.main.mediaServerLogin = true;
+  setMediaServerLogin(true);
   settings.main.newPlexLogin = true;
   settings.main.localLogin = true;
   settings.plex.machineId = 'machine-1';

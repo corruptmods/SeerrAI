@@ -4,6 +4,7 @@ import { MEDIA_SERVER_KINDS, MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import UserPasskey from '@server/entity/UserPasskey';
+import { applyMediaServerLogin } from '@server/lib/mediaServerAdmin';
 import { passkeyName, takeChallenge } from '@server/lib/passkeys';
 import { getSettings } from '@server/lib/settings';
 import { checkUser } from '@server/middleware/auth';
@@ -17,6 +18,13 @@ import crypto from 'node:crypto';
 import type { Server } from 'node:http';
 import path from 'node:path';
 import { after, before, beforeEach, describe, it } from 'node:test';
+
+// Settings → Users' media server sign-in switch, which turns every
+// connected server's own switch on or off.
+const setMediaServerLogin = (on: boolean): void => {
+  getSettings().main.mediaServerLogin = on;
+  applyMediaServerLogin(on);
+};
 
 /*
  * Passkeys end to end against the real verification code: a small software
@@ -228,7 +236,7 @@ beforeEach(async () => {
   jellyfinEnabled = true;
   const settings = getSettings();
   settings.main.applicationUrl = ORIGIN;
-  settings.main.mediaServerLogin = true;
+  setMediaServerLogin(true);
   // A server set up with Plex, and nothing else connected.
   settings.main.mediaServerType = MediaServerType.PLEX;
   for (const kind of MEDIA_SERVER_KINDS) {
@@ -464,7 +472,7 @@ describe('passkeys', () => {
     const device = new Authenticator();
     await addPasskey(browser, device);
 
-    getSettings().main.mediaServerLogin = false;
+    setMediaServerLogin(false);
     assert.equal((await signInWith(device)).status, 403);
   });
 

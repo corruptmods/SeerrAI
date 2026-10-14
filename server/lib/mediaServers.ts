@@ -110,17 +110,12 @@ export const externalHostFor = (kind: JellyfinFamilyKind): string =>
   jellyfinFamily(kind).externalHostname || hostnameFor(kind);
 
 /**
- * People may sign in with their account on this server. The single switch
- * for media server sign-in (main.mediaServerLogin) still turns them all off.
+ * People may sign in with their account on this server: it is connected
+ * and its own switch (Settings → Media Servers) is on. The old single
+ * switch, main.mediaServerLogin, only follows these (lib/mediaServerAdmin).
  */
-export const signInAllowed = (kind: MediaServerKind): boolean => {
-  const settings = getSettings();
-  return (
-    isConnected(kind) &&
-    settings[kind]?.signIn !== false &&
-    settings.main.mediaServerLogin !== false
-  );
-};
+export const signInAllowed = (kind: MediaServerKind): boolean =>
+  isConnected(kind) && getSettings()[kind]?.signIn !== false;
 
 /**
  * Makes a server the primary one and connects it, at setup. Its sign-in

@@ -359,6 +359,25 @@ class PlexMatchCheck {
     );
   }
 
+  /**
+   * Forgets what the last report found on a server Seerr is no longer
+   * connected to; the rest of the report stays.
+   */
+  public async dropServer(mediaServer: MediaServerName): Promise<void> {
+    const report = await this.lastReport();
+    const problems = report.problems.filter(
+      (p) => (p.mediaServer ?? 'Plex') !== mediaServer
+    );
+    if (problems.length === report.problems.length) return;
+    this.report = { ...(this.report as PlexMatchReport), problems };
+    await fs.writeFile(REPORT_PATH, JSON.stringify(this.report)).catch((e) =>
+      logger.warn('Could not keep the Match Check report', {
+        label: 'Match Check',
+        errorMessage: e.message,
+      })
+    );
+  }
+
   private async expectedFolders(): Promise<{
     series: Map<string, Expected[]>;
     movies: Map<string, Expected[]>;

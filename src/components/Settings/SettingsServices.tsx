@@ -20,7 +20,6 @@ import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
 import { PlusIcon } from '@heroicons/react/24/solid';
-import { MediaServerType } from '@server/constants/server';
 import type OverrideRule from '@server/entity/OverrideRule';
 import type { OverrideRuleResultsResponse } from '@server/interfaces/api/overrideRuleInterfaces';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
@@ -443,10 +442,11 @@ const SettingsServices = () => {
       <SettingsDownloadClients />
       <SettingsBazarr />
       <SettingsTrakt />
-      {/* Tautulli reads Plex's watch history, so it is only offered with Plex. */}
-      {settings.currentSettings.mediaServerType === MediaServerType.PLEX && (
-        <SettingsTautulli />
-      )}
+      {/* Tautulli reads Plex's watch history, so it is offered while Plex is
+          connected. */}
+      {settings.currentSettings.mediaServers.some(
+        (server) => server.kind === 'plex'
+      ) && <SettingsTautulli />}
     </>
   );
 };

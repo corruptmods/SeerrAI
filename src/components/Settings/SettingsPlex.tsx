@@ -19,6 +19,7 @@ import type { PlexSettings } from '@server/lib/settings';
 import axios from 'axios';
 import { Field, Formik } from 'formik';
 import orderBy from 'lodash/orderBy';
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
@@ -76,6 +77,8 @@ const messages = defineMessages('components.Settings', {
   validationUrlTrailingSlash: 'URL must not end in a trailing slash',
   validationUrlBaseLeadingSlash: 'URL base must have a leading slash',
   validationUrlBaseTrailingSlash: 'URL base must not end in a trailing slash',
+  plexNotConnected:
+    'Seerr AI is not connected to Plex. Connect it under <MediaServersLink>Media Servers</MediaServersLink>.',
 });
 
 interface Library {
@@ -273,6 +276,23 @@ const SettingsPlex = ({ isSetupSettings }: SettingsPlexProps) => {
         <p className="description">
           {intl.formatMessage(messages.plexsettingsDescription)}
         </p>
+        {!isSetupSettings && data?.connected === false && (
+          <div className="section">
+            <Alert
+              type="warning"
+              title={intl.formatMessage(messages.plexNotConnected, {
+                MediaServersLink: (msg: React.ReactNode) => (
+                  <Link
+                    href="/settings/media-servers"
+                    className="text-white transition duration-300 hover:underline"
+                  >
+                    {msg}
+                  </Link>
+                ),
+              })}
+            />
+          </div>
+        )}
         {isSetupSettings && (
           <div className="section">
             <Alert

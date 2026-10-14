@@ -26,10 +26,10 @@ import {
 } from '@server/lib/health';
 import ImageProxy, { imageConversionAvailable } from '@server/lib/imageproxy';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
+import { applyMediaServerLogin } from '@server/lib/mediaServerAdmin';
 import {
   MEDIA_ID,
   MEDIA_SERVER_KINDS,
-  connectedServers,
   serverName,
 } from '@server/lib/mediaServers';
 import { Permission } from '@server/lib/permissions';
@@ -60,6 +60,7 @@ import bazarrSettingsRoutes from './bazarr';
 import downloadClientRoutes from './downloadClients';
 import jellyfinSettingsRoutes from './jellyfin';
 import maintainerrSettingsRoutes from './maintainerr';
+import mediaServerRoutes from './mediaServers';
 import metadataRoutes from './metadata';
 import notificationRoutes from './notifications';
 import radarrRoutes from './radarr';
@@ -83,6 +84,7 @@ settingsRoutes.use('/discover', discoverSettingRoutes);
 settingsRoutes.use('/metadatas', metadataRoutes);
 settingsRoutes.use('/jellyfin', jellyfinSettingsRoutes('jellyfin'));
 settingsRoutes.use('/emby', jellyfinSettingsRoutes('emby'));
+settingsRoutes.use('/media-servers', mediaServerRoutes);
 
 const libraryUpdateSchema = z.object({
   enabled: z.boolean(),
@@ -126,16 +128,12 @@ settingsRoutes.post('/main', async (req, res, next) => {
   }
   const limitBefore = ImageProxy.sizeLimit();
 
-  // The primary media server is set up once and is not changed here.
+  // The primary media server is changed under Settings → Media Servers.
   const update = omit(req.body, 'mediaServerType');
   settings.main = merge(settings.main, update);
   // The one switch for media server sign-in shown here stands for each
   // connected server's own.
-  if (typeof update.mediaServerLogin === 'boolean') {
-    for (const kind of connectedServers()) {
-      settings[kind].signIn = update.mediaServerLogin;
-    }
-  }
+  applyMediaServerLogin(update.mediaServerLogin);
   await settings.save();
 
   // A lower limit takes effect now, not at the next cleanup.
@@ -241,8 +239,9 @@ settingsRoutes.post('/plex', async (req, res, next) => {
       where: { id: 1 },
     });
 
-    // Whether Plex is connected is changed only by connecting or removing it.
-    Object.assign(settings.plex, omit(req.body, 'connected'));
+    // Whether Plex is connected, and whether people may sign in with it,
+    // are changed under Settings → Media Servers.
+    Object.assign(settings.plex, omit(req.body, 'connected', 'signIn'));
 
     const plexClient = new PlexAPI({ plexToken: admin.plexToken });
 

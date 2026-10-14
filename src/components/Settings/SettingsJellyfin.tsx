@@ -1,3 +1,4 @@
+import Alert from '@app/components/Common/Alert';
 import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
@@ -14,6 +15,7 @@ import { MediaServerType } from '@server/constants/server';
 import type { JellyfinSettings } from '@server/lib/settings';
 import axios from 'axios';
 import { Field, Formik } from 'formik';
+import Link from 'next/link';
 import { useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import useSWR from 'swr';
@@ -70,6 +72,8 @@ const messages = defineMessages('components.Settings', {
   tip: 'Tip',
   scanbackground:
     'Scanning will run in the background. You can continue the setup process in the meantime.',
+  jellyfinNotConnected:
+    'Seerr AI is not connected to {mediaServerName}. Connect it under <MediaServersLink>Media Servers</MediaServersLink>.',
 });
 
 interface Library {
@@ -89,8 +93,8 @@ interface SyncStatus {
 interface SettingsJellyfinProps {
   isSetupSettings?: boolean;
   /**
-   * The server these settings are for. Left out, it is Emby on a server set
-   * up with Emby, else Jellyfin.
+   * The server these settings are for. Left out, it is Jellyfin, or Emby
+   * while Emby is connected and Jellyfin is not.
    */
   kind?: 'jellyfin' | 'emby';
 }
@@ -100,11 +104,17 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
   kind: kindProp,
 }) => {
   const settings = useSettings();
+  // The old address of Emby's settings, /settings/jellyfin, still shows
+  // them while Emby is connected and Jellyfin is not.
+  const connected = settings.currentSettings.mediaServers.map((s) => s.kind);
   const kind =
     kindProp ??
-    (settings.currentSettings.mediaServerType === MediaServerType.EMBY
-      ? 'emby'
-      : 'jellyfin');
+    (connected.includes('jellyfin')
+      ? 'jellyfin'
+      : connected.includes('emby') ||
+          settings.currentSettings.mediaServerType === MediaServerType.EMBY
+        ? 'emby'
+        : 'jellyfin');
   const endpoint = `/api/v1/settings/${kind}`;
   const mediaServerName = kind === 'emby' ? 'Emby' : 'Jellyfin';
   const [isSyncing, setIsSyncing] = useState(false);
@@ -258,6 +268,24 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
 
   return (
     <>
+      {!isSetupSettings && data?.connected === false && (
+        <div className="mb-6">
+          <Alert
+            type="warning"
+            title={intl.formatMessage(messages.jellyfinNotConnected, {
+              mediaServerName,
+              MediaServersLink: (msg: React.ReactNode) => (
+                <Link
+                  href="/settings/media-servers"
+                  className="text-white transition duration-300 hover:underline"
+                >
+                  {msg}
+                </Link>
+              ),
+            })}
+          />
+        </div>
+      )}
       <div className="mb-6">
         <h3 className="heading">
           {intl.formatMessage(

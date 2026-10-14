@@ -61,9 +61,9 @@ const jellyfinSettingsRoutes = (kind: JellyfinFamilyKind): Router => {
         throw new ApiError(result?.status, ApiErrorCode.InvalidUrl);
       }
 
-      // Whether the server is connected is changed only by connecting or
-      // removing it.
-      Object.assign(settings[kind], omit(req.body, 'connected'));
+      // Whether the server is connected, and whether people may sign in
+      // with it, are changed under Settings → Media Servers.
+      Object.assign(settings[kind], omit(req.body, 'connected', 'signIn'));
       settings[kind].serverId = result.Id;
       settings[kind].name = result.ServerName;
       await settings.save();

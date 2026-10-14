@@ -91,9 +91,10 @@ describe('which servers are connected', () => {
     settings.jellyfin.signIn = false;
     assert.equal(signInAllowed('jellyfin'), false);
 
+    // The old single switch only follows the servers' own.
     settings.jellyfin.signIn = true;
     settings.main.mediaServerLogin = false;
-    assert.equal(signInAllowed('jellyfin'), false, 'the one switch for all');
+    assert.equal(signInAllowed('jellyfin'), true, "the server's own switch");
   });
 
   it('makes the server chosen at setup the connected primary one', () => {

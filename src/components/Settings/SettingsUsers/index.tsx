@@ -5,15 +5,22 @@ import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import PermissionEdit from '@app/components/PermissionEdit';
 import QuotaSelector from '@app/components/QuotaSelector';
+import { SERVER_NAMES } from '@app/components/Settings/SettingsMediaServers/names';
+import useLazyModule from '@app/hooks/useLazyModule';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
-import { MediaServerType } from '@server/constants/server';
+import { Transition } from '@headlessui/react';
+import {
+  ArrowDownOnSquareIcon,
+  InboxArrowDownIcon,
+} from '@heroicons/react/24/outline';
+import type { MediaServerKind } from '@server/constants/server';
 import type { MainSettings } from '@server/lib/settings';
 import axios from 'axios';
 import { Field, Form, Formik } from 'formik';
+import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR, { mutate } from 'swr';
 import * as yup from 'yup';
@@ -52,7 +59,25 @@ const messages = defineMessages('components.Settings.SettingsUsers', {
   defaultWatchlistSyncTvTip: 'Request series added to their watchlist',
   disabledMediaServerLoginWarning:
     'Some users may not have a {applicationTitle} password set. Disabling {mediaServerName} sign-in could lock them out. Affected users will need to set a password from their profile or via a password reset link.',
+  mediaServersLogin: 'Enable Media Server Sign-In',
+  mediaServersLoginTip:
+    'Allow users to sign in with their account on any connected media server. Each server can also be turned on or off on its own under Media Servers',
+  newMediaServersLogin: 'Enable New Media Server Sign-In',
+  newMediaServersLoginTip:
+    'Allow media server users to sign in without first being imported',
+  disabledMediaServersLoginWarning:
+    'Some users may not have a {applicationTitle} password set. Disabling media server sign-in could lock them out. Affected users will need to set a password from their profile or via a password reset link.',
+  importUsers: 'Import Users',
+  importUsersTip:
+    'Give people on a connected media server an account here, with the default permissions above. People already imported are refreshed',
+  importFrom: 'Import {mediaServerName} Users',
+  couldNotOpen:
+    'That could not be opened. Check your connection and try again.',
 });
+
+const loadPlexImport = () => import('@app/components/UserList/PlexImportModal');
+const loadJellyfinImport = () =>
+  import('@app/components/UserList/JellyfinImportModal');
 
 const SettingsUsers = () => {
   const { addToast } = useToasts();
@@ -63,6 +88,24 @@ const SettingsUsers = () => {
     mutate: revalidate,
   } = useSWR<MainSettings>('/api/v1/settings/main');
   const settings = useSettings();
+  const [importing, setImporting] = useState<MediaServerKind>();
+  const couldNotOpen = () => {
+    addToast(intl.formatMessage(messages.couldNotOpen), {
+      appearance: 'error',
+      autoDismiss: true,
+    });
+    setImporting(undefined);
+  };
+  const plexImport = useLazyModule(
+    loadPlexImport,
+    importing === 'plex',
+    couldNotOpen
+  );
+  const jellyfinImport = useLazyModule(
+    loadJellyfinImport,
+    importing === 'jellyfin' || importing === 'emby',
+    couldNotOpen
+  );
 
   const schema = yup
     .object()
@@ -89,16 +132,14 @@ const SettingsUsers = () => {
     return <LoadingSpinner />;
   }
 
+  // With one server connected the switches are named after it; with
+  // several, they stand for them all.
+  const servers = settings.currentSettings.mediaServers;
+  const several = servers.length > 1;
   const mediaServerFormatValues = {
-    mediaServerName:
-      settings.currentSettings.mediaServerType === MediaServerType.JELLYFIN
-        ? 'Jellyfin'
-        : settings.currentSettings.mediaServerType === MediaServerType.EMBY
-          ? 'Emby'
-          : settings.currentSettings.mediaServerType === MediaServerType.PLEX
-            ? 'Plex'
-            : undefined,
+    mediaServerName: servers[0] ? SERVER_NAMES[servers[0].kind] : undefined,
   };
+  const plexConnected = servers.some((server) => server.kind === 'plex');
 
   return (
     <>
@@ -206,11 +247,15 @@ const SettingsUsers = () => {
                         id="mediaServerLogin"
                         className="mt-4"
                         label={intl.formatMessage(
-                          messages.mediaServerLogin,
+                          several
+                            ? messages.mediaServersLogin
+                            : messages.mediaServerLogin,
                           mediaServerFormatValues
                         )}
                         description={intl.formatMessage(
-                          messages.mediaServerLoginTip,
+                          several
+                            ? messages.mediaServersLoginTip
+                            : messages.mediaServerLoginTip,
                           mediaServerFormatValues
                         )}
                         onChange={() =>
@@ -224,7 +269,9 @@ const SettingsUsers = () => {
                         <div className="mt-4">
                           <Alert
                             title={intl.formatMessage(
-                              messages.disabledMediaServerLoginWarning,
+                              several
+                                ? messages.disabledMediaServersLoginWarning
+                                : messages.disabledMediaServerLoginWarning,
                               {
                                 applicationTitle:
                                   settings.currentSettings.applicationTitle,
@@ -242,12 +289,16 @@ const SettingsUsers = () => {
                 <div className="form-row">
                   <label htmlFor="newPlexLogin" className="checkbox-label">
                     {intl.formatMessage(
-                      messages.newPlexLogin,
+                      several
+                        ? messages.newMediaServersLogin
+                        : messages.newPlexLogin,
                       mediaServerFormatValues
                     )}
                     <span className="label-tip">
                       {intl.formatMessage(
-                        messages.newPlexLoginTip,
+                        several
+                          ? messages.newMediaServersLoginTip
+                          : messages.newPlexLoginTip,
                         mediaServerFormatValues
                       )}
                     </span>
@@ -263,8 +314,7 @@ const SettingsUsers = () => {
                     />
                   </div>
                 </div>
-                {settings.currentSettings.mediaServerType ===
-                  MediaServerType.PLEX && (
+                {plexConnected && (
                   <div className="form-row">
                     <label
                       htmlFor="autoImportPlexUsers"
@@ -414,6 +464,59 @@ const SettingsUsers = () => {
           }}
         </Formik>
       </div>
+      {servers.length > 0 && (
+        <>
+          <div className="mb-6 mt-10">
+            <h3 className="heading">
+              {intl.formatMessage(messages.importUsers)}
+            </h3>
+            <p className="description">
+              {intl.formatMessage(messages.importUsersTip)}
+            </p>
+          </div>
+          <div className="section flex flex-wrap gap-3">
+            {servers.map((server) => (
+              <Button
+                key={server.kind}
+                type="button"
+                onClick={() => setImporting(server.kind)}
+              >
+                <InboxArrowDownIcon />
+                <span>
+                  {intl.formatMessage(messages.importFrom, {
+                    mediaServerName: SERVER_NAMES[server.kind],
+                  })}
+                </span>
+              </Button>
+            ))}
+          </div>
+        </>
+      )}
+      <Transition
+        as="div"
+        show={!!importing}
+        enter="transition-opacity duration-300"
+        enterFrom="opacity-0"
+        enterTo="opacity-100"
+        leave="transition-opacity duration-300"
+        leaveFrom="opacity-100"
+        leaveTo="opacity-0"
+      >
+        {importing === 'plex' && plexImport && (
+          <plexImport.default
+            onCancel={() => setImporting(undefined)}
+            onComplete={() => setImporting(undefined)}
+          />
+        )}
+        {(importing === 'jellyfin' || importing === 'emby') &&
+          jellyfinImport && (
+            <jellyfinImport.default
+              kind={importing}
+              onCancel={() => setImporting(undefined)}
+              onComplete={() => setImporting(undefined)}
+            />
+          )}
+      </Transition>
     </>
   );
 };

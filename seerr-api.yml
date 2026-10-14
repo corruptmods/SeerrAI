@@ -741,7 +741,8 @@ components:
           description: Seerr is connected to this server.
         signIn:
           type: boolean
-          description: People may sign in with their Plex account.
+          readOnly: true
+          description: People may sign in with their Plex account (changed at /settings/media-servers/plex/sign-in).
       required:
         - name
         - machineId
@@ -918,7 +919,8 @@ components:
           description: Seerr is connected to this server.
         signIn:
           type: boolean
-          description: People may sign in with their account on this server.
+          readOnly: true
+          description: People may sign in with their account on this server (changed at /settings/media-servers/{kind}/sign-in).
         adminUserId:
           type: string
           description: The account Seerr reads libraries as; the owner's linked account when not set.
@@ -1475,6 +1477,58 @@ components:
                 type: boolean
               signIn:
                 type: boolean
+    MediaServerSummary:
+      type: object
+      description: A media server as Settings → Media Servers shows it.
+      properties:
+        kind:
+          type: string
+          enum: [plex, jellyfin, emby]
+        name:
+          type: string
+          description: The server's own name, once Seerr has been connected to it.
+        connected:
+          type: boolean
+        primary:
+          type: boolean
+        signIn:
+          type: boolean
+          description: People may sign in with their account on this server.
+        libraries:
+          type: number
+        enabledLibraries:
+          type: number
+        lastScan:
+          type: number
+          description: When an enabled library was last scanned, in milliseconds.
+        address:
+          type: object
+          description: Where Seerr last reached the server, to connect again.
+          properties:
+            ip:
+              type: string
+            port:
+              type: number
+            useSsl:
+              type: boolean
+            urlBase:
+              type: string
+            externalHostname:
+              type: string
+            webAppUrl:
+              type: string
+        ownerAccount:
+          type: string
+          description: The owner's account on the server, when one is linked.
+      required:
+        - kind
+        - name
+        - connected
+        - primary
+        - signIn
+        - libraries
+        - enabledLibraries
+        - address
     MovieResult:
       type: object
       required:
@@ -3885,6 +3939,258 @@ paths:
                       type: string
                     thumb:
                       type: string
+  /settings/media-servers:
+    get:
+      summary: List the media servers
+      description: Plex, Jellyfin and Emby, whether Seerr is connected to each, which is primary, and whether people may sign in with it. API keys are never included.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Every media server, connected or not
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MediaServerSummary'
+  /settings/media-servers/plex/account:
+    post:
+      summary: Link the owner's Plex account, to connect Plex
+      description: |
+        The first step of connecting Plex: the owner signs in with Plex, and that Plex account is linked to their own (user 1). Seerr reaches the Plex server with it. Their email is left as it is. Refused (409) if the Plex account is linked to someone else, and (403) for anyone but the owner.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                authToken:
+                  type: string
+              required:
+                - authToken
+      responses:
+        '200':
+          description: The Plex account was linked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plexUsername:
+                    type: string
+  /settings/media-servers/{kind}/connect:
+    post:
+      summary: Connect a media server
+      description: |
+        Plex: the server chosen from `/settings/plex/devices/servers` (`hostname`, `port`, `useSsl`), reached with the owner's Plex account; owner only.
+
+        Jellyfin or Emby: `hostname`, `port`, `useSsl`, `urlBase`, and either an administrator's `username` and `password` (Seerr makes itself an API key) or an `apiKey` and the `adminUserId` to read libraries as. `linkOwner` (owner only) links that administrator account to the owner.
+
+        `signIn` says whether people may sign in with the server. Libraries are then synced at the server's own settings routes. The server's scans start at once.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [plex, jellyfin, emby]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hostname:
+                  type: string
+                port:
+                  type: number
+                useSsl:
+                  type: boolean
+                urlBase:
+                  type: string
+                externalHostname:
+                  type: string
+                webAppUrl:
+                  type: string
+                username:
+                  type: string
+                password:
+                  type: string
+                apiKey:
+                  type: string
+                adminUserId:
+                  type: string
+                linkOwner:
+                  type: boolean
+                signIn:
+                  type: boolean
+              required:
+                - hostname
+      responses:
+        '200':
+          description: Connected; every media server
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MediaServerSummary'
+  /settings/media-servers/{kind}/admins:
+    post:
+      summary: List a Jellyfin or Emby server's administrators
+      description: For connecting with an API key, the administrators Seerr could read libraries as.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [jellyfin, emby]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hostname:
+                  type: string
+                port:
+                  type: number
+                useSsl:
+                  type: boolean
+                urlBase:
+                  type: string
+                apiKey:
+                  type: string
+              required:
+                - hostname
+                - apiKey
+      responses:
+        '200':
+          description: The server's administrators
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+  /settings/media-servers/{kind}/removal:
+    get:
+      summary: What removing a media server would do to sign-in
+      description: How many people with an account on the server have no other way in through a connected server, and so could then sign in only with a password, or not at all.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [plex, jellyfin, emby]
+      responses:
+        '200':
+          description: Counts of people
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  passwordOnly:
+                    type: number
+                  noSignIn:
+                    type: number
+  /settings/media-servers/{kind}:
+    delete:
+      summary: Remove a media server
+      description: |
+        Disconnects the server. Its address and libraries are kept for reconnecting; a Jellyfin or Emby API key is forgotten. Removing the primary server makes the next connected one primary. Titles lose the server's ids, an availability sync runs, its scans stop and its Match Check findings are dropped. People's accounts on it are kept but no longer used to sign in. The last connected server cannot be removed (400).
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [plex, jellyfin, emby]
+      responses:
+        '200':
+          description: Removed; every media server
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MediaServerSummary'
+  /settings/media-servers/{kind}/primary:
+    post:
+      summary: Make a connected media server the primary one
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [plex, jellyfin, emby]
+      responses:
+        '200':
+          description: Every media server
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MediaServerSummary'
+  /settings/media-servers/{kind}/sign-in:
+    post:
+      summary: Allow or stop sign-in with a connected media server
+      description: Turning the last way to sign in off (no other server allowing it, and sign-in with a password off) is refused (400). `mediaServerLogin` in the main settings follows these switches.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [plex, jellyfin, emby]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                signIn:
+                  type: boolean
+              required:
+                - signIn
+      responses:
+        '200':
+          description: Every media server
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MediaServerSummary'
   /settings/metadatas:
     get:
       summary: Get Metadata settings

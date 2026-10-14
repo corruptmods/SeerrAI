@@ -14,6 +14,11 @@ import useSWR from 'swr';
 interface JellyfinImportProps {
   onCancel?: () => void;
   onComplete?: () => void;
+  /**
+   * The server to import from. Left out, it is Emby on a server set up with
+   * Emby, else Jellyfin.
+   */
+  kind?: 'jellyfin' | 'emby';
 }
 
 interface JellyfinImportResponse {
@@ -45,14 +50,23 @@ const messages = defineMessages('components.UserList', {
 const JellyfinImportModal: React.FC<JellyfinImportProps> = ({
   onCancel,
   onComplete,
+  kind,
 }) => {
   const intl = useIntl();
   const settings = useSettings();
   const { addToast } = useToasts();
   const [isImporting, setImporting] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const isEmby =
-    settings.currentSettings.mediaServerType === MediaServerType.EMBY;
+  const isEmby = kind
+    ? kind === 'emby'
+    : settings.currentSettings.mediaServerType === MediaServerType.EMBY;
+  // The Jellyfin import route imports from the one Jellyfin or Emby server
+  // connected; Emby has its own once Jellyfin is connected beside it.
+  const importRoute =
+    isEmby &&
+    settings.currentSettings.mediaServers.some((s) => s.kind === 'jellyfin')
+      ? '/api/v1/user/import-from-emby'
+      : '/api/v1/user/import-from-jellyfin';
   const mediaServerName = isEmby ? 'Emby' : 'Jellyfin';
   const { data, error } = useSWR<
     {
@@ -73,7 +87,7 @@ const JellyfinImportModal: React.FC<JellyfinImportProps> = ({
       // People already imported are refreshed on every import, so with
       // nobody left to import this is still worth doing, as a sync.
       const { data: importResponse } = await axios.post<JellyfinImportResponse>(
-        '/api/v1/user/import-from-jellyfin',
+        importRoute,
         { jellyfinUserIds: selectedUsers }
       );
 

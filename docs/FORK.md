@@ -254,16 +254,27 @@ Do not undo these without reading why first — each was tried the other way.
   has it (`pickPlayLink` in `src/utils/playLinks.ts`). Notifications link
   to Seerr's own page, which is the same for everyone.
 - **One GitHub Actions workflow: images.** `release.yml` builds and
-  publishes the image (amd64 and arm64) for an `ai-v*` tag, and `:develop`
-  when run by hand from `dev` (pushes to `dev` publish nothing), so Seerr AI
-  can be installed like Seerr, on its own. The `ai-` prefix keeps releases
-  apart from Seerr's own `v1.0.0`…`v3.x` tags, which arrive whenever Seerr is
-  fetched as `upstream`; never `git push --tags`, which would send those
-  too. A build takes about half an hour (arm64 under emulation), so it
-  builds only when asked, and it doesn't run the tests. Run the tests
-  locally (see Tests) before pushing. Upstream's other workflows (docs,
-  issue triage, Helm) and its Helm chart aren't carried. Anyone can still
-  build their own image with `build.sh`.
+  publishes the image for an `ai-v*` tag, `:preview-<name>` for a
+  `preview-<name>` tag, and `:develop` when run by hand from `dev` (pushes
+  to `dev` publish nothing; run by hand from any other branch it builds
+  `:preview-<branch>`), so Seerr AI can be installed like Seerr, on its own.
+  It builds the way upstream does: amd64 and arm64 (the platforms upstream
+  ships) each on their own runner, arm64 on GitHub's arm64 runner rather
+  than under emulation, pushed by digest and joined into one multi-arch
+  image; to GHCR, and to Docker Hub only when the `DOCKERHUB_USERNAME` and
+  `DOCKERHUB_TOKEN` secrets are set (as `<username>/seerr-ai`, or the
+  `DOCKERHUB_IMAGE` repository variable); signed with cosign (keyless)
+  with a CycloneDX SBOM attestation from Trivy, both verified before a
+  release is published. Unlike upstream, every image is signed, not only
+  releases, and the version comes from the tag (written into
+  `package.json` for the build), not a release commit. The `ai-` prefix
+  keeps releases apart from Seerr's own `v1.0.0`…`v3.x` tags, which arrive
+  whenever Seerr is fetched as `upstream`; never `git push --tags`, which
+  would send those too. It builds only when asked, and it doesn't run the
+  tests. Run the tests locally (see Tests) before pushing. Upstream's
+  other workflows (docs, issue triage, Helm, its weekly Trivy scan to code
+  scanning, Discord notices, `create-tag`) and its Helm chart aren't
+  carried. Anyone can still build their own image with `build.sh`.
 - **Update checks are against this repository.** `server/constants/project.ts`
   names it; Settings → About and the update check read its releases and
   commits. Change it if the repository is renamed.

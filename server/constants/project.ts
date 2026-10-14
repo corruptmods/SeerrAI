@@ -10,8 +10,8 @@ export const PROJECT_REPO = 'corruptmods/SeerrAI';
 export const PROJECT_BRANCH = 'main';
 /**
  * Work lands here first. A build that is not a release (version
- * "develop-<commit>": the NAS's own build.sh, or :edge) checks for updates
- * against this branch's commits.
+ * "develop-<commit>": the NAS's own build.sh, :develop or a :preview-…
+ * image) checks for updates against this branch's commits.
  */
 export const PROJECT_DEV_BRANCH = 'dev';
 export const PROJECT_URL = `https://github.com/${PROJECT_REPO}`;

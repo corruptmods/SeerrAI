@@ -11,8 +11,9 @@ The image is published for amd64 (PCs, servers, most NAS boxes) and arm64 (Raspb
 | Tag | What |
 |---|---|
 | `ghcr.io/corruptmods/seerr-ai:latest` | The latest release |
-| `ghcr.io/corruptmods/seerr-ai:1.2.3`, `:1.2` | A release, or the newest in a series |
+| `ghcr.io/corruptmods/seerr-ai:1.2.3`, `:1.2`, `:1` | A release, or the newest in a series |
 | `ghcr.io/corruptmods/seerr-ai:develop` | A build of the `dev` branch, published when the maintainer chooses: newer than the latest release, and less tried |
+| `ghcr.io/corruptmods/seerr-ai:preview-<name>` | Something being tried out before it reaches `dev`. Only run one if you've been asked to |
 
 With Docker Compose:
 
@@ -53,6 +54,18 @@ The container runs as user and group 1000, so the `config` folder must be writab
 Open port 5055 and follow the setup: sign in with Plex, Jellyfin or Emby, then connect Radarr and Sonarr. Seerr's own [getting started](https://docs.seerr.dev/getting-started/) describes the setup screens, which are the same.
 
 Sonarr v4 and the Sonarr v5 beta both work. On v5, a series you set to another language in Sonarr shows there under its translated title; Backfill also searches under its original title, which is what most releases use. If you switch a series to another episode order in Sonarr v5 (DVD order, say), its season numbers no longer match TMDB's, so requests for single seasons of that series may pick the wrong season.
+
+### Checking an image
+
+Every published image is signed, and carries a list of everything inside it (an SBOM). With [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) you can check that an image was built by this project's own workflow before you run it:
+
+```bash
+cosign verify ghcr.io/corruptmods/seerr-ai:latest \
+  --certificate-identity-regexp '^https://github\.com/corruptmods/SeerrAI/\.github/workflows/release\.yml@refs/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+`verify-attestation --type cyclonedx`, with the same options, checks the SBOM. To accept only releases, end the identity with `@refs/tags/ai-v` instead of `@refs/`.
 
 ### Coming from Seerr
 
@@ -146,13 +159,26 @@ git switch dev
 
 `--ff-only` refuses if `main` has anything `dev` doesn't, so `main` never gets ahead of `dev`.
 
-The **Seerr AI Release** workflow (`.github/workflows/release.yml`) builds the image for amd64 and arm64 and publishes it to `ghcr.io/<owner>/seerr-ai`:
+The **Seerr AI Release** workflow (`.github/workflows/release.yml`) builds the image for amd64 and arm64, each on its own machine (arm64 on GitHub's arm64 runner), joins them into one image and publishes it to `ghcr.io/<owner>/seerr-ai` (and Docker Hub, below). Every image is then signed and given its SBOM, and both are checked; a release's page is only published once they pass.
 
-- **A release:** `git tag ai-v1.2.3 && git push origin ai-v1.2.3` publishes `:1.2.3`, `:1.2` and `:latest`, and creates the GitHub release that **Settings → About** checks for updates against. A version with a hyphen (`ai-v1.3.0-beta.1`) is a pre-release and leaves `:latest` alone.
+- **A release:** `git tag ai-v1.2.3 && git push origin ai-v1.2.3` publishes `:1.2.3`, `:1.2`, `:1` and `:latest`, and creates the GitHub release that **Settings → About** checks for updates against. A version with a hyphen (`ai-v1.3.0-beta.1`) is a pre-release: it gets only `:1.3.0-beta.1`, and leaves `:1.3`, `:1` and `:latest` alone.
 - **Why `ai-v`:** Seerr's own tags (`v1.0.0` to `v3.x`) arrive in a copy that fetches Seerr as `upstream`, so Seerr AI's releases are tagged apart from them. Push one tag at a time; `git push --tags` would send Seerr's too.
-- **`:develop`:** pushing to `dev` publishes nothing. When `dev` is ready to share: Actions → Seerr AI Release → Run workflow, with **Use workflow from** set to `dev`. Started from any other branch, it stops without publishing.
+- **`:develop`:** pushing to `dev` publishes nothing. When `dev` is ready to share: Actions → Seerr AI Release → Run workflow, with **Use workflow from** set to `dev`.
+- **A preview:** to let someone try work that isn't on `dev` yet, push a tag `preview-<name>` (`git tag preview-music-fix && git push origin preview-music-fix`) for `:preview-music-fix`, or run the workflow by hand from that branch for `:preview-<branch>` (a `/` in its name becomes `-`). A preview never moves `:latest` or `:develop`, and creates no release. Started by hand from `main`, the workflow stops without publishing: `main` only moves for a release.
 - **Cutting a release again:** move the tag (`git tag -f ai-v1.2.3 && git push -f origin ai-v1.2.3`); the images are rebuilt, and the existing release page is kept and published again (GitHub turns it into a draft while its tag is gone).
 
-Each build takes about half an hour, because arm64 is built under emulation. While the repository is private, that comes out of its limited Actions minutes.
+Every image is also tagged `:sha-<commit>`. Building the two platforms side by side, natively, should be much quicker than the half hour arm64 used to take under emulation. While the repository is private, the minutes come out of its Actions allowance (arm64 runners included).
 
 To let anyone pull the image, make the package public: GitHub → your profile → Packages → seerr-ai → Package settings → Change visibility.
+
+#### Settings on GitHub
+
+Nothing has to be set for GHCR: the workflow publishes with its own token. The rest is optional, under Settings → Secrets and variables → Actions:
+
+| Name | Kind | What |
+|---|---|---|
+| `DOCKERHUB_USERNAME` | Secret | Your Docker Hub user. With the token, every image also goes to Docker Hub, signed the same way; without both, Docker Hub is skipped. |
+| `DOCKERHUB_TOKEN` | Secret | A Docker Hub personal access token with **Read & Write** access (Docker Hub → Account settings → Personal access tokens). |
+| `DOCKERHUB_IMAGE` | Variable | Where on Docker Hub, if not `<username>/seerr-ai` (an organisation's repository, say). |
+
+Create the Docker Hub repository yourself first, public so anyone can pull it; otherwise the first push creates it with your account's default visibility. Signing is keyless: each signature is recorded in Sigstore's public transparency log, naming this repository and the tag or branch it was built from.

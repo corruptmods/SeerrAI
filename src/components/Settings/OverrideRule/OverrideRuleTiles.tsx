@@ -12,6 +12,7 @@ import type {
   SonarrSettings,
 } from '@server/lib/settings';
 import type { Keyword } from '@server/models/common';
+import { parseRuleCertifications } from '@server/utils/ruleCertification';
 import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
@@ -32,9 +33,21 @@ const messages = defineMessages('components.Settings.OverrideRuleTile', {
   genre: 'Genre',
   language: 'Language',
   keywords: 'Keywords',
+  certification: 'Age Ratings',
   conditions: 'Conditions',
   settings: 'Settings',
 });
+
+/** A rule's age ratings, country by country: [["US", ["G", "PG"]]]. */
+const ratingsByCountry = (value: string): [string, string[]][] => {
+  const entries = parseRuleCertifications(value);
+  return [...new Set(entries.map((entry) => entry.country))].map((country) => [
+    country,
+    entries
+      .filter((entry) => entry.country === country)
+      .map((entry) => entry.certification),
+  ]);
+};
 
 interface OverrideRuleTilesProps {
   rules: OverrideRule[];
@@ -228,6 +241,27 @@ const OverrideRuleTiles = ({
                       );
                     })}
                   </div>
+                </p>
+              )}
+              {rule.certification && (
+                <p className="truncate text-sm leading-5 text-gray-300">
+                  <span className="mr-2 font-bold">
+                    {intl.formatMessage(messages.certification)}
+                  </span>
+                  <span className="inline-flex gap-2">
+                    {ratingsByCountry(rule.certification).map(
+                      ([country, certifications]) => (
+                        <span key={country}>
+                          {`${
+                            intl.formatDisplayName(country, {
+                              type: 'region',
+                              fallback: 'none',
+                            }) ?? country
+                          }: ${certifications.join(', ')}`}
+                        </span>
+                      )
+                    )}
+                  </span>
                 </p>
               )}
               <span className="text-lg">

@@ -17,6 +17,10 @@ import overrideRules, {
 import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
+import {
+  formatRuleCertifications,
+  parseRuleCertifications,
+} from '@server/utils/ruleCertification';
 import { Router } from 'express';
 
 const overrideRuleRoutes = Router();
@@ -35,6 +39,13 @@ const seriesTypeFor = (body: {
     : body.radarrServiceId !== undefined && body.radarrServiceId !== null
       ? toSeriesTypeFor(MediaType.MOVIE, body.seriesType)
       : null;
+
+/**
+ * A rule's age ratings, tidied: each "country:rating" kept as given, and
+ * anything without both left out. Nothing left is no condition at all.
+ */
+const certificationFor = (value?: string | null) =>
+  formatRuleCertifications(parseRuleCertifications(value));
 
 overrideRuleRoutes.get(
   '/',
@@ -60,6 +71,7 @@ overrideRuleRoutes.post<
     genre?: string;
     language?: string;
     keywords?: string;
+    certification?: string | null;
     profileId?: number;
     rootFolder?: string;
     tags?: string;
@@ -76,6 +88,7 @@ overrideRuleRoutes.post<
       genre: req.body.genre,
       language: req.body.language,
       keywords: req.body.keywords,
+      certification: certificationFor(req.body.certification),
       profileId: req.body.profileId,
       rootFolder: req.body.rootFolder,
       tags: req.body.tags,
@@ -226,6 +239,7 @@ overrideRuleRoutes.put<
     genre?: string;
     language?: string;
     keywords?: string;
+    certification?: string | null;
     profileId?: number;
     rootFolder?: string;
     tags?: string;
@@ -251,6 +265,7 @@ overrideRuleRoutes.put<
     rule.genre = req.body.genre;
     rule.language = req.body.language;
     rule.keywords = req.body.keywords;
+    rule.certification = certificationFor(req.body.certification);
     rule.profileId = req.body.profileId;
     rule.rootFolder = req.body.rootFolder;
     rule.tags = req.body.tags;

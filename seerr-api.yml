@@ -2898,6 +2898,11 @@ components:
           nullable: true
           enum: [standard, daily, anime, null]
           description: The series type a matching request is added with; for a Radarr rule only anime or standard, whether the movie goes as anime.
+        certification:
+          type: string
+          nullable: true
+          example: 'US:G,US:PG'
+          description: Age ratings a title must have one of, each as country:rating. The title's rating is read from TMDB for the server's Discover region, or its US rating when it has none there; a title with no rating never matches. Null for no age rating condition.
     Certification:
       type: object
       properties:

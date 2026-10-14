@@ -12,6 +12,37 @@ import OverrideRule from '@server/entity/OverrideRule';
 import type { User } from '@server/entity/User';
 import { getSettings } from '@server/lib/settings';
 import { isAnime } from '@server/utils/isAnime';
+import type { RuleCertification } from '@server/utils/ruleCertification';
+import { parseRuleCertifications } from '@server/utils/ruleCertification';
+
+/**
+ * A title's age rating, read as its page reads it: TMDB's rating for the
+ * region (for a film, the first of its releases there that has one), or
+ * else its US rating. Undefined when it has neither.
+ */
+export const titleCertification = (
+  tmdbMedia: TmdbMovieDetails | TmdbTvDetails,
+  region: string
+): RuleCertification | undefined => {
+  const ratingIn = (country: string) =>
+    'release_dates' in tmdbMedia
+      ? tmdbMedia.release_dates?.results
+          ?.find((r) => r.iso_3166_1 === country)
+          ?.release_dates.find((release) => release.certification?.trim())
+          ?.certification.trim()
+      : tmdbMedia.content_ratings?.results
+          ?.find((r) => r.iso_3166_1 === country)
+          ?.rating?.trim();
+
+  for (const country of new Set([region, 'US'])) {
+    const certification = ratingIn(country);
+    if (certification) {
+      return { country, certification };
+    }
+  }
+
+  return undefined;
+};
 
 export type OverrideRulesResult = {
   rootFolder: string | null;
@@ -78,6 +109,12 @@ async function overrideRules({
     !!radarrServer?.activeAnimeProfileId;
   const anime = animeSettings && (animeSetting ?? isAnime(tmdbMedia));
 
+  // Read for the server's Discover region, as the title's page reads it for
+  // anyone who has not chosen a region of their own.
+  const certification = rules.some((rule) => rule.certification)
+    ? titleCertification(tmdbMedia, settings.main.discoverRegion || 'US')
+    : undefined;
+
   const appliedOverrideRules = rules.filter((rule) => {
     // Anime goes by the anime settings, unless a rule names the anime
     // keyword to take it over. Anime is told by the title's own setting, or
@@ -133,6 +170,18 @@ async function overrideRules({
     ) {
       return false;
     }
+    // A rating is only the same rating in the same country's system: "PG"
+    // in the US is not the British "PG". A title without one never matches.
+    if (
+      rule.certification &&
+      !parseRuleCertifications(rule.certification).some(
+        (entry) =>
+          entry.country === certification?.country &&
+          entry.certification === certification.certification
+      )
+    ) {
+      return false;
+    }
     return true;
   });
 
@@ -147,7 +196,12 @@ async function overrideRules({
     return typeof value !== 'string' || value.trim() !== '';
   };
   const prioritizedRule = appliedOverrideRules.sort((a, b) => {
-    const keys: (keyof OverrideRule)[] = ['genre', 'language', 'keywords'];
+    const keys: (keyof OverrideRule)[] = [
+      'genre',
+      'language',
+      'keywords',
+      'certification',
+    ];
     const aSpecificity = keys.filter((key) =>
       hasSpecificOverrideValue(a, key)
     ).length;

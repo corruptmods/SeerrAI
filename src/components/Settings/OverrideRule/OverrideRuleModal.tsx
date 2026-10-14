@@ -5,6 +5,7 @@ import {
   KeywordSelector,
   UserSelector,
 } from '@app/components/Selector';
+import CertificationPicker from '@app/components/Settings/OverrideRule/CertificationPicker';
 import type { DVRTestResponse } from '@app/components/Settings/SettingsServices';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
@@ -36,6 +37,11 @@ const messages = defineMessages('components.Settings.OverrideRuleModal', {
   genres: 'Genres',
   languages: 'Languages',
   keywords: 'Keywords',
+  certification: 'Age Ratings',
+  certificationTip:
+    'Matches titles with any of the age ratings chosen. Ratings come from TMDB for the Discover Region in Settings → General, now {region}. A title not rated there goes by its US rating, and one with no rating at all never matches.',
+  certificationTipUs:
+    'Matches titles with any of the age ratings chosen. Ratings come from TMDB for the Discover Region in Settings → General, now {region}. A title with no rating never matches.',
   rootfolder: 'Root Folder',
   selectRootFolder: 'Select root folder',
   qualityprofile: 'Quality Profile',
@@ -96,6 +102,8 @@ const OverrideRuleModal = ({
   const intl = useIntl();
   const { addToast } = useToasts();
   const { currentSettings } = useSettings();
+  // Ratings are read for the server's Discover region; see overrideRules.
+  const region = currentSettings.discoverRegion || 'US';
   const [isValidated, setIsValidated] = useState(rule ? true : false);
   const [isTesting, setIsTesting] = useState(false);
   const [testResponse, setTestResponse] = useState<DVRTestResponse>({
@@ -183,6 +191,7 @@ const OverrideRuleModal = ({
           genre: rule?.genre,
           language: rule?.language,
           keywords: rule?.keywords,
+          certification: rule?.certification,
           profileId: rule?.profileId,
           rootFolder: rule?.rootFolder,
           tags: rule?.tags,
@@ -195,6 +204,7 @@ const OverrideRuleModal = ({
               genre: values.genre || null,
               language: values.language || null,
               keywords: values.keywords || null,
+              certification: values.certification || null,
               profileId: Number(values.profileId) || null,
               rootFolder: values.rootFolder || null,
               tags: values.tags || null,
@@ -247,7 +257,8 @@ const OverrideRuleModal = ({
                 (!values.users &&
                   !values.genre &&
                   !values.language &&
-                  !values.keywords) ||
+                  !values.keywords &&
+                  !values.certification) ||
                 (!values.rootFolder &&
                   !values.profileId &&
                   !values.tags &&
@@ -283,6 +294,17 @@ const OverrideRuleModal = ({
                         }
                         onChange={(e) => {
                           const id = Number(e.target.value.split('-')[1]);
+                          // Films and series are rated differently, so the
+                          // ratings chosen do not carry over between them.
+                          if (
+                            values.certification &&
+                            e.target.value.split('-')[0] !==
+                              (values.radarrServiceId != null
+                                ? 'radarr'
+                                : 'sonarr')
+                          ) {
+                            setFieldValue('certification', null);
+                          }
                           if (e.target.value.startsWith('radarr-')) {
                             setFieldValue('radarrServiceId', id);
                             setFieldValue('sonarrServiceId', null);
@@ -449,6 +471,46 @@ const OverrideRuleModal = ({
                       typeof errors.keywords === 'string' && (
                         <div className="error">{errors.keywords}</div>
                       )}
+                  </div>
+                </div>
+                <div className="form-row">
+                  <span id="certification-label" className="text-label">
+                    {intl.formatMessage(messages.certification)}
+                    <span className="label-tip">
+                      {intl.formatMessage(
+                        region === 'US'
+                          ? messages.certificationTipUs
+                          : messages.certificationTip,
+                        {
+                          region:
+                            intl.formatDisplayName(region, {
+                              type: 'region',
+                              fallback: 'none',
+                            }) ?? region,
+                        }
+                      )}
+                    </span>
+                  </span>
+                  <div className="form-input-area">
+                    <div className="form-input-field">
+                      {values.radarrServiceId != null ||
+                      values.sonarrServiceId != null ? (
+                        <CertificationPicker
+                          type={values.radarrServiceId != null ? 'movie' : 'tv'}
+                          region={region}
+                          value={values.certification}
+                          labelledBy="certification-label"
+                          isDisabled={!isValidated || isTesting}
+                          onChange={(value) =>
+                            setFieldValue('certification', value)
+                          }
+                        />
+                      ) : (
+                        <p className="text-sm text-gray-500">
+                          {intl.formatMessage(messages.selectService)}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <h3 className="mt-4 text-lg font-bold leading-8 text-gray-100">

@@ -1,5 +1,6 @@
 import TheMovieDb from '@server/api/themoviedb';
 import { getRepository } from '@server/datasource';
+import OverrideRule from '@server/entity/OverrideRule';
 import { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
 import overrideRuleRoutes from '@server/routes/overrideRule';
@@ -166,5 +167,52 @@ describe('override rules after loosening the mount', () => {
   it('refuses a preview for another user without request management', async () => {
     actingAs = advanced;
     assert.equal(await preview(plain.id), 403);
+  });
+});
+
+describe('an override rule on age ratings', () => {
+  const stored = () =>
+    getRepository(OverrideRule).findOneOrFail({
+      where: { rootFolder: '/kids' },
+    });
+
+  it('keeps the ratings it is given, through the API', async () => {
+    assert.equal(
+      await call('POST', '/api/v1/overrideRule', {
+        radarrServiceId: 0,
+        certification: ' US:G , US:PG ',
+        rootFolder: '/kids',
+      }),
+      200
+    );
+    const created = await stored();
+    assert.equal(created.certification, 'US:G,US:PG');
+
+    assert.equal(
+      await call('PUT', `/api/v1/overrideRule/${created.id}`, {
+        radarrServiceId: 0,
+        certification: 'GB:U',
+        rootFolder: '/kids',
+      }),
+      200
+    );
+    assert.equal((await stored()).certification, 'GB:U');
+  });
+
+  it('keeps none when none or nothing usable is given', async () => {
+    await call('POST', '/api/v1/overrideRule', {
+      radarrServiceId: 0,
+      certification: '',
+      rootFolder: '/kids',
+    });
+    const created = await stored();
+    assert.equal(created.certification, null);
+
+    await call('PUT', `/api/v1/overrideRule/${created.id}`, {
+      radarrServiceId: 0,
+      certification: 'PG',
+      rootFolder: '/kids',
+    });
+    assert.equal((await stored()).certification, null);
   });
 });

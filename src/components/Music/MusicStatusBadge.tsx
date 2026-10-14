@@ -1,4 +1,5 @@
 import Badge from '@app/components/Common/Badge';
+import StatusBadgeMini from '@app/components/Common/StatusBadgeMini';
 import StatusBadge from '@app/components/StatusBadge';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -27,6 +28,11 @@ interface MusicStatusBadgeProps {
    * that is itself a link.
    */
   plain?: boolean;
+  /**
+   * The small round badge in a card's corner, as a film's or a series' card
+   * has: the status's icon, turning while it is on its way.
+   */
+  mini?: boolean;
 }
 
 /**
@@ -58,6 +64,7 @@ const MusicStatusBadge = ({
   title,
   serviceUrl,
   plain = false,
+  mini = false,
 }: MusicStatusBadgeProps) => {
   const intl = useIntl();
 
@@ -67,6 +74,12 @@ const MusicStatusBadge = ({
     status !== MediaStatus.UNKNOWN &&
     status !== MediaStatus.PENDING &&
     status !== MediaStatus.BLOCKLISTED;
+
+  if (mini) {
+    return status !== undefined && status !== MediaStatus.UNKNOWN ? (
+      <StatusBadgeMini status={status} inProgress={onItsWay} shrink />
+    ) : null;
+  }
 
   if (onItsWay && plain) {
     return (

@@ -10,6 +10,8 @@ interface MusicImageProps {
   priority?: boolean;
   sizes?: string;
   className?: string;
+  /** Told when there turns out to be no picture. */
+  onMissing?: () => void;
 }
 
 /**
@@ -24,6 +26,7 @@ const MusicImage = ({
   priority,
   sizes,
   className,
+  onMissing,
 }: MusicImageProps) => {
   const [failed, setFailed] = useState(false);
 
@@ -52,7 +55,10 @@ const MusicImage = ({
       sizes={sizes}
       className={className}
       style={{ objectFit: 'cover' }}
-      onError={() => setFailed(true)}
+      onError={() => {
+        setFailed(true);
+        onMissing?.();
+      }}
       {...(priority ? { priority: true } : { loading: 'lazy' })}
     />
   );

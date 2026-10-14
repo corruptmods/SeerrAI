@@ -1,33 +1,46 @@
+import Button from '@app/components/Common/Button';
 import MusicImage from '@app/components/Music/MusicImage';
 import MusicStatusBadge from '@app/components/Music/MusicStatusBadge';
 import {
   albumDownloads,
+  albumKind,
   requestable,
   yearOf,
 } from '@app/components/Music/musicHelpers';
 import RequestModal from '@app/components/RequestModal';
+import CardShell, {
+  NoPicture,
+  useCardDetail,
+} from '@app/components/TitleCard/CardShell';
+import Placeholder from '@app/components/TitleCard/Placeholder';
 import useFeature from '@app/hooks/useFeature';
 import { Permission, useUser } from '@app/hooks/useUser';
+import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import type { MediaStatus } from '@server/constants/media';
 import { VARIOUS_ARTISTS_MBID } from '@server/constants/media';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
 import type { MusicAlbumResult } from '@server/models/Music';
-import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Music.MusicCard', {
-  requestAlbum: 'Request {title}',
+  album: 'Album',
+  ep: 'EP',
+  single: 'Single',
+  release: 'Release',
 });
 
 interface MusicCardProps {
   album: MusicAlbumResult;
   /** Fills a grid cell rather than taking a row's width. */
   canExpand?: boolean;
-  /** Under the title: the artist (rows, search), or the year (their page). */
-  subtitle?: 'artist' | 'year';
+  /**
+   * The artist under the title (rows, search); on the artist's own page,
+   * what kind of album it is instead (live, a compilation...).
+   */
+  showArtist?: boolean;
   /**
    * The artist the album is requested under, where the album does not say
    * (an artist's own page lists their albums without their credits).
@@ -39,14 +52,40 @@ interface MusicCardProps {
   downloads?: DownloadingItem[];
 }
 
-const width = (canExpand?: boolean) =>
-  canExpand ? 'w-full' : 'w-36 sm:w-36 md:w-44';
+/**
+ * An album's square cover in a poster's 2:3 tile: the cover across the
+ * middle, at the tile's full width, over a blurred and enlarged copy of
+ * itself that fills the rest. The bands above and below hold the corner
+ * badges, so they never sit on the cover itself. Both are the one picture,
+ * fetched once.
+ */
+const CoverArt = ({
+  src,
+  onMissing,
+}: {
+  src: string;
+  onMissing: () => void;
+}) => (
+  <>
+    <div className="absolute inset-0 scale-150 blur-xl" aria-hidden="true">
+      <MusicImage src={src} fallback="none" />
+    </div>
+    <div className="absolute inset-0 bg-gray-900/40" />
+    <div className="absolute inset-x-0 top-1/2 aspect-square -translate-y-1/2 shadow-lg">
+      <MusicImage src={src} fallback="none" onMissing={onMissing} />
+    </div>
+  </>
+);
 
-/** An album: its cover, title and artist or year, and whether it is here. */
+/**
+ * An album, as a film's or a series' card: its cover, what kind of release
+ * it is and whether it is here, and on hover or a tap its year, title and
+ * artist, with Request when it can be asked for.
+ */
 const MusicCard = ({
   album,
   canExpand,
-  subtitle = 'artist',
+  showArtist = true,
   artistId = album.artistId,
   onRequested,
   downloads,
@@ -54,106 +93,97 @@ const MusicCard = ({
   const intl = useIntl();
   const musicOn = useFeature('music');
   const { hasPermission } = useUser();
+  const detail = useCardDetail();
   const [requesting, setRequesting] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [missing, setMissing] = useState(false);
   // Shown at once after a request from the card, before the row reloads.
   const [requestedStatus, setRequestedStatus] = useState<MediaStatus>();
   const status = requestedStatus ?? album.status;
-  const year = yearOf(album.releaseDate);
-  const below =
-    subtitle === 'artist' ? (album.artistName ?? year) : (year ?? '—');
 
-  const card = (
-    <Link
-      href={`/music/album/${album.id}`}
-      className={`group block ${width(canExpand)}`}
-      data-testid="music-card"
-    >
-      <div className="overflow-hidden rounded-xl bg-gray-800 shadow ring-1 ring-gray-700 transition duration-150 group-hover:ring-gray-500 group-focus-visible:ring-indigo-500">
-        <div className="relative w-full" style={{ paddingBottom: '100%' }}>
-          <MusicImage
-            src={album.coverUrl}
-            fallback="album"
-            sizes="(min-width: 768px) 11rem, 9rem"
-          />
-          <div className="absolute right-2 top-2">
-            <MusicStatusBadge
-              status={status}
-              downloads={albumDownloads(downloads, album.id)}
-              addingToLibrary={album.addingToLibrary}
-              plain
-            />
-          </div>
-        </div>
-        <div className="px-2 py-2">
-          <div className="truncate text-sm font-semibold text-white">
-            {album.title}
-          </div>
-          <div className="truncate text-xs text-gray-400">{below}</div>
-        </div>
-      </div>
-    </Link>
-  );
+  useEffect(() => {
+    setMissing(false);
+  }, [album.coverUrl]);
 
   const canRequest =
     musicOn &&
     !!artistId &&
     artistId !== VARIOUS_ARTISTS_MBID &&
-    requestable(status) &&
     hasPermission([Permission.REQUEST, Permission.REQUEST_MUSIC], {
       type: 'or',
     });
+  const showRequest = canRequest && requestable(status);
 
-  if (!canRequest) {
-    return card;
-  }
-
-  // Beside the link rather than in it: a button inside a link is neither
-  // one thing nor the other to a keyboard or a screen reader.
   return (
-    <div className={`relative ${width(canExpand)}`}>
-      {card}
-      <button
-        type="button"
-        className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white shadow ring-1 ring-indigo-400 transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-        aria-label={intl.formatMessage(messages.requestAlbum, {
-          title: album.title,
-        })}
-        title={intl.formatMessage(messages.requestAlbum, {
-          title: album.title,
-        })}
-        onClick={() => setRequesting(true)}
-      >
-        <ArrowDownTrayIcon className="h-4 w-4" />
-      </button>
-      {requesting && (
-        <RequestModal
-          type="music"
-          show
-          artistMbid={artistId}
-          albumMbid={album.id}
-          onCancel={() => setRequesting(false)}
-          onComplete={(newStatus) => {
-            setRequesting(false);
-            setRequestedStatus(newStatus);
-            onRequested?.();
-          }}
+    <CardShell
+      detail={detail}
+      canExpand={canExpand}
+      testId="music-card"
+      modals={
+        canRequest &&
+        artistId && (
+          <RequestModal
+            type="music"
+            show={requesting}
+            artistMbid={artistId}
+            albumMbid={album.id}
+            onUpdating={setUpdating}
+            onCancel={() => setRequesting(false)}
+            onComplete={(newStatus) => {
+              setRequesting(false);
+              setRequestedStatus(newStatus);
+              onRequested?.();
+            }}
+          />
+        )
+      }
+      image={
+        missing ? (
+          <NoPicture />
+        ) : (
+          <CoverArt src={album.coverUrl} onMissing={() => setMissing(true)} />
+        )
+      }
+      badge={{
+        label: intl.formatMessage(messages[albumKind(album)]),
+        className: 'border-pink-600 bg-pink-600/80',
+      }}
+      indicators={
+        <MusicStatusBadge
+          status={status}
+          downloads={albumDownloads(downloads, album.id)}
+          addingToLibrary={album.addingToLibrary}
+          mini
         />
-      )}
-    </div>
+      }
+      updating={updating}
+      showOverlay={missing || detail.showDetail || requesting}
+      href={`/music/album/${album.id}`}
+      overline={yearOf(album.releaseDate)}
+      title={album.title}
+      summary={showArtist ? album.artistName : album.secondaryTypes.join(' · ')}
+      roomForActions={showRequest}
+      actions={
+        showRequest && (
+          <Button
+            buttonType="primary"
+            buttonSize="sm"
+            onClick={(e) => {
+              e.preventDefault();
+              setRequesting(true);
+            }}
+            className="h-7 w-full"
+          >
+            <ArrowDownTrayIcon />
+            <span>{intl.formatMessage(globalMessages.request)}</span>
+          </Button>
+        )
+      }
+    />
   );
 };
 
-/** Where a card will be while its row loads. */
-const Placeholder = ({ canExpand }: { canExpand?: boolean }) => (
-  <div
-    className={`animate-pulse overflow-hidden rounded-xl bg-gray-700 ${width(
-      canExpand
-    )}`}
-  >
-    <div className="w-full" style={{ paddingBottom: '135%' }} />
-  </div>
-);
-
+/** Where a card will be while its row loads: a film's placeholder. */
 MusicCard.Placeholder = Placeholder;
 
 export default MusicCard;

@@ -79,6 +79,26 @@ export const albumGroup = (album: MusicAlbumResult): AlbumGroup => {
   }
 };
 
+/**
+ * What a card calls an album in its corner, as films' say Movie: an album,
+ * an EP or a single by its primary type, live albums and compilations
+ * included; a broadcast or anything else, a release.
+ */
+export const albumKind = (
+  album: Pick<MusicAlbumResult, 'primaryType'>
+): 'album' | 'ep' | 'single' | 'release' => {
+  switch (album.primaryType) {
+    case 'Album':
+      return 'album';
+    case 'EP':
+      return 'ep';
+    case 'Single':
+      return 'single';
+    default:
+      return 'release';
+  }
+};
+
 /** Newest first; undated ones last. */
 export const byNewest = (a: MusicAlbumResult, b: MusicAlbumResult): number =>
   (b.releaseDate ?? '').localeCompare(a.releaseDate ?? '');

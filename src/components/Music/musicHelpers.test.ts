@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 import {
   albumDownloads,
   albumGroup,
+  albumKind,
   allowedByProfile,
   artistImageUrl,
   byNewest,
@@ -214,5 +215,15 @@ describe('an album’s downloads', () => {
       ['a', 'b']
     );
     assert.deepEqual(albumDownloads(undefined, 'a'), []);
+  });
+});
+
+describe('albumKind', () => {
+  it('names an album by its primary type, whatever else it is', () => {
+    assert.equal(albumKind(album('Album', ['Live'])), 'album');
+    assert.equal(albumKind(album('EP')), 'ep');
+    assert.equal(albumKind(album('Single', ['Remix'])), 'single');
+    assert.equal(albumKind(album('Broadcast')), 'release');
+    assert.equal(albumKind(album(undefined)), 'release');
   });
 });

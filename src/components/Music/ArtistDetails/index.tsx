@@ -158,7 +158,7 @@ const Discography = ({
           <MusicCard
             album={album}
             canExpand
-            subtitle="year"
+            showArtist={false}
             artistId={artistId}
             onRequested={onRequested}
             downloads={downloads}

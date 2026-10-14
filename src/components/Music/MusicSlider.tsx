@@ -62,7 +62,6 @@ const MusicSlider = ({
       <Slider
         sliderKey={sliderKey}
         isLoading={loading}
-        placeholder={<MusicCard.Placeholder />}
         items={results.map((item) =>
           item.mediaType === 'artist' ? (
             <ArtistCard key={`artist-${item.id}`} artist={item} />

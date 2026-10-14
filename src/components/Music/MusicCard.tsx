@@ -1,6 +1,10 @@
 import MusicImage from '@app/components/Music/MusicImage';
 import MusicStatusBadge from '@app/components/Music/MusicStatusBadge';
-import { requestable, yearOf } from '@app/components/Music/musicHelpers';
+import {
+  albumDownloads,
+  requestable,
+  yearOf,
+} from '@app/components/Music/musicHelpers';
 import RequestModal from '@app/components/RequestModal';
 import useFeature from '@app/hooks/useFeature';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -8,6 +12,7 @@ import defineMessages from '@app/utils/defineMessages';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import type { MediaStatus } from '@server/constants/media';
 import { VARIOUS_ARTISTS_MBID } from '@server/constants/media';
+import type { DownloadingItem } from '@server/lib/downloadtracker';
 import type { MusicAlbumResult } from '@server/models/Music';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -30,6 +35,8 @@ interface MusicCardProps {
   artistId?: string;
   /** Told when the album has been requested from the card. */
   onRequested?: () => void;
+  /** The artist's downloads in Lidarr; the card shows its album's. */
+  downloads?: DownloadingItem[];
 }
 
 const width = (canExpand?: boolean) =>
@@ -42,6 +49,7 @@ const MusicCard = ({
   subtitle = 'artist',
   artistId = album.artistId,
   onRequested,
+  downloads,
 }: MusicCardProps) => {
   const intl = useIntl();
   const musicOn = useFeature('music');
@@ -68,7 +76,12 @@ const MusicCard = ({
             sizes="(min-width: 768px) 11rem, 9rem"
           />
           <div className="absolute right-2 top-2">
-            <MusicStatusBadge status={status} />
+            <MusicStatusBadge
+              status={status}
+              downloads={albumDownloads(downloads, album.id)}
+              addingToLibrary={album.addingToLibrary}
+              plain
+            />
           </div>
         </div>
         <div className="px-2 py-2">

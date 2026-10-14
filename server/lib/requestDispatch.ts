@@ -49,10 +49,11 @@ export const markUndispatchable = async (
 
       // An update does not reach the request hooks, so the failure and its
       // reason are recorded here.
-      if (entity.media?.tmdbId) {
+      if (entity.media?.tmdbId || entity.media?.foreignId) {
         await recordMediaEvent(
           {
             tmdbId: entity.media.tmdbId,
+            foreignId: entity.media.foreignId,
             mediaType: entity.media.mediaType,
             type: MediaEventType.FAILED,
             is4k: !!entity.is4k,

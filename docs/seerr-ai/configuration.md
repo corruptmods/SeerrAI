@@ -17,6 +17,10 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | **Settings → Services → Tautulli** | Watch history from Plex, for Suggested for You, "up next" on lists, Who Watched, Pick for the Room and Catch Me Up. Plex only; moved here from Settings → Plex. Its API key is never sent back to the browser. With Jellyfin or Emby there is nothing to set up: Seerr AI reads watch history from the server itself, with the API key in Settings → Jellyfin/Emby. | Port 8181 |
 | **Settings → Services → Trakt** | The Client ID of your own Trakt app, so people can import public Trakt lists and have their public Trakt watchlist requested. Make the app at [developer.trakt.tv/apps](https://developer.trakt.tv/apps) (Trakt asks for a verified GitHub account); nobody signs in to Trakt. Trakt deletes apps unused for 30 days, which regular watchlist syncing prevents. Never sent back to the browser. | |
 | **Settings → Services → Maintainerr** | One or more servers. Per server: show Deleting Soon badges, include in the Deleting Soon row, allow Keep for everyone, days Keep adds (0 restarts the rule's grace period), what counts as "soon". | Port 6246; badges, row and Keep on; 0 days; 14 days |
+| **Settings → Services → Lidarr** | Music. Address, API key, quality and metadata profiles, root folder and tags for new artists; **Enable Scan** brings in what Lidarr already has; **Tag Requests** tags the artist with who asked. Music appears for everyone once one Lidarr is the default. See [Music](./music.md). | None |
+| **Settings → Plex / Jellyfin / Emby → Music Libraries** | The music libraries read to find which albums are here, apart from the film and series ones. With none switched on anywhere, Lidarr's files decide. | Off until switched on |
+| **Settings → Metadata → Music** | **MusicBrainz Address** (a mirror of your own has no request limit), **Contact Email** sent to MusicBrainz, **New and Popular Music** from ListenBrainz, **TheAudioDB API Key** for pictures of artists, **Most Albums in One Request**. | Public MusicBrainz; none; on; none; 100 |
+| **Settings → Users** | **Global Album Request Limit**: albums each person may request in a period, like seasons for series. Each person's own limit is on their settings. | Unlimited |
 | **Settings → Services → Radarr** | **Anime Quality Profile**, **Anime Root Folder**, **Anime Tags** for anime movies. | Unset (anime movies use the regular ones) |
 | **Settings → Services → Override Rules** | Sonarr rules can set **Series Type**; Radarr rules can set **Anime**. | Left to detection |
 | **Settings → Services → Anime** | **Leave out anime made in**: countries whose anime-styled titles don't count as anime unless they're in Japanese. | Empty (United States on servers from before the setting) |
@@ -81,7 +85,9 @@ Seerr AI adds these to **Settings → Jobs & Cache**, where each can be reschedu
 | Health Alerts | every 10 minutes | Tells admins when a connected service newly has a problem. |
 | Anime Check | daily, 04:15 | Report: series and movies in the wrong anime folder, type or profile. |
 | Match Check | daily, 04:20 | Report: folders a connected media server (Plex, Jellyfin or Emby) matched to another title. |
-| Database Maintenance | daily, 03:45 | Clears rows nothing reads any more, then compacts the database. |
+| Music Sync | every 5 minutes (at :03, :08…) | Reads what each server's music libraries added recently, follows Lidarr's work on requests (counting its files, adding albums it didn't have yet), completes requests whose albums are all here, and says so. Also runs a minute after Lidarr imports something. Only while music is set up and on. |
+| Music Full Scan | daily, 03:40 | Reads every music library and all of Lidarr; with **Enable Scan** on, brings in what Lidarr has; marks albums gone from everywhere as deleted (or not here, if nobody asked for them), unless a server or Lidarr didn't answer. Only while music is set up and on. |
+| Database Maintenance | daily, 03:45 | Clears rows nothing reads any more (and MusicBrainz answers nobody has looked at in a month), then compacts the database. |
 
 ## Feature switches
 
@@ -99,6 +105,7 @@ Every feature below is on unless an admin turns it off for everyone (**Settings 
 | `passkeyPrompt` | The banner offering to add a passkey (passkeys still work) |
 | `subtitles` | The Subtitles panel and episode subtitle tags |
 | `autoFix` | Fixing reported problems automatically |
+| `music` | Music: the Music item, music in search and on Discover, requesting music, and the Lidarr and music settings. Only appears once a Lidarr is added |
 | `aiChat` | AI Search |
 | `aiReasons` | Why These Suggestions |
 | `aiPicker` | Pick for the Room |
@@ -115,7 +122,7 @@ The AI switches only appear once AI is set up.
 
 | Where | What |
 |---|---|
-| Profile → Settings → Features | Turn features off for yourself |
+| Profile → Settings → Features | Turn features off for yourself, music included |
 | Profile → Settings → Passkeys | Add, rename and remove passkeys |
 | Profile → Settings → General → Trakt Username | Your public Trakt watchlist is requested for you, with **Auto-Request Movies** and **Auto-Request Series** (once an admin has set up Trakt) |
 | Discover → pencil button | Rows to show on your home page |

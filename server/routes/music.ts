@@ -1,13 +1,22 @@
-import { MusicBrainzBusyError, musicBrainz } from '@server/api/musicbrainz';
+import {
+  MusicBrainzBusyError,
+  isMbid,
+  musicBrainz,
+} from '@server/api/musicbrainz';
+import { MediaType } from '@server/constants/media';
 import mediaForViewer from '@server/lib/mediaForViewer';
+import { mediaHistory } from '@server/lib/mediaHistory';
 import { artistImages, musicImageUrl } from '@server/lib/music/artistImage';
 import {
   albumLinks,
   albumStatuses,
   artistMedia,
   artistStatuses,
+  markBeingAdded,
 } from '@server/lib/music/library';
+import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
+import { isAuthenticated } from '@server/middleware/auth';
 import { requireMusic } from '@server/middleware/music';
 import type {
   MusicAlbumResult,
@@ -125,7 +134,9 @@ musicRoutes.get<{ mbid: string }>(
         page,
         totalPages: Math.max(1, Math.ceil(total / ALBUMS_PER_PAGE)),
         totalResults: total,
-        results: groups.map((g) => mapAlbumResult(g, statuses)),
+        results: await markBeingAdded(
+          groups.map((g) => mapAlbumResult(g, statuses))
+        ),
       } satisfies MusicPage<MusicAlbumResult>);
     } catch (e) {
       return mbFailed(next, e, 'artist');
@@ -157,6 +168,33 @@ musicRoutes.get<{ mbid: string }>(
   }
 );
 
+/**
+ * What has happened to an artist and their albums, newest first, for the
+ * manage panel: requests, approvals, albums arriving or leaving. Kept by
+ * the artist's MusicBrainz id, so it outlives Seerr's own record of them.
+ */
+musicRoutes.get<{ mbid: string }>(
+  '/artist/:mbid/history',
+  isAuthenticated([Permission.MANAGE_REQUESTS, Permission.ADMIN], {
+    type: 'or',
+  }),
+  async (req, res, next) => {
+    if (!isMbid(req.params.mbid)) {
+      return next({ status: 400, message: 'Not a MusicBrainz id.' });
+    }
+    try {
+      return res.status(200).json(
+        await mediaHistory({
+          mediaType: MediaType.MUSIC,
+          foreignId: req.params.mbid,
+        })
+      );
+    } catch (e) {
+      return next({ status: 500, message: e.message });
+    }
+  }
+);
+
 musicRoutes.get<{ mbid: string }>('/album/:mbid', async (req, res, next) => {
   try {
     const group = await musicBrainz().getReleaseGroup(req.params.mbid);
@@ -166,13 +204,14 @@ musicRoutes.get<{ mbid: string }>('/album/:mbid', async (req, res, next) => {
       artistId ? artistMedia(artistId) : undefined,
       albumLinks(group.id),
     ]);
-    return res.status(200).json(
+    const [album] = await markBeingAdded([
       mapAlbumDetails(group, {
         status: statuses.get(group.id),
         mediaInfo: mediaForViewer(media, req.user),
         playLinks,
-      })
-    );
+      }),
+    ]);
+    return res.status(200).json(album);
   } catch (e) {
     return mbFailed(next, e, 'album');
   }

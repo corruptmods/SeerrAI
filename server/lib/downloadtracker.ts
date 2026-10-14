@@ -4,6 +4,8 @@ import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
 import type { DownloadStage, DownloadStep } from '@server/constants/downloads';
 import { MediaType } from '@server/constants/media';
+import { lidarrApi, musicReady } from '@server/lib/music/access';
+import type { DVRSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { uniqWith } from 'lodash';
@@ -47,6 +49,8 @@ export interface DownloadingItem {
   title: string;
   downloadId: string;
   episode?: EpisodeNumberResult;
+  /** Music: the album it is for. `externalId` is then Lidarr's artist. */
+  album?: { id: number; title: string; foreignAlbumId: string };
 }
 
 interface QueueFields {
@@ -138,7 +142,8 @@ const trackedItem = (
   },
   mediaType: MediaType,
   externalId: number,
-  episode?: EpisodeNumberResult
+  episode?: EpisodeNumberResult,
+  album?: DownloadingItem['album']
 ): DownloadingItem => {
   const stage = downloadStageOf(item);
   return {
@@ -153,6 +158,7 @@ const trackedItem = (
     title: item.title,
     downloadId: item.downloadId,
     ...(episode ? { episode } : {}),
+    ...(album ? { album } : {}),
   };
 };
 
@@ -223,14 +229,20 @@ const DONE_STAGES: DownloadStage[] = ['importing', 'finishing'];
 
 /** A download that left the queue because it was imported, held a while. */
 interface ImportedDownload {
-  kind: 'movie' | 'series';
+  kind: 'movie' | 'series' | 'music';
   serverId: number;
   item: DownloadingItem;
   at: number;
 }
 
 const itemKey = (item: DownloadingItem) =>
-  `${item.downloadId ?? ''}|${item.episode?.id ?? ''}|${item.externalId}`;
+  `${item.downloadId ?? ''}|${item.episode?.id ?? ''}|${item.album?.id ?? ''}|${
+    item.externalId
+  }`;
+
+/** Servers that are one and the same: the same address. */
+const sameServer = (a: DVRSettings, b: DVRSettings) =>
+  a.hostname === b.hostname && a.port === b.port && a.baseUrl === b.baseUrl;
 
 /**
  * Whether a download that left the queue was imported rather than removed:
@@ -246,6 +258,7 @@ export const leftImported = (item: DownloadingItem): boolean =>
 class DownloadTracker {
   private radarrServers: Record<number, DownloadingItem[]> = {};
   private sonarrServers: Record<number, DownloadingItem[]> = {};
+  private lidarrServers: Record<number, DownloadingItem[]> = {};
   /** Imported downloads still shown until the media server lists them. */
   private imported = new Map<string, ImportedDownload>();
   private onImport?: () => Promise<void> | void;
@@ -364,6 +377,40 @@ class DownloadTracker {
     return found;
   }
 
+  /** Music downloads Lidarr imported, still shown: by Lidarr and album. */
+  public heldMusicImports(now = Date.now()): {
+    serverId: number;
+    albumId: number;
+  }[] {
+    this.isHoldingImports(now);
+    return [...this.imported.values()].flatMap((held) =>
+      held.kind === 'music' && held.item.album
+        ? [{ serverId: held.serverId, albumId: held.item.album.id }]
+        : []
+    );
+  }
+
+  /**
+   * An album Lidarr imported is here now: its downloads are no longer
+   * shown. Those imported after the scan began stay until the next one.
+   */
+  public forgetImportedAlbum(
+    serverId: number,
+    albumId: number,
+    before = Date.now()
+  ) {
+    for (const [key, held] of this.imported) {
+      if (
+        held.kind === 'music' &&
+        held.serverId === serverId &&
+        held.item.album?.id === albumId &&
+        held.at <= before
+      ) {
+        this.imported.delete(key);
+      }
+    }
+  }
+
   /**
    * The media server listed a title: its imported downloads are no longer
    * shown. Those imported after the scan began stay until the next one.
@@ -459,9 +506,27 @@ class DownloadTracker {
       .concat(this.importedFor('series', serverId, externalServiceId));
   }
 
+  /**
+   * An artist's downloads in Lidarr, each saying which album it is for;
+   * only one album's, given its Lidarr id.
+   */
+  public getMusicProgress(
+    serverId: number,
+    artistId: number,
+    albumId?: number
+  ): DownloadingItem[] {
+    const forAlbum = (item: DownloadingItem) =>
+      albumId === undefined || item.album?.id === albumId;
+    return (this.lidarrServers[serverId] ?? [])
+      .filter((item) => item.externalId === artistId && forAlbum(item))
+      .map(this.withLive)
+      .concat(this.importedFor('music', serverId, artistId).filter(forAlbum));
+  }
+
   public async resetDownloadTracker() {
     this.radarrServers = {};
     this.sonarrServers = {};
+    this.lidarrServers = {};
     this.live = new Map();
     this.backfill = [];
     this.imported = new Map();
@@ -471,8 +536,8 @@ class DownloadTracker {
   private lastUpdate = 0;
 
   /**
-   * Asks every Radarr and Sonarr server for its queue, then the download
-   * clients for the latest on what is in it; one pass at a time.
+   * Asks every Radarr, Sonarr and Lidarr server for its queue, then the
+   * download clients for the latest on what is in it; one pass at a time.
    */
   public updateDownloads(): Promise<void> {
     if (!this.updating) {
@@ -480,6 +545,7 @@ class DownloadTracker {
       this.updating = Promise.all([
         this.updateRadarrDownloads(),
         this.updateSonarrDownloads(),
+        this.updateLidarrDownloads(),
       ])
         .then(() => this.updateLive())
         .finally(() => {
@@ -515,6 +581,7 @@ class DownloadTracker {
         [
           ...Object.values(this.radarrServers),
           ...Object.values(this.sonarrServers),
+          ...Object.values(this.lidarrServers),
           this.backfill.map((d) => d.item),
         ]
           .flat()
@@ -742,6 +809,73 @@ class DownloadTracker {
               this.sonarrServers[ms.id] = this.sonarrServers[server.id];
             }
           });
+        }
+      })
+    );
+  }
+
+  /**
+   * Every Lidarr's queue, while music is set up and on. Read whether or
+   * not the Lidarr scans its library into Seerr: every music request goes
+   * through one, and its progress is all there is to show for it. A
+   * Lidarr listed twice (the same address) is asked once.
+   */
+  private async updateLidarrDownloads() {
+    if (!musicReady()) {
+      this.lidarrServers = {};
+      return;
+    }
+    const servers = getSettings().lidarr;
+    const distinct = uniqWith(servers, sameServer);
+
+    await Promise.all(
+      distinct.map(async (server) => {
+        const sharing = servers
+          .filter(
+            (other) => other.id === server.id || sameServer(other, server)
+          )
+          .map((other) => other.id);
+        try {
+          const lidarr = lidarrApi(server);
+          await lidarr.refreshMonitoredDownloads();
+          const queueItems = await lidarr.getMusicQueue();
+
+          const before = this.lidarrServers[server.id] ?? [];
+          const items = queueItems.map((item) =>
+            trackedItem(
+              item,
+              MediaType.MUSIC,
+              item.artistId,
+              undefined,
+              item.album
+                ? {
+                    id: item.album.id,
+                    title: item.album.title,
+                    foreignAlbumId: item.album.foreignAlbumId,
+                  }
+                : item.albumId
+                  ? { id: item.albumId, title: '', foreignAlbumId: '' }
+                  : undefined
+            )
+          );
+          for (const id of sharing) {
+            this.lidarrServers[id] = items;
+          }
+          this.noteImported('music', sharing, before, items);
+
+          if (queueItems.length > 0) {
+            logger.debug(
+              `Found ${queueItems.length} item(s) in progress on Lidarr server: ${server.name}`,
+              { label: 'Download Tracker' }
+            );
+          }
+        } catch {
+          logger.error(
+            `Unable to get queue from Lidarr server: ${server.name}`,
+            {
+              label: 'Download Tracker',
+            }
+          );
         }
       })
     );

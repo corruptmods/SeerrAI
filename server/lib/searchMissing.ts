@@ -1,8 +1,12 @@
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
-import { MediaType, isVideo } from '@server/constants/media';
+import { MediaStatus, MediaType, isVideo } from '@server/constants/media';
+import { getRepository } from '@server/datasource';
 import type Media from '@server/entity/Media';
+import MusicAlbum from '@server/entity/MusicAlbum';
+import { lidarrApi } from '@server/lib/music/access';
 import { getSettings } from '@server/lib/settings';
+import { IsNull, Not } from 'typeorm';
 
 /*
  * Asks Radarr or Sonarr to search now for what a title is missing.
@@ -13,6 +17,8 @@ import { getSettings } from '@server/lib/settings';
  * date can stay missing indefinitely. This is that Search, aimed precisely:
  * only episodes that are monitored, have aired, and have no file — the ones
  * the health page counts as missing. For a film, Radarr searches for it.
+ * For an artist, Lidarr searches for the albums asked for that it has no
+ * files for yet.
  *
  * Each search is a query to the indexers, and many cap queries a day. So a
  * season whose every aired episode is missing gets one season search, which
@@ -25,7 +31,7 @@ export class NothingMissingError extends Error {}
 
 export interface SearchStarted {
   service: string;
-  /** Episodes searched for; 1 for a film. */
+  /** Episodes searched for; 1 for a film; albums for an artist. */
   searched: number;
   /** Of those, how many seasons were searched whole. */
   seasons: number;
@@ -35,8 +41,13 @@ export const searchMissing = async (
   media: Media,
   is4k: boolean
 ): Promise<SearchStarted> => {
+  if (media.mediaType === MediaType.MUSIC) {
+    return searchMissingAlbums(media);
+  }
   if (!isVideo(media.mediaType)) {
-    throw new NotInServiceError('Only films and series are searched here.');
+    throw new NotInServiceError(
+      'Only films, series and music are searched here.'
+    );
   }
   const settings = getSettings();
   const serverId = is4k ? media.serviceId4k : media.serviceId;
@@ -107,6 +118,45 @@ export const searchMissing = async (
     searched: missing.length,
     seasons: wholeSeasons.length,
   };
+};
+
+/**
+ * An artist's albums asked for (on their way, so processing) that Lidarr
+ * has no files for yet: Lidarr searches for each, in one command.
+ */
+export const searchMissingAlbums = async (
+  media: Media
+): Promise<SearchStarted> => {
+  const server = getSettings().lidarr.find((l) => l.id === media.serviceId);
+  if (!server || media.externalServiceId == null) {
+    throw new NotInServiceError('This artist is not linked to Lidarr.');
+  }
+
+  const albums = await getRepository(MusicAlbum).find({
+    select: {
+      id: true,
+      lidarrAlbumId: true,
+      trackCount: true,
+      trackFileCount: true,
+    },
+    where: {
+      mediaId: media.id,
+      status: MediaStatus.PROCESSING,
+      lidarrAlbumId: Not(IsNull()),
+    },
+  });
+  const missing = albums.filter((album) => !album.trackFileCount);
+  if (!missing.length) {
+    throw new NothingMissingError(
+      'Lidarr has files for every album asked for.'
+    );
+  }
+
+  await lidarrApi(server).searchAlbums(
+    missing.map((album) => album.lidarrAlbumId as number)
+  );
+
+  return { service: server.name, searched: missing.length, seasons: 0 };
 };
 
 export interface SearchAllResult {

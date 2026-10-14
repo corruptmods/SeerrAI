@@ -14,6 +14,7 @@ import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
+import Media from '@server/entity/Media';
 import MusicMetadata from '@server/entity/MusicMetadata';
 import { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
@@ -592,6 +593,42 @@ describe('an album', () => {
     }
   });
 
+  it('is being added to the library while Lidarr has files no server lists', async () => {
+    await seedMusicFixtures();
+    mock.method(MusicBrainz.prototype, 'getReleaseGroup', async () =>
+      album(IDS.otherAlbum, 'OK Computer', '1997-05-21')
+    );
+    const settings = getSettings();
+    const saved = {
+      type: settings.main.mediaServerType,
+      plex: { ...settings.plex },
+    };
+    try {
+      // No music library on anywhere: Lidarr's files decide, and three of
+      // twelve tracks is not here yet.
+      settings.plex.musicLibraries = [];
+      let details = (await get(`/music/album/${IDS.otherAlbum}`)).body as {
+        addingToLibrary?: boolean;
+      };
+      assert.equal(details.addingToLibrary, undefined);
+
+      settings.main.mediaServerType = MediaServerType.PLEX;
+      Object.assign(settings.plex, {
+        connected: true,
+        musicLibraries: [
+          { id: '7', name: 'Music', enabled: true, type: 'artist' },
+        ],
+      });
+      details = (await get(`/music/album/${IDS.otherAlbum}`)).body as {
+        addingToLibrary?: boolean;
+      };
+      assert.equal(details.addingToLibrary, true);
+    } finally {
+      settings.main.mediaServerType = saved.type;
+      Object.assign(settings.plex, saved.plex);
+    }
+  });
+
   it('lists its tracks, disc by disc', async () => {
     mock.method(MusicBrainz.prototype, 'getTracks', async () => [
       {
@@ -739,15 +776,24 @@ describe('Discover’s music rows', () => {
   });
 
   it('show what the media servers added most recently', async () => {
-    await seedMusicFixtures();
+    const { artist } = await seedMusicFixtures();
+    // The artist's name, as the music scans keep it.
+    await getRepository(Media).update(artist.id, { foreignTitle: 'Radiohead' });
     const { status, body } = await get('/discover/music/recently-added');
     assert.equal(status, 200);
     // Only albums that are here and known to MusicBrainz.
     assert.deepEqual(
       (
-        body as { results: { id: string; artistId: string; title: string }[] }
-      ).results.map((a) => [a.id, a.artistId, a.title]),
-      [[IDS.album, IDS.artist, 'Hail to the Thief']]
+        body as {
+          results: {
+            id: string;
+            artistId: string;
+            artistName: string;
+            title: string;
+          }[];
+        }
+      ).results.map((a) => [a.id, a.artistId, a.artistName, a.title]),
+      [[IDS.album, IDS.artist, 'Radiohead', 'Hail to the Thief']]
     );
   });
 

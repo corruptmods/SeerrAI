@@ -55,6 +55,8 @@ const messages = defineMessages('components.Settings.SettingsHealth', {
   searchStarted:
     '{count, plural, one {Searching for # missing episode} other {Searching for # missing episodes}} in {service}.',
   searchStartedMovie: 'Searching for it in {service}.',
+  searchStartedAlbums:
+    '{count, plural, one {Searching for # missing album} other {Searching for # missing albums}} in {service}.',
   searchFailed: 'Could not start the search.',
   pageOf: 'Page {page} of {pages}',
   previous: 'Prev',
@@ -69,6 +71,8 @@ const messages = defineMessages('components.Settings.SettingsHealth', {
     'Searching for {titles, plural, one {# title} other {# titles}}; {failed, plural, one {# could not be started} other {# could not be started}}.',
   awaitingApproval: 'Waiting on approval for over a week',
   stuckProcessing: 'Processing for over a week',
+  musicNotOnServer: 'Albums in Lidarr, not on your media server after a day',
+  musicNoRelease: 'Requested albums with no release found after a week',
   missingTvdb: 'Requested series with no TVDB id',
   collectionGaps: 'Collections partly in your library',
   plexMatches: 'Folders matched to another title',
@@ -115,18 +119,18 @@ const StatusDot = ({ status }: { status: HealthStatus }) => {
 };
 
 /**
- * Asks Radarr or Sonarr to search now for what the title is missing. After
- * one press it says what was asked for and stays done, so it is not sent
- * again by a second tap.
+ * Asks Radarr, Sonarr or Lidarr to search now for what the title is
+ * missing. After one press it says what was asked for and stays done, so
+ * it is not sent again by a second tap.
  */
 const SearchButton = ({
   mediaId,
   is4k,
-  isMovie,
+  mediaType,
 }: {
   mediaId: number;
   is4k: boolean;
-  isMovie: boolean;
+  mediaType: string;
 }) => {
   const intl = useIntl();
   const { addToast } = useToasts();
@@ -147,14 +151,16 @@ const SearchButton = ({
           }>(`/api/v1/media/${mediaId}/search-missing`, { is4k });
           setState('done');
           addToast(
-            isMovie
+            mediaType === 'movie'
               ? intl.formatMessage(messages.searchStartedMovie, {
                   service: data.service,
                 })
-              : intl.formatMessage(messages.searchStarted, {
-                  count: data.searched,
-                  service: data.service,
-                }),
+              : intl.formatMessage(
+                  mediaType === 'music'
+                    ? messages.searchStartedAlbums
+                    : messages.searchStarted,
+                  { count: data.searched, service: data.service }
+                ),
             { appearance: 'success', autoDismiss: true }
           );
         } catch (e) {
@@ -421,7 +427,7 @@ const CheckRow = ({
                       <SearchButton
                         mediaId={item.searchable.mediaId}
                         is4k={item.searchable.is4k}
-                        isMovie={item.searchable.mediaType === 'movie'}
+                        mediaType={item.searchable.mediaType}
                       />
                     )}
                   </li>

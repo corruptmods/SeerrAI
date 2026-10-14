@@ -2,6 +2,7 @@ import Badge from '@app/components/Common/Badge';
 import Tooltip from '@app/components/Common/Tooltip';
 import MusicStatusBadge from '@app/components/Music/MusicStatusBadge';
 import {
+  albumDownloads,
   artistImageUrl,
   musicRequestStatus,
 } from '@app/components/Music/musicHelpers';
@@ -99,7 +100,15 @@ export const AlbumsField = ({
             {albums.map((album) => (
               <li key={album.id} className="flex items-center gap-2">
                 <span className="truncate">{album.title}</span>
-                <MusicStatusBadge status={album.albumStatus} />
+                <MusicStatusBadge
+                  status={album.albumStatus}
+                  downloads={albumDownloads(
+                    request.media?.downloadStatus,
+                    album.albumMbid
+                  )}
+                  addingToLibrary={album.addingToLibrary}
+                  plain
+                />
               </li>
             ))}
           </ul>
@@ -131,8 +140,19 @@ export const MusicRequestBadge = ({ request }: { request: Request }) => {
     );
   }
   const status = musicRequestStatus(request);
+  const albums = albumsOf(request);
   return status === MediaStatus.UNKNOWN ? null : (
-    <MusicStatusBadge status={status} />
+    <MusicStatusBadge
+      status={status}
+      downloads={albumDownloads(
+        request.media?.downloadStatus,
+        albums.map((album) => album.albumMbid)
+      )}
+      addingToLibrary={albums.some((album) => album.addingToLibrary)}
+      artistId={request.media?.foreignId ?? undefined}
+      title={musicRequestTitle(request, intl)}
+      serviceUrl={request.media?.serviceUrl}
+    />
   );
 };
 

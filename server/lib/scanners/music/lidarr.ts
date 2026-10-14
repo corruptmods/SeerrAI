@@ -8,10 +8,13 @@ import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import { lidarrApi } from '@server/lib/music/access';
+import type { AlbumEvent } from '@server/lib/music/availability';
 import {
+  STATUS_EVENTS,
   artistRow,
   fromLidarr,
   lidarrStatus,
+  recordAlbumEvents,
 } from '@server/lib/music/availability';
 import type { IndexAlbum, LidarrIndex } from '@server/lib/music/matcher';
 import { markUndispatchable } from '@server/lib/requestDispatch';
@@ -238,8 +241,11 @@ export const importLidarrLibrary = async (
       if (!albums.length) continue;
 
       await dataSource.transaction(async (manager) => {
-        const media = await artistRow(manager, artist.mbid);
+        const media = await artistRow(manager, artist.mbid, {
+          lidarr: artist.name,
+        });
         touched.add(media.id);
+        const events: AlbumEvent[] = [];
         if (media.serviceId == null || media.externalServiceId == null) {
           await manager.update(Media, media.id, {
             serviceId: server.id,
@@ -279,8 +285,12 @@ export const importLidarrLibrary = async (
               row.status === MediaStatus.DELETED)
           ) {
             await manager.update(MusicAlbum, row.id, { status });
+            const type = STATUS_EVENTS[status];
+            if (type)
+              events.push({ mediaId: media.id, type, title: row.title });
           }
         }
+        await recordAlbumEvents(events, manager);
       });
     }
   }

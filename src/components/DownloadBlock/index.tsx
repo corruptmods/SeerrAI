@@ -45,6 +45,7 @@ const messages = defineMessages('components.DownloadBlock', {
   stepNoPeers: 'No one to download from right now',
   formattedTitle: '{title}: Season {seasonNumber} Episode {episodeNumber}',
   formattedSeason: '{title}: Season {seasonNumber}',
+  formattedAlbum: '{album} — {title}',
 });
 
 /** How much has arrived, 0 to 100, whatever the server reported. */
@@ -142,7 +143,12 @@ const DownloadBlock = ({
   const stage = STAGES[downloadItem.stage] ?? STAGES.downloading;
   const detail =
     stepDetail(downloadItem.stage, downloadItem.step) ?? stage.detail;
-  const arr = downloadItem.mediaType === MediaType.MOVIE ? 'Radarr' : 'Sonarr';
+  const arr =
+    downloadItem.mediaType === MediaType.MOVIE
+      ? 'Radarr'
+      : downloadItem.mediaType === MediaType.MUSIC
+        ? 'Lidarr'
+        : 'Sonarr';
   // Radarr and Sonarr hold a release for the delay its profile sets; what
   // they call time left is how long until they send it.
   const held =
@@ -180,7 +186,12 @@ const DownloadBlock = ({
                   seasonNumber: downloadItem?.episode?.seasonNumber,
                   episodeNumber: downloadItem?.episode?.episodeNumber,
                 })
-              : title}
+              : downloadItem.album?.title && title
+                ? intl.formatMessage(messages.formattedAlbum, {
+                    title,
+                    album: downloadItem.album.title,
+                  })
+                : (downloadItem.album?.title ?? title)}
       </div>
       <div className="relative mb-2 h-6 min-w-0 overflow-hidden rounded-full bg-gray-700">
         <div

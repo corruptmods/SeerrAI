@@ -1,8 +1,10 @@
 import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
+import type { DownloadingItem } from '@server/lib/downloadtracker';
 import type { MusicAlbumResult } from '@server/models/Music';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  albumDownloads,
   albumGroup,
   allowedByProfile,
   artistImageUrl,
@@ -178,5 +180,26 @@ describe('a music request card’s status', () => {
       of(MediaRequestStatus.COMPLETED, [undefined]),
       MediaStatus.AVAILABLE
     );
+  });
+});
+
+describe('an album’s downloads', () => {
+  const item = (foreignAlbumId?: string) =>
+    ({
+      downloadId: foreignAlbumId ?? 'none',
+      album: foreignAlbumId ? { id: 1, title: 'x', foreignAlbumId } : undefined,
+    }) as DownloadingItem;
+
+  it('are the artist’s downloads for that album, or those albums', () => {
+    const all = [item('a'), item('b'), item()];
+    assert.deepEqual(
+      albumDownloads(all, 'a').map((d) => d.downloadId),
+      ['a']
+    );
+    assert.deepEqual(
+      albumDownloads(all, ['a', 'b']).map((d) => d.downloadId),
+      ['a', 'b']
+    );
+    assert.deepEqual(albumDownloads(undefined, 'a'), []);
   });
 });

@@ -18,6 +18,7 @@ import { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
 import { Permission } from '@server/lib/permissions';
 import { getSettings, musicDefaults } from '@server/lib/settings';
+import musicRoutes from '@server/routes/music';
 import requestRoutes from '@server/routes/request';
 import userRoutes from '@server/routes/user';
 import { setupTestDb } from '@server/test/db';
@@ -135,6 +136,7 @@ before(async () => {
   });
   ex.use('/api/v1/request', requestRoutes);
   ex.use('/api/v1/user', userRoutes);
+  ex.use('/api/v1/music', musicRoutes);
   ex.use(
     (
       err: { status?: number; message: string },
@@ -617,5 +619,69 @@ describe('changing a music request', () => {
     );
     assert.equal((await albumRow(KID_A)).status, MediaStatus.PROCESSING);
     assert.equal((await artistMedia()).status, MediaStatus.PROCESSING);
+  });
+});
+
+describe('a music request’s history', () => {
+  type Entry = {
+    type: string;
+    detail: string | null;
+    user: { displayName: string } | null;
+  };
+  const history = async () => {
+    const res = await call('GET', `/music/artist/${ARTIST}/history`);
+    assert.equal(res.status, 200);
+    return (res.body as Entry[])
+      .map((e) => [e.type, e.detail, e.user?.displayName ?? null])
+      .reverse();
+  };
+
+  beforeEach(() => {
+    lidarr.lookupArtists.set(ARTIST, {
+      id: 0,
+      artistName: 'Radiohead',
+      foreignArtistId: ARTIST,
+      monitored: false,
+      qualityProfileId: 0,
+      metadataProfileId: 0,
+      tags: [],
+    });
+  });
+
+  it('is kept by the artist: asked for, approved, on its way', async () => {
+    await actAs(Permission.REQUEST);
+    const res = await requestMusic({ albums: [OK_COMPUTER, KID_A] });
+    const id = (res.body as { id: number }).id;
+
+    await actAs(Permission.MANAGE_REQUESTS, 'manager@x');
+    await call('POST', `/request/${id}/approve`);
+    await lidarr.waitFor(
+      (c) => c.method === 'POST' && c.path === '/api/v1/artist'
+    );
+
+    assert.deepEqual(await history(), [
+      ['requested', '2 albums: OK Computer, Kid A', 'listener@test.local'],
+      ['approved', null, 'manager@x'],
+      ['processing', null, null],
+    ]);
+  });
+
+  it('says why Lidarr could not take it', async () => {
+    const res = await requestMusic({ albums: [OK_COMPUTER] });
+    const id = (res.body as { id: number }).id;
+    lidarr.down = true;
+
+    await actAs(Permission.MANAGE_REQUESTS, 'manager@x');
+    await call('POST', `/request/${id}/approve`);
+    await lidarr.waitFor(() => false);
+
+    const failed = (await history()).find(([type]) => type === 'failed');
+    assert.match(String(failed?.[1]), /^Lidarr could not take the request/);
+  });
+
+  it('is for request managers and admins only', async () => {
+    await requestMusic({ albums: [OK_COMPUTER] });
+    const res = await call('GET', `/music/artist/${ARTIST}/history`);
+    assert.equal(res.status, 403);
   });
 });

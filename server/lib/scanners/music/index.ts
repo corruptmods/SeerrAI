@@ -1,8 +1,9 @@
-import { MediaType } from '@server/constants/media';
+import { MediaStatus, MediaType } from '@server/constants/media';
 import type { MediaServerKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import MusicAlbum from '@server/entity/MusicAlbum';
+import downloadTracker from '@server/lib/downloadtracker';
 import {
   connectedServers,
   isJellyfinFamily,
@@ -18,6 +19,7 @@ import {
   recordServerAlbums,
   refreshArtists,
 } from '@server/lib/music/availability';
+import { completeMusicRequests } from '@server/lib/music/completion';
 import type {
   AlbumMatch,
   KnownAlbum,
@@ -102,6 +104,35 @@ const knownAlbums = () => {
   };
 };
 
+/**
+ * Albums now here that Lidarr imported: their downloads stop being shown
+ * as being added to the library. Those imported after the scan began wait
+ * for the next one.
+ */
+const forgetListedImports = async (before: number): Promise<void> => {
+  const held = downloadTracker.heldMusicImports();
+  if (!held.length) return;
+  const here = await getRepository(MusicAlbum)
+    .createQueryBuilder('album')
+    .innerJoin('album.media', 'media')
+    .select('album.lidarrAlbumId', 'albumId')
+    .addSelect('media.serviceId', 'serverId')
+    .where('album.lidarrAlbumId IN (:...ids)', {
+      ids: [...new Set(held.map((h) => h.albumId))],
+    })
+    .andWhere('album.status = :available', {
+      available: MediaStatus.AVAILABLE,
+    })
+    .getRawMany<{ albumId: number | string; serverId: number | string }>();
+  for (const row of here) {
+    downloadTracker.forgetImportedAlbum(
+      Number(row.serverId),
+      Number(row.albumId),
+      before
+    );
+  }
+};
+
 /** The music scan under way, if any. */
 let underWay: Promise<void> | undefined;
 
@@ -157,6 +188,7 @@ class MusicScanner {
   }
 
   private async scan(): Promise<void> {
+    const startedAt = Date.now();
     const settings = getSettings();
     const decide = lidarrOnly();
     const index = new LidarrIndex(settings.lidarr, { full: this.full });
@@ -209,7 +241,7 @@ class MusicScanner {
           }
           if (!this.cancelled) scanned.push([library, askedAt]);
         }
-        const recorded = await recordServerAlbums(kind, matches);
+        const recorded = await recordServerAlbums(kind, matches, index);
         // The next sync reads from here, once what was read is kept.
         for (const [library, askedAt] of scanned) library.lastScan = askedAt;
         matched += matches.filter((m) => m.albumMbid).length;
@@ -248,6 +280,13 @@ class MusicScanner {
 
     await refreshArtists(artists, index);
 
+    // Requests whose albums are all here now are done, and say so.
+    const completed = await completeMusicRequests(artists);
+
+    // Downloads shown as being added to the library, for albums a server
+    // now lists, are no longer shown.
+    await forgetListedImports(startedAt);
+
     logger.info(`${this.name} finished`, {
       label: LABEL,
       albums: this.total,
@@ -257,6 +296,7 @@ class MusicScanner {
       leftForNextRun: matcher.later,
       musicBrainzCalls: resolver.calls,
       lidarrOnly: decide,
+      requestsCompleted: completed.length,
     });
   }
 

@@ -1,13 +1,18 @@
 import type { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import MediaEvent, { MediaEventType } from '@server/entity/MediaEvent';
+import { User } from '@server/entity/User';
 import logger from '@server/logger';
-import type { EntityManager } from 'typeorm';
+import type { EntityManager, FindOptionsWhere } from 'typeorm';
+import { In } from 'typeorm';
 
 export { MediaEventType };
 
 export interface MediaEventInput {
+  /** 0 for music, which is kept by `foreignId` instead. */
   tmdbId: number;
+  /** For music: the artist's MusicBrainz id. */
+  foreignId?: string | null;
   mediaType: MediaType;
   type: MediaEventType;
   is4k?: boolean;
@@ -32,6 +37,7 @@ export const recordMediaEvent = async (
   try {
     await (manager ?? getRepository(MediaEvent).manager).insert(MediaEvent, {
       tmdbId: input.tmdbId,
+      foreignId: input.foreignId ?? null,
       mediaType: input.mediaType,
       type: input.type,
       is4k: input.is4k ?? false,
@@ -42,9 +48,60 @@ export const recordMediaEvent = async (
     logger.warn('Could not record a history event', {
       label: 'Media History',
       tmdbId: input.tmdbId,
+      foreignId: input.foreignId ?? undefined,
       mediaType: input.mediaType,
       type: input.type,
       errorMessage: e.message,
     });
   }
+};
+
+/** One event as the manage panel shows it. */
+export interface MediaHistoryEntry {
+  id: number;
+  type: MediaEventType;
+  is4k: boolean;
+  detail: string | null;
+  occurredAt: Date;
+  user: { id: number; displayName: string; avatar: string } | null;
+}
+
+/**
+ * A title's history, newest first, with who did each thing: by TMDB id for
+ * films and series, by `foreignId` for music.
+ */
+export const mediaHistory = async (
+  where: FindOptionsWhere<MediaEvent>
+): Promise<MediaHistoryEntry[]> => {
+  const events = await getRepository(MediaEvent).find({
+    where,
+    order: { occurredAt: 'DESC', id: 'DESC' },
+    take: 100,
+  });
+
+  const userIds = [
+    ...new Set(events.map((e) => e.userId).filter((id) => id != null)),
+  ] as number[];
+  const users = userIds.length
+    ? await getRepository(User).find({ where: { id: In(userIds) } })
+    : [];
+  const byId = new Map(users.map((user) => [user.id, user]));
+
+  return events.map((event) => {
+    const user = event.userId != null ? byId.get(event.userId) : null;
+    return {
+      id: event.id,
+      type: event.type,
+      is4k: event.is4k,
+      detail: event.detail ?? null,
+      occurredAt: event.occurredAt,
+      user: user
+        ? {
+            id: user.id,
+            displayName: user.displayName,
+            avatar: user.avatar,
+          }
+        : null,
+    };
+  });
 };

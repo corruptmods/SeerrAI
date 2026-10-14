@@ -2,8 +2,10 @@ import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import Tag from '@app/components/Common/Tag';
+import Tooltip from '@app/components/Common/Tooltip';
 import MusicCard from '@app/components/Music/MusicCard';
 import MusicImage from '@app/components/Music/MusicImage';
+import MusicManage from '@app/components/Music/MusicManage';
 import MusicStatusBadge from '@app/components/Music/MusicStatusBadge';
 import MusicUnavailable from '@app/components/Music/MusicUnavailable';
 import type { AlbumGroup } from '@app/components/Music/musicHelpers';
@@ -22,14 +24,17 @@ import defineMessages from '@app/utils/defineMessages';
 import {
   ArrowDownTrayIcon,
   ArrowTopRightOnSquareIcon,
+  CogIcon,
   PlayIcon,
 } from '@heroicons/react/24/outline';
 import { VARIOUS_ARTISTS_MBID } from '@server/constants/media';
+import type { DownloadingItem } from '@server/lib/downloadtracker';
 import type {
   MusicAlbumResult,
   MusicArtistDetails,
   MusicPage,
 } from '@server/models/Music';
+import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
@@ -60,6 +65,7 @@ const messages = defineMessages('components.Music.ArtistDetails', {
   variousArtists:
     'Lidarr cannot add Various Artists, so their compilations cannot be requested.',
   openInLidarr: 'Open in Lidarr',
+  manageArtist: 'Manage Artist',
 });
 
 const hostOf = (url: string): string => {
@@ -90,6 +96,8 @@ const linkName = (kind: string, url: string): string => {
 
 interface DiscographyProps {
   artistId: string;
+  /** What Lidarr is downloading of theirs, for the album cards. */
+  downloads?: DownloadingItem[];
   /** Changes when something was requested, to show it. */
   refreshToken: number;
   /** Told when an album was requested from its card. */
@@ -99,6 +107,7 @@ interface DiscographyProps {
 /** The artist's releases, a hundred at a time, grouped by kind. */
 const Discography = ({
   artistId,
+  downloads,
   refreshToken,
   onRequested,
 }: DiscographyProps) => {
@@ -152,6 +161,7 @@ const Discography = ({
             subtitle="year"
             artistId={artistId}
             onRequested={onRequested}
+            downloads={downloads}
           />
         </li>
       ))}
@@ -225,9 +235,22 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
   const [bioOpen, setBioOpen] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [requested, setRequested] = useState(0);
+  const [managing, setManaging] = useState(false);
+  const router = useRouter();
   const { data, error, mutate } = useSWR<MusicArtistDetails>(
     musicOn ? `/api/v1/music/artist/${artistId}` : null
   );
+
+  // Opened from a status pill's "Manage Artist" link.
+  useEffect(() => {
+    if (router.query.manage === '1') {
+      setManaging(true);
+      router.replace({
+        pathname: router.pathname,
+        query: { mbid: router.query.mbid },
+      });
+    }
+  }, [router, router.query.manage]);
   const variousArtists = artistId === VARIOUS_ARTISTS_MBID;
   const canRequest =
     !variousArtists &&
@@ -307,7 +330,13 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
         </div>
         <div className="media-title">
           <div className="media-status">
-            <MusicStatusBadge status={data.mediaInfo?.status} />
+            <MusicStatusBadge
+              status={data.mediaInfo?.status}
+              downloads={data.mediaInfo?.downloadStatus}
+              artistId={data.id}
+              title={data.name}
+              serviceUrl={data.mediaInfo?.serviceUrl}
+            />
           </div>
           <h1 data-testid="media-title">
             {data.name}{' '}
@@ -351,6 +380,18 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
                 </span>
               </Button>
             ))}
+          {data.mediaInfo && hasPermission(Permission.MANAGE_REQUESTS) && (
+            <Tooltip content={intl.formatMessage(messages.manageArtist)}>
+              <Button
+                buttonType="ghost"
+                onClick={() => setManaging(true)}
+                className="media-action-icon"
+                aria-label={intl.formatMessage(messages.manageArtist)}
+              >
+                <CogIcon className="!mr-0" />
+              </Button>
+            </Tooltip>
+          )}
           {data.mediaInfo?.serviceUrl && hasPermission(Permission.ADMIN) && (
             <Button
               as="a"
@@ -442,10 +483,22 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
       )}
       <Discography
         artistId={data.id}
+        downloads={data.mediaInfo?.downloadStatus}
         refreshToken={requested}
         // The artist's status may change with an album asked for.
         onRequested={() => mutate()}
       />
+      {data.mediaInfo && hasPermission(Permission.MANAGE_REQUESTS) && (
+        <MusicManage
+          show={managing}
+          artist={data}
+          onClose={() => setManaging(false)}
+          revalidate={() => {
+            mutate();
+            setRequested((count) => count + 1);
+          }}
+        />
+      )}
       {canRequest && (
         <RequestModal
           type="music"

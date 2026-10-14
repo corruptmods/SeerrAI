@@ -9,7 +9,9 @@ import { getRepository } from '@server/datasource';
 import Episode from '@server/entity/Episode';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
+import MusicAlbum from '@server/entity/MusicAlbum';
 import { NotificationDelivery } from '@server/entity/NotificationDelivery';
+import { musicRequestAvailable } from '@server/lib/music/completion';
 import {
   claimDelivery,
   hasDelivery,
@@ -22,8 +24,22 @@ import { seriesReadyToWatchEvent } from '@server/lib/notifications/eventTitles';
 import logger from '@server/logger';
 import { In } from 'typeorm';
 
-const isRequestAvailable = (request: MediaRequest, media: Media): boolean => {
+const isRequestAvailable = async (
+  request: MediaRequest,
+  media: Media
+): Promise<boolean> => {
   const statusKey = request.is4k ? 'status4k' : 'status';
+
+  // Music: every album it asked for is here.
+  if (request.type === MediaType.MUSIC) {
+    return musicRequestAvailable(
+      request,
+      await getRepository(MusicAlbum).find({
+        select: { id: true, mbId: true, status: true },
+        where: { mediaId: media.id },
+      })
+    );
+  }
 
   if (request.type === MediaType.MOVIE) {
     return media[statusKey] === MediaStatus.AVAILABLE;
@@ -153,10 +169,11 @@ const findUnclaimedRequests = (
       .leftJoinAndSelect('request.requestedBy', 'requestedBy')
       .leftJoinAndSelect('requestedBy.settings', 'requestedBySettings')
       .leftJoinAndSelect('request.seasons', 'seasons')
+      .leftJoinAndSelect('request.albums', 'albums')
       .where('request.status = :status', { status })
-      // Films and series: what these notifications are worded for.
-      .andWhere('request.type IN (:...videoTypes)', {
-        videoTypes: VIDEO_MEDIA_TYPES,
+      // Films, series and music: what these notifications are worded for.
+      .andWhere('request.type IN (:...types)', {
+        types: [...VIDEO_MEDIA_TYPES, MediaType.MUSIC],
       })
       .andWhere(
         `NOT EXISTS (
@@ -426,7 +443,7 @@ class NotificationReconciler {
         relations: { seasons: true },
       });
 
-      if (!media || !isRequestAvailable(request, media)) {
+      if (!media || !(await isRequestAvailable(request, media))) {
         continue;
       }
 

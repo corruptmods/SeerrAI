@@ -237,13 +237,17 @@ describe('music stays out of film and series code', () => {
     assert.deepEqual(await searchableStuckTitles(), []);
   });
 
-  it('notification catch-up leaves music requests alone', async () => {
+  it('notification catch-up words music as music, asking TMDB nothing', async () => {
     await notificationReconciler.run();
     const musicIds = before.requests.map((r) => r.id);
     const deliveries = await getRepository(NotificationDelivery).find();
+    // The failed music request is told of; the completed one is not, as
+    // the album it asked for is not here.
     assert.deepEqual(
-      deliveries.filter((d) => musicIds.includes(d.requestId)),
-      []
+      deliveries
+        .filter((d) => musicIds.includes(d.requestId))
+        .map((d) => d.requestId),
+      [music.requests[MediaRequestStatus.FAILED].id]
     );
     assert.ok(deliveries.some((d) => d.requestId === seriesRequest.id));
   });

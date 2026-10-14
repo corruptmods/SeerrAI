@@ -4,8 +4,9 @@ import type { PlayLink } from '@server/entity/Media';
 import Media from '@server/entity/Media';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import { albumPlayLinks } from '@server/lib/mediaServers';
+import { lidarrOnly } from '@server/lib/music/availability';
 import type { Statuses } from '@server/models/Music';
-import { In } from 'typeorm';
+import { In, MoreThan } from 'typeorm';
 
 /*
  * What Seerr already has of the artists and albums a page shows: their
@@ -63,6 +64,45 @@ export const albumStatuses = async (ids: string[]): Promise<Statuses> => {
     }
   }
   return statuses;
+};
+
+/**
+ * Albums Lidarr has files for that no media server lists yet: shown as
+ * being added to the library. Not while Lidarr's files decide on their own
+ * (no music library switched on), when such an album is already here.
+ */
+export const albumsBeingAdded = async (ids: string[]): Promise<Set<string>> => {
+  const adding = new Set<string>();
+  if (lidarrOnly()) {
+    return adding;
+  }
+  for (const chunk of chunks(ids)) {
+    const rows = await getRepository(MusicAlbum).find({
+      select: { id: true, mbId: true },
+      where: {
+        mbId: In(chunk),
+        status: MediaStatus.PROCESSING,
+        trackFileCount: MoreThan(0),
+      },
+    });
+    for (const row of rows) {
+      if (row.mbId) adding.add(row.mbId);
+    }
+  }
+  return adding;
+};
+
+/** Marks the albums Lidarr has and no media server lists yet. */
+export const markBeingAdded = async <
+  T extends { id: string; addingToLibrary?: boolean },
+>(
+  albums: T[]
+): Promise<T[]> => {
+  const adding = await albumsBeingAdded(albums.map((album) => album.id));
+  for (const album of albums) {
+    if (adding.has(album.id)) album.addingToLibrary = true;
+  }
+  return albums;
 };
 
 /** How far along a status is, for choosing between two. */

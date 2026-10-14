@@ -1711,6 +1711,9 @@ components:
         status:
           type: number
           description: The album's status here, when Seerr has it.
+        addingToLibrary:
+          type: boolean
+          description: Lidarr has its files and no media server lists it yet.
     MusicPage:
       type: object
       properties:
@@ -2374,6 +2377,9 @@ components:
           type: number
           nullable: true
           description: Where the request lists are sent it, whether the album itself is here yet, as a title's status.
+        addingToLibrary:
+          type: boolean
+          description: Where the request lists are sent it, whether Lidarr has the album's files and no media server lists it yet.
     MediaInfo:
       type: object
       properties:
@@ -11064,6 +11070,44 @@ paths:
           description: Where the picture is
         '404':
           description: No picture of this artist
+  /music/artist/{mbid}/history:
+    get:
+      summary: An artist's history
+      description: What has happened to the artist and their albums, newest first, up to 100 events. Requires MANAGE_REQUESTS or ADMIN.
+      tags:
+        - music
+      parameters:
+        - in: path
+          name: mbid
+          required: true
+          description: The artist's MusicBrainz id.
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      responses:
+        '200':
+          description: The events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: number
+                    type:
+                      type: string
+                    is4k:
+                      type: boolean
+                    detail:
+                      type: string
+                      nullable: true
+                    occurredAt:
+                      type: string
+                    user:
+                      type: object
+                      nullable: true
   /music/album/{mbid}:
     get:
       summary: An album
@@ -13621,8 +13665,8 @@ paths:
                     type: string
   /media/{mediaId}/search-missing:
     post:
-      summary: Ask Radarr or Sonarr to search for what a title is missing
-      description: For a series, only monitored episodes that have aired without a file. Requires MANAGE_REQUESTS or ADMIN.
+      summary: Ask Radarr, Sonarr or Lidarr to search for what a title is missing
+      description: For a series, only monitored episodes that have aired without a file; for an artist, the albums asked for that Lidarr has no files for. Requires MANAGE_REQUESTS or ADMIN.
       tags:
         - media
       parameters:
@@ -13653,7 +13697,7 @@ paths:
                   searched:
                     type: number
         '409':
-          description: Not linked to Radarr or Sonarr, or nothing missing
+          description: Not linked to Radarr, Sonarr or Lidarr, or nothing missing
   /media/{mediaId}:
     delete:
       summary: Delete media item

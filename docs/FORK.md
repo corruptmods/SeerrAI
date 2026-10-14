@@ -210,6 +210,9 @@ empty one.
 | `src/utils/mediaServerAccounts.ts`, `src/utils/playLinks.ts` | people's server accounts, and which play link to offer them |
 | `server/lib/ai/` | AI: providers, limit and cache, credit, each feature's prompt |
 | `src/components/Ai/`, `src/components/AiChat/` | AI panels and the AI button |
+| `server/api/musicbrainz/`, `server/api/servarr/lidarr.ts` | MusicBrainz (its one shared queue) and Lidarr |
+| `server/lib/music/`, `server/lib/scanners/music/` | music: matching albums, availability, completing requests; the music scans |
+| `src/components/Music/` | music pages, cards, request cards and the artist's manage panel |
 
 ## Deliberate decisions
 
@@ -313,6 +316,41 @@ Do not undo these without reading why first — each was tried the other way.
   opens a window the person confirms, with every title shown and each one
   able to be left out; requests then follow the usual rules, one at a time.
   A model that gets something wrong can only mislead, never change anything.
+- **Music is kept by artist, with albums as its parts.** An artist is a
+  `Media` row (`mediaType` music, `tmdbId` 0, the MusicBrainz id in
+  `foreignId`, the name in `foreignTitle`); each album is a `MusicAlbum`,
+  as a season is a `Season`; a request is a `MediaRequest` holding
+  `AlbumRequest`s. Lidarr keeps folders, profiles and tags on the artist,
+  so one request for a whole discography is one approval and one set of
+  choices; one row per album (as SeerrNG does) made a discography a pile
+  of approvals fighting over the same artist. Requests, approvals, quotas,
+  watchers and notifications came for free. Albums are completed and
+  announced by the music scans (`lib/music/completion`), not the save
+  hooks: they change through `update()`, which the hooks never see, and an
+  artist's status says nothing about which albums one request asked for.
+  For the same reason an artist becoming available never approves a
+  pending music request. Lidarr is only ever told to monitor and search:
+  `albumsToMonitor` unmonitors everything else, so it is used only for an
+  artist being added, and an artist Lidarr has keeps its own settings.
+- **Film and series code only ever sees films and series.** Everything that
+  goes through titles in bulk (availability sync, Health, catch-up,
+  watch history, Recently Added, the AI) is scoped with `VIDEO_MEDIA_TYPES`,
+  and `server/lib/musicScope.test.ts` fails if a music row reaches any of
+  it. Music's `tmdbId` of 0 never goes into a table keyed by `tmdbId`
+  (Blocklist, MediaDeletion, Watchlist, list items): an artist's history
+  is kept by `foreignId`, and clearing an artist records no deletion.
+- **Permissions are a bigint.** Auto-Approve Music is 2^31, past what an
+  integer column holds and past JavaScript's 32-bit `&`. `user.permissions`
+  is a bigint read back as a number, and `hasPermission` uses arithmetic,
+  not bitwise operators. Bit 0 and 2^29 were the only free ones below.
+- **One MusicBrainz line for the whole server.** MusicBrainz allows one
+  request a second from an address, and limits per instance of the client
+  (upstream's way) let several run at once. Every request goes through one
+  queue, people on a page ahead of scans; someone who would wait too long
+  is told it is busy instead. Answers are kept in the database too, so a
+  restart asks nothing again. Health judges MusicBrainz from how that
+  queue has fared rather than spending a request on a check. A mirror
+  (Settings → Metadata → Music) is not limited.
 - **Admins can remove someone's passkeys, not add or rename them.** For a
   lost device. The owner's and other admins' passkeys are the owner's to
   manage, as with passwords.

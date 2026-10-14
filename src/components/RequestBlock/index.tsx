@@ -19,7 +19,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/solid';
 import type { VideoMediaType } from '@server/constants/media';
-import { MediaRequestStatus } from '@server/constants/media';
+import { MediaRequestStatus, MediaType } from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import axios from 'axios';
 import Link from 'next/link';
@@ -29,6 +29,7 @@ import { mutate } from 'swr';
 
 const messages = defineMessages('components.RequestBlock', {
   seasons: '{seasonCount, plural, one {Season} other {Seasons}}',
+  albums: '{albumCount, plural, one {Album} other {Albums}}',
   requestoverrides: 'Request Overrides',
   server: 'Destination Server',
   profilechanged: 'Quality Profile',
@@ -82,21 +83,34 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
 
   return (
     <div className="block">
-      <RequestModal
-        show={showEditModal}
-        tmdbId={request.media.tmdbId}
-        // The requests listed here are for films and series.
-        type={request.type as VideoMediaType}
-        is4k={request.is4k}
-        editRequest={request}
-        onCancel={() => setShowEditModal(false)}
-        onComplete={() => {
-          if (onUpdate) {
-            onUpdate();
-          }
-          setShowEditModal(false);
-        }}
-      />
+      {request.type === MediaType.MUSIC ? (
+        <RequestModal
+          show={showEditModal}
+          type="music"
+          artistMbid={request.media.foreignId ?? ''}
+          editRequest={request}
+          onCancel={() => setShowEditModal(false)}
+          onComplete={() => {
+            onUpdate?.();
+            setShowEditModal(false);
+          }}
+        />
+      ) : (
+        <RequestModal
+          show={showEditModal}
+          tmdbId={request.media.tmdbId}
+          type={request.type as VideoMediaType}
+          is4k={request.is4k}
+          editRequest={request}
+          onCancel={() => setShowEditModal(false)}
+          onComplete={() => {
+            if (onUpdate) {
+              onUpdate();
+            }
+            setShowEditModal(false);
+          }}
+        />
+      )}
       <DeclineRequestModal
         show={showDeclineModal}
         requests={[request]}
@@ -302,6 +316,27 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
                   </Badge>
                 </span>
               ))}
+            </div>
+          </div>
+        )}
+        {(request.albums ?? []).length > 0 && (
+          <div className="mt-2 flex flex-col text-sm">
+            <div className="mb-1 font-medium">
+              {intl.formatMessage(messages.albums, {
+                albumCount: request.albums.length,
+              })}
+            </div>
+            <div>
+              {[...request.albums]
+                .sort((a, b) => a.id - b.id)
+                .map((album) => (
+                  <span
+                    key={`album-${album.id}`}
+                    className="mb-1 mr-2 inline-block"
+                  >
+                    <Badge>{album.title}</Badge>
+                  </span>
+                ))}
             </div>
           </div>
         )}

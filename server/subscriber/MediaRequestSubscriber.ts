@@ -19,6 +19,7 @@ import SeasonRequest from '@server/entity/SeasonRequest';
 import type { User } from '@server/entity/User';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
 import { lidarrApi } from '@server/lib/music/access';
+import { notifyAvailableMusic } from '@server/lib/music/completion';
 import {
   claimDelivery,
   notifyRequestWatchers,
@@ -56,6 +57,21 @@ const sanitizeDisplayName = (displayName: string): string => {
     .replace(/[^a-z0-9-]/gi, '')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
+};
+
+/**
+ * Which albums a music request asked for, as its history says it: the
+ * album's title, or how many and the first few.
+ */
+const albumScope = (titles: string[]): string | undefined => {
+  if (!titles.length) {
+    return undefined;
+  }
+  if (titles.length === 1) {
+    return titles[0];
+  }
+  const shown = titles.slice(0, 3).join(', ');
+  return `${titles.length} albums: ${shown}${titles.length > 3 ? '…' : ''}`;
 };
 
 /**
@@ -1793,7 +1809,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
   ): Promise<void> {
     let media = request.media;
 
-    if (!media?.tmdbId && request.id) {
+    if (!media?.tmdbId && !media?.foreignId && request.id) {
       media = (
         await manager.findOne(MediaRequest, {
           where: { id: request.id },
@@ -1802,12 +1818,14 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       )?.media as Media;
     }
 
-    if (!media?.tmdbId) {
+    // Films and series by their TMDB id; music by the artist's own.
+    if (!media?.tmdbId && !media?.foreignId) {
       return;
     }
 
     const base = {
       tmdbId: media.tmdbId,
+      foreignId: media.foreignId,
       mediaType: media.mediaType,
       is4k: !!request.is4k,
     };
@@ -1816,8 +1834,10 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       const seasons = [...(request.seasons ?? [])].sort(
         (a, b) => a.seasonNumber - b.seasonNumber
       );
-      const scope =
-        seasons.length === 1 && seasons[0].episodes?.length
+      const albums = [...(request.albums ?? [])].sort((a, b) => a.id - b.id);
+      const scope = albums.length
+        ? albumScope(albums.map((album) => album.title))
+        : seasons.length === 1 && seasons[0].episodes?.length
           ? `Season ${seasons[0].seasonNumber}, ${
               seasons[0].episodes.length === 1 ? 'episode' : 'episodes'
             } ${seasons[0].episodes
@@ -1925,12 +1945,17 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         });
       }
 
+      // A plain update() of the status arrives without the request's
+      // media: whatever made it says so itself (music's completion does).
       if (event.entity.status === MediaRequestStatus.COMPLETED) {
-        if (event.entity.media.mediaType === MediaType.MOVIE) {
+        if (event.entity.media?.mediaType === MediaType.MOVIE) {
           await this.notifyAvailableMovie(event.entity as MediaRequest, event);
         }
-        if (event.entity.media.mediaType === MediaType.TV) {
+        if (event.entity.media?.mediaType === MediaType.TV) {
           await this.notifyAvailableSeries(event.entity as MediaRequest, event);
+        }
+        if (event.entity.media?.mediaType === MediaType.MUSIC) {
+          await notifyAvailableMusic(event.entity as MediaRequest);
         }
       }
     } catch (e) {

@@ -1,4 +1,5 @@
 import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
+import type { DownloadingItem } from '@server/lib/downloadtracker';
 import type { MusicAlbumResult } from '@server/models/Music';
 
 /*
@@ -149,4 +150,18 @@ export const musicRequestStatus = (request: {
   return request.status === MediaRequestStatus.COMPLETED
     ? MediaStatus.AVAILABLE
     : MediaStatus.PROCESSING;
+};
+
+/**
+ * Of an artist's downloads, those for these albums (by their MusicBrainz
+ * ids): an album's page, card or request shows its own.
+ */
+export const albumDownloads = (
+  downloads: DownloadingItem[] | undefined,
+  albumMbids: string | string[]
+): DownloadingItem[] => {
+  const wanted = new Set(Array.isArray(albumMbids) ? albumMbids : [albumMbids]);
+  return (downloads ?? []).filter(
+    (item) => !!item.album && wanted.has(item.album.foreignAlbumId)
+  );
 };

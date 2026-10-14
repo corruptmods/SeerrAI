@@ -28,6 +28,7 @@ const messages = defineMessages('components.StatusBadge', {
   playonplex: 'Play on {mediaServerName}',
   openinarr: 'Open in {arr}',
   managemedia: 'Manage {mediaType}',
+  manageartist: 'Manage Artist',
   seasonnumber: 'S{seasonNumber}',
   seasonepisodenumber: 'S{seasonNumber}E{episodeNumber}',
   episoderange: 'S{seasonNumber}E{first}–E{last}',
@@ -62,7 +63,9 @@ interface StatusBadgeProps {
   playLink?: PlayTarget;
   serviceUrl?: string;
   tmdbId?: number;
-  mediaType?: 'movie' | 'tv';
+  mediaType?: 'movie' | 'tv' | 'music';
+  /** Music: the artist's MusicBrainz id, whose page manages it. */
+  artistId?: string;
   title?: string | string[];
   statusLabelOverride?: string;
 }
@@ -76,6 +79,7 @@ const StatusBadge = ({
   serviceUrl,
   tmdbId,
   mediaType,
+  artistId,
   title,
   statusLabelOverride,
 }: StatusBadgeProps) => {
@@ -137,6 +141,7 @@ const StatusBadge = ({
 
   if (
     mediaType &&
+    mediaType !== 'music' &&
     playLink &&
     hasPermission(
       is4k
@@ -166,7 +171,10 @@ const StatusBadge = ({
       mediaServerName: playLink.name,
     });
   } else if (hasPermission(Permission.MANAGE_REQUESTS)) {
-    if (mediaType && tmdbId) {
+    if (mediaType === 'music' && artistId) {
+      mediaLink = `/music/artist/${artistId}?manage=1`;
+      mediaLinkDescription = intl.formatMessage(messages.manageartist);
+    } else if (mediaType && mediaType !== 'music' && tmdbId) {
       mediaLink = `/${mediaType}/${tmdbId}?manage=1`;
       mediaLinkDescription = intl.formatMessage(messages.managemedia, {
         mediaType: intl.formatMessage(
@@ -176,7 +184,12 @@ const StatusBadge = ({
     } else if (hasPermission(Permission.ADMIN) && serviceUrl) {
       mediaLink = serviceUrl;
       mediaLinkDescription = intl.formatMessage(messages.openinarr, {
-        arr: mediaType === 'movie' ? 'Radarr' : 'Sonarr',
+        arr:
+          mediaType === 'movie'
+            ? 'Radarr'
+            : mediaType === 'music'
+              ? 'Lidarr'
+              : 'Sonarr',
       });
     }
   }

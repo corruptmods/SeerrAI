@@ -174,6 +174,79 @@ describe('the MusicBrainz queue', () => {
   });
 });
 
+describe('how the MusicBrainz queue has fared, for Health', () => {
+  it('counts 503s, failures and people turned away, and failures in a row', async () => {
+    const clock = fakeClock();
+    const queue = new RequestQueue({
+      spacingMs: () => MB_SPACING_MS,
+      maxWaitMs: 60_000,
+      ...clock,
+    });
+    const overLimit = () => ({ response: { status: 503, headers: {} } });
+
+    // Over the limit twice: tried again, then given up.
+    await assert.rejects(
+      queue.add('down', 'interactive', async () => {
+        throw overLimit();
+      })
+    );
+    await assert.rejects(
+      queue.add('timeout', 'background', async () => {
+        throw new Error('timeout of 15000ms exceeded');
+      })
+    );
+    // No such thing is an answer, not a failure.
+    await assert.rejects(
+      queue.add('missing', 'interactive', async () => {
+        throw { response: { status: 404 } };
+      })
+    );
+    let health = queue.health();
+    assert.equal(health.rateLimited, 2);
+    assert.equal(health.failed, 2);
+    assert.equal(health.failingInARow, 0);
+    assert.equal(health.lastError, 'timeout of 15000ms exceeded');
+
+    await assert.rejects(
+      queue.add('again', 'interactive', async () => {
+        throw new Error('getaddrinfo ENOTFOUND');
+      })
+    );
+    assert.equal(queue.health().failingInARow, 1);
+    await queue.add('fine', 'interactive', async () => 'ok');
+    health = queue.health();
+    assert.equal(health.failingInARow, 0);
+    assert.equal(health.lastSuccessAt, clock.now());
+
+    // An hour on, it is all forgotten.
+    await clock.sleep(60 * 60 * 1000);
+    health = queue.health();
+    assert.deepEqual(
+      [health.rateLimited, health.failed, health.busy],
+      [0, 0, 0]
+    );
+  });
+
+  it('counts people told it was busy', async () => {
+    const clock = fakeClock();
+    const queue = new RequestQueue({
+      spacingMs: () => MB_SPACING_MS,
+      maxWaitMs: 8000,
+      now: clock.now,
+      sleep: () => new Promise(() => undefined),
+    });
+    const never = () => new Promise<void>(() => undefined);
+    for (let i = 0; i < 8; i++) {
+      void queue.add(`page-${i}`, 'interactive', never);
+    }
+    await settle();
+    await assert.rejects(queue.add('one-more', 'interactive', never));
+    await assert.rejects(queue.add('two-more', 'interactive', never));
+    assert.equal(queue.health().busy, 2);
+    assert.equal(queue.health().waiting, 8);
+  });
+});
+
 describe('the MusicBrainz client', () => {
   setupTestDb();
 

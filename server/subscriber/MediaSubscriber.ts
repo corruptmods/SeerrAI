@@ -47,6 +47,11 @@ export class MediaSubscriber implements EntitySubscriberInterface<Media> {
     databaseEvent: Media,
     is4k: boolean
   ) {
+    // Music requests are completed album by album, by the music scans
+    // (lib/music/completion), not from the artist's own status.
+    if (event.mediaType === MediaType.MUSIC) {
+      return;
+    }
     const requestRepository = manager.getRepository(MediaRequest);
     const seasonRequestRepository = manager.getRepository(SeasonRequest);
 
@@ -140,8 +145,16 @@ export class MediaSubscriber implements EntitySubscriberInterface<Media> {
       return;
     }
 
+    // An artist is available once every album wanted is, which says
+    // nothing about the albums a pending request asks for: those wait for
+    // someone to approve them, as they would have.
+    const isMusic =
+      (event.entity.mediaType ?? event.databaseEntity.mediaType) ===
+      MediaType.MUSIC;
+
     try {
       if (
+        !isMusic &&
         event.entity.status === MediaStatus.AVAILABLE &&
         event.databaseEntity?.status === MediaStatus.PENDING
       ) {
@@ -167,6 +180,7 @@ export class MediaSubscriber implements EntitySubscriberInterface<Media> {
 
     try {
       if (
+        !isMusic &&
         event.entity.status4k === MediaStatus.AVAILABLE &&
         event.databaseEntity?.status4k === MediaStatus.PENDING
       ) {
@@ -224,10 +238,15 @@ export class MediaSubscriber implements EntitySubscriberInterface<Media> {
       const tmdbId =
         (event.entity as Media).tmdbId ??
         (event.databaseEntity as Media).tmdbId;
-      if (type && tmdbId) {
+      // Music is kept by the artist's MusicBrainz id (its tmdbId is 0).
+      const foreignId =
+        (event.entity as Media).foreignId ??
+        (event.databaseEntity as Media).foreignId;
+      if (type && (tmdbId || foreignId)) {
         await recordMediaEvent(
           {
             tmdbId,
+            foreignId,
             mediaType:
               (event.entity as Media).mediaType ??
               (event.databaseEntity as Media).mediaType,

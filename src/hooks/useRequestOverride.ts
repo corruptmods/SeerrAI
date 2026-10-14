@@ -12,15 +12,17 @@ interface OverrideStatus {
   languageProfile?: string;
 }
 
+/** Where a request of this kind goes: Radarr, Sonarr or Lidarr. */
+const serviceOf = (type: MediaRequest['type']) =>
+  type === 'movie' ? 'radarr' : type === 'music' ? 'lidarr' : 'sonarr';
+
 const useRequestOverride = (request: MediaRequest): OverrideStatus => {
   const { data: allServers } = useSWR<ServiceCommonServer[]>(
-    `/api/v1/service/${request.type === 'movie' ? 'radarr' : 'sonarr'}`
+    `/api/v1/service/${serviceOf(request.type)}`
   );
 
   const { data } = useSWR<ServiceCommonServerWithDetails>(
-    `/api/v1/service/${request.type === 'movie' ? 'radarr' : 'sonarr'}/${
-      request.serverId
-    }`
+    `/api/v1/service/${serviceOf(request.type)}/${request.serverId}`
   );
 
   if (!data || !allServers) {

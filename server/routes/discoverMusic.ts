@@ -171,7 +171,7 @@ discoverMusicRoutes.get('/recently-added', async (req, res) => {
       releaseDate: true,
       status: true,
       mediaAddedAt: true,
-      media: { id: true, foreignId: true },
+      media: { id: true, foreignId: true, foreignTitle: true },
     },
     where: { status: MediaStatus.AVAILABLE, mbId: Not(IsNull()) },
     order: {
@@ -193,6 +193,8 @@ discoverMusicRoutes.get('/recently-added', async (req, res) => {
       secondaryTypes: album.secondaryTypes ?? [],
       releaseDate: album.releaseDate ?? undefined,
       artistId: album.media?.foreignId ?? undefined,
+      // The name the music scans keep, so the row asks MusicBrainz nothing.
+      artistName: album.media?.foreignTitle ?? undefined,
       coverUrl: albumCoverUrl(album.mbId as string),
       status: album.status,
     })),

@@ -58,6 +58,11 @@ export interface MusicAlbumResult {
   coverUrl: string;
   /** The album's status here, when Seerr has it. */
   status?: MediaStatus;
+  /**
+   * Lidarr has its files and no media server lists it yet: it is being
+   * added to the library.
+   */
+  addingToLibrary?: boolean;
 }
 
 export interface MusicLink {

@@ -6,6 +6,7 @@ import MusicImage from '@app/components/Music/MusicImage';
 import MusicStatusBadge from '@app/components/Music/MusicStatusBadge';
 import MusicUnavailable from '@app/components/Music/MusicUnavailable';
 import {
+  albumDownloads,
   requestable,
   trackLength,
   yearOf,
@@ -190,7 +191,17 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
         </div>
         <div className="media-title">
           <div className="media-status">
-            <MusicStatusBadge status={data.status} />
+            <MusicStatusBadge
+              status={data.status}
+              downloads={albumDownloads(
+                data.mediaInfo?.downloadStatus,
+                data.id
+              )}
+              addingToLibrary={data.addingToLibrary}
+              artistId={data.artistId}
+              title={data.artistName}
+              serviceUrl={data.mediaInfo?.serviceUrl}
+            />
           </div>
           <h1 data-testid="media-title">
             {data.title} {year && <span className="media-year">({year})</span>}

@@ -220,6 +220,11 @@ export class LidarrIndex {
     return key ? unique(this.byName.get(key)) : undefined;
   }
 
+  /** The artist's name as Lidarr has it (MusicBrainz's own). */
+  public artistName(mbid: string): string | undefined {
+    return this.artists.get(mbid)?.[0]?.name || undefined;
+  }
+
   public album(mbid?: string | null): IndexAlbum | undefined {
     return mbid ? this.albums.get(mbid) : undefined;
   }

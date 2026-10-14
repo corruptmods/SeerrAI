@@ -519,6 +519,19 @@ class Media {
       }
     }
 
+    // An artist: everything of theirs Lidarr is downloading, each item
+    // naming its album.
+    if (
+      this.mediaType === MediaType.MUSIC &&
+      this.externalServiceId != null &&
+      this.serviceId != null
+    ) {
+      this.downloadStatus = downloadTracker.getMusicProgress(
+        this.serviceId,
+        this.externalServiceId
+      );
+    }
+
     if (this.downloadStatus?.length || this.downloadStatus4k?.length) {
       downloadTracker.keepFresh();
     }

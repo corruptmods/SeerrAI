@@ -5,6 +5,7 @@ import {
 } from '@server/api/downloadclients';
 import JellyfinAPI from '@server/api/jellyfin';
 import MaintainerrAPI from '@server/api/maintainerr';
+import { musicBrainzQueue } from '@server/api/musicbrainz';
 import PlexAPI from '@server/api/plexapi';
 import ProwlarrAPI from '@server/api/prowlarr';
 import type LidarrAPI from '@server/api/servarr/lidarr';
@@ -19,10 +20,12 @@ import {
   VIDEO_MEDIA_TYPES,
 } from '@server/constants/media';
 import dataSource, { getRepository } from '@server/datasource';
+import AlbumRequest from '@server/entity/AlbumRequest';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
+import MusicAlbum from '@server/entity/MusicAlbum';
 import { User } from '@server/entity/User';
 import { listModels } from '@server/lib/ai/providers';
 import { getCollectionGaps } from '@server/lib/collectionGaps';
@@ -34,7 +37,8 @@ import {
   isJellyfinFamily,
   jellyfinFamily,
 } from '@server/lib/mediaServers';
-import { lidarrApi } from '@server/lib/music/access';
+import { lidarrApi, musicReady } from '@server/lib/music/access';
+import { lidarrOnly } from '@server/lib/music/availability';
 import type { PlexMatchProblem } from '@server/lib/plexMatchCheck';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import type { DownloadClientSettings } from '@server/lib/settings';
@@ -591,6 +595,76 @@ export const mediaServerCheck = async (
   }
 };
 
+/** People told MusicBrainz was busy, in an hour, before it is worth a look. */
+const MB_BUSY_WARNING = 5;
+/** Failures in a row before MusicBrainz counts as not answering. */
+const MB_DOWN_AFTER = 3;
+
+/**
+ * MusicBrainz, judged by how its shared line has fared over the last hour
+ * rather than by a call of its own: it allows one request a second, and a
+ * check would spend one. Over its limit, failing, or turning people away
+ * as busy are each worth a look; failing every time is a problem.
+ */
+const musicBrainzCheck = (): HealthCheck => {
+  const health = musicBrainzQueue.health();
+  const base = { id: 'musicbrainz', group: 'services' as const };
+  const name = 'MusicBrainz';
+
+  if (health.failingInARow >= MB_DOWN_AFTER) {
+    return {
+      ...base,
+      name,
+      status: 'error',
+      count: 1,
+      detail: `The last ${health.failingInARow} requests failed${
+        health.lastError ? `: ${health.lastError}` : ''
+      }`,
+      items: [],
+    };
+  }
+
+  const items: HealthItem[] = [];
+  if (health.rateLimited > 0) {
+    items.push({
+      title: `Over its limit ${health.rateLimited} ${
+        health.rateLimited === 1 ? 'time' : 'times'
+      } in the last hour`,
+      detail:
+        'MusicBrainz allows one request a second from each address. A MusicBrainz mirror (Settings → Metadata → Music) has no limit.',
+    });
+  }
+  if (health.failed > 0) {
+    items.push({
+      title: `${health.failed} ${
+        health.failed === 1 ? 'request' : 'requests'
+      } failed in the last hour`,
+      detail: health.lastError,
+    });
+  }
+  if (health.busy >= MB_BUSY_WARNING) {
+    items.push({
+      title: `People were told it was busy ${health.busy} times in the last hour`,
+      detail:
+        'Pages ask again rather than wait; scans of a large library fill the line for a while.',
+    });
+  }
+
+  return {
+    ...base,
+    name,
+    reachable: true,
+    status: items.length ? 'warning' : 'ok',
+    count: items.length,
+    detail: health.waiting
+      ? `${health.waiting} waiting in line`
+      : health.lastSuccessAt
+        ? `Answering · last ${ago(new Date(health.lastSuccessAt))}`
+        : 'Nothing asked yet',
+    items,
+  };
+};
+
 export const serviceChecks = async (): Promise<HealthCheck[]> => {
   const settings = getSettings();
   const pending: Promise<HealthCheck>[] = [];
@@ -657,6 +731,9 @@ export const serviceChecks = async (): Promise<HealthCheck[]> => {
       pending.push(
         arrCheck(`lidarr:${lidarr.id}`, lidarr.name, lidarrApi(lidarr))
       );
+    }
+    if (musicReady()) {
+      pending.push(Promise.resolve(musicBrainzCheck()));
     }
   }
 
@@ -1066,12 +1143,182 @@ const stuckProcessing = async (
   };
 };
 
+/*
+ * Music, judged apart from films and series (stuckProcessing is theirs):
+ * an album is on its way from being approved, and is stuck in one of two
+ * ways. Lidarr has its files but no media server lists it a day later
+ * (the music library is off, or not scanned, or the album is filed where
+ * the server does not look). Or Lidarr has found no release for it a week
+ * after it was approved, which a search may fix.
+ */
+
+/** "Hail to the Thief — Radiohead", or the album alone. */
+const albumTitle = (title: string, artist?: string | null) =>
+  artist ? `${title} — ${artist}` : title;
+
+const musicNotOnServer = async (page: Page): Promise<HealthCheck> => {
+  if (lidarrOnly()) {
+    // Lidarr's files decide on their own: such an album is already here.
+    return {
+      id: 'musicNotOnServer',
+      group: 'media',
+      status: 'ok',
+      count: 0,
+      items: [],
+    };
+  }
+  const [rows, count] = await getRepository(MusicAlbum)
+    .createQueryBuilder('album')
+    .innerJoinAndSelect('album.media', 'media')
+    .where('album.status = :processing', {
+      processing: MediaStatus.PROCESSING,
+    })
+    .andWhere('album.trackFileCount > 0')
+    .andWhere('album.updatedAt < :dayAgo', {
+      dayAgo: new Date(Date.now() - DAY_MS),
+    })
+    .orderBy('album.updatedAt', 'ASC')
+    .skip(page.skip)
+    .take(page.take)
+    .getManyAndCount();
+
+  return {
+    id: 'musicNotOnServer',
+    group: 'media',
+    status: count > 0 ? 'warning' : 'ok',
+    count,
+    items: rows.map((row) => ({
+      title: albumTitle(row.title, row.media?.foreignTitle),
+      detail: [
+        `${row.trackFileCount} of ${row.trackCount ?? '?'} tracks in Lidarr`,
+        `last changed ${ago(row.updatedAt)}`,
+        'Is a music library switched on for it, and scanned?',
+      ].join(' · '),
+      href: row.mbId ? `/music/album/${row.mbId}` : undefined,
+    })),
+  };
+};
+
+interface WaitingAlbum {
+  mediaId: number | string;
+  foreignId: string;
+  artist: string | null;
+  linked: number | string | boolean | null;
+  title: string;
+  lidarrAlbumId: number | string | null;
+  releaseDate: string | null;
+  requestId: number | string;
+}
+
+const musicNoRelease = async (page: Page): Promise<HealthCheck> => {
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = await getRepository(AlbumRequest)
+    .createQueryBuilder('wanted')
+    .innerJoin('wanted.request', 'request')
+    .innerJoin('request.media', 'media')
+    .innerJoin(
+      MusicAlbum,
+      'row',
+      'row.mediaId = media.id AND row.mbId = wanted.albumMbid'
+    )
+    .select('media.id', 'mediaId')
+    .addSelect('media.foreignId', 'foreignId')
+    .addSelect('media.foreignTitle', 'artist')
+    .addSelect('media.externalServiceId', 'linked')
+    .addSelect('row.title', 'title')
+    .addSelect('row.lidarrAlbumId', 'lidarrAlbumId')
+    .addSelect('row.releaseDate', 'releaseDate')
+    .addSelect('request.id', 'requestId')
+    .where('request.type = :music', { music: MediaType.MUSIC })
+    .andWhere('request.status = :approved', {
+      approved: MediaRequestStatus.APPROVED,
+    })
+    .andWhere('wanted.status = :approved', {
+      approved: MediaRequestStatus.APPROVED,
+    })
+    .andWhere('request.updatedAt < :weekAgo', {
+      weekAgo: new Date(Date.now() - 7 * DAY_MS),
+    })
+    .andWhere('row.status = :processing', {
+      processing: MediaStatus.PROCESSING,
+    })
+    .andWhere('(row.trackFileCount IS NULL OR row.trackFileCount = 0)')
+    .orderBy('request.updatedAt', 'ASC')
+    .getRawMany<WaitingAlbum>();
+
+  // An album not out yet has nothing to find. MusicBrainz's dates can be
+  // just a year, or a year and month: those count from their start.
+  const due = rows.filter(
+    (row) => !row.releaseDate || row.releaseDate.slice(0, 10) <= today
+  );
+
+  // When each was approved, read through the entity: a raw date from
+  // SQLite would be taken for local time.
+  const approvedAt = new Map(
+    (
+      await getRepository(MediaRequest).find({
+        select: { id: true, updatedAt: true },
+        where: {
+          id: In([...new Set(due.map((row) => Number(row.requestId)))]),
+        },
+      })
+    ).map((request) => [request.id, request.updatedAt])
+  );
+
+  const byArtist = new Map<number, WaitingAlbum[]>();
+  for (const row of due) {
+    const id = Number(row.mediaId);
+    byArtist.set(id, [...(byArtist.get(id) ?? []), row]);
+  }
+  const artists = [...byArtist.entries()];
+
+  return {
+    id: 'musicNoRelease',
+    group: 'media',
+    status: artists.length > 0 ? 'warning' : 'ok',
+    count: artists.length,
+    items: artists
+      .slice(page.skip, page.skip + page.take)
+      .map(([mediaId, albums]) => {
+        const titles = [...new Set(albums.map((a) => a.title))];
+        const first = albums[0];
+        return {
+          title:
+            titles.length === 1
+              ? albumTitle(titles[0], first.artist)
+              : `${first.artist ?? 'An artist'} — ${titles.length} albums`,
+          detail: [
+            titles.length > 1 ? titles.join(', ') : undefined,
+            `approved ${ago(
+              approvedAt.get(Number(first.requestId)) ?? new Date()
+            )}`,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+          href: `/music/artist/${first.foreignId}`,
+          searchable:
+            first.linked != null &&
+            albums.some((album) => album.lidarrAlbumId != null)
+              ? { mediaId, is4k: false, mediaType: MediaType.MUSIC }
+              : undefined,
+        };
+      }),
+  };
+};
+
+/** The music checks, while music is set up and on for everyone. */
+const musicChecks = (page: Page): Promise<HealthCheck>[] =>
+  featureEnabled('music') && musicReady()
+    ? [musicNotOnServer(page), musicNoRelease(page)]
+    : [];
+
 const mediaChecks = async (page: Page = FIRST_PAGE): Promise<HealthCheck[]> => {
   const media = getRepository(Media);
   const weekAgo = new Date(Date.now() - 7 * DAY_MS);
 
   return Promise.all([
     stuckProcessing(weekAgo, page),
+    ...musicChecks(page),
     // Sonarr needs a TVDB id; without one a series request cannot be sent.
     media
       .findAndCount({
@@ -1420,6 +1667,8 @@ export const runHealthCheck = async (
     awaitingApproval: requestChecks,
     unlinkedRequests: requestChecks,
     stuckProcessing: mediaChecks,
+    musicNotOnServer: mediaChecks,
+    musicNoRelease: mediaChecks,
     missingTvdb: mediaChecks,
     collectionGaps: mediaChecks,
     plexMatches: mediaChecks,
@@ -1440,6 +1689,11 @@ export const runHealthCheck = async (
 
   if (id === 'stuckProcessing') {
     return stuckProcessing(new Date(Date.now() - WEEK_MS), page);
+  }
+  if (id === 'musicNotOnServer' || id === 'musicNoRelease') {
+    return featureEnabled('music') && musicReady()
+      ? (id === 'musicNotOnServer' ? musicNotOnServer : musicNoRelease)(page)
+      : undefined;
   }
 
   return (await group(page)).find((check) => check.id === id);

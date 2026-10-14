@@ -10,6 +10,7 @@
 - **Backfill**: titles it couldn't search, packs waiting for approval, downloads that failed this week.
 - **Requests**: failed, approved but never sent, waiting on approval for over a week, and requests no longer linked to a title (with a button to remove them).
 - **Titles**: processing for over a week (with **Search now** for each and **Search all**), series requests with no TVDB id, folders Plex matched to the wrong title, collections partly in the library.
+- **Music** (once a Lidarr is added): Lidarr checked like Radarr and Sonarr; albums Lidarr has that no media server lists after a day; requested albums with no release found a week after approval (with **Search now** for each); and whether MusicBrainz has been answering, from how its requests have fared over the last hour rather than a call of its own. See [Music](./music.md#for-admins).
 - **Users**: expired Plex sign-ins.
 - **Resources**: Seerr AI's own CPU and memory over the last hour or day.
 

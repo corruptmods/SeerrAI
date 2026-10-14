@@ -1,5 +1,6 @@
 import DelugeAPI from '@server/api/downloadclients/deluge';
 import NzbgetAPI from '@server/api/downloadclients/nzbget';
+import { musicBrainzQueue } from '@server/api/musicbrainz';
 import TheMovieDb from '@server/api/themoviedb';
 import {
   MediaRequestStatus,
@@ -8,11 +9,13 @@ import {
 } from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
 import dataSource, { getRepository } from '@server/datasource';
+import AlbumRequest from '@server/entity/AlbumRequest';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
 import Media from '@server/entity/Media';
 import MediaEvent from '@server/entity/MediaEvent';
 import { MediaRequest } from '@server/entity/MediaRequest';
+import MusicAlbum from '@server/entity/MusicAlbum';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
@@ -68,8 +71,12 @@ Object.defineProperty(TheMovieDb.prototype, 'getTvShow', {
 let radarrMovies: unknown[] = [];
 let sonarrSeries: unknown[] = [];
 let sonarrEpisodes: unknown[] = [];
-let commands: { name: string; episodeIds?: number[]; movieIds?: number[] }[] =
-  [];
+let commands: {
+  name: string;
+  episodeIds?: number[];
+  movieIds?: number[];
+  albumIds?: number[];
+}[] = [];
 // What the fake Radarr says on its health page, and its disks.
 let arrHealth: unknown[] | null = [];
 let rootFolders: unknown[] = [];
@@ -81,7 +88,10 @@ let bazarrHealth: unknown[] = [];
 let bazarrProviders: unknown[] = [];
 const fake = http.createServer((req, res) => {
   const url = req.url ?? '';
-  if (req.method === 'POST' && url.startsWith('/api/v3/command')) {
+  if (
+    req.method === 'POST' &&
+    (url.startsWith('/api/v3/command') || url.startsWith('/api/v1/command'))
+  ) {
     let raw = '';
     req.on('data', (c) => (raw += c));
     req.on('end', () => {
@@ -1518,5 +1528,291 @@ describe('requests, titles and users', () => {
         'plexSignIn:ok',
       ]
     );
+  });
+});
+
+describe('music', () => {
+  const ARTIST = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
+  const album = (n: number) =>
+    `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
+  beforeEach(async () => {
+    commands = [];
+    const settings = getSettings();
+    settings.main.disabledFeatures = [];
+    // A default Lidarr: music is ready.
+    settings.lidarr = [
+      {
+        ...radarr(0, 'Lidarr', fakePort),
+        isDefault: true,
+        activeMetadataProfileId: 1,
+        activeMetadataProfileName: 'Standard',
+      } as unknown as LidarrSettings,
+    ];
+    // Plex connected with a music library on, so a media server decides
+    // whether an album is here.
+    settings.main.mediaServerType = MediaServerType.PLEX;
+    settings.plex = {
+      ...settings.plex,
+      connected: true,
+      musicLibraries: [
+        { id: '7', name: 'Music', enabled: true, type: 'artist' },
+      ],
+    };
+    actingAs = await getRepository(User).findOneByOrFail({ id: 1 });
+  });
+
+  const resetSettings = () => {
+    const settings = getSettings();
+    settings.lidarr = [];
+    settings.main.disabledFeatures = [];
+    settings.plex = { ...settings.plex, musicLibraries: [] };
+  };
+
+  /** Radiohead, their albums, and a request for some of them. */
+  const seed = async (
+    albums: Partial<MusicAlbum>[],
+    {
+      approvedAgo = 8 * DAY,
+      changedAgo = 2 * DAY,
+    }: { approvedAgo?: number; changedAgo?: number } = {}
+  ) => {
+    const media = await dataSource.manager.save(
+      new Media({
+        mediaType: MediaType.MUSIC,
+        tmdbId: 0,
+        foreignId: ARTIST,
+        foreignTitle: 'Radiohead',
+        status: MediaStatus.PROCESSING,
+        serviceId: 0,
+        externalServiceId: 7,
+        externalServiceSlug: ARTIST,
+      }),
+      { listeners: false }
+    );
+    for (const row of albums) {
+      await getRepository(MusicAlbum).insert(
+        new MusicAlbum({
+          mediaId: media.id,
+          secondaryTypes: [],
+          status: MediaStatus.PROCESSING,
+          ...row,
+        })
+      );
+    }
+    await getRepository(MusicAlbum)
+      .createQueryBuilder()
+      .update()
+      .set({ updatedAt: new Date(Date.now() - changedAgo) })
+      .execute();
+    const request = await dataSource.manager.save(
+      new MediaRequest({
+        type: MediaType.MUSIC,
+        status: MediaRequestStatus.APPROVED,
+        media,
+        requestedBy: await getRepository(User).findOneByOrFail({ id: 2 }),
+        is4k: false,
+        albums: albums.map(
+          (row) =>
+            new AlbumRequest({
+              albumMbid: row.mbId as string,
+              title: row.title as string,
+              status: MediaRequestStatus.APPROVED,
+            })
+        ),
+      }),
+      { listeners: false }
+    );
+    await getRepository(MediaRequest)
+      .createQueryBuilder()
+      .update()
+      .set({ updatedAt: new Date(Date.now() - approvedAgo) })
+      .where('id = :id', { id: request.id })
+      .callListeners(false)
+      .execute();
+    return media;
+  };
+
+  it('flags albums Lidarr has that no media server lists after a day', async () => {
+    try {
+      await seed([
+        {
+          mbId: album(1),
+          title: 'Hail to the Thief',
+          trackCount: 14,
+          trackFileCount: 14,
+        },
+        // Lidarr has nothing of it yet: not this check's.
+        { mbId: album(2), title: 'Kid A', trackFileCount: 0 },
+      ]);
+      // In Lidarr only an hour: the media server may not have scanned yet.
+      const fresh = await getRepository(MusicAlbum).save(
+        new MusicAlbum({
+          mediaId: (
+            await getRepository(Media).findOneByOrFail({
+              foreignId: ARTIST,
+            })
+          ).id,
+          mbId: album(3),
+          title: 'Amnesiac',
+          secondaryTypes: [],
+          status: MediaStatus.PROCESSING,
+          trackFileCount: 11,
+        })
+      );
+      assert.ok(fresh.id);
+
+      const check = byId(await health(), 'musicNotOnServer');
+      assert.equal(check.status, 'warning');
+      assert.equal(check.count, 1);
+      assert.equal(check.items[0].title, 'Hail to the Thief — Radiohead');
+      assert.match(check.items[0].detail!, /^14 of 14 tracks in Lidarr · /);
+      assert.equal(check.items[0].href, `/music/album/${album(1)}`);
+
+      // With no music library on anywhere, Lidarr's files decide: nothing
+      // is waiting on a media server.
+      getSettings().plex.musicLibraries = [];
+      assert.equal(byId(await health(), 'musicNotOnServer').count, 0);
+    } finally {
+      resetSettings();
+    }
+  });
+
+  it('flags requested albums with no release a week after approval, ready to search', async () => {
+    try {
+      const media = await seed([
+        { mbId: album(1), title: 'Kid A', lidarrAlbumId: 71, trackCount: 10 },
+        { mbId: album(2), title: 'Amnesiac', lidarrAlbumId: 72 },
+        // Not out yet: nothing to find.
+        {
+          mbId: album(3),
+          title: 'Next Year',
+          lidarrAlbumId: 73,
+          releaseDate: '2999',
+        },
+        // Lidarr is getting it.
+        { mbId: album(4), title: 'Pablo Honey', trackFileCount: 4 },
+      ]);
+
+      const check = byId(await health(), 'musicNoRelease');
+      assert.equal(check.status, 'warning');
+      assert.equal(check.count, 1);
+      assert.equal(check.items[0].title, 'Radiohead — 2 albums');
+      assert.match(
+        check.items[0].detail!,
+        /^Kid A, Amnesiac · approved 8 days ago$/
+      );
+      assert.equal(check.items[0].href, `/music/artist/${ARTIST}`);
+      assert.deepEqual(
+        (check.items[0] as { searchable?: unknown }).searchable,
+        { mediaId: media.id, is4k: false, mediaType: MediaType.MUSIC }
+      );
+
+      // Searching asks Lidarr for the albums it has no files for.
+      const searched = await new Promise<{
+        status: number;
+        body: { service: string; searched: number };
+      }>((resolve, reject) => {
+        const req = http.request(
+          {
+            host: '127.0.0.1',
+            port,
+            path: `/api/v1/media/${media.id}/search-missing`,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          },
+          (res) => {
+            let raw = '';
+            res.on('data', (c) => (raw += c));
+            res.on('end', () =>
+              resolve({ status: res.statusCode ?? 0, body: JSON.parse(raw) })
+            );
+          }
+        );
+        req.on('error', reject);
+        req.end('{}');
+      });
+      assert.equal(searched.status, 200);
+      assert.deepEqual(searched.body, {
+        service: 'Lidarr',
+        searched: 3,
+        seasons: 0,
+      });
+      assert.deepEqual(commands, [
+        { name: 'AlbumSearch', albumIds: [71, 72, 73] },
+      ]);
+      const events = await getRepository(MediaEvent).find();
+      assert.deepEqual(
+        events.map((e) => [e.foreignId, e.type, e.detail]),
+        [[ARTIST, 'searched', '3 missing albums, in Lidarr']]
+      );
+    } finally {
+      resetSettings();
+    }
+  });
+
+  it('leaves alone a request approved this week', async () => {
+    try {
+      await seed([{ mbId: album(1), title: 'Kid A', lidarrAlbumId: 71 }], {
+        approvedAgo: 2 * DAY,
+      });
+      assert.equal(byId(await health(), 'musicNoRelease').count, 0);
+    } finally {
+      resetSettings();
+    }
+  });
+
+  it('judges MusicBrainz by how its line has fared, without asking it anything', async (t) => {
+    const fared = (over: Partial<ReturnType<typeof musicBrainzQueue.health>>) =>
+      t.mock.method(musicBrainzQueue, 'health', () => ({
+        waiting: 0,
+        busy: 0,
+        rateLimited: 0,
+        failed: 0,
+        failingInARow: 0,
+        ...over,
+      }));
+    try {
+      fared({ lastSuccessAt: Date.now() - 5 * 60_000 });
+      let check = byId(await health(), 'musicbrainz');
+      assert.equal(check.name, 'MusicBrainz');
+      assert.equal(check.status, 'ok');
+
+      t.mock.restoreAll();
+      fared({ rateLimited: 4, failed: 1, lastError: 'timeout of 15000ms' });
+      check = byId(await health(), 'musicbrainz');
+      assert.equal(check.status, 'warning');
+      assert.deepEqual(
+        check.items.map((item) => item.title),
+        [
+          'Over its limit 4 times in the last hour',
+          '1 request failed in the last hour',
+        ]
+      );
+
+      t.mock.restoreAll();
+      fared({ failingInARow: 3, lastError: 'connect ECONNREFUSED' });
+      check = byId(await health(), 'musicbrainz');
+      assert.equal(check.status, 'error');
+      assert.equal(
+        check.detail,
+        'The last 3 requests failed: connect ECONNREFUSED'
+      );
+    } finally {
+      resetSettings();
+    }
+  });
+
+  it('is left off the page while music is off for everyone', async () => {
+    try {
+      await seed([{ mbId: album(1), title: 'Kid A', lidarrAlbumId: 71 }]);
+      getSettings().main.disabledFeatures = ['music'];
+      const ids = (await health()).map((c) => c.id);
+      for (const id of ['musicbrainz', 'musicNotOnServer', 'musicNoRelease']) {
+        assert.ok(!ids.includes(id), id);
+      }
+    } finally {
+      resetSettings();
+    }
   });
 });

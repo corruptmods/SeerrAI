@@ -8,6 +8,7 @@ import dataSource, { getRepository } from '@server/datasource';
 import AlbumRequest from '@server/entity/AlbumRequest';
 import Media from '@server/entity/Media';
 import MusicAlbum from '@server/entity/MusicAlbum';
+import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
 import {
   MEDIA_ID,
   MEDIA_SERVER_KINDS,
@@ -45,7 +46,8 @@ import { In } from 'typeorm';
  * requests say (pending, processing) stands.
  *
  * Rows change through update() and insert(), never by saving a loaded
- * entity, and each artist's rows in one transaction.
+ * entity, and each artist's rows in one transaction. Albums Seerr already
+ * knew arriving or leaving are written into their artist's history.
  */
 
 /** A server's music libraries that are switched on. */
@@ -103,23 +105,96 @@ export const artistStatus = (
   return current;
 };
 
-/** The artist's row, made when Seerr does not have them yet. */
+/**
+ * An artist's name, for their row: Lidarr's is MusicBrainz's own and
+ * replaces what was kept; a media server's (from the files' tags) only
+ * fills in a name not yet known.
+ */
+export interface ArtistNames {
+  lidarr?: string;
+  server?: string;
+}
+
+/**
+ * The artist's row, made when Seerr does not have them yet, with their
+ * name kept on it (foreignTitle) for request cards, Recently Added and
+ * notifications.
+ */
 export const artistRow = async (
   manager: EntityManager,
-  artistMbid: string
+  artistMbid: string,
+  names: ArtistNames = {}
 ): Promise<Media> => {
   const where = { mediaType: MediaType.MUSIC, foreignId: artistMbid };
   const found = await manager.findOne(Media, { where });
   if (found) {
+    const name =
+      names.lidarr || (!found.foreignTitle ? names.server : undefined);
+    if (name && name !== found.foreignTitle) {
+      await manager.update(Media, found.id, { foreignTitle: name });
+      found.foreignTitle = name;
+    }
     return found;
   }
   await manager.insert(Media, {
     mediaType: MediaType.MUSIC,
     tmdbId: 0,
     foreignId: artistMbid,
+    foreignTitle: names.lidarr || names.server || null,
     status: MediaStatus.UNKNOWN,
   });
   return manager.findOneOrFail(Media, { where });
+};
+
+/** A change to one album, for its artist's history. */
+export interface AlbumEvent {
+  mediaId: number;
+  type: MediaEventType;
+  title: string;
+}
+
+/** What an album's new status is, in its artist's history. */
+export const STATUS_EVENTS: Partial<Record<MediaStatus, MediaEventType>> = {
+  [MediaStatus.AVAILABLE]: MediaEventType.AVAILABLE,
+  [MediaStatus.PARTIALLY_AVAILABLE]: MediaEventType.PARTIALLY_AVAILABLE,
+  [MediaStatus.DELETED]: MediaEventType.REMOVED,
+};
+
+/**
+ * Albums Seerr already knew arriving or leaving, in their artists'
+ * histories, each naming the album. Albums only now found (a library read
+ * for the first time) are not: that would be thousands of entries saying
+ * nothing happened.
+ */
+export const recordAlbumEvents = async (
+  events: AlbumEvent[],
+  manager?: EntityManager
+): Promise<void> => {
+  if (!events.length) {
+    return;
+  }
+  const repository = (manager ?? getRepository(Media).manager).getRepository(
+    Media
+  );
+  const artists = await repository.find({
+    select: { id: true, foreignId: true },
+    where: { id: In([...new Set(events.map((e) => e.mediaId))]) },
+  });
+  const foreignIds = new Map(artists.map((a) => [a.id, a.foreignId]));
+  for (const event of events) {
+    const foreignId = foreignIds.get(event.mediaId);
+    if (!foreignId) continue;
+    await recordMediaEvent(
+      {
+        tmdbId: 0,
+        foreignId,
+        mediaType: MediaType.MUSIC,
+        type: event.type,
+        detail: event.title,
+      },
+      manager
+    );
+  }
 };
 
 /** An album's details from Lidarr, for a row made or placed from it. */
@@ -153,7 +228,8 @@ export interface Recorded {
  */
 export const recordServerAlbums = async (
   kind: MediaServerKind,
-  matches: AlbumMatch[]
+  matches: AlbumMatch[],
+  index?: LidarrIndex
 ): Promise<Recorded> => {
   const recorded: Recorded = {
     albumIds: new Set(),
@@ -173,8 +249,12 @@ export const recordServerAlbums = async (
 
   for (const [artistMbid, group] of byArtist) {
     await dataSource.transaction(async (manager) => {
-      const media = await artistRow(manager, artistMbid);
+      const media = await artistRow(manager, artistMbid, {
+        lidarr: index?.artistName(artistMbid),
+        server: group.find((match) => match.serversArtist)?.album.artistName,
+      });
       recorded.artistIds.add(media.id);
+      const events: AlbumEvent[] = [];
 
       const artistItemId = group.find(
         (match) => match.serversArtist && match.album.artistItemId
@@ -252,6 +332,11 @@ export const recordServerAlbums = async (
           row.status !== MediaStatus.BLOCKLISTED
         ) {
           changes.status = MediaStatus.AVAILABLE;
+          events.push({
+            mediaId: media.id,
+            type: MediaEventType.AVAILABLE,
+            title: changes.title ?? row.title,
+          });
         }
         if (row[idColumn] !== album.itemId) {
           changes[idColumn] = album.itemId;
@@ -268,6 +353,7 @@ export const recordServerAlbums = async (
         }
         recorded.albumIds.add(row.id);
       }
+      await recordAlbumEvents(events, manager);
     });
   }
 
@@ -285,6 +371,7 @@ export const applyLidarr = async (
   { decide }: { decide: boolean }
 ): Promise<Set<number>> => {
   const changed = new Set<number>();
+  const events: AlbumEvent[] = [];
   const albums = index.allAlbums();
   for (let i = 0; i < albums.length; i += 400) {
     const chunk = albums.slice(i, i + 400);
@@ -316,6 +403,8 @@ export const applyLidarr = async (
       ) {
         changes.status = status;
         if (!row.mediaAddedAt) changes.mediaAddedAt = new Date();
+        const type = STATUS_EVENTS[status];
+        if (type) events.push({ mediaId: row.mediaId, type, title: row.title });
       }
       if (Object.keys(changes).length) {
         await getRepository(MusicAlbum).update(row.id, changes);
@@ -323,6 +412,7 @@ export const applyLidarr = async (
       }
     }
   }
+  await recordAlbumEvents(events);
   return changed;
 };
 
@@ -378,6 +468,7 @@ export const markGone = async (
   index: LidarrIndex
 ): Promise<Set<number>> => {
   const touched = new Set<number>();
+  const events: AlbumEvent[] = [];
   const rows = await getRepository(MusicAlbum).find();
   const requested = await requestedAlbums(getRepository(MusicAlbum).manager, [
     ...new Set(rows.map((row) => row.mediaId)),
@@ -406,6 +497,11 @@ export const markGone = async (
         row.mbId && requested.get(row.mediaId)?.has(row.mbId)
           ? MediaStatus.DELETED
           : MediaStatus.UNKNOWN;
+      events.push({
+        mediaId: row.mediaId,
+        type: MediaEventType.REMOVED,
+        title: row.title,
+      });
     }
     if (Object.keys(changes).length) {
       await getRepository(MusicAlbum).update(row.id, changes);
@@ -437,6 +533,7 @@ export const markGone = async (
     }
   }
 
+  await recordAlbumEvents(events);
   return touched;
 };
 

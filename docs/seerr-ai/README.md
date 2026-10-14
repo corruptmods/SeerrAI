@@ -5,6 +5,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 ## For everyone
 
 - **[Requests and downloads](./requests-and-downloads.md)**: when a request should arrive, what each status pill means, single episodes, new seasons, anime.
+- **[Music](./music.md)**: finding and requesting albums, how they reach your library through Lidarr, and setting it up.
 - **[Discover and lists](./discover-and-lists.md)**: your own home page, Suggested for You, filtering and requesting several titles, shared watch lists, Roulette, the calendar.
 - **[AI](./ai.md)**: AI Search (from text or a photo), Pick for the Room, Catch Me Up, and what AI can and can't do.
 - **[Subtitles and fixing problems](./subtitles-and-autofix.md)**: subtitles from Bazarr, transcription, and problems fixed from a report.
@@ -32,6 +33,7 @@ Almost everything here is an optional feature. An admin can turn one off for eve
 | **Admin agent** | An AI that looks further when Backfill finds nothing, within limits you set. On its own it never replaces a file on disk; when you ask, it can replace files, block release groups and more, once you approve. |
 | **Status that says why** | Waiting on a delay profile (and for how long), queued, stalled, verifying, unpacking, importing, adding to Plex. Live progress from SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent. |
 | **Arrival estimates** | "Digital release expected 3 Nov", "Released — searching, usually arrives within 2 days here", or time left while downloading. |
+| **Music** | Request albums, EPs or a whole discography through Lidarr, as one request; download progress, availability from your music libraries, and a notification when it's all here. |
 | **Several media servers** | Plex, Jellyfin and Emby connected at once: available on any, sign in with any, Play on each. |
 | **Health** | Every connected service checked, problems listed with how to fix them, and an alert when something newly breaks. |
 | **Plex Match Check** | Nightly: folders Plex matched to a different title than Sonarr or Radarr has in them. |

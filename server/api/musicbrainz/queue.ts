@@ -62,7 +62,38 @@ const retryAfterOf = (e: unknown, now: number): number | undefined => {
   return Number.isNaN(date) ? undefined : Math.max(0, date - now);
 };
 
+/** How the line has fared over the last hour, for Health. */
+export interface QueueHealth {
+  /** Requests waiting or under way now. */
+  waiting: number;
+  /** People told MusicBrainz was busy rather than kept waiting. */
+  busy: number;
+  /** Times MusicBrainz said it was over its limit (503). */
+  rateLimited: number;
+  /** Requests that failed in the end: no answer, a timeout, an error. */
+  failed: number;
+  /** Failures one after another since a request last worked. */
+  failingInARow: number;
+  lastError?: string;
+  lastSuccessAt?: number;
+}
+
+/** How far back Health looks. */
+const HEALTH_WINDOW_MS = 60 * 60 * 1000;
+
+type Trouble = 'busy' | 'rateLimited' | 'failed';
+
 export class RequestQueue {
+  /** When each kind of trouble happened, over the last hour. */
+  private seen: Record<Trouble, number[]> = {
+    busy: [],
+    rateLimited: [],
+    failed: [],
+  };
+  private failingInARow = 0;
+  private lastError?: string;
+  private lastSuccessAt?: number;
+
   private waiting: Record<MbPriority, Job[]> = {
     interactive: [],
     background: [],
@@ -77,6 +108,29 @@ export class RequestQueue {
 
   private now(): number {
     return (this.options.now ?? Date.now)();
+  }
+
+  private note(kind: Trouble) {
+    const now = this.now();
+    const list = this.seen[kind].filter((at) => now - at < HEALTH_WINDOW_MS);
+    list.push(now);
+    this.seen[kind] = list;
+  }
+
+  /** How MusicBrainz has answered over the last hour. */
+  public health(): QueueHealth {
+    const now = this.now();
+    const count = (kind: Trouble) =>
+      this.seen[kind].filter((at) => now - at < HEALTH_WINDOW_MS).length;
+    return {
+      waiting: this.jobs.size,
+      busy: count('busy'),
+      rateLimited: count('rateLimited'),
+      failed: count('failed'),
+      failingInARow: this.failingInARow,
+      lastError: this.lastError,
+      lastSuccessAt: this.lastSuccessAt,
+    };
   }
 
   private sleep(ms: number): Promise<void> {
@@ -121,6 +175,7 @@ export class RequestQueue {
       priority === 'interactive' &&
       this.expectedWait() > this.options.maxWaitMs
     ) {
+      this.note('busy');
       return Promise.reject(new MusicBrainzBusyError());
     }
 
@@ -174,7 +229,12 @@ export class RequestQueue {
         try {
           job.resolve(await job.run());
           this.jobs.delete(job.key);
+          this.failingInARow = 0;
+          this.lastSuccessAt = this.now();
         } catch (e) {
+          if (statusOf(e) === 503) {
+            this.note('rateLimited');
+          }
           if (statusOf(e) === 503 && !job.retried) {
             // Over the limit after all: everyone backs off, then this one
             // is tried once more, first in its line.
@@ -189,6 +249,21 @@ export class RequestQueue {
             );
             this.waiting[job.priority].unshift(job);
           } else {
+            // A 404 is an answer: there is no such thing. Anything else
+            // (another 503, a timeout, no answer at all) is MusicBrainz
+            // failing.
+            if (statusOf(e) === 404) {
+              this.failingInARow = 0;
+              this.lastSuccessAt = this.now();
+            } else {
+              this.note('failed');
+              this.failingInARow++;
+              this.lastError = statusOf(e)
+                ? `MusicBrainz answered ${statusOf(e)}`
+                : e instanceof Error
+                  ? e.message
+                  : String(e);
+            }
             job.reject(e);
             this.jobs.delete(job.key);
           }

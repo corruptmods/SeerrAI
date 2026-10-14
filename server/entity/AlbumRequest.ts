@@ -37,6 +37,9 @@ class AlbumRequest {
    */
   public albumStatus?: MediaStatus;
 
+  /** Lidarr has its files and no media server lists it yet. Not a column. */
+  public addingToLibrary?: boolean;
+
   @ManyToOne(() => MediaRequest, (request) => request.albums, {
     onDelete: 'CASCADE',
   })

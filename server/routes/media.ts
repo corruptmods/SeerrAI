@@ -3,10 +3,10 @@ import {
   MediaStatus,
   MediaType,
   VIDEO_MEDIA_TYPES,
+  isVideo,
 } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
-import MediaEvent from '@server/entity/MediaEvent';
 import Season from '@server/entity/Season';
 import { User } from '@server/entity/User';
 import type {
@@ -21,18 +21,22 @@ import { getAnimePlacement, setAnimeSetting } from '@server/lib/animePlacement';
 import { NoArrServerError, removeFromArr } from '@server/lib/arrRemoval';
 import { featureEnabled } from '@server/lib/features';
 import { recordMediaDeletion } from '@server/lib/mediaDeletions';
-import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
+import {
+  MediaEventType,
+  mediaHistory,
+  recordMediaEvent,
+} from '@server/lib/mediaHistory';
 import { isConnected } from '@server/lib/mediaServers';
 import { Permission } from '@server/lib/permissions';
 import { defaultRegion, estimateTitle } from '@server/lib/requestEta';
 import {
-  NothingMissingError,
   NotInServiceError,
+  NothingMissingError,
   searchMissing,
 } from '@server/lib/searchMissing';
 import { getSettings } from '@server/lib/settings';
-import { getWatchedBy } from '@server/lib/watchedBy';
 import { watchSource } from '@server/lib/watchHistory';
+import { getWatchedBy } from '@server/lib/watchedBy';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { pageOf } from '@server/utils/pagination';
@@ -139,11 +143,20 @@ mediaRoutes.post<{ id: string }, unknown, { is4k?: boolean }>(
         return next({ status: 404, message: 'Media not found.' });
       }
 
+      // Music turned off: its artists are not searched for either.
+      if (
+        media.mediaType === MediaType.MUSIC &&
+        !featureEnabled('music', req.user)
+      ) {
+        return next({ status: 404, message: 'Media not found.' });
+      }
+
       const is4k = !!req.body?.is4k;
       const started = await searchMissing(media, is4k);
 
       await recordMediaEvent({
         tmdbId: media.tmdbId,
+        foreignId: media.foreignId,
         mediaType: media.mediaType,
         type: MediaEventType.SEARCHED,
         is4k,
@@ -151,9 +164,13 @@ mediaRoutes.post<{ id: string }, unknown, { is4k?: boolean }>(
         detail:
           media.mediaType === MediaType.MOVIE
             ? started.service
-            : `${started.searched} missing ${
-                started.searched === 1 ? 'episode' : 'episodes'
-              }, in ${started.service}`,
+            : media.mediaType === MediaType.MUSIC
+              ? `${started.searched} missing ${
+                  started.searched === 1 ? 'album' : 'albums'
+                }, in ${started.service}`
+              : `${started.searched} missing ${
+                  started.searched === 1 ? 'episode' : 'episodes'
+                }, in ${started.service}`,
       });
 
       return res.status(200).json(started);
@@ -163,7 +180,7 @@ mediaRoutes.post<{ id: string }, unknown, { is4k?: boolean }>(
       }
       return next({
         status: 502,
-        message: `Radarr or Sonarr did not accept the search: ${e.message}`,
+        message: `Radarr, Sonarr or Lidarr did not accept the search: ${e.message}`,
       });
     }
   }
@@ -253,8 +270,11 @@ mediaRoutes.delete(
       });
 
       // Recorded before the row goes, so watchlist sync can still tell a
-      // stale watchlist entry from one added after this deletion.
-      await recordMediaDeletion(media.tmdbId, media.mediaType);
+      // stale watchlist entry from one added after this deletion. Not for
+      // an artist: deletions are kept by TMDB id, and every artist's is 0.
+      if (isVideo(media.mediaType)) {
+        await recordMediaDeletion(media.tmdbId, media.mediaType);
+      }
 
       if (media.status === MediaStatus.BLOCKLISTED) {
         media.resetServiceData();
@@ -294,39 +314,11 @@ mediaRoutes.get(
     }
 
     try {
-      const events = await getRepository(MediaEvent).find({
-        where: { tmdbId: Number(req.params.tmdbId), mediaType },
-        order: { occurredAt: 'DESC', id: 'DESC' },
-        take: 100,
-      });
-
-      const userIds = [
-        ...new Set(events.map((e) => e.userId).filter((id) => id != null)),
-      ] as number[];
-      const users = userIds.length
-        ? await getRepository(User).find({ where: { id: In(userIds) } })
-        : [];
-      const byId = new Map(users.map((user) => [user.id, user]));
-
-      return res.status(200).json(
-        events.map((event) => {
-          const user = event.userId != null ? byId.get(event.userId) : null;
-          return {
-            id: event.id,
-            type: event.type,
-            is4k: event.is4k,
-            detail: event.detail ?? null,
-            occurredAt: event.occurredAt,
-            user: user
-              ? {
-                  id: user.id,
-                  displayName: user.displayName,
-                  avatar: user.avatar,
-                }
-              : null,
-          };
-        })
-      );
+      return res
+        .status(200)
+        .json(
+          await mediaHistory({ tmdbId: Number(req.params.tmdbId), mediaType })
+        );
     } catch (e) {
       return next({ status: 500, message: e.message });
     }

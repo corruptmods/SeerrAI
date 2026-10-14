@@ -1,3 +1,4 @@
+import useSettings from '@app/hooks/useSettings';
 import defineMessages from '@app/utils/defineMessages';
 import Link from 'next/link';
 import { useIntl } from 'react-intl';
@@ -64,6 +65,16 @@ const messages = defineMessages('components.Settings.SettingsGuide', {
   stuck3:
     'Health lists titles that have been processing for over a week, and Search all asks Radarr and Sonarr to search for every one of them.',
 
+  musicTitle: 'Music',
+  music1:
+    'Once a default Lidarr is added (Services), everyone who can request can ask for an artist’s albums, EPs and singles: one album, several, or everything they have released. However many albums, it is one request, approved once. Approved, it goes to Lidarr, which monitors and searches for exactly those albums and nothing else of the artist’s.',
+  music2:
+    'Music Sync (every 5 minutes, and a minute after Lidarr imports something) follows Lidarr’s work and reads what each media server’s music libraries have added; the Music Full Scan reads all of them at 3:40am. An album is Available once a music library lists it, or, with no music library switched on anywhere, once Lidarr has all its tracks. The requester is told when every album they asked for is here.',
+  music3:
+    'Health lists albums Lidarr has that no media server lists after a day, requested albums with no release found after a week (Search now asks Lidarr to look again), and how MusicBrainz, where album and artist details come from, has been answering.',
+  music4:
+    'Music can be switched off for everyone under Features, and each person can switch it off for themselves.',
+
   subsTitle: 'Subtitles',
   subs1:
     'Bazarr finds subtitles for what Radarr and Sonarr import. When none exist, Transcribe on a title’s subtitles asks Bazarr’s WhisperAI provider to make them. If Bazarr has paused WhisperAI after an error, Transcribe says so, and Health shows it.',
@@ -82,7 +93,7 @@ const messages = defineMessages('components.Settings.SettingsGuide', {
   settingsUsers:
     'Users: who may request, and whose requests are approved on their own.',
   settingsServices:
-    'Services: Radarr, Sonarr, Bazarr, Tautulli, Maintainerr and the download clients.',
+    'Services: Radarr, Sonarr, Lidarr, Bazarr, Tautulli, Maintainerr and the download clients.',
   settingsBackfill:
     'Backfill: Prowlarr, which download client gets packs, when a title counts as stuck, and what may be approved on its own. Limits and tuning are under Advanced.',
   settingsAi:
@@ -139,6 +150,7 @@ const Pill = ({
  */
 const SettingsGuide = () => {
   const intl = useIntl();
+  const { currentSettings } = useSettings();
   const t = (m: keyof typeof messages) => intl.formatMessage(messages[m]);
   const where = (href: string, m: keyof typeof messages) => {
     const [name, ...rest] = t(m).split(': ');
@@ -229,6 +241,17 @@ const SettingsGuide = () => {
           <p>{t('stuck3')}</p>
         </div>
       </Section>
+
+      {currentSettings.musicReady && (
+        <Section title={t('musicTitle')}>
+          <div className="space-y-3 text-sm text-gray-300">
+            <p>{t('music1')}</p>
+            <p>{t('music2')}</p>
+            <p>{t('music3')}</p>
+            <p>{t('music4')}</p>
+          </div>
+        </Section>
+      )}
 
       <Section title={t('subsTitle')}>
         <p className="text-sm text-gray-300">{t('subs1')}</p>

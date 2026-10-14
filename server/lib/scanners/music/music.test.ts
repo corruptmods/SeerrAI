@@ -10,13 +10,17 @@ import { MediaServerType } from '@server/constants/server';
 import dataSource, { getRepository } from '@server/datasource';
 import AlbumRequest from '@server/entity/AlbumRequest';
 import Media from '@server/entity/Media';
+import MediaEvent from '@server/entity/MediaEvent';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import MusicMetadata from '@server/entity/MusicMetadata';
 import { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
+import downloadTracker from '@server/lib/downloadtracker';
 import { albumPlayLinks } from '@server/lib/mediaServers';
 import { MB_CALL_CAP } from '@server/lib/music/matcher';
+import notificationManager, { Notification } from '@server/lib/notifications';
+import type { NotificationPayload } from '@server/lib/notifications/agents/agent';
 import { musicFullScan, musicSync } from '@server/lib/scanners/music';
 import type { LidarrSettings } from '@server/lib/settings';
 import {
@@ -29,7 +33,15 @@ import assert from 'node:assert/strict';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { after, before, beforeEach, describe, it } from 'node:test';
+import {
+  after,
+  afterEach,
+  before,
+  beforeEach,
+  describe,
+  it,
+  mock,
+} from 'node:test';
 
 /*
  * The music scans against stand-ins that answer as Plex, Jellyfin, Emby,
@@ -1103,6 +1115,7 @@ describe('music scans', () => {
     );
     const artist = await artistOf(ARTIST);
     assert.equal(artist.status, MediaStatus.PROCESSING);
+    assert.equal(artist.foreignTitle, 'Radiohead');
     assert.equal(artist.externalServiceId, 7);
     assert.equal(
       artist.serviceUrl,
@@ -1112,5 +1125,153 @@ describe('music scans', () => {
       await getRepository(Media).countBy({ foreignId: OTHER_ARTIST }),
       0
     );
+  });
+
+  describe('closing the loop', () => {
+    const sent: { type: Notification; payload: NotificationPayload }[] = [];
+
+    beforeEach(() => {
+      sent.length = 0;
+      mock.method(
+        notificationManager,
+        'sendNotification',
+        (type: Notification, payload: NotificationPayload) => {
+          sent.push({ type, payload });
+        }
+      );
+    });
+
+    afterEach(() => {
+      mock.restoreAll();
+      for (const held of downloadTracker.heldMusicImports()) {
+        downloadTracker.forgetImportedAlbum(held.serverId, held.albumId);
+      }
+    });
+
+    const history = async () =>
+      (
+        await getRepository(MediaEvent).find({
+          where: { foreignId: ARTIST },
+          order: { id: 'ASC' },
+        })
+      ).map((event) => [event.type, event.detail]);
+
+    it('keeps the artist’s name: Lidarr’s, or the server’s until Lidarr knows them', async () => {
+      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
+      state.plex.albums = [
+        plexAlbum('601', 'Amnesiac', {
+          guid: AMNESIAC,
+          artistName: 'Radiohead (tagged)',
+        }),
+      ];
+      state.mb.groups[AMNESIAC] = ARTIST;
+
+      await musicFullScan.run();
+      assert.equal((await artistOf(ARTIST)).foreignTitle, 'Radiohead (tagged)');
+
+      // A server's name never replaces one known.
+      state.plex.albums[0].parentTitle = 'Someone Else';
+      await musicFullScan.run();
+      assert.equal((await artistOf(ARTIST)).foreignTitle, 'Radiohead (tagged)');
+
+      // Lidarr's, MusicBrainz's own, does.
+      state.lidarr.artists = [lidarrArtist()];
+      await musicFullScan.run();
+      assert.equal((await artistOf(ARTIST)).foreignTitle, 'Radiohead');
+    });
+
+    it('completes a request once its albums are here, says so once, and writes it down', async () => {
+      const media = await seedArtist([
+        { mbId: HAIL, title: 'Hail to the Thief' },
+      ]);
+      const request = await seedRequest(media, [
+        { mbid: HAIL, title: 'Hail to the Thief' },
+      ]);
+      state.lidarr.artists = [lidarrArtist()];
+      state.lidarr.albums = [lidarrAlbum({ monitored: true })];
+      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
+      state.plex.albums = [plexAlbum('600', 'Hail', { guid: HAIL_RELEASE })];
+
+      await musicFullScan.run();
+      await musicSync.run();
+      await musicFullScan.run();
+
+      assert.equal(
+        (await getRepository(MediaRequest).findOneByOrFail({ id: request.id }))
+          .status,
+        MediaRequestStatus.COMPLETED
+      );
+      const available = sent.filter(
+        (s) => s.type === Notification.MEDIA_AVAILABLE
+      );
+      assert.equal(available.length, 1);
+      // The artist's name, kept from Lidarr by the scan.
+      assert.equal(
+        available[0].payload.subject,
+        'Hail to the Thief — Radiohead'
+      );
+      assert.deepEqual(await history(), [['available', 'Hail to the Thief']]);
+    });
+
+    it('writes an album leaving into its artist’s history', async () => {
+      await seedArtist(
+        [
+          {
+            mbId: HAIL,
+            title: 'Hail to the Thief',
+            status: MediaStatus.AVAILABLE,
+          },
+        ],
+        { status: MediaStatus.AVAILABLE }
+      );
+      state.lidarr.artists = [lidarrArtist()];
+      state.lidarr.albums = [lidarrAlbum()];
+
+      await musicFullScan.run();
+
+      assert.equal((await albumOf(HAIL)).status, MediaStatus.UNKNOWN);
+      assert.deepEqual(await history(), [['removed', 'Hail to the Thief']]);
+    });
+
+    it('stops showing an import as being added once the album is here', async () => {
+      const media = await seedArtist([
+        { mbId: HAIL, title: 'Hail to the Thief', lidarrAlbumId: 70 },
+      ]);
+      await seedRequest(media, [{ mbid: HAIL, title: 'Hail to the Thief' }]);
+      (
+        downloadTracker as unknown as {
+          hold: (
+            kind: string,
+            serverId: number,
+            item: Record<string, unknown>,
+            now: number
+          ) => void;
+        }
+      ).hold(
+        'music',
+        0,
+        {
+          externalId: 7,
+          downloadId: 'hail',
+          album: { id: 70, title: 'Hail to the Thief', foreignAlbumId: HAIL },
+          stage: 'importing',
+          size: 1,
+          sizeLeft: 0,
+        },
+        Date.now() - 1000
+      );
+      assert.equal(downloadTracker.getMusicProgress(0, 7).length, 1);
+
+      // Not here yet: still shown.
+      state.lidarr.artists = [lidarrArtist()];
+      state.lidarr.albums = [lidarrAlbum({ monitored: true })];
+      await musicSync.run();
+      assert.equal(downloadTracker.getMusicProgress(0, 7).length, 1);
+
+      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
+      state.plex.albums = [plexAlbum('600', 'Hail', { guid: HAIL_RELEASE })];
+      await musicFullScan.run();
+      assert.deepEqual(downloadTracker.getMusicProgress(0, 7), []);
+    });
   });
 });

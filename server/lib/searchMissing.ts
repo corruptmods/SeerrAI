@@ -1,6 +1,6 @@
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
-import { MediaType } from '@server/constants/media';
+import { MediaType, isVideo } from '@server/constants/media';
 import type Media from '@server/entity/Media';
 import { getSettings } from '@server/lib/settings';
 
@@ -35,6 +35,9 @@ export const searchMissing = async (
   media: Media,
   is4k: boolean
 ): Promise<SearchStarted> => {
+  if (!isVideo(media.mediaType)) {
+    throw new NotInServiceError('Only films and series are searched here.');
+  }
   const settings = getSettings();
   const serverId = is4k ? media.serviceId4k : media.serviceId;
   const externalId = is4k ? media.externalServiceId4k : media.externalServiceId;

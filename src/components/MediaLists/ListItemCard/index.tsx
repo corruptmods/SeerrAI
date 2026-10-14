@@ -3,7 +3,7 @@ import TitleCard from '@app/components/TitleCard';
 import type { ListItem, SeriesProgress } from '@app/hooks/useListDetail';
 import defineMessages from '@app/utils/defineMessages';
 import { EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
-import type { MediaStatus, MediaType } from '@server/constants/media';
+import type { MediaStatus } from '@server/constants/media';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.MediaLists.ListItemCard', {
@@ -78,7 +78,7 @@ const ListItemCard = ({
           }
           id={item.tmdbId}
           image={item.posterPath ?? undefined}
-          mediaType={item.mediaType as MediaType}
+          mediaType={item.mediaType}
           status={item.mediaInfo?.status as MediaStatus | undefined}
           summary={undefined}
           title={item.title ?? String(item.tmdbId)}

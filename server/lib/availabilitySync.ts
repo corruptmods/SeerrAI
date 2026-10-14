@@ -10,7 +10,11 @@ import type {
   TmdbTvDetails,
   TmdbTvScanDetails,
 } from '@server/api/themoviedb/interfaces';
-import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  VIDEO_MEDIA_TYPES,
+} from '@server/constants/media';
 import type {
   JellyfinFamilyKind,
   MediaServerKind,
@@ -34,7 +38,7 @@ import { isBlocklisted } from '@server/lib/scanners/baseScanner';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
-import { MoreThan } from 'typeorm';
+import { In, MoreThan } from 'typeorm';
 
 /** What one media server said about one version of a title. */
 interface ServerCheck {
@@ -360,6 +364,7 @@ class AvailabilitySync {
       mediaPage = await mediaRepository.find({
         where: whereOptions.map((where) => ({
           ...where,
+          mediaType: In(VIDEO_MEDIA_TYPES),
           id: MoreThan(lastId),
         })),
         order: { id: 'ASC' },

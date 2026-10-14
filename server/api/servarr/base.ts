@@ -187,7 +187,13 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
     return response.data ?? [];
   };
 
-  public getQueue = async (): Promise<(QueueItem & QueueItemAppendT)[]> => {
+  /**
+   * Everything in the download queue. `include` asks for what each item is
+   * for: Sonarr's episodes by default, Lidarr's albums and artists.
+   */
+  public getQueue = async (
+    include: Record<string, boolean> = { includeEpisode: true }
+  ): Promise<(QueueItem & QueueItemAppendT)[]> => {
     try {
       // The queue comes in pages (10 items unless asked for more): every
       // page, so a busy queue does not leave titles without progress.
@@ -197,7 +203,7 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
           `/queue`,
           {
             params: {
-              includeEpisode: true,
+              ...include,
               page,
               pageSize: QUEUE_PAGE_SIZE,
             },

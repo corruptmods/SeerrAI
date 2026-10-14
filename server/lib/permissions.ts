@@ -28,8 +28,36 @@ export enum Permission {
   RECENT_VIEW = 67108864,
   WATCHLIST_VIEW = 134217728,
   MANAGE_BLOCKLIST = 268435456,
+  REQUEST_MUSIC = 536870912,
   VIEW_BLOCKLIST = 1073741824,
+  /**
+   * 2^31: past what a 32-bit `&` reads, so permissions are tested with
+   * arithmetic rather than bitwise operators, and stored as a bigint.
+   */
+  AUTO_APPROVE_MUSIC = 2147483648,
 }
+
+/** The single bits a permission value is made of. */
+const bitsOf = (value: number): number[] => {
+  const bits: number[] = [];
+  let rest = value;
+  for (let bit = 1; rest > 0; bit *= 2) {
+    if (Math.floor(rest / bit) % 2 === 1) {
+      bits.push(bit);
+      rest -= bit;
+    }
+  }
+  return bits;
+};
+
+/**
+ * Whether a permission is set in a permission value; for a permission of
+ * several bits, whether any of them is. Arithmetic, not `&`: JavaScript's
+ * bitwise operators work on 32 bits, which loses 2^31 and above (and with
+ * them Auto-Approve Music).
+ */
+const holds = (value: number, permission: number): boolean =>
+  bitsOf(permission).some((bit) => Math.floor(value / bit) % 2 === 1);
 
 export interface PermissionCheckOptions {
   type: 'and' | 'or';
@@ -57,18 +85,18 @@ export const hasPermission = (
   }
 
   if (Array.isArray(permissions)) {
-    if (value & Permission.ADMIN) {
+    if (holds(value, Permission.ADMIN)) {
       return true;
     }
     switch (options.type) {
       case 'and':
-        return permissions.every((permission) => !!(value & permission));
+        return permissions.every((permission) => holds(value, permission));
       case 'or':
-        return permissions.some((permission) => !!(value & permission));
+        return permissions.some((permission) => holds(value, permission));
     }
   } else {
     total = permissions;
   }
 
-  return !!(value & Permission.ADMIN) || !!(value & total);
+  return holds(value, Permission.ADMIN) || holds(value, total);
 };

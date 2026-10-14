@@ -1,5 +1,6 @@
 import type { MaintainerrCollection } from '@server/api/maintainerr';
 import MaintainerrAPI, { DELETING_ACTIONS } from '@server/api/maintainerr';
+import type { VideoMediaType } from '@server/constants/media';
 import { MediaType } from '@server/constants/media';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
 import type { MaintainerrSettings } from '@server/lib/settings';
@@ -35,7 +36,7 @@ interface Hold {
 
 interface ServerEntry extends Hold {
   tmdbId: number;
-  mediaType: MediaType;
+  mediaType: VideoMediaType;
 }
 
 interface ServerSnapshot {
@@ -46,7 +47,7 @@ interface ServerSnapshot {
 /** A title as shown to people: soonest date, and what they may do. */
 export interface DeletingSoonItem {
   tmdbId: number;
-  mediaType: MediaType;
+  mediaType: VideoMediaType;
   deleteAt: Date;
   showBadge: boolean;
   showInRow: boolean;
@@ -234,7 +235,7 @@ const toItem = (key: string): DeletingSoonItem | undefined => {
 
   return {
     tmdbId: Number(tmdbId),
-    mediaType: mediaType as MediaType,
+    mediaType: mediaType as VideoMediaType,
     deleteAt: new Date(
       Math.min(...imminent.map((hold) => hold.deleteAt.getTime()))
     ),

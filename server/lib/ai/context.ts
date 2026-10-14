@@ -3,7 +3,7 @@ import type {
   TmdbMovieResult,
   TmdbTvResult,
 } from '@server/api/themoviedb/interfaces';
-import { MediaType } from '@server/constants/media';
+import { MediaType, VIDEO_MEDIA_TYPES } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
@@ -14,6 +14,7 @@ import { isCompletedPlay, watchSource } from '@server/lib/watchHistory';
 import logger from '@server/logger';
 import { mapMovieResult, mapTvResult } from '@server/models/Search';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
+import { In } from 'typeorm';
 
 /*
  * The little each feature tells the model about a person, and turning the
@@ -86,7 +87,7 @@ export const recentActivity = async (user: User): Promise<Activity> => {
     };
   } else {
     const requests = await getRepository(MediaRequest).find({
-      where: { requestedBy: { id: user.id } },
+      where: { requestedBy: { id: user.id }, type: In(VIDEO_MEDIA_TYPES) },
       relations: { media: true },
       order: { createdAt: 'DESC' },
       take: 10,

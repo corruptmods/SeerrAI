@@ -1,6 +1,6 @@
 import type { TautulliHistoryRecord } from '@server/api/tautulli';
 import TautulliAPI from '@server/api/tautulli';
-import { MediaType } from '@server/constants/media';
+import { MediaType, VIDEO_MEDIA_TYPES } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { User } from '@server/entity/User';
@@ -51,7 +51,10 @@ export class TautulliWatchSource implements WatchSource {
     const found = new Map<string, Media>();
     if (!titleIds.length) return found;
     const media = await getRepository(Media).find({
-      where: [{ ratingKey: In(titleIds) }, { ratingKey4k: In(titleIds) }],
+      where: [
+        { mediaType: In(VIDEO_MEDIA_TYPES), ratingKey: In(titleIds) },
+        { mediaType: In(VIDEO_MEDIA_TYPES), ratingKey4k: In(titleIds) },
+      ],
     });
     for (const item of media) {
       for (const key of this.titleIdsOf(item)) found.set(key, item);

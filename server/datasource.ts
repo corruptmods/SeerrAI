@@ -1,6 +1,7 @@
 import AgentRun from '@server/entity/AgentRun';
 import AiSpend from '@server/entity/AiSpend';
 import AiUsage from '@server/entity/AiUsage';
+import AlbumRequest from '@server/entity/AlbumRequest';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
@@ -22,6 +23,8 @@ import {
 } from '@server/entity/MediaList';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
+import MusicAlbum from '@server/entity/MusicAlbum';
+import MusicMetadata from '@server/entity/MusicMetadata';
 import { NotificationDelivery } from '@server/entity/NotificationDelivery';
 import OverrideRule from '@server/entity/OverrideRule';
 import RemovedPlexAccount from '@server/entity/RemovedPlexAccount';
@@ -51,6 +54,7 @@ const entities = [
   AgentRun,
   AiSpend,
   AiUsage,
+  AlbumRequest,
   BackfillCandidate,
   BackfillJob,
   BackfillSeries,
@@ -70,6 +74,8 @@ const entities = [
   MediaListWatchSuggestion,
   MediaRequest,
   MediaRequestWatcher,
+  MusicAlbum,
+  MusicMetadata,
   NotificationDelivery,
   OverrideRule,
   RemovedPlexAccount,

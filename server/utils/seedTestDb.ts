@@ -1,5 +1,14 @@
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
 import { UserType } from '@server/constants/user';
 import dataSource, { getRepository } from '@server/datasource';
+import AlbumRequest from '@server/entity/AlbumRequest';
+import Media from '@server/entity/Media';
+import { MediaRequest } from '@server/entity/MediaRequest';
+import MusicAlbum from '@server/entity/MusicAlbum';
 import { User } from '@server/entity/User';
 import gravatarUrl from 'gravatar-url';
 
@@ -109,4 +118,177 @@ export async function resetTestDb(): Promise<void> {
 
   await dataSource.synchronize(true);
   await seedTestUsers();
+}
+
+/** MusicBrainz ids the music fixtures use. */
+export const MUSIC_FIXTURE_IDS = {
+  /** An artist with albums in the library and a request in each status. */
+  artist: 'a74b1b7f-71a5-4011-9441-d0b5e4122711',
+  album: 'b1392450-e666-3926-a536-22c65f834433',
+  otherAlbum: '1b022e01-4da6-387b-8658-8678046e4cef',
+  /** An artist whose albums Lidarr is still getting. */
+  processingArtist: '8bfac288-ccc5-448d-9573-c33ea2aa5c30',
+  processingAlbum: '6e335887-60ba-38f0-95af-fae7774336bf',
+} as const;
+
+export interface MusicFixtures {
+  artist: Media;
+  processingArtist: Media;
+  albums: MusicAlbum[];
+  /** One music request in each status, by status. */
+  requests: Record<MediaRequestStatus, MediaRequest>;
+}
+
+/**
+ * Music in the test database: two artists (Media of type music, tmdbId 0)
+ * with ids on every server and in Lidarr, their albums, and a request for
+ * an album in each status, all made long enough ago to count as old.
+ * Saved without subscribers, as data already there would be.
+ */
+export async function seedMusicFixtures(): Promise<MusicFixtures> {
+  assertTestDatabase('seed music fixtures');
+
+  const manager = dataSource.manager;
+  const longAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const ids = MUSIC_FIXTURE_IDS;
+
+  const [artist, processingArtist] = await manager.save(
+    [
+      new Media({
+        mediaType: MediaType.MUSIC,
+        tmdbId: 0,
+        foreignId: ids.artist,
+        status: MediaStatus.PARTIALLY_AVAILABLE,
+        serviceId: 0,
+        externalServiceId: 7,
+        externalServiceSlug: ids.artist,
+        ratingKey: '9001',
+        jellyfinMediaId: 'jellyfin-artist',
+        embyMediaId: 'emby-artist',
+        mediaAddedAt: longAgo,
+      }),
+      new Media({
+        mediaType: MediaType.MUSIC,
+        tmdbId: 0,
+        foreignId: ids.processingArtist,
+        status: MediaStatus.PROCESSING,
+        serviceId: 0,
+        externalServiceId: 8,
+        externalServiceSlug: ids.processingArtist,
+      }),
+    ],
+    { listeners: false }
+  );
+
+  const albums = await manager.save(
+    [
+      new MusicAlbum({
+        mediaId: artist.id,
+        mbId: ids.album,
+        title: 'Hail to the Thief',
+        primaryType: 'Album',
+        secondaryTypes: [],
+        releaseDate: '2003-06-09',
+        status: MediaStatus.AVAILABLE,
+        lidarrAlbumId: 70,
+        trackCount: 14,
+        trackFileCount: 14,
+        ratingKey: '9002',
+        jellyfinItemId: 'jellyfin-album',
+        embyItemId: 'emby-album',
+        folder: 'Hail to the Thief (2003)',
+        mediaAddedAt: longAgo,
+      }),
+      new MusicAlbum({
+        mediaId: artist.id,
+        mbId: ids.otherAlbum,
+        title: 'OK Computer',
+        primaryType: 'Album',
+        secondaryTypes: [],
+        releaseDate: '1997-05-21',
+        status: MediaStatus.PROCESSING,
+        lidarrAlbumId: 71,
+        trackCount: 12,
+        trackFileCount: 3,
+      }),
+      new MusicAlbum({
+        mediaId: artist.id,
+        mbId: null,
+        title: 'A Bootleg Nobody Matched',
+        secondaryTypes: ['Live'],
+        status: MediaStatus.AVAILABLE,
+        ratingKey: '9003',
+      }),
+      new MusicAlbum({
+        mediaId: processingArtist.id,
+        mbId: ids.processingAlbum,
+        title: 'In Rainbows',
+        primaryType: 'Album',
+        secondaryTypes: [],
+        releaseDate: '2007-10-10',
+        status: MediaStatus.PROCESSING,
+        lidarrAlbumId: 80,
+      }),
+    ],
+    { listeners: false }
+  );
+
+  const requester = await getRepository(User).findOneByOrFail({ id: 2 });
+  const statuses = [
+    MediaRequestStatus.PENDING,
+    MediaRequestStatus.APPROVED,
+    MediaRequestStatus.DECLINED,
+    MediaRequestStatus.FAILED,
+    MediaRequestStatus.COMPLETED,
+  ];
+  const requests = {} as Record<MediaRequestStatus, MediaRequest>;
+  for (const status of statuses) {
+    const request = await manager.save(
+      new MediaRequest({
+        type: MediaType.MUSIC,
+        status,
+        media: artist,
+        requestedBy: requester,
+        is4k: false,
+        serverId: 0,
+        profileId: 1,
+        metadataProfileId: 1,
+        rootFolder: '/music',
+        albums: [
+          new AlbumRequest({
+            albumMbid: ids.otherAlbum,
+            title: 'OK Computer',
+            status,
+          }),
+        ],
+      }),
+      { listeners: false }
+    );
+    requests[status] = request;
+  }
+
+  // Old enough for every "waiting too long" check to look at.
+  await manager
+    .createQueryBuilder()
+    .update(MediaRequest)
+    .set({ createdAt: longAgo, updatedAt: longAgo })
+    .where({ type: MediaType.MUSIC })
+    .callListeners(false)
+    .execute();
+  await manager
+    .createQueryBuilder()
+    .update(Media)
+    .set({ updatedAt: longAgo })
+    .where({ mediaType: MediaType.MUSIC })
+    .callListeners(false)
+    .execute();
+
+  return {
+    artist: await manager.findOneByOrFail(Media, { id: artist.id }),
+    processingArtist: await manager.findOneByOrFail(Media, {
+      id: processingArtist.id,
+    }),
+    albums,
+    requests,
+  };
 }

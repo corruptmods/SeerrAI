@@ -29,6 +29,15 @@ export interface Library {
   lastScan?: number;
 }
 
+/**
+ * A music library: 'artist' is Plex's word for one, 'music' Jellyfin's and
+ * Emby's. A type of its own, so code for film and series libraries cannot
+ * be handed one.
+ */
+export interface MusicLibrary extends Omit<Library, 'type'> {
+  type: 'artist' | 'music';
+}
+
 export interface Region {
   iso_3166_1: string;
   english_name: string;
@@ -48,6 +57,11 @@ export interface PlexSettings {
   port: number;
   useSsl?: boolean;
   libraries: Library[];
+  /**
+   * Music libraries, kept apart from `libraries` so the scans, checks and
+   * watch history for films and series never walk them.
+   */
+  musicLibraries: MusicLibrary[];
   webAppUrl?: string;
   /** Seerr is connected to this server (see lib/mediaServers). */
   connected?: boolean;
@@ -65,6 +79,8 @@ export interface JellyfinSettings {
   externalHostname?: string;
   jellyfinForgotPasswordUrl?: string;
   libraries: Library[];
+  /** Music libraries, kept apart as Plex's are. */
+  musicLibraries: MusicLibrary[];
   serverId: string;
   apiKey: string;
   /** Seerr is connected to this server (see lib/mediaServers). */
@@ -78,6 +94,15 @@ export interface JellyfinSettings {
   adminUserId?: string;
 }
 
+/** Music before an admin changes anything. */
+export const musicDefaults = (): MusicSettings => ({
+  musicbrainzUrl: MUSICBRAINZ_URL,
+  contactEmail: '',
+  listenBrainz: true,
+  theAudioDbApiKey: '',
+  maxAlbumsPerRequest: 100,
+});
+
 /** A Jellyfin or Emby server that has not been set up. */
 export const jellyfinDefaults = (): JellyfinSettings => ({
   name: '',
@@ -88,6 +113,7 @@ export const jellyfinDefaults = (): JellyfinSettings => ({
   externalHostname: '',
   jellyfinForgotPasswordUrl: '',
   libraries: [],
+  musicLibraries: [],
   serverId: '',
   apiKey: '',
   connected: false,
@@ -361,6 +387,38 @@ export interface RadarrSettings extends DVRSettings {
   animeTags?: number[];
 }
 
+/**
+ * A Lidarr server, for music. There is no 4K Lidarr: is4k is always false.
+ * The metadata profile decides which kinds of release (albums, EPs, live
+ * albums) Lidarr lists for an artist it adds.
+ */
+export interface LidarrSettings extends DVRSettings {
+  activeMetadataProfileId: number;
+  activeMetadataProfileName: string;
+}
+
+/** Where music's details come from, and limits on requesting it. */
+export interface MusicSettings {
+  /**
+   * MusicBrainz, or a mirror of it. The public one allows a request a
+   * second; a mirror has no limit.
+   */
+  musicbrainzUrl: string;
+  /**
+   * Added to how Seerr names itself to MusicBrainz, so MusicBrainz can reach
+   * whoever runs this server rather than slowing every Seerr AI down.
+   */
+  contactEmail: string;
+  /** New releases and what is popular, for Discover, from ListenBrainz. */
+  listenBrainz: boolean;
+  /** TheAudioDB, for artist pictures Lidarr has none of. Never sent back. */
+  theAudioDbApiKey: string;
+  /** The most albums one request may ask for. */
+  maxAlbumsPerRequest: number;
+}
+
+export const MUSICBRAINZ_URL = 'https://musicbrainz.org';
+
 export interface SonarrSettings extends DVRSettings {
   seriesType: 'standard' | 'daily' | 'anime';
   animeSeriesType: 'standard' | 'daily' | 'anime';
@@ -472,6 +530,8 @@ export interface MainSettings {
   defaultQuotas: {
     movie: Quota;
     tv: Quota;
+    /** Albums. */
+    music: Quota;
   };
   /** Optional features (see constants/features) turned off for everyone. */
   disabledFeatures: string[];
@@ -584,6 +644,11 @@ interface FullPublicSettings extends PublicSettings {
   subtitlesReady: boolean;
   /** A Trakt Client ID is set: Trakt links and watchlists can be read. */
   traktReady: boolean;
+  /**
+   * A default Lidarr is set up and music is not turned off for everyone:
+   * music can be searched, browsed and requested.
+   */
+  musicReady: boolean;
 }
 
 export interface NotificationAgentConfig {
@@ -749,6 +814,8 @@ export type JobId =
   | 'backfill-monitor'
   | 'health-watch'
   | 'plex-match-check'
+  | 'music-sync'
+  | 'music-full-scan'
   | 'database-maintenance';
 
 export interface AllSettings {
@@ -768,6 +835,8 @@ export interface AllSettings {
   backfill: BackfillSettings;
   radarr: RadarrSettings[];
   sonarr: SonarrSettings[];
+  lidarr: LidarrSettings[];
+  music: MusicSettings;
   public: PublicSettings;
   notifications: NotificationSettings;
   jobs: Record<JobId, JobSettings>;
@@ -789,6 +858,7 @@ export interface AllSettings {
 export type ServerList =
   | 'radarr'
   | 'sonarr'
+  | 'lidarr'
   | 'maintainerr'
   | 'downloadClients';
 
@@ -818,6 +888,7 @@ class Settings {
         defaultQuotas: {
           movie: {},
           tv: {},
+          music: {},
         },
         disabledFeatures: [],
         animeExcludedCountries: [],
@@ -848,6 +919,7 @@ class Settings {
         port: 32400,
         useSsl: false,
         libraries: [],
+        musicLibraries: [],
         connected: false,
         signIn: true,
       },
@@ -887,6 +959,8 @@ class Settings {
       },
       radarr: [],
       sonarr: [],
+      lidarr: [],
+      music: musicDefaults(),
       public: {
         initialized: false,
       },
@@ -1086,6 +1160,15 @@ class Settings {
         'plex-match-check': {
           schedule: '0 20 4 * * *',
         },
+        // Lidarr's progress on music requests, and each media server's newly
+        // added music. Off the five-minute marks the video scans run on.
+        'music-sync': {
+          schedule: '0 3-59/5 * * * *',
+        },
+        // Every music library and Lidarr, and what has gone from them.
+        'music-full-scan': {
+          schedule: '0 40 3 * * *',
+        },
         // Clears out rows nothing reads any more, then vacuums.
         'database-maintenance': {
           schedule: '0 45 3 * * *',
@@ -1252,6 +1335,30 @@ class Settings {
     );
   }
 
+  // Settings saved before music have neither until they are next loaded
+  // (which fills in defaults); made here so changes to them are kept.
+  get lidarr(): LidarrSettings[] {
+    if (!this.data.lidarr) {
+      this.data.lidarr = [];
+    }
+    return this.data.lidarr;
+  }
+
+  set lidarr(data: LidarrSettings[]) {
+    this.data.lidarr = data;
+  }
+
+  get music(): MusicSettings {
+    if (!this.data.music) {
+      this.data.music = musicDefaults();
+    }
+    return this.data.music;
+  }
+
+  set music(data: MusicSettings) {
+    this.data.music = data;
+  }
+
   get radarr(): RadarrSettings[] {
     return this.data.radarr;
   }
@@ -1329,6 +1436,9 @@ class Settings {
         this.data.bazarr?.hostname && this.data.bazarr?.apiKey
       ),
       traktReady: !!this.data.trakt?.clientId,
+      musicReady:
+        (this.data.lidarr ?? []).some((lidarr) => lidarr.isDefault) &&
+        !(this.data.main.disabledFeatures ?? []).includes('music'),
     };
   }
 

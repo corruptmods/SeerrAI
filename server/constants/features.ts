@@ -14,6 +14,7 @@ export const FEATURES = [
   'passkeyPrompt',
   'subtitles',
   'autoFix',
+  'music',
   'aiChat',
   'aiReasons',
   'aiPicker',

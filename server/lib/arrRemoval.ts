@@ -1,7 +1,7 @@
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
 import TheMovieDb from '@server/api/themoviedb';
-import { MediaType } from '@server/constants/media';
+import { MediaType, isVideo } from '@server/constants/media';
 import type Media from '@server/entity/Media';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -27,6 +27,11 @@ export const removeFromArr = async (
   is4k: boolean,
   { addImportExclusion = false }: { addImportExclusion?: boolean } = {}
 ): Promise<void> => {
+  // A music title's server ids are Lidarr's, and must never be read as a
+  // Radarr or Sonarr id.
+  if (!isVideo(media.mediaType)) {
+    throw new NoArrServerError('Radarr or Sonarr');
+  }
   const settings = getSettings();
   const isMovie = media.mediaType === MediaType.MOVIE;
 

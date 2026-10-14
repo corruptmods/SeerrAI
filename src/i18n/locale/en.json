@@ -523,6 +523,8 @@
   "components.Common.FeatureSwitches.autoFixTip": "Acts on a reported issue or an AI Search request at once: finds or transcribes subtitles, searches for missing episodes, replaces a broken or wrong file with another release, and comments on the issue with what it did",
   "components.Common.FeatureSwitches.deletingSoon": "Deleting Soon",
   "components.Common.FeatureSwitches.deletingSoonTip": "The row, poster badges and Keep button for titles Maintainerr is about to remove",
+  "components.Common.FeatureSwitches.music": "Music",
+  "components.Common.FeatureSwitches.musicTip": "Music in search, Discover and its own pages, and requesting albums through Lidarr",
   "components.Common.FeatureSwitches.newSeasons": "Get New Seasons",
   "components.Common.FeatureSwitches.newSeasonsTip": "The series page button that requests each new season as it premieres. Off pauses any series already followed",
   "components.Common.FeatureSwitches.offForEveryone": "Turned off for everyone by an admin",

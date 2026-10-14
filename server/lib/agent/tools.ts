@@ -4,7 +4,11 @@ import ProwlarrAPI, {
   TV_CATEGORIES,
 } from '@server/api/prowlarr';
 import TheMovieDb from '@server/api/themoviedb';
-import { MediaStatus, MediaType } from '@server/constants/media';
+import {
+  MediaStatus,
+  MediaType,
+  VIDEO_MEDIA_TYPES,
+} from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import type { AgentAction, AgentRun } from '@server/entity/AgentRun';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
@@ -272,7 +276,10 @@ const findTitle: AgentTool = {
       .slice(0, 6);
     if (found.length) {
       const media = await getRepository(Media).find({
-        where: { tmdbId: In(found.map((r) => r.id)) },
+        where: {
+          tmdbId: In(found.map((r) => r.id)),
+          mediaType: In(VIDEO_MEDIA_TYPES),
+        },
       });
       for (const r of found) {
         const type = r.media_type === 'tv' ? MediaType.TV : MediaType.MOVIE;

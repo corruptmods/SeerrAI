@@ -6,7 +6,8 @@ import type {
   TmdbSearchMovieResponse,
   TmdbSearchTvResponse,
 } from '@server/api/themoviedb/interfaces';
-import { MediaType } from '@server/constants/media';
+import type { VideoMediaType } from '@server/constants/media';
+import { MediaType, VIDEO_MEDIA_TYPES } from '@server/constants/media';
 import dataSource from '@server/datasource';
 import { Blocklist } from '@server/entity/Blocklist';
 import Media from '@server/entity/Media';
@@ -138,7 +139,7 @@ class BlocklistedTagProcessor implements RunnableScanner<StatusBase> {
   }
 
   private async processTagForType<S extends string>(
-    type: MediaType,
+    type: VideoMediaType,
     tag: string,
     em: EntityManager,
     getDiscover: (options: {
@@ -191,7 +192,7 @@ class BlocklistedTagProcessor implements RunnableScanner<StatusBase> {
   private async processResults(
     response: TmdbSearchMovieResponse | TmdbSearchTvResponse,
     keywordId: string,
-    mediaType: MediaType,
+    mediaType: VideoMediaType,
     em: EntityManager
   ) {
     const blocklistRepository = em.getRepository(Blocklist);
@@ -240,6 +241,9 @@ class BlocklistedTagProcessor implements RunnableScanner<StatusBase> {
         'blist.tmdbId = media.tmdbId AND blist.mediaType = media.mediaType'
       )
       .where(`blist.blocklistedTags IS NOT NULL`)
+      .andWhere('media.mediaType IN (:...videoTypes)', {
+        videoTypes: VIDEO_MEDIA_TYPES,
+      })
       .getMany();
 
     // Batch removes so the query doesn't get too large

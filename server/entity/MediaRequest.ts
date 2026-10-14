@@ -35,6 +35,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import AlbumRequest from './AlbumRequest';
 import EpisodeRequest from './EpisodeRequest';
 import Media from './Media';
 import SeasonRequest from './SeasonRequest';
@@ -692,6 +693,13 @@ export class MediaRequest {
   })
   public seasons: SeasonRequest[];
 
+  /** For music: the albums asked for. */
+  @OneToMany(() => AlbumRequest, (album) => album.request, {
+    eager: true,
+    cascade: true,
+  })
+  public albums: AlbumRequest[];
+
   @Column({ default: false })
   public is4k: boolean;
 
@@ -706,6 +714,10 @@ export class MediaRequest {
 
   @Column({ nullable: true })
   public languageProfileId: number;
+
+  /** For music: the Lidarr metadata profile chosen for the artist. */
+  @Column({ type: 'int', nullable: true })
+  public metadataProfileId?: number | null;
 
   /**
    * Anime or not for this request, as its requester ticked it or as an

@@ -35,6 +35,7 @@ import {
 } from 'typeorm';
 import Issue from './Issue';
 import { MediaRequest } from './MediaRequest';
+import MusicAlbum from './MusicAlbum';
 import Season from './Season';
 
 /** Where a title can be played on one media server. */
@@ -51,6 +52,7 @@ export interface PlayLink {
 
 @Entity()
 @Index(['tmdbId', 'mediaType'])
+@Index(['mediaType', 'foreignId'], { unique: true })
 class Media {
   /**
    * The media Seerr has for these titles. Throws when the database cannot
@@ -159,6 +161,13 @@ class Media {
   @Index()
   public tvdbId?: number;
 
+  /**
+   * A title's id outside TMDB: an artist's MusicBrainz id, for music (whose
+   * tmdbId is 0). Null for films and series.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  public foreignId?: string | null;
+
   @Column({ nullable: true })
   @Index()
   public imdbId?: string;
@@ -187,6 +196,10 @@ class Media {
 
   @OneToMany(() => Issue, (issue) => issue.media, { cascade: true })
   public issues: Issue[];
+
+  /** An artist's albums. Only loaded when asked for. */
+  @OneToMany(() => MusicAlbum, (album) => album.media)
+  public musicAlbums?: MusicAlbum[];
 
   @OneToOne(() => Blocklist, (blocklist) => blocklist.media)
   public blocklist: Promise<Blocklist>;

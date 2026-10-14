@@ -1,5 +1,9 @@
 import TautulliAPI from '@server/api/tautulli';
-import { MediaStatus, MediaType } from '@server/constants/media';
+import {
+  MediaStatus,
+  MediaType,
+  VIDEO_MEDIA_TYPES,
+} from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import MediaEvent from '@server/entity/MediaEvent';
@@ -82,13 +86,16 @@ mediaRoutes.get('/', async (req, res, next) => {
       };
   }
 
-  let whereClause: FindOneOptions<Media>['where'];
-  if (statusFilter || req.query.sort === 'mediaAdded') {
-    whereClause = {};
-    if (statusFilter) whereClause.status = statusFilter;
-    if (req.query.sort === 'mediaAdded')
-      whereClause.mediaAddedAt = Not(IsNull());
-  }
+  // Films and series unless another type is asked for: what lists them
+  // (Recently Added) shows each as a film or a series.
+  const mediaType = Object.values(MediaType).find(
+    (type) => type === req.query.mediaType
+  );
+  const whereClause: FindOneOptions<Media>['where'] = {
+    mediaType: mediaType ?? In(VIDEO_MEDIA_TYPES),
+  };
+  if (statusFilter) whereClause.status = statusFilter;
+  if (req.query.sort === 'mediaAdded') whereClause.mediaAddedAt = Not(IsNull());
 
   try {
     const [media, mediaCount] = await mediaRepository.findAndCount({

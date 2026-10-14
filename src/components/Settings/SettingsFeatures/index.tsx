@@ -84,6 +84,11 @@ const SettingsFeatures = () => {
             disabled={data.disabled}
             saving={saving}
             aiReady={currentSettings.aiReady}
+            // Turned off for everyone, music is not "ready", but its switch
+            // has to stay here to turn it back on.
+            musicReady={
+              currentSettings.musicReady || data.disabled.includes('music')
+            }
             onChange={change}
           />
         </div>

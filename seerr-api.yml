@@ -10983,7 +10983,7 @@ paths:
           name: mediaType
           description: >-
             One value, or several comma-separated, e.g. "movie,tv". Allowed:
-            movie, tv, all.
+            movie, tv, music, all. "all", or none, lists films and series.
           schema:
             type: string
             nullable: true
@@ -11187,6 +11187,8 @@ paths:
                   movie:
                     type: number
                   tv:
+                    type: number
+                  music:
                     type: number
                   pending:
                     type: number
@@ -12033,6 +12035,12 @@ paths:
             type: string
             enum: [added, modified, mediaAdded]
             default: added
+        - in: query
+          name: mediaType
+          description: Only this type. Without it, films and series.
+          schema:
+            type: string
+            enum: [movie, tv, music]
       responses:
         '200':
           description: Returned media

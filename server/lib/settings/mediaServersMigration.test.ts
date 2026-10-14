@@ -101,7 +101,13 @@ describe('settings migration 0010 (media servers)', () => {
     );
     assert.deepEqual(
       { ...after.jellyfin, connected: undefined, signIn: undefined },
-      { ...jellyfinBlock, connected: undefined, signIn: undefined }
+      // Filled in from a new server's defaults, music libraries included.
+      {
+        ...jellyfinBlock,
+        musicLibraries: [],
+        connected: undefined,
+        signIn: undefined,
+      }
     );
     assert.equal(after.jellyfin.connected, true);
     assert.equal(after.jellyfin.signIn, false);

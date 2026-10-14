@@ -73,6 +73,8 @@ export interface PublicSettingsResponse {
   subtitlesReady: boolean;
   /** A Trakt Client ID is set: Trakt links and watchlists can be read. */
   traktReady: boolean;
+  /** Lidarr is set up and music is not turned off for everyone. */
+  musicReady: boolean;
 }
 
 export interface CacheItem {

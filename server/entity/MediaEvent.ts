@@ -52,6 +52,11 @@ export class MediaEvent {
   @Column()
   public tmdbId: number;
 
+  /** For music (tmdbId 0): the artist's MusicBrainz id. */
+  @Column({ type: 'varchar', nullable: true })
+  @Index()
+  public foreignId?: string | null;
+
   @Column({ type: 'varchar' })
   public mediaType: MediaType;
 

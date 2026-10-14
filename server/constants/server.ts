@@ -58,6 +58,13 @@ export const MEDIA_ID = {
   emby: ['embyMediaId', 'embyMediaId4k'],
 } as const;
 
+/** Each server's id on a music album (MusicAlbum); there is no 4K. */
+export const MUSIC_ALBUM_ID = {
+  plex: 'ratingKey',
+  jellyfin: 'jellyfinItemId',
+  emby: 'embyItemId',
+} as const;
+
 /** Each server's account id on a person. */
 export const USER_ID = {
   plex: 'plexId',

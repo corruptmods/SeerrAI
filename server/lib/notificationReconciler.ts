@@ -3,6 +3,7 @@ import {
   MediaRequestStatus,
   MediaStatus,
   MediaType,
+  VIDEO_MEDIA_TYPES,
 } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Episode from '@server/entity/Episode';
@@ -145,24 +146,30 @@ const findUnclaimedRequests = (
   // The requester's settings are joined by hand: a query builder does not
   // load eager relations, and without them a requester's email ignored their
   // PGP key and their choice of what to be told about.
-  return requestRepository
-    .createQueryBuilder('request')
-    .leftJoinAndSelect('request.media', 'media')
-    .leftJoinAndSelect('request.requestedBy', 'requestedBy')
-    .leftJoinAndSelect('requestedBy.settings', 'requestedBySettings')
-    .leftJoinAndSelect('request.seasons', 'seasons')
-    .where('request.status = :status', { status })
-    .andWhere(
-      `NOT EXISTS (
+  return (
+    requestRepository
+      .createQueryBuilder('request')
+      .leftJoinAndSelect('request.media', 'media')
+      .leftJoinAndSelect('request.requestedBy', 'requestedBy')
+      .leftJoinAndSelect('requestedBy.settings', 'requestedBySettings')
+      .leftJoinAndSelect('request.seasons', 'seasons')
+      .where('request.status = :status', { status })
+      // Films and series: what these notifications are worded for.
+      .andWhere('request.type IN (:...videoTypes)', {
+        videoTypes: VIDEO_MEDIA_TYPES,
+      })
+      .andWhere(
+        `NOT EXISTS (
         SELECT 1 FROM notification_delivery delivery
         WHERE delivery."requestId" = request.id
           AND delivery."type" = :type
           AND delivery."userId" = 0
           AND delivery."episodeKey" = ''
       )`,
-      { type }
-    )
-    .getMany();
+        { type }
+      )
+      .getMany()
+  );
 };
 
 class NotificationReconciler {

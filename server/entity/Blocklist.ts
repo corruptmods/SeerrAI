@@ -1,7 +1,7 @@
 import {
   MediaRequestStatus,
   MediaStatus,
-  type MediaType,
+  type VideoMediaType,
 } from '@server/constants/media';
 import dataSource from '@server/datasource';
 import Media from '@server/entity/Media';
@@ -30,7 +30,7 @@ export class Blocklist implements BlocklistItem {
   public id: number;
 
   @Column({ type: 'varchar' })
-  public mediaType: MediaType;
+  public mediaType: VideoMediaType;
 
   @Column({ nullable: true, type: 'varchar' })
   title?: string;
@@ -96,7 +96,7 @@ export class Blocklist implements BlocklistItem {
       blocklistRequest,
     }: {
       blocklistRequest: {
-        mediaType: MediaType;
+        mediaType: VideoMediaType;
         title?: ZodOptional<ZodString>['_output'];
         tmdbId: ZodNumber['_output'];
         blocklistedTags?: string;

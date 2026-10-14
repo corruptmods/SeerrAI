@@ -1,6 +1,7 @@
 import dataSource, { getRepository } from '@server/datasource';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
+import MusicMetadata from '@server/entity/MusicMetadata';
 import { Session } from '@server/entity/Session';
 import agent from '@server/lib/agent';
 import { getSettings } from '@server/lib/settings';
@@ -12,7 +13,7 @@ import { In, IsNull, LessThan, Not } from 'typeorm';
  * Keeps the database from filling with rows nothing reads any more, and
  * gives the space back. Every night: sessions that ended, Backfill's
  * finished downloads and the packs it looked at past the days kept, old
- * admin agent conversations; then the database is vacuumed (Postgres) or
+ * admin agent conversations, music details long past their time; then the database is vacuumed (Postgres) or
  * checkpointed and compacted when worth it (SQLite).
  *
  * What people made is never touched: requests, issues, history, watchlists,
@@ -45,6 +46,7 @@ export interface MaintenanceReport {
     backfillJobs: number;
     backfillPacks: number;
     agentConversations: number;
+    musicMetadata: number;
   };
   /** VACUUM (ANALYZE) on Postgres; checkpoint, optimize and maybe VACUUM on SQLite. */
   vacuum: string;
@@ -91,6 +93,20 @@ const pruneBackfill = async (
   return { jobs: jobs.affected ?? 0, packs: packs.affected ?? 0 };
 };
 
+/**
+ * Kept MusicBrainz answers a month past their time. One just past it is
+ * still shown while a fresh copy is fetched; one this old is for an artist
+ * or album nobody has looked at since.
+ */
+const MUSIC_METADATA_GRACE = 30 * DAY;
+
+const pruneMusicMetadata = async (now: number): Promise<number> => {
+  const result = await getRepository(MusicMetadata).delete({
+    expiresAt: LessThan(new Date(now - MUSIC_METADATA_GRACE)),
+  });
+  return result.affected ?? 0;
+};
+
 const vacuum = async (): Promise<string> => {
   if (isPgsql) {
     // Outside a transaction, as VACUUM must be. Autovacuum does this too,
@@ -128,6 +144,7 @@ export const runDbMaintenance = async (
     const sessions = await pruneSessions(now);
     const backfill = await pruneBackfill(now);
     const agentConversations = await agent.purge(now);
+    const musicMetadata = await pruneMusicMetadata(now);
     let vacuumed: string;
     try {
       vacuumed = await vacuum();
@@ -146,6 +163,7 @@ export const runDbMaintenance = async (
         backfillJobs: backfill.jobs,
         backfillPacks: backfill.packs,
         agentConversations,
+        musicMetadata,
       },
       vacuum: vacuumed,
       tookMs: Date.now() - started,

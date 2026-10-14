@@ -18,6 +18,7 @@ import {
   UserIcon,
   XMarkIcon,
 } from '@heroicons/react/24/solid';
+import type { VideoMediaType } from '@server/constants/media';
 import { MediaRequestStatus } from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import axios from 'axios';
@@ -84,7 +85,8 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
       <RequestModal
         show={showEditModal}
         tmdbId={request.media.tmdbId}
-        type={request.type}
+        // The requests listed here are for films and series.
+        type={request.type as VideoMediaType}
         is4k={request.is4k}
         editRequest={request}
         onCancel={() => setShowEditModal(false)}

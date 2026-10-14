@@ -104,6 +104,7 @@ const UserFeatureSettings = () => {
             saving={saving}
             lockedOff={currentSettings.disabledFeatures}
             aiReady={currentSettings.aiReady}
+            musicReady={currentSettings.musicReady}
             forPerson
             hidden={adminTools}
             onChange={change}

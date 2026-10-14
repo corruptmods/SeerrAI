@@ -32,6 +32,9 @@ const messages = defineMessages('components.Common.FeatureSwitches', {
   autoFix: 'Fix Reported Problems',
   autoFixTip:
     'Acts on a reported issue or an AI Search request at once: finds or transcribes subtitles, searches for missing episodes, replaces a broken or wrong file with another release, and comments on the issue with what it did',
+  music: 'Music',
+  musicTip:
+    'Music in search, Discover and its own pages, and requesting albums through Lidarr',
   offForEveryone: 'Turned off for everyone by an admin',
   ai: 'AI',
   aiDescription:
@@ -76,6 +79,11 @@ interface FeatureSwitchesProps {
   /** Whether an admin has set up a model for the AI features. */
   aiReady: boolean;
   /**
+   * Whether music is there to switch: it only exists once an admin has set
+   * up Lidarr, and its switch is left out until then.
+   */
+  musicReady: boolean;
+  /**
    * The admin page lists every feature; someone's own page leaves out the
    * AI section until a model is set up, and tools they cannot use.
    */
@@ -91,6 +99,7 @@ const FeatureSwitches = ({
   lockedOff = [],
   saving,
   aiReady,
+  musicReady,
   forPerson = false,
   hidden = [],
   onChange,
@@ -124,7 +133,10 @@ const FeatureSwitches = ({
     );
   };
 
-  const visible = FEATURES.filter((feature) => !hidden.includes(feature));
+  const visible = FEATURES.filter(
+    (feature) =>
+      !hidden.includes(feature) && (feature !== 'music' || musicReady)
+  );
   const ai = visible.filter(isAiFeature);
   const showAi = ai.length > 0 && (aiReady || !forPerson);
 

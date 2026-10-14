@@ -1,6 +1,6 @@
 import type { JellyfinAccount, JellyfinUserItem } from '@server/api/jellyfin';
 import JellyfinAPI from '@server/api/jellyfin';
-import { MediaType } from '@server/constants/media';
+import { MediaType, VIDEO_MEDIA_TYPES } from '@server/constants/media';
 import type { JellyfinFamilyKind } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
@@ -100,6 +100,7 @@ export class JellyfinWatchSource implements WatchSource {
     if (!titleIds.length) return found;
     const media = await getRepository(Media).find({
       where: MEDIA_ID[this.kind].map((column) => ({
+        mediaType: In(VIDEO_MEDIA_TYPES),
         [column]: In(titleIds),
       })),
     });

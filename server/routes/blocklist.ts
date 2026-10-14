@@ -51,7 +51,7 @@ const releaseBlocklistedMedia = async (
 
 export const blocklistAdd = z.object({
   tmdbId: z.coerce.number(),
-  mediaType: z.nativeEnum(MediaType),
+  mediaType: z.enum([MediaType.MOVIE, MediaType.TV]),
   title: z.coerce.string().optional(),
   /** Ignored: an entry is always credited to whoever adds it. */
   user: z.coerce.number().optional(),

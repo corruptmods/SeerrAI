@@ -15,6 +15,7 @@ import {
   MediaRequestStatus,
   MediaStatus,
   MediaType,
+  VIDEO_MEDIA_TYPES,
 } from '@server/constants/media';
 import dataSource, { getRepository } from '@server/datasource';
 import BackfillJob from '@server/entity/BackfillJob';
@@ -779,6 +780,7 @@ const requestChecks = async (
       .findAndCount({
         where: {
           status: MediaRequestStatus.FAILED,
+          type: In(VIDEO_MEDIA_TYPES),
           media: { id: Not(IsNull()) },
         },
         relations: { media: true, requestedBy: true },
@@ -802,12 +804,14 @@ const requestChecks = async (
         where: [
           {
             status: MediaRequestStatus.APPROVED,
+            type: In(VIDEO_MEDIA_TYPES),
             is4k: false,
             updatedAt: LessThan(new Date(now - HOUR_MS)),
             media: { id: Not(IsNull()), externalServiceId: IsNull() },
           },
           {
             status: MediaRequestStatus.APPROVED,
+            type: In(VIDEO_MEDIA_TYPES),
             is4k: true,
             updatedAt: LessThan(new Date(now - HOUR_MS)),
             media: { id: Not(IsNull()), externalServiceId4k: IsNull() },
@@ -829,6 +833,7 @@ const requestChecks = async (
       .findAndCount({
         where: {
           status: MediaRequestStatus.PENDING,
+          type: In(VIDEO_MEDIA_TYPES),
           createdAt: LessThan(new Date(now - 7 * DAY_MS)),
         },
         relations: { media: true, requestedBy: true },
@@ -903,8 +908,16 @@ const stuckProcessing = async (
   const settings = getSettings();
   const candidates = await getRepository(Media).find({
     where: [
-      { status: MediaStatus.PROCESSING, updatedAt: LessThan(weekAgo) },
-      { status4k: MediaStatus.PROCESSING, updatedAt: LessThan(weekAgo) },
+      {
+        mediaType: In(VIDEO_MEDIA_TYPES),
+        status: MediaStatus.PROCESSING,
+        updatedAt: LessThan(weekAgo),
+      },
+      {
+        mediaType: In(VIDEO_MEDIA_TYPES),
+        status4k: MediaStatus.PROCESSING,
+        updatedAt: LessThan(weekAgo),
+      },
     ],
     order: { updatedAt: 'ASC' },
   });
@@ -1437,7 +1450,10 @@ export const searchableStuckTitles = async (): Promise<
   }
 
   const media = await getRepository(Media).find({
-    where: { id: In(wanted.map((w) => w.mediaId)) },
+    where: {
+      id: In(wanted.map((w) => w.mediaId)),
+      mediaType: In(VIDEO_MEDIA_TYPES),
+    },
   });
   const byId = new Map(media.map((m) => [m.id, m]));
   return wanted.flatMap((w) => {

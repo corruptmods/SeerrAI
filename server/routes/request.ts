@@ -6,6 +6,7 @@ import {
   MediaRequestStatus,
   MediaStatus,
   MediaType,
+  VIDEO_MEDIA_TYPES,
 } from '@server/constants/media';
 import { toSeriesTypeFor } from '@server/constants/seriesType';
 import { getRepository } from '@server/datasource';
@@ -97,7 +98,10 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         .filter((id) => Number.isFinite(id));
 
       const mediaTypes = splitParam(req.query.mediaType).filter(
-        (type) => type === 'movie' || type === 'tv'
+        (type): type is MediaType =>
+          type === MediaType.MOVIE ||
+          type === MediaType.TV ||
+          type === MediaType.MUSIC
       );
 
       /**
@@ -265,12 +269,11 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         });
       }
 
-      // Ticking both is the same as ticking neither.
-      if (mediaTypes.length && mediaTypes.length < 2) {
-        query = query.andWhere('request.type = :type', {
-          type: mediaTypes[0] === 'movie' ? MediaType.MOVIE : MediaType.TV,
-        });
-      }
+      // Ticking none is films and series: music is only listed when asked
+      // for by name.
+      query = query.andWhere('request.type IN (:...mediaTypes)', {
+        mediaTypes: mediaTypes.length ? mediaTypes : VIDEO_MEDIA_TYPES,
+      });
 
       const [requests, requestCount] = await query
         .orderBy(sortFilter, sortDirection)
@@ -332,6 +335,8 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
                 ?.profiles?.find((profile) => profile.id === r.profileId)?.name,
             };
           }
+          default:
+            return { ...r, profileName: undefined };
         }
       });
 
@@ -361,6 +366,8 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
                 ),
               };
             }
+            default:
+              return { ...r, canRemove: false };
           }
         });
       }
@@ -561,6 +568,12 @@ requestRoutes.get('/count', async (_req, res, next) => {
       })
       .getCount();
 
+    const musicCount = await query
+      .where('request.type = :requestType', {
+        requestType: MediaType.MUSIC,
+      })
+      .getCount();
+
     const pendingCount = await query
       .where('request.status = :requestStatus', {
         requestStatus: MediaRequestStatus.PENDING,
@@ -613,6 +626,7 @@ requestRoutes.get('/count', async (_req, res, next) => {
       total: totalCount,
       movie: movieCount,
       tv: tvCount,
+      music: musicCount,
       pending: pendingCount,
       approved: approvedCount,
       declined: declinedCount,

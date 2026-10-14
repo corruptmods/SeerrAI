@@ -40,6 +40,7 @@ const defaultSettings = {
   aiReady: false,
   subtitlesReady: false,
   traktReady: false,
+  musicReady: false,
 };
 
 export const SettingsContext = React.createContext<SettingsContextProps>({

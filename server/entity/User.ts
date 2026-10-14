@@ -10,7 +10,11 @@ import type { PermissionCheckOptions } from '@server/lib/permissions';
 import { Permission, hasPermission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
-import { DbAwareColumn, resolveDbType } from '@server/utils/DbColumnHelper';
+import {
+  DbAwareColumn,
+  bigNumber,
+  resolveDbType,
+} from '@server/utils/DbColumnHelper';
 import { AfterDate } from '@server/utils/dateHelpers';
 import bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
@@ -120,7 +124,12 @@ export class User {
   @Column({ type: 'varchar', nullable: true, select: false })
   public plexToken?: string | null;
 
-  @Column({ type: 'integer', default: 0 })
+  /**
+   * A bigint: Auto-Approve Music is 2^31, past what an integer column
+   * holds. Postgres hands bigints back as text, so they are read back as
+   * numbers.
+   */
+  @Column({ type: 'bigint', default: 0, transformer: bigNumber })
   public permissions = 0;
 
   @Column()
@@ -166,6 +175,13 @@ export class User {
 
   @Column({ nullable: true })
   public tvQuotaDays?: number;
+
+  /** Albums, counted as seasons are for series. */
+  @Column({ type: 'int', nullable: true })
+  public musicQuotaLimit?: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  public musicQuotaDays?: number | null;
 
   @OneToOne(() => UserSettings, (settings) => settings.user, {
     cascade: true,

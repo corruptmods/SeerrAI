@@ -25,6 +25,7 @@ import {
   TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/solid';
+import type { VideoMediaType } from '@server/constants/media';
 import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { NonFunctionProperties } from '@server/interfaces/api/common';
@@ -168,7 +169,7 @@ const RequestCardError = ({ requestData }: RequestCardErrorProps) => {
                       title={intl.formatMessage(messages.unknowntitle)}
                       inProgress={requestDownloadStatus.length > 0}
                       is4k={requestData.is4k}
-                      mediaType={requestData.type}
+                      mediaType={requestData.type as VideoMediaType}
                       plexUrl={requestData.is4k ? plexUrl4k : plexUrl}
                       serviceUrl={
                         requestData.is4k
@@ -347,7 +348,8 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
       <RequestModal
         show={showEditModal}
         tmdbId={request.media.tmdbId}
-        type={request.type}
+        // The requests listed here are for films and series.
+        type={request.type as VideoMediaType}
         is4k={request.is4k}
         editRequest={request}
         onCancel={() => setShowEditModal(false)}
@@ -490,7 +492,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                 inProgress={requestDownloadStatus.length > 0}
                 is4k={requestData.is4k}
                 tmdbId={requestData.media.tmdbId}
-                mediaType={requestData.type}
+                mediaType={requestData.type as VideoMediaType}
                 plexUrl={requestData.is4k ? plexUrl4k : plexUrl}
                 serviceUrl={
                   requestData.is4k

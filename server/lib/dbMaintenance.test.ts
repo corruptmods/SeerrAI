@@ -3,6 +3,7 @@ import AgentRun from '@server/entity/AgentRun';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
+import MusicMetadata from '@server/entity/MusicMetadata';
 import { Session } from '@server/entity/Session';
 import { runDbMaintenance } from '@server/lib/dbMaintenance';
 import { BACKFILL_DEFAULTS, getSettings } from '@server/lib/settings';
@@ -135,6 +136,16 @@ describe('database maintenance', () => {
       })
     );
 
+    const kept = (key: string, expiresAt: Date | null) =>
+      new MusicMetadata({ key, data: '{}', expiresAt });
+    await getRepository(MusicMetadata).save([
+      kept('artist:fresh', new Date(now + DAY)),
+      // Just past its time: still shown while it is fetched again.
+      kept('artist:stale', new Date(now - DAY)),
+      kept('artist:forgotten', new Date(now - 40 * DAY)),
+      kept('release-rg:forever', null),
+    ]);
+
     const report = await runDbMaintenance(now);
     assert.ok(report);
     assert.deepEqual(report.removed, {
@@ -142,7 +153,14 @@ describe('database maintenance', () => {
       backfillJobs: 1,
       backfillPacks: 2,
       agentConversations: 1,
+      musicMetadata: 1,
     });
+    assert.deepEqual(
+      (await getRepository(MusicMetadata).find({ order: { key: 'ASC' } })).map(
+        (m) => m.key
+      ),
+      ['artist:fresh', 'artist:stale', 'release-rg:forever']
+    );
     assert.match(report.vacuum, /VACUUM|checkpoint/);
 
     assert.deepEqual(

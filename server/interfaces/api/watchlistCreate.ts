@@ -4,6 +4,6 @@ import { z } from 'zod';
 export const watchlistCreate = z.object({
   ratingKey: z.coerce.string().optional(),
   tmdbId: z.coerce.number(),
-  mediaType: z.nativeEnum(MediaType),
+  mediaType: z.enum([MediaType.MOVIE, MediaType.TV]),
   title: z.coerce.string().optional(),
 });

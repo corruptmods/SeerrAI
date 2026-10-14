@@ -2,6 +2,7 @@ import Slider from '@app/components/Slider';
 import TmdbTitleCard from '@app/components/TitleCard/TmdbTitleCard';
 import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
+import type { VideoMediaType } from '@server/constants/media';
 import type { MediaResultsResponse } from '@server/interfaces/api/mediaInterfaces';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
@@ -43,7 +44,8 @@ const RecentlyAddedSlider = () => {
             id={item.id}
             tmdbId={item.tmdbId}
             tvdbId={item.tvdbId}
-            type={item.mediaType}
+            // Films and series only: /media lists music only when asked to.
+            type={item.mediaType as VideoMediaType}
           />
         ))}
       />

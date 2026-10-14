@@ -10,6 +10,7 @@ import { Permission, UserType, useUser } from '@app/hooks/useUser';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowRightCircleIcon } from '@heroicons/react/24/outline';
+import type { VideoMediaType } from '@server/constants/media';
 import type { WatchlistResponse } from '@server/interfaces/api/discoverInterfaces';
 import type {
   QuotaResponse,
@@ -395,7 +396,8 @@ const UserProfile = () => {
                   id={item.id}
                   tmdbId={item.tmdbId}
                   tvdbId={item.tvdbId}
-                  type={item.mediaType}
+                  // Watch history only ever has films and series.
+                  type={item.mediaType as VideoMediaType}
                 />
               ))}
             />

@@ -3,7 +3,11 @@ import type {
   TmdbMovieResult,
   TmdbTvResult,
 } from '@server/api/themoviedb/interfaces';
-import { MediaStatus, MediaType } from '@server/constants/media';
+import {
+  MediaStatus,
+  MediaType,
+  VIDEO_MEDIA_TYPES,
+} from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import type { User } from '@server/entity/User';
@@ -175,6 +179,7 @@ const build = async (user: User): Promise<SuggestionResult[]> => {
       await getRepository(Media).find({
         where: {
           status: MediaStatus.BLOCKLISTED,
+          mediaType: In(VIDEO_MEDIA_TYPES),
           tmdbId: In(ranked.map(({ result }) => result.id)),
         },
       })

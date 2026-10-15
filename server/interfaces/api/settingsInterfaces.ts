@@ -51,6 +51,11 @@ export interface PublicSettingsResponse {
     primary: boolean;
     signIn: boolean;
   }[];
+  /**
+   * The single sign-on providers people may sign in with: the switched-on
+   * ones, once the Application URL is set.
+   */
+  oidcProviders: { id: string; name: string; logoUrl: string }[];
   movie4kEnabled: boolean;
   series4kEnabled: boolean;
   discoverRegion: string;

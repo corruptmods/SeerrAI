@@ -44,19 +44,31 @@ export class SignInLimiter {
    * stops there.
    */
   public allow(req: Request, res: Response, account: unknown): boolean {
-    const now = Date.now();
-    const entry = attempts.get(keyFor(this.kind, req, account));
-    if (!entry || entry.resetAt <= now || entry.count < LIMIT) {
+    const wait = this.retryAfter(req, account);
+    if (!wait) {
       return true;
     }
-    res.set('Retry-After', String(Math.ceil((entry.resetAt - now) / 1000)));
+    res.set('Retry-After', String(wait));
     res.status(429).json({
       message: 'Too many attempts. Try again in a few minutes.',
     });
     return false;
   }
 
-  /** Counts a wrong password, or a reset email sent. */
+  /**
+   * How many seconds until this account may be tried again from this
+   * address; 0 when it may be now. For callers that answer in their own way.
+   */
+  public retryAfter(req: Request, account: unknown): number {
+    const now = Date.now();
+    const entry = attempts.get(keyFor(this.kind, req, account));
+    if (!entry || entry.resetAt <= now || entry.count < LIMIT) {
+      return 0;
+    }
+    return Math.ceil((entry.resetAt - now) / 1000);
+  }
+
+  /** Counts a wrong password, a reset email sent, or a failed sign-in. */
   public count(req: Request, account: unknown): void {
     const now = Date.now();
     prune(now);

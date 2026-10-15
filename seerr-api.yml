@@ -1065,6 +1065,51 @@ components:
         hasPassword:
           type: boolean
           readOnly: true
+    OidcProviderSettings:
+      type: object
+      description: A single sign-on (OpenID Connect) provider people can sign in with.
+      required:
+        - name
+        - issuerUrl
+        - clientId
+      properties:
+        id:
+          type: string
+          readOnly: true
+          description: Made from the name when the provider is added and never changed; part of its callback URL.
+          example: authentik
+        name:
+          type: string
+          description: Shown on the sign-in button, "Sign in with {name}".
+          example: Authentik
+        issuerUrl:
+          type: string
+          description: The provider's issuer URL, exactly as it gives it. https, or http on this machine only.
+          example: https://auth.example.com/application/o/seerr/
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+          description: Never returned. Blank on saving or testing keeps the saved one, while the issuer URL is unchanged.
+        logoUrl:
+          type: string
+          description: A picture for the sign-in button (https, or a path on this site); blank for none.
+        scopes:
+          type: string
+          example: openid profile email
+        enabled:
+          type: boolean
+        newUserSignUp:
+          type: boolean
+          description: Someone new signing in with this provider gets an account. Off by default.
+        hasClientSecret:
+          type: boolean
+          readOnly: true
+        callbackUrl:
+          type: string
+          nullable: true
+          readOnly: true
+          description: The redirect URL to register with the provider; null until the Application URL is set.
     BazarrSettings:
       type: object
       required:
@@ -1534,6 +1579,18 @@ components:
                 type: boolean
               signIn:
                 type: boolean
+        oidcProviders:
+          type: array
+          description: The single sign-on providers people may sign in with (switched on, with the Application URL set).
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              logoUrl:
+                type: string
     MediaServerSummary:
       type: object
       description: A media server as Settings → Media Servers shows it.
@@ -5992,6 +6049,129 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DownloadClientSettings'
+  /settings/oidc:
+    get:
+      summary: List the single sign-on providers
+      description: Client secrets are never returned. Also gives the Application URL callback URLs are built from (blank when unset) and the provider ids already taken, including removed providers' whose links remain.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  applicationUrl:
+                    type: string
+                  providers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OidcProviderSettings'
+                  takenIds:
+                    type: array
+                    items:
+                      type: string
+    post:
+      summary: Add a single sign-on provider
+      description: Checks the provider answers first; refuses to save one that does not.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OidcProviderSettings'
+      responses:
+        '201':
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcProviderSettings'
+        '400':
+          description: What is wrong, in plain words
+  /settings/oidc/test:
+    post:
+      summary: Check a single sign-on provider
+      description: Reads the provider's discovery document. With the id of a saved provider, a blank secret uses the saved one while the issuer URL is unchanged.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - issuerUrl
+                - clientId
+              properties:
+                id:
+                  type: string
+                issuerUrl:
+                  type: string
+                clientId:
+                  type: string
+                clientSecret:
+                  type: string
+      responses:
+        '200':
+          description: The provider answered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  issuer:
+                    type: string
+        '400':
+          description: What is wrong, in plain words
+  /settings/oidc/{providerId}:
+    parameters:
+      - in: path
+        name: providerId
+        required: true
+        schema:
+          type: string
+    put:
+      summary: Update a single sign-on provider
+      description: Checks the provider answers first; refuses to save one that does not. The id never changes.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OidcProviderSettings'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcProviderSettings'
+        '400':
+          description: What is wrong, in plain words
+        '404':
+          description: No such provider
+    delete:
+      summary: Remove a single sign-on provider
+      description: People's links to it stay, unused; its id is never given to another provider.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcProviderSettings'
+        '404':
+          description: No such provider
   /maintainerr/deleting:
     get:
       summary: Titles Maintainerr will delete soon
@@ -8668,6 +8848,80 @@ paths:
           description: Expired
         '403':
           description: Refused
+  /auth/oidc/{providerId}/sign-in:
+    get:
+      summary: Sign in through a single sign-on provider
+      description: A page the browser goes to, not a call. Sends it on to the provider (302) with a short-lived correlation cookie; it comes back to the callback. When the provider can't be used, it goes to the sign-in page with `?sso=` saying why.
+      security: []
+      tags:
+        - auth
+      parameters:
+        - in: path
+          name: providerId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: redirect
+          required: false
+          description: Where to go once signed in; a path on this site, as the sign-in page's own.
+          schema:
+            type: string
+      responses:
+        '302':
+          description: On to the provider, or back to the sign-in page
+  /auth/oidc/{providerId}/link:
+    get:
+      summary: Link a single sign-on account to your own
+      description: A page the browser goes to while signed in. Sends it on to the provider (302); the callback links the account it signs in as to the signed-in person, unless it is linked to someone else, and ends on Linked Accounts with `?sso=` saying how it went.
+      security: []
+      tags:
+        - auth
+      parameters:
+        - in: path
+          name: providerId
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: On to the provider, to Linked Accounts when it can't be used, or to sign in first
+  /auth/oidc/{providerId}/callback:
+    get:
+      summary: Where a single sign-on provider sends people back to
+      description: Finishes a sign-in or link (authorization code with PKCE, state and nonce, checked against the correlation cookie, which is cleared). Answers with a page that moves on to where it ends, with `?sso=` saying why when it did not go through.
+      security: []
+      x-eov-allow-unknown-query-parameters: true
+      tags:
+        - auth
+      parameters:
+        - in: path
+          name: providerId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: code
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: state
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: error
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A page that moves on to the sign-in page, Linked Accounts, or where the person was going
+          content:
+            text/html:
+              schema:
+                type: string
   /auth/logout:
     post:
       summary: Sign out and clear session cookie
@@ -10687,6 +10941,63 @@ paths:
           description: Unlink request invalid
         '404':
           description: User does not exist
+  /user/{userId}/settings/linked-accounts/oidc:
+    get:
+      summary: Someone's single sign-on links
+      description: Includes links to providers that are switched off or removed, as not available.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    provider:
+                      type: string
+                    name:
+                      type: string
+                    logoUrl:
+                      type: string
+                    username:
+                      type: string
+                      nullable: true
+                    available:
+                      type: boolean
+  /user/{userId}/settings/linked-accounts/oidc/{providerId}:
+    delete:
+      summary: Remove a single sign-on link
+      description: Only while the person keeps another way to sign in (a password, an account on a connected media server, or another provider that is switched on). A link that can't be used to sign in can always be removed.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: providerId
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Removed
+        '400':
+          description: It is their only way to sign in
+        '404':
+          description: Not linked
   /user/{userId}/settings/linked-accounts/jellyfin/quickconnect:
     post:
       summary: Link a Jellyfin account with Quick Connect

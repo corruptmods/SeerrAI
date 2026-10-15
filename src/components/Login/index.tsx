@@ -7,8 +7,10 @@ import PageTitle from '@app/components/Common/PageTitle';
 import LanguagePicker from '@app/components/Layout/LanguagePicker';
 import JellyfinLogin from '@app/components/Login/JellyfinLogin';
 import LocalLogin from '@app/components/Login/LocalLogin';
+import OidcLoginButton from '@app/components/Login/OidcLoginButton';
 import PasskeyLoginButton from '@app/components/Login/PasskeyLoginButton';
 import PlexLoginButton from '@app/components/Login/PlexLoginButton';
+import { singleSignOnOutcome } from '@app/components/Login/singleSignOnMessages';
 import useSettings from '@app/hooks/useSettings';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
@@ -87,6 +89,15 @@ const Login = () => {
     }
   }, [authToken, revalidate, intl]);
 
+  // Back from a single sign-on provider that did not sign them in: say why.
+  const oidcProviders = settings.currentSettings.oidcProviders;
+  useEffect(() => {
+    const outcome = singleSignOnOutcome(intl, router.query, oidcProviders);
+    if (outcome) {
+      setError(outcome.message);
+    }
+  }, [intl, router.query, oidcProviders]);
+
   // Effect that is triggered whenever `useUser`'s user changes. Every way of
   // signing in (Plex, Jellyfin or Emby, Quick Connect, a password, a passkey)
   // ends by revalidating the user, so this is where all of them go on: to
@@ -157,6 +168,15 @@ const Login = () => {
     ...formServers
       .filter((kind) => !showingServerForm || kind !== shownServer)
       .map(serverFormButton),
+    // Each single sign-on provider people may sign in with.
+    ...oidcProviders.map((provider) => (
+      <OidcLoginButton
+        key={`oidc-${provider.id}`}
+        provider={provider}
+        applicationUrl={settings.currentSettings.applicationUrl}
+        redirect={safeRedirect(router.query.redirect)}
+      />
+    )),
     showingServerForm && settings.currentSettings.localLogin && (
       <Button
         key="seerr"

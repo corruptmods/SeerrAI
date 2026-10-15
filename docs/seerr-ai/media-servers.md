@@ -47,7 +47,7 @@ Accounts are matched only by each server's own account, never by email across se
 
 Anyone can link their accounts on other connected servers in **Profile → Settings → Linked Accounts**, and then sign in with any of them. Linking takes signing in there (with Plex, a password, or Jellyfin's Quick Connect), an account nobody else here has, and one that server lets in: shared on Plex, or not switched off on Jellyfin or Emby. Linking doesn't change what kind of account someone has, unless they only had a password.
 
-An account can be unlinked while a password or another account on a connected server still lets its owner in. The owner keeps their account on the primary server, and their Plex account while Plex is connected.
+An account can be unlinked while a password, another account on a connected server, or a [single sign-on](./single-sign-on.md) provider that is switched on still lets its owner in. The owner keeps their account on the primary server, and their Plex account while Plex is connected.
 
 **Settings → Users** has an **Import Users** button for each connected server. People whose email or name another account already has are left out, and the import says who.
 

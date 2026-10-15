@@ -419,3 +419,121 @@ describe('a push that is not what Seerr sends', () => {
     assert.equal(worker.shown[0].options.body, 'Something arrived');
   });
 });
+
+/*
+ * Per-person Discover rows: the worker with caches that record what is
+ * emptied, and a server that answers every request (a page, or a redirect
+ * when it would send the browser on).
+ */
+const loadSessionWorker = () => {
+  const handlers: Record<string, Handler> = {};
+  const deleted: string[] = [];
+  const cache = {
+    match: async () => undefined,
+    put: async () => undefined,
+    keys: async () => [],
+    delete: async () => true,
+  };
+
+  class WorkerRequest extends Request {
+    constructor(input: string, init?: RequestInit) {
+      super(new URL(input, ORIGIN), init);
+    }
+  }
+
+  runInNewContext(source, {
+    self: {
+      location: { origin: ORIGIN },
+      addEventListener: (type: string, handler: Handler) => {
+        handlers[type] = handler;
+      },
+    },
+    clients: { matchAll: async () => [], openWindow: async () => null },
+    caches: {
+      open: async () => cache,
+      delete: async (name: string) => {
+        deleted.push(name);
+        return true;
+      },
+    },
+    navigator: {},
+    Request: WorkerRequest,
+    Response,
+    URL,
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    fetch: async (request: Request) =>
+      /\/(sign-in|link)$/.test(new URL(request.url).pathname)
+        ? // A navigation is fetched with redirects left to the browser.
+          Object.defineProperty(new Response(null, { status: 200 }), 'type', {
+            value: 'opaqueredirect',
+          })
+        : new Response('<html></html>', {
+            headers: { 'Content-Type': 'text/html' },
+          }),
+  });
+
+  /** The browser going to a page, or the page making a call. */
+  const go = async (path: string, method: 'GET' | 'POST' = 'GET') => {
+    const request = new WorkerRequest(path, { method });
+    if (method === 'GET') {
+      // Request cannot be made with mode "navigate" outside a browser.
+      Object.defineProperty(request, 'mode', { value: 'navigate' });
+    }
+    let response: Promise<Response> | undefined;
+    handlers.fetch({
+      request,
+      respondWith: (promise: Promise<Response>) => {
+        response = promise;
+      },
+      waitUntil: () => undefined,
+      preloadResponse: Promise.resolve(undefined),
+    });
+    await response;
+    const emptied = deleted.includes('discover-v3');
+    deleted.length = 0;
+    return emptied;
+  };
+
+  return { go };
+};
+
+describe('Discover rows after a sign-in or sign-out', () => {
+  it('are emptied when someone signs in or out', async () => {
+    const worker = loadSessionWorker();
+    for (const path of [
+      '/api/v1/auth/local',
+      '/api/v1/auth/plex',
+      '/api/v1/auth/jellyfin',
+      '/api/v1/auth/passkey/login',
+      '/api/v1/auth/logout',
+    ]) {
+      assert.equal(await worker.go(path, 'POST'), true, path);
+    }
+  });
+
+  it('are emptied on the way to and back from a single sign-on provider', async () => {
+    const worker = loadSessionWorker();
+    for (const path of [
+      '/api/v1/auth/oidc/authentik/sign-in?redirect=%2F',
+      '/api/v1/auth/oidc/authentik/link',
+      '/api/v1/auth/oidc/authentik/callback?code=c&state=s',
+      '/api/v1/auth/oidc/pocket-id-2/callback?error=access_denied',
+    ]) {
+      assert.equal(await worker.go(path), true, path);
+    }
+  });
+
+  it('are kept for any other page', async () => {
+    const worker = loadSessionWorker();
+    for (const path of [
+      '/',
+      '/login?sso=no-account&provider=authentik',
+      '/api/v1/auth/oidc/authentik/callback/extra',
+      '/profile/settings/linked-accounts?sso=linked&provider=authentik',
+    ]) {
+      assert.equal(await worker.go(path), false, path);
+    }
+  });
+});

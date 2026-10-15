@@ -1,5 +1,6 @@
 import type { AiFeature } from '@server/constants/features';
 import { DEFAULT_IMAGE_CACHE_MAX_MB } from '@server/constants/images';
+import { oidcApplicationUrl } from '@server/constants/oidc';
 import type { MediaServerKind } from '@server/constants/server';
 import {
   MEDIA_SERVER_KINDS,
@@ -319,6 +320,31 @@ export interface BazarrSettings {
   apiKey: string;
 }
 
+/**
+ * A provider people can sign in with (single sign-on through OpenID
+ * Connect): Authentik, Authelia, Keycloak, Pocket ID, Google and the like.
+ */
+export interface OidcProviderSettings {
+  /** Made from the name when added, and never changed: links refer to it. */
+  id: string;
+  /** Shown on the button: "Sign in with {name}". */
+  name: string;
+  issuerUrl: string;
+  clientId: string;
+  /** Never sent back to a browser. */
+  clientSecret: string;
+  /** A picture for the button; blank for none. */
+  logoUrl: string;
+  scopes: string;
+  enabled: boolean;
+  /** Someone new to Seerr gets an account on signing in. Off by default. */
+  newUserSignUp: boolean;
+}
+
+export interface OidcSettings {
+  providers: OidcProviderSettings[];
+}
+
 export interface MaintainerrSettings {
   id: number;
   name: string;
@@ -604,6 +630,13 @@ export interface PublicMediaServer {
   signIn: boolean;
 }
 
+/** A provider people may sign in with, as the sign-in page sees it. */
+export interface PublicOidcProvider {
+  id: string;
+  name: string;
+  logoUrl: string;
+}
+
 interface FullPublicSettings extends PublicSettings {
   applicationTitle: string;
   applicationUrl: string;
@@ -616,6 +649,11 @@ interface FullPublicSettings extends PublicSettings {
   mediaServerLogin: boolean;
   /** The connected media servers, the primary one first. */
   mediaServers: PublicMediaServer[];
+  /**
+   * The single sign-on providers people may sign in with: the switched-on
+   * ones, once the Application URL is set.
+   */
+  oidcProviders: PublicOidcProvider[];
   movie4kEnabled: boolean;
   series4kEnabled: boolean;
   discoverRegion: string;
@@ -833,6 +871,7 @@ export interface AllSettings {
   downloadClients: DownloadClientSettings[];
   bazarr: BazarrSettings;
   backfill: BackfillSettings;
+  oidc: OidcSettings;
   radarr: RadarrSettings[];
   sonarr: SonarrSettings[];
   lidarr: LidarrSettings[];
@@ -929,6 +968,7 @@ class Settings {
       trakt: {},
       maintainerr: [],
       downloadClients: [],
+      oidc: { providers: [] },
       bazarr: {
         hostname: '',
         port: 6767,
@@ -1265,6 +1305,14 @@ class Settings {
     this.data.downloadClients = data;
   }
 
+  get oidc(): OidcSettings {
+    return { providers: this.data.oidc?.providers ?? [] };
+  }
+
+  set oidc(data: OidcSettings) {
+    this.data.oidc = data;
+  }
+
   get bazarr(): BazarrSettings {
     return (
       this.data.bazarr ?? {
@@ -1401,6 +1449,11 @@ class Settings {
         primary: index === 0 && kind === kindOfType(this.main.mediaServerType),
         signIn: this.data[kind]?.signIn !== false,
       })),
+      oidcProviders: oidcApplicationUrl(this.data.main.applicationUrl)
+        ? this.oidc.providers
+            .filter((provider) => provider.enabled)
+            .map(({ id, name, logoUrl }) => ({ id, name, logoUrl }))
+        : [],
       // For the pages that know one Jellyfin or Emby server: Emby's when
       // Emby is the one connected.
       jellyfinExternalHost: this.jellyfinFamilyPublic().externalHostname,

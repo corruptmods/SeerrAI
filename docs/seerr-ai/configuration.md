@@ -11,6 +11,7 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | **Settings → General** | **Image Cache Size Limit**, with Enable Image Caching: posters and backdrops are also kept as AVIF and WebP at three sizes; the least recently viewed go first past the limit. | 2048 MB (at least 256) |
 | **Settings → Media Servers** | Connect, edit and remove Plex, Jellyfin and Emby, choose the primary one, and whether people may sign in with each. See [Plex, Jellyfin and Emby together](./media-servers.md). | The server chosen at setup, as primary |
 | **Settings → Users** | **Auto-Import Plex Users**: an account for everyone the Plex server is shared with, hourly. Only adds; someone deleted isn't brought back. | Off |
+| **Settings → Users → Single Sign-On** | Providers people can sign in with (Authentik, Authelia, Keycloak, Pocket ID, Google…): name, issuer URL, client ID and secret (never sent back to the browser), button logo, scopes, **Enabled**, **Let New People Sign Up**, **Test**, and the redirect URL to give the provider. Needs the Application URL. See [Single sign-on](./single-sign-on.md). | None; scopes `openid profile email`; enabled; sign-up off |
 | **Settings → Features** | Turns optional features off for everyone. See [Feature switches](#feature-switches). | All on |
 | **Settings → Services → Download Clients** | SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent, read for live progress, and for Backfill to send what it finds to. Keys and passwords are never sent back to the browser. | None |
 | **Settings → Services → Bazarr** | Subtitles and transcription. | Port 6767 |
@@ -124,6 +125,7 @@ The AI switches only appear once AI is set up.
 |---|---|
 | Profile → Settings → Features | Turn features off for yourself, music included |
 | Profile → Settings → Passkeys | Add, rename and remove passkeys |
+| Profile → Settings → Linked Accounts | Link or remove single sign-on providers, beside media server accounts |
 | Profile → Settings → General → Trakt Username | Your public Trakt watchlist is requested for you, with **Auto-Request Movies** and **Auto-Request Series** (once an admin has set up Trakt) |
 | Discover → pencil button | Rows to show on your home page |
 | Profile → Settings → Notifications → Web Push | Which notifications reach your devices |

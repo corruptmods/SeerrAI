@@ -20,6 +20,7 @@ const defaultSettings = {
   localLogin: true,
   mediaServerLogin: true,
   mediaServers: [],
+  oidcProviders: [],
   movie4kEnabled: false,
   series4kEnabled: false,
   discoverRegion: '',

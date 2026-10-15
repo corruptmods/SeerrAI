@@ -15,6 +15,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 
 - **[Installing and updating](./install.md)**: building, updating with patches, migrations, backups.
 - **[Plex, Jellyfin and Emby together](./media-servers.md)**: connecting several media servers, the primary one, sign-in, linking accounts, removing a server.
+- **[Single sign-on](./single-sign-on.md)**: letting people sign in with Authentik, Authelia, Keycloak, Pocket ID or Google.
 - **[Backfill and the admin agent](./backfill-and-agent.md)**: getting what Sonarr and Radarr can't find.
 - **[Keeping it healthy](./health.md)**: the Health page and alerts, Plex Match Check, Anime Check, the offline page.
 - **[Configuration reference](./configuration.md)**: every setting the fork adds, its default, the jobs and the feature switches.
@@ -45,4 +46,5 @@ Almost everything here is an optional feature. An admin can turn one off for eve
 | **Subtitles** | See and replace subtitles through Bazarr, or transcribe them with Whisper. |
 | **Maintainerr** | "Deleting in N days" badges, a Deleting Soon row and a Keep button. |
 | **Passkeys** | Sign in without a password. |
+| **Single sign-on** | Sign in with Authentik, Authelia, Keycloak, Pocket ID, Google or another OpenID Connect provider. |
 | **Notifications** | Bursts gathered into one, missed ones caught up, list activity, Backfill and Health. |

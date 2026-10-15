@@ -6,6 +6,7 @@ import PageTitle from '@app/components/Common/PageTitle';
 import PermissionEdit from '@app/components/PermissionEdit';
 import QuotaSelector from '@app/components/QuotaSelector';
 import { SERVER_NAMES } from '@app/components/Settings/SettingsMediaServers/names';
+import SingleSignOn from '@app/components/Settings/SettingsUsers/SingleSignOn';
 import useLazyModule from '@app/hooks/useLazyModule';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
@@ -518,6 +519,7 @@ const SettingsUsers = () => {
           </div>
         </>
       )}
+      <SingleSignOn />
       <Transition
         as="div"
         show={!!importing}

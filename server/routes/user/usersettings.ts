@@ -10,6 +10,7 @@ import {
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
+import OidcLink from '@server/entity/OidcLink';
 import { User } from '@server/entity/User';
 import UserPasskey from '@server/entity/UserPasskey';
 import { UserSettings } from '@server/entity/UserSettings';
@@ -39,6 +40,7 @@ import {
   primaryServer,
   serverName,
 } from '@server/lib/mediaServers';
+import { usableProvider, usableProviderLinks } from '@server/lib/oidc';
 import { passkeySummary } from '@server/lib/passkeys';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
@@ -412,7 +414,8 @@ const linkJellyfinAccount = async (
 
 /**
  * Unlinks someone's account on a media server, if they can still sign in
- * afterwards: with a password, or another account on a connected server.
+ * afterwards: with a password, another account on a connected server, or a
+ * single sign-on provider that is switched on.
  * The owner keeps their account on the primary server, and their Plex
  * account while Plex is connected: Seerr reaches Plex with it.
  */
@@ -463,12 +466,16 @@ const unlinkAccount = async (
   const others = connectedServers().filter(
     (other) => other !== kind && !!user[USER_ID[other]]
   );
-  if (!user.password && others.length === 0) {
+  if (
+    !user.password &&
+    others.length === 0 &&
+    (await usableProviderLinks(user.id)).length === 0
+  ) {
     return {
       status: 400,
       body: {
         message:
-          'Set a password first, or link another media server account: without either this person could not sign in.',
+          'Set a password first, or link another account: without one this person could not sign in.',
       },
     };
   }
@@ -722,6 +729,86 @@ userSettingsRoutes.delete<{ id: string }>(
     } catch (e) {
       return res.status(500).json({ message: e.message });
     }
+  }
+);
+
+/*
+ * Single sign-on links. Made by signing in at the provider (see
+ * routes/oidc.ts); listed and removed here. A provider that is switched off
+ * or removed keeps its links, shown as not available.
+ */
+userSettingsRoutes.get<{ id: string }>(
+  '/linked-accounts/oidc',
+  isOwnProfileOrAdmin(),
+  async (req, res) => {
+    const links = await getRepository(OidcLink).find({
+      where: { user: { id: Number(req.params.id) } },
+      order: { id: 'ASC' },
+    });
+    const providers = getSettings().oidc.providers;
+    return res.status(200).json(
+      links.map((link) => {
+        const provider = providers.find((p) => p.id === link.provider);
+        return {
+          provider: link.provider,
+          // A removed provider's name went with it; its id is made from it.
+          name: provider?.name ?? link.provider,
+          logoUrl: provider?.logoUrl ?? '',
+          username: link.username ?? null,
+          available: !!usableProvider(link.provider),
+        };
+      })
+    );
+  }
+);
+
+/**
+ * Removes a single sign-on link, if the person can still sign in
+ * afterwards: with a password, an account on a connected media server, or
+ * another provider that is switched on. A link that can't be used to sign
+ * in can always go.
+ */
+userSettingsRoutes.delete<{ id: string; providerId: string }>(
+  '/linked-accounts/oidc/:providerId',
+  isOwnProfileOrAdmin(),
+  async (req, res) => {
+    const user = await getRepository(User)
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where({ id: Number(req.params.id) })
+      .getOne();
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+    if (!mayEditUser(req.user, user)) {
+      return res.status(403).json({
+        message: "You do not have permission to modify this user's settings.",
+      });
+    }
+
+    const links = getRepository(OidcLink);
+    const link = await links.findOne({
+      where: { user: { id: user.id }, provider: req.params.providerId },
+    });
+    if (!link) {
+      return res.status(404).json({ message: 'That account is not linked.' });
+    }
+
+    const otherWayIn =
+      !!user.password ||
+      connectedServers().some((kind) => !!user[USER_ID[kind]]) ||
+      (await usableProviderLinks(user.id)).some(
+        (other) => other.id !== link.id
+      );
+    if (usableProvider(link.provider) && !otherWayIn) {
+      return res.status(400).json({
+        message:
+          'Set a password first, or link another account: without one this person could not sign in.',
+      });
+    }
+
+    await links.delete(link.id);
+    return res.status(204).send();
   }
 );
 

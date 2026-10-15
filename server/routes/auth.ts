@@ -37,6 +37,7 @@ import { SignInLimiter } from '@server/lib/signInLimiter';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { checkAvatarChanged } from '@server/routes/avatarproxy';
+import oidcRoutes from '@server/routes/oidc';
 import passkeyRoutes from '@server/routes/passkey';
 import { ApiError } from '@server/types/error';
 import { getAppVersion } from '@server/utils/appVersion';
@@ -54,6 +55,9 @@ const resetLimiter = new SignInLimiter('reset');
 
 // Signing in with a passkey, and managing your own.
 authRoutes.use('/passkey', passkeyRoutes);
+
+// Signing in, or linking an account, through a single sign-on provider.
+authRoutes.use('/oidc', oidcRoutes);
 
 export const quickConnectSecret = z.object({
   secret: z

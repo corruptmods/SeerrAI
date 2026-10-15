@@ -32,9 +32,13 @@ const PRECACHE_CONCURRENCY = 3;
  * Requests that start or end a session. Once one succeeds, the Discover cache
  * belongs to someone else: it is emptied before the page carries on, so the
  * next person on the device never sees the last one's rows or suggestions.
+ *
+ * Signing in (or linking an account) through a single sign-on provider is not
+ * a call but pages the browser goes to: on to the provider, and back to the
+ * callback. Those empty it whatever the answer.
  */
 const SESSION_CHANGES =
-  /^\/api\/v1\/auth\/(local|plex|jellyfin|jellyfin\/quickconnect\/authenticate|passkey\/login|logout)$/;
+  /^\/api\/v1\/auth\/(local|plex|jellyfin|jellyfin\/quickconnect\/authenticate|passkey\/login|logout|oidc\/[^/]+\/(sign-in|link|callback))$/;
 
 /** Changes after which the cached Discover rows are out of date. */
 const DISCOVER_CHANGES =
@@ -610,6 +614,12 @@ self.addEventListener('fetch', (event) => {
 
           // Settled before the page gets its response, so none of its own
           // requests can be answered with someone else's rows.
+          if (
+            url.origin === self.location.origin &&
+            SESSION_CHANGES.test(url.pathname)
+          ) {
+            await clearDiscover().catch(() => undefined);
+          }
           await checkDiscoverOwner(response).catch(() => undefined);
 
           return response;

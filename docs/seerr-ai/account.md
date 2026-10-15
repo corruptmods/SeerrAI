@@ -10,6 +10,10 @@ Passkeys belong to the server's address (Settings → General → Application UR
 
 Admins who manage users can remove someone's passkeys, for a lost device, but can't add or rename them.
 
+## Single sign-on
+
+If your admin has set up single sign-on, the sign-in page has a **Sign in with …** button for each provider, such as Authentik or Google. To use one with the account you already have here, sign in as usual first, then link it in **Profile → Settings → Linked Accounts → Link Account**. Signing out of Seerr AI doesn't sign you out of the provider. See [Single sign-on](./single-sign-on.md).
+
 ## Turning features off for yourself
 
 **Profile → Settings → Features** lists every optional feature. Turning one off there hides it for you, everywhere. A feature an admin turned off for everyone stays off. See the [list of switches](./configuration.md#feature-switches).

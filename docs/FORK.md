@@ -208,6 +208,7 @@ empty one.
 | `public/sw.js` | service worker |
 | `server/lib/mediaServers.ts` | which media servers are connected, their settings, ids and clients |
 | `src/utils/mediaServerAccounts.ts`, `src/utils/playLinks.ts` | people's server accounts, and which play link to offer them |
+| `server/lib/oidc.ts`, `server/routes/oidc.ts` | single sign-on: talking to providers, the correlation cookie, finding or making the account |
 | `server/lib/ai/` | AI: providers, limit and cache, credit, each feature's prompt |
 | `src/components/Ai/`, `src/components/AiChat/` | AI panels and the AI button |
 | `server/api/musicbrainz/`, `server/api/servarr/lidarr.ts` | MusicBrainz (its one shared queue) and Lidarr |
@@ -362,6 +363,27 @@ Do not undo these without reading why first — each was tried the other way.
   restart asks nothing again. Health judges MusicBrainz from how that
   queue has fared rather than spending a request on a check. A mirror
   (Settings → Metadata → Music) is not limited.
+- **Single sign-on finds people by provider account only.** A provider
+  (Settings → Users → Single Sign-On) signs someone in only through a
+  link of the provider's id and its own id for them (`sub`, in
+  `oidc_link`), never by email: some providers let anyone put any email
+  on an account, and an email match is how a Plex account could once take
+  over the owner's. A new person is refused, unless the provider lets new
+  people sign up; then they get an account, with the provider's email
+  only when it is verified and nobody here has it, else a stand-in that
+  isn't an email. An email someone here already has is refused with the
+  usual "sign in and link it" message. A provider's id is made from its
+  name once and never reused, even after it is removed, so its old links
+  can never start matching another provider's people. Starting and
+  finishing are pages the browser goes to, not calls: the callback is a
+  link from the provider's site, so the state, PKCE verifier, nonce and
+  return path ride in a signed, httpOnly, SameSite=Lax cookie (Strict
+  would not come back), cleared on use. The callback answers with a page
+  that moves on rather than a redirect, so a Strict session cookie (CSRF
+  protection on) is sent with the page it lands on. Everything is built
+  from the Application URL, never the request's Host. A provider sign-in
+  is proof enough on its own (no `maySignIn`), and signing out ends only
+  Seerr's session.
 - **Admins can remove someone's passkeys, not add or rename them.** For a
   lost device. The owner's and other admins' passkeys are the owner's to
   manage, as with passwords.

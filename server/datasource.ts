@@ -26,6 +26,7 @@ import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import MusicMetadata from '@server/entity/MusicMetadata';
 import { NotificationDelivery } from '@server/entity/NotificationDelivery';
+import OidcLink from '@server/entity/OidcLink';
 import OverrideRule from '@server/entity/OverrideRule';
 import RemovedPlexAccount from '@server/entity/RemovedPlexAccount';
 import Season from '@server/entity/Season';
@@ -77,6 +78,7 @@ const entities = [
   MusicAlbum,
   MusicMetadata,
   NotificationDelivery,
+  OidcLink,
   OverrideRule,
   RemovedPlexAccount,
   Season,

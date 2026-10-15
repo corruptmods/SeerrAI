@@ -68,6 +68,7 @@ import mediaServerRoutes from './mediaServers';
 import metadataRoutes from './metadata';
 import musicSettingsRoutes from './music';
 import notificationRoutes from './notifications';
+import oidcSettingsRoutes from './oidc';
 import radarrRoutes from './radarr';
 import sonarrRoutes from './sonarr';
 import tautulliSettingsRoutes from './tautulli';
@@ -92,6 +93,7 @@ settingsRoutes.use('/metadatas', metadataRoutes);
 settingsRoutes.use('/jellyfin', jellyfinSettingsRoutes('jellyfin'));
 settingsRoutes.use('/emby', jellyfinSettingsRoutes('emby'));
 settingsRoutes.use('/media-servers', mediaServerRoutes);
+settingsRoutes.use('/oidc', oidcSettingsRoutes);
 
 const libraryUpdateSchema = z.object({
   enabled: z.boolean(),

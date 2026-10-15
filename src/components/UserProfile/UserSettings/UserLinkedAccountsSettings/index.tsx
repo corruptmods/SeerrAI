@@ -5,6 +5,7 @@ import Alert from '@app/components/Common/Alert';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
 import Dropdown from '@app/components/Common/Dropdown';
 import PageTitle from '@app/components/Common/PageTitle';
+import { singleSignOnOutcome } from '@app/components/Login/singleSignOnMessages';
 import LinkJellyfinQuickConnectModal from '@app/components/UserProfile/UserSettings/UserLinkedAccountsSettings/LinkJellyfinQuickConnectModal';
 import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -12,7 +13,9 @@ import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { SERVER_NAMES, accountServers } from '@app/utils/mediaServerAccounts';
 import PlexOAuth from '@app/utils/plex';
+import { KeyIcon } from '@heroicons/react/24/outline';
 import { TrashIcon } from '@heroicons/react/24/solid';
+import { oidcApplicationUrl } from '@server/constants/oidc';
 import type {
   JellyfinFamilyKind,
   MediaServerKind,
@@ -41,6 +44,7 @@ const messages = defineMessages(
     errorUnknown: 'An unknown error occurred',
     deleteFailed: 'Unable to delete linked account.',
     notConnected: 'Not connected',
+    notAvailable: 'Not available',
     linkAccount: 'Link Account',
   }
 );
@@ -58,6 +62,16 @@ type LinkedAccount = {
   username: string;
   /** Seerr is connected to this server; the account is used to sign in. */
   connected: boolean;
+};
+
+/** An account on a single sign-on provider, linked here. */
+type ProviderLink = {
+  provider: string;
+  name: string;
+  logoUrl: string;
+  username: string | null;
+  /** The provider is switched on: the link can be used to sign in. */
+  available: boolean;
 };
 
 const UserLinkedAccountsSettings = () => {
@@ -78,9 +92,19 @@ const UserLinkedAccountsSettings = () => {
   >();
   const [showJellyfinQuickConnectModal, setShowJellyfinQuickConnectModal] =
     useState(false);
+  const { data: providerLinks, mutate: revalidateProviderLinks } = useSWR<
+    ProviderLink[]
+  >(user ? `/api/v1/user/${user.id}/settings/linked-accounts/oidc` : null);
   const [error, setError] = useState<string | null>(null);
 
   const applicationName = settings.currentSettings.applicationTitle;
+  const oidcProviders = settings.currentSettings.oidcProviders;
+  // Back from a single sign-on provider: how linking went.
+  const providerOutcome = singleSignOnOutcome(
+    intl,
+    router.query,
+    oidcProviders
+  );
 
   const mediaServers = settings.currentSettings.mediaServers;
   const primary = mediaServers.find((server) => server.primary)?.kind;
@@ -131,26 +155,52 @@ const UserLinkedAccountsSettings = () => {
     }
   };
 
-  // Each connected server they have no account linked from yet.
-  const linkable = mediaServers
-    .filter((server) => !accounts.some((a) => a.kind === server.kind))
-    .map(({ kind }) => ({
-      kind,
-      action: () => {
-        if (kind === 'plex') {
-          plexOAuth.preparePopup();
-          setTimeout(() => linkPlexAccount(), 1500);
-        } else {
-          setJellyfinModalKind(kind);
-        }
-      },
-    }));
+  // Each connected server, and each single sign-on provider, they have no
+  // account linked from yet. A provider is linked by signing in there, by
+  // way of the Application URL it sends people back to.
+  const linkable = [
+    ...mediaServers
+      .filter((server) => !accounts.some((a) => a.kind === server.kind))
+      .map(({ kind }) => ({
+        key: kind,
+        name: SERVER_NAMES[kind],
+        action: () => {
+          if (kind === 'plex') {
+            plexOAuth.preparePopup();
+            setTimeout(() => linkPlexAccount(), 1500);
+          } else {
+            setJellyfinModalKind(kind);
+          }
+        },
+      })),
+    ...oidcProviders
+      .filter((p) => !providerLinks?.some((link) => link.provider === p.id))
+      .map((p) => ({
+        key: `oidc-${p.id}`,
+        name: p.name,
+        action: () => {
+          // Not a page here but a route the server answers by sending the
+          // browser on to the provider, by way of the Application URL it
+          // comes back to: a full page load, which the router can't do.
+          const start = `${oidcApplicationUrl(
+            settings.currentSettings.applicationUrl
+          )}/api/v1/auth/oidc/${encodeURIComponent(p.id)}/link`;
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+          window.location.assign(start);
+        },
+      })),
+  ];
+
+  const usableProviderLinks = (providerLinks ?? []).filter(
+    (link) => link.available
+  );
 
   /*
    * Whether an account can be unlinked, as the server decides: never the
    * owner's account on the primary server, nor the owner's Plex account
    * while Plex is connected (Seerr reaches Plex with it), and only while a
-   * password or another account on a connected server still lets them in.
+   * password, another account on a connected server, or a single sign-on
+   * provider that is switched on still lets them in.
    */
   const mayUnlink = (account: LinkedAccount) =>
     !(
@@ -160,7 +210,29 @@ const UserLinkedAccountsSettings = () => {
           mediaServers.some((server) => server.kind === 'plex')))
     ) &&
     (!!passwordInfo?.hasPassword ||
+      usableProviderLinks.length > 0 ||
       accounts.some((other) => other.kind !== account.kind && other.connected));
+
+  /** The same for a provider link; one that can't be used can always go. */
+  const mayUnlinkProvider = (link: ProviderLink) =>
+    !link.available ||
+    !!passwordInfo?.hasPassword ||
+    accounts.some((account) => account.connected) ||
+    usableProviderLinks.some((other) => other.provider !== link.provider);
+
+  const deleteProviderLink = async (link: ProviderLink) => {
+    try {
+      await axios.delete(
+        `/api/v1/user/${user?.id}/settings/linked-accounts/oidc/${encodeURIComponent(
+          link.provider
+        )}`
+      );
+    } catch {
+      setError(intl.formatMessage(messages.deleteFailed));
+    }
+
+    await revalidateProviderLinks();
+  };
 
   const deleteRequest = async (account: MediaServerKind) => {
     try {
@@ -220,9 +292,9 @@ const UserLinkedAccountsSettings = () => {
               text={intl.formatMessage(messages.linkAccount)}
               buttonType="ghost"
             >
-              {linkable.map(({ kind, action }) => (
-                <Dropdown.Item key={kind} onClick={action}>
-                  {SERVER_NAMES[kind]}
+              {linkable.map(({ key, name, action }) => (
+                <Dropdown.Item key={key} onClick={action}>
+                  {name}
                 </Dropdown.Item>
               ))}
             </Dropdown>
@@ -230,7 +302,13 @@ const UserLinkedAccountsSettings = () => {
         )}
       </div>
       {error && <Alert title={error} type="error" />}
-      {accounts.length ? (
+      {providerOutcome && (
+        <Alert
+          title={providerOutcome.message}
+          type={providerOutcome.outcome === 'linked' ? 'info' : 'error'}
+        />
+      )}
+      {accounts.length || providerLinks?.length ? (
         <ul className="space-y-4">
           {accounts.map((acct) => {
             const Logo = SERVER_LOGOS[acct.kind];
@@ -276,6 +354,55 @@ const UserLinkedAccountsSettings = () => {
               </li>
             );
           })}
+          {providerLinks?.map((link) => (
+            <li
+              key={`oidc-${link.provider}`}
+              className="flex items-center gap-4 overflow-hidden rounded-lg bg-gray-800/50 px-4 py-5 shadow ring-1 ring-gray-700 sm:p-6"
+            >
+              <div
+                className={`flex aspect-square w-12 items-center justify-center rounded-full bg-neutral-800 ${
+                  link.available ? '' : 'opacity-50'
+                }`}
+              >
+                {link.logoUrl ? (
+                  // A picture the admin chose, from wherever it is kept.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={link.logoUrl}
+                    alt=""
+                    className="h-7 w-7 object-contain"
+                  />
+                ) : (
+                  <KeyIcon className="h-7 w-7 text-gray-300" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-bold text-gray-300">
+                  {link.name}
+                  {!link.available && (
+                    <span className="ml-2 font-normal text-gray-400">
+                      ({intl.formatMessage(messages.notAvailable)})
+                    </span>
+                  )}
+                </div>
+                <div className="truncate text-xl font-semibold text-white">
+                  {link.username}
+                </div>
+              </div>
+              <div className="flex-grow" />
+              {mayUnlinkProvider(link) && (
+                <ConfirmButton
+                  onClick={() => {
+                    deleteProviderLink(link);
+                  }}
+                  confirmText={intl.formatMessage(globalMessages.areyousure)}
+                >
+                  <TrashIcon />
+                  <span>{intl.formatMessage(globalMessages.delete)}</span>
+                </ConfirmButton>
+              )}
+            </li>
+          ))}
         </ul>
       ) : (
         <div className="mt-4 text-center md:py-12">

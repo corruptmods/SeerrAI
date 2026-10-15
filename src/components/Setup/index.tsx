@@ -130,7 +130,7 @@ const Setup = () => {
       </div>
       <div className="relative z-40 px-4 sm:mx-auto sm:w-full sm:max-w-4xl">
         <div className="relative mb-10 h-48 max-w-full sm:mx-auto sm:h-64 sm:max-w-md">
-          <Image src="/logo_stacked.svg" alt="Logo" fill />
+          <Image src="/logo_stacked_ai.svg" alt="Seerr AI" fill />
         </div>
         <AppDataWarning />
         <nav className="relative z-50">

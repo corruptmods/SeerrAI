@@ -457,7 +457,7 @@ const CollectionRequestModal = ({
                                 type="tmdb"
                                 src={
                                   part.posterPath
-                                    ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${part.posterPath}`
+                                    ? `https://image.tmdb.org/t/p/w300_and_h450_face${part.posterPath}`
                                     : '/images/seerr_poster_not_found.png'
                                 }
                                 alt=""
@@ -467,8 +467,8 @@ const CollectionRequestModal = ({
                                   height: 'auto',
                                   objectFit: 'cover',
                                 }}
-                                width={600}
-                                height={900}
+                                width={300}
+                                height={450}
                               />
                             </div>
                             <div className="flex flex-col justify-center pl-2">

@@ -1,5 +1,7 @@
+import type { OidcClaimRule, OidcProblem } from '@server/constants/oidc';
 import {
   DEFAULT_OIDC_SCOPES,
+  normalizeIssuer,
   oidcApplicationUrl,
   oidcCallbackUrl,
 } from '@server/constants/oidc';
@@ -18,6 +20,8 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import * as client from 'openid-client';
+import type { EntityManager } from 'typeorm';
+import { IsNull, Not } from 'typeorm';
 import isEmail from 'validator/lib/isEmail';
 
 /*
@@ -61,6 +65,19 @@ export const usableProvider = (
     : undefined;
 };
 
+/**
+ * Whether a link can sign someone in now: its provider can be used, and
+ * still has the issuer the link was made at. A link from before issuers
+ * were recorded has none, and goes with the provider's.
+ */
+export const linkUsable = (link: Pick<OidcLink, 'provider' | 'issuer'>) => {
+  const provider = usableProvider(link.provider);
+  return (
+    !!provider &&
+    (!link.issuer || link.issuer === normalizeIssuer(provider.issuerUrl))
+  );
+};
+
 /** Where this provider sends people back to. */
 export const callbackUrlFor = (provider: { id: string }): string =>
   oidcCallbackUrl(
@@ -85,15 +102,17 @@ const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
  * must not cross a network unencrypted. Plain http is only accepted on this
  * machine itself.
  */
-export const issuerUrlProblem = (issuerUrl: string): string | undefined => {
+export const issuerUrlProblem = (
+  issuerUrl: string
+): OidcProblem | undefined => {
   let url: URL;
   try {
     url = new URL(issuerUrl);
   } catch {
-    return 'Enter the issuer URL, starting with https://.';
+    return { problem: 'issuer-url' };
   }
   if (url.search || url.hash) {
-    return 'The issuer URL cannot have a ? or # part.';
+    return { problem: 'issuer-query' };
   }
   if (url.protocol === 'https:') {
     return undefined;
@@ -101,7 +120,7 @@ export const issuerUrlProblem = (issuerUrl: string): string | undefined => {
   if (url.protocol === 'http:' && LOOPBACK.has(url.hostname)) {
     return undefined;
   }
-  return 'The issuer URL must start with https://.';
+  return { problem: 'issuer-https' };
 };
 
 type DiscoveryTarget = Pick<
@@ -206,10 +225,13 @@ const CERTIFICATE_PROBLEMS = new Set([
 ]);
 
 /**
- * Why a provider could not be used, in plain words for the admin setting
- * it up. Nothing secret is in it: no client secret, token or code.
+ * Why a provider could not be used, for the admin setting it up. Nothing
+ * secret is in it: no client secret, token or code.
  */
-export const discoveryProblem = (e: unknown, issuerUrl: string): string => {
+export const discoveryProblem = (
+  e: unknown,
+  issuerUrl: string
+): OidcProblem => {
   let host = issuerUrl;
   try {
     host = new URL(issuerUrl).host;
@@ -222,34 +244,80 @@ export const discoveryProblem = (e: unknown, issuerUrl: string): string => {
   const name = e instanceof Error ? e.name : '';
 
   if (name === 'TimeoutError' || name === 'AbortError') {
-    return `${host} did not answer within ${OIDC_TIMEOUT_SECONDS} seconds.`;
+    return {
+      problem: 'timeout',
+      params: { host, seconds: OIDC_TIMEOUT_SECONDS },
+    };
   }
   if (code === 'OAUTH_JSON_ATTRIBUTE_COMPARISON_FAILED') {
     const said = (cause as { body?: { issuer?: unknown } } | undefined)?.body
       ?.issuer;
     return typeof said === 'string'
-      ? `The provider gives its issuer URL as ${said}. Enter exactly that (a slash at the end counts).`
-      : 'The provider gives a different issuer URL. Enter it exactly as the provider shows it.';
+      ? { problem: 'issuer-mismatch', params: { issuer: said } }
+      : { problem: 'issuer-mismatch' };
   }
   if (code === 'OAUTH_RESPONSE_IS_NOT_CONFORM') {
     const status = (cause as { status?: unknown } | undefined)?.status;
-    return `No sign-in details were found at that address${
-      typeof status === 'number' ? ` (it answered ${status})` : ''
-    }. Check the issuer URL: Seerr reads /.well-known/openid-configuration under it.`;
+    return typeof status === 'number'
+      ? { problem: 'no-discovery', params: { status } }
+      : { problem: 'no-discovery' };
   }
   if (code === 'OAUTH_RESPONSE_IS_NOT_JSON' || code === 'OAUTH_PARSE_ERROR') {
-    return 'That address answered, but not with sign-in details. Check the issuer URL.';
+    return { problem: 'not-discovery' };
   }
   if (causeCode === 'ENOTFOUND' || causeCode === 'EAI_AGAIN') {
-    return `${host} could not be found. Check the issuer URL.`;
+    return { problem: 'host-not-found', params: { host } };
   }
   if (causeCode === 'ECONNREFUSED') {
-    return `Nothing answered at ${host}.`;
+    return { problem: 'refused', params: { host } };
   }
   if (causeCode && CERTIFICATE_PROBLEMS.has(causeCode)) {
-    return `${host}'s certificate is not trusted (${causeCode}).`;
+    return { problem: 'certificate', params: { host, reason: causeCode } };
   }
-  return `Could not reach ${host}.`;
+  return { problem: 'unreachable', params: { host } };
+};
+
+/**
+ * A problem in plain English, for the log and for anyone reading the API
+ * without the settings page. The settings page shows its own translation.
+ */
+export const problemText = ({ problem, params = {} }: OidcProblem): string => {
+  switch (problem) {
+    case 'check-details':
+      return 'Check the provider details.';
+    case 'issuer-url':
+      return 'Enter the issuer URL, starting with https://.';
+    case 'issuer-query':
+      return 'The issuer URL cannot have a ? or # part.';
+    case 'issuer-https':
+      return 'The issuer URL must start with https://.';
+    case 'client-secret':
+      return 'Enter the client secret.';
+    case 'logo-url':
+      return 'The logo must be an address starting with https://, or left blank.';
+    case 'claim-name':
+      return 'Each rule needs a claim name, without spaces.';
+    case 'timeout':
+      return `${params.host} did not answer within ${params.seconds} seconds.`;
+    case 'issuer-mismatch':
+      return params.issuer !== undefined
+        ? `The provider gives its issuer URL as ${params.issuer}. Enter exactly that (a slash at the end counts).`
+        : 'The provider gives a different issuer URL. Enter it exactly as the provider shows it.';
+    case 'no-discovery':
+      return `No sign-in details were found at that address${
+        params.status !== undefined ? ` (it answered ${params.status})` : ''
+      }. Check the issuer URL: Seerr reads /.well-known/openid-configuration under it.`;
+    case 'not-discovery':
+      return 'That address answered, but not with sign-in details. Check the issuer URL.';
+    case 'host-not-found':
+      return `${params.host} could not be found. Check the issuer URL.`;
+    case 'refused':
+      return `Nothing answered at ${params.host}.`;
+    case 'certificate':
+      return `${params.host}'s certificate is not trusted (${params.reason}).`;
+    case 'unreachable':
+      return `Could not reach ${params.host}.`;
+  }
 };
 
 /*
@@ -383,7 +451,12 @@ export const finishAtProvider = async (
   provider: OidcProviderSettings,
   query: string,
   correlation: Correlation
-): Promise<{ identity: OidcIdentity; userinfoFailed?: unknown }> => {
+): Promise<{
+  identity: OidcIdentity;
+  /** The ID token's claims, with userinfo's over them when it was read. */
+  claims: Record<string, unknown>;
+  userinfoFailed?: unknown;
+}> => {
   const config = await discover(provider);
   // The callback address exactly as registered, with what the provider
   // added to it; nothing from the request's own Host header.
@@ -401,9 +474,11 @@ export const finishAtProvider = async (
     throw new Error('The provider sent no ID token.');
   }
 
-  // Some providers (Authelia, by default) give the name and email only
-  // from userinfo. Who someone is comes from the ID token alone; without
-  // userinfo a linked account still signs in.
+  // Some providers (Authelia, by default) give the name, email and groups
+  // only from userinfo. Who someone is comes from the ID token alone;
+  // without userinfo a linked account still signs in, unless the
+  // provider has rules for who may (the caller decides). It is asked with
+  // the same timeout as every other request to the provider.
   let details: Record<string, unknown> = { ...claims };
   let userinfoFailed: unknown;
   if (config.serverMetadata().userinfo_endpoint && tokens.access_token) {
@@ -436,8 +511,94 @@ export const finishAtProvider = async (
       displayName,
       label: text(details.preferred_username) ?? displayName ?? verifiedEmail,
     },
+    claims: details,
     userinfoFailed,
   };
+};
+
+/** Whether one claim meets one rule. */
+const meets = (claim: unknown, rule: OidcClaimRule): boolean => {
+  if (rule.value === undefined) {
+    return claim === true || claim === 'true';
+  }
+  const same = (item: unknown) =>
+    (typeof item === 'string' ||
+      typeof item === 'number' ||
+      typeof item === 'boolean') &&
+    String(item) === rule.value;
+  return Array.isArray(claim) ? claim.some(same) : same(claim);
+};
+
+/**
+ * The names of the claims that don't meet a provider's rules for who may
+ * sign in (none when everyone may). Every rule has to hold. Claim names are
+ * matched exactly, at the top level only.
+ */
+export const failedClaims = (
+  rules: OidcClaimRule[],
+  claims: Record<string, unknown>
+): string[] => [
+  ...new Set(
+    rules
+      .filter(
+        (rule) =>
+          !rule.claim ||
+          !Object.hasOwn(claims, rule.claim) ||
+          !meets(claims[rule.claim], rule)
+      )
+      .map((rule) => rule.claim)
+  ),
+];
+
+/**
+ * The link for this provider account at the provider's current issuer:
+ * one made there, or one from before issuers were recorded. A link made
+ * at an earlier issuer is someone else's: the same `sub` from a different
+ * provider says nothing about who they are.
+ */
+const findLink = async (
+  provider: OidcProviderSettings,
+  sub: string
+): Promise<OidcLink | null> => {
+  const link = await getRepository(OidcLink).findOne({
+    where: { provider: provider.id, sub },
+    relations: { user: true },
+  });
+  return link &&
+    (!link.issuer || link.issuer === normalizeIssuer(provider.issuerUrl))
+    ? link
+    : null;
+};
+
+/**
+ * Removes links to a provider made at an earlier issuer that are in the
+ * way of a new one: with the same `sub`, or the same person's. They can
+ * never sign anyone in while the provider keeps its new issuer, and each
+ * provider account, and each person, has one link per provider.
+ */
+const dropStaleLinks = async (
+  manager: EntityManager,
+  provider: OidcProviderSettings,
+  { sub, userId }: { sub: string; userId?: number }
+) => {
+  // Links with no issuer yet are the current issuer's, never stale.
+  const stale = {
+    provider: provider.id,
+    issuer: Not(normalizeIssuer(provider.issuerUrl)),
+  };
+  const found = await manager.find(OidcLink, {
+    select: { id: true },
+    where: [
+      { ...stale, sub },
+      ...(userId !== undefined ? [{ ...stale, user: { id: userId } }] : []),
+    ],
+  });
+  if (found.length > 0) {
+    await manager.delete(
+      OidcLink,
+      found.map((link) => link.id)
+    );
+  }
 };
 
 export type SignInResult =
@@ -455,14 +616,19 @@ export const accountForSignIn = async (
   identity: OidcIdentity
 ): Promise<SignInResult> => {
   const links = getRepository(OidcLink);
-  const link = await links.findOne({
-    where: { provider: provider.id, sub: identity.sub },
-    relations: { user: true },
-  });
+  const issuer = normalizeIssuer(provider.issuerUrl);
+  const link = await findLink(provider, identity.sub);
 
   if (link) {
+    const changes: Partial<OidcLink> = {};
     if (identity.label && identity.label !== link.username) {
-      await links.update(link.id, { username: identity.label });
+      changes.username = identity.label;
+    }
+    if (!link.issuer) {
+      changes.issuer = issuer;
+    }
+    if (Object.keys(changes).length > 0) {
+      await links.update(link.id, changes);
     }
     return { user: link.user, created: false };
   }
@@ -484,6 +650,7 @@ export const accountForSignIn = async (
   const settings = getSettings();
 
   const user = await dataSource.transaction(async (manager) => {
+    await dropStaleLinks(manager, provider, { sub: identity.sub });
     const created = await manager.save(
       withNewUserDefaults(
         new User({
@@ -501,6 +668,7 @@ export const accountForSignIn = async (
         user: created,
         provider: provider.id,
         sub: identity.sub,
+        issuer,
         username: identity.label ?? null,
       })
     );
@@ -524,37 +692,44 @@ export const linkToAccount = async (
   userId: number
 ): Promise<LinkResult> => {
   const links = getRepository(OidcLink);
-  const existing = await links.findOne({
-    where: { provider: provider.id, sub: identity.sub },
-    relations: { user: true },
-  });
+  const issuer = normalizeIssuer(provider.issuerUrl);
+  const existing = await findLink(provider, identity.sub);
   if (existing) {
-    return existing.user.id === userId
-      ? { linked: true }
-      : { refused: 'taken' };
-  }
-  if (
-    await links.exists({
-      where: { provider: provider.id, user: { id: userId } },
-    })
-  ) {
-    return { refused: 'already-linked' };
+    if (existing.user.id !== userId) {
+      return { refused: 'taken' };
+    }
+    if (!existing.issuer) {
+      await links.update(existing.id, { issuer });
+    }
+    return { linked: true };
   }
 
-  await links.save(
-    new OidcLink({
-      user: { id: userId } as User,
-      provider: provider.id,
-      sub: identity.sub,
-      username: identity.label ?? null,
-    })
-  );
-  return { linked: true };
+  return dataSource.transaction(async (manager): Promise<LinkResult> => {
+    await dropStaleLinks(manager, provider, { sub: identity.sub, userId });
+    if (
+      await manager.exists(OidcLink, {
+        where: { provider: provider.id, user: { id: userId } },
+      })
+    ) {
+      return { refused: 'already-linked' };
+    }
+    await manager.save(
+      new OidcLink({
+        user: { id: userId } as User,
+        provider: provider.id,
+        sub: identity.sub,
+        issuer,
+        username: identity.label ?? null,
+      })
+    );
+    return { linked: true };
+  });
 };
 
 /**
  * The providers someone could still sign in with: those they have linked
- * that are switched on (and usable, with the Application URL set).
+ * that are switched on (and usable, with the Application URL set), at the
+ * issuer they linked.
  */
 export const usableProviderLinks = async (
   userId: number
@@ -562,5 +737,20 @@ export const usableProviderLinks = async (
   const links = await getRepository(OidcLink).find({
     where: { user: { id: userId } },
   });
-  return links.filter((link) => !!usableProvider(link.provider));
+  return links.filter(linkUsable);
+};
+
+/**
+ * When a provider's issuer URL changes, its links that have no issuer yet
+ * are tied to the old one, so a different provider at the new address can
+ * never sign anyone in through them.
+ */
+export const keepLinksAtIssuer = async (
+  providerId: string,
+  oldIssuerUrl: string
+): Promise<void> => {
+  await getRepository(OidcLink).update(
+    { provider: providerId, issuer: IsNull() },
+    { issuer: normalizeIssuer(oldIssuerUrl) }
+  );
 };

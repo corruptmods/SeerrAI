@@ -1,6 +1,9 @@
+import ArtistCard from '@app/components/Music/ArtistCard';
+import MusicCard from '@app/components/Music/MusicCard';
 import MusicSlider from '@app/components/Music/MusicSlider';
 import useDebouncedState from '@app/hooks/useDebouncedState';
 import useFeature from '@app/hooks/useFeature';
+import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import type { MusicSearchResponse } from '@server/models/Music';
 import { useEffect } from 'react';
@@ -11,14 +14,23 @@ const messages = defineMessages('components.Music.MusicSearchResults', {
   artists: 'Artists',
   albums: 'Albums',
   busy: 'MusicBrainz is busy right now; music results will come with your next search.',
+  failed: 'MusicBrainz did not answer. Try again in a moment.',
 });
 
 /**
- * Music in search results: artists and albums from MusicBrainz, loaded on
- * their own and after a longer pause in typing than films and series, as
- * MusicBrainz answers one request a second for the whole server.
+ * Music found for a search: artists and albums from MusicBrainz, after a
+ * longer pause in typing than films and series, as MusicBrainz answers one
+ * request a second for the whole server. Shown where music is asked for
+ * (Search's Music, the Music page) as a page of cards, or, with `rows`, as
+ * an Artists row and an Albums row below the films and series in All.
  */
-const MusicSearchResults = ({ query }: { query: string }) => {
+const MusicSearchResults = ({
+  query,
+  rows = false,
+}: {
+  query: string;
+  rows?: boolean;
+}) => {
   const intl = useIntl();
   const musicOn = useFeature('music');
   const [, settled, setQuery] = useDebouncedState(query.trim(), 700);
@@ -38,30 +50,98 @@ const MusicSearchResults = ({ query }: { query: string }) => {
     return null;
   }
 
-  const waiting = isLoading || settled !== query.trim();
+  // Turned off since the page loaded: there is no music to show.
+  if (error?.response?.status === 403) {
+    return null;
+  }
 
   if (error) {
-    return error.response?.status === 503 ? (
-      <p className="mb-4 text-sm text-gray-400">
-        {intl.formatMessage(messages.busy)}
+    return (
+      <p className="mt-8 text-center text-gray-400">
+        {error.response?.status === 503
+          ? intl.formatMessage(messages.busy)
+          : intl.formatMessage(messages.failed)}
       </p>
-    ) : null;
+    );
+  }
+
+  const waiting = !data && (isLoading || settled !== query.trim());
+
+  if (rows) {
+    // Below the films and series: a row with nothing in it is left out, and
+    // nothing found says nothing, as the films and series above have
+    // already answered the search.
+    return (
+      <div className="mt-8 space-y-6">
+        <MusicSlider
+          sliderKey="search-artists"
+          title={intl.formatMessage(messages.artists)}
+          items={data?.artists}
+          isLoading={waiting}
+        />
+        <MusicSlider
+          sliderKey="search-albums"
+          title={intl.formatMessage(messages.albums)}
+          items={data?.albums}
+          isLoading={waiting}
+        />
+      </div>
+    );
+  }
+
+  if (waiting) {
+    return (
+      <ul className="cards-vertical" aria-busy="true">
+        {[...Array(10)].map((_, i) => (
+          <li key={`placeholder-${i}`}>
+            <MusicCard.Placeholder canExpand />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  const artists = data?.artists ?? [];
+  const albums = data?.albums ?? [];
+
+  if (!artists.length && !albums.length) {
+    return (
+      <div className="mt-16 w-full text-center text-2xl text-gray-400">
+        {intl.formatMessage(globalMessages.noresults)}
+      </div>
+    );
   }
 
   return (
-    <div className="mb-6">
-      <MusicSlider
-        sliderKey="search-artists"
-        title={intl.formatMessage(messages.artists)}
-        items={data?.artists}
-        isLoading={waiting && !data}
-      />
-      <MusicSlider
-        sliderKey="search-albums"
-        title={intl.formatMessage(messages.albums)}
-        items={data?.albums}
-        isLoading={waiting && !data}
-      />
+    <div className="space-y-6">
+      {artists.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-lg font-bold text-gray-200">
+            {intl.formatMessage(messages.artists)}
+          </h2>
+          <ul className="cards-vertical">
+            {artists.map((artist) => (
+              <li key={artist.id}>
+                <ArtistCard artist={artist} canExpand />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {albums.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-lg font-bold text-gray-200">
+            {intl.formatMessage(messages.albums)}
+          </h2>
+          <ul className="cards-vertical">
+            {albums.map((album) => (
+              <li key={album.id}>
+                <MusicCard album={album} canExpand />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 };

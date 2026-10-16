@@ -21,6 +21,11 @@ type OptionType = {
 };
 
 const messages = defineMessages('components.Settings.SonarrModal', {
+  seriesTypeStandard: 'Standard',
+  seriesTypeDaily: 'Daily',
+  seriesTypeAnime: 'Anime',
+  monitorAll: 'All',
+  monitorNone: 'None',
   createsonarr: 'Add New Sonarr Server',
   create4ksonarr: 'Add New 4K Sonarr Server',
   editsonarr: 'Edit Sonarr Server',
@@ -571,8 +576,12 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
                         name="seriesType"
                         disabled={!isValidated || isTesting}
                       >
-                        <option value="standard">Standard</option>
-                        <option value="daily">Daily</option>
+                        <option value="standard">
+                          {intl.formatMessage(messages.seriesTypeStandard)}
+                        </option>
+                        <option value="daily">
+                          {intl.formatMessage(messages.seriesTypeDaily)}
+                        </option>
                       </Field>
                     </div>
                   </div>
@@ -791,8 +800,12 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
                         name="animeSeriesType"
                         disabled={!isValidated || isTesting}
                       >
-                        <option value="anime">Anime</option>
-                        <option value="standard">Standard</option>
+                        <option value="anime">
+                          {intl.formatMessage(messages.seriesTypeAnime)}
+                        </option>
+                        <option value="standard">
+                          {intl.formatMessage(messages.seriesTypeStandard)}
+                        </option>
                       </Field>
                     </div>
                   </div>
@@ -1026,8 +1039,12 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
                         name="monitorNewItems"
                         disabled={!isValidated || isTesting}
                       >
-                        <option value="all">All</option>
-                        <option value="none">None</option>
+                        <option value="all">
+                          {intl.formatMessage(messages.monitorAll)}
+                        </option>
+                        <option value="none">
+                          {intl.formatMessage(messages.monitorNone)}
+                        </option>
                       </Field>
                     </div>
                   </div>

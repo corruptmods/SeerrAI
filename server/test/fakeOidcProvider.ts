@@ -37,6 +37,12 @@ export interface FakeOidcProvider {
   down: boolean;
   /** Puts these claims only in userinfo, not in the ID token. */
   claimsInUserinfoOnly: boolean;
+  /** More claims for the ID token, as a provider's mappers would add. */
+  idTokenClaims: Record<string, unknown>;
+  /** More claims for userinfo only. */
+  userinfoClaims: Record<string, unknown>;
+  /** Answers userinfo with a server error while set. */
+  userinfoDown: boolean;
   start: () => Promise<void>;
   stop: () => Promise<void>;
   reset: () => void;
@@ -102,6 +108,9 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
     tokenRequests: [],
     down: false,
     claimsInUserinfoOnly: false,
+    idTokenClaims: {},
+    userinfoClaims: {},
+    userinfoDown: false,
     start: () =>
       new Promise((resolve) => {
         server.listen(0, '127.0.0.1', () => {
@@ -122,6 +131,9 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
       fake.tokenRequests = [];
       fake.down = false;
       fake.claimsInUserinfoOnly = false;
+      fake.idTokenClaims = {};
+      fake.userinfoClaims = {};
+      fake.userinfoDown = false;
     },
     authorize: async (authorizationUrl, account, tamper = {}) => {
       const url = new URL(authorizationUrl);
@@ -232,6 +244,7 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
         iat: now,
         exp: now + 300,
         ...(issued.nonce ? { nonce: issued.nonce } : {}),
+        ...fake.idTokenClaims,
         ...(fake.claimsInUserinfoOnly
           ? { sub: issued.account.sub }
           : claimsOf(issued.account)),
@@ -250,7 +263,10 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
       if (!account) {
         return json(res, 401, { error: 'invalid_token' });
       }
-      return json(res, 200, claimsOf(account));
+      if (fake.userinfoDown) {
+        return json(res, 500, { error: 'down' });
+      }
+      return json(res, 200, { ...claimsOf(account), ...fake.userinfoClaims });
     }
 
     json(res, 404, { error: 'not_found' });

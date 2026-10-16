@@ -32,6 +32,8 @@ const messages = defineMessages('components.Discover.DiscoverSliderEdit', {
   deletesuccess: 'Sucessfully deleted slider.',
   deletefail: 'Failed to delete slider.',
   remove: 'Remove',
+  moveUp: 'Move up',
+  moveDown: 'Move down',
   enable: 'Shown to everyone',
   showForMe: 'Show on my home page',
   hideForMe: 'Hide for me only',
@@ -355,6 +357,7 @@ const DiscoverSliderEdit = ({
                   onPositionUpdate(Number(slider.id), Position.Above, true)
                 }
                 disabled={disableUpButton}
+                aria-label={intl.formatMessage(messages.moveUp)}
               >
                 <ChevronUpIcon className="h-7 w-7 md:h-6 md:w-6" />
               </button>
@@ -364,6 +367,7 @@ const DiscoverSliderEdit = ({
                   onPositionUpdate(Number(slider.id), Position.Below, true)
                 }
                 disabled={disableDownButton}
+                aria-label={intl.formatMessage(messages.moveDown)}
               >
                 <ChevronDownIcon className="h-7 w-7 md:h-6 md:w-6" />
               </button>

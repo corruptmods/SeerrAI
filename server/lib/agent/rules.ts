@@ -224,6 +224,23 @@ export const checkMapping = (
   return { ok, problems };
 };
 
+const REPLACE_WORDS =
+  /\b(replac\w*|re-?download\w*|download\w* (it |them |that |those )?again|re-?grab\w*|fix\w*|swap\w*)\b/i;
+const DELETE_WORDS = /\b(delet\w*|remov\w*|get rid of|trash|wipe)\b/i;
+
+/**
+ * Whether files may be deleted outright: only when deleting is what the
+ * admin asked for. Asked to replace or fix something, without a word about
+ * deleting, the old files go only through a replacement (replace_season,
+ * or grab with replace), never by deleting them first and leaving nothing
+ * to play until something is found. Returns why not, or null.
+ */
+export const deleteProblem = (said: string[]): string | null =>
+  said.some((text) => DELETE_WORDS.test(text)) ||
+  !said.some((text) => REPLACE_WORDS.test(text))
+    ? null
+    : 'The admin asked for a replacement, not for files to be deleted. Use replace_season for a whole season, or grab with replace: true for some episodes: the new release is downloaded first, and the old files go only after. Propose deleteFiles only when deleting is what was asked.';
+
 /** Megabytes or gigabytes, as people read sizes. */
 export const sizeOf = (bytes: number | undefined): string => {
   if (!bytes) return '?';

@@ -1015,8 +1015,11 @@ describe('linked accounts with several media servers', () => {
     assert.strictEqual(after.userType, UserType.LOCAL);
   });
 
-  it("keeps the owner's primary account, and Plex while it is connected", async () => {
+  it("keeps the owner's primary account, and Plex while it is connected", async (t) => {
     connectServers('jellyfin', 'plex', 'emby');
+    t.after(() => {
+      delete getSettings().emby.adminUserId;
+    });
     await getRepository(User).update(1, {
       jellyfinUserId: 'jf-owner',
       embyUserId: 'emby-owner',
@@ -1028,6 +1031,11 @@ describe('linked accounts with several media servers', () => {
 
     assert.strictEqual((await unlink('jellyfin')).status, 400);
     assert.strictEqual((await unlink('plex')).status, 400);
+    // Emby is read as the owner's account until another one is chosen.
+    const refused = await unlink('emby');
+    assert.strictEqual(refused.status, 400);
+    assert.match(refused.body.message, /another administrator/);
+    getSettings().emby.adminUserId = 'emby-admin';
     assert.strictEqual((await unlink('emby')).status, 204);
 
     const owner = await getRepository(User).findOneOrFail({

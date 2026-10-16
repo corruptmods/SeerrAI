@@ -34,6 +34,7 @@ import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
 const messages = defineMessages('components.Settings.SettingsLogs', {
+  pagination: 'Pagination',
   logs: 'Logs',
   logsDescription:
     'You can also view these logs directly via <code>stdout</code>, or in <code>{appDataPath}/logs/seerr.log</code>.',
@@ -427,7 +428,7 @@ const SettingsLogs = () => {
               <Table.TD colSpan={5} noPadding>
                 <nav
                   className="flex w-screen flex-col items-center space-x-4 space-y-3 px-6 py-3 sm:flex-row sm:space-y-0 md:w-full"
-                  aria-label="Pagination"
+                  aria-label={intl.formatMessage(messages.pagination)}
                 >
                   <div className="hidden lg:flex lg:flex-1">
                     <p className="text-sm">

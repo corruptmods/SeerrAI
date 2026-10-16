@@ -20,6 +20,8 @@ const messages = defineMessages('components.Login.SingleSignOn', {
   taken: 'This {provider} account is already linked to someone else here.',
   alreadyLinked:
     'You already have a {provider} account linked. Remove it first to link another.',
+  notAllowed:
+    "Your {provider} account isn't allowed to use this server. Ask an admin if you think it should be.",
   tooMany: 'Too many attempts. Try again in a few minutes.',
   linked: '{provider} is linked. You can now sign in with it.',
 });
@@ -33,6 +35,7 @@ const OUTCOME_MESSAGES: Record<OidcOutcome, keyof typeof messages> = {
   'existing-account': 'existingAccount',
   taken: 'taken',
   'already-linked': 'alreadyLinked',
+  'not-allowed': 'notAllowed',
   'too-many': 'tooMany',
   linked: 'linked',
 };

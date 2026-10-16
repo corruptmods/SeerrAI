@@ -1,3 +1,4 @@
+import { PROJECT_BRANCH, PROJECT_REPO } from '@server/constants/project';
 import type { NotificationAgentEmail } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import Email from 'email-templates';
@@ -6,6 +7,24 @@ import nodemailer from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { URL } from 'url';
 import { openpgpEncrypt } from './openpgpEncrypt';
+
+// Seerr AI's logo, light on the emails' dark background.
+const PUBLIC_LOGO_URL = `https://raw.githubusercontent.com/${PROJECT_REPO}/${PROJECT_BRANCH}/public/logo_ai_dark.svg`;
+
+/**
+ * The logo at the top of every email: the copy in the repository when the
+ * email settings say to use the public logo, else this server's own (which
+ * needs the Application URL). Without either, emails show the application's
+ * name instead.
+ */
+export const emailLogoUrl = (): string | undefined => {
+  const settings = getSettings();
+  const { applicationUrl } = settings.main;
+  if (settings.notifications.agents.email.options.usePublicLogo) {
+    return PUBLIC_LOGO_URL;
+  }
+  return applicationUrl ? `${applicationUrl}/logo_ai_dark.svg` : undefined;
+};
 
 const getSocket: SMTPTransport.Options['getSocket'] = (options, callback) => {
   if (!options.host || typeof options.port !== 'number') {

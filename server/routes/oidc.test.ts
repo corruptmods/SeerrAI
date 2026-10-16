@@ -94,6 +94,7 @@ const provider = (
   scopes: 'openid profile email',
   enabled: true,
   newUserSignUp: false,
+  requiredClaims: [],
   ...overrides,
 });
 
@@ -519,15 +520,16 @@ describe('signing in with a provider', () => {
     assert.equal(fake.discoveryCalls, 1);
   });
 
-  it('slows down someone whose callbacks keep failing', async () => {
+  it('slows down someone whose sign-ins keep failing', async () => {
     const from = '203.0.113.9';
-    for (let i = 0; i < 10; i++) {
-      const res = await request(app)
-        .get('/api/v1/auth/oidc/authentik/callback?code=x&state=y')
-        .set('X-Forwarded-For', from);
-      assert.equal(destinationOf(res).searchParams.get('sso'), 'expired');
-    }
     await linkSub('friend@seerr.dev', ALICE.sub);
+    for (let i = 0; i < 10; i++) {
+      const { destination } = await goThrough(ALICE, {
+        from,
+        tamper: { nonce: 'other' },
+      });
+      assert.equal(destination.searchParams.get('sso'), 'expired');
+    }
 
     const blocked = await goThrough(ALICE, { from });
     assert.equal(blocked.destination.searchParams.get('sso'), 'too-many');
@@ -536,6 +538,42 @@ describe('signing in with a provider', () => {
     // Someone signing in from elsewhere is not held up.
     const elsewhere = await goThrough(ALICE);
     assert.ok(await signedInAs(elsewhere.cookies));
+  });
+
+  it('never holds anyone up over callbacks no sign-in here started', async () => {
+    // Behind a proxy Seerr does not trust, everyone has the same address:
+    // callbacks made up by someone else must not lock them all out.
+    const from = '203.0.113.10';
+    for (let i = 0; i < 12; i++) {
+      for (const providerId of ['authentik', `made-up-${i}`]) {
+        const res = await request(app)
+          .get(`/api/v1/auth/oidc/${providerId}/callback?code=x&state=y`)
+          .set('X-Forwarded-For', from);
+        assert.notEqual(destinationOf(res).searchParams.get('sso'), 'too-many');
+      }
+    }
+    // Nor a genuine cookie from a sign-in with another provider.
+    const elsewhere = sealCorrelation({
+      provider: 'google',
+      state: 's',
+      verifier: 'v',
+      nonce: 'n',
+      returnTo: '/',
+      expires: Date.now() + 60_000,
+    });
+    for (let i = 0; i < 12; i++) {
+      const res = await request(app)
+        .get('/api/v1/auth/oidc/authentik/callback?code=x&state=s')
+        .set('X-Forwarded-For', from)
+        .set('Cookie', `${CORRELATION_COOKIE}=${elsewhere}`);
+      assert.equal(destinationOf(res).searchParams.get('sso'), 'expired');
+    }
+    await linkSub('friend@seerr.dev', ALICE.sub);
+
+    const { destination, cookies } = await goThrough(ALICE, { from });
+
+    assert.equal(destination.pathname, '/');
+    assert.ok(await signedInAs(cookies));
   });
 
   it('never writes a code, token or secret to the log', async () => {
@@ -563,6 +601,264 @@ describe('signing in with a provider', () => {
       assert.ok(!/"code"|code_verifier|access_token|id_token/.test(log));
     } finally {
       mocks.forEach((m) => m.mock.restore());
+    }
+  });
+});
+
+describe('who can sign in', () => {
+  const refused = (destination: URL) =>
+    destination.searchParams.get('sso') === 'not-allowed';
+
+  it('lets in someone whose claim is true, as upstream does', async () => {
+    const friend = await linkSub('friend@seerr.dev', ALICE.sub);
+    setProvider({ requiredClaims: [{ claim: 'is_seerr_user' }] });
+    fake.idTokenClaims = { is_seerr_user: true };
+
+    const { destination, cookies } = await goThrough(ALICE);
+
+    assert.equal(destination.pathname, '/');
+    assert.equal(await signedInAs(cookies), friend.id);
+  });
+
+  it('takes the string "true" as true', async () => {
+    const friend = await linkSub('friend@seerr.dev', ALICE.sub);
+    setProvider({ requiredClaims: [{ claim: 'is_seerr_user' }] });
+    fake.idTokenClaims = { is_seerr_user: 'true' };
+
+    const { cookies } = await goThrough(ALICE);
+
+    assert.equal(await signedInAs(cookies), friend.id);
+  });
+
+  it('turns away someone whose claim is missing, false or anything else', async () => {
+    await linkSub('friend@seerr.dev', ALICE.sub);
+    setProvider({ requiredClaims: [{ claim: 'is_seerr_user' }] });
+
+    for (const value of [undefined, false, 'false', 1, 'yes']) {
+      fake.idTokenClaims = value === undefined ? {} : { is_seerr_user: value };
+      const { destination, cookies } = await goThrough(ALICE);
+      assert.ok(refused(destination), `refused with ${String(value)}`);
+      assert.equal(destination.pathname, '/login');
+      assert.equal(destination.searchParams.get('provider'), 'authentik');
+      assert.equal(await signedInAs(cookies), undefined);
+    }
+  });
+
+  it('compares a value with a text claim exactly', async () => {
+    const friend = await linkSub('friend@seerr.dev', ALICE.sub);
+    setProvider({ requiredClaims: [{ claim: 'hd', value: 'example.com' }] });
+
+    fake.idTokenClaims = { hd: 'example.com' };
+    const allowed = await goThrough(ALICE);
+    assert.equal(await signedInAs(allowed.cookies), friend.id);
+
+    for (const hd of ['other.com', 'Example.com', 'example.com.evil']) {
+      fake.idTokenClaims = { hd };
+      const { destination, cookies } = await goThrough(ALICE);
+      assert.ok(refused(destination), hd);
+      assert.equal(await signedInAs(cookies), undefined);
+    }
+  });
+
+  it('looks for a value in a list claim, such as groups', async () => {
+    const friend = await linkSub('friend@seerr.dev', ALICE.sub);
+    setProvider({
+      requiredClaims: [{ claim: 'groups', value: 'seerr-users' }],
+    });
+
+    fake.idTokenClaims = { groups: ['admins', 'seerr-users'] };
+    const allowed = await goThrough(ALICE);
+    assert.equal(await signedInAs(allowed.cookies), friend.id);
+
+    for (const groups of [[], ['admins'], ['Seerr-Users'], 'admins']) {
+      fake.idTokenClaims = { groups };
+      const { destination, cookies } = await goThrough(ALICE);
+      assert.ok(refused(destination), JSON.stringify(groups));
+      assert.equal(await signedInAs(cookies), undefined);
+    }
+  });
+
+  it('needs every rule to pass', async () => {
+    const friend = await linkSub('friend@seerr.dev', ALICE.sub);
+    setProvider({
+      requiredClaims: [
+        { claim: 'groups', value: 'seerr-users' },
+        { claim: 'hd', value: 'example.com' },
+        { claim: 'is_seerr_user' },
+      ],
+    });
+
+    fake.idTokenClaims = {
+      groups: ['seerr-users'],
+      hd: 'example.com',
+      is_seerr_user: false,
+    };
+    const one = await goThrough(ALICE);
+    assert.ok(refused(one.destination));
+    assert.equal(await signedInAs(one.cookies), undefined);
+
+    fake.idTokenClaims = {
+      groups: ['seerr-users'],
+      hd: 'example.com',
+      is_seerr_user: true,
+    };
+    const all = await goThrough(ALICE);
+    assert.equal(await signedInAs(all.cookies), friend.id);
+  });
+
+  it('sees claims the provider only gives from userinfo', async () => {
+    const friend = await linkSub('friend@seerr.dev', ALICE.sub);
+    setProvider({
+      requiredClaims: [{ claim: 'groups', value: 'seerr-users' }],
+    });
+    fake.userinfoClaims = { groups: ['seerr-users'] };
+
+    const { cookies } = await goThrough(ALICE);
+
+    assert.equal(await signedInAs(cookies), friend.id);
+  });
+
+  it('turns everyone away when userinfo cannot be read and there are rules', async () => {
+    const friend = await linkSub('friend@seerr.dev', ALICE.sub);
+    setProvider({
+      requiredClaims: [{ claim: 'groups', value: 'seerr-users' }],
+    });
+    fake.idTokenClaims = { groups: ['seerr-users'] };
+    fake.userinfoDown = true;
+
+    const refusedTrip = await goThrough(ALICE);
+    assert.equal(
+      refusedTrip.destination.searchParams.get('sso'),
+      'provider',
+      'the provider is at fault, not the person'
+    );
+    assert.equal(await signedInAs(refusedTrip.cookies), undefined);
+
+    // Without rules, a linked account still signs in as before.
+    setProvider();
+    const { cookies } = await goThrough(ALICE);
+    assert.equal(await signedInAs(cookies), friend.id);
+  });
+
+  it('makes no account for someone it turns away, even with sign-up on', async () => {
+    setProvider({
+      newUserSignUp: true,
+      requiredClaims: [{ claim: 'groups', value: 'seerr-users' }],
+    });
+    fake.idTokenClaims = { groups: ['family'] };
+    const users = await getRepository(User).count();
+
+    const { destination, cookies } = await goThrough(ALICE);
+
+    assert.ok(refused(destination));
+    assert.equal(await signedInAs(cookies), undefined);
+    assert.equal(await getRepository(User).count(), users);
+    assert.equal(await getRepository(OidcLink).count(), 0);
+
+    // Let in, the same person gets their account.
+    fake.idTokenClaims = { groups: ['family', 'seerr-users'] };
+    const allowed = await goThrough(ALICE);
+    assert.ok(await signedInAs(allowed.cookies));
+    assert.equal(await getRepository(User).count(), users + 1);
+  });
+
+  it('refuses to link an account it would turn away', async () => {
+    setProvider({
+      requiredClaims: [{ claim: 'groups', value: 'seerr-users' }],
+    });
+    fake.idTokenClaims = { groups: ['family'] };
+    const session = await signInWithPassword('friend@seerr.dev');
+
+    const { destination, cookies } = await goThrough(ALICE, {
+      start: '/api/v1/auth/oidc/authentik/link',
+      cookies: session,
+    });
+
+    assert.equal(destination.pathname, '/profile/settings/linked-accounts');
+    assert.ok(refused(destination));
+    assert.equal(destination.searchParams.get('provider'), 'authentik');
+    assert.equal(await getRepository(OidcLink).count(), 0);
+    // Still signed in as themselves.
+    assert.ok(await signedInAs(cookies));
+  });
+
+  it('applies rules saved the way upstream writes them', async () => {
+    const friend = await linkSub('friend@seerr.dev', ALICE.sub);
+    // As pasted from upstream's settings.json: names in one string.
+    getSettings().oidc = {
+      providers: [
+        provider({
+          requiredClaims: 'is_seerr_user  other_claim' as never,
+        }),
+      ],
+    };
+
+    fake.idTokenClaims = { is_seerr_user: true };
+    const one = await goThrough(ALICE);
+    assert.ok(refused(one.destination));
+
+    fake.idTokenClaims = { is_seerr_user: true, other_claim: true };
+    const both = await goThrough(ALICE);
+    assert.equal(await signedInAs(both.cookies), friend.id);
+  });
+
+  it('counts each refusal toward the sign-in limit', async () => {
+    await linkSub('friend@seerr.dev', ALICE.sub);
+    setProvider({ requiredClaims: [{ claim: 'is_seerr_user' }] });
+    const from = '203.0.113.20';
+
+    for (let i = 0; i < 10; i++) {
+      const { destination } = await goThrough(ALICE, { from });
+      assert.ok(refused(destination));
+    }
+    fake.idTokenClaims = { is_seerr_user: true };
+    const blocked = await goThrough(ALICE, { from });
+    assert.equal(blocked.destination.searchParams.get('sso'), 'too-many');
+    assert.equal(await signedInAs(blocked.cookies), undefined);
+  });
+
+  it('logs which claims failed by name, never their values', async () => {
+    await linkSub('friend@seerr.dev', ALICE.sub);
+    setProvider({
+      requiredClaims: [
+        { claim: 'groups', value: 'seerr-users' },
+        { claim: 'hd', value: 'example.com' },
+        { claim: 'is_seerr_user' },
+      ],
+    });
+    fake.idTokenClaims = {
+      groups: ['secret-family-group'],
+      hd: 'private.example',
+      is_seerr_user: true,
+    };
+    const written: unknown[] = [];
+    const methods = ['info', 'warn', 'error', 'debug'] as const;
+    const mocks = methods.map((method) =>
+      mock.method(logger, method, (...args: unknown[]) => {
+        written.push(args);
+        return logger;
+      })
+    );
+    try {
+      await goThrough(ALICE);
+    } finally {
+      mocks.forEach((m) => m.mock.restore());
+    }
+    const refusal = written.find(
+      (args) =>
+        (args as [string, { outcome?: string }])[1]?.outcome === 'not-allowed'
+    ) as [string, Record<string, unknown>] | undefined;
+    assert.ok(refusal, 'the refusal is logged');
+    assert.equal(refusal[1].provider, 'authentik');
+    assert.deepEqual(refusal[1].failedClaims, ['groups', 'hd']);
+    const log = JSON.stringify(written);
+    for (const secret of [
+      'secret-family-group',
+      'private.example',
+      'seerr-users',
+      'example.com',
+    ]) {
+      assert.ok(!log.includes(secret), `no ${secret}`);
     }
   });
 });
@@ -630,6 +926,108 @@ describe('linking a provider account', () => {
       res.headers.location,
       '/login?redirect=%2Fprofile%2Fsettings%2Flinked-accounts'
     );
+  });
+});
+
+describe('a provider whose issuer URL changed', () => {
+  const OLD_ISSUER = 'https://old-idp.example/realms/home';
+
+  /** A link made while the provider was at another issuer. */
+  const linkElsewhere = async (email: string, sub: string) => {
+    const user = await getRepository(User).findOneOrFail({ where: { email } });
+    await getRepository(OidcLink).save(
+      new OidcLink({ user, provider: 'authentik', sub, issuer: OLD_ISSUER })
+    );
+    return user;
+  };
+
+  it('signs nobody in through a link made at the old issuer', async () => {
+    const friend = await linkElsewhere('friend@seerr.dev', ALICE.sub);
+
+    const { destination, cookies } = await goThrough(ALICE);
+
+    assert.equal(destination.searchParams.get('sso'), 'no-account');
+    assert.equal(await signedInAs(cookies), undefined);
+
+    // With sign-up on, the same id at the new issuer is someone new.
+    setProvider({ newUserSignUp: true });
+    const again = await goThrough(ALICE);
+    const id = await signedInAs(again.cookies);
+    assert.ok(id);
+    assert.notEqual(id, friend.id);
+  });
+
+  it('records the issuer on every new link', async () => {
+    setProvider({ newUserSignUp: true });
+
+    await goThrough(ALICE);
+
+    const link = await getRepository(OidcLink).findOneByOrFail({
+      sub: ALICE.sub,
+    });
+    assert.equal(link.issuer, fake.issuer);
+  });
+
+  it('gives a link from before issuers were recorded the current one when it is used', async () => {
+    const friend = await linkSub('friend@seerr.dev', ALICE.sub);
+
+    const { cookies } = await goThrough(ALICE);
+
+    assert.equal(await signedInAs(cookies), friend.id);
+    const link = await getRepository(OidcLink).findOneByOrFail({
+      sub: ALICE.sub,
+    });
+    assert.equal(link.issuer, fake.issuer);
+  });
+
+  it('shows a link to the old issuer as not available, and lets it go', async () => {
+    const friend = await linkElsewhere('friend@seerr.dev', ALICE.sub);
+    await getRepository(User)
+      .createQueryBuilder()
+      .update()
+      .set({ password: () => 'NULL' })
+      .where('id = :id', { id: friend.id })
+      .execute();
+    const admin = await signInWithPassword('admin@seerr.dev');
+
+    const listed = await request(app)
+      .get(`/api/v1/user/${friend.id}/settings/linked-accounts/oidc`)
+      .set('Cookie', cookieHeader(admin));
+    assert.deepEqual(
+      listed.body.map((l: { available: boolean }) => l.available),
+      [false]
+    );
+
+    // It is no way in, so it is never someone's last.
+    const removed = await request(app)
+      .delete(
+        `/api/v1/user/${friend.id}/settings/linked-accounts/oidc/authentik`
+      )
+      .set('Cookie', cookieHeader(admin));
+    assert.equal(removed.status, 204, removed.text);
+  });
+
+  it('lets people link again, in place of their old link', async () => {
+    const friend = await linkElsewhere('friend@seerr.dev', 'old-sub');
+    // Someone at the old issuer had the id the new one gives Alice.
+    await linkElsewhere('admin@seerr.dev', ALICE.sub);
+    const session = await signInWithPassword('friend@seerr.dev');
+
+    const { destination } = await goThrough(ALICE, {
+      start: '/api/v1/auth/oidc/authentik/link',
+      cookies: session,
+    });
+
+    assert.equal(destination.searchParams.get('sso'), 'linked');
+    const links = await getRepository(OidcLink).find({
+      relations: { user: true },
+    });
+    assert.deepEqual(
+      links.map((l) => [l.user.id, l.sub, l.issuer]),
+      [[friend.id, ALICE.sub, fake.issuer]]
+    );
+    const { cookies } = await goThrough(ALICE);
+    assert.equal(await signedInAs(cookies), friend.id);
   });
 });
 

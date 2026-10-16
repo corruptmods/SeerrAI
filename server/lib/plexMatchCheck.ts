@@ -330,9 +330,10 @@ class PlexMatchCheck {
 
   /**
    * The problems the last report found for one title: one per server at
-   * most, as each server matches it on its own. `key` is any server's id
-   * for the title; `keys` are ids known to be a given server's (Emby's
-   * ids and Plex's can look alike).
+   * most, as each server matches it on its own. `keys` are the title's ids,
+   * each with the server it is on; `key` alone is a Plex rating key, as
+   * Emby's ids and Plex's look alike and would find another title's
+   * problem on the other server.
    */
   public async problemFor(
     kind: 'movie' | 'series',
@@ -351,7 +352,9 @@ class PlexMatchCheck {
         ((ids.tmdbId && p.expected.tmdbId === ids.tmdbId) ||
           (ids.tvdbId && p.expected.tvdbId === ids.tvdbId) ||
           // ...or the title it matched it to, wrongly shown as available.
-          (ids.key && p.matched.key === ids.key) ||
+          (ids.key &&
+            p.matched.key === ids.key &&
+            (p.mediaServer ?? 'Plex') === 'Plex') ||
           ids.keys?.some(
             ({ mediaServer, key }) =>
               p.matched.key === key && (p.mediaServer ?? 'Plex') === mediaServer
@@ -520,7 +523,7 @@ class PlexMatchCheck {
       const { series, movies } = await this.expectedFolders();
       // Every connected server, each on its own: one that cannot be read
       // leaves the others' findings, and the report says which it was.
-      const failed: string[] = [];
+      const failed: { server: MediaServerName; message: string }[] = [];
       for (const server of servers) {
         if (this.cancelled) break;
         try {
@@ -531,16 +534,29 @@ class PlexMatchCheck {
           }
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e);
-          failed.push(
-            servers.length > 1 ? `${serverName(server)}: ${message}` : message
-          );
+          failed.push({
+            server: serverName(server) as MediaServerName,
+            message:
+              servers.length > 1
+                ? `${serverName(server)}: ${message}`
+                : message,
+          });
         }
       }
+      // A server removed while the check ran has had its findings dropped
+      // (dropServer); this report must not bring them back.
+      const stillConnected = connectedServers().map(serverName);
+      report.problems = report.problems.filter((p) =>
+        stillConnected.includes(p.mediaServer ?? 'Plex')
+      );
+      const stillFailed = failed.filter((f) =>
+        stillConnected.includes(f.server)
+      );
       report.problems.sort((a, b) =>
         a.expected.title.localeCompare(b.expected.title)
       );
-      if (failed.length) {
-        report.error = failed.join('; ');
+      if (stillFailed.length) {
+        report.error = stillFailed.map((f) => f.message).join('; ');
         logger.warn('Match Check could not finish', {
           label: 'Match Check',
           errorMessage: report.error,

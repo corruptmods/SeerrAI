@@ -54,8 +54,17 @@ interface ServerCheck {
   seasonsMap?: Map<number, boolean>;
 }
 
+/** Every server's id columns on a title, for both versions. */
+const serverIdColumns = () =>
+  MEDIA_SERVER_KINDS.flatMap((kind) => MEDIA_ID[kind]);
+
 class AvailabilitySync {
   public running = false;
+  /**
+   * The media servers changed while a run was under way (one was removed):
+   * the titles it had already checked are checked again once it finishes.
+   */
+  private runAgain = false;
   /** The connected media servers this run asks, the primary one first. */
   private servers: MediaServerKind[] = [];
   private plexClient?: PlexAPI;
@@ -85,8 +94,60 @@ class AvailabilitySync {
       });
       return;
     }
-    const settings = getSettings();
     this.running = true;
+    try {
+      do {
+        this.runAgain = false;
+        await this.syncOnce();
+        // Stopped (cancelled, or a server could not be reached): no rerun.
+      } while (this.runAgain && this.running);
+    } finally {
+      this.runAgain = false;
+      this.running = false;
+    }
+  }
+
+  /**
+   * Runs a sync now, or, when one is under way, once more after it: the
+   * media servers changed, and the titles it has already checked were
+   * checked against servers as they were.
+   */
+  public runSoon(): Promise<void> {
+    if (this.running) {
+      this.runAgain = true;
+      return Promise.resolve();
+    }
+    return this.run();
+  }
+
+  /**
+   * Stops asking a server Seerr is no longer connected to (it was removed
+   * during the run): what it has must not keep a title available.
+   */
+  private dropRemovedServers(): void {
+    const connected = connectedServers();
+    const removed = this.servers.filter(
+      (server) => !connected.includes(server)
+    );
+    if (!removed.length) {
+      return;
+    }
+    this.servers = this.servers.filter((server) => connected.includes(server));
+    for (const server of removed) {
+      if (server === 'plex') {
+        this.plexClient = undefined;
+      } else {
+        delete this.jellyfinClients[server];
+      }
+    }
+    logger.info(
+      `No longer connected to ${removed.map(serverName).join(', ')}; the rest of this sync goes without it.`,
+      { label: 'AvailabilitySync' }
+    );
+  }
+
+  private async syncOnce() {
+    const settings = getSettings();
     this.servers = connectedServers();
     this.plexClient = undefined;
     this.jellyfinClients = {};
@@ -127,6 +188,7 @@ class AvailabilitySync {
         if (!this.running) {
           throw new Error('Job aborted');
         }
+        this.dropRemovedServers();
 
         // A blocklisted title stays blocklisted, files or not: marking it
         // deleted would let it be requested again.
@@ -334,12 +396,38 @@ class AvailabilitySync {
       logger.info(`Availability sync complete.`, {
         label: 'AvailabilitySync',
       });
-      this.running = false;
     }
   }
 
   public cancel() {
     this.running = false;
+    this.runAgain = false;
+  }
+
+  /**
+   * Saves what the sync changed on a title. Every server's id is left out of
+   * the save unless the sync cleared it itself (`clearing`): the title was
+   * read at the start of its page, and a server removed since has had its
+   * ids taken off, which writing the old copy back would undo.
+   */
+  private async saveTitle(
+    media: Media,
+    clearing: ReturnType<typeof serverIdColumns> = []
+  ): Promise<void> {
+    const kept = serverIdColumns()
+      .filter((column) => !clearing.includes(column))
+      .map((column) => [column, media[column]] as const);
+    // A column left undefined is not written.
+    for (const [column] of kept) {
+      (media as unknown as Record<string, unknown>)[column] = undefined;
+    }
+    try {
+      await getRepository(Media).save(media);
+    } finally {
+      for (const [column, value] of kept) {
+        (media as unknown as Record<string, unknown>)[column] = value;
+      }
+    }
   }
 
   private async *loadAvailableMediaPaginated(pageSize: number) {
@@ -498,8 +586,6 @@ class AvailabilitySync {
   }
 
   private async mediaUpdater(media: Media, is4k: boolean): Promise<void> {
-    const mediaRepository = getRepository(Media);
-
     try {
       // Check if an approved request for this version is still in flight
       // to see if we need to keep the external metadata
@@ -543,10 +629,11 @@ class AvailabilitySync {
           ? media[is4k ? 'externalServiceSlug4k' : 'externalServiceSlug']
           : null;
       // Gone from every server: none of them keeps an id for it.
-      if (!isMediaProcessing) {
-        for (const kind of MEDIA_SERVER_KINDS) {
-          media[MEDIA_ID[kind][is4k ? 1 : 0]] = null;
-        }
+      const clearing = isMediaProcessing
+        ? []
+        : MEDIA_SERVER_KINDS.map((kind) => MEDIA_ID[kind][is4k ? 1 : 0]);
+      for (const column of clearing) {
+        media[column] = null;
       }
       logger.debug(
         `The ${is4k ? '4K' : 'non-4K'} ${
@@ -557,7 +644,7 @@ class AvailabilitySync {
         { label: 'AvailabilitySync' }
       );
 
-      await mediaRepository.save(media);
+      await this.saveTitle(media, clearing);
     } catch (ex) {
       logger.debug(
         `Failure updating the ${is4k ? '4K' : 'non-4K'} ${
@@ -576,8 +663,6 @@ class AvailabilitySync {
     seasons: Map<number, boolean>,
     is4k: boolean
   ): Promise<void> {
-    const mediaRepository = getRepository(Media);
-
     // Filter out only the values that are false
     // (media that should be deleted)
     const seasonsPendingRemoval = new Map(
@@ -619,7 +704,7 @@ class AvailabilitySync {
       }
 
       media.lastSeasonChange = new Date();
-      await mediaRepository.save(media);
+      await this.saveTitle(media);
     } catch (ex) {
       logger.debug(
         `Failure updating the ${

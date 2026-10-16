@@ -3,6 +3,7 @@ import JellyfinLogo from '@app/assets/services/jellyfin-icon.svg';
 import PlexLogo from '@app/assets/services/plex.svg';
 import Alert from '@app/components/Common/Alert';
 import Badge from '@app/components/Common/Badge';
+import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
 import PageTitle from '@app/components/Common/PageTitle';
@@ -15,6 +16,7 @@ import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
 import {
+  ArrowPathIcon,
   LinkIcon,
   PencilIcon,
   StarIcon,
@@ -67,6 +69,7 @@ const messages = defineMessages('components.Settings.SettingsMediaServers', {
     'At least one way to sign in must stay on. Turn on sign-in with a password, or with another server, first.',
   couldNotOpen:
     'That could not be opened. Check your connection and try again.',
+  loadFailed: 'The media servers could not be loaded.',
 });
 
 const LOGOS: Record<
@@ -243,6 +246,14 @@ const SettingsMediaServers = () => {
         </p>
       </div>
       <div className="section">
+        {error && !data && (
+          <Alert type="error" title={intl.formatMessage(messages.loadFailed)}>
+            <Button buttonSize="sm" onClick={() => revalidate()}>
+              <ArrowPathIcon />
+              <span>{intl.formatMessage(globalMessages.retry)}</span>
+            </Button>
+          </Alert>
+        )}
         <ul className="grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
           {data?.map((server) => {
             const Logo = LOGOS[server.kind];

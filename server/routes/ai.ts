@@ -168,7 +168,7 @@ aiRoutes.post(
 );
 
 const fixBody = z.object({
-  kind: z.enum(['broken', 'wrongEpisode']),
+  kind: z.enum(['broken', 'wrongEpisode', 'replaceSeason']),
   mediaId: z.number().int().positive(),
   seasonNumber: z.number().int().min(0).max(500).optional(),
   episodeNumber: z.number().int().min(0).max(5000).optional(),

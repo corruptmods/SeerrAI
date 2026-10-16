@@ -1,10 +1,10 @@
 import CachedImage from '@app/components/Common/CachedImage';
 import TitleCard from '@app/components/TitleCard';
+import useNearScreen from '@app/hooks/useNearScreen';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowRightCircleIcon } from '@heroicons/react/24/solid';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useInView } from 'react-intersection-observer';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.MediaSlider.ShowMoreCard', {
@@ -19,11 +19,10 @@ interface ShowMoreCardProps {
 const ShowMoreCard = ({ url, posters }: ShowMoreCardProps) => {
   const intl = useIntl();
   const [isHovered, setHovered] = useState(false);
-  const { ref, inView } = useInView({
-    triggerOnce: true,
-  });
+  // Drawn, posters and all, as it nears the screen along the row.
+  const { ref, near } = useNearScreen();
 
-  if (!inView) {
+  if (!near) {
     return (
       <div ref={ref}>
         <TitleCard.Placeholder />

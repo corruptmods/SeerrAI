@@ -1,8 +1,7 @@
 import ShowMoreCard from '@app/components/MediaSlider/ShowMoreCard';
 import PersonCard from '@app/components/PersonCard';
 import Slider from '@app/components/Slider';
-import TitleCard, { EagerPosters } from '@app/components/TitleCard';
-import useNearViewport from '@app/hooks/useNearViewport';
+import TitleCard from '@app/components/TitleCard';
 import useSettings from '@app/hooks/useSettings';
 import useTitleChanged, { pageHolds } from '@app/hooks/useTitleChanged';
 import { useUser } from '@app/hooks/useUser';
@@ -15,7 +14,6 @@ import type {
   TvResult,
 } from '@server/models/Search';
 import Link from 'next/link';
-import type { ReactElement } from 'react';
 import { useEffect } from 'react';
 import useSWRInfinite from 'swr/infinite';
 
@@ -36,9 +34,6 @@ interface MediaSliderProps {
   onNewTitles?: (titleCount: number) => void;
 }
 
-/** A first swipe's worth of cards on a wide screen. */
-const EAGER_CARDS = 8;
-
 const MediaSlider = ({
   title,
   url,
@@ -50,7 +45,6 @@ const MediaSlider = ({
 }: MediaSliderProps) => {
   const settings = useSettings();
   const { hasPermission } = useUser();
-  const { ref, near } = useNearViewport<HTMLDivElement>();
   const { data, error, setSize, size, mutate } = useSWRInfinite<MixedResult>(
     (pageIndex: number, previousPageData: MixedResult | null) => {
       if (previousPageData && pageIndex + 1 > previousPageData.totalPages) {
@@ -144,25 +138,16 @@ const MediaSlider = ({
         );
       return title;
     })
-    .map((title, index) => {
-      // Once the row is a screen or so away, the cards that fill its first
-      // swipe load at once, so they are drawn when it arrives; the rest of
-      // the row loads as it is swiped to.
-      const card = (element: ReactElement) => (
-        <EagerPosters.Provider
-          key={`${title.mediaType}-${title.id}`}
-          value={near && index < EAGER_CARDS}
-        >
-          {element}
-        </EagerPosters.Provider>
-      );
+    .map((title) => {
       switch (title.mediaType) {
         case 'movie':
-          return card(
+          return (
             <TitleCard
+              key={`${title.mediaType}-${title.id}`}
               id={title.id}
               isAddedToWatchlist={title.mediaInfo?.watchlists?.length ?? 0}
               image={title.posterPath}
+              backdrop={title.backdropPath}
               status={title.mediaInfo?.status}
               summary={title.overview}
               title={title.title}
@@ -173,11 +158,13 @@ const MediaSlider = ({
             />
           );
         case 'tv':
-          return card(
+          return (
             <TitleCard
+              key={`${title.mediaType}-${title.id}`}
               id={title.id}
               isAddedToWatchlist={title.mediaInfo?.watchlists?.length ?? 0}
               image={title.posterPath}
+              backdrop={title.backdropPath}
               status={title.mediaInfo?.status}
               summary={title.overview}
               title={title.name}
@@ -212,7 +199,7 @@ const MediaSlider = ({
   }
 
   return (
-    <div ref={ref}>
+    <div>
       <div className="slider-header">
         {linkUrl ? (
           <Link href={linkUrl} className="slider-title min-w-0 pr-16">

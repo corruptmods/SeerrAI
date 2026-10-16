@@ -1,3 +1,4 @@
+import globalMessages from '@app/i18n/globalMessages';
 import { Transition } from '@headlessui/react';
 import {
   CheckCircleIcon,
@@ -7,6 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { XMarkIcon } from '@heroicons/react/24/solid';
 import { Fragment } from 'react';
+import { useIntl } from 'react-intl';
 
 export interface ToastProps {
   appearance?: 'success' | 'error' | 'info' | 'warning';
@@ -21,6 +23,7 @@ const Toast = ({
   onDismiss,
   transitionState,
 }: ToastProps) => {
+  const intl = useIntl();
   return (
     <div className="toast pointer-events-none flex max-w-full items-end justify-center px-2 py-2 sm:items-start sm:justify-end">
       <Transition
@@ -56,6 +59,7 @@ const Toast = ({
                 <div className="ml-4 flex flex-shrink-0">
                   <button
                     onClick={() => onDismiss()}
+                    aria-label={intl.formatMessage(globalMessages.close)}
                     className="inline-flex text-gray-400 transition duration-150 ease-in-out focus:text-gray-500 focus:outline-none"
                   >
                     <XMarkIcon className="h-5 w-5" />

@@ -12,6 +12,16 @@ import {
 export type AgentTrigger = 'ask' | 'auto' | 'report';
 
 /**
+ * What a run is for. Work: looking for something, as asked or on its own.
+ * Approval: a change asked for on someone's behalf, waiting for an admin.
+ * Follow: a replaced season, followed until its new files are in. Retry:
+ * work that went on by itself after a download it started failed. An
+ * approval or a followed season is not one of the runs it may start in a
+ * day, and only work under way holds up another report of the same title.
+ */
+export type AgentRunPurpose = 'work' | 'approval' | 'follow' | 'retry';
+
+/**
  * Held: for a report, until Sonarr's or Radarr's search and Backfill's are
  * over, and only then if nothing was found. Waiting: it asked an admin
  * something and goes on once answered. A finished run goes on too when an
@@ -42,7 +52,9 @@ export interface AgentStep {
     /** An admin's answer, correction or follow-up. */
     | 'reply'
     /** It proposed changes only an admin can approve. */
-    | 'propose';
+    | 'propose'
+    /** A download it started failed, and it was told to look again. */
+    | 'followUp';
   tool?: string;
   text: string;
 }
@@ -80,6 +92,9 @@ export class AgentRun {
 
   @Column({ type: 'varchar' })
   public trigger: AgentTrigger;
+
+  @Column({ type: 'varchar', default: 'work' })
+  public purpose: AgentRunPurpose;
 
   @Index()
   @Column({ type: 'varchar', default: 'queued' })

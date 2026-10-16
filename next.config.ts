@@ -4,13 +4,11 @@ const nextConfig: NextConfig = {
   env: {
     commitTag: process.env.COMMIT_TAG || 'local',
   },
+  // Pictures load from where they are (or through Seerr's own image cache),
+  // never through Next's resizer: that would let anyone, signed in or not,
+  // have the server fetch and keep pictures outside the image cache's limit.
   images: {
-    remotePatterns: [
-      { hostname: 'gravatar.com' },
-      { hostname: 'image.tmdb.org' },
-      { hostname: 'artworks.thetvdb.com' },
-      { hostname: 'plex.tv' },
-    ],
+    unoptimized: true,
   },
   // Compression is done once, by the server, with brotli where the browser
   // accepts it (see server/index.ts). Next's own gzip stays off so a second,

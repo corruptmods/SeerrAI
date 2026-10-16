@@ -2,15 +2,18 @@ import dataSource, { getRepository } from '@server/datasource';
 import OidcLink from '@server/entity/OidcLink';
 import { User } from '@server/entity/User';
 import { AddOidcLink1794700000000 as PostgresMigration } from '@server/migration/postgres/1794700000000-AddOidcLink';
+import { AddOidcLinkIssuer1794800000000 as PostgresIssuerMigration } from '@server/migration/postgres/1794800000000-AddOidcLinkIssuer';
 import { AddOidcLink1794700000000 as SqliteMigration } from '@server/migration/sqlite/1794700000000-AddOidcLink';
+import { AddOidcLinkIssuer1794800000000 as SqliteIssuerMigration } from '@server/migration/sqlite/1794800000000-AddOidcLinkIssuer';
 import { setupTestDb } from '@server/test/db';
 import { isPgsql } from '@server/utils/dbType';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 /*
- * The table of single sign-on links, added by the migration for whichever
- * database the tests run on (DB_TYPE=postgres for Postgres).
+ * The table of single sign-on links, added by the migrations for whichever
+ * database the tests run on (DB_TYPE=postgres for Postgres): the table,
+ * then the issuer each link was made at.
  */
 
 setupTestDb();
@@ -27,12 +30,21 @@ const tableExists = async () => {
 describe('the single sign-on links migration', () => {
   it('adds the table the entity expects, and takes it away again', async () => {
     const migration = isPgsql ? new PostgresMigration() : new SqliteMigration();
+    const issuer = isPgsql
+      ? new PostgresIssuerMigration()
+      : new SqliteIssuerMigration();
     const runner = dataSource.createQueryRunner();
+    const hasIssuer = async () =>
+      !!(await runner.getTable('oidc_link'))?.findColumnByName('issuer');
     try {
+      await issuer.down(runner);
+      assert.equal(await hasIssuer(), false);
       await migration.down(runner);
       assert.equal(await tableExists(), false);
       await migration.up(runner);
       assert.equal(await tableExists(), true);
+      await issuer.up(runner);
+      assert.equal(await hasIssuer(), true);
 
       const table = await runner.getTable('oidc_link');
       const unique = (table?.indices ?? [])

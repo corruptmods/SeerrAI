@@ -9,6 +9,7 @@ const messages = defineMessages('components.Settings', {
   menuGeneralSettings: 'General',
   menuUsers: 'Users',
   menuFeatures: 'Features',
+  menuMusic: 'Music',
   menuMediaServers: 'Media Servers',
   menuServices: 'Services',
   menuNetwork: 'Network',
@@ -44,6 +45,12 @@ const SettingsLayout = ({ children }: SettingsLayoutProps) => {
       text: intl.formatMessage(messages.menuFeatures),
       route: '/settings/features',
       regex: /^\/settings\/features/,
+    },
+    // Shown before Lidarr is added too: it says where music starts.
+    {
+      text: intl.formatMessage(messages.menuMusic),
+      route: '/settings/music',
+      regex: /^\/settings\/music/,
     },
     // Each server's own settings (/settings/plex, /settings/jellyfin,
     // /settings/emby) are reached from here, with Edit.

@@ -405,6 +405,13 @@ describe('watch history from Jellyfin and Emby', () => {
     assert.equal(found.get('m-4k')?.id, film.id);
     assert.equal(found.has('nope'), false);
     assert.deepEqual(source().titleIdsOf(film), ['m-reg', 'm-4k']);
+    // Regular and 4K as one item: its plays are read, and counted, once.
+    assert.deepEqual(
+      source().titleIdsOf(
+        new Media({ jellyfinMediaId: 'm-both', jellyfinMediaId4k: 'm-both' })
+      ),
+      ['m-both']
+    );
     const users = await source().usersFor(['j2', 'unknown']);
     assert.equal(users.get('j2')?.id, jordan.id);
     assert.equal(users.size, 1);

@@ -11,7 +11,12 @@ import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
 import { KeyIcon } from '@heroicons/react/24/outline';
-import { PencilIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/solid';
+import {
+  ArrowPathIcon,
+  PencilIcon,
+  PlusIcon,
+  TrashIcon,
+} from '@heroicons/react/24/solid';
 import axios from 'axios';
 import Link from 'next/link';
 import { Fragment, useState } from 'react';
@@ -41,6 +46,7 @@ const messages = defineMessages(
     deleteFailed: 'Could not delete the provider.',
     couldNotOpen:
       'That could not be opened. Check your connection and try again.',
+    loadFailed: 'The single sign-on providers could not be loaded.',
   }
 );
 
@@ -142,6 +148,14 @@ const SingleSignOn = () => {
       </Transition>
       <div className="section">
         {!data && !error && <LoadingSpinner />}
+        {error && !data && (
+          <Alert type="error" title={intl.formatMessage(messages.loadFailed)}>
+            <Button buttonSize="sm" onClick={() => revalidate()}>
+              <ArrowPathIcon />
+              <span>{intl.formatMessage(globalMessages.retry)}</span>
+            </Button>
+          </Alert>
+        )}
         {data && !data.applicationUrl && (
           <Alert title={intl.formatMessage(messages.needsApplicationUrl)}>
             <Link href="/settings/main" className="underline">

@@ -339,6 +339,7 @@ CoreApp.getInitialProps = async (initialProps) => {
     subtitlesReady: false,
     traktReady: false,
     musicReady: false,
+    musicSearch: { inAll: false, musicPage: true, chip: true },
   };
 
   if (ctx.res) {

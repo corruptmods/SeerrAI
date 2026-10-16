@@ -8,11 +8,17 @@ import DeclineRequestModal from '@app/components/DeclineRequestModal';
 import MusicRequestCard from '@app/components/Music/MusicRequest/MusicRequestCard';
 import RequestModal from '@app/components/RequestModal';
 import StatusBadge from '@app/components/StatusBadge';
+import useNearScreen, {
+  bothRefs,
+  useLoadWhenNear,
+} from '@app/hooks/useNearScreen';
 import usePlayLinks from '@app/hooks/usePlayLinks';
+import useRequestAction from '@app/hooks/useRequestAction';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { pictureLoading } from '@app/utils/nearScreen';
 import {
   getRequestDownloadStatus,
   refreshIntervalHelper,
@@ -38,7 +44,7 @@ import type { MovieDetails } from '@server/models/Movie';
 import type { TvDetails } from '@server/models/Tv';
 import axios from 'axios';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { useIntl } from 'react-intl';
 import useSWR, { mutate } from 'swr';
@@ -91,12 +97,14 @@ const RequestCardError = ({ requestData }: RequestCardErrorProps) => {
       : []
   );
 
-  const deleteRequest = async () => {
-    await axios.delete(`/api/v1/media/${requestData?.media.id}`);
-    mutate('/api/v1/media?filter=allavailable&take=20&sort=mediaAdded');
-    mutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');
-    mutate('/api/v1/request/count');
-  };
+  const { run } = useRequestAction();
+  const deleteRequest = () =>
+    run(async () => {
+      await axios.delete(`/api/v1/media/${requestData?.media.id}`);
+      mutate('/api/v1/media?filter=allavailable&take=20&sort=mediaAdded');
+      mutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');
+      mutate('/api/v1/request/count');
+    }, messages.failedmodify);
 
   return (
     <div
@@ -222,16 +230,11 @@ interface RequestCardProps {
 }
 
 const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
-  // On screen now, for checking on the request; on screen at any point, for
-  // loading the title, which then stays loaded.
-  const [seen, setSeen] = useState(false);
-  const { ref, inView } = useInView({
-    onChange: (visible) => {
-      if (visible) {
-        setSeen(true);
-      }
-    },
-  });
+  // Near the screen, for loading the title (and its pictures) before the
+  // card is scrolled to; on screen now, for checking on the request.
+  const { ref: nearRef, near, nearness } = useNearScreen();
+  const { ref: viewRef, inView } = useInView();
+  const ref = useMemo(() => bothRefs(nearRef, viewRef), [nearRef, viewRef]);
   const intl = useIntl();
   const { user, hasPermission } = useUser();
   const { addToast } = useToasts();
@@ -244,9 +247,8 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
       ? `/api/v1/movie/${request.media.tmdbId}`
       : `/api/v1/tv/${request.media.tmdbId}`;
 
-  const { data: title, error } = useSWR<MovieDetails | TvDetails>(
-    seen ? `${url}` : null
-  );
+  const titleKey = useLoadWhenNear(url, near);
+  const { data: title, error } = useSWR<MovieDetails | TvDetails>(titleKey);
   const {
     data: requestData,
     error: requestError,
@@ -284,11 +286,13 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
     }
   };
 
-  const deleteRequest = async () => {
-    await axios.delete(`/api/v1/request/${request.id}`);
-    mutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');
-    mutate('/api/v1/request/count');
-  };
+  const { run } = useRequestAction();
+  const deleteRequest = () =>
+    run(async () => {
+      await axios.delete(`/api/v1/request/${request.id}`);
+      mutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');
+      mutate('/api/v1/request/count');
+    }, messages.failedmodify);
 
   const retryRequest = async () => {
     setRetrying(true);
@@ -378,6 +382,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
               fill
               // The card is 18rem wide, 24rem from sm: a small backdrop does.
               sizes="(min-width: 640px) 384px, 288px"
+              {...pictureLoading(nearness)}
             />
             <div
               className="absolute inset-0"
@@ -650,14 +655,15 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
             type="tmdb"
             src={
               title.posterPath
-                ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${title.posterPath}`
+                ? `https://image.tmdb.org/t/p/w300_and_h450_face${title.posterPath}`
                 : '/images/seerr_poster_not_found.png'
             }
             alt=""
             sizes="100vw"
             style={{ width: '100%', height: 'auto' }}
-            width={600}
-            height={900}
+            width={300}
+            height={450}
+            {...pictureLoading(nearness)}
           />
         </Link>
       </div>

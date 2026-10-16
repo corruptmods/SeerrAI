@@ -89,10 +89,15 @@ export class JellyfinWatchSource implements WatchSource {
     return user[USER_ID[this.kind]] || undefined;
   }
 
+  /** Once each: regular and 4K can be one item, read once. */
   public titleIdsOf(media: Media): string[] {
-    return MEDIA_ID[this.kind]
-      .map((column) => media[column])
-      .filter((id): id is string => !!id);
+    return [
+      ...new Set(
+        MEDIA_ID[this.kind]
+          .map((column) => media[column])
+          .filter((id): id is string => !!id)
+      ),
+    ];
   }
 
   public async mediaFor(titleIds: string[]): Promise<Map<string, Media>> {

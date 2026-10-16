@@ -35,6 +35,7 @@ import {
   getAppVersion,
   getCommitTag,
 } from '@server/utils/appVersion';
+import { releaseUpdateAvailable } from '@server/utils/releases';
 import restartFlag from '@server/utils/restartFlag';
 import { isPerson } from '@server/utils/typeHelpers';
 import { Router } from 'express';
@@ -88,15 +89,12 @@ router.get<unknown, StatusResponse>('/status', async (req, res) => {
         commitTag
       ));
     } else if (commitTag !== 'local') {
-      const releases = await githubApi.getSeerrReleases();
-
-      if (releases.length) {
-        const latestVersion = releases[0];
-
-        if (!latestVersion.name.includes(currentVersion)) {
-          updateAvailable = true;
-        }
-      }
+      // A stable install is only offered stable releases, and only one
+      // newer than the version it runs.
+      updateAvailable = releaseUpdateAvailable(
+        await githubApi.getSeerrReleases(),
+        currentVersion
+      );
     }
   }
 

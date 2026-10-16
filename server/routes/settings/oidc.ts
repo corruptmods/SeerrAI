@@ -1,8 +1,11 @@
+import type { OidcProblem } from '@server/constants/oidc';
 import {
   DEFAULT_OIDC_SCOPES,
+  normalizeIssuer,
   oidcApplicationUrl,
   oidcCallbackUrl,
   oidcProviderId,
+  requiredClaimsFrom,
 } from '@server/constants/oidc';
 import { getRepository } from '@server/datasource';
 import OidcLink from '@server/entity/OidcLink';
@@ -11,12 +14,15 @@ import {
   discoveryProblem,
   forgetDiscovery,
   issuerUrlProblem,
+  keepLinksAtIssuer,
   normalizeScopes,
+  problemText,
 } from '@server/lib/oidc';
 import { keptSecret } from '@server/lib/savedSecret';
 import type { OidcProviderSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import type { Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 
@@ -28,6 +34,13 @@ import { z } from 'zod';
  */
 const oidcSettingsRoutes = Router();
 
+/**
+ * Says what is wrong: as a code with its details, which the settings page
+ * shows in the admin's language, and in English for anything else.
+ */
+const refuse = (res: Response, problem: OidcProblem) =>
+  res.status(400).json({ message: problemText(problem), ...problem });
+
 const providerBody = z.object({
   name: z.string().trim().min(1).max(60),
   issuerUrl: z.string().trim().min(1),
@@ -37,6 +50,13 @@ const providerBody = z.object({
   scopes: z.string().trim().default(DEFAULT_OIDC_SCOPES),
   enabled: z.boolean().default(true),
   newUserSignUp: z.boolean().default(false),
+  // A list of rules, or upstream's claim names separated by spaces.
+  requiredClaims: z
+    .union([
+      z.string(),
+      z.array(z.object({ claim: z.string(), value: z.string().optional() })),
+    ])
+    .default([]),
 });
 
 const testBody = z.object({
@@ -93,7 +113,7 @@ const secretFor = (
  * A logo: blank, an https address, or a picture on this site. Not plain
  * http: the sign-in page would show it over https without it.
  */
-const logoProblem = (logoUrl: string): string | undefined => {
+const logoProblem = (logoUrl: string): OidcProblem | undefined => {
   if (!logoUrl || /^\/(?![/\\])/.test(logoUrl)) {
     return undefined;
   }
@@ -105,7 +125,7 @@ const logoProblem = (logoUrl: string): string | undefined => {
   } catch {
     // Not an address at all.
   }
-  return 'The logo must be an address starting with https://, or left blank.';
+  return { problem: 'logo-url' };
 };
 
 /** Ids that must not be given again: current providers and removed ones. */
@@ -129,25 +149,25 @@ const takenIds = async (): Promise<string[]> => {
  */
 const check = async (
   target: Pick<OidcProviderSettings, 'issuerUrl' | 'clientId' | 'clientSecret'>
-): Promise<{ issuer: string } | { problem: string }> => {
+): Promise<{ issuer: string } | OidcProblem> => {
   const problem = issuerUrlProblem(target.issuerUrl);
   if (problem) {
-    return { problem };
+    return problem;
   }
   if (!target.clientSecret) {
-    return { problem: 'Enter the client secret.' };
+    return { problem: 'client-secret' };
   }
   try {
     const config = await discover(target, { fresh: true });
     return { issuer: config.serverMetadata().issuer };
   } catch (e) {
-    const message = discoveryProblem(e, target.issuerUrl);
+    const found = discoveryProblem(e, target.issuerUrl);
     logger.warn('Single sign-on provider check failed', {
       label: 'Settings',
       issuerUrl: target.issuerUrl,
-      problem: message,
+      problem: problemText(found),
     });
-    return { problem: message };
+    return found;
   }
 };
 
@@ -159,10 +179,10 @@ oidcSettingsRoutes.get('/', async (_req, res) => {
   });
 });
 
-oidcSettingsRoutes.post('/test', async (req, res, next) => {
+oidcSettingsRoutes.post('/test', async (req, res) => {
   const parsed = testBody.safeParse(req.body);
   if (!parsed.success) {
-    return next({ status: 400, message: 'Check the provider details.' });
+    return refuse(res, { problem: 'check-details' });
   }
   const saved = getSettings().oidc.providers.find(
     (provider) => provider.id === parsed.data.id
@@ -177,7 +197,7 @@ oidcSettingsRoutes.post('/test', async (req, res, next) => {
     ),
   });
   if ('problem' in result) {
-    return next({ status: 400, message: result.problem });
+    return refuse(res, result);
   }
   return res.status(200).json(result);
 });
@@ -187,10 +207,16 @@ const toSave = async (
   body: z.infer<typeof providerBody>,
   id: string,
   saved?: OidcProviderSettings
-): Promise<OidcProviderSettings | { problem: string }> => {
+): Promise<OidcProviderSettings | OidcProblem> => {
   const logo = logoProblem(body.logoUrl);
   if (logo) {
-    return { problem: logo };
+    return logo;
+  }
+  if (
+    Array.isArray(body.requiredClaims) &&
+    body.requiredClaims.some(({ claim }) => !/^\S+$/.test(claim.trim()))
+  ) {
+    return { problem: 'claim-name' };
   }
   const provider: OidcProviderSettings = {
     id,
@@ -202,20 +228,21 @@ const toSave = async (
     scopes: normalizeScopes(body.scopes),
     enabled: body.enabled,
     newUserSignUp: body.newUserSignUp,
+    requiredClaims: requiredClaimsFrom(body.requiredClaims),
   };
   const result = await check(provider);
   return 'problem' in result ? result : provider;
 };
 
-oidcSettingsRoutes.post('/', async (req, res, next) => {
+oidcSettingsRoutes.post('/', async (req, res) => {
   const parsed = providerBody.safeParse(req.body);
   if (!parsed.success) {
-    return next({ status: 400, message: 'Check the provider details.' });
+    return refuse(res, { problem: 'check-details' });
   }
   const id = oidcProviderId(parsed.data.name, await takenIds());
   const provider = await toSave(parsed.data, id);
   if ('problem' in provider) {
-    return next({ status: 400, message: provider.problem });
+    return refuse(res, provider);
   }
 
   const settings = getSettings();
@@ -233,14 +260,22 @@ oidcSettingsRoutes.put<{ id: string }>('/:id', async (req, res, next) => {
   }
   const parsed = providerBody.safeParse(req.body);
   if (!parsed.success) {
-    return next({ status: 400, message: 'Check the provider details.' });
+    return refuse(res, { problem: 'check-details' });
   }
   // The id stays: people's links refer to it.
   const provider = await toSave(parsed.data, saved.id, saved);
   if ('problem' in provider) {
-    return next({ status: 400, message: provider.problem });
+    return refuse(res, provider);
   }
 
+  // Links made at the old issuer stay with it: the provider at the new
+  // address is someone else, whose ids for people mean nothing here. Each
+  // person links again.
+  if (
+    normalizeIssuer(provider.issuerUrl) !== normalizeIssuer(saved.issuerUrl)
+  ) {
+    await keepLinksAtIssuer(saved.id, saved.issuerUrl);
+  }
   settings.oidc = {
     providers: settings.oidc.providers.map((p) =>
       p.id === saved.id ? provider : p

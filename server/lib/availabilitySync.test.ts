@@ -30,11 +30,14 @@ import Media from '@server/entity/Media';
 import MediaRequest from '@server/entity/MediaRequest';
 import Season from '@server/entity/Season';
 import { User } from '@server/entity/User';
+import { scheduledJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
+import { removeServer } from '@server/lib/mediaServerAdmin';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
 import { ApiError } from '@server/types/error';
+import schedule from 'node-schedule';
 
 // --- Mock JellyfinAPI ---
 let getSystemInfoImpl: (
@@ -2758,6 +2761,110 @@ describe('AvailabilitySync', () => {
       assert.equal(media.status, MediaStatus.AVAILABLE);
       assert.equal(media.embyMediaId, 'emby-id');
       assert.equal(availabilitySync.running, false);
+    });
+
+    it('lets go of a server removed while it runs, and runs again', async (t) => {
+      t.after(async () => {
+        await schedule.gracefulShutdown();
+        scheduledJobs.length = 0;
+      });
+      connectServers('plex', 'jellyfin');
+      configureRadarr([{ syncEnabled: true }]);
+      getSettings().sonarr = [];
+      // On Jellyfin alone, and checked before Jellyfin is removed.
+      await saveMovie(4940, { jellyfinMediaId: 'jf-early' });
+      // On both; Jellyfin is removed while Plex is being asked about it.
+      const show = new Media();
+      show.tmdbId = 4941;
+      show.mediaType = MediaType.TV;
+      show.status = MediaStatus.AVAILABLE;
+      show.ratingKey = 'plex-show-rk';
+      show.jellyfinMediaId = 'jf-show-id';
+      show.seasons = [1, 2].map(
+        (seasonNumber) =>
+          new Season({
+            seasonNumber,
+            status: MediaStatus.AVAILABLE,
+            status4k: MediaStatus.UNKNOWN,
+          })
+      );
+      await getRepository(Media).save(show);
+      // On Jellyfin alone, and checked after it is removed.
+      await saveMovie(4942, { jellyfinMediaId: 'jf-late' });
+      getTvShowImpl = async ({ tvId }) =>
+        fakeTmdbShow(tvId, [
+          {
+            id: 1,
+            air_date: '2024-01-01',
+            episode_count: 10,
+            name: 'Season 1',
+            overview: '',
+            season_number: 1,
+          },
+          {
+            id: 2,
+            air_date: '2024-01-01',
+            episode_count: 10,
+            name: 'Season 2',
+            overview: '',
+            season_number: 2,
+          },
+        ]);
+
+      let removed = false;
+      getMetadataImpl = async (key) => {
+        if (key !== 'plex-show-rk') throw new Error('404');
+        if (!removed) {
+          removed = true;
+          await removeServer('jellyfin');
+        }
+        return fakePlexShow(key);
+      };
+      // Plex has season 1 of the show, not season 2.
+      getChildrenMetadataImpl = async (key) =>
+        key === 'plex-show-rk'
+          ? [1, 2].map((n) => fakePlexSeason(n, `plex-s${n}`))
+          : key === 'plex-s1'
+            ? fakePlexEpisodes(5)
+            : [];
+      // Jellyfin, while it is asked, has everything.
+      const askedAfter: string[] = [];
+      getItemDataImpl = async (id) => {
+        if (removed) askedAfter.push(id);
+        return id === 'jf-show-id'
+          ? fakeJellyfinShow(id, '4941')
+          : jellyfinMovie(id);
+      };
+
+      await availabilitySync.run();
+
+      assert.equal(removed, true);
+      assert.equal(availabilitySync.running, false);
+      assert.ok(
+        !askedAfter.includes('jf-late'),
+        'Jellyfin is not asked about titles after it is removed'
+      );
+      const updated = await getRepository(Media).findOneOrFail({
+        where: { tmdbId: 4941 },
+        relations: ['seasons'],
+      });
+      assert.equal(updated.status, MediaStatus.PARTIALLY_AVAILABLE);
+      assert.equal(updated.ratingKey, 'plex-show-rk');
+      assert.equal(
+        updated.jellyfinMediaId,
+        null,
+        "the removed server's id is not written back"
+      );
+      assert.equal(
+        (await reload(4942)).status,
+        MediaStatus.DELETED,
+        'a title checked after the removal is not kept for Jellyfin'
+      );
+      assert.equal(
+        (await reload(4940)).status,
+        MediaStatus.DELETED,
+        'a title checked before the removal is checked again'
+      );
     });
 
     it('leaves a single server’s id alone while Radarr has the file', async () => {

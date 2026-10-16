@@ -334,11 +334,34 @@ describe('music stays out of film and series code', () => {
     }
   });
 
-  it('GET /request/count counts music on its own', async () => {
-    const res = await request(app).get('/api/v1/request/count');
+  it('GET /request/count counts music on its own, once Lidarr is set up', async () => {
+    // As the list: music someone cannot see is not in their counts, or the
+    // pending badge would show requests they cannot open.
+    let res = await request(app).get('/api/v1/request/count');
     assert.equal(res.status, 200);
-    assert.equal(res.body.music, 5);
+    assert.equal(res.body.music, 0);
     assert.equal(res.body.tv, 1);
     assert.equal(res.body.movie, 0);
+    assert.equal(res.body.total, 1);
+    assert.equal(res.body.pending, 0);
+
+    getSettings().lidarr = [
+      { id: 0, name: 'Lidarr', isDefault: true } as LidarrSettings,
+    ];
+    try {
+      res = await request(app).get('/api/v1/request/count');
+      assert.equal(res.body.music, 5);
+      assert.equal(res.body.tv, 1);
+      assert.equal(res.body.total, 6);
+      assert.equal(
+        res.body.pending,
+        await getRepository(MediaRequest).countBy({
+          type: MediaType.MUSIC,
+          status: MediaRequestStatus.PENDING,
+        })
+      );
+    } finally {
+      getSettings().lidarr = [];
+    }
   });
 });

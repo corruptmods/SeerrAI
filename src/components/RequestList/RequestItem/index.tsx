@@ -16,12 +16,18 @@ import RequestEta, {
 } from '@app/components/RequestEta';
 import RequestModal from '@app/components/RequestModal';
 import StatusBadge from '@app/components/StatusBadge';
+import useNearScreen, {
+  bothRefs,
+  useLoadWhenNear,
+} from '@app/hooks/useNearScreen';
 import usePlayLinks from '@app/hooks/usePlayLinks';
+import useRequestAction from '@app/hooks/useRequestAction';
 import type { RequestEta as RequestEtaData } from '@app/hooks/useRequestEtas';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { pictureLoading } from '@app/utils/nearScreen';
 import {
   getRequestDownloadStatus,
   refreshIntervalHelper,
@@ -48,7 +54,7 @@ import type { MovieDetails } from '@server/models/Movie';
 import type { TvDetails } from '@server/models/Tv';
 import axios from 'axios';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { FormattedRelativeTime, useIntl } from 'react-intl';
 import useSWR, { mutate } from 'swr';
@@ -89,11 +95,13 @@ const RequestItemError = ({
   const intl = useIntl();
   const { hasPermission } = useUser();
 
-  const deleteRequest = async () => {
-    await axios.delete(`/api/v1/media/${requestData?.media.id}`);
-    revalidateList();
-    mutate('/api/v1/request/count');
-  };
+  const { run } = useRequestAction();
+  const deleteRequest = () =>
+    run(async () => {
+      await axios.delete(`/api/v1/media/${requestData?.media.id}`);
+      revalidateList();
+      mutate('/api/v1/request/count');
+    }, messages.failedmodify);
 
   const { playLink, playLink4k } = usePlayLinks(requestData?.media);
 
@@ -323,16 +331,11 @@ const RequestItem = ({
   backfill,
   backfillStatus,
 }: RequestItemProps) => {
-  // On screen now, for checking on the request; on screen at any point, for
-  // loading the title, which then stays loaded.
-  const [seen, setSeen] = useState(false);
-  const { ref, inView } = useInView({
-    onChange: (visible) => {
-      if (visible) {
-        setSeen(true);
-      }
-    },
-  });
+  // Near the screen, for loading the title (and its pictures) before the
+  // row is scrolled to; on screen now, for checking on the request.
+  const { ref: nearRef, near, nearness } = useNearScreen();
+  const { ref: viewRef, inView } = useInView();
+  const ref = useMemo(() => bothRefs(nearRef, viewRef), [nearRef, viewRef]);
   const { addToast } = useToasts();
   const intl = useIntl();
   const { user, hasPermission } = useUser();
@@ -341,9 +344,8 @@ const RequestItem = ({
     request.type === 'movie'
       ? `/api/v1/movie/${request.media.tmdbId}`
       : `/api/v1/tv/${request.media.tmdbId}`;
-  const { data: title, error } = useSWR<MovieDetails | TvDetails>(
-    seen ? url : null
-  );
+  const titleKey = useLoadWhenNear(url, near);
+  const { data: title, error } = useSWR<MovieDetails | TvDetails>(titleKey);
   const { data: requestData, mutate: revalidate } = useSWR<
     NonFunctionProperties<MediaRequest>
   >(`/api/v1/request/${request.id}`, {
@@ -379,12 +381,13 @@ const RequestItem = ({
     }
   };
 
-  const deleteRequest = async () => {
-    await axios.delete(`/api/v1/request/${request.id}`);
-
-    revalidateList();
-    mutate('/api/v1/request/count');
-  };
+  const { run } = useRequestAction();
+  const deleteRequest = () =>
+    run(async () => {
+      await axios.delete(`/api/v1/request/${request.id}`);
+      revalidateList();
+      mutate('/api/v1/request/count');
+    }, messages.failedmodify);
 
   const deleteMediaFile = async () => {
     if (request.media) {
@@ -488,6 +491,7 @@ const RequestItem = ({
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               fill
               sizes="(min-width: 1280px) 66vw, 100vw"
+              {...pictureLoading(nearness)}
             />
             <div
               className="absolute inset-0"
@@ -512,14 +516,15 @@ const RequestItem = ({
                 type="tmdb"
                 src={
                   title.posterPath
-                    ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${title.posterPath}`
+                    ? `https://image.tmdb.org/t/p/w300_and_h450_face${title.posterPath}`
                     : '/images/seerr_poster_not_found.png'
                 }
                 alt=""
                 sizes="100vw"
                 style={{ width: '100%', height: 'auto', objectFit: 'cover' }}
-                width={600}
-                height={900}
+                width={300}
+                height={450}
+                {...pictureLoading(nearness)}
               />
             </Link>
             <div className="flex flex-col justify-center overflow-hidden pl-2 xl:pl-4">

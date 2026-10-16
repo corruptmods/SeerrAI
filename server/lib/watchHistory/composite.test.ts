@@ -1,3 +1,4 @@
+import TautulliAPI from '@server/api/tautulli';
 import { MediaStatus, MediaType } from '@server/constants/media';
 import type { MediaServerKind } from '@server/constants/server';
 import {
@@ -130,6 +131,41 @@ describe('which watch history is read', () => {
 
     connect('plex', 'jellyfin', 'emby');
     assert.equal(watchSource()?.label, 'Tautulli, Jellyfin and Emby');
+  });
+
+  it('counts a play once when regular and 4K are one Plex item', async () => {
+    connect('plex');
+    const asked: string[] = [];
+    mock.method(
+      TautulliAPI.prototype,
+      'getTitleHistory',
+      async (ratingKey: string) => {
+        asked.push(ratingKey);
+        return [
+          {
+            date: now,
+            media_type: 'movie',
+            rating_key: 77,
+            title: 'A film',
+            watched_status: 1,
+            percent_complete: 100,
+            user_id: 5,
+            friendly_name: 'Someone',
+          },
+        ];
+      }
+    );
+    const film = new Media({
+      tmdbId: 7700,
+      mediaType: MediaType.MOVIE,
+      ratingKey: '77',
+      ratingKey4k: '77',
+    });
+    const source = watchSource() as TautulliWatchSource;
+
+    assert.deepEqual(source.titleIdsOf(film), ['77']);
+    assert.equal((await source.titleHistory(film)).length, 1);
+    assert.deepEqual(asked, ['77']);
   });
 
   it('counts only servers with history to read', () => {

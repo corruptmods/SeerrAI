@@ -1,7 +1,9 @@
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
 import { MEDIA_SERVER_KINDS, MediaServerType } from '@server/constants/server';
+import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
+import OidcLink from '@server/entity/OidcLink';
 import { User } from '@server/entity/User';
 import UserPasskey from '@server/entity/UserPasskey';
 import { applyMediaServerLogin } from '@server/lib/mediaServerAdmin';
@@ -513,6 +515,51 @@ describe('passkeys', () => {
     assert.equal((await signInWith(device)).status, 403);
     getSettings().plex.signIn = true;
     assert.equal((await signInWith(device)).status, 200);
+  });
+
+  it('lets in an account made by single sign-on while password sign-in is off', async () => {
+    const users = getRepository(User);
+    const sso = await users.save(
+      new User({
+        email: 'sso@seerr.dev',
+        avatar: '',
+        permissions: 0,
+        userType: UserType.LOCAL,
+      })
+    );
+    await getRepository(OidcLink).save(
+      new OidcLink({ user: sso, provider: 'authentik', sub: 'sso-sub' })
+    );
+    const password = await users.save(
+      new User({
+        email: 'password@seerr.dev',
+        avatar: '',
+        permissions: 0,
+        userType: UserType.LOCAL,
+      })
+    );
+    const settings = getSettings();
+    settings.main.localLogin = false;
+    try {
+      const ssoDevice = new Authenticator();
+      const ssoBrowser = new Browser();
+      await ssoBrowser.signInAs(sso.id);
+      assert.equal((await addPasskey(ssoBrowser, ssoDevice)).status, 201);
+      assert.equal((await signInWith(ssoDevice)).status, 200);
+
+      // A password account's passkey stands in for its password, which is
+      // switched off.
+      const passwordDevice = new Authenticator();
+      const passwordBrowser = new Browser();
+      await passwordBrowser.signInAs(password.id);
+      assert.equal(
+        (await addPasskey(passwordBrowser, passwordDevice)).status,
+        201
+      );
+      assert.equal((await signInWith(passwordDevice)).status, 403);
+    } finally {
+      settings.main.localLogin = true;
+    }
   });
 
   it('refuses a response made for another site', async () => {

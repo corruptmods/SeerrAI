@@ -12,7 +12,8 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 
 /*
  * Search: TMDB's search across everything never returns collections, so
- * they are searched for separately and shown with the rest.
+ * they are searched for separately and shown with the rest. Search can also
+ * be for films only (with their collections) or series only.
  */
 
 setupTestDb();
@@ -34,6 +35,28 @@ const film = (id: number) => ({
   release_date: '2020-01-01',
   video: false,
 });
+const series = (id: number) => ({
+  id,
+  media_type: 'tv',
+  name: `Series ${id}`,
+  original_name: `Series ${id}`,
+  overview: '',
+  poster_path: null,
+  backdrop_path: null,
+  genre_ids: [],
+  original_language: 'en',
+  popularity: 1,
+  vote_average: 7,
+  vote_count: 10,
+  first_air_date: '2020-01-01',
+  origin_country: ['US'],
+});
+// TMDB's film and series searches leave out media_type: every result is
+// of the one kind asked for.
+const untyped = (result: object) =>
+  Object.fromEntries(
+    Object.entries(result).filter(([key]) => key !== 'media_type')
+  );
 const collection = (id: number) => ({
   id,
   name: `Collection ${id}`,
@@ -52,6 +75,10 @@ let collectionPages: Record<number, ReturnType<typeof collection>[]> = {};
 let collectionTotal = { pages: 1, results: 0 };
 let collectionsDown = false;
 let collectionPagesAsked: number[] = [];
+let filmPages: Record<number, ReturnType<typeof film>[]> = {};
+let seriesPages: Record<number, ReturnType<typeof series>[]> = {};
+/** Which of TMDB's searches were used. */
+let asked: string[] = [];
 
 const stub = (name: string, value: unknown) =>
   Object.defineProperty(TheMovieDb.prototype, name, {
@@ -61,13 +88,40 @@ const stub = (name: string, value: unknown) =>
       return value;
     },
   });
-stub('searchMulti', async ({ page = 1 }: { page?: number }) => ({
-  page,
-  total_pages: multiTotal.pages,
-  total_results: multiTotal.results,
-  results: multiPages[page] ?? [],
+stub('searchMulti', async ({ page = 1 }: { page?: number }) => {
+  asked.push('multi');
+  return {
+    page,
+    total_pages: multiTotal.pages,
+    total_results: multiTotal.results,
+    results: multiPages[page] ?? [],
+  };
+});
+stub('searchMovies', async ({ page = 1 }: { page?: number }) => {
+  asked.push('movie');
+  return {
+    page,
+    total_pages: Object.keys(filmPages).length || 1,
+    total_results: Object.values(filmPages).flat().length,
+    results: (filmPages[page] ?? []).map(untyped),
+  };
+});
+stub('searchTvShows', async ({ page = 1 }: { page?: number }) => {
+  asked.push('tv');
+  return {
+    page,
+    total_pages: Object.keys(seriesPages).length || 1,
+    total_results: Object.values(seriesPages).flat().length,
+    results: (seriesPages[page] ?? []).map(untyped),
+  };
+});
+stub('getByExternalId', async () => ({
+  movie_results: [untyped(film(1))],
+  tv_results: [untyped(series(2))],
+  person_results: [],
 }));
 stub('searchCollection', async ({ page = 1 }: { page?: number }) => {
+  asked.push('collection');
   collectionPagesAsked.push(page);
   if (collectionsDown) {
     throw new Error('[TMDB] Failed to search collections: timeout');
@@ -110,15 +164,19 @@ beforeEach(() => {
   collectionTotal = { pages: 1, results: 0 };
   collectionsDown = false;
   collectionPagesAsked = [];
+  filmPages = {};
+  seriesPages = {};
+  asked = [];
 });
 
-const search = async (page = 1) => {
+const search = async (page = 1, more = '') => {
   const res = await fetch(
-    `http://127.0.0.1:${port}/api/v1/search?query=alien&page=${page}`
+    `http://127.0.0.1:${port}/api/v1/search?query=alien&page=${page}${more}`
   );
+  const text = await res.text();
   return {
     status: res.status,
-    body: (await res.json()) as {
+    body: (res.ok ? JSON.parse(text) : { error: text }) as {
       page: number;
       totalPages: number;
       totalResults: number;
@@ -198,5 +256,76 @@ describe('GET /search', () => {
     assert.equal(status, 200);
     assert.deepEqual(shown(body.results), ['movie:1']);
     assert.equal(body.totalResults, 1);
+  });
+});
+
+describe('GET /search for one kind of title', () => {
+  beforeEach(() => {
+    multiPages = { 1: [film(1), series(2) as never] };
+    multiTotal = { pages: 1, results: 2 };
+    filmPages = { 1: [film(1), film(3)], 2: [film(5)] };
+    seriesPages = { 1: [series(2), series(4)] };
+    collectionPages = { 1: [collection(8091)] };
+    collectionTotal = { pages: 1, results: 1 };
+  });
+
+  it('finds films, with their collections ahead of them', async () => {
+    const { status, body } = await search(1, '&type=movie');
+
+    assert.equal(status, 200);
+    assert.deepEqual(shown(body.results), [
+      'collection:8091',
+      'movie:1',
+      'movie:3',
+    ]);
+    assert.deepEqual(asked.sort(), ['collection', 'movie']);
+    assert.equal(body.results[1].title, 'Film 1');
+    assert.equal(body.totalPages, 2);
+    assert.equal(body.totalResults, 4);
+
+    const second = await search(2, '&type=movie');
+    assert.deepEqual(shown(second.body.results), ['movie:5']);
+  });
+
+  it('finds series only', async () => {
+    const { status, body } = await search(1, '&type=tv');
+
+    assert.equal(status, 200);
+    assert.deepEqual(shown(body.results), ['tv:2', 'tv:4']);
+    assert.deepEqual(asked, ['tv']);
+    assert.equal(body.totalResults, 2);
+  });
+
+  it('searches everything without a type, or with type=all', async () => {
+    for (const more of ['', '&type=all']) {
+      asked = [];
+      const { status, body } = await search(1, more);
+      assert.equal(status, 200, JSON.stringify(body));
+      assert.deepEqual(shown(body.results), [
+        'collection:8091',
+        'movie:1',
+        'tv:2',
+      ]);
+      assert.deepEqual(asked.sort(), ['collection', 'multi']);
+    }
+  });
+
+  it('keeps to the kind asked for when looking up an id', async () => {
+    const res = await fetch(
+      `http://127.0.0.1:${port}/api/v1/search?query=imdb%3Att0078748&type=tv`
+    );
+    assert.equal(res.status, 200, await res.clone().text());
+    const body = (await res.json()) as {
+      totalResults: number;
+      results: { id: number; mediaType: string }[];
+    };
+
+    assert.deepEqual(shown(body.results), ['tv:2']);
+    assert.equal(body.totalResults, 1);
+  });
+
+  it('refuses a kind it does not know', async () => {
+    const { status } = await search(1, '&type=music');
+    assert.equal(status, 400);
   });
 });

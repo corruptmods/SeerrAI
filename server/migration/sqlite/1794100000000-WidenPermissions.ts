@@ -19,7 +19,22 @@ export class WidenPermissions1794100000000 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "temporary_user" RENAME TO "user"`);
   }
 
+  /**
+   * Rebuilding the table drops the old one, and with foreign keys on that
+   * deletes everything belonging to every account (requests, settings,
+   * lists). TypeORM reverts inside a transaction, where SQLite ignores
+   * turning foreign keys off, so this refuses unless they are already off.
+   * To undo it, revert without a transaction, which turns them off first:
+   * TypeORM's `migration:revert` with `-t none`.
+   */
   public async down(queryRunner: QueryRunner): Promise<void> {
+    const [{ foreign_keys: foreignKeys }] =
+      await queryRunner.query(`PRAGMA foreign_keys`);
+    if (Number(foreignKeys) !== 0) {
+      throw new Error(
+        'Undoing WidenPermissions1794100000000 rebuilds the user table, which with foreign keys on deletes everything that belongs to an account. Revert it without a transaction (migration:revert -t none) so foreign keys are turned off first.'
+      );
+    }
     await queryRunner.query(
       `UPDATE "user" SET "permissions" = "permissions" % 2147483648`
     );

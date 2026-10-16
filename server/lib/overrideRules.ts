@@ -107,7 +107,10 @@ async function overrideRules({
     mediaType === MediaType.TV ||
     !!radarrServer?.activeAnimeDirectory ||
     !!radarrServer?.activeAnimeProfileId;
-  const anime = animeSettings && (animeSetting ?? detectAnime(tmdbMedia));
+  // Whether Seerr takes the title as anime: the request's choice (passed in
+  // as animeSetting), the title's own setting, or else detection.
+  const decidedAnime = animeSetting ?? detectAnime(tmdbMedia);
+  const anime = animeSettings && decidedAnime;
 
   // Read for the server's Discover region, as the title's page reads it for
   // anyone who has not chosen a region of their own.
@@ -117,9 +120,9 @@ async function overrideRules({
 
   const appliedOverrideRules = rules.filter((rule) => {
     // Anime goes by the anime settings, unless a rule names the anime
-    // keyword to take it over. Anime is told by the title's own setting, or
-    // else the same test as routing (utils/isAnime), so a title without the
-    // keyword is treated alike.
+    // keyword to take it over. Anime is told by the request's choice, the
+    // title's own setting, or else the same test as routing (utils/isAnime),
+    // so a title without the keyword is treated alike.
     if (
       anime &&
       (!rule.keywords ||
@@ -152,9 +155,17 @@ async function overrideRules({
     ) {
       return false;
     }
+    // A rule naming TMDB's anime keyword matches exactly the titles Seerr
+    // takes as anime, whether or not TMDB lists the keyword: a title set as
+    // not anime, or left out by country, stays out of it, and Japanese
+    // animation without the keyword (or a title set as anime) is in it.
     if (
       rule.keywords &&
       !rule.keywords.split(',').some((keywordId) => {
+        if (Number(keywordId) === ANIME_KEYWORD_ID) {
+          return decidedAnime;
+        }
+
         let keywordList: TmdbKeyword[] = [];
 
         if ('keywords' in tmdbMedia.keywords) {

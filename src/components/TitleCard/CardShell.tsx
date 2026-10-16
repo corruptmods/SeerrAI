@@ -1,10 +1,11 @@
 import Spinner from '@app/assets/spinner.svg';
 import CachedImage from '@app/components/Common/CachedImage';
 import { useIsTouch } from '@app/hooks/useIsTouch';
+import useNearScreen, { bothRefs, NearScreen } from '@app/hooks/useNearScreen';
 import { Transition } from '@headlessui/react';
 import Link from 'next/link';
-import type { ReactNode, Ref } from 'react';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import type { HTMLAttributes, ReactNode, Ref } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 /*
  * The shape every poster card shares: films, series and collections
@@ -101,6 +102,29 @@ export const NoPicture = () => (
   />
 );
 
+/**
+ * A card's outermost box. It tells the picture inside when the card comes
+ * near the screen, so it loads before it is scrolled to: in a row, as the
+ * row tells it; in a grid, by itself.
+ */
+const NearCard = ({
+  cardRef,
+  testId,
+  children,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & {
+  cardRef?: Ref<HTMLDivElement>;
+  testId: string;
+}) => {
+  const { ref: nearRef, nearness } = useNearScreen();
+  const ref = useMemo(() => bothRefs(cardRef, nearRef), [cardRef, nearRef]);
+  return (
+    <div ref={ref} data-testid={testId} {...props}>
+      <NearScreen.Provider value={nearness}>{children}</NearScreen.Provider>
+    </div>
+  );
+};
+
 interface CardShellProps {
   detail: CardDetail;
   canExpand?: boolean;
@@ -120,6 +144,8 @@ interface CardShellProps {
   /** Whether the title and actions show over the picture. */
   showOverlay: boolean;
   href: string;
+  /** Called as the card's page is opened, before it has loaded. */
+  onOpen?: () => void;
   /** Above the title: the year. */
   overline?: string;
   title: string;
@@ -144,6 +170,7 @@ const CardShell = ({
   updating = false,
   showOverlay,
   href,
+  onOpen,
   overline,
   title,
   titleTestId,
@@ -151,10 +178,10 @@ const CardShell = ({
   roomForActions,
   actions,
 }: CardShellProps) => (
-  <div
+  <NearCard
     className={cardWidth(canExpand)}
-    data-testid={testId}
-    ref={cardRef}
+    testId={testId}
+    cardRef={cardRef}
     {...detail.cardProps}
   >
     {modals}
@@ -226,6 +253,7 @@ const CardShell = ({
           <div className="absolute inset-0 overflow-hidden rounded-xl">
             <Link
               href={href}
+              onClick={onOpen}
               className="absolute inset-0 h-full w-full cursor-pointer overflow-hidden text-left"
               style={{
                 background:
@@ -276,7 +304,7 @@ const CardShell = ({
         </Transition>
       </div>
     </div>
-  </div>
+  </NearCard>
 );
 
 export default CardShell;

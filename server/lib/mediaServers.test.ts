@@ -18,6 +18,7 @@ import {
   kindOfUserType,
   linkedServers,
   primaryServer,
+  rememberJellyfinAdmins,
   serverName,
   signInAllowed,
 } from '@server/lib/mediaServers';
@@ -41,6 +42,9 @@ const reset = () => {
   settings.plex.signIn = true;
   settings.jellyfin = { ...jellyfinDefaults() };
   settings.emby = { ...jellyfinDefaults() };
+  // Setting a server's settings keeps what is not given.
+  delete settings.jellyfin.adminUserId;
+  delete settings.emby.adminUserId;
 };
 
 beforeEach(reset);
@@ -100,10 +104,15 @@ describe('which servers are connected', () => {
   it('makes the server chosen at setup the connected primary one', () => {
     const settings = getSettings();
     settings.main.mediaServerLogin = false;
-    connectAsPrimary('emby');
+    connectAsPrimary('emby', 'emby-admin');
     assert.equal(settings.main.mediaServerType, MediaServerType.EMBY);
     assert.equal(settings.emby.connected, true);
     assert.equal(settings.emby.signIn, false);
+    assert.equal(
+      settings.emby.adminUserId,
+      'emby-admin',
+      'it is read as the account it was set up with'
+    );
     assert.equal(settings.jellyfin.connected, false);
   });
 });
@@ -204,5 +213,29 @@ describe("people's accounts on each server", () => {
       userId: 'chosen-admin',
       deviceId: 'owner-device',
     });
+  });
+
+  it("keeps the owner's account as the one a server is read as", async () => {
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.JELLYFIN;
+    settings.jellyfin.connected = true;
+    settings.emby.connected = true;
+    settings.emby.adminUserId = 'chosen-admin';
+    await getRepository(User).update(1, {
+      jellyfinUserId: 'owner-jf',
+      embyUserId: 'owner-emby',
+    });
+
+    await rememberJellyfinAdmins();
+
+    assert.equal(settings.jellyfin.adminUserId, 'owner-jf');
+    assert.equal(settings.emby.adminUserId, 'chosen-admin', 'one chosen stays');
+    assert.equal(
+      (await jellyfinAdmin('jellyfin'))?.userId,
+      'owner-jf',
+      'and stays once the owner unlinks theirs'
+    );
+    await getRepository(User).update(1, { jellyfinUserId: null });
+    assert.equal((await jellyfinAdmin('jellyfin'))?.userId, 'owner-jf');
   });
 });

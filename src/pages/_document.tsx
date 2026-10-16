@@ -15,7 +15,9 @@ class MyDocument extends Document {
 
   render(): JSX.Element {
     return (
-      <Html>
+      // Seerr AI is always dark; "dark" turns on the `dark:` styles
+      // (tailwind.config.js) whatever the device's own setting.
+      <Html className="dark">
         <Head />
         <body>
           <BootScreen />

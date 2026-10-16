@@ -10,11 +10,18 @@ import CardShell, { useCardDetail } from '@app/components/TitleCard/CardShell';
 import ErrorCard from '@app/components/TitleCard/ErrorCard';
 import Placeholder from '@app/components/TitleCard/Placeholder';
 import useMediaMarkers, { MARKERS_KEY } from '@app/hooks/useMediaMarkers';
+import useSettings from '@app/hooks/useSettings';
 import { announceTitleChanged } from '@app/hooks/useTitleChanged';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import {
+  preloadPicture,
+  titleBackdrop,
+  titlePoster,
+  tmdbImageSrc,
+} from '@app/utils/imageSources';
 import { hasAccountOn } from '@app/utils/mediaServerAccounts';
 import { withProperties } from '@app/utils/typeHelpers';
 import {
@@ -32,21 +39,15 @@ import { MediaStatus } from '@server/constants/media';
 import type { Watchlist } from '@server/entity/Watchlist';
 import type { MediaType } from '@server/models/Search';
 import axios from 'axios';
-import {
-  createContext,
-  memo,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import { useSWRConfig } from 'swr';
 
 interface TitleCardProps {
   id: number;
   image?: string;
+  /** The title's backdrop, fetched ahead as its page is opened. */
+  backdrop?: string;
   summary?: string;
   year?: string;
   title: string;
@@ -65,6 +66,7 @@ interface TitleCardProps {
 
 const messages = defineMessages('components.TitleCard', {
   addToWatchList: 'Add to watchlist',
+  removeFromWatchList: 'Remove from watchlist',
   watchlistSuccess:
     '<strong>{title}</strong> added to watchlist  successfully!',
   watchlistDeleted:
@@ -73,17 +75,10 @@ const messages = defineMessages('components.TitleCard', {
   watchlistError: 'Something went wrong. Please try again.',
 });
 
-/**
- * Posters that load as soon as their card is drawn, rather than when the
- * browser judges them close to the screen. For pages of posters loaded ahead
- * of the scroll: a lazy poster on a phone often only started once it was
- * already on screen, so scrolling fast showed blank cards.
- */
-export const EagerPosters = createContext(false);
-
 const TitleCard = ({
   id,
   image,
+  backdrop,
   summary,
   year,
   title,
@@ -97,12 +92,12 @@ const TitleCard = ({
   mutateParent,
 }: TitleCardProps) => {
   const intl = useIntl();
-  const eager = useContext(EagerPosters);
   const { mutate: globalMutate } = useSWRConfig();
   const { isOnList, isNotified } = useMediaMarkers();
   const onList = mediaType !== 'person' && isOnList(id, mediaType);
   const notified = mediaType !== 'person' && isNotified(id, mediaType);
   const { user, hasPermission } = useUser();
+  const { currentSettings } = useSettings();
   const [isUpdating, setIsUpdating] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(status);
   const detail = useCardDetail();
@@ -113,6 +108,21 @@ const TitleCard = ({
     useState<boolean>(!isAddedToWatchlist);
   const [showBlocklistModal, setShowBlocklistModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  // The pictures at the top of the title's page start loading as it is
+  // opened, alongside the page itself rather than once it has arrived.
+  const preloadPage = () => {
+    if (backdrop) {
+      preloadPicture(
+        tmdbImageSrc(titleBackdrop(backdrop), currentSettings.cacheImages)
+      );
+    }
+    if (image) {
+      preloadPicture(
+        tmdbImageSrc(titlePoster(image), currentSettings.cacheImages)
+      );
+    }
+  };
 
   // Just to get the year from the date
   if (year) {
@@ -423,7 +433,6 @@ const TitleCard = ({
           }
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           fill
-          loading={eager ? 'eager' : 'lazy'}
         />
       }
       badge={{
@@ -474,6 +483,7 @@ const TitleCard = ({
                     className="z-40"
                     buttonSize={'sm'}
                     onClick={onClickWatchlistBtn}
+                    aria-label={intl.formatMessage(messages.addToWatchList)}
                   >
                     <StarIcon className={'h-3 text-amber-300'} />
                   </Button>
@@ -482,6 +492,9 @@ const TitleCard = ({
                     className="z-40"
                     buttonSize={'sm'}
                     onClick={onClickDeleteWatchlistBtn}
+                    aria-label={intl.formatMessage(
+                      messages.removeFromWatchList
+                    )}
                   >
                     <MinusCircleIcon className={'h-3'} />
                   </Button>
@@ -496,6 +509,9 @@ const TitleCard = ({
                     className="z-40"
                     buttonSize={'sm'}
                     onClick={() => setShowBlocklistModal(true)}
+                    aria-label={intl.formatMessage(
+                      globalMessages.addToBlocklist
+                    )}
                   >
                     <EyeSlashIcon className={'h-3'} />
                   </Button>
@@ -529,6 +545,7 @@ const TitleCard = ({
             ? `/collection/${id}`
             : `/tv/${id}`
       }
+      onOpen={preloadPage}
       overline={year}
       title={title}
       titleTestId="title-card-title"

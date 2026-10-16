@@ -9,13 +9,19 @@ import IssueComment from '@server/entity/IssueComment';
 import type Media from '@server/entity/Media';
 import type { User } from '@server/entity/User';
 import agent from '@server/lib/agent';
-import type {
-  ArrEpisode,
-  ArrFile,
-  ArrHistoryRecord,
-  ArrRelease,
-} from '@server/lib/autofix/arr';
+import type { ArrEpisode, ArrRelease } from '@server/lib/autofix/arr';
 import { FixRadarr, FixSonarr } from '@server/lib/autofix/arr';
+import {
+  grabbedFrom,
+  originOf,
+  pickReplacement,
+} from '@server/lib/autofix/releases';
+import {
+  carryOutSeason,
+  planDetails,
+  planHeadline,
+  planSeason,
+} from '@server/lib/autofix/season';
 import backfill from '@server/lib/backfill/engine';
 import { featureEnabled } from '@server/lib/features';
 import { owner } from '@server/lib/owner';
@@ -37,12 +43,16 @@ import logger from '@server/logger';
 /*
  * Fixing what someone says is wrong with a title, as an admin would: find
  * subtitles (or transcribe them), look for missing episodes, replace a
- * broken file with a different release, or check a season whose episodes
- * are mixed up. Asked for from AI Search or by reporting an issue; on an
- * issue, each step is written as a comment, which tells the reporter.
+ * broken file with a different release, check a season whose episodes are
+ * mixed up, or replace a whole season. Asked for from AI Search or by
+ * reporting an issue; on an issue, each step is written as a comment, which
+ * tells the reporter.
  *
- * A file is only ever removed once another release for it has been found,
- * and the same title is replaced at most once a day.
+ * A file is only ever removed once another release for it has been found
+ * (for a whole season, once it has been grabbed), and the same title is
+ * replaced at most once a day, except by an admin replacing a season. A
+ * whole season is replaced at once for an admin; anyone else's waits for
+ * an admin to approve it on the admin agent's page.
  */
 
 const LABEL = 'Auto-fix';
@@ -69,7 +79,8 @@ export type FixKind =
   | 'transcribe'
   | 'missing'
   | 'broken'
-  | 'wrongEpisode';
+  | 'wrongEpisode'
+  | 'replaceSeason';
 
 export const FIX_KINDS: FixKind[] = [
   'subtitles',
@@ -77,6 +88,7 @@ export const FIX_KINDS: FixKind[] = [
   'missing',
   'broken',
   'wrongEpisode',
+  'replaceSeason',
 ];
 
 export interface FixRequest {
@@ -156,6 +168,85 @@ const languageIn = (text: string): string | undefined => {
   return first?.code;
 };
 
+const NUMBER_WORDS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
+};
+const NUMBER = `(\\d{1,3}|${Object.keys(NUMBER_WORDS).join('|')})`;
+const numberOf = (word: string) =>
+  NUMBER_WORDS[word.toLowerCase()] ?? Number(word);
+
+/**
+ * The season and episode named in what someone wrote: "S06E03", "6x03",
+ * "season 6", "s6", "season six episode two", "episode 3 of season 6".
+ * Whatever is not named is left out.
+ */
+export const seasonEpisodeIn = (
+  text: string
+): { season?: number; episode?: number } => {
+  const both =
+    text.match(/\bs(\d{1,2})\s*e(\d{1,3})\b/i) ??
+    text.match(/\b(\d{1,2})x(\d{2,3})\b/i);
+  if (both) return { season: Number(both[1]), episode: Number(both[2]) };
+  const season =
+    text.match(new RegExp(`\\bseason\\s+${NUMBER}\\b`, 'i'))?.[1] ??
+    text.match(/\bs(\d{1,2})\b/i)?.[1];
+  const episode = text.match(
+    new RegExp(`\\b(?:episode|ep)\\.?\\s*${NUMBER}\\b`, 'i')
+  )?.[1];
+  return {
+    ...(season !== undefined ? { season: numberOf(season) } : {}),
+    ...(episode !== undefined ? { episode: numberOf(episode) } : {}),
+  };
+};
+
+/** A whole season, named as such. */
+const WHOLE_SEASON =
+  /\b(whole|entire|full|complete)\s+(season|series)\b|\ball\s+(of\s+)?(the\s+)?season\b|\bseason\s*\d*\s+(is\s+)?(all|completely|totally|entirely)\b/i;
+/** Everything there, in other words. */
+const WHOLE_OTHERWISE =
+  /\b(every|all( of)?( the)?) (episodes?|files?)\b|\b(replace|redownload|re-download)\s+(it|them)\s+all\b/i;
+const REPLACE_WORDS =
+  /\b(replac\w*|re-?download\w*|download\w* (it |them )?again|re-?grab\w*)\b/i;
+const BAD_WORDS =
+  /\b(bad|messed[ -]?up|a mess|wrong|broken|corrupt\w*|garbage|trash|screwed( up)?|ruined|unwatchable|mixed[ -]?up)\b/i;
+
+/**
+ * A whole season to be replaced: the whole season said to be bad, or a
+ * season (and no one episode) to be replaced or downloaded again.
+ */
+const wholeSeason = (text: string) => {
+  const named = seasonEpisodeIn(text);
+  return (
+    (WHOLE_SEASON.test(text) &&
+      (BAD_WORDS.test(text) || REPLACE_WORDS.test(text))) ||
+    (WHOLE_OTHERWISE.test(text) &&
+      REPLACE_WORDS.test(text) &&
+      named.episode === undefined) ||
+    (REPLACE_WORDS.test(text) &&
+      /\bseason\b|\bs\d{1,2}\b/i.test(text) &&
+      named.episode === undefined)
+  );
+};
+
 /** The wrong episode or film: named as such, never just "wrong". */
 const WRONG_EPISODE =
   /\b(wrong|different|incorrect)\s+(episode|ep|movie|film)\b|\bnot the (right|correct|same) (episode|ep|movie|film)\b|\b(episodes?|eps?)\b[^.]{0,30}\b(mislabel+ed|mixed[ -]?up|out of order|swapped)\b|\b(mislabel+ed|mixed[ -]?up|swapped)\b[^.]{0,30}\b(episodes?|eps?)\b|\bis actually (episode|ep)\b|\bplays (episode|ep)\b/i;
@@ -195,6 +286,9 @@ export const classify = (
               : undefined,
         };
   if (issueType === IssueType.SUBTITLES) return subtitles();
+  if (wholeSeason(text) && !SUBTITLE.test(text)) {
+    return { kind: 'replaceSeason' };
+  }
   if (WRONG_EPISODE.test(text)) return { kind: 'wrongEpisode' };
   if (issueType === IssueType.VIDEO || issueType === IssueType.AUDIO) {
     return { kind: 'broken' };
@@ -259,9 +353,6 @@ const needsSeason = (req: FixRequest) =>
   req.episodeNumber !== undefined &&
   req.seasonNumber === undefined;
 
-const grabbedFrom = (release: ArrRelease) =>
-  `${release.title}${release.indexer ? ` from ${release.indexer}` : ''}`;
-
 /** One file swapped for another release, through Sonarr or Radarr. */
 interface Swap {
   /** "S01E02", or nothing for a movie. */
@@ -274,85 +365,6 @@ interface Swap {
   grab: (release: ArrRelease) => Promise<void>;
   search: () => Promise<void>;
 }
-
-/** Rejections that only say the file on disk is as good: fine to replace. */
-const ONLY_EXISTING =
-  /existing file|equal or higher preference|not an upgrade|cutoff (has been |already )?(met|reached)|already meets cutoff/i;
-
-const rejectionText = (r: string | { reason?: string }) =>
-  typeof r === 'string' ? r : (r.reason ?? '');
-
-const groupOf = (title?: string | null) =>
-  (
-    title?.match(/^\s*\[([^\]]+)\]/)?.[1] ??
-    title?.match(/-([A-Za-z0-9]+)$/)?.[1] ??
-    ''
-  ).toLowerCase();
-
-const bare = (title: string) =>
-  title
-    .replace(/\.[a-z0-9]{2,4}$/i, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '');
-
-const sameTitle = (a?: string | null, b?: string | null) =>
-  !!a && !!b && bare(a) === bare(b);
-
-/**
- * The best other release for one episode or movie: one Sonarr or Radarr
- * would only turn down because a file is already there, for that episode
- * alone (a release holding others too would not import over their files),
- * never the release the current file came from, a different group first.
- */
-export const pickReplacement = (
-  releases: ArrRelease[],
-  current: { title?: string | null; group?: string | null },
-  episodeId?: number
-): ArrRelease | undefined => {
-  const currentGroup = (current.group ?? groupOf(current.title)).toLowerCase();
-  const forThisEpisode = (r: ArrRelease) => {
-    if (episodeId === undefined) return true;
-    const mapped = r.mappedEpisodeInfo ?? [];
-    return mapped.length
-      ? mapped.length === 1 && mapped[0].id === episodeId
-      : !!r.episodeRequested;
-  };
-  const usable = releases.filter(
-    (r) =>
-      r.downloadAllowed !== false &&
-      !r.fullSeason &&
-      (!r.rejected ||
-        (r.rejections ?? []).every((x) =>
-          ONLY_EXISTING.test(rejectionText(x))
-        )) &&
-      forThisEpisode(r) &&
-      !sameTitle(r.title, current.title)
-  );
-  const differs = (r: ArrRelease) =>
-    !!currentGroup &&
-    (r.releaseGroup ?? groupOf(r.title)).toLowerCase() !== currentGroup;
-  return usable.sort(
-    (a, b) =>
-      Number(differs(b)) - Number(differs(a)) ||
-      (b.qualityWeight ?? 0) - (a.qualityWeight ?? 0) ||
-      (b.customFormatScore ?? 0) - (a.customFormatScore ?? 0) ||
-      (b.seeders ?? 0) - (a.seeders ?? 0)
-  )[0];
-};
-
-/** Where the file on disk came from: the release's own name, if known. */
-const originOf = (
-  file: ArrFile | undefined,
-  history: ArrHistoryRecord[]
-): string | undefined => {
-  const imported = history.find(
-    (h) =>
-      h.eventType === 'downloadFolderImported' &&
-      (!file || String(h.data?.fileId ?? '') === String(file.id))
-  );
-  const dropped = imported?.data?.droppedPath?.split(/[\\/]/).pop();
-  return file?.sceneName || dropped || imported?.sourceTitle || undefined;
-};
 
 /** "S05E17 (202)": an episode number with its absolute number in brackets. */
 const BRACKETED_ABSOLUTE = /S\d{1,2}E\d{1,3}\b.*?\((\d{2,4})\)/i;
@@ -513,6 +525,8 @@ class AutoFix {
         return this.broken(req);
       case 'wrongEpisode':
         return this.wrongEpisode(req);
+      case 'replaceSeason':
+        return this.replaceSeason(req);
     }
   }
 
@@ -791,11 +805,13 @@ class AutoFix {
         new Date(ep.airDateUtc).getTime() < now
     );
     if (!missing.length) {
+      // Nothing to fetch, so it is something else: asked, not turned away.
       return {
         ok: false,
-        message: `Sonarr shows nothing missing${
-          req.seasonNumber !== undefined ? ` in season ${req.seasonNumber}` : ''
-        }. If an episode is there but wrong, report it as the wrong episode.`,
+        message:
+          req.seasonNumber !== undefined
+            ? `Sonarr has every aired episode of season ${req.seasonNumber}, so nothing is missing. What is wrong with it: should I replace the whole season, check it for mixed-up episodes, or fix its subtitles?`
+            : 'Sonarr has every aired episode, so nothing is missing. What is wrong with it: a season to replace (say which), mixed-up episodes, or subtitles?',
       };
     }
     const count = `${missing.length} missing episode${missing.length === 1 ? '' : 's'}`;
@@ -832,7 +848,8 @@ class AutoFix {
     req: FixRequest,
     kind: BackfillKind,
     serverId: number,
-    arrId: number
+    arrId: number,
+    replace?: boolean
   ): Promise<boolean> {
     try {
       if (!backfill.readiness().ready) return false;
@@ -846,6 +863,7 @@ class AutoFix {
         reporter: req.user,
         issueId: req.issueId,
         seasonNumber: req.seasonNumber,
+        ...(replace ? { replace: true } : {}),
       });
       return !!run;
     } catch (e) {
@@ -1035,6 +1053,161 @@ class AutoFix {
   }
 
   /**
+   * Replaces every file of a season with another release (see season.ts):
+   * at once for an admin, who may do it again the same day; anyone else's
+   * is put to an admin to approve, once a day per season. A movie has one
+   * file, so replacing "all of it" is replacing that.
+   */
+  private async replaceSeason(req: FixRequest): Promise<Outcome> {
+    if (req.media.mediaType === MediaType.MOVIE) {
+      return this.replaceMovie(req);
+    }
+    if (req.seasonNumber === undefined) {
+      return {
+        ok: false,
+        message:
+          'Which season should be replaced? Say its number, for example “replace season 2”.',
+      };
+    }
+    const sonarr = sonarrFor(req.media);
+    if (!sonarr) return NOT_ON_SERVER;
+    const season = req.seasonNumber;
+    const admin = isAdmin(req.user);
+    const release = admin
+      ? () => undefined
+      : this.claim(`replace:season:${req.media.id}:${season}`, DAY);
+    if (!release) {
+      return {
+        ok: false,
+        message: `Season ${season} was already asked to be replaced today. An admin can see where that stands, or ask again tomorrow.`,
+      };
+    }
+    const refund = this.take('replace', req.user, MAX_REPLACED_PER_DAY);
+    if (!refund) {
+      release();
+      return { ok: false, message: TOO_MANY };
+    }
+    try {
+      const outcome = await this.seasonWork(req, sonarr, season);
+      if (!outcome.ok) {
+        release();
+        refund();
+      }
+      return outcome;
+    } catch (e) {
+      release();
+      refund();
+      throw e;
+    }
+  }
+
+  private async seasonWork(
+    req: FixRequest,
+    sonarr: NonNullable<ReturnType<typeof sonarrFor>>,
+    season: number
+  ): Promise<Outcome> {
+    const plan = await planSeason(sonarr.api, sonarr.id, season);
+    if ('nothing' in plan) {
+      if (plan.noFiles) {
+        // Nothing there to replace: what is wanted is searched for.
+        const wanted = plan.noFiles.filter((ep) => ep.monitored);
+        if (wanted.length) {
+          await sonarr.api.searchEpisodes(wanted.map((ep) => ep.id));
+          return {
+            ok: true,
+            message: `Season ${season} has no files yet, so Sonarr was asked to search for it.`,
+          };
+        }
+        return { ok: false, message: plan.nothing };
+      }
+      const handedOn = await this.handOn(
+        req,
+        'series',
+        sonarr.serverId,
+        sonarr.id,
+        true
+      );
+      return {
+        ok: false,
+        message: `${plan.nothing}${
+          handedOn
+            ? req.issueId
+              ? ' The admin agent looks further, and answers here.'
+              : ' The admin agent looks further.'
+            : ''
+        }`,
+      };
+    }
+    const title = {
+      kind: 'series' as const,
+      serverId: sonarr.serverId,
+      arrId: sonarr.id,
+    };
+    if (!isAdmin(req.user)) {
+      // Asked on their behalf, through the admin agent's approvals.
+      const run = await agent.awaitApproval({
+        title,
+        name: plan.name,
+        change: {
+          kind: 'replaceSeason',
+          headline: planHeadline(plan),
+          title,
+          details: planDetails(plan),
+          params: {
+            season,
+            ...(plan.pack ? { prefer: plan.pack.title } : {}),
+          },
+        },
+        reporter: req.user,
+        issueId: req.issueId,
+        seasonNumber: season,
+        ask: `Asked to replace all of season ${season}`,
+      });
+      if (!run) {
+        return {
+          ok: false,
+          message: `Replacing a whole season needs an admin’s approval, and the admin agent that asks for it is not set up. An admin can replace season ${season} themselves.`,
+        };
+      }
+      return {
+        ok: true,
+        message: `Found ${
+          plan.pack
+            ? `the season pack ${grabbedFrom(plan.pack)}`
+            : `${plan.singles.length === 1 ? 'a release' : `${plan.singles.length} releases`} to replace season ${season} with`
+        }. Replacing a whole season needs an admin’s approval, so it is waiting for an admin; once one approves, it is downloaded first and the current files are removed after. Nothing changes until then.`,
+      };
+    }
+    const outcome = await carryOutSeason(sonarr.api, plan);
+    if (outcome.ok && req.issueId) {
+      // Whoever reported it hears when the season is back.
+      await agent
+        .follow({
+          title,
+          name: plan.name,
+          reporter: req.user,
+          issueId: req.issueId,
+          seasonNumber: season,
+          episodeIds: outcome.episodeIds,
+        })
+        .catch((e) =>
+          logger.warn('Could not follow a replaced season', {
+            label: LABEL,
+            mediaId: req.media.id,
+            errorMessage: message(e),
+          })
+        );
+    }
+    return {
+      ok: outcome.ok,
+      message:
+        outcome.ok && req.issueId
+          ? `${outcome.message} You will be told here when it is back.`
+          : outcome.message,
+    };
+  }
+
+  /**
    * Checks every file in the season against the release it came from and
    * its length. When most files are off by the same number, the files are
    * fine and the numbering is not, which needs an admin, not new downloads.
@@ -1216,11 +1389,29 @@ class AutoFix {
         .join('\n');
       const asked = options.asked ?? classify(text, issue.issueType);
       if (!asked) return undefined;
+      // Filed on All Seasons, but the report names one: that one, on the
+      // issue too, so it shows where the problem is.
+      let seasonNumber = issue.problemSeason || undefined;
+      let episodeNumber = issue.problemEpisode || undefined;
+      if (
+        issue.media.mediaType === MediaType.TV &&
+        seasonNumber === undefined
+      ) {
+        const said = seasonEpisodeIn(text);
+        if (said.season) {
+          seasonNumber = said.season;
+          episodeNumber = said.episode || undefined;
+          await getRepository(Issue).update(issue.id, {
+            problemSeason: seasonNumber,
+            problemEpisode: episodeNumber ?? 0,
+          });
+        }
+      }
       const result = await this.run({
         ...asked,
         media: issue.media,
-        seasonNumber: issue.problemSeason || undefined,
-        episodeNumber: issue.problemEpisode || undefined,
+        seasonNumber,
+        episodeNumber,
         user: actor,
         issueId: issue.id,
       });
@@ -1244,6 +1435,8 @@ class AutoFix {
     }
   }
 }
+
+export { pickReplacement };
 
 const autofix = new AutoFix();
 export default autofix;

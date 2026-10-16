@@ -1,9 +1,16 @@
 import { useUser } from '@app/hooks/useUser';
+import defineMessages from '@app/utils/defineMessages';
 import type { Permission } from '@server/lib/permissions';
 import { hasPermission } from '@server/lib/permissions';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
+import { useIntl } from 'react-intl';
+
+const messages = defineMessages('components.Common.SettingsTabs', {
+  selectTab: 'Select a Tab',
+  tabs: 'Tabs',
+});
 
 export interface SettingsRoute {
   text: string;
@@ -75,6 +82,7 @@ const SettingsTabs = ({
   tabType?: 'default' | 'button';
   settingsRoutes: SettingsRoute[];
 }) => {
+  const intl = useIntl();
   const router = useRouter();
   const { user: currentUser } = useUser();
 
@@ -135,7 +143,7 @@ const SettingsTabs = ({
     <>
       <div className="sm:hidden">
         <label htmlFor="tabs" className="sr-only">
-          Select a Tab
+          {intl.formatMessage(messages.selectTab)}
         </label>
         <select
           id="tabs"
@@ -149,7 +157,6 @@ const SettingsTabs = ({
             settingsRoutes.find((route) => !!router.pathname.match(route.regex))
               ?.route
           }
-          aria-label="Selected Tab"
         >
           {settingsRoutes
             .filter(
@@ -180,7 +187,10 @@ const SettingsTabs = ({
       </div>
       {tabType === 'button' ? (
         <div className="hidden sm:block">
-          <nav className="-mx-2 -my-1 flex flex-wrap" aria-label="Tabs">
+          <nav
+            className="-mx-2 -my-1 flex flex-wrap"
+            aria-label={intl.formatMessage(messages.tabs)}
+          >
             {settingsRoutes.map((route, index) => (
               <SettingsLink
                 tabType={tabType}

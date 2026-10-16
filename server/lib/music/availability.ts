@@ -37,8 +37,10 @@ import { In } from 'typeorm';
  * where it was (processing, "adding to Plex").
  *
  * Statuses only go down on a full scan that every connected server and
- * every Lidarr answered: an album nowhere any more becomes deleted if it
- * was asked for, else unknown.
+ * every Lidarr answered, and that left nothing waiting on MusicBrainz: an
+ * album nowhere any more becomes deleted if it was asked for, else
+ * unknown. An item a server lists that could not be placed this time
+ * still counts as listed for the album that has its id.
  *
  * An artist's status follows their albums: partly available with any of
  * them here, available once every album wanted (asked for and not

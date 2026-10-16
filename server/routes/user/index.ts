@@ -19,7 +19,11 @@ import type {
 } from '@server/interfaces/api/userInterfaces';
 import { featureEnabled } from '@server/lib/features';
 import { linkedJellyfinUsers } from '@server/lib/jellyfinUsers';
-import { mayManageUser, plexAccountMayClaim } from '@server/lib/manageUser';
+import {
+  mayManageUser,
+  plexAccountMayClaim,
+  plexProfileChanges,
+} from '@server/lib/manageUser';
 import type { JellyfinFamilyKind } from '@server/lib/mediaServers';
 import {
   USERNAME,
@@ -842,10 +846,15 @@ router.post(
             (sameEmail && plexAccountMayClaim(sameEmail) ? sameEmail : null);
 
           if (user) {
-            // Update the user's avatar with their Plex thumbnail, in case it changed
+            // Their Plex name, and their picture and email as signing in
+            // with Plex would bring them: never over a Jellyfin or Emby
+            // account's, and never an email another account has.
+            // An account found by email was waiting for this Plex account:
+            // tie it to it, as signing in with Plex would, so it is found by
+            // its Plex account from now on.
             await userRepository.update(user.id, {
-              avatar: account.thumb,
-              email: account.email,
+              ...(await plexProfileChanges(user, account)),
+              ...(linked ? {} : { plexId: parseInt(account.id) }),
               plexUsername: account.username,
             });
             refreshedUsers += 1;

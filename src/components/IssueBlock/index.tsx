@@ -1,6 +1,7 @@
 import Button from '@app/components/Common/Button';
 import { issueOptions } from '@app/components/IssueModal/constants';
 import { useUser } from '@app/hooks/useUser';
+import defineMessages from '@app/utils/defineMessages';
 import {
   CalendarIcon,
   ExclamationTriangleIcon,
@@ -10,6 +11,10 @@ import {
 import type Issue from '@server/entity/Issue';
 import Link from 'next/link';
 import { useIntl } from 'react-intl';
+
+const messages = defineMessages('components.IssueBlock', {
+  viewIssue: 'View Issue',
+});
 
 interface IssueBlockProps {
   issue: Issue;
@@ -64,7 +69,11 @@ const IssueBlock = ({ issue }: IssueBlockProps) => {
         </div>
         <div className="ml-2 flex flex-shrink-0 flex-wrap">
           <Link href={`/issues/${issue.id}`} passHref legacyBehavior>
-            <Button buttonType="primary" as="a">
+            <Button
+              buttonType="primary"
+              as="a"
+              aria-label={intl.formatMessage(messages.viewIssue)}
+            >
               <EyeIcon />
             </Button>
           </Link>

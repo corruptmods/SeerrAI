@@ -1,3 +1,4 @@
+import { resolveDbType } from '@server/utils/DbColumnHelper';
 import {
   Column,
   CreateDateColumn,
@@ -40,7 +41,7 @@ export class MediaRequestWatcher {
   @Column()
   public userId: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: resolveDbType('datetime') })
   public createdAt: Date;
 
   constructor(init?: Partial<MediaRequestWatcher>) {

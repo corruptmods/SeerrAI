@@ -16,9 +16,12 @@ const STATIC_CACHE = 'static-v1';
 // requested again but would otherwise sit in the cache indefinitely.
 const STATIC_CACHE_MAX_ENTRIES = 300;
 // Proxied poster and backdrop images. Cache-first with a bounded size so
-// repeat views are instant and the origin proxy is not hit again.
+// repeat views are instant and the origin proxy is not hit again. One trip
+// through Discover, two titles, Movies and a person stores about 160, so
+// this keeps several such trips (about 20 MB: most are posters of 15 KB or
+// so) before the least used make room.
 const IMAGE_CACHE = 'images-v1';
-const IMAGE_CACHE_MAX_ENTRIES = 400;
+const IMAGE_CACHE_MAX_ENTRIES = 1000;
 // Discover rows answer per person: their region and language, what they have
 // requested, their own suggestions. v2 dropped copies stored before the cache
 // was emptied on every sign-in and sign-out (see SESSION_CHANGES); v3 drops

@@ -169,13 +169,21 @@ export const signInAllowed = (kind: MediaServerKind): boolean =>
 
 /**
  * Makes a server the primary one and connects it, at setup. Its sign-in
- * follows the switch for media server sign-in. The caller saves.
+ * follows the switch for media server sign-in. For Jellyfin and Emby,
+ * `adminUserId` is the administrator account set up with, which Seerr reads
+ * the libraries as from then on (jellyfinAdmin). The caller saves.
  */
-export const connectAsPrimary = (kind: MediaServerKind): void => {
+export const connectAsPrimary = (
+  kind: MediaServerKind,
+  adminUserId?: string
+): void => {
   const settings = getSettings();
   settings.main.mediaServerType = typeOfKind(kind);
   settings[kind].connected = true;
   settings[kind].signIn = settings.main.mediaServerLogin !== false;
+  if (isJellyfinFamily(kind) && adminUserId) {
+    settings[kind].adminUserId = adminUserId;
+  }
 };
 
 /** The servers a person has an account linked from. */
@@ -245,6 +253,38 @@ export const jellyfinAdmin = async (
     userId: userId ?? '',
     deviceId: owner?.[DEVICE_ID[kind]] ?? undefined,
   };
+};
+
+/**
+ * Servers set up before the account Seerr reads them as was kept with
+ * them relied on the owner's linked account, and stopped working once the
+ * owner unlinked it. Each connected Jellyfin or Emby server without one
+ * keeps the owner's account from now on. Run at startup; saves when it
+ * changes anything.
+ */
+export const rememberJellyfinAdmins = async (): Promise<void> => {
+  const settings = getSettings();
+  const missing = connectedServers()
+    .filter(isJellyfinFamily)
+    .filter((kind) => !settings[kind].adminUserId);
+  if (!missing.length) {
+    return;
+  }
+  const owner = await getRepository(User).findOne({
+    where: { id: 1 },
+    select: ['id', ...missing.map((kind) => USER_ID[kind])],
+  });
+  let changed = false;
+  for (const kind of missing) {
+    const userId = owner?.[USER_ID[kind]];
+    if (userId) {
+      settings[kind].adminUserId = userId;
+      changed = true;
+    }
+  }
+  if (changed) {
+    await settings.save();
+  }
 };
 
 /**

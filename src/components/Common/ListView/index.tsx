@@ -1,7 +1,8 @@
 import Button from '@app/components/Common/Button';
 import { SmallLoadingSpinner } from '@app/components/Common/LoadingSpinner';
+import PageSearch from '@app/components/Common/PageSearch';
 import PersonCard from '@app/components/PersonCard';
-import TitleCard, { EagerPosters } from '@app/components/TitleCard';
+import TitleCard from '@app/components/TitleCard';
 import TmdbTitleCard from '@app/components/TitleCard/TmdbTitleCard';
 import useBulkRequest, { bulkKey } from '@app/hooks/useBulkRequest';
 import useSearchText from '@app/hooks/useSearchText';
@@ -9,7 +10,6 @@ import { Permission, useUser } from '@app/hooks/useUser';
 import useVerticalScroll from '@app/hooks/useVerticalScroll';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { MediaStatus } from '@server/constants/media';
 import type { WatchlistItem } from '@server/interfaces/api/discoverInterfaces';
 import type {
@@ -23,6 +23,7 @@ import {
   normalizeSearchText,
   searchWords,
 } from '@server/utils/searchText';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
@@ -37,6 +38,8 @@ const messages = defineMessages('components.Common.ListView', {
   lookedThrough: 'Looked through the first {loaded} titles.',
   searchFurther: 'Keep looking',
   nomatch: 'Nothing here matches “{query}”.',
+  searchAllMovies: 'Search all movies for “{query}”',
+  searchAllSeries: 'Search all series for “{query}”',
 });
 
 type ListItem = TvResult | MovieResult | PersonResult | CollectionResult;
@@ -49,6 +52,12 @@ type ListViewProps = {
   isReachingEnd?: boolean;
   onScrollBottom: () => void;
   mutateParent?: () => void;
+  /**
+   * The kind of title the page lists, on the Movies and Series pages: the
+   * filter, which only looks through this page's list, then offers to
+   * search every title of that kind.
+   */
+  searchAllType?: 'movie' | 'tv';
 };
 
 /** How many titles a filter looks through before asking to go further. */
@@ -94,6 +103,7 @@ const ListView = ({
   isReachingEnd,
   plexItems,
   mutateParent,
+  searchAllType,
 }: ListViewProps) => {
   const intl = useIntl();
   const router = useRouter();
@@ -211,35 +221,14 @@ const ListView = ({
     <>
       {showControls && (
         <div className="mb-4 flex items-stretch gap-2">
-          <div className="relative flex flex-1">
-            <span className="inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-800 px-3 text-gray-100">
-              <MagnifyingGlassIcon className="h-5 w-5" />
-            </span>
-            <input
-              type="text"
-              inputMode="search"
-              enterKeyHint="search"
-              name="list-filter"
-              aria-label={intl.formatMessage(messages.filter)}
-              placeholder={intl.formatMessage(messages.filterHint)}
-              value={filter}
-              maxLength={100}
-              onChange={(e) => setFilter(e.target.value)}
-              // Room for the clear button only while there is something to
-              // clear, so the hint fits beside Select on a phone.
-              className={`rounded-r-only text-ellipsis ${filter ? 'pr-9' : ''}`}
-            />
-            {filter && (
-              <button
-                type="button"
-                aria-label={intl.formatMessage(messages.clearFilter)}
-                onClick={() => setFilter('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-              >
-                <XMarkIcon className="h-5 w-5" />
-              </button>
-            )}
-          </div>
+          <PageSearch
+            name="list-filter"
+            value={filter}
+            onChange={setFilter}
+            label={intl.formatMessage(messages.filter)}
+            placeholder={intl.formatMessage(messages.filterHint)}
+            clearLabel={intl.formatMessage(messages.clearFilter)}
+          />
           {selectButton}
         </div>
       )}
@@ -251,6 +240,22 @@ const ListView = ({
               loaded: loadedCount,
             })}
           </span>
+          {searchAllType && (
+            <Link
+              href={{
+                pathname: '/search',
+                query: { query: debounced.trim(), type: searchAllType },
+              }}
+              className="font-medium text-indigo-400 hover:text-indigo-300"
+            >
+              {intl.formatMessage(
+                searchAllType === 'movie'
+                  ? messages.searchAllMovies
+                  : messages.searchAllSeries,
+                { query: debounced.trim() }
+              )}
+            </Link>
+          )}
         </div>
       )}
       {isEmpty && !filtering && (
@@ -263,144 +268,136 @@ const ListView = ({
           {intl.formatMessage(messages.nomatch, { query: debounced.trim() })}
         </div>
       )}
-      {/* Pages load ahead of the scroll; their posters start as they arrive. */}
-      <EagerPosters.Provider value={true}>
-        <ul className={`cards-vertical ${selecting ? 'pb-28' : ''}`}>
-          {shownPlexItems.map((title, index) => {
-            const key = keyOf(title.mediaType, title.tmdbId);
-            return (
-              <li key={`${title.ratingKey}-${index}`}>
-                {pick(
-                  key,
-                  title.mediaType,
-                  statusOf(key),
-                  <TmdbTitleCard
-                    id={title.tmdbId}
-                    tmdbId={title.tmdbId}
-                    type={title.mediaType}
-                    isAddedToWatchlist={true}
-                    canExpand
-                    mutateParent={mutateParent}
-                  />,
-                  title.title
-                )}
-              </li>
-            );
-          })}
-          {shownItems.map((title) => {
-            let titleCard: React.ReactNode;
-            let status: MediaStatus | undefined;
+      <ul className={`cards-vertical ${selecting ? 'pb-28' : ''}`}>
+        {shownPlexItems.map((title, index) => {
+          const key = keyOf(title.mediaType, title.tmdbId);
+          return (
+            <li key={`${title.ratingKey}-${index}`}>
+              {pick(
+                key,
+                title.mediaType,
+                statusOf(key),
+                <TmdbTitleCard
+                  id={title.tmdbId}
+                  tmdbId={title.tmdbId}
+                  type={title.mediaType}
+                  isAddedToWatchlist={true}
+                  canExpand
+                  mutateParent={mutateParent}
+                />,
+                title.title
+              )}
+            </li>
+          );
+        })}
+        {shownItems.map((title) => {
+          let titleCard: React.ReactNode;
+          let status: MediaStatus | undefined;
 
-            switch (title.mediaType) {
-              case 'movie':
-                status = statusOf(
-                  keyOf('movie', title.id),
-                  title.mediaInfo?.status
-                );
-                titleCard = (
-                  <TitleCard
-                    key={title.id}
-                    id={title.id}
-                    isAddedToWatchlist={
-                      title.mediaInfo?.watchlists?.length ?? 0
-                    }
-                    image={title.posterPath}
-                    status={status}
-                    summary={title.overview}
-                    title={title.title}
-                    userScore={title.voteAverage}
-                    year={title.releaseDate}
-                    mediaType={title.mediaType}
-                    inProgress={
-                      (title.mediaInfo?.downloadStatus ?? []).length > 0
-                    }
-                    canExpand
-                  />
-                );
-                break;
-              case 'tv':
-                status = statusOf(
-                  keyOf('tv', title.id),
-                  title.mediaInfo?.status
-                );
-                titleCard = (
-                  <TitleCard
-                    key={title.id}
-                    id={title.id}
-                    isAddedToWatchlist={
-                      title.mediaInfo?.watchlists?.length ?? 0
-                    }
-                    image={title.posterPath}
-                    status={status}
-                    summary={title.overview}
-                    title={title.name}
-                    userScore={title.voteAverage}
-                    year={title.firstAirDate}
-                    mediaType={title.mediaType}
-                    inProgress={
-                      (title.mediaInfo?.downloadStatus ?? []).length > 0
-                    }
-                    canExpand
-                  />
-                );
-                break;
-              case 'collection':
-                titleCard = (
-                  <TitleCard
-                    id={title.id}
-                    image={title.posterPath}
-                    summary={title.overview}
-                    title={title.title}
-                    mediaType={title.mediaType}
-                    canExpand
-                  />
-                );
-                break;
-              case 'person':
-                titleCard = (
-                  <PersonCard
-                    personId={title.id}
-                    name={title.name}
-                    profilePath={title.profilePath}
-                    canExpand
-                  />
-                );
-                break;
-            }
+          switch (title.mediaType) {
+            case 'movie':
+              status = statusOf(
+                keyOf('movie', title.id),
+                title.mediaInfo?.status
+              );
+              titleCard = (
+                <TitleCard
+                  key={title.id}
+                  id={title.id}
+                  isAddedToWatchlist={title.mediaInfo?.watchlists?.length ?? 0}
+                  image={title.posterPath}
+                  backdrop={title.backdropPath}
+                  status={status}
+                  summary={title.overview}
+                  title={title.title}
+                  userScore={title.voteAverage}
+                  year={title.releaseDate}
+                  mediaType={title.mediaType}
+                  inProgress={
+                    (title.mediaInfo?.downloadStatus ?? []).length > 0
+                  }
+                  canExpand
+                />
+              );
+              break;
+            case 'tv':
+              status = statusOf(keyOf('tv', title.id), title.mediaInfo?.status);
+              titleCard = (
+                <TitleCard
+                  key={title.id}
+                  id={title.id}
+                  isAddedToWatchlist={title.mediaInfo?.watchlists?.length ?? 0}
+                  image={title.posterPath}
+                  backdrop={title.backdropPath}
+                  status={status}
+                  summary={title.overview}
+                  title={title.name}
+                  userScore={title.voteAverage}
+                  year={title.firstAirDate}
+                  mediaType={title.mediaType}
+                  inProgress={
+                    (title.mediaInfo?.downloadStatus ?? []).length > 0
+                  }
+                  canExpand
+                />
+              );
+              break;
+            case 'collection':
+              titleCard = (
+                <TitleCard
+                  id={title.id}
+                  image={title.posterPath}
+                  backdrop={title.backdropPath}
+                  summary={title.overview}
+                  title={title.title}
+                  mediaType={title.mediaType}
+                  canExpand
+                />
+              );
+              break;
+            case 'person':
+              titleCard = (
+                <PersonCard
+                  personId={title.id}
+                  name={title.name}
+                  profilePath={title.profilePath}
+                  canExpand
+                />
+              );
+              break;
+          }
 
-            // Keyed by the title, not its place: when one drops out (it was
-            // just requested, say) the cards after it keep their state and
-            // images instead of all being rebuilt. A title listed twice,
-            // as a search across pages can, is told apart by its count.
-            const baseKey = keyOf(title.mediaType, title.id);
-            const repeat = renderedKeys.get(baseKey) ?? 0;
-            renderedKeys.set(baseKey, repeat + 1);
+          // Keyed by the title, not its place: when one drops out (it was
+          // just requested, say) the cards after it keep their state and
+          // images instead of all being rebuilt. A title listed twice,
+          // as a search across pages can, is told apart by its count.
+          const baseKey = keyOf(title.mediaType, title.id);
+          const repeat = renderedKeys.get(baseKey) ?? 0;
+          renderedKeys.set(baseKey, repeat + 1);
 
-            return (
-              <li key={repeat ? `${baseKey}#${repeat}` : baseKey}>
-                {pick(
-                  keyOf(title.mediaType, title.id),
-                  title.mediaType,
-                  status,
-                  titleCard,
-                  title.mediaType === 'movie' ||
-                    title.mediaType === 'collection'
-                    ? title.title
-                    : title.name
-                )}
-              </li>
-            );
-          })}
-          {isLoading &&
-            !isReachingEnd &&
-            !filtering &&
-            [...Array(20)].map((_item, i) => (
-              <li key={`placeholder-${i}`}>
-                <TitleCard.Placeholder canExpand />
-              </li>
-            ))}
-        </ul>
-      </EagerPosters.Provider>
+          return (
+            <li key={repeat ? `${baseKey}#${repeat}` : baseKey}>
+              {pick(
+                keyOf(title.mediaType, title.id),
+                title.mediaType,
+                status,
+                titleCard,
+                title.mediaType === 'movie' || title.mediaType === 'collection'
+                  ? title.title
+                  : title.name
+              )}
+            </li>
+          );
+        })}
+        {isLoading &&
+          !isReachingEnd &&
+          !filtering &&
+          [...Array(20)].map((_item, i) => (
+            <li key={`placeholder-${i}`}>
+              <TitleCard.Placeholder canExpand />
+            </li>
+          ))}
+      </ul>
       {/*
         While filtering, only matches are shown: no placeholder cards for
         pages still loading, just a line saying the search is going on, or,

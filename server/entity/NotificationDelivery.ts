@@ -1,3 +1,4 @@
+import { resolveDbType } from '@server/utils/DbColumnHelper';
 import {
   Column,
   CreateDateColumn,
@@ -33,7 +34,7 @@ export class NotificationDelivery {
   @Column({ default: '' })
   public episodeKey: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: resolveDbType('datetime') })
   public sentAt: Date;
 
   constructor(init?: Partial<NotificationDelivery>) {

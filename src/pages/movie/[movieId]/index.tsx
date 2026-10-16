@@ -3,13 +3,18 @@ import { getHostAndPort } from '@app/utils/urlHelper';
 import type { MovieDetails as MovieDetailsType } from '@server/models/Movie';
 import axios from 'axios';
 import type { GetServerSideProps, NextPage } from 'next';
+import { useRouter } from 'next/router';
 
 interface MoviePageProps {
   movie?: MovieDetailsType;
 }
 
 const MoviePage: NextPage<MoviePageProps> = ({ movie }) => {
-  return <MovieDetails movie={movie} />;
+  const router = useRouter();
+  // Keyed by the title, so going from one movie's page straight to
+  // another's starts afresh instead of keeping the first one's state (its
+  // watchlist button, an open panel).
+  return <MovieDetails key={String(router.query.movieId)} movie={movie} />;
 };
 
 export const getServerSideProps: GetServerSideProps<MoviePageProps> = async (

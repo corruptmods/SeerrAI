@@ -4,6 +4,10 @@ const defaultTheme = require('tailwindcss/defaultTheme');
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   mode: 'jit',
+  // `dark:` styles (the date picker's, among others) follow the app, which is
+  // always dark, rather than the device's light or dark setting: the
+  // document carries the "dark" class (pages/_document.tsx).
+  darkMode: 'class',
   content: [
     './node_modules/@seerr-team/react-tailwindcss-datepicker/dist/index.esm.js',
     './src/pages/**/*.{ts,tsx}',

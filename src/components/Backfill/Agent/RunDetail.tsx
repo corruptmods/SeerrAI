@@ -1,10 +1,19 @@
 import ProposalCard from '@app/components/Backfill/Agent/ProposalCard';
+import { changeMessages } from '@app/components/Backfill/Agent/changeMessages';
 import {
   RunMeta,
   RunStatusBadge,
   messages,
 } from '@app/components/Backfill/Agent/parts';
 import { runRefreshMs } from '@app/components/Backfill/Agent/refresh';
+import { toolMessages } from '@app/components/Backfill/Agent/toolMessages';
+import type { ChangeIcon } from '@app/components/Backfill/Agent/work';
+import {
+  changeIcon,
+  changeWords,
+  matchActions,
+  toolWords,
+} from '@app/components/Backfill/Agent/work';
 import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
@@ -13,21 +22,26 @@ import PageTitle from '@app/components/Common/PageTitle';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import {
+  AdjustmentsHorizontalIcon,
   ArrowDownIcon,
   ArrowDownTrayIcon,
+  ArrowPathRoundedSquareIcon,
   CheckBadgeIcon,
   ExclamationTriangleIcon,
   HandRaisedIcon,
   LinkIcon,
+  LockOpenIcon,
   NoSymbolIcon,
   PaperAirplaneIcon,
   PlusCircleIcon,
   QuestionMarkCircleIcon,
   SparklesIcon,
+  StopCircleIcon,
   TrashIcon,
   WrenchScrewdriverIcon,
+  XCircleIcon,
 } from '@heroicons/react/24/outline';
-import type { AgentStep } from '@server/entity/AgentRun';
+import type { AgentAction, AgentStep } from '@server/entity/AgentRun';
 import type { AgentRunDetail } from '@server/interfaces/api/agentInterfaces';
 import axios from 'axios';
 import Link from 'next/link';
@@ -68,7 +82,14 @@ const runMessages = defineMessages('components.Backfill.Agent.Run', {
 });
 
 type Entry =
-  | { type: 'admin'; at: string; text: string; who?: string }
+  | {
+      type: 'admin';
+      at: string;
+      text: string;
+      who?: string;
+      /** Backfill telling it a download it started failed. */
+      backfill?: boolean;
+    }
   | {
       type: 'agent';
       at: string;
@@ -77,11 +98,12 @@ type Entry =
       proposal?: boolean;
     }
   | { type: 'work'; at: string; steps: AgentStep[] }
-  | { type: 'action'; at: string; text: string };
+  | { type: 'action'; at: string; text: string; action?: AgentAction };
 
 /** The steps as a conversation: who said what, and the work in between. */
 const conversationOf = (run: AgentRunDetail): Entry[] => {
   const entries: Entry[] = [];
+  const actionFor = matchActions(run.actions);
   if (run.ask) {
     entries.push({
       type: 'admin',
@@ -103,6 +125,14 @@ const conversationOf = (run: AgentRunDetail): Entry[] => {
         });
         break;
       }
+      case 'followUp':
+        entries.push({
+          type: 'admin',
+          at: step.at,
+          text: step.text,
+          backfill: true,
+        });
+        break;
       case 'say':
         entries.push({ type: 'agent', at: step.at, text: step.text });
         break;
@@ -123,7 +153,12 @@ const conversationOf = (run: AgentRunDetail): Entry[] => {
         });
         break;
       case 'action':
-        entries.push({ type: 'action', at: step.at, text: step.text });
+        entries.push({
+          type: 'action',
+          at: step.at,
+          text: step.text,
+          action: actionFor(step.text),
+        });
         break;
       default:
         if (last?.type === 'work') {
@@ -136,15 +171,46 @@ const conversationOf = (run: AgentRunDetail): Entry[] => {
   return entries;
 };
 
+/** An icon for each kind of change: a delete is a bin, not a download. */
+const CHANGE_ICONS: Record<ChangeIcon, typeof TrashIcon> = {
+  download: ArrowDownTrayIcon,
+  request: PlusCircleIcon,
+  stop: StopCircleIcon,
+  link: LinkIcon,
+  delete: TrashIcon,
+  block: NoSymbolIcon,
+  unblock: LockOpenIcon,
+  failed: XCircleIcon,
+  profile: AdjustmentsHorizontalIcon,
+  replace: ArrowPathRoundedSquareIcon,
+  done: CheckBadgeIcon,
+};
+
+/** The colour a change is shown in: stopping is neutral, deleting red. */
+const changeColour = (icon: ChangeIcon): string =>
+  icon === 'stop'
+    ? 'text-gray-300'
+    : icon === 'delete'
+      ? 'text-red-200'
+      : 'text-green-200';
+
 const WorkStep = ({ step }: { step: AgentStep }) => {
   const intl = useIntl();
   if (step.kind === 'tool') {
+    const words = intl.formatMessage(toolMessages[toolWords(step.tool)]);
+    // What it did in words; the call itself, for an admin who wants it,
+    // small underneath.
     return (
       <div className="flex gap-2">
         <WrenchScrewdriverIcon className="mt-0.5 h-4 w-4 flex-none text-gray-500" />
-        <code className="min-w-0 break-all text-xs leading-5 text-gray-400">
-          {step.text}
-        </code>
+        <div className="min-w-0">
+          <p className="text-xs leading-5 text-gray-300">
+            {words.charAt(0).toLocaleUpperCase(intl.locale) + words.slice(1)}
+          </p>
+          <code className="block break-all text-[11px] leading-4 text-gray-500">
+            {step.text}
+          </code>
+        </div>
       </div>
     );
   }
@@ -190,9 +256,21 @@ const EntryView = ({ entry }: { entry: Entry }) => {
   if (entry.type === 'admin') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-indigo-600 px-4 py-2.5 text-white shadow">
-          <div className="mb-0.5 flex items-center justify-between gap-3 text-[11px] text-indigo-200">
-            <span>{entry.who ?? intl.formatMessage(runMessages.you)}</span>
+        <div
+          className={`max-w-[85%] rounded-2xl rounded-br-sm px-4 py-2.5 text-white shadow ${
+            entry.backfill ? 'bg-gray-600' : 'bg-indigo-600'
+          }`}
+        >
+          <div
+            className={`mb-0.5 flex items-center justify-between gap-3 text-[11px] ${
+              entry.backfill ? 'text-gray-300' : 'text-indigo-200'
+            }`}
+          >
+            <span>
+              {entry.backfill
+                ? intl.formatMessage(runMessages.backfill)
+                : (entry.who ?? intl.formatMessage(runMessages.you))}
+            </span>
             <Time at={entry.at} />
           </div>
           <p className="whitespace-pre-wrap break-words text-sm">
@@ -239,26 +317,40 @@ const EntryView = ({ entry }: { entry: Entry }) => {
     );
   }
   if (entry.type === 'action') {
+    // Where it happened, in a few words: the whole of it is under What it
+    // changed, at the top. One recorded before changes were kept by kind
+    // keeps its own words.
+    const icon = entry.action ? changeIcon(entry.action) : 'done';
+    const Icon = CHANGE_ICONS[icon];
     return (
-      <div className="flex items-start gap-2 px-1 text-sm font-medium text-green-200">
-        <ArrowDownTrayIcon className="mt-0.5 h-4 w-4 flex-none text-green-400" />
-        <span className="min-w-0 break-words">{entry.text}</span>
+      <div
+        className={`flex items-start gap-2 px-1 text-sm font-medium ${changeColour(icon)}`}
+      >
+        <Icon className="mt-0.5 h-4 w-4 flex-none" />
+        <span className="min-w-0 break-words">
+          {entry.action
+            ? intl.formatMessage(changeMessages[changeWords(entry.action)])
+            : entry.text}
+        </span>
       </div>
     );
   }
-  const tools = [
-    ...new Set(
-      entry.steps.filter((s) => s.kind === 'tool').map((s) => s.tool ?? '')
-    ),
-  ]
-    .filter(Boolean)
-    .join(', ');
+  const tools = intl.formatList(
+    [
+      ...new Set(
+        entry.steps.filter((s) => s.kind === 'tool').map((s) => s.tool ?? '')
+      ),
+    ]
+      .filter(Boolean)
+      .map((tool) => intl.formatMessage(toolMessages[toolWords(tool)])),
+    { type: 'conjunction' }
+  );
   const calls = entry.steps.filter((s) => s.kind === 'tool').length;
   return (
     <details className="rounded-lg bg-gray-800/60 px-3 py-1.5 ring-1 ring-gray-700">
-      <summary className="flex cursor-pointer list-none items-center gap-2 text-xs text-gray-400 marker:hidden">
-        <WrenchScrewdriverIcon className="h-4 w-4 flex-none" />
-        <span className="min-w-0 flex-1 truncate">
+      <summary className="flex cursor-pointer list-none items-start gap-2 text-xs leading-5 text-gray-400 marker:hidden">
+        <WrenchScrewdriverIcon className="mt-0.5 h-4 w-4 flex-none" />
+        <span className="min-w-0 flex-1">
           {intl.formatMessage(runMessages.worked, { count: calls, tools })}
         </span>
       </summary>
@@ -447,43 +539,40 @@ const RunDetail = () => {
           <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">
             {intl.formatMessage(runMessages.changes)}
           </div>
-          <ul className="mt-2 max-h-28 space-y-2 overflow-y-auto overscroll-contain pr-1">
-            {data.actions.map((action, i) => (
-              <li
-                key={`${action.at}-${i}`}
-                className="flex flex-col gap-2 sm:flex-row sm:items-center"
-              >
-                <span
-                  className={`flex min-w-0 flex-1 items-start gap-2 text-sm ${
-                    action.type === 'stop' ? 'text-gray-300' : 'text-green-200'
-                  }`}
+          <ul className="mt-2 max-h-60 space-y-3 overflow-y-auto overscroll-contain pr-1 sm:max-h-40">
+            {data.actions.map((action, i) => {
+              const icon = changeIcon(action);
+              const Icon = CHANGE_ICONS[icon];
+              return (
+                <li
+                  key={`${action.at}-${i}`}
+                  className="flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:gap-3"
                 >
-                  {action.type === 'grab' ? (
-                    <ArrowDownTrayIcon className="mt-0.5 h-4 w-4 flex-none" />
-                  ) : action.type === 'change' ? (
-                    <CheckBadgeIcon className="mt-0.5 h-4 w-4 flex-none" />
-                  ) : action.type === 'stop' ? (
-                    <NoSymbolIcon className="mt-0.5 h-4 w-4 flex-none" />
-                  ) : action.type === 'relink' ? (
-                    <LinkIcon className="mt-0.5 h-4 w-4 flex-none" />
-                  ) : (
-                    <PlusCircleIcon className="mt-0.5 h-4 w-4 flex-none" />
-                  )}
-                  <span className="min-w-0 break-words">{action.detail}</span>
-                </span>
-                {action.jobId && action.type === 'grab' && (
-                  <Link
-                    href={`/backfill/jobs/${action.jobId}`}
-                    passHref
-                    legacyBehavior
+                  <span
+                    className={`flex min-w-0 flex-1 items-start gap-2 text-sm ${changeColour(icon)}`}
                   >
-                    <Button as="a" buttonType="primary" buttonSize="sm">
-                      {intl.formatMessage(runMessages.openDownload)}
-                    </Button>
-                  </Link>
-                )}
-              </li>
-            ))}
+                    <Icon className="mt-0.5 h-4 w-4 flex-none" />
+                    <span className="min-w-0 break-words">{action.detail}</span>
+                  </span>
+                  {action.jobId && action.type === 'grab' && (
+                    <Link
+                      href={`/backfill/jobs/${action.jobId}`}
+                      passHref
+                      legacyBehavior
+                    >
+                      <Button
+                        as="a"
+                        buttonType="primary"
+                        buttonSize="sm"
+                        className="ml-6 flex-none sm:ml-0"
+                      >
+                        {intl.formatMessage(runMessages.openDownload)}
+                      </Button>
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
@@ -562,14 +651,18 @@ const RunDetail = () => {
               )}
               className="min-h-[44px] min-w-0 flex-1 resize-y rounded-md border border-gray-500 bg-gray-700 px-3 py-2 text-sm text-white placeholder:text-gray-400 disabled:opacity-60"
             />
+            {/* Just the arrow on a phone, leaving the box the room. */}
             <Button
               buttonType="primary"
               type="submit"
               disabled={working || sending || !text.trim()}
               className="flex-none"
+              aria-label={intl.formatMessage(
+                sending ? runMessages.sending : runMessages.send
+              )}
             >
               <PaperAirplaneIcon />
-              <span>
+              <span className="hidden sm:inline">
                 {intl.formatMessage(
                   sending ? runMessages.sending : runMessages.send
                 )}
@@ -577,14 +670,14 @@ const RunDetail = () => {
             </Button>
           </div>
           {failed && <p className="text-sm text-red-300">{failed}</p>}
-          <p className="text-right text-[11px] text-gray-500">
-            {intl.formatMessage(runMessages.tokens, {
-              input: intl.formatNumber(data.inputTokens),
-              output: intl.formatNumber(data.outputTokens),
-            })}
-          </p>
         </form>
       </section>
+      <p className="mt-2 px-1 text-right text-[11px] text-gray-500">
+        {intl.formatMessage(runMessages.tokens, {
+          input: intl.formatNumber(data.inputTokens),
+          output: intl.formatNumber(data.outputTokens),
+        })}
+      </p>
     </>
   );
 };

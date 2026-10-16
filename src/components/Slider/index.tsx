@@ -1,9 +1,20 @@
 import TitleCard from '@app/components/TitleCard';
+import { NearRow, NearScreen, useNearObserver } from '@app/hooks/useNearScreen';
 import globalMessages from '@app/i18n/globalMessages';
+import { SCREENS_AHEAD } from '@app/utils/nearScreen';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { useSpring } from '@react-spring/web';
 import debounce from 'lodash/debounce';
-import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
+import type { ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type JSX,
+} from 'react';
+import { useInView } from 'react-intersection-observer';
 import { useIntl } from 'react-intl';
 
 interface SliderProps {
@@ -20,6 +31,20 @@ enum Direction {
   LEFT,
 }
 
+/**
+ * A card's place in the row. It tells the card inside, and its picture,
+ * when it comes near the screen along the row, so the next few cards are
+ * ready before they are swiped to.
+ */
+const Slot = ({ children }: { children: ReactNode }) => {
+  const { ref, nearness } = useNearObserver();
+  return (
+    <div ref={ref} className="inline-block px-2 align-top">
+      <NearScreen.Provider value={nearness}>{children}</NearScreen.Provider>
+    </div>
+  );
+};
+
 const Slider = ({
   sliderKey,
   items,
@@ -29,7 +54,20 @@ const Slider = ({
   placeholder = <TitleCard.Placeholder />,
 }: SliderProps) => {
   const intl = useIntl();
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  // The row's cards are measured against the box they scroll in, once the
+  // row itself is near the screen.
+  const [root, setRoot] = useState<HTMLDivElement | null>(null);
+  const setContainer = useCallback((element: HTMLDivElement | null) => {
+    containerRef.current = element;
+    setRoot(element);
+  }, []);
+  const { ref: rowRef, inView: rowNear } = useInView({
+    triggerOnce: true,
+    rootMargin: SCREENS_AHEAD,
+    fallbackInView: true,
+  });
+  const row = useMemo(() => ({ root, near: rowNear }), [root, rowNear]);
   const [scrollPos, setScrollPos] = useState({ isStart: true, isEnd: false });
 
   // The parent builds a new items array every time it renders; only how many
@@ -160,7 +198,7 @@ const Slider = ({
   };
 
   return (
-    <div className="relative" data-testid="media-slider">
+    <div className="relative" data-testid="media-slider" ref={rowRef}>
       <div className="absolute right-0 -mt-10 flex text-gray-400">
         <button
           className={`${
@@ -187,17 +225,14 @@ const Slider = ({
       </div>
       <div
         className="hide-scrollbar relative -my-2 -ml-4 -mr-4 overflow-y-auto overflow-x-scroll overscroll-x-contain whitespace-nowrap px-2 py-2"
-        ref={containerRef}
+        ref={setContainer}
         onScroll={onScroll}
       >
-        {items?.map((item, index) => (
-          <div
-            key={`${sliderKey}-${index}`}
-            className="inline-block px-2 align-top"
-          >
-            {item}
-          </div>
-        ))}
+        <NearRow.Provider value={row}>
+          {items?.map((item, index) => (
+            <Slot key={`${sliderKey}-${index}`}>{item}</Slot>
+          ))}
+        </NearRow.Provider>
         {isLoading &&
           [...Array(10)].map((_item, i) => (
             <div

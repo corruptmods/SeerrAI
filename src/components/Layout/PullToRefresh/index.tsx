@@ -1,3 +1,4 @@
+import { isBodyScrollLocked } from '@app/utils/bodyScrollLock';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
@@ -30,6 +31,13 @@ const PullToRefresh = () => {
     // Determines if we are at the top of the page
     // Locks or unlocks page when pulling down to refresh
     const pullStart = (e: TouchEvent) => {
+      // A panel or dialog is open: a pull inside it scrolls it, and must
+      // neither reload the page nor touch the styles holding the page still.
+      if (isBodyScrollLocked(document.body)) {
+        setPullStartPoint(0);
+        return;
+      }
+
       setPullStartPoint(e.targetTouches[0].screenY);
 
       const html = document.querySelector('html');
@@ -68,6 +76,9 @@ const PullToRefresh = () => {
         setTimeout(() => setPullStartPoint(0), 200);
       }
 
+      if (isBodyScrollLocked(document.body)) {
+        return;
+      }
       document.body.style.touchAction = 'auto';
       document.body.style.overscrollBehaviorY = 'auto';
       if (html) {

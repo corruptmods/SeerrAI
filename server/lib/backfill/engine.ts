@@ -25,6 +25,13 @@ import BackfillSeries from '@server/entity/BackfillSeries';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
 import { magnetHash, parseTorrent } from '@server/lib/backfill/bencode';
+import {
+  IndexerLimitReached,
+  PROWLARR,
+  indexerLimits,
+  limitMessage,
+  limitOf,
+} from '@server/lib/backfill/indexerLimit';
 import type { PackFile, SeriesContext } from '@server/lib/backfill/matcher';
 import {
   judgePack,
@@ -280,6 +287,25 @@ const METADATA_GIVE_UP_MS = 30 * 60_000;
 const IMPORT_GIVE_UP_MS = 3 * 60 * 60_000;
 const MAX_LOG_LINES = 300;
 const IMPORT_BATCH = 50;
+/** How long a job waits on its indexer's download limit before giving up. */
+const LIMIT_GIVE_UP_MS = 24 * 60 * 60_000;
+/**
+ * How long after a job for a pack failed to start the pack is only taken
+ * by an admin: whatever kept it from starting may well do it again, and
+ * taking it again on its own each time would only go round and round.
+ */
+const START_FAILED_HOLD_MS = 24 * 60 * 60_000;
+/**
+ * Why a pack is left for an admin after its download did not start, said
+ * beside it on the title's page.
+ */
+const heldReason = (error: string | null): string => {
+  // Short enough that the whole of it fits in the pack's reason.
+  const why = error ? ` (${error.replace(/\.$/, '').slice(0, 100)})` : '';
+  return `Its last download did not start${why}, so Backfill will not take it by itself for a day: approve it by hand once that is put right`;
+};
+/** Who approved a pack Backfill took itself, by the auto-approve rule. */
+const AUTO_APPROVED = 'Backfill (auto-approve)';
 const ACTIVE: BackfillJob['status'][] = ['queued', 'downloading', 'importing'];
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -312,6 +338,73 @@ export const isUnreachable = (e: unknown, depth = 0): boolean => {
   const { code, cause } = e as { code?: unknown; cause?: unknown };
   // Sonarr's and Radarr's own calls wrap what went wrong as the cause.
   return UNREACHABLE.has(String(code ?? '')) || isUnreachable(cause, depth + 1);
+};
+
+/** The HTTP request an error came from, looking into what it wraps. */
+const requestOf = (
+  e: unknown,
+  depth = 0
+): { status?: number; url?: URL } | null => {
+  if (!e || typeof e !== 'object' || depth > 3) return null;
+  if (isAxiosError(e)) {
+    let url: URL | undefined;
+    try {
+      url = new URL(e.config?.url ?? '', e.config?.baseURL);
+    } catch {
+      url = undefined;
+    }
+    return { status: e.response?.status, url };
+  }
+  return requestOf((e as { cause?: unknown }).cause, depth + 1);
+};
+
+/**
+ * Which of the apps Backfill talks to an error came from, by the address
+ * it was asking: "Sonarr", "SABnzbd", "Prowlarr".
+ */
+const appAsked = (e: unknown): string | undefined => {
+  const url = requestOf(e)?.url;
+  if (!url) return undefined;
+  const port = Number(url.port || (url.protocol === 'https:' ? 443 : 80));
+  const settings = getSettings();
+  const at = (s: { hostname: string; port: number }) =>
+    s.hostname.toLowerCase() === url.hostname.toLowerCase() &&
+    Number(s.port) === port;
+  if (at(settings.backfill.prowlarr)) return 'Prowlarr';
+  return [
+    ...settings.sonarr,
+    ...settings.radarr,
+    ...settings.downloadClients,
+  ].find(at)?.name;
+};
+
+/**
+ * A problem put in plain words already, carrying what came in as its
+ * cause for the server's log.
+ */
+class SaidPlainly extends Error {}
+
+/**
+ * What went wrong, in plain words, for the cases met often: a limit
+ * reached, an app not answering, an API key refused. Anything else is
+ * said as it came. `indexer` is the indexer a release was being fetched
+ * from, when it was.
+ */
+export const plainProblem = (e: unknown, indexer?: string): string => {
+  if (e instanceof IndexerLimitReached || e instanceof SaidPlainly) {
+    return e.message;
+  }
+  if (limitOf(e)) {
+    return limitMessage(indexer ?? appAsked(e) ?? 'The indexer', 'download');
+  }
+  if (isUnreachable(e)) {
+    return `${appAsked(e) ?? 'An app Backfill uses'} did not answer`;
+  }
+  const status = requestOf(e)?.status;
+  if (status === 401 || status === 403) {
+    return `${indexer ?? appAsked(e) ?? 'An app Backfill uses'} refused the API key`;
+  }
+  return message(e);
 };
 
 /**
@@ -507,6 +600,28 @@ export interface SearchOptions {
    */
   cancelled?: () => boolean;
 }
+
+/**
+ * What the admin agent does with a download it started that failed: look
+ * for another release (`look` starts it, once the job says so), or not,
+ * and why. Null when it can't (it is off, or the conversation is gone):
+ * Backfill then searches as for any download.
+ */
+export type AgentHandBack =
+  | { look: () => Promise<void> }
+  | { stopped: 'gaveUp' | 'limit'; why: string }
+  | null;
+
+/** A download the admin agent started, rather than Backfill or an admin. */
+export const startedByAgent = (job: BackfillJob): boolean =>
+  (job.agentRunId ?? null) !== null ||
+  // One started before downloads kept their conversation: by who approved it.
+  /^AI agent\b/.test(job.approvedByName ?? '');
+
+/** The episodes (or movie) a download was for. */
+export const jobEpisodes = (job: Pick<BackfillJob, 'files'>): number[] => [
+  ...new Set(job.files.flatMap((f) => f.episodeIds)),
+];
 
 /**
  * Failed downloads of one title in a day after which Backfill stops
@@ -1036,6 +1151,14 @@ class Backfill {
    * (the admin agent) can look further. Set once at startup.
    */
   public onNothingFound: ((row: BackfillSeries) => void) | null = null;
+
+  /**
+   * Asked about each download the admin agent started that failed for its
+   * release, so the agent can look for another. Set by the agent.
+   */
+  public onAgentDownloadFailed:
+    | ((job: BackfillJob) => Promise<AgentHandBack>)
+    | null = null;
 
   private nothingFound(row: BackfillSeries) {
     try {
@@ -1725,9 +1848,11 @@ class Backfill {
       ];
       for (const term of queries) {
         try {
-          for (const release of await prowlarr.search(term, {
-            categories: target.categories,
-          })) {
+          for (const release of await indexerLimits.guard(
+            PROWLARR,
+            'search',
+            () => prowlarr.search(term, { categories: target.categories })
+          )) {
             const key =
               release.infoHash?.toLowerCase() ||
               `${release.title.toLowerCase()}|${Math.round(release.size / 1e6)}`;
@@ -1737,7 +1862,17 @@ class Backfill {
             }
           }
         } catch (e) {
-          errors.push(`${term}: ${message(e)}`);
+          errors.push(`${term}: ${plainProblem(e)}`);
+          if (!(e instanceof IndexerLimitReached) || e.asked) {
+            logger.warn('Prowlarr could not search', {
+              label: LABEL,
+              seriesId: id,
+              term,
+              errorMessage: message(e),
+            });
+          }
+          // Each further name would only spend another search on a limit.
+          if (e instanceof IndexerLimitReached) break;
         }
       }
       if (!found.size && errors.length) {
@@ -1838,7 +1973,7 @@ class Backfill {
                     : 'No episodes in it'));
           } catch (e) {
             candidate.status = 'failed';
-            candidate.reason = message(e).slice(0, 250);
+            candidate.reason = plainProblem(e, release.indexer).slice(0, 250);
           }
           return candidate;
         }
@@ -1860,6 +1995,13 @@ class Backfill {
         seriesId: id,
         status: In(['ready', 'rejected', 'failed']),
       });
+      // A pack whose download did not start lately is found again as a new
+      // one: it still waits for an admin, and says why.
+      const startFailed = await this.startFailures(id);
+      for (const c of results) {
+        const held = c.status === 'ready' ? startFailed(c) : undefined;
+        if (held) c.reason = held;
+      }
       await candidates.save(results);
 
       const ready = rankCandidates(
@@ -1889,16 +2031,21 @@ class Backfill {
           ? new Set(options.replacing)
           : null;
       // In place of a failed download, the best good pack for what it was
-      // fetching, even beside other downloads for the title.
+      // fetching, even beside other downloads for the title. Never one
+      // that failed to start lately.
       const pick = replacing
         ? ready.find(
-            (c) => this.takesItself(c, replacing) && !multiMustWait(c, ready)
+            (c) =>
+              this.takesItself(c, replacing) &&
+              !multiMustWait(c, ready) &&
+              !startFailed(c)
           )
         : best &&
             !busy &&
             settings.autoApprove.enabled &&
             options.autoApprove !== false &&
-            this.takesItself(best)
+            this.takesItself(best) &&
+            !startFailed(best)
           ? best
           : undefined;
       let taken = false;
@@ -1921,6 +2068,14 @@ class Backfill {
         }
       }
       if (options.failedJob) {
+        // Taking a pack linked it already; otherwise the failed download
+        // says what was offered instead, or that nothing was.
+        if (!taken) {
+          await this.settleFailed(
+            options.failedJob.id,
+            best && !busy ? 'offered' : 'none'
+          );
+        }
         backfillNotices.add({
           kind: taken ? 'replaced' : 'failed',
           seriesId: id,
@@ -1939,6 +2094,11 @@ class Backfill {
         );
       }
     } catch (e) {
+      if (options.failedJob) {
+        await this.settleFailed(options.failedJob.id, 'none').catch(
+          () => undefined
+        );
+      }
       await repo.update(id, {
         status: previous === 'searching' ? 'stuck' : previous,
         searchError: message(e).slice(0, 250),
@@ -2010,18 +2170,27 @@ class Backfill {
     return this.probeMagnet(fetched.uri, hash, release.title);
   }
 
+  /**
+   * A release's .torrent or .nzb from its indexer, through Prowlarr; never
+   * asked while the indexer is waiting out its download limit.
+   */
   private fetch(candidate: BackfillCandidate): Promise<FetchedRelease> {
-    return this.prowlarr().fetchRelease({
-      guid: candidate.guid,
-      title: candidate.title,
-      size: candidate.size,
-      indexerId: candidate.indexerId,
-      indexer: candidate.indexer,
-      protocol: candidate.protocol,
-      downloadUrl: candidate.downloadUrl ?? undefined,
-      magnetUrl: candidate.magnetUrl ?? undefined,
-      infoHash: candidate.infoHash ?? undefined,
-    });
+    return indexerLimits.guard(
+      { id: candidate.indexerId, name: candidate.indexer },
+      'download',
+      () =>
+        this.prowlarr().fetchRelease({
+          guid: candidate.guid,
+          title: candidate.title,
+          size: candidate.size,
+          indexerId: candidate.indexerId,
+          indexer: candidate.indexer,
+          protocol: candidate.protocol,
+          downloadUrl: candidate.downloadUrl ?? undefined,
+          magnetUrl: candidate.magnetUrl ?? undefined,
+          infoHash: candidate.infoHash ?? undefined,
+        })
+    );
   }
 
   /**
@@ -2232,6 +2401,8 @@ class Backfill {
       includeAi?: boolean;
       /** Who approved it, when not a person: "AI agent". */
       by?: string;
+      /** The admin agent's conversation taking it. */
+      agentRunId?: number;
     }
   ): Promise<BackfillJob> {
     const candidates = getRepository(BackfillCandidate);
@@ -2314,14 +2485,15 @@ class Backfill {
       }
       leftOut = `; left out ${clashing.length} already downloading in ${others}`;
     }
-    const who = options.user
-      ? options.user.displayName
-      : (options.by ?? 'Auto-approve');
+    // Who actually approved it: the person, or what approved it for them
+    // ("Sam (API key)", "AI agent"), or Backfill itself.
+    const who = options.by ?? options.user?.displayName ?? AUTO_APPROVED;
     // Taken only if still waiting: of two approvals at once (two admins,
     // or an admin and auto-approve), only one starts a download.
     const claimed = await candidates.update(
       { id: candidate.id, status: 'ready' },
-      { status: 'approved' }
+      // Why it waited for an admin no longer holds once one takes it.
+      { status: 'approved', reason: null }
     );
     if (!claimed.affected) {
       throw new Error('This pack is not waiting for approval.');
@@ -2357,19 +2529,27 @@ class Backfill {
           ],
           approvedById: options.user?.id ?? null,
           approvedByName: who,
+          agentRunId: options.agentRunId ?? null,
         })
       )
       .catch(async (e) => {
         await candidates.update(candidate.id, { status: 'ready' });
         throw e;
       });
+    await this.linkReplacement(job);
     await getRepository(BackfillSeries).update(candidate.seriesId, {
       status: 'downloading',
     });
     try {
       await this.start(job);
     } catch (e) {
-      this.note(job, 'warn', `Not started yet: ${message(e)}`);
+      // Said as the tick says it, so the tries that follow add to the line.
+      logger.warn('Backfill could not start a download yet', {
+        label: LABEL,
+        jobId: job.id,
+        errorMessage: message(e),
+      });
+      this.note(job, 'warn', plainProblem(e));
       // Only while it is still waiting to start: a tick may have started
       // it, or an admin ended it, since.
       await jobs.update(
@@ -2379,6 +2559,35 @@ class Backfill {
     }
     await this.publishDownloads();
     return job;
+  }
+
+  /**
+   * A new download for episodes a failed one was for, of the same title, is
+   * what replaced it: whoever started it (Backfill, an admin approving the
+   * pack offered, the admin agent looking again). Only for failures still
+   * waiting on what becomes of them, from the last week.
+   */
+  private async linkReplacement(job: BackfillJob): Promise<void> {
+    const jobs = getRepository(BackfillJob);
+    const wanted = new Set(jobEpisodes(job));
+    const failed = await jobs.find({
+      select: { id: true, files: true },
+      where: {
+        seriesId: job.seriesId,
+        status: 'failed',
+        id: Not(job.id),
+        replacedById: IsNull(),
+        followUp: Not(IsNull()),
+        finishedAt: MoreThan(new Date(Date.now() - 7 * 24 * 60 * 60_000)),
+      },
+    });
+    for (const old of failed) {
+      if (!jobEpisodes(old).some((id) => wanted.has(id))) continue;
+      await jobs.update(
+        { id: old.id, replacedById: IsNull() },
+        { followUp: 'replaced', replacedById: job.id }
+      );
+    }
   }
 
   public async skip(candidateId: number): Promise<void> {
@@ -2439,11 +2648,23 @@ class Backfill {
     };
   }
 
+  /**
+   * Adds a line to a job's activity. The same line as the last one is not
+   * written again: the last one counts it, and says when it came last.
+   */
   private note(job: BackfillJob, kind: BackfillLogLine['kind'], text: string) {
-    job.log = [
-      ...(job.log ?? []),
-      { at: new Date().toISOString(), kind, message: text },
-    ].slice(-MAX_LOG_LINES);
+    const at = new Date().toISOString();
+    const last = job.log?.at(-1);
+    if (last && last.message === text && last.kind === kind) {
+      job.log = [
+        ...job.log.slice(0, -1),
+        { ...last, count: (last.count ?? 1) + 1, lastAt: at },
+      ];
+      return;
+    }
+    job.log = [...(job.log ?? []), { at, kind, message: text }].slice(
+      -MAX_LOG_LINES
+    );
   }
 
   /** Adds an approved job's download, if there is room for it. */
@@ -2463,6 +2684,27 @@ class Backfill {
     const current = await jobs.findOne({ where: { id: job.id } });
     if (current?.status !== 'queued') return;
     const settings = getSettings().backfill;
+    const candidate = await getRepository(BackfillCandidate).findOneOrFail({
+      where: { id: job.candidateId ?? -1 },
+    });
+    const indexer = { id: candidate.indexerId, name: candidate.indexer };
+    // A wait this job kept from before Seerr restarted still holds.
+    const kept = job.indexerWait;
+    if (kept && Date.parse(kept.until) > Date.now()) {
+      indexerLimits.restore(
+        indexer,
+        'download',
+        Date.parse(kept.until),
+        kept.strikes
+      );
+    }
+    // While the indexer waits out its limit, that is what the job waits
+    // for, and nothing else is asked.
+    const waiting = indexerLimits.waiting(indexer);
+    if (waiting) {
+      await this.waitOutLimit(job, waiting, candidate.indexerId);
+      return;
+    }
     // The limit is per client: torrents and Usenet do not share bandwidth,
     // and an import is Sonarr's or Radarr's work, not a download.
     const running = await jobs.count({
@@ -2497,16 +2739,31 @@ class Backfill {
       return;
     }
 
-    const candidate = await getRepository(BackfillCandidate).findOneOrFail({
-      where: { id: job.candidateId ?? -1 },
-    });
     const client = this.clientById(job.clientId);
-    const fetched = await this.fetch(candidate).catch((e) => {
+    let fetched: FetchedRelease;
+    try {
+      fetched = await this.fetch(candidate);
+    } catch (e) {
+      if (e instanceof IndexerLimitReached) {
+        await this.waitOutLimit(job, e, candidate.indexerId);
+        return;
+      }
+      logger.warn('Backfill could not fetch a release from its indexer', {
+        label: LABEL,
+        jobId: job.id,
+        indexer: candidate.indexer,
+        errorMessage: message(e),
+      });
       // The indexer no longer has it: the release is gone, not Prowlarr.
-      throw isAxiosError(e) && [404, 410].includes(e.response?.status ?? 0)
-        ? new ReleaseProblem(`The indexer no longer has it (${message(e)}).`)
+      const status = requestOf(e)?.status ?? 0;
+      if ([404, 410].includes(status)) {
+        throw new ReleaseProblem(`${candidate.indexer} no longer has it.`);
+      }
+      throw status === 401 || status === 403
+        ? new SaidPlainly(plainProblem(e, candidate.indexer), { cause: e })
         : e;
-    });
+    }
+    if (job.indexerWait) job.indexerWait = null;
     let torrents: TorrentClient | undefined;
     if (job.protocol === 'torrent') {
       torrents = torrentClientFor(client);
@@ -2570,6 +2827,49 @@ class Backfill {
       }
       await this.pickFiles(job);
     }
+  }
+
+  /**
+   * The release's indexer has reached its download limit: the job stays
+   * queued, says so, and is not tried again before the indexer has had time
+   * to reset (see indexerLimit). A day of that, and it gives up, leaving the
+   * pack for an admin.
+   */
+  private async waitOutLimit(
+    job: BackfillJob,
+    limit: IndexerLimitReached,
+    indexerId: number
+  ): Promise<void> {
+    const now = Date.now();
+    const since = job.indexerWait ? Date.parse(job.indexerWait.since) : now;
+    if (now - since > LIMIT_GIVE_UP_MS) {
+      job.indexerWait = null;
+      await this.fail(
+        job,
+        `${limit.indexer} has been at its download limit for over a day, so Backfill stopped trying`,
+        { releaseAtFault: false }
+      );
+      return;
+    }
+    job.indexerWait = {
+      indexer: limit.indexer,
+      indexerId,
+      since: new Date(since).toISOString(),
+      until: limit.until.toISOString(),
+      strikes: limit.strikes,
+    };
+    job.stage = limit.message;
+    // Only a try is written down; waiting is said by the stage.
+    if (limit.asked) {
+      this.note(job, 'warn', limit.message);
+      logger.info('An indexer has reached its download limit', {
+        label: LABEL,
+        jobId: job.id,
+        indexer: limit.indexer,
+        until: limit.until.toISOString(),
+      });
+    }
+    await getRepository(BackfillJob).save(job);
   }
 
   /**
@@ -2696,9 +2996,19 @@ class Backfill {
    * else counts, and ten in a row give the job up.
    */
   private async stumbled(job: BackfillJob, e: unknown): Promise<void> {
+    // In plain words on the job; as it came in the server's log.
+    // An app out of reach is tried each minute: said once a minute only
+    // when debugging.
+    const said = plainProblem(e);
+    logger[isUnreachable(e) ? 'debug' : 'warn'](
+      'Backfill ran into a problem with a download',
+      { label: LABEL, jobId: job.id, errorMessage: message(e) }
+    );
     if (isUnreachable(e)) {
-      const said = `No answer (${message(e)}); trying again each minute`;
-      if (job.log?.at(-1)?.message !== said) this.note(job, 'warn', said);
+      const waiting = `${said}; trying again each minute`;
+      if (job.log?.at(-1)?.message !== waiting) {
+        this.note(job, 'warn', waiting);
+      }
       // Time out of reach is not time without progress.
       this.lastGain.delete(job.id);
       await getRepository(BackfillJob).save(job);
@@ -2706,10 +3016,10 @@ class Backfill {
     }
     const count = (this.failures.get(job.id) ?? 0) + 1;
     this.failures.set(job.id, count);
-    this.note(job, 'warn', message(e));
+    this.note(job, 'warn', said);
     if (count >= 10) {
       this.failures.delete(job.id);
-      await this.fail(job, message(e), {
+      await this.fail(job, said, {
         releaseAtFault: e instanceof ReleaseProblem,
       });
     } else {
@@ -3192,21 +3502,92 @@ class Backfill {
     const row = await getRepository(BackfillSeries).findOneOrFail({
       where: { id: job.seriesId },
     });
-    const outcome = releaseAtFault
-      ? await this.offerNext(row, job)
-      : await this.offerAgain(row, job);
-    // A search for a replacement says what became of it once it is done.
-    if (outcome !== 'searching') {
+    // Never got as far as the download client: the pack is not taken again
+    // on its own for a day (see startFailures), so it waits for an admin.
+    const notStarted = !job.startedAt && !job.downloadId;
+    const { outcome, stopped }: { outcome: string; stopped?: string } =
+      releaseAtFault
+        ? await this.offerNext(row, job)
+        : { outcome: await this.offerAgain(row, job, notStarted) };
+    // A search for a replacement, or the admin agent looking for one, says
+    // what became of it once it is done.
+    if (outcome !== 'searching' && outcome !== 'agent') {
+      const why = reason.replace(/\.$/, '');
       backfillNotices.add({
         kind: outcome === 'replaced' ? 'replaced' : 'failed',
         seriesId: row.id,
         title: row.title,
         poster: row.poster,
         what: jobWhat(row, job),
-        detail: reason,
+        detail: stopped
+          ? `${why}. ${stopped}`
+          : notStarted && outcome === 'offered'
+            ? `${why}. It never started, so Backfill will not take the pack by itself for a day: approve it by hand once that is put right`
+            : reason,
         url: `/backfill/jobs/${job.id}`,
       });
     }
+  }
+
+  /**
+   * Says what became of a failed download once a search for a replacement
+   * is over, unless something took its place meanwhile.
+   */
+  private async settleFailed(
+    jobId: number,
+    followUp: 'offered' | 'none'
+  ): Promise<void> {
+    await getRepository(BackfillJob).update(
+      { id: jobId, followUp: 'searching', replacedById: IsNull() },
+      { followUp }
+    );
+  }
+
+  /**
+   * Hands a failed download the admin agent started back to it. Null when
+   * it was not the agent's, or the agent can't take it.
+   */
+  private async agentHandBack(job: BackfillJob): Promise<AgentHandBack> {
+    if (!this.onAgentDownloadFailed || !startedByAgent(job)) return null;
+    try {
+      return await this.onAgentDownloadFailed(job);
+    } catch (e) {
+      logger.warn('Could not hand a failed download back to the admin agent', {
+        label: LABEL,
+        jobId: job.id,
+        errorMessage: message(e),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Packs of a title whose download failed to start in the last day, by id
+   * and by name (a new search finds the same release again as a new pack):
+   * none is taken without an admin, whatever kept it from starting. Gives
+   * why one is held, to say beside it, or undefined for one that is not.
+   */
+  private async startFailures(
+    seriesId: number
+  ): Promise<(pack: { id?: number; title: string }) => string | undefined> {
+    const failed = await getRepository(BackfillJob).find({
+      select: { candidateId: true, title: true, error: true },
+      where: {
+        seriesId,
+        status: 'failed',
+        startedAt: IsNull(),
+        finishedAt: MoreThan(new Date(Date.now() - START_FAILED_HOLD_MS)),
+      },
+      order: { finishedAt: 'DESC' },
+    });
+    return (pack) => {
+      const last = failed.find(
+        (j) =>
+          (pack.id !== undefined && j.candidateId === pack.id) ||
+          j.title === pack.title
+      );
+      return last ? heldReason(last.error) : undefined;
+    };
   }
 
   /** Other downloads still under way for a series. */
@@ -3230,7 +3611,11 @@ class Backfill {
   private async offerNext(
     row: BackfillSeries,
     job: BackfillJob
-  ): Promise<'replaced' | 'searching' | 'offered' | 'none'> {
+  ): Promise<{
+    outcome: 'replaced' | 'searching' | 'agent' | 'offered' | 'none';
+    /** Why the admin agent stopped looking, when it did. */
+    stopped?: string;
+  }> {
     const candidates = getRepository(BackfillCandidate);
     if (job.candidateId) {
       await candidates.update(job.candidateId, {
@@ -3247,6 +3632,7 @@ class Backfill {
     const wanted = new Set(job.files.flatMap((f) => f.episodeIds));
 
     let held: string | null = null;
+    let stopped: { followUp: 'gaveUp' | 'limit'; why: string } | undefined;
     if (getSettings().backfill.replaceFailed && wanted.size) {
       const failed = await getRepository(BackfillJob).count({
         where: {
@@ -3261,8 +3647,12 @@ class Backfill {
       } else if (failed >= MAX_FAILED_PER_DAY) {
         held = `${failed} downloads for this title failed in the last day, so the next is left for an admin`;
       } else {
+        const notAgain = await this.startFailures(row.id);
         const pick = ranked.find(
-          (c) => this.takesItself(c, wanted) && !multiMustWait(c, ranked)
+          (c) =>
+            this.takesItself(c, wanted) &&
+            !multiMustWait(c, ranked) &&
+            !notAgain(c)
         );
         if (pick) {
           try {
@@ -3271,8 +3661,10 @@ class Backfill {
               by: `Backfill (replacing #${job.id})`,
             });
             this.note(job, 'info', `Replaced by #${next.id}: ${pick.title}`);
+            job.followUp = 'replaced';
+            job.replacedById = next.id;
             await getRepository(BackfillJob).save(job);
-            return 'replaced';
+            return { outcome: 'replaced' };
           } catch (e) {
             this.note(
               job,
@@ -3281,17 +3673,39 @@ class Backfill {
             );
           }
         }
-        this.note(job, 'info', 'Searching again for a replacement');
-        await getRepository(BackfillJob).save(job);
-        this.startSearch(row.id, undefined, {
-          replacing: [...wanted],
-          failedJob: {
-            id: job.id,
-            what: jobWhat(row, job),
-            reason: job.error ?? 'The download failed',
-          },
-        });
-        return 'searching';
+        // One the admin agent started goes back to it: it looks the way it
+        // did the first time, which Backfill's own search came up empty for.
+        const handBack = await this.agentHandBack(job);
+        if (handBack && 'look' in handBack) {
+          this.note(
+            job,
+            'info',
+            'Handed back to the admin agent, to look for another release'
+          );
+          job.followUp = 'agent';
+          // Saved before it starts looking: what it starts links itself to
+          // this job, and nothing here may save over that.
+          await getRepository(BackfillJob).save(job);
+          await handBack.look();
+          return { outcome: 'agent' };
+        }
+        if (handBack) {
+          stopped = { followUp: handBack.stopped, why: handBack.why };
+          held = handBack.why;
+        } else {
+          this.note(job, 'info', 'Searching again for a replacement');
+          job.followUp = 'searching';
+          await getRepository(BackfillJob).save(job);
+          this.startSearch(row.id, undefined, {
+            replacing: [...wanted],
+            failedJob: {
+              id: job.id,
+              what: jobWhat(row, job),
+              reason: job.error ?? 'The download failed',
+            },
+          });
+          return { outcome: 'searching' };
+        }
       }
     }
 
@@ -3309,8 +3723,11 @@ class Backfill {
       this.note(job, 'info', `Offered the next pack: ${entity.title}`);
       await this.notifyFound(row, entity);
     }
+    // The admin agent stopping is what an admin most needs to know, even
+    // beside a pack offered to them.
+    job.followUp = stopped?.followUp ?? (next ? 'offered' : 'none');
     await getRepository(BackfillJob).save(job);
-    return next ? 'offered' : 'none';
+    return { outcome: next ? 'offered' : 'none', stopped: stopped?.why };
   }
 
   /**
@@ -3319,15 +3736,17 @@ class Backfill {
    */
   private async offerAgain(
     row: BackfillSeries,
-    job: BackfillJob
+    job: BackfillJob,
+    byHand = false
   ): Promise<'offered' | 'none'> {
     const back = job.candidateId
       ? await getRepository(BackfillCandidate).update(
           { id: job.candidateId, status: 'approved' },
-          { status: 'ready' }
+          { status: 'ready', reason: byHand ? heldReason(job.error) : null }
         )
       : undefined;
     const offered = !!back?.affected;
+    job.followUp = offered ? 'offeredAgain' : 'none';
     const running = await this.othersRunning(row.id, job.id);
     await getRepository(BackfillSeries).update(
       { id: row.id, status: In(['downloading', 'found', 'none', 'stuck']) },
@@ -3337,10 +3756,12 @@ class Backfill {
       this.note(
         job,
         'info',
-        'The pack is offered again, to approve once that is put right'
+        byHand
+          ? 'The pack waits for an admin to approve it by hand, once that is put right'
+          : 'The pack is offered again, to approve once that is put right'
       );
-      await getRepository(BackfillJob).save(job);
     }
+    await getRepository(BackfillJob).save(job);
     return offered ? 'offered' : 'none';
   }
 

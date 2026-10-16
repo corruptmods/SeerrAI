@@ -32,6 +32,12 @@ export interface ArrRelease {
   /** Sonarr: the episodes the release maps to. */
   mappedEpisodeInfo?: { id: number }[];
   episodeRequested?: boolean;
+  /** The languages Sonarr or Radarr reads in its name. */
+  languages?: { id?: number; name?: string }[];
+  /** Sonarr: the season a release is for. */
+  seasonNumber?: number;
+  /** Sonarr v5: every season a pack holds. */
+  seasonNumbers?: number[];
 }
 
 export interface ArrMediaInfo {
@@ -221,6 +227,48 @@ export class FixSonarr extends SonarrAPI {
       timeout: RELEASE_SEARCH_TIMEOUT_MS,
     });
     return Array.isArray(data) ? data : [];
+  }
+
+  /**
+   * Sonarr's search for a whole season: its packs, and the single episodes
+   * the indexers return for it, each with why Sonarr would turn it down.
+   */
+  public async seasonReleases(
+    seriesId: number,
+    seasonNumber: number
+  ): Promise<ArrRelease[]> {
+    const { data } = await this.axios.get<ArrRelease[]>('/release', {
+      params: { seriesId, seasonNumber },
+      timeout: RELEASE_SEARCH_TIMEOUT_MS,
+    });
+    return Array.isArray(data) ? data : [];
+  }
+
+  /** One season's events, newest first: where each file came from. */
+  public async seasonHistory(
+    seriesId: number,
+    seasonNumber: number
+  ): Promise<ArrHistoryRecord[]> {
+    const { data } = await this.axios.get('/history/series', {
+      params: { seriesId, seasonNumber },
+    });
+    return records(data).sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }
+
+  /** The series' name and original language, as Sonarr has them. */
+  public async seriesFacts(
+    seriesId: number
+  ): Promise<{ title?: string; originalLanguage?: string }> {
+    const { data } = await this.axios.get<{
+      title?: string;
+      originalLanguage?: { name?: string };
+    }>(`/series/${seriesId}`);
+    return {
+      title: data?.title,
+      originalLanguage: data?.originalLanguage?.name,
+    };
   }
 
   public async grab(release: Pick<ArrRelease, 'guid' | 'indexerId'>) {

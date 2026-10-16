@@ -104,7 +104,19 @@ const jobView = (job: BackfillJob, withDetail = false) => ({
   rejected: job.rejected,
   fileCount: job.files.length,
   error: job.error,
+  // When a job waiting on its indexer's download limit is tried again.
+  retryAt:
+    job.status === 'queued' &&
+    job.indexerWait &&
+    Date.parse(job.indexerWait.until) > Date.now()
+      ? job.indexerWait.until
+      : null,
   approvedByName: job.approvedByName,
+  // Once failed, what became of it: the download that replaced it, or the
+  // admin agent's conversation looking for one.
+  followUp: job.followUp,
+  replacedById: job.replacedById,
+  agentRunId: job.agentRunId,
   createdAt: job.createdAt,
   startedAt: job.startedAt,
   finishedAt: job.finishedAt,
@@ -692,10 +704,18 @@ backfillRoutes.post('/candidates/:id/approve', async (req, res, next) => {
         message: `This replaces ${replaces} file${replaces === 1 ? '' : 's'} on disk. Type the title to confirm.`,
       });
     }
+    // A call made with the API key acts as an account (the owner's, unless
+    // it names another) but was made by whatever holds the key: the job
+    // says so, rather than that the person approved it.
+    const viaApiKey =
+      !!req.user &&
+      !!getSettings().main.apiKey &&
+      req.header('X-API-Key') === getSettings().main.apiKey;
     const job = await backfill.approve(id, {
       mode: parsed.data.mode,
       user: req.user,
       includeAi: parsed.data.includeAi,
+      by: viaApiKey ? `${req.user?.displayName} (API key)` : undefined,
     });
     return res.status(200).json(jobView(job));
   } catch (e) {

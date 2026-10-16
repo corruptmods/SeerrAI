@@ -448,6 +448,56 @@ describe('Match Check on several servers', () => {
       }),
       []
     );
+    // An id without its server is taken as Plex's.
+    assert.deepEqual(
+      await plexMatchCheck.problemFor('series', { key: 'jf-carrie' }),
+      []
+    );
+  });
+
+  it('leaves out a server removed while it runs', async (t) => {
+    setUp(t);
+    t.mock.method(SonarrAPI.prototype, 'getSeries', async () => [
+      { ...carrie, path: '/tv/Carrie' },
+    ]);
+    t.mock.method(PlexAPI.prototype, 'getLibraryContents', async () => ({
+      totalSize: 1,
+      items: [
+        show('126741', 'The Carrie Diaries', 'Carrie', ['tvdb://257454']),
+      ],
+    }));
+    t.mock.method(JellyfinAPI.prototype, 'getLibraryPage', async () => {
+      // Removed in Settings → Media Servers while its library is read.
+      getSettings().jellyfin.connected = false;
+      await plexMatchCheck.dropServer('Jellyfin');
+      return {
+        TotalRecordCount: 1,
+        Items: [
+          {
+            Id: 'jf-carrie',
+            Name: 'The Carrie Diaries',
+            Type: 'Series',
+            Path: '/data/tv/Carrie',
+            ProviderIds: { Tvdb: '257454' },
+          },
+        ],
+      };
+    });
+
+    await plexMatchCheck.run();
+
+    const report = await plexMatchCheck.lastReport();
+    assert.deepEqual(
+      report.problems.map((p) => p.mediaServer),
+      ['Plex']
+    );
+    assert.deepEqual(
+      (
+        JSON.parse(await fs.readFile(REPORT_PATH, 'utf-8')) as typeof report
+      ).problems.map((p) => p.mediaServer),
+      ['Plex'],
+      'nor in the kept file'
+    );
   });
 
   it('keeps what one server found when another cannot be read', async (t) => {

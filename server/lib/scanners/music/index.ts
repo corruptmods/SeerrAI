@@ -5,6 +5,7 @@ import Media from '@server/entity/Media';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import downloadTracker from '@server/lib/downloadtracker';
 import {
+  MUSIC_ALBUM_ID,
   connectedServers,
   isJellyfinFamily,
   serverName,
@@ -40,6 +41,7 @@ import type { MusicSource } from '@server/lib/scanners/music/source';
 import type { MusicLibrary } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import { In } from 'typeorm';
 
 /*
  * The music jobs. Music Sync (every few minutes) follows Lidarr's work on
@@ -50,6 +52,24 @@ import logger from '@server/logger';
  */
 
 const LABEL = 'Music Scan';
+
+/** Albums Seerr has under these item ids of one server. */
+const rowsWithItemIds = async (
+  kind: MediaServerKind,
+  itemIds: string[]
+): Promise<Pick<MusicAlbum, 'id' | 'mediaId'>[]> => {
+  const rows: Pick<MusicAlbum, 'id' | 'mediaId'>[] = [];
+  // In slices, to stay under the databases' limit on query parameters.
+  for (let i = 0; i < itemIds.length; i += 500) {
+    rows.push(
+      ...(await getRepository(MusicAlbum).find({
+        select: { id: true, mediaId: true },
+        where: { [MUSIC_ALBUM_ID[kind]]: In(itemIds.slice(i, i + 500)) },
+      }))
+    );
+  }
+  return rows;
+};
 
 /** A recent scan's window reaches this far behind the last one. */
 const RECENT_OVERLAP_MS = 10 * 60 * 1000;
@@ -214,6 +234,8 @@ class MusicScanner {
       try {
         const source = await openSource(kind);
         const matches: AlbumMatch[] = [];
+        // Items the server lists that could not be placed this time.
+        const notPlaced: string[] = [];
         const scanned: [MusicLibrary, number][] = [];
         for (const library of libraries) {
           if (this.cancelled) break;
@@ -237,6 +259,7 @@ class MusicScanner {
             if (this.cancelled) break;
             const match = await this.place(matcher, source, album);
             if (match) matches.push(match);
+            else notPlaced.push(album.itemId);
             this.progress++;
           }
           if (!this.cancelled) scanned.push([library, askedAt]);
@@ -248,6 +271,12 @@ class MusicScanner {
         unplaced += matches.filter((m) => !m.albumMbid).length;
         seen.albums.set(kind, recorded.albumIds);
         seen.artists.set(kind, recorded.listedArtistIds);
+        // An album placed on an earlier run that could not be placed this
+        // time (MusicBrainz busy, the artist not told) is still listed.
+        for (const row of await rowsWithItemIds(kind, notPlaced)) {
+          recorded.albumIds.add(row.id);
+          recorded.listedArtistIds.add(row.mediaId);
+        }
         recorded.artistIds.forEach((id) => artists.add(id));
       } catch (e) {
         everyServerAnswered = false;
@@ -262,13 +291,20 @@ class MusicScanner {
     for (const id of await applyLidarr(index, { decide })) artists.add(id);
 
     if (this.full) {
-      if (everyServerAnswered && index.complete && !this.cancelled) {
-        for (const id of await markGone(seen, index)) artists.add(id);
-      } else {
+      if (!everyServerAnswered || !index.complete || this.cancelled) {
         logger.info(
           'A media server or Lidarr did not answer; nothing is marked as gone this time',
           { label: LABEL }
         );
+      } else if (matcher.later > 0) {
+        // An album left for MusicBrainz may be one Seerr has under another
+        // server id; it is not taken down for want of an answer.
+        logger.info(
+          'Some albums wait for MusicBrainz; nothing is marked as gone this time',
+          { label: LABEL, leftForNextRun: matcher.later }
+        );
+      } else {
+        for (const id of await markGone(seen, index)) artists.add(id);
       }
       for (const artist of await getRepository(Media).find({
         select: { id: true },

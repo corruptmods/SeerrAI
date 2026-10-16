@@ -1,11 +1,10 @@
 import { IssueType, IssueTypeName } from '@server/constants/issue';
 import { MediaType } from '@server/constants/media';
-import { PROJECT_BRANCH, PROJECT_REPO } from '@server/constants/project';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { defineMessages, getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
-import PreparedEmail from '@server/lib/email';
+import PreparedEmail, { emailLogoUrl } from '@server/lib/email';
 import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
 import { mediaPagePath } from '@server/lib/notifications/mediaPage';
@@ -19,9 +18,6 @@ import validator from 'validator';
 import { Notification, shouldSendAdminNotification } from '..';
 import type { NotificationAgent, NotificationPayload } from './agent';
 import { BaseAgent } from './agent';
-
-// Seerr AI's logo, light on the emails' dark background.
-const PUBLIC_LOGO_URL = `https://raw.githubusercontent.com/${PROJECT_REPO}/${PROJECT_BRANCH}/public/logo_ai_dark.svg`;
 
 const messages = defineMessages('notifications.agents.email', {
   issueType: '{type} issue',
@@ -103,12 +99,7 @@ class EmailAgent
     const settings = getSettings();
     const { applicationUrl, applicationTitle } = settings.main;
     const { embedPoster } = settings.notifications.agents.email;
-    const { usePublicLogo } = settings.notifications.agents.email.options;
-    const logoUrl = usePublicLogo
-      ? PUBLIC_LOGO_URL
-      : applicationUrl
-        ? `${applicationUrl}/logo_ai_dark.svg`
-        : undefined;
+    const logoUrl = emailLogoUrl();
 
     if (type === Notification.TEST_NOTIFICATION) {
       return {

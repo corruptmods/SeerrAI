@@ -101,6 +101,29 @@ describe('a media server scan', () => {
     assert.equal(other.status, MediaStatus.AVAILABLE);
   });
 
+  it('leaves a title another server still has as it is', async () => {
+    const scanner = new ProbeScanner();
+    scanner.begin();
+    await getRepository(Media).save(
+      new Media({
+        tmdbId: 9011,
+        mediaType: MediaType.TV,
+        status: MediaStatus.AVAILABLE,
+        ratingKey: '556',
+        jellyfinMediaId: 'jf-9011',
+        seasons: [],
+      })
+    );
+    // Plex's item is now another show; Jellyfin still has this one.
+    await scanner.seeShow(9012, '556');
+    const other = await getRepository(Media).findOneOrFail({
+      where: { tmdbId: 9011, mediaType: MediaType.TV },
+    });
+    assert.equal(other.ratingKey, null);
+    assert.equal(other.jellyfinMediaId, 'jf-9011');
+    assert.equal(other.status, MediaStatus.AVAILABLE);
+  });
+
   it('stops showing imported downloads for a title it lists', async () => {
     const forget = mock.method(downloadTracker, 'forgetImported');
     await getRepository(Media).save(

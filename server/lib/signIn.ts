@@ -3,6 +3,7 @@ import PlexTvAPI from '@server/api/plextv';
 import type { JellyfinFamilyKind } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
+import OidcLink from '@server/entity/OidcLink';
 import { Session } from '@server/entity/Session';
 import { User } from '@server/entity/User';
 import {
@@ -59,6 +60,10 @@ export const sessionTtlSeconds = (session: { userId?: number }): number =>
  * A passkey stands in for signing in with the media server, so it also
  * follows each server's sign-in switch. A password has its own switch,
  * checked where it is typed, and the owner can always sign in with theirs.
+ * On an account with no media server, a passkey stands in for its
+ * password, so it follows the password switch, unless the account has a
+ * single sign-on link: a passkey is proof of its own, and people who sign
+ * in with a provider keep theirs when passwords are switched off.
  */
 export const maySignIn = async (
   user: Pick<
@@ -82,7 +87,12 @@ export const maySignIn = async (
     (linked.length > 0 && live.length === 0)
   ) {
     return (
-      how === 'password' || settings.main.localLogin !== false || user.id === 1
+      how === 'password' ||
+      settings.main.localLogin !== false ||
+      user.id === 1 ||
+      (await getRepository(OidcLink).exists({
+        where: { user: { id: user.id } },
+      }))
     );
   }
 

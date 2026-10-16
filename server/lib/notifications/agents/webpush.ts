@@ -7,6 +7,7 @@ import { defineMessages, getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
 import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import { mediaPagePath } from '@server/lib/notifications/mediaPage';
+import { isPushServiceEndpoint } from '@server/lib/pushEndpoint';
 import type { NotificationAgentConfig } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -387,6 +388,22 @@ class WebPushAgent
       pushSub: UserPushSubscription,
       notificationPayload: Buffer
     ) => {
+      // Addresses are checked when a device signs up; one saved before that
+      // check, anywhere but a browser push service, is never called and is
+      // forgotten.
+      if (!isPushServiceEndpoint(pushSub.endpoint)) {
+        logger.warn(
+          'Removing a web push subscription that is not at a browser push service',
+          {
+            label: 'Notifications',
+            recipient: pushSub.user.displayName,
+            subscriptionId: pushSub.id,
+          }
+        );
+        await userPushSubRepository.delete(pushSub.id);
+        return;
+      }
+
       logger.debug('Sending web push notification', {
         label: 'Notifications',
         recipient: pushSub.user.displayName,

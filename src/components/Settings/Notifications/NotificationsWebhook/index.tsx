@@ -16,6 +16,7 @@ import {
   ArrowPathIcon,
   QuestionMarkCircleIcon,
 } from '@heroicons/react/24/solid';
+import { PROJECT_BRANCH, PROJECT_URL } from '@server/constants/project';
 import axios from 'axios';
 import { Field, Form, Formik } from 'formik';
 import dynamic from 'next/dynamic';
@@ -76,6 +77,10 @@ const defaultPayload = {
   },
   '{{extra}}': [],
 };
+
+// Seerr AI's own guide: Seerr's lacks the variables added here, such as
+// Emby's ids and music's albums.
+const TEMPLATE_VARIABLES_URL = `${PROJECT_URL}/blob/${PROJECT_BRANCH}/docs/using-seerr/notifications/webhook.md#template-variables`;
 
 const messages = defineMessages(
   'components.Settings.Notifications.NotificationsWebhook',
@@ -365,11 +370,7 @@ const NotificationsWebhook = () => {
             </div>
             {values.supportVariables && (
               <div className="mt-2">
-                <Link
-                  href="https://docs.seerr.dev/using-seerr/notifications/webhook#template-variables"
-                  passHref
-                  legacyBehavior
-                >
+                <Link href={TEMPLATE_VARIABLES_URL} passHref legacyBehavior>
                   <Button
                     as="a"
                     buttonSize="sm"
@@ -533,11 +534,7 @@ const NotificationsWebhook = () => {
                     <ArrowPathIcon />
                     <span>{intl.formatMessage(messages.resetPayload)}</span>
                   </Button>
-                  <Link
-                    href="https://docs.seerr.dev/using-seerr/notifications/webhook#template-variables"
-                    passHref
-                    legacyBehavior
-                  >
+                  <Link href={TEMPLATE_VARIABLES_URL} passHref legacyBehavior>
                     <Button
                       as="a"
                       buttonSize="sm"

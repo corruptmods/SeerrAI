@@ -7,6 +7,7 @@ import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
 import { DocumentTextIcon } from '@heroicons/react/24/outline';
 import { PROJECT_REPO } from '@server/constants/project';
+import { isCurrentRelease, latestRelease } from '@server/utils/releases';
 import dynamic from 'next/dynamic';
 import { Fragment, useState } from 'react';
 import { FormattedRelativeTime, useIntl } from 'react-intl';
@@ -106,7 +107,7 @@ const Release = ({ currentVersion, release, isLatest }: ReleaseProps) => {
             {intl.formatMessage(messages.latestversion)}
           </Badge>
         )}
-        {release.name.includes(currentVersion) && (
+        {isCurrentRelease(release, currentVersion) && (
           <Badge badgeType="primary">
             {intl.formatMessage(messages.currentversion)}
           </Badge>
@@ -140,17 +141,20 @@ const Releases = ({ currentVersion }: ReleasesProps) => {
     );
   }
 
+  // The same release the update check counts as the latest.
+  const latest = latestRelease(data, currentVersion);
+
   return (
     <div>
       <h3 className="heading">{intl.formatMessage(messages.releases)}</h3>
       <div className="section space-y-3">
-        {data.map((release, index) => {
+        {data.map((release) => {
           return (
             <div key={`release-${release.id}`}>
               <Release
                 release={release}
                 currentVersion={currentVersion}
-                isLatest={index === 0}
+                isLatest={release === latest}
               />
             </div>
           );

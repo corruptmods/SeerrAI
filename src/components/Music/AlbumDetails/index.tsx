@@ -14,6 +14,7 @@ import {
 import RequestModal from '@app/components/RequestModal';
 import useFeature from '@app/hooks/useFeature';
 import useMediaQuery from '@app/hooks/useMediaQuery';
+import usePlayLinks from '@app/hooks/usePlayLinks';
 import { Permission, useUser } from '@app/hooks/useUser';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
@@ -26,7 +27,7 @@ import {
 import { VARIOUS_ARTISTS_MBID } from '@server/constants/media';
 import type { MusicAlbumDetails, MusicTrack } from '@server/models/Music';
 import Link from 'next/link';
-import { Fragment, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -148,6 +149,13 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
   const { data, error, mutate } = useSWR<MusicAlbumDetails>(
     musicOn ? `/api/v1/music/album/${albumId}` : null
   );
+  // Played the way a movie or series is: on an iPhone or iPad, Plex's app
+  // opens; the viewer's own servers come first.
+  const albumLinks = useMemo(
+    () => (data ? { playLinks: data.playLinks ?? [] } : undefined),
+    [data]
+  );
+  const { links: playLinks } = usePlayLinks(albumLinks);
 
   if (!musicOn) {
     return <ErrorPage statusCode={404} />;
@@ -228,7 +236,7 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
           </span>
         </div>
         <div className="media-actions">
-          {(data.playLinks ?? [])
+          {playLinks
             .filter((link) => link.url)
             .map((link) => (
               <Button

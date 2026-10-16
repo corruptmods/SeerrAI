@@ -9,7 +9,8 @@ import IssueComment from '@server/entity/IssueComment';
 import { MediaEventType } from '@server/entity/MediaEvent';
 import { User } from '@server/entity/User';
 import type { Proposal, ProposedChange } from '@server/lib/agent/changes';
-import { applyChange } from '@server/lib/agent/changes';
+import { applyChange, applySeasonChange } from '@server/lib/agent/changes';
+import { rangeLabel } from '@server/lib/agent/rules';
 import type {
   AgentState,
   KnownRelease,
@@ -26,7 +27,13 @@ import { aiFeatureOn, modelFor } from '@server/lib/ai';
 import { countAnswer, noteFailure } from '@server/lib/ai/credit';
 import type { ConverseMessage, ToolResult } from '@server/lib/ai/providers';
 import { converse } from '@server/lib/ai/providers';
-import backfill, { requestedSince } from '@server/lib/backfill/engine';
+import type { AgentHandBack } from '@server/lib/backfill/engine';
+import backfill, {
+  jobEpisodes,
+  requestedSince,
+  startedByAgent,
+} from '@server/lib/backfill/engine';
+import { releaseGroup } from '@server/lib/backfill/naming';
 import backfillNotices from '@server/lib/backfill/notices';
 import { recordMediaEvent } from '@server/lib/mediaHistory';
 import notificationManager, { Notification } from '@server/lib/notifications';
@@ -70,12 +77,24 @@ const FINISHED: AgentRun['status'][] = ['done', 'failed'];
 const HOLD_CHECK_MS = 60 * 1000;
 /** A report is held no longer than this for searches still going. */
 const HOLD_LONGEST_MS = 6 * 60 * 60 * 1000;
+/** A replaced season is followed this long for its new files to import. */
+const FOLLOW_LONGEST_MS = 2 * 24 * 60 * 60 * 1000;
 const UNFINISHED: AgentRun['status'][] = [
   'held',
   'queued',
   'running',
   'waiting',
 ];
+/**
+ * Replacements of a failed download (for the same episodes) that may fail
+ * in a day before the agent stops looking for more and tells admins.
+ */
+const MAX_FAILED_REPLACEMENTS = 3;
+/**
+ * The runs that are its own looking: they count towards the runs it starts
+ * in a day. One that went on after a failed download is still the run it was.
+ */
+const COUNTED: AgentRun['purpose'][] = ['work', 'retry'];
 const SEARCH_COMMANDS = new Set([
   'EpisodeSearch',
   'SeasonSearch',
@@ -104,7 +123,49 @@ interface ReportMemory {
    * between them and the agent.
    */
   answered?: boolean;
+  /** The files are there but bad: they are to be replaced, not filled. */
+  replace?: boolean;
+  /**
+   * Not a search: a replaced season, followed until its new files have
+   * imported, to tell whoever reported it.
+   */
+  follow?: { episodeIds: number[] };
 }
+
+/** What a run asked of an admin without the model, from a report. */
+interface DirectMemory {
+  /** Approved, its change is made and the run ends; no model is asked. */
+  direct?: boolean;
+}
+
+const directOf = (run: AgentRun): boolean =>
+  !!(run.memory as DirectMemory | null)?.direct && !run.conversation.length;
+
+/** Downloads it started that failed, which it was told to look again for. */
+interface FollowUpMemory {
+  /** Told, and not yet settled: replaced, or nothing else found. */
+  lookingFor?: number[];
+}
+
+const lookingForOf = (run: AgentRun): number[] =>
+  (run.memory as FollowUpMemory | null)?.lookingFor ?? [];
+
+/** "S06E03", "S06E01-E02, S06E05", or "the movie": what a download was for. */
+const jobWhat = (job: BackfillJob, kind: AgentRun['kind']): string =>
+  kind === 'movie'
+    ? 'the movie'
+    : [
+        ...new Set(
+          job.files.map((f) =>
+            rangeLabel(
+              f.season ?? 0,
+              f.episodeIds.map((_, i) => (f.episode ?? 0) + i)
+            )
+          )
+        ),
+      ].join(', ');
+
+const pad = (n: number) => String(n).padStart(2, '0');
 
 /** The runs among these with a Backfill download they started still going. */
 const downloading = async (runs: AgentRun[]): Promise<Set<number>> => {
@@ -143,8 +204,19 @@ const deleteFinished = async (
   const ids = finished.map((r) => r.id).filter((id) => !keep.has(id));
   if (!ids.length) return 0;
   const result = await repo.delete({ id: In(ids) });
+  await stopLooking(ids);
   return result.affected ?? ids.length;
 };
+
+/**
+ * Failed downloads that deleted conversations were to look again for: with
+ * the conversation gone, nothing else will be found.
+ */
+const stopLooking = (runIds: number[]) =>
+  getRepository(BackfillJob).update(
+    { agentRunId: In(runIds), followUp: 'agent' },
+    { followUp: 'none' }
+  );
 
 /** Whether it has already looked for this title on its own. */
 const triedOn = async (title: {
@@ -173,7 +245,7 @@ How to work:
 4. Be certain before you grab. Check the language with check_language when there is any question. Grab only files for missing episodes. One file per episode is preferred: take a release whose files each hold several episodes (S06E01-02, "Title A + Title B") only when no release has those episodes one per file, and then give each such file every episode it holds (episodes: [1, 2]), so Sonarr names it S06E01-E02. Weigh it in this order: the right content; English or the title's original language; covering as much as possible; quality; size. When nothing meets the quality profile, a lower quality is fine as a stopgap, since Sonarr and Radarr keep looking for upgrades. Prefer a well-seeded torrent or usenet.
 5. Turn down dubs in other languages (TRUEFRENCH, iTALiAN, GERMAN and so on, unless that is the original language), fakes (sizes far too small, torrents of archives or executables only), samples, and other shows. A Usenet post packed in archives, or with scrambled file names (only its PAR2 repair files named), is normal but cannot be opened: when its name is exactly one missing episode, or the movie, grab it whole (whole: true); a season pack like that cannot be used.
 6. If the admin says something you started is wrong, stop it with stop_download and fix it. A file already imported that holds several episodes but is linked to only one (title_status shows the others missing, the file's name or length says it holds them) is fixed with relink_file, when an admin is in the conversation; nothing is downloaded. If nothing usable exists, say so and what you tried. Only ask the admin (ask_admin) when you truly cannot decide yourself.
-7. When the admin asks you to change what is already there, propose it; the admin approves or declines, and nothing happens before that. A bad or wrong file: find a good release and grab it with replace: true (the old file goes only once the new one has imported), or search_upgrade to let Radarr or Sonarr find something better by its profile. A release group they do not want: propose_change blockGroup. A download that is wrong or broken: propose_change markFailed. Files to remove: propose_change deleteFiles. Another quality profile: propose_change changeProfile. Propose only what was asked for, then stop and wait; the next message says what was decided and what came of it.
+7. When the admin asks you to change what is already there, propose it; the admin approves or declines, and nothing happens before that. A bad or wrong file: find a good release and grab it with replace: true (the old file goes only once the new one has imported), or search_upgrade to let Radarr or Sonarr find something better by its profile. A whole season that is bad, or that they want replaced or downloaded again: replace_season (it grabs a new release first and removes the old files only after). A release group they do not want: propose_change blockGroup. A download that is wrong or broken: propose_change markFailed. Files to remove, only when removing them is what they asked for: propose_change deleteFiles; never delete files to replace them, which would leave nothing to play until something is found. Another quality profile: propose_change changeProfile. Propose only what was asked for, then stop and wait; the next message says what was decided and what came of it.
 
 Reply in short plain text, no headings or markdown: what was missing, what you found, what you started downloading (with its Backfill job number), and what is still missing and why.`;
 
@@ -331,6 +403,8 @@ class Agent {
     reporter: User;
     issueId?: number;
     seasonNumber?: number;
+    /** The files are there but bad, and should be replaced. */
+    replace?: boolean;
   }): Promise<AgentRun | null> {
     const settings = getSettings().backfill;
     if (!settings.agent.autoRun) return null;
@@ -341,27 +415,29 @@ class Agent {
       serverId: report.serverId,
       arrId: report.arrId,
     };
-    if (await runs.count({ where: { ...title, status: In(UNFINISHED) } })) {
+    // Only work under way holds a report up: not a change waiting for an
+    // admin, a season being followed, or a go looking again by itself.
+    if (
+      await runs.count({
+        where: { ...title, status: In(UNFINISHED), purpose: 'work' },
+      })
+    ) {
       return null;
     }
     // An admin reporting it is asking; anyone else's report is the agent
     // starting on its own, which it does once per title.
     const byAdmin = report.reporter.hasPermission(Permission.ADMIN);
     if (!byAdmin && (await triedOn(title))) return null;
-    const today = await runs.count({
-      where: {
-        trigger: In(['auto', 'report']),
-        createdAt: MoreThan(new Date(Date.now() - DAY)),
-      },
-    });
-    if (today >= settings.agent.maxAutoRunsPerDay) return null;
+    if ((await this.runsToday()) >= settings.agent.maxAutoRunsPerDay) {
+      return null;
+    }
     const run = await runs.save(
       new AgentRun({
         trigger: 'report',
         status: 'held',
         ...title,
         title: report.title,
-        ask: `Reported missing${
+        ask: `${report.replace ? 'Reported bad, to be replaced' : 'Reported missing'}${
           report.seasonNumber !== undefined
             ? ` (season ${report.seasonNumber})`
             : ''
@@ -372,6 +448,7 @@ class Agent {
             issueId: report.issueId,
             seasonNumber: report.seasonNumber,
             byAdmin,
+            ...(report.replace ? { replace: true } : {}),
           },
         },
         steps: [],
@@ -379,6 +456,101 @@ class Agent {
       })
     );
     return run;
+  }
+
+  /**
+   * Puts a change to admins on someone's behalf, without the model: a run
+   * waiting for approval, told to admins as any proposal is. Approved, the
+   * change is made and the run ends; declined, nothing happens. Null when
+   * the agent cannot work, so nobody could approve it.
+   */
+  public async awaitApproval(input: {
+    title: TitleRef;
+    name: string;
+    change: ProposedChange;
+    reporter: User;
+    issueId?: number;
+    seasonNumber?: number;
+    /** What they asked, in their words. */
+    ask: string;
+  }): Promise<AgentRun | null> {
+    if (this.problem(await owner())) return null;
+    const proposal: Proposal = {
+      id: randomUUID(),
+      at: new Date().toISOString(),
+      changes: [input.change],
+    };
+    const now = new Date();
+    const run = await getRepository(AgentRun).save(
+      new AgentRun({
+        trigger: 'report',
+        purpose: 'approval',
+        status: 'waiting',
+        ...input.title,
+        title: input.name,
+        ask: input.ask.trim().slice(0, MAX_ASK),
+        requestedByName: input.reporter.displayName,
+        question: `Waiting for approval: ${input.change.headline}.`,
+        memory: {
+          proposal,
+          direct: true,
+          report: {
+            issueId: input.issueId,
+            seasonNumber: input.seasonNumber,
+            byAdmin: input.reporter.hasPermission(Permission.ADMIN),
+            replace: true,
+          },
+        },
+        steps: [
+          {
+            at: now.toISOString(),
+            kind: 'propose',
+            text: input.change.headline,
+          },
+        ],
+        actions: [],
+        startedAt: now,
+        finishedAt: now,
+      })
+    );
+    await this.tell(run, []).catch(() => undefined);
+    return run;
+  }
+
+  /**
+   * Follows a replaced season until its new files have imported, then says
+   * so on the issue it was reported on. Checked with the held reports.
+   */
+  public async follow(input: {
+    title: TitleRef;
+    name: string;
+    reporter?: User | null;
+    issueId?: number;
+    seasonNumber: number;
+    episodeIds: number[];
+  }): Promise<AgentRun | null> {
+    if (!input.episodeIds.length) return null;
+    return getRepository(AgentRun).save(
+      new AgentRun({
+        trigger: 'report',
+        purpose: 'follow',
+        status: 'held',
+        ...input.title,
+        title: input.name,
+        ask: `Replaced season ${input.seasonNumber}: following it until the new files are in`,
+        requestedByName: input.reporter?.displayName ?? null,
+        memory: {
+          report: {
+            issueId: input.issueId,
+            seasonNumber: input.seasonNumber,
+            byAdmin: !!input.reporter?.hasPermission(Permission.ADMIN),
+            follow: { episodeIds: input.episodeIds },
+          },
+        },
+        steps: [],
+        actions: [],
+      })
+    );
   }
 
   /** Looks at every held report; one at a time. */
@@ -410,20 +582,28 @@ class Agent {
         // Only while it is still held: an admin may have replied to it
         // while it was being checked on, and their reply stands.
         const held = { id: run.id, status: 'held' as const };
+        // A followed season tells whoever reported it how it ended.
+        const following = !!reportOf(run).follow;
         if ('notNeeded' in verdict) {
-          await runs.update(held, {
+          const settled = await runs.update(held, {
             status: 'done',
             summary: verdict.notNeeded,
             finishedAt: new Date(),
           });
+          if (following && settled.affected) {
+            await this.comment(run, `Automatic fix: ${verdict.notNeeded}`);
+          }
           continue;
         }
         if ('failed' in verdict) {
-          await runs.update(held, {
+          const settled = await runs.update(held, {
             status: 'failed',
             error: verdict.failed.slice(0, 500),
             finishedAt: new Date(),
           });
+          if (following && settled.affected) {
+            await this.comment(run, `Automatic fix: ${verdict.failed}`);
+          }
           continue;
         }
         const queued = await runs.update(held, { status: 'queued' });
@@ -459,14 +639,54 @@ class Agent {
         }.`,
       };
     }
-    if (now - new Date(run.createdAt).getTime() >= HOLD_LONGEST_MS) {
+    const longest = reportOf(run).follow ? FOLLOW_LONGEST_MS : HOLD_LONGEST_MS;
+    if (now - new Date(run.createdAt).getTime() >= longest) {
       return {
         failed: `Not looked into: it could not be checked on for ${
-          HOLD_LONGEST_MS / (60 * 60 * 1000)
+          longest / (60 * 60 * 1000)
         } hours (${why}).`,
       };
     }
     return null;
+  }
+
+  /**
+   * Whether a replaced season is back: every episode a new release was
+   * grabbed for has a file again. Given up on after two days.
+   */
+  private async followVerdict(
+    run: AgentRun,
+    follow: { episodeIds: number[] },
+    now: number
+  ): Promise<{ wait: true } | { notNeeded: string } | { failed: string }> {
+    const { seasonNumber } = reportOf(run);
+    const season = seasonNumber !== undefined ? `Season ${seasonNumber}` : 'It';
+    const episodes = await backfill
+      .sonarrFor(run.serverId ?? 0)
+      .getSeriesEpisodes(run.arrId ?? 0);
+    const waiting = follow.episodeIds
+      .map((id) => episodes.find((ep) => ep.id === id))
+      .filter((ep): ep is NonNullable<typeof ep> => !!ep && !ep.hasFile);
+    if (!waiting.length) {
+      const count = follow.episodeIds.length;
+      return {
+        notNeeded: `${season} of ${run.title ?? 'the series'} is back: ${
+          count === 1 ? 'its new file has' : `all ${count} new files have`
+        } been imported.`,
+      };
+    }
+    if (now - new Date(run.createdAt).getTime() < FOLLOW_LONGEST_MS) {
+      return { wait: true };
+    }
+    const names = waiting
+      .slice(0, 12)
+      .map((ep) => `S${pad(ep.seasonNumber)}E${pad(ep.episodeNumber)}`)
+      .join(', ');
+    return {
+      failed: `${season} of ${run.title ?? 'the series'} is not all back after two days: ${names} still ${
+        waiting.length === 1 ? 'has' : 'have'
+      } no file. An admin can see what happened to the download in Sonarr.`,
+    };
   }
 
   /**
@@ -477,9 +697,16 @@ class Agent {
   private async holdVerdict(
     run: AgentRun,
     now: number
-  ): Promise<{ go: true } | { wait: true } | { notNeeded: string }> {
+  ): Promise<
+    { go: true } | { wait: true } | { notNeeded: string } | { failed: string }
+  > {
+    const report = reportOf(run);
+    if (report.follow) return this.followVerdict(run, report.follow, now);
+    // Bad files to replace: Sonarr's search for another release is already
+    // over, and nothing is missing to wait for.
+    if (report.replace) return { go: true };
     const young = now - new Date(run.createdAt).getTime() < HOLD_LONGEST_MS;
-    const { seasonNumber } = reportOf(run);
+    const { seasonNumber } = report;
     const serverId = run.serverId ?? 0;
     const arrId = run.arrId ?? 0;
     const row = await getRepository(BackfillSeries).findOne({
@@ -584,6 +811,7 @@ class Agent {
       );
     }
     await runs.delete({ id });
+    await stopLooking([id]);
     return true;
   }
 
@@ -695,6 +923,8 @@ class Agent {
     run.status = 'queued';
     run.question = null;
     run.error = null;
+    // An admin talking to it makes it their work again.
+    if (run.purpose === 'retry') run.purpose = 'work';
     // The rest of the conversation acts as whoever is talking to it now.
     run.requestedById = user.id;
     run.requestedByName = run.requestedByName ?? user.displayName;
@@ -756,6 +986,7 @@ class Agent {
         );
       }
       const headlines = proposal.changes.map((c) => c.headline).join('; ');
+      const direct = directOf(run);
       const { proposal: _taken, ...memory } = run.memory as {
         proposal?: Proposal;
       };
@@ -792,6 +1023,15 @@ class Agent {
       run.status = 'done';
       run.summary = `${user.displayName} declined: ${headlines}. Nothing was changed.`;
       run.finishedAt = new Date();
+      // Asked for on someone's behalf: they hear it was turned down.
+      if (direct && this.reportSettled(run)) {
+        await runs.save(run);
+        await this.comment(
+          run,
+          `Admin agent: An admin declined this: ${headlines}. Nothing was changed.`
+        );
+        return run;
+      }
       await runs.save(run);
       return run;
     } finally {
@@ -815,6 +1055,40 @@ class Agent {
             `AI agent, approved by ${decision.by}`
           );
           lines.push(`Done: ${change.headline}. ${said}`);
+          continue;
+        }
+        if (change.kind === 'replaceSeason') {
+          const outcome = await applySeasonChange(change);
+          if (!outcome.ok) {
+            lines.push(`Not done: ${change.headline}. ${outcome.message}`);
+            continue;
+          }
+          state.act({
+            at: new Date().toISOString(),
+            type: 'change',
+            change: change.kind,
+            approvedBy: decision.by,
+            title: state.run.title ?? change.headline,
+            detail: `${change.headline} (approved by ${decision.by}): ${outcome.message}`,
+          });
+          lines.push(`Done: ${outcome.message}`);
+          // Whoever reported it hears when the season is back.
+          const report = reportOf(state.run);
+          if (report.issueId && change.title) {
+            await this.follow({
+              title: change.title,
+              name: state.run.title ?? '',
+              issueId: report.issueId,
+              seasonNumber: Number(change.params.season),
+              episodeIds: outcome.episodeIds,
+            }).catch((e) =>
+              logger.warn('Could not follow a replaced season', {
+                label: LABEL,
+                runId: state.run.id,
+                errorMessage: e instanceof Error ? e.message : String(e),
+              })
+            );
+          }
           continue;
         }
         const said = await applyChange(change);
@@ -857,21 +1131,22 @@ class Agent {
     const lately = new Date(Date.now() - settings.researchAfterDays * DAY);
     const recent = await runs.count({
       where: [
-        { ...sameTitle(row), createdAt: MoreThan(lately) },
+        {
+          ...sameTitle(row),
+          createdAt: MoreThan(lately),
+          purpose: In(COUNTED),
+        },
         {
           ...sameTitle(row),
           status: In(UNFINISHED),
+          purpose: 'work',
         },
       ],
     });
     if (recent) return null;
-    const today = await runs.count({
-      where: {
-        trigger: In(['auto', 'report']),
-        createdAt: MoreThan(new Date(Date.now() - DAY)),
-      },
-    });
-    if (today >= settings.agent.maxAutoRunsPerDay) return null;
+    if ((await this.runsToday()) >= settings.agent.maxAutoRunsPerDay) {
+      return null;
+    }
     const run = await runs.save(
       new AgentRun({
         trigger: 'auto',
@@ -887,6 +1162,21 @@ class Agent {
     this.queue.push(run.id);
     void this.pump();
     return run;
+  }
+
+  /**
+   * The runs it started in the last day without an admin asking: on its
+   * own, or for a report. A change waiting for approval and a followed
+   * season are not runs of its own.
+   */
+  private runsToday(): Promise<number> {
+    return getRepository(AgentRun).count({
+      where: {
+        trigger: In(['auto', 'report']),
+        purpose: In(COUNTED),
+        createdAt: MoreThan(new Date(Date.now() - DAY)),
+      },
+    });
   }
 
   public isBusy(): boolean {
@@ -933,6 +1223,18 @@ class Agent {
       serverId: run.serverId ?? 0,
       arrId: run.arrId ?? 0,
     });
+    if (run.trigger === 'report' && reportOf(run).replace) {
+      const { seasonNumber } = reportOf(run);
+      const what =
+        seasonNumber !== undefined
+          ? `season ${seasonNumber} of ${run.title}`
+          : run.title;
+      return `Someone reported that ${what} (${ref}) is bad and asked for it to be replaced. Sonarr's search found no other release it would take. Look further with search_releases and search_indexers. ${
+        seasonNumber !== undefined
+          ? 'For the whole season, use replace_season if Sonarr now offers something; a release found elsewhere is taken with grab and replace: true.'
+          : 'A release found is taken with grab and replace: true.'
+      } Either way an admin approves it first, and the old files go only after the new ones are in. If nothing usable exists, say so and what you tried.`;
+    }
     if (run.trigger === 'report') {
       const { seasonNumber } = reportOf(run);
       // Not the reporter's name: they chose it, and it is not for the model
@@ -1056,7 +1358,11 @@ class Agent {
       messages = run.conversation.length
         ? compact(answerCalls(run.conversation as ConverseMessage[]))
         : [{ role: 'user', text: this.firstMessage(run) }];
+      let answer = '';
       const decision = (run.memory as { decision?: Decision }).decision;
+      // Asked for on someone's behalf, without the model: once approved,
+      // the change is made and that is all.
+      const direct = directOf(run) && !!decision;
       if (decision) {
         // Taken off first: whatever happens, an approval is carried out once.
         const { decision: _done, ...rest } = run.memory as {
@@ -1070,6 +1376,9 @@ class Agent {
           role: 'user',
           text: `${decision.by} (admin) approved. What came of it:\n${outcome}\nTell the admin in a line or two; carry on only with what is still left of their ask.`,
         });
+        if (direct) {
+          answer = `Approved by ${decision.by}. ${outcome}`;
+        }
       }
       const maxSteps = settings.backfill.agent.maxSteps;
       // A go that runs out of steps mid-task carries on by itself, while it
@@ -1079,10 +1388,9 @@ class Agent {
       let goes = 0;
       let actionsAtGo = run.actions.length;
       let used = 0;
-      let answer = '';
       let warned = false;
 
-      for (;;) {
+      for (; !direct; ) {
         const turn = await converse(ai, {
           model,
           system,
@@ -1274,6 +1582,262 @@ class Agent {
       () => undefined
     );
     if (answerIssue) await this.answerReport(run);
+    // Downloads it was looking again for are settled, and any that failed
+    // while it worked are handed to it now.
+    await this.followFailures(run.id);
+  }
+
+  /**
+   * A download it started failed for its release (Backfill found no good
+   * pack to take its place). It looks again in the same conversation, with
+   * the same say as before, unless replacements for the same episodes have
+   * failed three times today or its downloads for the day are used up.
+   * Null when it can't look: the conversation is gone or it can't work.
+   */
+  public async afterFailedDownload(job: BackfillJob): Promise<AgentHandBack> {
+    const run = await this.runOf(job);
+    if (!run || this.problem(await owner())) return null;
+    const wanted = new Set(jobEpisodes(job));
+    const failed = (
+      await getRepository(BackfillJob).find({
+        select: {
+          id: true,
+          files: true,
+          agentRunId: true,
+          approvedByName: true,
+        },
+        where: {
+          seriesId: job.seriesId,
+          status: 'failed',
+          finishedAt: MoreThan(new Date(Date.now() - DAY)),
+        },
+      })
+    ).filter(
+      (other) =>
+        startedByAgent(other) && jobEpisodes(other).some((id) => wanted.has(id))
+    );
+    // The first of them was the download it was asked for; the rest were
+    // replacements.
+    const replacements = failed.length - 1;
+    if (replacements >= MAX_FAILED_REPLACEMENTS) {
+      return {
+        stopped: 'gaveUp',
+        why: `${replacements} replacements for these episodes failed today, so the admin agent stopped looking`,
+      };
+    }
+    const most = getSettings().backfill.agent.maxGrabsPerDay;
+    if ((await this.grabsToday()) >= most) {
+      return {
+        stopped: 'limit',
+        why: `The admin agent's ${most} downloads for today are used up, so it did not look for another`,
+      };
+    }
+    return { look: () => this.followFailures(run.id) };
+  }
+
+  /** The conversation that started a download. */
+  private async runOf(job: BackfillJob): Promise<AgentRun | null> {
+    const runs = getRepository(AgentRun);
+    if (job.agentRunId) {
+      return runs.findOne({ where: { id: job.agentRunId } });
+    }
+    // Started before downloads kept their conversation: found by what each
+    // recent one started.
+    const recent = await runs.find({
+      select: { id: true, actions: true },
+      where: { createdAt: MoreThan(new Date(Date.now() - 30 * DAY)) },
+      order: { id: 'DESC' },
+    });
+    const id = recent.find((run) =>
+      run.actions.some(
+        (a) => a.type === 'grab' && !a.extended && a.jobId === job.id
+      )
+    )?.id;
+    return id ? runs.findOne({ where: { id } }) : null;
+  }
+
+  /** Downloads started in the last day, by any conversation. */
+  private async grabsToday(): Promise<number> {
+    const dayAgo = Date.now() - DAY;
+    const runs = await getRepository(AgentRun).find({
+      select: { id: true, actions: true },
+      where: { finishedAt: MoreThan(new Date(dayAgo)) },
+    });
+    return runs.reduce(
+      (n, r) =>
+        n +
+        r.actions.filter(
+          (a) => a.type === 'grab' && new Date(a.at).getTime() > dayAgo
+        ).length,
+      0
+    );
+  }
+
+  /** One at a time, so two failures at once tell a conversation once. */
+  private following: Promise<void> = Promise.resolve();
+
+  /**
+   * After a go, or when a download it started fails: what it looked again
+   * for is settled (replaced, or nothing else found, which admins hear),
+   * and failed downloads it has not been told of start a go of their own.
+   * Only once a go is over: while it works or waits on an admin, they wait.
+   */
+  public followFailures(runId: number): Promise<void> {
+    const next = this.following.then(() =>
+      this.followFailuresNow(runId).catch((e) => {
+        logger.warn('Could not hand failed downloads back to the admin agent', {
+          label: LABEL,
+          runId,
+          errorMessage: e instanceof Error ? e.message : String(e),
+        });
+      })
+    );
+    this.following = next;
+    return next;
+  }
+
+  private async followFailuresNow(runId: number): Promise<void> {
+    const runs = getRepository(AgentRun);
+    const jobs = getRepository(BackfillJob);
+    const run = await runs.findOne({ where: { id: runId } });
+    // While it works or waits on an admin, the conversation is theirs.
+    if (!run || !FINISHED.includes(run.status)) return;
+    const row = run.kind
+      ? await getRepository(BackfillSeries).findOne({
+          where: {
+            kind: run.kind,
+            serverId: run.serverId ?? 0,
+            arrId: run.arrId ?? 0,
+          },
+        })
+      : null;
+    const notice = (
+      job: BackfillJob,
+      kind: 'replaced' | 'failed',
+      why?: string
+    ) =>
+      backfillNotices.add({
+        kind,
+        seriesId: job.seriesId,
+        title: row?.title ?? run.title ?? job.title,
+        poster: row?.poster,
+        what: jobWhat(job, run.kind),
+        detail: `${(job.error ?? 'The download failed').replace(/\.$/, '')}${
+          why ? `; ${why}` : ''
+        }`,
+        url: `/backfill/jobs/${job.id}`,
+      });
+
+    // What it was told of: replaced since, or, once the conversation is
+    // over without that, nothing else was found.
+    const told = lookingForOf(run);
+    for (const job of told.length
+      ? await jobs.find({ where: { id: In(told) } })
+      : []) {
+      if (job.followUp === 'replaced') {
+        notice(job, 'replaced');
+      } else if (job.followUp === 'agent') {
+        const settled = await jobs.update(
+          { id: job.id, followUp: 'agent' },
+          { followUp: 'none' }
+        );
+        if (settled.affected) {
+          notice(job, 'failed', 'the admin agent found nothing else');
+        }
+      }
+    }
+
+    // Failed downloads it started that it has not been told of yet.
+    const started = run.actions
+      .filter((a) => a.type === 'grab' && !a.extended && a.jobId)
+      .map((a) => a.jobId!);
+    const fresh = started.length
+      ? (
+          await jobs.find({
+            where: { id: In(started), status: 'failed', followUp: 'agent' },
+            order: { id: 'ASC' },
+          })
+        ).filter((job) => !told.includes(job.id))
+      : [];
+    const problem = fresh.length ? this.problem(await owner()) : null;
+    if (problem) {
+      for (const job of fresh) {
+        await jobs.update(
+          { id: job.id, followUp: 'agent' },
+          { followUp: 'none' }
+        );
+        notice(
+          job,
+          'failed',
+          `the admin agent could not look again: ${problem}`
+        );
+      }
+    }
+    const telling = problem ? [] : fresh;
+    if (!telling.length) {
+      if (told.length) {
+        await runs.update(run.id, {
+          memory: { ...run.memory, lookingFor: [] },
+        });
+      }
+      return;
+    }
+
+    const text = this.lookAgainText(telling, run.kind);
+    run.steps.push({ at: new Date().toISOString(), kind: 'followUp', text });
+    if (run.steps.length > MAX_STEPS_KEPT) {
+      run.steps.splice(0, run.steps.length - MAX_STEPS_KEPT);
+    }
+    // A conversation never put to the model (a change approved on someone's
+    // behalf) starts with what it was asked.
+    const opening = run.conversation.length
+      ? ''
+      : `${this.firstMessage(run)}\n\n`;
+    run.conversation = [
+      ...run.conversation,
+      { role: 'user', text: `${opening}${text}` },
+    ];
+    run.memory = {
+      ...run.memory,
+      lookingFor: telling.map((job) => job.id),
+    };
+    // Another go of the same run, not a new one: no report waits on it.
+    if (run.purpose === 'work') run.purpose = 'retry';
+    run.status = 'queued';
+    run.question = null;
+    run.error = null;
+    await runs.save(run);
+    this.queue.push(run.id);
+    void this.pump();
+  }
+
+  /** What it is told when downloads it started failed. */
+  private lookAgainText(failed: BackfillJob[], kind: AgentRun['kind']) {
+    const what = [...new Set(failed.map((job) => jobWhat(job, kind)))].join(
+      ', '
+    );
+    const releases = failed.map((job) => `"${job.title}"`).join(', ');
+    const groups = [
+      ...new Set(
+        failed
+          .map(
+            (job) =>
+              job.files.find((f) => f.releaseGroup)?.releaseGroup ??
+              releaseGroup(job.title)
+          )
+          .filter((group): group is string => !!group)
+      ),
+    ].join(', ');
+    return `${failed
+      .map(
+        (job) =>
+          `Download #${job.id} failed (${(job.error ?? 'it failed').replace(/\.$/, '')}).`
+      )
+      .join(
+        ' '
+      )} Find another release for ${what}; do not pick the same release (${releases})${
+      groups ? ` or group (${groups})` : ''
+    } again.`;
   }
 
   /**
@@ -1310,9 +1874,13 @@ class Agent {
     // is noted when the conversation is over.
     const over = run.status === 'done' || run.status === 'failed';
     if (!over && !actions.length) return;
+    // A change asked for on someone's behalf is not the agent starting on
+    // its own, which it does once per title.
     const own =
       run.trigger === 'auto' ||
-      (run.trigger === 'report' && !reportOf(run).byAdmin);
+      (run.trigger === 'report' &&
+        !reportOf(run).byAdmin &&
+        !(run.memory as DirectMemory).direct);
     try {
       const series = getRepository(BackfillSeries);
       const where = {
@@ -1373,6 +1941,14 @@ class Agent {
 
   /** A reported title's outcome, on the issue it was reported on. */
   private async answerReport(run: AgentRun): Promise<void> {
+    await this.comment(
+      run,
+      `Admin agent: ${(run.summary ?? 'Done.').slice(0, 2000)}`
+    );
+  }
+
+  /** A comment on the issue a run's title was reported on, if any. */
+  private async comment(run: AgentRun, message: string): Promise<void> {
     const { issueId } = reportOf(run);
     if (!issueId) return;
     try {
@@ -1382,11 +1958,7 @@ class Agent {
       const author = await owner();
       if (!issue || !author) return;
       await getRepository(IssueComment).save(
-        new IssueComment({
-          issue,
-          user: author,
-          message: `Admin agent: ${(run.summary ?? 'Done.').slice(0, 2000)}`,
-        })
+        new IssueComment({ issue, user: author, message })
       );
     } catch (e) {
       logger.warn('Could not answer a report with what the agent did', {
@@ -1457,5 +2029,8 @@ class Agent {
 }
 
 const agent = new Agent();
+
+// Told of every failed download it started, from the moment it is loaded.
+backfill.onAgentDownloadFailed = (job) => agent.afterFailedDownload(job);
 
 export default agent;

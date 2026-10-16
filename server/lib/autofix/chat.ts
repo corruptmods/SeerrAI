@@ -13,17 +13,21 @@ import type { User } from '@server/entity/User';
 import type { NamedTitle } from '@server/lib/ai/context';
 import { label, withLibraryStatus } from '@server/lib/ai/context';
 import type { FixKind, FixResult } from '@server/lib/autofix';
-import autofix from '@server/lib/autofix';
+import autofix, { classify, seasonEpisodeIn } from '@server/lib/autofix';
 import { Permission } from '@server/lib/permissions';
 import { In, MoreThan } from 'typeorm';
 
 /*
  * A fix asked for in AI Search. Subtitles, transcriptions and searches for
- * missing episodes are done at once. A broken or wrong episode removes a
- * file, so it is only offered, with the title it is for shown, and done
- * once the person confirms. It needs permission to report issues: it is
- * filed as one, for a record and to tell the person how it went, and fixed
- * in the background.
+ * missing episodes are done at once. A broken or wrong episode, or a whole
+ * season to replace, removes files, so it is only offered, with the title
+ * it is for shown, and done once the person confirms. It needs permission
+ * to report issues: it is filed as one, for a record and to tell the
+ * person how it went, and fixed in the background.
+ *
+ * The season and episode named in their words are taken over the model's:
+ * a model that leaves them out (or gets them wrong) must not turn "season 6"
+ * into All Seasons.
  */
 
 interface ChatFix {
@@ -37,11 +41,12 @@ interface ChatFix {
 const ISSUE_TYPE: Partial<Record<FixKind, IssueType>> = {
   broken: IssueType.VIDEO,
   wrongEpisode: IssueType.OTHER,
+  replaceSeason: IssueType.OTHER,
 };
 
 /** A fix that replaces files, waiting for the person to confirm it. */
 export interface FixToConfirm {
-  kind: 'broken' | 'wrongEpisode';
+  kind: 'broken' | 'wrongEpisode' | 'replaceSeason';
   mediaId: number;
   seasonNumber?: number;
   episodeNumber?: number;
@@ -157,14 +162,47 @@ const refuseToFile = async (
   return undefined;
 };
 
+/**
+ * What was asked, from the model's reading and their words: the season and
+ * episode they named win, and a whole season said to be bad is replaced
+ * whatever the model called it. `earlier` is what they said before, for a
+ * season they named there ("Fix season 6", then "replace all of it").
+ */
+export const readFix = (
+  fix: ChatFix,
+  message: string,
+  earlier?: string
+): ChatFix => {
+  const said = seasonEpisodeIn(message);
+  const before = earlier ? seasonEpisodeIn(earlier) : {};
+  const kind =
+    fix.kind !== 'subtitles' &&
+    fix.kind !== 'transcribe' &&
+    classify(message)?.kind === 'replaceSeason'
+      ? 'replaceSeason'
+      : fix.kind;
+  const seasonNumber = said.season ?? fix.seasonNumber ?? before.season;
+  const episodeNumber =
+    kind === 'replaceSeason'
+      ? undefined
+      : (said.episode ??
+        // The model's episode only goes with the season it was for.
+        (said.season === undefined || said.season === fix.seasonNumber
+          ? fix.episodeNumber
+          : undefined));
+  return { ...fix, kind, seasonNumber, episodeNumber };
+};
+
 export const fixFromChat = async (
   user: User,
   message: string,
-  fix: ChatFix
+  asked: ChatFix,
+  earlier?: string
 ): Promise<ChatFixAnswer> => {
   if (!autofix.enabledFor(user)) {
     return { reply: 'Fixing problems from here is turned off.', results: [] };
   }
+  const fix = readFix(asked, message, earlier);
   if (!fix.title) {
     return {
       reply: 'Which title is it? Name the movie or series (and the episode).',
@@ -206,11 +244,22 @@ export const fixFromChat = async (
     };
   }
 
-  const refused = await refuseToFile(user, media, fix, results);
+  // A whole movie is its one file.
+  const kind = (
+    fix.kind === 'replaceSeason' && mediaType === MediaType.MOVIE
+      ? 'broken'
+      : fix.kind
+  ) as FixToConfirm['kind'];
+  if (kind === 'replaceSeason' && fix.seasonNumber === undefined) {
+    return {
+      reply: `Which season of ${label(result)} should be replaced? Say its number, for example “replace season 2”.`,
+      results,
+    };
+  }
+  const refused = await refuseToFile(user, media, { ...fix, kind }, results);
   if (refused) {
     return refused;
   }
-  const kind = fix.kind as FixToConfirm['kind'];
   const episode =
     mediaType === MediaType.TV && fix.seasonNumber
       ? ` season ${fix.seasonNumber}${
@@ -219,17 +268,27 @@ export const fixFromChat = async (
       : '';
   // Offered, not done: it replaces files, so the person sees which title
   // it is for and confirms it.
+  const admin = user.hasPermission(Permission.ADMIN);
   return {
     reply:
-      kind === 'wrongEpisode' && mediaType === MediaType.TV
-        ? `This checks ${label(result)}${episode} against where each file came from, and replaces what is wrong. Confirm to go ahead.`
-        : `This replaces the file of ${label(result)}${episode} with another release. Confirm to go ahead.`,
+      kind === 'replaceSeason'
+        ? `This replaces all of season ${fix.seasonNumber} of ${label(result)} with another release: the new one is downloaded first, and the current files are removed only once it is grabbed. ${
+            admin
+              ? 'Confirm to go ahead.'
+              : 'An admin approves it first. Confirm to ask for it.'
+          }`
+        : kind === 'wrongEpisode' && mediaType === MediaType.TV
+          ? `This checks ${label(result)}${episode} against where each file came from, and replaces what is wrong. Confirm to go ahead.`
+          : `This replaces the file of ${label(result)}${episode} with another release. Confirm to go ahead.`,
     results,
     confirm: {
       kind,
       mediaId: media.id,
-      seasonNumber: fix.seasonNumber,
-      episodeNumber: fix.episodeNumber,
+      seasonNumber: mediaType === MediaType.TV ? fix.seasonNumber : undefined,
+      episodeNumber:
+        mediaType === MediaType.TV && kind !== 'replaceSeason'
+          ? fix.episodeNumber
+          : undefined,
       message,
     },
   };
@@ -271,6 +330,15 @@ export const confirmFix = async (
     })
   );
   void autofix.fromIssue(issue.id, { actor: user, asked: { kind: fix.kind } });
+  if (fix.kind === 'replaceSeason' && media.mediaType === MediaType.TV) {
+    return {
+      reply: user.hasPermission(Permission.ADMIN)
+        ? `Reported it, and started replacing season ${fix.seasonNumber}: another release is being looked for, and the current files are removed only once it is grabbed. What happens is written on the issue, and you will be told.`
+        : `Reported it. Replacing a whole season needs an admin’s approval: another release is being looked for now, and an admin is asked to approve it. What happens is written on the issue, and you will be told.`,
+      results: [],
+      fix: { kind: fix.kind, ok: true, link: `/issues/${issue.id}` },
+    };
+  }
   return {
     reply: `Reported it, and started fixing it: ${
       fix.kind === 'wrongEpisode' && media.mediaType === MediaType.TV

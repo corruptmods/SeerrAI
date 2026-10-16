@@ -43,6 +43,7 @@ import ErrorPage from '@app/pages/_error';
 import blocklistAction from '@app/utils/blocklistAction';
 import { sortCrewPriority } from '@app/utils/creditHelpers';
 import defineMessages from '@app/utils/defineMessages';
+import { titleBackdrop, titlePoster } from '@app/utils/imageSources';
 import { hasAccountOn } from '@app/utils/mediaServerAccounts';
 import {
   refreshIntervalHelper,
@@ -465,7 +466,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
           <CachedImage
             type="tmdb"
             alt=""
-            src={`https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${data.backdropPath}`}
+            src={titleBackdrop(data.backdropPath)}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             fill
             priority
@@ -514,7 +515,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
             type="tmdb"
             src={
               data.posterPath
-                ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${data.posterPath}`
+                ? titlePoster(data.posterPath)
                 : '/images/seerr_poster_not_found.png'
             }
             alt=""

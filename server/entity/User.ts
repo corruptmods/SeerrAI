@@ -5,7 +5,7 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { Watchlist } from '@server/entity/Watchlist';
 import type { QuotaResponse } from '@server/interfaces/api/userInterfaces';
-import PreparedEmail from '@server/lib/email';
+import PreparedEmail, { emailLogoUrl } from '@server/lib/email';
 import type { PermissionCheckOptions } from '@server/lib/permissions';
 import { Permission, hasPermission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
@@ -34,6 +34,28 @@ import Issue from './Issue';
 import { MediaRequest } from './MediaRequest';
 import { UserPushSubscription } from './UserPushSubscription';
 import { UserSettings } from './UserSettings';
+
+/**
+ * When a quota of so many days began: requests made after it count towards
+ * it. Undefined for a quota with no window, which counts every request.
+ */
+export const quotaWindowStart = (days?: number | null): Date | undefined => {
+  if (!days) {
+    return undefined;
+  }
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  return start;
+};
+
+/** Whether a request made then counts towards a quota of so many days. */
+export const countsTowardsQuota = (
+  createdAt: Date,
+  days?: number | null
+): boolean => {
+  const start = quotaWindowStart(days);
+  return !start || createdAt > start;
+};
 
 @Entity()
 export class User {
@@ -294,6 +316,7 @@ export class User {
           password: password,
           applicationUrl,
           applicationTitle,
+          logoUrl: emailLogoUrl(),
           recipientName: this.username,
         },
       });
@@ -337,6 +360,7 @@ export class User {
           resetPasswordLink,
           applicationUrl,
           applicationTitle,
+          logoUrl: emailLogoUrl(),
           recipientName: this.displayName,
           recipientEmail: this.email,
         },
@@ -385,10 +409,7 @@ export class User {
     const movieQuotaDays = this.movieQuotaDays ?? defaultQuotas.movie.quotaDays;
 
     // Count movie requests made during quota period
-    const movieDate = new Date();
-    if (movieQuotaDays) {
-      movieDate.setDate(movieDate.getDate() - movieQuotaDays);
-    }
+    const movieDate = quotaWindowStart(movieQuotaDays);
 
     const movieQuotaUsed = movieQuotaLimit
       ? await requestRepository.count({
@@ -396,7 +417,7 @@ export class User {
             requestedBy: {
               id: this.id,
             },
-            ...(movieQuotaDays ? { createdAt: AfterDate(movieDate) } : {}),
+            ...(movieDate ? { createdAt: AfterDate(movieDate) } : {}),
             type: MediaType.MOVIE,
             status: Not(MediaRequestStatus.DECLINED),
             ignoreQuota: false,
@@ -410,11 +431,7 @@ export class User {
     const tvQuotaDays = this.tvQuotaDays ?? defaultQuotas.tv.quotaDays;
 
     // Count tv season requests made during quota period
-    const tvDate = new Date();
-    if (tvQuotaDays) {
-      tvDate.setDate(tvDate.getDate() - tvQuotaDays);
-    }
-    const tvQuotaStartDate = tvDate.toJSON();
+    const tvDate = quotaWindowStart(tvQuotaDays);
     const tvQuotaUsedQuery = requestRepository
       .createQueryBuilder('request')
       .leftJoin('request.requestedBy', 'requestedBy')
@@ -428,10 +445,11 @@ export class User {
         declinedStatus: MediaRequestStatus.DECLINED,
       });
 
-    if (tvQuotaDays) {
-      tvQuotaUsedQuery.andWhere('request.createdAt > :date', {
-        date: tvQuotaStartDate,
-      });
+    // Passed as a Date, so the database driver writes it as it stores dates.
+    // As text ('…T…Z'), SQLite compared it as a string against its own
+    // 'YYYY-MM-DD HH:MM:SS' and left out the window's whole first day.
+    if (tvDate) {
+      tvQuotaUsedQuery.andWhere('request.createdAt > :date', { date: tvDate });
     }
 
     const tvQuotaUsed = tvQuotaLimit
@@ -456,10 +474,7 @@ export class User {
 
     // Count the albums in music requests made during the quota period, as
     // seasons are counted for series.
-    const musicDate = new Date();
-    if (musicQuotaDays) {
-      musicDate.setDate(musicDate.getDate() - musicQuotaDays);
-    }
+    const musicDate = quotaWindowStart(musicQuotaDays);
     const musicQuotaUsedQuery = requestRepository
       .createQueryBuilder('request')
       .leftJoin('request.requestedBy', 'requestedBy')
@@ -472,9 +487,9 @@ export class User {
       })
       .andWhere('request.ignoreQuota = :ignoreQuota', { ignoreQuota: false });
 
-    if (musicQuotaDays) {
+    if (musicDate) {
       musicQuotaUsedQuery.andWhere('request.createdAt > :date', {
-        date: musicDate.toJSON(),
+        date: musicDate,
       });
     }
 

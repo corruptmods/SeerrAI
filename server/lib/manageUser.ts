@@ -1,6 +1,8 @@
+import type { MediaServerKind } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
-import type { User } from '@server/entity/User';
-import { primaryServer } from '@server/lib/mediaServers';
+import { getRepository } from '@server/datasource';
+import { User } from '@server/entity/User';
+import { USER_TYPE, primaryServer } from '@server/lib/mediaServers';
 import { Permission } from '@server/lib/permissions';
 
 /**
@@ -45,3 +47,51 @@ export const plexAccountMayClaim = (user: User): boolean =>
   (user.id === 1
     ? primaryServer() === 'plex'
     : user.userType === UserType.PLEX);
+
+/**
+ * No account but (optionally) this one has this email. A media server
+ * account is never given an email another account already has.
+ */
+export const emailFree = async (
+  email: string,
+  exceptId?: number
+): Promise<boolean> => {
+  const holder = await getRepository(User)
+    .createQueryBuilder('user')
+    .select('user.id')
+    .where('user.email = :email', { email: (email ?? '').toLowerCase() })
+    .getOne();
+  return !holder || holder.id === exceptId;
+};
+
+/**
+ * Whether signing in with this server brings someone's picture (and, for
+ * Plex, email) up to date: when it holds their main account, or they have
+ * none but a password.
+ */
+export const mainAccountOn = (
+  user: Pick<User, 'userType'>,
+  kind: MediaServerKind
+): boolean =>
+  user.userType === USER_TYPE[kind] || user.userType === UserType.LOCAL;
+
+/**
+ * What a Plex account brings to the account it is linked to, on signing in
+ * with Plex and on Import Plex Users alike: its picture and email only
+ * when Plex is their main account (someone who signs in with Jellyfin or
+ * Emby keeps what they have), and the email only when nobody else here
+ * has it.
+ */
+export const plexProfileChanges = async (
+  user: Pick<User, 'id' | 'userType'>,
+  account: { thumb: string; email: string }
+): Promise<Partial<User>> => {
+  if (!mainAccountOn(user, 'plex')) {
+    return {};
+  }
+  const changes: Partial<User> = { avatar: account.thumb };
+  if (await emailFree(account.email, user.id)) {
+    changes.email = account.email;
+  }
+  return changes;
+};

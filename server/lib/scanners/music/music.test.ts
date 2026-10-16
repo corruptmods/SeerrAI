@@ -893,6 +893,69 @@ describe('music scans', () => {
       assert.equal(album.status, MediaStatus.AVAILABLE);
       assert.equal(album.ratingKey, '600');
     });
+
+    it('keeps an album a server still lists when MusicBrainz cannot be asked', async () => {
+      const group = mbid(301);
+      state.mb.groups[group] = ARTIST;
+      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
+      state.plex.albums = [plexAlbum('600', 'Some Album', { guid: group })];
+
+      await musicFullScan.run();
+      assert.equal((await albumOf(group)).status, MediaStatus.AVAILABLE);
+
+      // The kept answer has been pruned, and MusicBrainz does not answer
+      // during this full scan.
+      await getRepository(MusicMetadata).clear();
+      cacheManager.getCache('musicbrainz').flush();
+      getSettings().music.musicbrainzUrl = 'http://127.0.0.1:1';
+
+      await musicFullScan.run();
+
+      const album = await albumOf(group);
+      assert.equal(album.status, MediaStatus.AVAILABLE);
+      assert.equal(album.ratingKey, '600');
+      assert.equal((await artistOf(ARTIST)).ratingKey, '500');
+    });
+
+    it('keeps an album a server still lists whose artist it cannot tell this time', async () => {
+      await seedArtist(
+        [{ mbId: HAIL, status: MediaStatus.AVAILABLE, ratingKey: '600' }],
+        { status: MediaStatus.AVAILABLE, ratingKey: '500' }
+      );
+      // Plex lists the same album, but with no ids and under a name
+      // Lidarr does not know.
+      state.plex.artists = [plexArtist('500', 'Someone Else')];
+      state.plex.albums = [
+        plexAlbum('600', 'Hail to the Thief', { artistName: 'Someone Else' }),
+      ];
+
+      await musicFullScan.run();
+
+      const album = await albumOf(HAIL);
+      assert.equal(album.status, MediaStatus.AVAILABLE);
+      assert.equal(album.ratingKey, '600');
+      assert.equal((await artistOf(ARTIST)).ratingKey, '500');
+    });
+
+    it('marks nothing gone while an album waits for MusicBrainz', async () => {
+      await seedArtist(
+        [{ mbId: HAIL, status: MediaStatus.AVAILABLE, ratingKey: '600' }],
+        { status: MediaStatus.AVAILABLE, ratingKey: '500' }
+      );
+      // The server lists the album under a new id, which only MusicBrainz
+      // could place, and MusicBrainz does not answer.
+      getSettings().music.musicbrainzUrl = 'http://127.0.0.1:1';
+      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
+      state.plex.albums = [
+        plexAlbum('700', 'Hail to the Thief', { guid: HAIL_RELEASE }),
+      ];
+
+      await musicFullScan.run();
+
+      const album = await albumOf(HAIL);
+      assert.equal(album.status, MediaStatus.AVAILABLE);
+      assert.equal(album.ratingKey, '600');
+    });
   });
 
   describe('Lidarr only', () => {

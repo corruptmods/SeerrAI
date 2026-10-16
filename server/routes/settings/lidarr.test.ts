@@ -316,6 +316,105 @@ describe('music settings', () => {
   });
 });
 
+describe('how music is searched', () => {
+  it('starts as it always was, then keeps what an admin saves', async () => {
+    const first = await call('GET', '/settings/music/search');
+    assert.equal(first.status, 200);
+    assert.deepEqual(first.body, {
+      inAll: false,
+      musicPage: true,
+      chip: true,
+      artists: 8,
+      albums: 12,
+    });
+
+    const saved = await call('POST', '/settings/music/search', {
+      inAll: true,
+      musicPage: false,
+      chip: true,
+      artists: 4,
+      albums: 20,
+    });
+    assert.equal(saved.status, 200);
+    const expected = {
+      inAll: true,
+      musicPage: false,
+      chip: true,
+      artists: 4,
+      albums: 20,
+    };
+    assert.deepEqual(saved.body, expected);
+    assert.deepEqual(
+      (await call('GET', '/settings/music/search')).body,
+      expected
+    );
+    assert.deepEqual(getSettings().music.search, expected);
+
+    // Saving Metadata → Music leaves them as they are.
+    await call('POST', '/settings/music', { listenBrainz: false });
+    assert.deepEqual(getSettings().music.search, expected);
+  });
+
+  it('keeps what a save leaves out', async () => {
+    await call('POST', '/settings/music/search', { artists: 3 });
+    await call('POST', '/settings/music/search', { chip: false });
+    assert.deepEqual(getSettings().music.search, {
+      inAll: false,
+      musicPage: true,
+      chip: false,
+      artists: 3,
+      albums: 12,
+    });
+  });
+
+  it('refuses a number of results out of bounds, changing nothing', async () => {
+    for (const body of [
+      { artists: 0 },
+      { artists: 26 },
+      { albums: 2.5 },
+      { albums: -1 },
+      { inAll: 'yes' },
+    ]) {
+      assert.equal(
+        (await call('POST', '/settings/music/search', body)).status,
+        400,
+        JSON.stringify(body)
+      );
+    }
+    assert.deepEqual(getSettings().music.search, musicDefaults().search);
+  });
+
+  it('tells everyone only what their pages need', async () => {
+    await call('POST', '/settings/music/search', {
+      inAll: true,
+      musicPage: false,
+      chip: false,
+      artists: 5,
+      albums: 6,
+    });
+    assert.deepEqual(getSettings().fullPublicSettings.musicSearch, {
+      inAll: true,
+      musicPage: false,
+      chip: false,
+    });
+  });
+
+  it('is gone while music is turned off for everyone', async () => {
+    getSettings().main.disabledFeatures = ['music'];
+    assert.equal((await call('GET', '/settings/music/search')).status, 403);
+    assert.equal(
+      (await call('POST', '/settings/music/search', { inAll: true })).status,
+      403
+    );
+    assert.equal(getSettings().music.search.inAll, false);
+  });
+
+  it('is there before a Lidarr is added, since music starts here', async () => {
+    assert.equal(getSettings().lidarr.length, 0);
+    assert.equal((await call('GET', '/settings/music/search')).status, 200);
+  });
+});
+
 describe('the request window’s Lidarr', () => {
   beforeEach(() => {
     getSettings().lidarr = [

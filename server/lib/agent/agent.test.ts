@@ -3279,3 +3279,648 @@ describe('the admin agent keeping its conversations whole', () => {
     assert.match(events[0].detail ?? '', /started a download/);
   });
 });
+
+describe('replacing a whole season through the admin agent', () => {
+  const OLD = 'Casper.S01.DVDRip.x264-OLDGRP';
+  const NEW = 'Casper.the.Friendly.Ghost.S01.1080p.WEB-DL-NEWGRP';
+  let done: string[] = [];
+  /** Season 1 of Casper, every episode with a file from one old pack. */
+  const season = () =>
+    [1, 2, 3].map((n) => ({
+      id: 500 + n,
+      seriesId: SERIES_ID,
+      seasonNumber: 1,
+      episodeNumber: n,
+      hasFile: true,
+      episodeFileId: 1500 + n,
+      monitored: true,
+      airDateUtc: '1951-01-01T00:00:00Z',
+    }));
+
+  beforeEach(() => {
+    done = [];
+    mock.method(FixSonarr.prototype, 'episodes', async () => season());
+    mock.method(FixSonarr.prototype, 'episodeFile', async (id: number) => ({
+      id,
+      releaseGroup: 'OLDGRP',
+    }));
+    mock.method(FixSonarr.prototype, 'seriesFacts', async () => ({
+      title: 'Casper the Friendly Ghost',
+      originalLanguage: 'English',
+    }));
+    mock.method(FixSonarr.prototype, 'seasonHistory', async () => [
+      ...season().map((ep) => ({
+        id: 700 + ep.episodeNumber,
+        eventType: 'downloadFolderImported',
+        sourceTitle: OLD,
+        date: '2026-01-01T01:00:00Z',
+        downloadId: 'old',
+        episodeId: ep.id,
+        data: { fileId: String(ep.episodeFileId) },
+      })),
+      {
+        id: 700,
+        eventType: 'grabbed',
+        sourceTitle: OLD,
+        date: '2026-01-01T00:00:00Z',
+        downloadId: 'old',
+        episodeId: 501,
+        data: {},
+      },
+    ]);
+    mock.method(FixSonarr.prototype, 'seasonReleases', async () =>
+      [OLD, NEW].map((title) => ({
+        guid: title,
+        indexerId: 1,
+        indexer: 'Torznab',
+        title,
+        fullSeason: true,
+        rejected: true,
+        rejections: ['Existing file on disk is of equal or higher preference'],
+      }))
+    );
+    mock.method(FixSonarr.prototype, 'releases', async () => []);
+    mock.method(FixSonarr.prototype, 'grab', async (r: { guid: string }) => {
+      done.push(`grab:${r.guid}`);
+    });
+    mock.method(
+      FixSonarr.prototype,
+      'deleteEpisodeFile',
+      async (id: number) => {
+        done.push(`delete:${id}`);
+      }
+    );
+    mock.method(FixSonarr.prototype, 'monitorEpisodes', async () => undefined);
+    mock.getter(
+      FixSonarr.prototype,
+      'extras',
+      () =>
+        ({
+          markFailed: async (id: number) => {
+            done.push(`failed:${id}`);
+          },
+          recycleBin: async () => '',
+        }) as unknown as ArrExtras
+    );
+  });
+
+  const proposalOf = (run: AgentRun) =>
+    (
+      run.memory as {
+        proposal?: {
+          id: string;
+          changes: { kind: string; headline: string; details: string[] }[];
+        };
+      }
+    ).proposal;
+
+  it('replaces a season asked to be replaced, never by deleting first: the new release is grabbed, then the old files go', async () => {
+    script = [
+      // As on the owner's server: it reaches for deleting the files.
+      () =>
+        toolUse('propose_change', {
+          kind: 'deleteFiles',
+          title: 'series:0:1283',
+          season: 1,
+          reason: 'The season is bad.',
+        }),
+      (body) => {
+        const refused = lastResult(body);
+        assert.equal(refused.is_error, true);
+        assert.match(refused.content, /not for files to be deleted/);
+        assert.match(refused.content, /replace_season/);
+        return toolUse('replace_season', {
+          title: 'series:0:1283',
+          season: 1,
+          reason: 'The admin says the whole season is bad.',
+        });
+      },
+    ];
+    const run = await agent.ask(
+      'Fix season 1 of Casper. Replace it all',
+      await admin()
+    );
+    const waiting = await waitForRun(run.id, ['waiting']);
+    const proposal = proposalOf(waiting);
+    assert.equal(proposal?.changes.length, 1);
+    assert.equal(proposal?.changes[0].kind, 'replaceSeason');
+    assert.equal(
+      proposal?.changes[0].headline,
+      `Replace season 1 of Casper the Friendly Ghost: download ${NEW} and then remove the 3 current files`
+    );
+    assert.equal(
+      waiting.question,
+      `Waiting for approval: Replace season 1 of Casper the Friendly Ghost: download ${NEW} and then remove the 3 current files.`
+    );
+    assert.match(
+      proposal!.changes[0].details.join('\n'),
+      new RegExp(`marks "${OLD.replace(/\./g, '\\.')}" failed`)
+    );
+    // Proposing changed nothing.
+    assert.deepEqual(done, []);
+    assert.match(sent[0]?.subject ?? '', /needs your approval/);
+
+    script = [
+      (body) => {
+        const messages = body.messages as { role: string; content: unknown }[];
+        const said = String(messages[messages.length - 1].content);
+        assert.match(said, /Done: Replacing season 1 of Casper/);
+        return say('Season 1 is being replaced.');
+      },
+    ];
+    await agent.approve(run.id, proposal!.id, await admin());
+    const finished = await waitForRun(run.id);
+    assert.equal(finished.status, 'done', finished.error ?? '');
+    // Grabbed first; only then the old release blocklisted and files gone.
+    assert.deepEqual(done, [
+      `grab:${NEW}`,
+      'failed:700',
+      'delete:1501',
+      'delete:1502',
+      'delete:1503',
+    ]);
+    assert.equal(finished.actions[0].change, 'replaceSeason');
+  });
+
+  it('still deletes files when deleting is what was asked', async () => {
+    script = [
+      () =>
+        toolUse('propose_change', {
+          kind: 'deleteFiles',
+          title: 'series:0:1283',
+          season: 1,
+          reason: 'Asked to delete them.',
+        }),
+    ];
+    const run = await agent.ask(
+      'Delete the files of season 1 of Casper',
+      await admin()
+    );
+    const waiting = await waitForRun(run.id, ['waiting']);
+    assert.equal(proposalOf(waiting)?.changes[0].kind, 'deleteFiles');
+  });
+
+  it('looks further for a season reported bad, and only proposes replacing it', async () => {
+    script = [
+      (body) => {
+        assert.match(
+          JSON.stringify((body.messages as unknown[])[0]),
+          /season 1 of Casper the Friendly Ghost \(series:0:1283\) is bad and asked for it to be replaced/
+        );
+        return toolUse('replace_season', {
+          title: 'series:0:1283',
+          season: 1,
+          reason: 'Reported bad; Sonarr now offers another pack.',
+        });
+      },
+    ];
+    const reporter = await getRepository(User).save(
+      new User({
+        email: 'season-reporter@test.local',
+        plexUsername: 'season-reporter',
+        permissions: 0,
+        avatar: '',
+      })
+    );
+    const held = await agent.afterReport({
+      kind: 'series',
+      serverId: 0,
+      arrId: SERIES_ID,
+      title: 'Casper the Friendly Ghost',
+      reporter,
+      seasonNumber: 1,
+      replace: true,
+    });
+    assert.equal(held?.ask, 'Reported bad, to be replaced (season 1)');
+    await agent.checkHeld();
+    const waiting = await waitForRun(held!.id, ['waiting']);
+    assert.equal(proposalOf(waiting)?.changes[0].kind, 'replaceSeason');
+    assert.deepEqual(done, []);
+  });
+
+  it('says when there is nothing else to replace the season with', async () => {
+    mock.method(FixSonarr.prototype, 'seasonReleases', async () => []);
+    const state = {
+      run: { trigger: 'ask', steps: [], actions: [] },
+      releases: new Map(),
+      bind: () => undefined,
+      propose: () => assert.fail('nothing to propose'),
+    } as unknown as AgentState;
+    const result = await runTool(state, 'replace_season', {
+      title: 'series:0:1283',
+      season: 1,
+      reason: 'bad',
+    });
+    assert.equal(result.isError, true);
+    assert.match(
+      result.text,
+      /No other release of season 1 was found, so nothing was removed\. Look further/
+    );
+    assert.deepEqual(done, []);
+  });
+});
+
+describe('when a download the admin agent started fails', () => {
+  const post = (title: string): ProwlarrRelease => ({
+    ...COLLECTION,
+    guid: `https://usenet/${title}`,
+    title,
+    protocol: 'usenet',
+    size: 350 * MB,
+    seeders: undefined,
+  });
+  // As on the owner's server: a usenet post that SABnzbd could not finish,
+  // and another group's post of the same episode that would have worked.
+  const HONE = post('Casper.the.Friendly.Ghost.S01E02.DVDRip.x264-HONE');
+  const MEGUSTA = post('Casper.the.Friendly.Ghost.S01E02.480p.WEB-MeGusta');
+  /** What SABnzbd says of each download it was given, by its id. */
+  let sab: Map<string, 'queue' | 'failed'>;
+  let added = 0;
+
+  beforeEach(() => {
+    sab = new Map();
+    added = 0;
+    getSettings().backfill = { ...getSettings().backfill, usenetClientId: 2 };
+    getSettings().downloadClients = [
+      ...getSettings().downloadClients,
+      {
+        id: 2,
+        name: 'SABnzbd',
+        type: 'sabnzbd',
+        hostname: 'sabnzbd',
+        port: 8080,
+        useSsl: false,
+        urlBase: '',
+        apiKey: 'k',
+        username: '',
+        password: '',
+      },
+    ];
+    mock.method(ProwlarrAPI.prototype, 'search', async () => [HONE, MEGUSTA]);
+    mock.method(
+      ProwlarrAPI.prototype,
+      'fetchRelease',
+      async (release: ProwlarrRelease) => ({
+        kind: 'nzb',
+        data: `<?xml version="1.0"?><nzb xmlns="http://www.newzbin.com/DTD/2003/nzb"><file poster="p" date="1" subject="[1/1] - &quot;${release.title}.mkv&quot; yEnc (1/1)"><segments><segment bytes="${350 * MB}" number="1">a@x</segment></segments></file></nzb>`,
+      })
+    );
+    mock.method(SabnzbdAPI.prototype, 'addNzb', async () => {
+      added += 1;
+      const id = `SABnzbd_nzo_${added}`;
+      sab.set(id, 'queue');
+      return id;
+    });
+    mock.method(SabnzbdAPI.prototype, 'getJob', async (id: string) =>
+      sab.get(id) === 'failed'
+        ? {
+            place: 'history',
+            status: 'Failed',
+            percentage: 0,
+            size: 350 * MB,
+            sizeLeft: 350 * MB,
+            failMessage: 'Aborted, cannot be completed',
+          }
+        : {
+            place: 'queue',
+            status: 'Downloading',
+            percentage: 10,
+            size: 350 * MB,
+            sizeLeft: 300 * MB,
+          }
+    );
+    mock.method(SabnzbdAPI.prototype, 'deleteJob', async () => undefined);
+    mock.method(SabnzbdAPI.prototype, 'pauseJob', async () => undefined);
+  });
+
+  /** A go that searches and takes HONE's post of S01E02. */
+  const grabHone = (then: Reply) => [
+    () =>
+      toolUse('search_indexers', {
+        query: 'Casper the Friendly Ghost S01E02',
+        kind: 'series',
+      }),
+    () =>
+      toolUse('grab', {
+        title: 'series:0:1283',
+        release: 'r1',
+        files: [{ index: 0, season: 1, episode: 2 }],
+        reason: 'its name is the episode',
+      }),
+    (body: Record<string, unknown>) => {
+      const started = lastResult(body);
+      assert.equal(started.is_error, undefined, started.content);
+      return then(body);
+    },
+  ];
+
+  /** The last thing the model was told, whatever its shape. */
+  const lastSaid = (body: Record<string, unknown>) => {
+    const messages = body.messages as unknown[];
+    return JSON.stringify(messages[messages.length - 1]);
+  };
+
+  const failFirst = async (run: AgentRun) => {
+    const job = await getRepository(BackfillJob).findOneOrFail({
+      where: { id: run.actions[0].jobId },
+    });
+    sab.set(job.downloadId!, 'failed');
+    await backfill.tick();
+    return job.id;
+  };
+
+  it('looks for another release once the run is over, never the one that failed', async () => {
+    script = grabHone(() => say('Downloading S01E02 from Usenet.'));
+    const run = await agent.ask('Get Casper S01E02', await admin());
+    const first = await waitForRun(run.id);
+    assert.equal(first.status, 'done', first.error ?? '');
+    const asked = bodies.length;
+
+    let failedId = 0;
+    script = [
+      (body) => {
+        assert.match(
+          lastSaid(body),
+          new RegExp(
+            `Download #${failedId} failed \\(SABnzbd could not finish it: Aborted, cannot be completed\\)\\. Find another release for S01E02; do not pick the same release \\(\\\\"Casper\\.the\\.Friendly\\.Ghost\\.S01E02\\.DVDRip\\.x264-HONE\\\\"\\) or group \\(HONE\\) again\\.`
+          )
+        );
+        return toolUse('search_indexers', {
+          query: 'Casper the Friendly Ghost S01E02',
+          kind: 'series',
+        });
+      },
+      (body) => {
+        const found = lastResult(body).content;
+        const [hone, megusta] = found.split('\n').slice(1);
+        assert.match(
+          hone,
+          /^r1 .*HONE.*failed to download for this title: never take it again/
+        );
+        assert.doesNotMatch(megusta, /failed/);
+        return toolUse('grab', {
+          title: 'series:0:1283',
+          release: 'r1',
+          files: [{ index: 0, season: 1, episode: 2 }],
+          reason: 'trying it again',
+        });
+      },
+      (body) => {
+        const refused = lastResult(body);
+        assert.equal(refused.is_error, true);
+        assert.match(
+          refused.content,
+          /failed to download for this title before/
+        );
+        return toolUse('grab', {
+          title: 'series:0:1283',
+          release: 'r2',
+          files: [{ index: 0, season: 1, episode: 2 }],
+          reason: 'another group',
+        });
+      },
+      (body) => {
+        const started = lastResult(body);
+        assert.equal(started.is_error, undefined, started.content);
+        return say('Took the MeGusta post of S01E02 instead.');
+      },
+    ];
+    const job = await getRepository(BackfillJob).findOneOrFail({
+      where: { id: first.actions[0].jobId },
+    });
+    failedId = job.id;
+    assert.equal(job.agentRunId, run.id);
+    await failFirst(first);
+    const after = await waitForRun(run.id);
+    assert.equal(after.status, 'done', after.error ?? '');
+    assert.equal(bodies.length, asked + 4, 'one more go of the same run');
+    assert.equal(after.summary, 'Took the MeGusta post of S01E02 instead.');
+    // Its own kind of go: not a new conversation, and not one counted
+    // towards the agent's runs a day.
+    assert.equal(await getRepository(AgentRun).count(), 1);
+    assert.equal(after.purpose, 'retry');
+    assert.ok(
+      after.steps.some(
+        (s) =>
+          s.kind === 'followUp' &&
+          s.text.startsWith(`Download #${job.id} failed`)
+      )
+    );
+
+    const jobs = getRepository(BackfillJob);
+    const failed = await jobs.findOneOrFail({ where: { id: job.id } });
+    const replacement = await jobs.findOneOrFail({
+      where: { id: after.actions[1].jobId },
+    });
+    assert.equal(failed.status, 'failed');
+    assert.equal(failed.followUp, 'replaced');
+    assert.equal(failed.replacedById, replacement.id);
+    assert.equal(replacement.title, MEGUSTA.title);
+    assert.equal(replacement.agentRunId, run.id);
+  });
+
+  it('gives up after three replacements of the same episodes fail in a day, and says so', async () => {
+    const row = await getRepository(BackfillSeries).save(
+      new BackfillSeries({
+        kind: 'series',
+        serverId: 0,
+        arrId: SERIES_ID,
+        title: 'Casper the Friendly Ghost',
+        status: 'downloading',
+        missing: 2,
+        searchTerms: [],
+      })
+    );
+    // Three earlier tries at S01E02 by the agent failed today.
+    for (const n of [1, 2, 3]) {
+      await getRepository(BackfillJob).save(
+        new BackfillJob({
+          seriesId: row.id,
+          candidateId: null,
+          title: `Casper.the.Friendly.Ghost.S01E02.Try${n}-GRP${n}`,
+          status: 'failed',
+          protocol: 'usenet',
+          clientId: 2,
+          files: [
+            {
+              index: 0,
+              path: 'x.mkv',
+              size: 1,
+              judgedAs: 'x',
+              episodeIds: [502],
+              score: 0,
+              action: 'fill',
+              replaces: 0,
+              state: 'waiting',
+            },
+          ],
+          approvedByName: 'AI agent',
+          agentRunId: 999,
+          error: 'SABnzbd could not finish it: Aborted, cannot be completed',
+          finishedAt: new Date(Date.now() - n * 60_000),
+        })
+      );
+    }
+    script = grabHone(() => say('Downloading S01E02 from Usenet.'));
+    const run = await agent.ask('Get Casper S01E02', await admin());
+    const first = await waitForRun(run.id);
+    assert.equal(first.status, 'done', first.error ?? '');
+    const asked = bodies.length;
+    backfillNotices.flush();
+    sent = [];
+
+    const failedId = await failFirst(first);
+    const after = await waitForRun(run.id);
+    assert.equal(bodies.length, asked, 'it did not look again');
+    assert.equal(after.status, 'done');
+    const failed = await getRepository(BackfillJob).findOneOrFail({
+      where: { id: failedId },
+    });
+    assert.equal(failed.followUp, 'gaveUp');
+    assert.equal(failed.replacedById, null);
+    assert.match(
+      failed.log.map((l) => l.message).join('\n'),
+      /3 replacements for these episodes failed today, so the admin agent stopped looking/
+    );
+    // The admins hear it with Backfill's other news.
+    backfillNotices.flush();
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].subject ?? '', /download failed/);
+    assert.match(
+      sent[0].message ?? '',
+      /3 replacements for these episodes failed today, so the admin agent stopped looking/
+    );
+  });
+
+  it('looks again once a conversation waiting on an admin goes on, if it found nothing then', async () => {
+    script = grabHone(() =>
+      toolUse('ask_admin', { question: 'Do you want S01E01 in 480p too?' })
+    );
+    const run = await agent.ask('Get Casper S01E02', await admin());
+    const waiting = await waitForRun(run.id, ['waiting']);
+    const asked = bodies.length;
+    const failedId = await failFirst(waiting);
+    // Not while it waits on the admin: the job says it is the agent's to
+    // pick up.
+    assert.equal(bodies.length, asked);
+    const jobs = getRepository(BackfillJob);
+    assert.equal(
+      (await jobs.findOneOrFail({ where: { id: failedId } })).followUp,
+      'agent'
+    );
+
+    script = [
+      () => say('Leaving S01E01 as it is.'),
+      (body) => {
+        assert.match(
+          lastSaid(body),
+          new RegExp(`Download #${failedId} failed`)
+        );
+        return say('No other release of S01E02 is out there yet.');
+      },
+    ];
+    await agent.reply(run.id, 'No thanks', await admin());
+    const after = await waitForRun(run.id);
+    assert.equal(after.status, 'done', after.error ?? '');
+    assert.equal(bodies.length, asked + 2);
+    const failed = await jobs.findOneOrFail({ where: { id: failedId } });
+    assert.equal(failed.followUp, 'none');
+    assert.ok(
+      backfillNotices
+        .held()
+        .some(
+          (n) =>
+            n.kind === 'failed' &&
+            n.url === `/backfill/jobs/${failedId}` &&
+            /the admin agent found nothing else/.test(n.detail ?? '')
+        )
+    );
+  });
+
+  it('keeps approvals and followed seasons out of its daily runs, and lets reports through beside them', async () => {
+    const settings = getSettings();
+    settings.backfill = {
+      ...settings.backfill,
+      agent: { ...settings.backfill.agent, maxAutoRunsPerDay: 1 },
+    };
+    const title = { kind: 'series' as const, serverId: 0, arrId: SERIES_ID };
+    const member = await getRepository(User).save(
+      new User({
+        email: 'agent-kinds@test.local',
+        permissions: 0,
+        avatar: '',
+      })
+    );
+    const approval = await agent.awaitApproval({
+      title,
+      name: 'Casper the Friendly Ghost',
+      change: {
+        kind: 'replaceSeason',
+        headline: 'Replace season 1 of Casper the Friendly Ghost',
+        title,
+        details: [],
+        params: { season: 1 },
+      },
+      reporter: member,
+      ask: 'Season 1 is all wrong',
+    });
+    const followed = await agent.follow({
+      title,
+      name: 'Casper the Friendly Ghost',
+      seasonNumber: 1,
+      episodeIds: [501],
+    });
+    assert.equal(approval?.purpose, 'approval');
+    assert.equal(followed?.purpose, 'follow');
+    assert.equal(
+      approval?.trigger,
+      'report',
+      'still said to come from a report'
+    );
+
+    // Neither counts as a run of the day, nor holds a report of the title.
+    const report = await agent.afterReport({
+      ...title,
+      title: 'Casper the Friendly Ghost',
+      reporter: member,
+    });
+    assert.ok(report, 'the report was looked into');
+    assert.equal(report.purpose, 'work');
+    // A run of its own does count: with one done today, that is the day's.
+    await getRepository(AgentRun).delete({ id: report.id });
+    const second = await getRepository(AgentRun).save(
+      new AgentRun({
+        trigger: 'auto',
+        status: 'done',
+        ...title,
+        title: 'Casper the Friendly Ghost',
+        steps: [],
+        actions: [],
+      })
+    );
+    assert.equal(
+      await agent.afterReport({
+        ...title,
+        title: 'Casper the Friendly Ghost',
+        reporter: member,
+      }),
+      null,
+      "the day's runs are used up"
+    );
+    // A run going again after a failed download holds up no report.
+    await getRepository(AgentRun).update(
+      { id: second.id },
+      { purpose: 'retry', status: 'running' }
+    );
+    settings.backfill = {
+      ...settings.backfill,
+      agent: { ...settings.backfill.agent, maxAutoRunsPerDay: 2 },
+    };
+    const beside = await agent.afterReport({
+      ...title,
+      title: 'Casper the Friendly Ghost',
+      reporter: member,
+    });
+    assert.ok(beside, 'not held up by a go looking again');
+  });
+});

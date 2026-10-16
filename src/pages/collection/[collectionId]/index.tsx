@@ -3,13 +3,22 @@ import { getHostAndPort } from '@app/utils/urlHelper';
 import type { Collection } from '@server/models/Collection';
 import axios from 'axios';
 import type { GetServerSideProps, NextPage } from 'next';
+import { useRouter } from 'next/router';
 
 interface CollectionPageProps {
   collection?: Collection;
 }
 
 const CollectionPage: NextPage<CollectionPageProps> = ({ collection }) => {
-  return <CollectionDetails collection={collection} />;
+  const router = useRouter();
+  // Keyed by the collection, so going from one straight to another starts
+  // afresh instead of keeping the first one's state.
+  return (
+    <CollectionDetails
+      key={String(router.query.collectionId)}
+      collection={collection}
+    />
+  );
 };
 
 export const getServerSideProps: GetServerSideProps<

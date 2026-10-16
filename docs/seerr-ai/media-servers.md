@@ -47,18 +47,18 @@ Accounts are matched only by each server's own account, never by email across se
 
 Anyone can link their accounts on other connected servers in **Profile → Settings → Linked Accounts**, and then sign in with any of them. Linking takes signing in there (with Plex, a password, or Jellyfin's Quick Connect), an account nobody else here has, and one that server lets in: shared on Plex, or not switched off on Jellyfin or Emby. Linking doesn't change what kind of account someone has, unless they only had a password.
 
-An account can be unlinked while a password, another account on a connected server, or a [single sign-on](./single-sign-on.md) provider that is switched on still lets its owner in. The owner keeps their account on the primary server, and their Plex account while Plex is connected.
+An account can be unlinked while a password, another account on a connected server, or a [single sign-on](./single-sign-on.md) provider that is switched on still lets its owner in. The owner keeps their account on the primary server, and their Plex account while Plex is connected. A Jellyfin or Emby server's libraries are read as the administrator it was connected (or set up) with, so the owner can unlink their own account there too; only on a server with no such administrator recorded is it kept, until the server is connected again with one.
 
 **Settings → Users** has an **Import Users** button for each connected server. People whose email or name another account already has are left out, and the import says who.
 
 ## Removing a server
 
-**Remove** on a server's card disconnects it. Before you confirm, it says how many people could then only sign in with a password, and how many couldn't sign in at all. Then:
+**Remove** on a server's card disconnects it. Before you confirm, it says how many people could then only sign in with a password, and how many couldn't sign in at all; someone who can still sign in with a single sign-on provider that is switched on isn't counted. Then:
 
-- its scans stop and its titles lose their Play links to it; an availability sync runs, so a title only that server had is no longer shown as available;
+- its scans stop and its titles lose their Play links to it; an availability sync runs, so a title only that server had is no longer shown as available. If one is already running, it stops asking that server straight away and runs once more when it finishes;
 - its address and libraries are kept, so connecting it again is quick, but a Jellyfin or Emby API key is forgotten;
 - people's accounts on it stay linked but aren't used to sign in; their profile shows them as not connected. Nobody is deleted;
-- its Match Check findings go.
+- its Match Check findings go, and a Match Check running at the time leaves them out too.
 
 The last server can't be removed. Removing the primary server makes the next connected one primary.
 
@@ -70,4 +70,4 @@ The last server can't be removed. Removing the primary server makes the next con
 
 ## Upgrading
 
-An existing install needs nothing: the server it was set up with is the primary one and the only one connected, and everything works as before. On a server set up with Emby, Emby's ids for titles and people were kept where Jellyfin's go; they move to Emby's own place automatically, once, the first time Seerr AI starts after the update.
+An existing install needs nothing: the server it was set up with is the primary one and the only one connected, and everything works as before. On a server set up with Emby, Emby's ids for titles and people were kept where Jellyfin's go; they move to Emby's own place automatically, once, the first time Seerr AI starts after the update. A Jellyfin or Emby server set up before the administrator to read it as was recorded takes the owner's linked account as that administrator when Seerr AI starts.

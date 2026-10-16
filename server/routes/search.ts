@@ -61,9 +61,47 @@ const toCollectionResult = (
   backdrop_path: collection.backdrop_path ?? undefined,
 });
 
+/** What a search can be narrowed to: films (with their collections) or series. */
+type SearchType = 'movie' | 'tv';
+
+/** Search for one kind of title, or everything when no kind is asked for. */
+const searchTitles = async (
+  tmdb: TheMovieDb,
+  type: SearchType | undefined,
+  options: { query: string; page: number; language: string }
+): Promise<TmdbSearchMultiResponse> => {
+  // TMDB's film and series searches leave out the kind of each result:
+  // every one is the kind asked for.
+  if (type === 'movie') {
+    const found = await tmdb.searchMovies(options);
+    return {
+      ...found,
+      results: found.results.map((result) => ({
+        ...result,
+        media_type: 'movie',
+      })),
+    };
+  }
+  if (type === 'tv') {
+    const found = await tmdb.searchTvShows(options);
+    return {
+      ...found,
+      results: found.results.map((result) => ({
+        ...result,
+        media_type: 'tv',
+      })),
+    };
+  }
+  return tmdb.searchMulti(options);
+};
+
 searchRoutes.get('/', async (req, res, next) => {
   const queryString = req.query.query as string;
   const searchProvider = findSearchProvider(queryString.toLowerCase());
+  const type =
+    req.query.type === 'movie' || req.query.type === 'tv'
+      ? (req.query.type as SearchType)
+      : undefined;
   let results: TmdbSearchMultiResponse;
 
   try {
@@ -76,14 +114,27 @@ searchRoutes.get('/', async (req, res, next) => {
         language: (req.query.language as string) ?? req.locale,
         query: queryString,
       });
+      if (type) {
+        const ofType = results.results.filter(
+          (result) => result.media_type === type
+        );
+        results = {
+          ...results,
+          total_results: ofType.length,
+          results: ofType,
+        };
+      }
     } else {
       const tmdb = new TheMovieDb();
       const page = Number(req.query.page) || 1;
       const language = (req.query.language as string) ?? req.locale;
 
+      // Collections are films', so a search for series leaves them out.
       const [multi, collections] = await Promise.all([
-        tmdb.searchMulti({ query: queryString, page, language }),
-        searchCollections(tmdb, queryString, page, language),
+        searchTitles(tmdb, type, { query: queryString, page, language }),
+        type === 'tv'
+          ? { page, results: [], total_pages: 0, total_results: 0 }
+          : searchCollections(tmdb, queryString, page, language),
       ]);
 
       // Collections lead the page: a franchise's name is usually what was

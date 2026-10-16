@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { convertible, sourcesFor } from './imageSources';
+import {
+  convertible,
+  preloadFor,
+  sourcesFor,
+  titleBackdrop,
+  titlePoster,
+  tmdbImageSrc,
+} from './imageSources';
 
 describe('sourcesFor', () => {
   it('offers a poster as AVIF, then WebP, at its own size', () => {
@@ -131,5 +138,66 @@ describe('convertible', () => {
     ]) {
       assert.equal(convertible(url), false, url);
     }
+  });
+});
+
+describe('tmdbImageSrc', () => {
+  it('goes through the image cache when it is on', () => {
+    assert.equal(
+      tmdbImageSrc('https://image.tmdb.org/t/p/w300_and_h450_face/a.jpg', true),
+      '/imageproxy/tmdb/t/p/w300_and_h450_face/a.jpg'
+    );
+  });
+
+  it('goes to TMDB when it is off, and leaves the app’s own pictures', () => {
+    assert.equal(
+      tmdbImageSrc(
+        'https://image.tmdb.org/t/p/w300_and_h450_face/a.jpg',
+        false
+      ),
+      'https://image.tmdb.org/t/p/w300_and_h450_face/a.jpg'
+    );
+    assert.equal(
+      tmdbImageSrc('/images/seerr_poster_not_found.png', true),
+      '/images/seerr_poster_not_found.png'
+    );
+  });
+});
+
+describe('the pictures at the top of a title’s page', () => {
+  it('are at the addresses the page has always used, so kept copies count', () => {
+    assert.equal(
+      titleBackdrop('/b.jpg'),
+      'https://image.tmdb.org/t/p/w1920_and_h800_multi_faces//b.jpg'
+    );
+    assert.equal(
+      titlePoster('/p.jpg'),
+      'https://image.tmdb.org/t/p/w600_and_h900_bestv2/p.jpg'
+    );
+  });
+});
+
+describe('preloadFor', () => {
+  it('fetches a backdrop ahead in the width its <picture> will pick', () => {
+    const url = tmdbImageSrc(titleBackdrop('/b.jpg'), true);
+    const [avif] = sourcesFor(url);
+    assert.deepEqual(preloadFor(url), {
+      type: 'image/avif',
+      imageSrcset: avif.srcSet,
+      imageSizes: '100vw',
+    });
+  });
+
+  it('fetches a poster ahead as the AVIF copy only', () => {
+    const url = tmdbImageSrc(titlePoster('/p.jpg'), true);
+    assert.deepEqual(preloadFor(url), {
+      type: 'image/avif',
+      href: '/imageproxy/tmdb/t/p/w600_and_h900_bestv2/p.jpg?f=avif',
+    });
+  });
+
+  it('fetches a picture from TMDB as it is, with the image cache off', () => {
+    const url = tmdbImageSrc(titlePoster('/p.jpg'), false);
+    assert.deepEqual(preloadFor(url), { href: url });
   });
 });

@@ -11,6 +11,7 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
+import { Notification } from '@server/lib/notifications';
 import { getSettings } from '@server/lib/settings';
 import { MediaRequestSubscriber } from '@server/subscriber/MediaRequestSubscriber';
 import { setupTestDb } from '@server/test/db';
@@ -555,6 +556,73 @@ describe('when a music request is approved', () => {
     );
 
     assert.equal(calls('POST', '/api/v1/album').length, 1);
+  });
+
+  it('fails, and stays failed, when approved as it is made and Lidarr cannot take it', async () => {
+    // On Postgres, sending began inside the request's own save, so a quick
+    // failure was written on another connection that could not yet see the
+    // new request: it stayed approved while "failed" went out.
+    const notified: Notification[] = [];
+    mock.method(
+      MediaRequest,
+      'sendNotification',
+      async (_request: MediaRequest, _media: Media, type: Notification) => {
+        notified.push(type);
+        return true;
+      }
+    );
+    const media = await dataSource.manager.save(
+      new Media({
+        mediaType: MediaType.MUSIC,
+        tmdbId: 0,
+        foreignId: ARTIST,
+        foreignTitle: 'Radiohead',
+        status: MediaStatus.UNKNOWN,
+      }),
+      { listeners: false }
+    );
+    await dataSource.manager.save(
+      new MusicAlbum({
+        mediaId: media.id,
+        mbId: OK_COMPUTER,
+        title: 'OK Computer',
+        secondaryTypes: [],
+        status: MediaStatus.UNKNOWN,
+      }),
+      { listeners: false }
+    );
+
+    // Lidarr cannot look the album up, so it fails straight away.
+    const request = await getRepository(MediaRequest).save(
+      new MediaRequest({
+        type: MediaType.MUSIC,
+        status: MediaRequestStatus.APPROVED,
+        media,
+        requestedBy: await getRepository(User).findOneByOrFail({ id: 2 }),
+        is4k: false,
+        albums: [
+          new AlbumRequest({
+            albumMbid: OK_COMPUTER,
+            title: 'OK Computer',
+            status: MediaRequestStatus.APPROVED,
+          }),
+        ],
+      })
+    );
+    for (
+      let i = 0;
+      i < 100 && !notified.includes(Notification.MEDIA_FAILED);
+      i++
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    assert.ok(notified.includes(Notification.MEDIA_FAILED));
+    assert.equal(await statusOf(request.id), MediaRequestStatus.FAILED);
+    assert.equal(
+      await getRepository(MediaRequest).countBy({ type: MediaType.MUSIC }),
+      1
+    );
   });
 
   it('fails at once when there is no Lidarr to send it to', async () => {

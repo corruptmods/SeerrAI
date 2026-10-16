@@ -1,6 +1,13 @@
 import type { TitleRef } from '@server/lib/agent/tools';
 import type { ArrEpisode, ArrHistoryRecord } from '@server/lib/autofix/arr';
 import { FixRadarr, FixSonarr } from '@server/lib/autofix/arr';
+import type { SeasonOutcome, SeasonPlan } from '@server/lib/autofix/season';
+import {
+  carryOutSeason,
+  planDetails,
+  planHeadline,
+  planSeason,
+} from '@server/lib/autofix/season';
 import {
   GROUP_NAME,
   blockedGroups,
@@ -11,8 +18,9 @@ import { getSettings } from '@server/lib/settings';
 /*
  * Changes the admin agent can propose and only an admin can approve: block
  * or unblock a release group, mark a download failed, delete a title's
- * files, move a title to another quality profile. (Replacing files goes
- * through grab with replace: true, also approved first.)
+ * files, move a title to another quality profile, replace a whole season.
+ * (Replacing chosen files goes through grab with replace: true, also
+ * approved first.)
  *
  * A proposal is checked and described when it is made, from what Radarr or
  * Sonarr says then, so the admin sees exactly what will happen; it is
@@ -25,7 +33,8 @@ export type ChangeKind =
   | 'unblockGroup'
   | 'markFailed'
   | 'deleteFiles'
-  | 'changeProfile';
+  | 'changeProfile'
+  | 'replaceSeason';
 
 /** One change, as proposed: what it does, in words, and how to do it. */
 export interface ProposedChange {
@@ -80,7 +89,7 @@ const whereDeletedGo = async (api: FixRadarr | FixSonarr, app: string) => {
 // ---- describing ------------------------------------------------------------
 
 export interface ChangeInput {
-  kind: Exclude<ChangeKind, 'replace'>;
+  kind: Exclude<ChangeKind, 'replace' | 'replaceSeason'>;
   title?: TitleRef;
   name?: string;
   group?: string;
@@ -336,6 +345,70 @@ export const describeChange = (input: ChangeInput): Promise<ProposedChange> => {
   }
 };
 
+// ---- a whole season ----------------------------------------------------------
+
+/**
+ * Replacing every file of a season, for an admin to approve: which release
+ * comes, which old ones are marked failed and which files go, in that
+ * order. On approval it is worked out again from what Sonarr says then.
+ */
+export const seasonChange = (
+  plan: SeasonPlan,
+  title: TitleRef,
+  reason?: string
+): ProposedChange => ({
+  kind: 'replaceSeason',
+  headline: planHeadline(plan),
+  title,
+  details: [...planDetails(plan), ...(reason ? [`Why: ${reason}`] : [])],
+  params: {
+    season: plan.seasonNumber,
+    ...(plan.pack ? { prefer: plan.pack.title } : {}),
+  },
+});
+
+/** A season's replacement worked out, or why there is none. */
+export const describeSeasonReplace = async (
+  title: TitleRef,
+  season: number,
+  reason: string
+): Promise<ProposedChange> => {
+  if (title.kind !== 'series') {
+    throw new ChangeError('Only a series has seasons to replace.');
+  }
+  const plan = await planSeason(sonarrOf(title), title.arrId, season);
+  if ('nothing' in plan) throw new ChangeError(plan.nothing);
+  return seasonChange(plan, title, reason);
+};
+
+/**
+ * Replaces an approved season: searched again (Sonarr only grabs from a
+ * recent search), taking the release shown when it is still offered;
+ * nothing is removed unless a replacement is grabbed.
+ */
+export const applySeasonChange = async (
+  change: ProposedChange
+): Promise<SeasonOutcome> => {
+  const title = change.title;
+  const season = Number(change.params.season);
+  if (!title || !Number.isInteger(season)) {
+    throw new ChangeError('Nothing to replace.');
+  }
+  const api = sonarrOf(title);
+  const prefer =
+    typeof change.params.prefer === 'string' ? change.params.prefer : undefined;
+  const plan = await planSeason(api, title.arrId, season, prefer);
+  if ('nothing' in plan) {
+    return { ok: false, message: plan.nothing, episodeIds: [] };
+  }
+  const outcome = await carryOutSeason(api, plan);
+  const instead =
+    prefer && plan.pack && plan.pack.title !== prefer
+      ? `${prefer} was no longer offered, so the next best release was taken. `
+      : '';
+  return { ...outcome, message: `${instead}${outcome.message}` };
+};
+
 // ---- applying --------------------------------------------------------------
 
 const ids = (value: unknown): number[] =>
@@ -344,8 +417,8 @@ const ids = (value: unknown): number[] =>
     : [];
 
 /**
- * Makes an approved change (all but replacing, which the agent's grab
- * does), and says what came of it.
+ * Makes an approved change (all but replacing chosen files, which the
+ * agent's grab does), and says what came of it.
  */
 export const applyChange = async (change: ProposedChange): Promise<string> => {
   const params = change.params;
@@ -443,5 +516,10 @@ export const applyChange = async (change: ProposedChange): Promise<string> => {
     }
     case 'replace':
       throw new ChangeError('Replacing is done by the agent’s grab.');
+    case 'replaceSeason': {
+      const outcome = await applySeasonChange(change);
+      if (!outcome.ok) throw new ChangeError(outcome.message);
+      return outcome.message;
+    }
   }
 };

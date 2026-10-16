@@ -15,6 +15,7 @@ import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
+import { titleBackdrop, titlePoster } from '@app/utils/imageSources';
 import { refreshIntervalHelper } from '@app/utils/refreshIntervalHelper';
 import {
   ArrowDownTrayIcon,
@@ -310,7 +311,7 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
           <CachedImage
             type="tmdb"
             alt=""
-            src={`https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${data.backdropPath}`}
+            src={titleBackdrop(data.backdropPath)}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             fill
             priority
@@ -351,7 +352,7 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
             type="tmdb"
             src={
               data.posterPath
-                ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${data.posterPath}`
+                ? titlePoster(data.posterPath)
                 : '/images/seerr_poster_not_found.png'
             }
             alt=""
@@ -539,6 +540,7 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
               id={title.id}
               isAddedToWatchlist={title.mediaInfo?.watchlists?.length ?? 0}
               image={title.posterPath}
+              backdrop={title.backdropPath}
               status={title.mediaInfo?.status}
               summary={title.overview}
               title={title.title}

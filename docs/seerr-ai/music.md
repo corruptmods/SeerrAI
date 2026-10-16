@@ -10,7 +10,8 @@ Nothing about music appears until an admin adds a Lidarr server. After that, eve
 
 1. **Add Lidarr** under **Settings → Services → Lidarr**: its address and API key, then the quality profile, metadata profile, root folder and tags new artists get. Mark one Lidarr as the default; music appears for everyone once there is one. **Enable Scan** also brings what Lidarr already has into Seerr AI, so those albums show as here and aren't requested again.
 2. **Switch on your music libraries** under **Settings → Plex**, **Jellyfin** or **Emby**, in the **Music Libraries** section (press **Sync Libraries** first if it's empty). An album counts as here once any connected server's music library lists it.
-3. Optionally, **Settings → Metadata → Music**: a MusicBrainz mirror of your own, a contact address for MusicBrainz, whether the New Music, Popular Albums and Popular Artists rows come from ListenBrainz, a TheAudioDB key for pictures of artists Lidarr has none of, and the most albums one request may ask for.
+3. Optionally, **Settings → Music**: how people search for music (see [Searching music](#searching-music)). The same page has the Music switch and links to each of these steps.
+4. Optionally, **Settings → Metadata → Music**: a MusicBrainz mirror of your own, a contact address for MusicBrainz, whether the New Music, Popular Albums and Popular Artists rows come from ListenBrainz, a TheAudioDB key for pictures of artists Lidarr has none of, and the most albums one request may ask for.
 
 Worth turning on in Lidarr: **Settings → Metadata → Write Audio Tags**. Jellyfin and Emby find an album's MusicBrainz ids in its files' tags; without them, albums are matched by folder name, then by title and year, which is usually right but not always.
 
@@ -18,11 +19,22 @@ If no music library is switched on anywhere, Lidarr's files decide instead: an a
 
 ## Finding music
 
-Search finds artists and albums as well as films and series, in a section of its own. Discover gains four rows: **Recently Added Music**, **New Music**, **Popular Albums** and **Popular Artists**. They can be moved or hidden like any row, and the **Music** item in the sidebar opens all of them.
+Search finds artists and albums under **Music**, at the top of the search results; **All** keeps to films, series, collections and people. The Music page has its own search box for artists and albums too. An admin can change this under **Settings → Music** (see [Searching music](#searching-music)). Discover gains four rows: **Recently Added Music**, **New Music**, **Popular Albums** and **Popular Artists**. They can be moved or hidden like any row, and the **Music** item in the sidebar opens all of them.
 
 An artist's page lists everything they have released, grouped as albums, EPs, singles and the rest (live albums, compilations, soundtracks and remixes, folded away). An album's page has its cover and track list, and **Play** on each server that has it.
 
 Artist and album details come from MusicBrainz, which answers one request a second for each server. A page that would have to wait too long says MusicBrainz is busy and offers to try again; it is rarely needed twice.
+
+### Searching music
+
+**Settings → Music** (admins) decides where people can search for music:
+
+- **Include Music in All Search Results** (off to start): **All** also shows a row of artists and a row of albums, below the films, series, collections and people. They're asked for once those have loaded, so music never slows the rest down, and they never come above them.
+- **Search on the Music Page** (on to start): the Music page's own search box.
+- **Music on the Search Page** (on to start): **Music** beside All, Movies and Series in search results.
+- **Artists per Search** and **Albums per Search** (8 and 12 to start, up to 25 each): how many a search shows, wherever it is.
+
+With all three places off, nobody can search music, and the server refuses to. Anyone who turned music off for themselves sees none of it, whatever is chosen here.
 
 ## Requesting music
 
@@ -70,7 +82,7 @@ An artist shows as **Partially Available** once any of their albums is here, and
 
 ## Turning it off
 
-An admin can switch **Music** off for everyone under **Settings → Features**: the Music item, music in search, the music rows on Discover, music requests and the music settings all go away, and the server refuses music for everyone. Anyone can also switch it off for themselves under **Profile → Settings → Features**.
+An admin can switch **Music** off for everyone under **Settings → Music** or **Settings → Features** (it's the same switch in both): the Music item, Music in search, the music rows on Discover, music requests and the music settings all go away, and the server refuses music for everyone. Anyone can also switch it off for themselves under **Profile → Settings → Features**.
 
 ## What music doesn't do yet
 

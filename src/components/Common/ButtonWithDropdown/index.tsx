@@ -1,8 +1,14 @@
 import Dropdown from '@app/components/Common/Dropdown';
+import defineMessages from '@app/utils/defineMessages';
 import { withProperties } from '@app/utils/typeHelpers';
 import { Menu, MenuButton } from '@headlessui/react';
 import { ChevronDownIcon } from '@heroicons/react/24/solid';
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes } from 'react';
+import { useIntl } from 'react-intl';
+
+const messages = defineMessages('components.Common.ButtonWithDropdown', {
+  more: 'More options',
+});
 
 type ButtonWithDropdownProps = {
   text: React.ReactNode;
@@ -21,6 +27,7 @@ const ButtonWithDropdown = ({
   buttonType = 'primary',
   ...props
 }: ButtonWithDropdownProps) => {
+  const intl = useIntl();
   const styleClasses = {
     mainButtonClasses: 'button-md text-white border',
     dropdownSideButtonClasses: 'button-md border',
@@ -57,7 +64,7 @@ const ButtonWithDropdown = ({
           <MenuButton
             type="button"
             className={`relative z-10 inline-flex h-full items-center rounded-r-md px-2 py-2 text-sm font-medium leading-5 text-white transition duration-150 ease-in-out hover:z-20 focus:z-20 ${styleClasses.dropdownSideButtonClasses}`}
-            aria-label="Expand"
+            aria-label={intl.formatMessage(messages.more)}
           >
             {dropdownIcon ? dropdownIcon : <ChevronDownIcon />}
           </MenuButton>

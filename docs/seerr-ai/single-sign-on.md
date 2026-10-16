@@ -19,17 +19,20 @@ In **Settings → Users → Single Sign-On**, press **Add Provider**:
 1. Type a **Name**. It's on the button: "Sign in with {name}". The **Redirect URL** below it fills in by itself, for example `https://seerr.example.com/api/v1/auth/oidc/authentik/callback`. Copy it.
 2. In your provider, make a client (an "application") for Seerr AI, using that redirect URL. The steps for each provider are below. Make it a **confidential** client: one with a client secret.
 3. Back in Seerr AI, fill in the **Issuer URL**, **Client ID** and **Client Secret** the provider gave you, and press **Test**. Seerr AI asks the provider about itself and says plainly if something is wrong: a wrong address, a slash too many or too few at the end of the issuer URL, a provider that doesn't answer.
-4. Leave **Scopes** as `openid profile email` unless you have a reason to change them, and press **Add Provider**.
+4. Leave **Scopes** as `openid profile email` unless you have a reason to change them (to let in only some people by their groups, some providers need `groups` added; see [Only let some people in](#only-let-some-people-in)), and press **Add Provider**.
 
 The other settings:
 
 - **Button Logo**: an https address of a small picture for the button. Optional.
 - **Enabled**: whether the provider is offered at all. Switching it off keeps everything as it is, just unused.
 - **Let New People Sign Up**: off by default. See [Who can sign in](#who-can-sign-in).
+- **Who Can Sign In**: rules that keep the provider to some of its people, such as one group. Empty by default, which lets in anyone with an account there. See [Only let some people in](#only-let-some-people-in).
 
 The client secret is never sent back to your browser. When you edit a provider, leave the secret blank to keep the saved one; it is only kept while the issuer URL stays the same, so a saved secret can never be sent to a different provider.
 
 The part of the redirect URL after `oidc/` is the provider's id. It is made from the name when you add the provider and never changes, so renaming a provider doesn't break anything.
+
+Changing a provider's **Issuer URL** is different: a new issuer is a different provider, even under the same name, and its ids for people mean nothing here. Everyone's links to the provider stop working (Linked Accounts shows them as **(not available)**), and each person signs in another way and links it again. The edit dialog warns you before you save. A slash at the end doesn't count as a change. To move to a new provider while the old one still works, add it as a new provider instead, and let people link it before you remove the old one.
 
 ## Who can sign in
 
@@ -43,11 +46,40 @@ Turn **Let New People Sign Up** on only for a provider whose users you would all
 
 A provider sign-in is enough on its own: it doesn't also ask the media server, as signing in with a password does.
 
+Someone who signs in with a provider can add a passkey in their profile, and it keeps working when password sign-in is switched off in **Settings → Users**.
+
+## Only let some people in
+
+Your provider may have people on it who shouldn't use Seerr AI: everyone at work, say, or every account on a Google Workspace. **Who Can Sign In**, in the provider's settings, keeps the provider to the people you choose, by what the provider says about them when they sign in. Those details are called claims: `groups` (the groups someone is in), `email`, `hd` (Google's Workspace domain), and so on.
+
+Press **Add Rule** and fill in a **Claim** and, usually, a **Value**:
+
+- **A claim and a value**: the claim must be exactly that value, or, when it is a list (as `groups` is), contain it. For example, the claim `groups` with the value `seerr-users` lets in only people in the `seerr-users` group. Capitals count: `Seerr-Users` is a different group.
+- **A claim with no value**: the claim must be `true`. This suits a provider you've set up to send a yes/no claim of your own, such as `is_seerr_user`.
+
+With several rules, someone has to pass every one of them. With none, anyone with an account on the provider can sign in (as long as they have an account here, or **Let New People Sign Up** is on).
+
+The rules are checked every time: when someone signs in, when a new person would get an account, and when someone links the provider in **Profile → Settings → Linked Accounts**. Someone they turn away is told "Your {provider} account isn't allowed to use this server. Ask an admin if you think it should be.", and nothing changes for them here: no account is made and nothing is linked. Taking someone out of the group at the provider stops their next sign-in with it. It doesn't sign them out of a session they already have, and doesn't stop other ways in, such as a password.
+
+Seerr AI reads claims from the ID token and from the provider's userinfo, so a claim the provider sends in either place counts. If the provider has rules and its userinfo can't be read, nobody is let in with it until it can.
+
+**Settings → Logs** says which claims someone failed, by name only, never what their claims were.
+
+How each provider sends groups:
+
+- **Authentik** sends `groups`, the names of the groups someone is in, with the `profile` scope, which is in the scopes Seerr AI asks for anyway. Use the group's name as the value.
+- **Authelia** sends `groups` with the `groups` scope. Add `groups` to the client's `scopes` in Authelia's configuration, and to **Scopes** in Seerr AI (`openid profile email groups`).
+- **Keycloak** sends groups through a **Group Membership** mapper: add one to the client, with `groups` as its token claim name. With **Full group path** on (the default), a group is sent as its path, such as `/family/seerr-users`, and that whole path is the value; turn it off to send just the name, `seerr-users`. The mapper adds the claim to the ID token and to userinfo unless you turn those off; either one is enough.
+- **Pocket ID** sends `groups`, the names of the groups someone is in, with the `groups` scope. Add `groups` to **Scopes** in Seerr AI (`openid profile email groups`), and use the group's name, not its friendly name, as the value.
+- **Google** has no groups. To let in only your Google Workspace, use the claim `hd` with your Workspace's domain, such as `example.com`, as the value. Accounts outside a Workspace (ordinary Gmail accounts) have no `hd`, so they're turned away.
+
+Upstream Seerr's `requiredClaims` (claim names separated by spaces, each of which must be `true`) is understood too: a provider pasted from its `settings.json` with `"requiredClaims": "is_seerr_user"` works the same here, and shows as a rule with no value.
+
 ## Linking and unlinking
 
 **Profile → Settings → Linked Accounts** lists each provider someone has linked, beside their media server accounts. A link can be removed while its owner still has another way in: a password, an account on a connected media server, or another provider that is switched on. Admins who manage users can remove someone's link too, for example when their account at the provider is replaced.
 
-When a provider is switched off or removed, people's links to it stay, shown as **(not available)**, and can't be used to sign in. They can always be removed. A provider added later never takes them over: its id is always a new one.
+When a provider is switched off or removed, people's links to it stay, shown as **(not available)**, and can't be used to sign in. They can always be removed. A provider added later never takes them over: its id is always a new one. The same goes for links made before a provider's issuer URL changed; linking it again replaces the old link.
 
 ## Signing out
 
@@ -115,4 +147,5 @@ In Seerr AI, the issuer URL is Authelia's own address, such as `https://auth.exa
 - **"No sign-in details were found at that address"**: the issuer URL is wrong. Seerr AI reads `/.well-known/openid-configuration` under it; opening that address in a browser should show a page of JSON.
 - **"That took too long, or was started in another window"**: signing in has to finish within ten minutes, in the same browser it was started in. It also shows when the provider sends people back to a different address than the Application URL they started from.
 - **"Something went wrong with {provider}"**: often a client secret or redirect URL that doesn't match the provider's. **Settings → Logs** says more; it never shows secrets, codes or tokens.
-- **"Too many attempts"**: after ten failed attempts from one address, that provider is refused there for up to fifteen minutes.
+- **"Your {provider} account isn't allowed to use this server"**: the provider's rules under **Who Can Sign In** turned them away. **Settings → Logs** names the claims they failed. Often the provider isn't sending the claim at all: check the scopes (see [Only let some people in](#only-let-some-people-in)) and that the value matches exactly, capitals included.
+- **"Too many attempts"**: after ten failed attempts from one address, that provider is refused there for up to fifteen minutes. A sign-in the rules turn away counts as a failed attempt. Only sign-ins started from Seerr AI's own sign-in page or Linked Accounts count, so nobody can lock others out by sending made-up sign-in links. Behind a reverse proxy, turn on **Enable Proxy Support** in **Settings → Network**, so each person's own address is counted rather than the proxy's.

@@ -15,6 +15,7 @@ import {
   appName,
   formatBytes,
   formatDuration,
+  jobStage,
   useCandidateLine,
 } from '@app/components/Backfill/shared';
 import type { Overview } from '@app/components/Backfill/types';
@@ -376,7 +377,7 @@ const BackfillDashboard = () => {
                       </div>
                       {job.stage && (
                         <div className="truncate text-xs text-gray-500">
-                          {job.stage}
+                          {jobStage(intl, job)}
                         </div>
                       )}
                       <div className="mt-2 flex justify-between text-xs text-gray-300">

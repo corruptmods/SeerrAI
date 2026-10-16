@@ -5,6 +5,7 @@ import {
   MediaType,
 } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import AlbumRequest from '@server/entity/AlbumRequest';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import SeasonRequest from '@server/entity/SeasonRequest';
@@ -110,6 +111,8 @@ describe('user request quotas', () => {
         movieQuotaDays: 7,
         tvQuotaLimit: 10,
         tvQuotaDays: 7,
+        musicQuotaLimit: 10,
+        musicQuotaDays: 7,
       })
     );
 
@@ -163,6 +166,66 @@ describe('user request quotas', () => {
     const quota = await user.getQuota();
 
     assert.equal(quota.tv.used, 0);
+  });
+
+  // Asked for while a pending request, so nothing is sent to Lidarr.
+  const addMusicRequest = async (albums: number) => {
+    const media = await getRepository(Media).save(
+      new Media({
+        tmdbId: 0,
+        foreignId: `artist-${tmdbId++}`,
+        mediaType: MediaType.MUSIC,
+        status: MediaStatus.PENDING,
+      })
+    );
+
+    const request = await getRepository(MediaRequest).save(
+      new MediaRequest({
+        media,
+        requestedBy: user,
+        type: MediaType.MUSIC,
+        status: MediaRequestStatus.PENDING,
+        is4k: false,
+      })
+    );
+
+    for (let i = 0; i < albums; i++) {
+      await getRepository(AlbumRequest).save(
+        new AlbumRequest({
+          albumMbid: `album-${request.id}-${i}`,
+          title: `Album ${i}`,
+          request,
+        })
+      );
+    }
+
+    return request;
+  };
+
+  it('counts requests from the first day of the window, and none before it', async (t) => {
+    // The window is the last seven days: from noon on 8 July.
+    t.mock.timers.enable({
+      apis: ['Date'],
+      now: new Date('2026-07-15T12:00:00Z'),
+    });
+    const inside = new Date('2026-07-08T13:00:00Z');
+    const before = new Date('2026-07-08T11:00:00Z');
+
+    for (const createdAt of [inside, before]) {
+      const movie = await addMovieRequest();
+      const series = await addSeriesRequest([1, 2]);
+      const music = await addMusicRequest(3);
+      await getRepository(MediaRequest).update(
+        [movie.id, series.id, music.id],
+        { createdAt }
+      );
+    }
+
+    const quota = await user.getQuota();
+
+    assert.equal(quota.movie.used, 1);
+    assert.equal(quota.tv.used, 2);
+    assert.equal(quota.music.used, 3);
   });
 
   it('ignores declined requests', async () => {

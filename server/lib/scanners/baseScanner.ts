@@ -808,16 +808,16 @@ class BaseScanner<T> {
    * "Carrie" for "The Carrie Diaries", then was corrected), the title it
    * left no longer has it: without this, both showed as available, and
    * the wrong one stayed so. A title the item leaves that Sonarr or Radarr
-   * never had goes back to unknown; one they have keeps its status for the
-   * availability sync to judge from them.
+   * never had, and no other media server has either, goes back to unknown;
+   * one they have keeps its status for the availability sync to judge from
+   * them.
    */
   private async releaseElsewhere(media: Media, is4k: boolean) {
     const statusKey = is4k ? 'status4k' : 'status';
     const serviceKey = is4k ? 'serviceId4k' : 'serviceId';
     const repository = getRepository(Media);
-    for (const key of MEDIA_SERVER_KINDS.map(
-      (kind) => MEDIA_ID[kind][is4k ? 1 : 0]
-    )) {
+    const keys = MEDIA_SERVER_KINDS.map((kind) => MEDIA_ID[kind][is4k ? 1 : 0]);
+    for (const key of keys) {
       const id = media[key];
       if (!id) continue;
       const others = await repository.find({
@@ -827,7 +827,7 @@ class BaseScanner<T> {
       for (const other of others) {
         if (other.id === media.id || other.tmdbId === media.tmdbId) continue;
         other[key] = null as never;
-        if (other[serviceKey] == null) {
+        if (other[serviceKey] == null && !keys.some((k) => other[k])) {
           other[statusKey] = MediaStatus.UNKNOWN;
           for (const season of other.seasons ?? []) {
             season[statusKey] = MediaStatus.UNKNOWN;

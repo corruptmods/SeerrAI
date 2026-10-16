@@ -530,6 +530,7 @@ class DownloadTracker {
     this.live = new Map();
     this.backfill = [];
     this.imported = new Map();
+    this.queueDown = new Set();
   }
 
   private updating?: Promise<void>;
@@ -642,6 +643,48 @@ class DownloadTracker {
     }
   }
 
+  /** Servers whose queue could not be read last time, as "Sonarr:2". */
+  private queueDown = new Set<string>();
+
+  /**
+   * A queue that could not be read. Said once, as a warning with the
+   * reason, when the server stops answering; while it stays down it is
+   * asked every pass all the same, and only mentioned at debug level, so
+   * a server switched off for the day does not fill the logs.
+   */
+  private queueFailed(
+    kind: 'Radarr' | 'Sonarr' | 'Lidarr',
+    server: { id: number; name: string },
+    e: unknown
+  ) {
+    const key = `${kind}:${server.id}`;
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    if (this.queueDown.has(key)) {
+      logger.debug(`${kind} server ${server.name} is still not answering`, {
+        label: 'Download Tracker',
+        errorMessage,
+      });
+      return;
+    }
+    this.queueDown.add(key);
+    logger.warn(
+      `${kind} server ${server.name} is not answering; its downloads are left as they were`,
+      { label: 'Download Tracker', errorMessage }
+    );
+  }
+
+  /** A queue read: if the server had stopped answering, say it is back. */
+  private queueAnswered(
+    kind: 'Radarr' | 'Sonarr' | 'Lidarr',
+    server: { id: number; name: string }
+  ) {
+    if (this.queueDown.delete(`${kind}:${server.id}`)) {
+      logger.info(`${kind} server ${server.name} is answering again`, {
+        label: 'Download Tracker',
+      });
+    }
+  }
+
   private async updateRadarrDownloads() {
     const settings = getSettings();
 
@@ -666,6 +709,7 @@ class DownloadTracker {
           try {
             await radarr.refreshMonitoredDownloads();
             const queueItems = await radarr.getQueue();
+            this.queueAnswered('Radarr', server);
 
             const before = this.radarrServers[server.id] ?? [];
             this.radarrServers[server.id] = queueItems.map((item) =>
@@ -693,13 +737,8 @@ class DownloadTracker {
                 { label: 'Download Tracker' }
               );
             }
-          } catch {
-            logger.error(
-              `Unable to get queue from Radarr server: ${server.name}`,
-              {
-                label: 'Download Tracker',
-              }
-            );
+          } catch (e) {
+            this.queueFailed('Radarr', server, e);
           }
 
           // Duplicate this data to matching servers
@@ -752,6 +791,7 @@ class DownloadTracker {
           try {
             await sonarr.refreshMonitoredDownloads();
             const queueItems = await sonarr.getQueue();
+            this.queueAnswered('Sonarr', server);
 
             const before = this.sonarrServers[server.id] ?? [];
             this.sonarrServers[server.id] = queueItems.map((item) =>
@@ -779,13 +819,8 @@ class DownloadTracker {
                 { label: 'Download Tracker' }
               );
             }
-          } catch {
-            logger.error(
-              `Unable to get queue from Sonarr server: ${server.name}`,
-              {
-                label: 'Download Tracker',
-              }
-            );
+          } catch (e) {
+            this.queueFailed('Sonarr', server, e);
           }
 
           // Duplicate this data to matching servers
@@ -839,6 +874,7 @@ class DownloadTracker {
           const lidarr = lidarrApi(server);
           await lidarr.refreshMonitoredDownloads();
           const queueItems = await lidarr.getMusicQueue();
+          this.queueAnswered('Lidarr', server);
 
           const before = this.lidarrServers[server.id] ?? [];
           const items = queueItems.map((item) =>
@@ -869,13 +905,8 @@ class DownloadTracker {
               { label: 'Download Tracker' }
             );
           }
-        } catch {
-          logger.error(
-            `Unable to get queue from Lidarr server: ${server.name}`,
-            {
-              label: 'Download Tracker',
-            }
-          );
+        } catch (e) {
+          this.queueFailed('Lidarr', server, e);
         }
       })
     );

@@ -42,6 +42,7 @@ const defaultSettings = {
   subtitlesReady: false,
   traktReady: false,
   musicReady: false,
+  musicSearch: { inAll: false, musicPage: true, chip: true },
 };
 
 export const SettingsContext = React.createContext<SettingsContextProps>({

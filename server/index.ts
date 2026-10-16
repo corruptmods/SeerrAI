@@ -10,7 +10,7 @@ import agent from '@server/lib/agent';
 import backfillNotices from '@server/lib/backfill/notices';
 import resourceMonitor from '@server/lib/containerResources';
 import { splitEmbyData } from '@server/lib/embySplit';
-import { isConnected } from '@server/lib/mediaServers';
+import { isConnected, rememberJellyfinAdmins } from '@server/lib/mediaServers';
 import notificationManager from '@server/lib/notifications';
 import DiscordAgent from '@server/lib/notifications/agents/discord';
 import EmailAgent from '@server/lib/notifications/agents/email';
@@ -42,8 +42,8 @@ import createCustomProxyAgent, {
 import { isPgsql } from '@server/utils/dbType';
 import { initializeDnsCache } from '@server/utils/dnsCache';
 import restartFlag from '@server/utils/restartFlag';
+import { trustedProxies } from '@server/utils/trustedProxies';
 import '@server/utils/userAgent';
-import { getClientIp } from '@supercharge/request-ip';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import type { NextFunction, Request, Response } from 'express';
@@ -131,6 +131,10 @@ app
     // once, before anything reads them.
     await splitEmbyData();
 
+    // A Jellyfin or Emby server set up before Seerr kept the account it
+    // reads the server as keeps the owner's from now on.
+    await rememberJellyfinAdmins();
+
     // Migrate library types
     if (
       isConnected('plex') &&
@@ -216,7 +220,7 @@ app
 
     const server = express();
     if (settings.network.trustProxy) {
-      server.enable('trust proxy');
+      server.set('trust proxy', trustedProxies(settings.network));
     }
     // Compress every text response: pages, scripts and styles, and the API's
     // JSON, which nothing compressed before. Brotli where the browser takes
@@ -233,24 +237,6 @@ app
     // photo sent to it may be larger than the usual limit.
     server.use(jsonBody);
     server.use(express.urlencoded({ extended: true }));
-    server.use((req, _res, next) => {
-      try {
-        const descriptor = Object.getOwnPropertyDescriptor(req, 'ip');
-        if (descriptor?.writable === true) {
-          Object.defineProperty(req, 'ip', {
-            ...descriptor,
-            value: getClientIp(req) ?? '',
-          });
-        }
-      } catch (e) {
-        logger.error('Failed to attach the ip to the request', {
-          label: 'Middleware',
-          message: (e as Error).message,
-        });
-      } finally {
-        next();
-      }
-    });
     if (settings.network.csrfProtection) {
       server.use(
         csurf({

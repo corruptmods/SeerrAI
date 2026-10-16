@@ -487,13 +487,15 @@ describe('music requests in the lists', () => {
     assert.equal(results.length, 1);
     assert.equal(results[0].type, 'music');
     assert.equal(results[0].albums[0].title, 'OK Computer');
+    let count = await call('GET', '/request/count');
+    assert.equal((count.body as { music: number }).music, 1);
 
+    // Without Lidarr, music leaves the counts as it leaves the lists.
     getSettings().lidarr = [];
     mine = await call('GET', `/user/${listener.id}/requests`);
     assert.equal((mine.body as { results: unknown[] }).results.length, 0);
-
-    const count = await call('GET', '/request/count');
-    assert.equal((count.body as { music: number }).music, 1);
+    count = await call('GET', '/request/count');
+    assert.equal((count.body as { music: number }).music, 0);
   });
 
   it('show one request with its albums', async () => {

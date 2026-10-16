@@ -1,4 +1,4 @@
-import { DbAwareColumn } from '@server/utils/DbColumnHelper';
+import { DbAwareColumn, resolveDbType } from '@server/utils/DbColumnHelper';
 import {
   Column,
   CreateDateColumn,
@@ -48,10 +48,10 @@ export class MediaList {
   @OneToMany(() => MediaListMember, (member: MediaListMember) => member.list)
   public members: MediaListMember[];
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: resolveDbType('datetime') })
   public createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: resolveDbType('datetime') })
   public updatedAt: Date;
 
   constructor(init?: Partial<MediaList>) {
@@ -109,7 +109,7 @@ export class MediaListItem {
   @Column({ nullable: true })
   public watchedById?: number | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: resolveDbType('datetime') })
   public createdAt: Date;
 
   constructor(init?: Partial<MediaListItem>) {
@@ -185,7 +185,7 @@ export class MediaListWatchSuggestion {
   @DbAwareColumn({ type: 'datetime', nullable: true })
   public dismissedAt?: Date | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: resolveDbType('datetime') })
   public createdAt: Date;
 
   constructor(init?: Partial<MediaListWatchSuggestion>) {

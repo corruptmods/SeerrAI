@@ -35,6 +35,18 @@ In some places (like China), the ISP blocks not only the DNS resolution but also
 
 If you have Seerr behind a reverse proxy, enable this setting to allow Seerr to correctly register client IP addresses. For details, please see the [Express Documentation](https://expressjs.com/en/guide/behind-proxies.html).
 
+Seerr AI only takes the address from a proxy it trusts. Always trusted are proxies on the same machine, on your local network and on Tailscale (loopback, link-local and private addresses such as `10.x.x.x`, `172.16.x.x`–`172.31.x.x`, `192.168.x.x` and `fc00::/7`, and `100.64.0.0/10`, where Tailscale and carrier-grade NAT give out addresses and which nobody on the internet can connect from), which is where a reverse proxy or a Docker network sits. The address used is the last one a trusted proxy added, so nobody can choose their own by sending a made-up `X-Forwarded-For` header: the sign-in attempt limits count by address.
+
+A proxy on a public address in front of your reverse proxy is only trusted if you say so, under the switch:
+
+- **Cloudflare Tunnel** needs nothing: the tunnel connects from your own machine or network.
+- **Cloudflare's proxy** (the orange cloud in front of your reverse proxy): tick **Trust Cloudflare**. Seerr AI then trusts [Cloudflare's published addresses](https://cloudflare.com/ips).
+- **Any other proxy on a public address**, such as a reverse proxy on a rented server: list its address or range (`203.0.113.5`, `203.0.113.0/24`, `2001:db8::/32`) under **Also Trust These Proxies**, separated by commas or spaces.
+
+Without that, Seerr AI sees the public proxy's address for everyone. Having your local reverse proxy put the visitor's real address in `X-Forwarded-For` still works too (in Nginx, the `real_ip` module with the public proxy's addresses as `set_real_ip_from`).
+
+Changes to these take effect after Seerr AI restarts.
+
 This setting is **disabled** by default.
 
 ## Enable CSRF Protection

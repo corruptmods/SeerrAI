@@ -3,9 +3,11 @@ import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import Tooltip from '@app/components/Common/Tooltip';
 import { issueOptions } from '@app/components/IssueModal/constants';
+import useNearScreen, { useLoadWhenNear } from '@app/hooks/useNearScreen';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { pictureLoading } from '@app/utils/nearScreen';
 import { EyeIcon } from '@heroicons/react/24/solid';
 import { IssueStatus } from '@server/constants/issue';
 import { MediaType } from '@server/constants/media';
@@ -13,7 +15,6 @@ import type Issue from '@server/entity/Issue';
 import type { MovieDetails } from '@server/models/Movie';
 import type { TvDetails } from '@server/models/Tv';
 import Link from 'next/link';
-import { useInView } from 'react-intersection-observer';
 import { FormattedRelativeTime, useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -41,16 +42,15 @@ interface IssueItemProps {
 const IssueItem = ({ issue }: IssueItemProps) => {
   const intl = useIntl();
   const { hasPermission } = useUser();
-  const { ref, inView } = useInView({
-    triggerOnce: true,
-  });
+  // The title, and with it the pictures, load once the row is near the
+  // screen, so they are there by the time it is scrolled to.
+  const { ref, near, nearness } = useNearScreen();
   const url =
     issue.media.mediaType === 'movie'
       ? `/api/v1/movie/${issue.media.tmdbId}`
       : `/api/v1/tv/${issue.media.tmdbId}`;
-  const { data: title, error } = useSWR<MovieDetails | TvDetails>(
-    inView ? url : null
-  );
+  const titleKey = useLoadWhenNear(url, near);
+  const { data: title, error } = useSWR<MovieDetails | TvDetails>(titleKey);
 
   if (!title && !error) {
     return (
@@ -127,6 +127,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             fill
             sizes="(min-width: 1280px) 66vw, 100vw"
+            {...pictureLoading(nearness)}
           />
           <div
             className="absolute inset-0"
@@ -151,14 +152,15 @@ const IssueItem = ({ issue }: IssueItemProps) => {
               type="tmdb"
               src={
                 title.posterPath
-                  ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${title.posterPath}`
+                  ? `https://image.tmdb.org/t/p/w300_and_h450_face${title.posterPath}`
                   : '/images/seerr_poster_not_found.png'
               }
               alt=""
               sizes="100vw"
               style={{ width: '100%', height: 'auto', objectFit: 'cover' }}
-              width={600}
-              height={900}
+              width={300}
+              height={450}
+              {...pictureLoading(nearness)}
             />
           </Link>
           <div className="flex flex-col justify-center overflow-hidden pl-2 xl:pl-4">
@@ -186,7 +188,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
                       content={
                         <div className="max-w-sm p-3">
                           <div className="mb-1 text-sm font-medium text-gray-200">
-                            Issue Description
+                            {intl.formatMessage(messages.descriptionpreview)}
                           </div>
                           <div className="whitespace-pre-wrap text-sm leading-relaxed text-gray-300">
                             {description}

@@ -163,10 +163,16 @@ const AiChatPanel = ({
     }, [])
   );
 
-  // Opening a title from the panel goes to its page; the panel steps aside.
+  // Opening a title from the panel goes to its page; the panel steps aside,
+  // and so does a sheet open in it, rather than coming back with the panel.
   useEffect(() => {
-    router.events.on('routeChangeStart', onClose);
-    return () => router.events.off('routeChangeStart', onClose);
+    const leave = () => {
+      setSheet(undefined);
+      setChoosing(undefined);
+      onClose();
+    };
+    router.events.on('routeChangeStart', leave);
+    return () => router.events.off('routeChangeStart', leave);
   }, [router.events, onClose]);
 
   useEffect(() => {

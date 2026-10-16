@@ -57,7 +57,7 @@ Seerr AI decides what counts as anime the same way everywhere (requests, scans, 
 
 - **When requesting:** "Request as anime" in the request window starts from that decision. Changing it switches the advanced options to the anime folder, profile and tags (or back).
 - **On a title:** admins can set **Anime** in the title's Manage panel to Automatic, Anime or Not anime. **Save and Move** moves it in Sonarr or Radarr to the matching folder, profile and series type.
-- **Override rules** can set a series' Sonarr type (Standard, Daily, Anime), or whether a movie is anime.
+- **Override rules** can set a series' Sonarr type (Standard, Daily, Anime), or whether a movie is anime. A rule whose keywords include TMDB's anime keyword matches what Seerr AI counts as anime, not the keyword itself: Japanese animation without the keyword, or a title set or requested as anime, is included, and a title set or requested as not anime, or from a country left out above, is not.
 - **Movies:** each Radarr server can have its own anime root folder, quality profile and tags (**Settings → Services**). Until they are set, anime movies use the regular ones.
 - **Anime Check** (nightly, 04:15): a report on **Settings → Services** of series and movies that sit in the wrong folder, or have the wrong type or profile, for what Seerr says they are. It changes nothing; **Run Check** runs it now.
 

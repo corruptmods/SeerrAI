@@ -2,8 +2,11 @@ import type Media from '@server/entity/Media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import { Notification } from '@server/lib/notifications';
 import type { NotificationPayload } from '@server/lib/notifications/agents/agent';
-import { KeyMap } from '@server/lib/notifications/agents/webhook';
+import WebhookAgent, { KeyMap } from '@server/lib/notifications/agents/webhook';
+import type { NotificationAgentWebhook } from '@server/lib/settings';
+import axios from 'axios';
 import assert from 'node:assert/strict';
+import type { TestContext } from 'node:test';
 import { describe, it } from 'node:test';
 
 /*
@@ -72,5 +75,98 @@ describe('webhook media server variables', () => {
     ]) {
       assert.equal(value(key, {}), '', key);
     }
+  });
+});
+
+describe('webhook templates', () => {
+  /** Sends one notification and returns the address and body posted. */
+  const send = async (
+    t: TestContext,
+    {
+      url = 'https://hook.test/',
+      template = {},
+      payload = {},
+      type = Notification.MEDIA_AVAILABLE,
+    }: {
+      url?: string;
+      template?: Record<string, unknown>;
+      payload?: Partial<NotificationPayload>;
+      type?: Notification;
+    }
+  ) => {
+    const posted: { url: string; body: unknown }[] = [];
+    t.mock.method(axios, 'post', async (postedUrl: string, body: unknown) => {
+      posted.push({ url: postedUrl, body });
+      return { data: {} };
+    });
+    const agent = new WebhookAgent({
+      enabled: true,
+      types: Notification.MEDIA_AVAILABLE | Notification.TEST_NOTIFICATION,
+      options: {
+        webhookUrl: url,
+        jsonPayload: Buffer.from(
+          JSON.stringify(JSON.stringify(template))
+        ).toString('base64'),
+        supportVariables: true,
+      },
+    } as NotificationAgentWebhook);
+    assert.equal(
+      await agent.send(type, {
+        notifySystem: true,
+        subject: '',
+        ...payload,
+      } as NotificationPayload),
+      true
+    );
+    assert.equal(posted.length, 1);
+    return posted[0];
+  };
+
+  it('puts values in as they are, however they are written', async (t) => {
+    const { body } = await send(t, {
+      template: {
+        subject: '{{subject}}',
+        message: '{{message}}',
+      },
+      payload: {
+        subject: "Costs $5 $& $$ $` $' less",
+        message: 'Typed in an issue: {{subject}} {{media_tmdbid}}',
+        media: { tmdbId: 42 } as Media,
+      },
+    });
+    assert.deepEqual(body, {
+      subject: "Costs $5 $& $$ $` $' less",
+      message: 'Typed in an issue: {{subject}} {{media_tmdbid}}',
+    });
+  });
+
+  it('fills every copy of a variable', async (t) => {
+    const { body } = await send(t, {
+      template: { text: '{{subject}} and {{subject}}, {{unknown_key}}' },
+      payload: { subject: 'Dune' },
+    });
+    assert.deepEqual(body, { text: 'Dune and Dune, {{unknown_key}}' });
+  });
+
+  it("fills the address with a value of 0, and nothing for one it hasn't", async (t) => {
+    const { url } = await send(t, {
+      url: 'https://hook.test/{{media_tmdbid}}/{{media_type}}?tvdb={{media_tvdbid}}&s={{subject}}',
+      payload: {
+        subject: 'a/b {{media_type}}',
+        media: { tmdbId: 0, mediaType: 'music' } as unknown as Media,
+      },
+    });
+    assert.equal(
+      url,
+      'https://hook.test/0/music?tvdb=&s=a%2Fb%20%7B%7Bmedia_type%7D%7D'
+    );
+  });
+
+  it('fills the address with "test" for the test notification', async (t) => {
+    const { url } = await send(t, {
+      url: 'https://hook.test/{{media_tmdbid}}',
+      type: Notification.TEST_NOTIFICATION,
+    });
+    assert.equal(url, 'https://hook.test/test');
   });
 });

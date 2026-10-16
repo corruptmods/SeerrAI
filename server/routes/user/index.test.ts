@@ -264,6 +264,118 @@ describe('importing Plex users', () => {
     assert.equal(after.plexId, null);
     assert.equal(after.plexUsername, null);
   });
+
+  it('brings email and picture from Plex only as signing in with Plex does', async () => {
+    getSettings().main.mediaServerType = MediaServerType.PLEX;
+    const users = getRepository(User);
+    // Signs in with Jellyfin, and has linked Plex too.
+    const jellyfinMain = await users.save(
+      new User({
+        email: 'jelly@seerr.dev',
+        username: 'jelly',
+        avatar: '/avatarproxy/jf',
+        permissions: Permission.REQUEST,
+        userType: UserType.JELLYFIN,
+        jellyfinUserId: 'jf-jelly',
+        plexId: 9301,
+      })
+    );
+    // A Plex account whose Plex email is now someone else's here.
+    const plexMain = await users.save(
+      new User({
+        email: 'plexmain@seerr.dev',
+        avatar: 'https://plex.tv/old',
+        permissions: Permission.REQUEST,
+        userType: UserType.PLEX,
+        plexId: 9302,
+      })
+    );
+    const plexUser = (id: string, username: string, email: string) => ({
+      $: {
+        id,
+        title: username,
+        username,
+        email,
+        thumb: `https://plex.tv/${username}`,
+      },
+      Server: [],
+    });
+    const getUsers = mock.method(PlexTvAPI.prototype, 'getUsers', async () => ({
+      MediaContainer: {
+        User: [
+          plexUser('9301', 'jellyonplex', 'jelly-plex@seerr.dev'),
+          plexUser('9302', 'plexmain', 'friend@seerr.dev'),
+          plexUser('9303', 'newcomer', 'newcomer@seerr.dev'),
+        ],
+      },
+    }));
+    try {
+      const { agent } = await loginAs('admin@seerr.dev');
+      const res = await agent.post('/user/import-from-plex').send();
+      assert.equal(res.status, 201, res.text);
+      assert.equal(res.body.refreshedUsers, 2);
+      assert.deepEqual(
+        res.body.createdUsers.map((u: User) => u.plexUsername),
+        ['newcomer']
+      );
+    } finally {
+      getUsers.mock.restore();
+    }
+
+    // Their Jellyfin email (what they sign in with) and picture stay.
+    const jelly = await users.findOneByOrFail({ id: jellyfinMain.id });
+    assert.equal(jelly.email, 'jelly@seerr.dev');
+    assert.equal(jelly.avatar, '/avatarproxy/jf');
+    assert.equal(jelly.plexUsername, 'jellyonplex');
+    // A new picture, but never another account's email.
+    const plex = await users.findOneByOrFail({ id: plexMain.id });
+    assert.equal(plex.email, 'plexmain@seerr.dev');
+    assert.equal(plex.avatar, 'https://plex.tv/plexmain');
+  });
+
+  it('ties an account waiting for its Plex account to it', async () => {
+    getSettings().main.mediaServerType = MediaServerType.PLEX;
+    const users = getRepository(User);
+    // Made by an admin for a Plex friend, before they ever signed in.
+    const waiting = await users.save(
+      new User({
+        email: 'waiting@seerr.dev',
+        avatar: '',
+        permissions: Permission.REQUEST,
+        userType: UserType.PLEX,
+      })
+    );
+    const getUsers = mock.method(PlexTvAPI.prototype, 'getUsers', async () => ({
+      MediaContainer: {
+        User: [
+          {
+            $: {
+              id: '9401',
+              title: 'waiting',
+              username: 'waitingonplex',
+              email: 'waiting@seerr.dev',
+              thumb: 'https://plex.tv/waiting',
+            },
+            Server: [],
+          },
+        ],
+      },
+    }));
+    try {
+      const { agent } = await loginAs('admin@seerr.dev');
+      const res = await agent.post('/user/import-from-plex').send();
+      assert.equal(res.status, 201, res.text);
+      assert.equal(res.body.refreshedUsers, 1);
+      assert.deepEqual(res.body.createdUsers, []);
+    } finally {
+      getUsers.mock.restore();
+    }
+
+    // Found by the Plex account from now on, as signing in would leave it.
+    const after = await users.findOneByOrFail({ id: waiting.id });
+    assert.equal(after.plexId, 9401);
+    assert.equal(after.plexUsername, 'waitingonplex');
+  });
 });
 
 describe('importing Jellyfin users', () => {

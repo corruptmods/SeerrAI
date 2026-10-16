@@ -1,4 +1,5 @@
 import CachedImage from '@app/components/Common/CachedImage';
+import useNearScreen, { NearScreen } from '@app/hooks/useNearScreen';
 import { UserCircleIcon } from '@heroicons/react/24/solid';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -19,9 +20,12 @@ const PersonCard = ({
   canExpand = false,
 }: PersonCardProps) => {
   const [isHovered, setHovered] = useState(false);
+  // The photo loads once the card is near the screen.
+  const { ref, nearness } = useNearScreen();
 
   return (
     <Link
+      ref={ref}
       href={`/person/${personId}`}
       className={canExpand ? 'w-full' : 'w-36 sm:w-36 md:w-44'}
       onMouseEnter={() => {
@@ -50,17 +54,19 @@ const PersonCard = ({
             <div className="relative mb-4 mt-2 flex h-1/2 w-full justify-center">
               {profilePath ? (
                 <div className="relative h-full w-3/4 overflow-hidden rounded-full ring-1 ring-gray-700">
-                  <CachedImage
-                    type="tmdb"
-                    src={`https://image.tmdb.org/t/p/w600_and_h900_bestv2${profilePath}`}
-                    alt=""
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                    }}
-                    fill
-                  />
+                  <NearScreen.Provider value={nearness}>
+                    <CachedImage
+                      type="tmdb"
+                      src={`https://image.tmdb.org/t/p/w300_and_h450_face${profilePath}`}
+                      alt=""
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                      fill
+                    />
+                  </NearScreen.Provider>
                 </div>
               ) : (
                 <UserCircleIcon className="h-full" />

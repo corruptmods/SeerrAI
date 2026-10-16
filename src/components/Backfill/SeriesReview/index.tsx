@@ -3,6 +3,7 @@ import ApproveModal from '@app/components/Backfill/SeriesReview/ApproveModal';
 import CoverageMap from '@app/components/Backfill/SeriesReview/CoverageMap';
 import StartSearchModal from '@app/components/Backfill/StartSearchModal';
 import {
+  JobFollowUpNote,
   JobStatusBadge,
   ProtocolBadge,
   SCROLL_LIST,
@@ -901,12 +902,15 @@ const SeriesReview = () => {
                 progress={job.progress}
                 kind={series.kind}
               />
-              <Link
-                href={`/backfill/jobs/${job.id}`}
-                className="min-w-0 flex-1 truncate text-gray-200 hover:underline"
-              >
-                {job.title}
-              </Link>
+              <div className="min-w-0 flex-1">
+                <Link
+                  href={`/backfill/jobs/${job.id}`}
+                  className="block truncate text-gray-200 hover:underline"
+                >
+                  {job.title}
+                </Link>
+                <JobFollowUpNote job={job} className="text-xs" />
+              </div>
               <span className="whitespace-nowrap text-gray-400">
                 {intl.formatMessage(messages.imported, { count: job.imported })}
               </span>

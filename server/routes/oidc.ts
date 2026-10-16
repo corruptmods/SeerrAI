@@ -6,9 +6,11 @@ import {
   accountForSignIn,
   discoveryProblem,
   errorCode,
+  failedClaims,
   finishAtProvider,
   linkToAccount,
   openCorrelation,
+  problemText,
   startAtProvider,
   usableProvider,
 } from '@server/lib/oidc';
@@ -152,7 +154,7 @@ const goToProvider = async (
       label: 'Auth',
       provider: provider.id,
       ip: req.ip,
-      problem: discoveryProblem(e, provider.issuerUrl),
+      problem: problemText(discoveryProblem(e, provider.issuerUrl)),
     });
     return res.redirect(
       linking
@@ -197,8 +199,20 @@ oidcRoutes.get<{ providerId: string }>(
 
     const linking = correlation?.userId !== undefined;
     const returnTo = safeRedirect(correlation?.returnTo);
-    const failed = (outcome: OidcOutcome, cause?: string) => {
-      limiter.count(req, providerId);
+    // The limit on failed attempts only covers sign-ins this browser
+    // started here with this provider: the genuine cookie proves it. A
+    // callback anyone can make up (no cookie, or one for another provider)
+    // is refused without counting, so it can never hold up other people
+    // who share an address, such as everyone behind one proxy.
+    const started = correlation?.provider === providerId;
+    const failed = (
+      outcome: OidcOutcome,
+      cause?: string,
+      details: Record<string, unknown> = {}
+    ) => {
+      if (started && outcome !== 'unavailable') {
+        limiter.count(req, providerId);
+      }
       logger.warn(
         linking ? 'Single sign-on link refused' : 'Single sign-on refused',
         {
@@ -207,6 +221,7 @@ oidcRoutes.get<{ providerId: string }>(
           ip: req.ip,
           outcome,
           cause,
+          ...details,
         }
       );
       return relay(
@@ -217,7 +232,7 @@ oidcRoutes.get<{ providerId: string }>(
       );
     };
 
-    if (limiter.retryAfter(req, providerId)) {
+    if (started && limiter.retryAfter(req, providerId)) {
       return relay(
         res,
         linking
@@ -246,18 +261,40 @@ oidcRoutes.get<{ providerId: string }>(
 
     const query = new URL(req.originalUrl, 'http://localhost').search;
     let identity: OidcIdentity;
+    let claims: Record<string, unknown>;
+    let userinfoFailed: unknown;
     try {
       const finished = await finishAtProvider(provider, query, correlation);
-      identity = finished.identity;
-      if (finished.userinfoFailed) {
+      ({ identity, claims, userinfoFailed } = finished);
+      if (userinfoFailed) {
         logger.warn('Single sign-on: could not read userinfo', {
           label: 'Auth',
           provider: provider.id,
-          problem: errorCode(finished.userinfoFailed),
+          problem: errorCode(userinfoFailed),
         });
       }
     } catch (e) {
       return failed(exchangeOutcome(e), errorCode(e) ?? 'exchange failed');
+    }
+
+    // Who may sign in, checked every time: signing in, a new account and
+    // linking alike. Without userinfo the claims may be missing some the
+    // provider only sends there, so nobody is let in on half of them.
+    const rules = provider.requiredClaims;
+    if (rules.length > 0) {
+      if (userinfoFailed) {
+        return failed(
+          'provider',
+          'userinfo, needed to check who may sign in, could not be read'
+        );
+      }
+      // Only the names: the values are the person's (their groups, say).
+      const failing = failedClaims(rules, claims);
+      if (failing.length > 0) {
+        return failed('not-allowed', 'claims do not meet the rules', {
+          failedClaims: failing,
+        });
+      }
     }
 
     try {

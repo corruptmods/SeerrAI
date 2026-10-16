@@ -5,6 +5,7 @@ import Tooltip from '@app/components/Common/Tooltip';
 import DeclineReason from '@app/components/DeclineReason';
 import DeclineRequestModal from '@app/components/DeclineRequestModal';
 import RequestModal from '@app/components/RequestModal';
+import useRequestAction from '@app/hooks/useRequestAction';
 import useRequestOverride from '@app/hooks/useRequestOverride';
 import { useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -52,34 +53,31 @@ interface RequestBlockProps {
 const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
   const { user } = useUser();
   const intl = useIntl();
-  const [isUpdating, setIsUpdating] = useState(false);
+  const { run, isBusy: isUpdating } = useRequestAction();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const { profile, rootFolder, server, languageProfile } =
     useRequestOverride(request);
 
-  const approveRequest = async (): Promise<void> => {
-    setIsUpdating(true);
-    await axios.post(`/api/v1/request/${request.id}/approve`);
+  const approveRequest = () =>
+    run(async () => {
+      await axios.post(`/api/v1/request/${request.id}/approve`);
 
-    if (onUpdate) {
-      onUpdate();
-      mutate('/api/v1/request/count');
-    }
-    setIsUpdating(false);
-  };
+      if (onUpdate) {
+        onUpdate();
+        mutate('/api/v1/request/count');
+      }
+    });
 
-  const deleteRequest = async () => {
-    setIsUpdating(true);
-    await axios.delete(`/api/v1/request/${request.id}`);
+  const deleteRequest = () =>
+    run(async () => {
+      await axios.delete(`/api/v1/request/${request.id}`);
 
-    if (onUpdate) {
-      onUpdate();
-      mutate('/api/v1/request/count');
-    }
-
-    setIsUpdating(false);
-  };
+      if (onUpdate) {
+        onUpdate();
+        mutate('/api/v1/request/count');
+      }
+    });
 
   return (
     <div className="block">

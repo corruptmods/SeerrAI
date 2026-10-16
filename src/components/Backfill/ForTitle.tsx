@@ -4,6 +4,7 @@ import {
   SeriesStatusBadge,
   formatBytes,
   formatDuration,
+  jobStage,
 } from '@app/components/Backfill/shared';
 import type { TitleKind, TitleLookup } from '@app/components/Backfill/types';
 import Button from '@app/components/Common/Button';
@@ -163,7 +164,7 @@ const BackfillForTitle = ({
                             size: formatBytes(job.sizeLeft),
                             speed: formatBytes(job.speed),
                           })
-                        : (job.stage ?? '')}
+                        : jobStage(intl, job)}
                     </span>
                     <span className="flex-shrink-0 tabular-nums">
                       {job.secondsLeft

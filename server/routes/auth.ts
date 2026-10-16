@@ -1,16 +1,18 @@
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
 import { ApiErrorCode } from '@server/constants/error';
-import type {
-  JellyfinFamilyKind,
-  MediaServerKind,
-} from '@server/constants/server';
+import type { JellyfinFamilyKind } from '@server/constants/server';
 import { MediaServerType, kindOfType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { startJobs } from '@server/job/schedule';
-import { plexAccountMayClaim } from '@server/lib/manageUser';
+import {
+  emailFree,
+  mainAccountOn,
+  plexAccountMayClaim,
+  plexProfileChanges,
+} from '@server/lib/manageUser';
 import {
   DEVICE_ID,
   USERNAME,
@@ -252,12 +254,9 @@ authRoutes.post('/plex', async (req, res, next) => {
           // when Plex is their main account: someone who signs in with
           // Jellyfin or Emby too keeps what they have.
           if (mainAccountOn(user, 'plex')) {
-            changes.avatar = account.thumb;
             changes.userType = UserType.PLEX;
-            if (await emailFree(account.email, user.id)) {
-              changes.email = account.email;
-            }
           }
+          Object.assign(changes, await plexProfileChanges(user, account));
           await userRepository.update(user.id, changes);
           user = await userRepository.findOneOrFail({
             where: { id: user.id },
@@ -336,27 +335,6 @@ authRoutes.post('/plex', async (req, res, next) => {
     });
   }
 });
-
-/**
- * No account but (optionally) this one has this email. A media server
- * account is never given an email another account already has.
- */
-const emailFree = async (email: string, exceptId?: number) => {
-  const holder = await getRepository(User)
-    .createQueryBuilder('user')
-    .select('user.id')
-    .where('user.email = :email', { email: (email ?? '').toLowerCase() })
-    .getOne();
-  return !holder || holder.id === exceptId;
-};
-
-/**
- * Whether signing in with this server brings someone's picture (and, for
- * Plex, email) up to date: when it holds their main account, or they have
- * none but a password.
- */
-const mainAccountOn = (user: User, kind: MediaServerKind) =>
-  user.userType === USER_TYPE[kind] || user.userType === UserType.LOCAL;
 
 /** A person's avatar from their account on a Jellyfin or Emby server. */
 function getUserAvatarUrl(user: User, kind: JellyfinFamilyKind): string {
@@ -485,7 +463,7 @@ authRoutes.post('/jellyfin', async (req, res, next) => {
       ) {
         throw new ApiError(500, ApiErrorCode.NoAdminUser);
       }
-      connectAsPrimary(serverKind);
+      connectAsPrimary(serverKind, account.User.Id);
 
       if (missingAdminUser) {
         logger.info(

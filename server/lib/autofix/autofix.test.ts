@@ -3,6 +3,7 @@ import TheMovieDb from '@server/api/themoviedb';
 import { IssueType } from '@server/constants/issue';
 import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import AgentRun from '@server/entity/AgentRun';
 import type BackfillSeries from '@server/entity/BackfillSeries';
 import Issue from '@server/entity/Issue';
 import IssueComment from '@server/entity/IssueComment';
@@ -14,11 +15,19 @@ import autofix, {
   classify,
   minutesOf,
   pickReplacement,
+  seasonEpisodeIn,
   wrongLength,
 } from '@server/lib/autofix';
-import type { ArrEpisode, ArrRelease } from '@server/lib/autofix/arr';
+import type {
+  ArrEpisode,
+  ArrExtras,
+  ArrHistoryRecord,
+  ArrRelease,
+} from '@server/lib/autofix/arr';
 import { FixRadarr, FixSonarr } from '@server/lib/autofix/arr';
 import backfill from '@server/lib/backfill/engine';
+import BackfillSonarr from '@server/lib/backfill/sonarr';
+import notificationManager from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
@@ -255,6 +264,16 @@ let episodes: ArrEpisode[] = [];
 let origins: Record<number, string> = {};
 let releases: ArrRelease[] = [];
 let modelAnswer = '{}';
+/** Sonarr's answer to a search for a whole season. */
+let seasonReleases: ArrRelease[] = [];
+/** The season's history: what was grabbed, and which files it became. */
+let seasonHistory: ArrHistoryRecord[] = [];
+/** Grabs marked failed (and so blocklisted), by history id. */
+let markedFailed: number[] = [];
+let monitored: number[][] = [];
+/** Everything done to Sonarr, in order. */
+let done: string[] = [];
+let slowHorses: Media;
 
 const call = async (method: string, url: string, body?: unknown) => {
   const res = await fetch(`http://127.0.0.1:${port}${url}`, {
@@ -289,6 +308,11 @@ beforeEach(async () => {
   origins = {};
   releases = [];
   modelAnswer = '{}';
+  seasonReleases = [];
+  seasonHistory = [];
+  markedFailed = [];
+  monitored = [];
+  done = [];
   episodes = [1, 2, 3, 4].map((n) => episode(n));
 
   const settings = getSettings();
@@ -363,10 +387,36 @@ beforeEach(async () => {
   mock.method(FixSonarr.prototype, 'releases', async () => releases);
   mock.method(FixSonarr.prototype, 'deleteEpisodeFile', async (id: number) => {
     deleted.push(id);
+    done.push(`delete:${id}`);
   });
   mock.method(FixSonarr.prototype, 'grab', async (r: { guid: string }) => {
     grabbed.push(r.guid);
+    done.push(`grab:${r.guid}`);
   });
+  mock.method(
+    FixSonarr.prototype,
+    'seasonReleases',
+    async () => seasonReleases
+  );
+  mock.method(FixSonarr.prototype, 'seasonHistory', async () => seasonHistory);
+  mock.method(FixSonarr.prototype, 'seriesFacts', async () => ({
+    title: 'Slow Horses',
+    originalLanguage: 'English',
+  }));
+  mock.method(FixSonarr.prototype, 'monitorEpisodes', async (ids: number[]) => {
+    monitored.push(ids);
+  });
+  mock.getter(
+    FixSonarr.prototype,
+    'extras',
+    () =>
+      ({
+        markFailed: async (id: number) => {
+          markedFailed.push(id);
+          done.push(`failed:${id}`);
+        },
+      }) as unknown as ArrExtras
+  );
   mock.method(FixSonarr.prototype, 'searchEpisodes', async (ids: number[]) => {
     searched.push(ids);
   });
@@ -530,6 +580,41 @@ beforeEach(async () => {
       externalServiceId: 77,
     })
   );
+  slowHorses = await getRepository(Media).save(
+    new Media({
+      tmdbId: 95480,
+      tvdbId: 410998,
+      mediaType: MediaType.TV,
+      status: MediaStatus.AVAILABLE,
+      serviceId: 0,
+      externalServiceId: 77,
+    })
+  );
+  Object.defineProperty(TheMovieDb.prototype, 'searchTvShows', {
+    configurable: true,
+    set() {},
+    get: () => async () => ({
+      page: 1,
+      total_pages: 1,
+      total_results: 1,
+      results: [
+        {
+          id: 95480,
+          name: 'Slow Horses',
+          first_air_date: '2022-04-01',
+          media_type: 'tv',
+          genre_ids: [],
+          overview: '',
+          popularity: 1,
+          vote_average: 8,
+          vote_count: 1,
+          origin_country: ['GB'],
+          original_language: 'en',
+          original_name: 'Slow Horses',
+        },
+      ],
+    }),
+  });
   movie = await getRepository(Media).save(
     new Media({
       tmdbId: 137,
@@ -1017,5 +1102,673 @@ describe('Auto-fix: from AI Search', () => {
       message: 'subtitles for groundhog day',
     });
     assert.match(res.body.reply, /not on the server yet/);
+  });
+});
+
+// ---- a whole season --------------------------------------------------------------
+
+/** The release Slow Horses' season 6 came from, on the fake Sonarr. */
+const OLD_PACK = 'Slow.Horses.S06.1080p.ATVP.WEB-DL.DDP5.1.H.264-OLDGRP';
+
+/**
+ * Season 6 of Slow Horses: five episodes, every file from one season pack,
+ * as Sonarr's history has it.
+ */
+const season6 = () => {
+  episodes = [1, 2, 3, 4, 5].map((n) =>
+    episode(n, {
+      id: 600 + n,
+      seasonNumber: 6,
+      absoluteEpisodeNumber: 30 + n,
+      episodeFileId: 1600 + n,
+    })
+  );
+  seasonHistory = [
+    ...episodes.map((ep) => ({
+      id: 9100 + ep.episodeNumber,
+      eventType: 'downloadFolderImported',
+      sourceTitle: OLD_PACK,
+      date: '2026-10-01T01:00:00Z',
+      downloadId: 'old',
+      episodeId: ep.id,
+      data: {
+        fileId: String(ep.episodeFileId),
+        droppedPath: `/downloads/${OLD_PACK}/Slow.Horses.S06E0${ep.episodeNumber}.mkv`,
+      },
+    })),
+    {
+      id: 9001,
+      eventType: 'grabbed',
+      sourceTitle: OLD_PACK,
+      date: '2026-10-01T00:00:00Z',
+      downloadId: 'old',
+      episodeId: 601,
+      data: { guid: 'old-guid' },
+    },
+  ];
+};
+
+/** A season pack Sonarr only turns down for the files already there. */
+const pack = (guid: string, title: string, over: Partial<ArrRelease> = {}) =>
+  release({
+    guid,
+    title,
+    fullSeason: true,
+    rejected: true,
+    rejections: [EXISTING],
+    mappedEpisodeInfo: [601, 602, 603, 604, 605].map((id) => ({ id })),
+    indexer: 'Torznab',
+    ...over,
+  });
+
+/** One episode's release. */
+const single = (n: number, over: Partial<ArrRelease> = {}) =>
+  release({
+    guid: `single-${n}`,
+    title: `Slow.Horses.S06E0${n}.1080p.WEB.H.264-EPGRP`,
+    rejected: true,
+    rejections: [EXISTING],
+    mappedEpisodeInfo: [{ id: 600 + n }],
+    indexer: 'Torznab',
+    ...over,
+  });
+
+const NEW_PACK = 'Slow.Horses.S06.1080p.WEB-DL-NEWGRP';
+
+/** The admin agent, able to ask admins: what it sends them. */
+const agentReady = () => {
+  const sent: { subject?: string; message?: string }[] = [];
+  mock.method(agent, 'problem', () => null);
+  mock.method(
+    notificationManager,
+    'sendNotification',
+    (_type: unknown, payload: { subject?: string; message?: string }) => {
+      sent.push(payload);
+    }
+  );
+  return sent;
+};
+
+/** A run, once the agent is done with it. */
+const settled = async (id: number) => {
+  for (let i = 0; i < 200; i++) {
+    const run = await getRepository(AgentRun).findOneOrFail({ where: { id } });
+    if (['done', 'failed'].includes(run.status) && !agent.isBusy()) return run;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  throw new Error('The run did not finish');
+};
+
+/** Every comment on an issue, oldest first, once there are `count`. */
+const commentsOn = async (issueId: number, count: number) => {
+  for (let i = 0; i < 100; i++) {
+    const comments = await getRepository(IssueComment).find({
+      where: { issue: { id: issueId } },
+      order: { id: 'ASC' },
+    });
+    if (comments.length >= count) return comments.map((c) => c.message);
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  throw new Error(`Fewer than ${count} comments were written`);
+};
+
+/** Sonarr, as the agent reads it, once the new files have imported. */
+const filesBack = () =>
+  mock.method(BackfillSonarr.prototype, 'getSeriesEpisodes', async () =>
+    episodes.map((ep) => ({ ...ep, hasFile: true }))
+  );
+
+describe('Auto-fix: reading which season and episode', () => {
+  it('reads the season and episode however they are said', () => {
+    assert.deepEqual(seasonEpisodeIn('Fix season 6 of slow horses'), {
+      season: 6,
+    });
+    assert.deepEqual(
+      seasonEpisodeIn('Whole season 6 is messed up of slow horses'),
+      { season: 6 }
+    );
+    assert.deepEqual(seasonEpisodeIn('s6 of slow horses is broken'), {
+      season: 6,
+    });
+    assert.deepEqual(seasonEpisodeIn('S06E03 has no sound'), {
+      season: 6,
+      episode: 3,
+    });
+    assert.deepEqual(
+      seasonEpisodeIn('episode 3 of season 6 is the wrong one'),
+      { season: 6, episode: 3 }
+    );
+    assert.deepEqual(seasonEpisodeIn('season six episode two'), {
+      season: 6,
+      episode: 2,
+    });
+    assert.deepEqual(seasonEpisodeIn('6x03 skips'), { season: 6, episode: 3 });
+    assert.deepEqual(seasonEpisodeIn('episode 4 is wrong'), { episode: 4 });
+    assert.deepEqual(seasonEpisodeIn('Interstellar has no sound'), {});
+    assert.deepEqual(seasonEpisodeIn('Blade Runner 2049 is broken'), {});
+  });
+
+  it('tells a whole season to replace from mixed-up episodes', () => {
+    assert.equal(
+      classify('Whole season 6 is messed up of slow horses')?.kind,
+      'replaceSeason'
+    );
+    assert.equal(classify('replace all of season 2')?.kind, 'replaceSeason');
+    assert.equal(
+      classify('season 3 needs redownloading')?.kind,
+      'replaceSeason'
+    );
+    assert.equal(
+      classify('the entire season is broken', IssueType.VIDEO)?.kind,
+      'replaceSeason'
+    );
+    assert.equal(
+      classify('episodes are mixed up in season 2')?.kind,
+      'wrongEpisode'
+    );
+    assert.equal(classify('season 2 episode 5 is broken')?.kind, 'broken');
+    assert.equal(
+      classify('replace the subtitles for season 2')?.kind,
+      'subtitles'
+    );
+    assert.equal(classify('Fix season 6 of slow horses'), undefined);
+  });
+});
+
+describe('Auto-fix: replacing a whole season', () => {
+  it('takes a season pack that is not the old release, and removes the old files only once it is grabbed', async () => {
+    season6();
+    // Episode 2 was unmonitored by someone: it is wanted again.
+    episodes[1] = { ...episodes[1], monitored: false };
+    seasonReleases = [
+      // The release the files came from, of the best quality: never again.
+      pack('old-again', OLD_PACK, { qualityWeight: 900 }),
+      // Dubbed into a language the series is not in.
+      pack('german', 'Slow.Horses.S06.GERMAN.1080p.WEB.x264-GERGRP', {
+        qualityWeight: 800,
+        languages: [{ id: 4, name: 'German' }],
+      }),
+      // A quality the profile does not want.
+      pack('unwanted', 'Slow.Horses.S06.480p.WEB.x264-LOW', {
+        rejections: ['WEBDL-480p is not wanted in profile'],
+      }),
+      // One episode, better than any pack: a pack is still preferred.
+      single(1, { qualityWeight: 950 }),
+      pack('good', 'Slow.Horses.S06.1080p.ATVP.WEB-DL.DDP5.1.H.264-NEWGRP', {
+        qualityWeight: 700,
+      }),
+    ];
+    const result = await autofix.run({
+      kind: 'replaceSeason',
+      media: slowHorses,
+      seasonNumber: 6,
+      user: admin,
+    });
+    assert.equal(result.ok, true, result.message);
+    assert.deepEqual(grabbed, ['good']);
+    // Grabbed first; then the old release blocklisted; then the files gone.
+    assert.deepEqual(done, [
+      'grab:good',
+      'failed:9001',
+      'delete:1601',
+      'delete:1602',
+      'delete:1603',
+      'delete:1604',
+      'delete:1605',
+    ]);
+    assert.deepEqual(markedFailed, [9001]);
+    assert.deepEqual(monitored, [[602]]);
+    assert.match(
+      result.message,
+      /grabbed the season pack Slow\.Horses\.S06\.1080p\.ATVP\.WEB-DL\.DDP5\.1\.H\.264-NEWGRP from Torznab/
+    );
+    assert.match(result.message, /the 5 old files were removed/);
+    assert.match(result.message, /marked failed in Sonarr/);
+  });
+
+  it('takes a release per episode when there is no season pack, and keeps the files of episodes it found nothing for', async () => {
+    season6();
+    seasonReleases = [single(1), single(2), single(3)];
+    // Episode 4 is found by its own search; episode 5 by none.
+    mock.method(FixSonarr.prototype, 'releases', async (episodeId: number) =>
+      episodeId === 604 ? [single(4)] : []
+    );
+    const result = await autofix.run({
+      kind: 'replaceSeason',
+      media: slowHorses,
+      seasonNumber: 6,
+      user: admin,
+    });
+    assert.equal(result.ok, true, result.message);
+    assert.deepEqual(grabbed, ['single-1', 'single-2', 'single-3', 'single-4']);
+    assert.deepEqual(deleted, [1601, 1602, 1603, 1604]);
+    const firstDelete = done.findIndex((d) => d.startsWith('delete'));
+    assert.equal(
+      done.slice(0, firstDelete).filter((d) => d.startsWith('grab')).length,
+      4,
+      done.join(', ')
+    );
+    assert.match(
+      result.message,
+      /one per episode \(no season pack was found\)/
+    );
+    assert.match(
+      result.message,
+      /No other release was found for S06E05, so its file stays\./
+    );
+  });
+
+  it('removes nothing when no other release is found, and hands it to the admin agent', async () => {
+    season6();
+    seasonReleases = [
+      pack('old-again', OLD_PACK),
+      pack('unwanted', 'Slow.Horses.S06.480p.WEB.x264-LOW', {
+        rejections: ['WEBDL-480p is not wanted in profile'],
+      }),
+    ];
+    mock.method(backfill, 'readiness', () => ({ ready: true }));
+    mock.method(
+      backfill,
+      'track',
+      async (kind: string, serverId: number, arrId: number) =>
+        ({
+          id: 12,
+          kind,
+          serverId,
+          arrId,
+          title: 'Slow Horses',
+          status: 'stuck',
+        }) as unknown as BackfillSeries
+    );
+    const handed: Record<string, unknown>[] = [];
+    mock.method(
+      agent,
+      'afterReport',
+      async (report: Record<string, unknown>) => {
+        handed.push(report);
+        return { id: 1 };
+      }
+    );
+    const result = await autofix.run({
+      kind: 'replaceSeason',
+      media: slowHorses,
+      seasonNumber: 6,
+      user: admin,
+      issueId: 7,
+    });
+    assert.equal(result.ok, false);
+    assert.match(
+      result.message,
+      /^No other release of season 6 was found, so nothing was removed\./
+    );
+    assert.match(result.message, /The admin agent looks further/);
+    assert.deepEqual(grabbed, []);
+    assert.deepEqual(deleted, []);
+    assert.deepEqual(markedFailed, []);
+    assert.deepEqual(
+      handed.map((h) => [h.seasonNumber, h.replace, h.issueId]),
+      [[6, true, 7]]
+    );
+  });
+
+  it('removes nothing when the replacement cannot be grabbed', async () => {
+    season6();
+    seasonReleases = [pack('good', NEW_PACK)];
+    mock.method(FixSonarr.prototype, 'grab', async () => {
+      throw new Error('Sonarr said no');
+    });
+    const result = await autofix.run({
+      kind: 'replaceSeason',
+      media: slowHorses,
+      seasonNumber: 6,
+      user: admin,
+    });
+    assert.equal(result.ok, false);
+    assert.match(
+      result.message,
+      /could not be grabbed, so nothing was removed/
+    );
+    assert.deepEqual(deleted, []);
+    assert.deepEqual(markedFailed, []);
+  });
+
+  it('lets an admin replace a season again the same day, and anyone else ask once a day', async () => {
+    season6();
+    seasonReleases = [pack('good', NEW_PACK)];
+    agentReady();
+    const replace = (user: User) =>
+      autofix.run({
+        kind: 'replaceSeason',
+        media: slowHorses,
+        seasonNumber: 6,
+        user,
+      });
+    assert.equal((await replace(admin)).ok, true);
+    assert.equal((await replace(admin)).ok, true);
+    assert.deepEqual(grabbed, ['good', 'good']);
+
+    const first = await replace(member);
+    assert.equal(first.ok, true, first.message);
+    const again = await replace(member);
+    assert.equal(again.ok, false);
+    assert.match(again.message, /already asked to be replaced today/);
+    assert.equal(
+      await getRepository(AgentRun).count({ where: { status: 'waiting' } }),
+      1
+    );
+  });
+
+  it("puts anyone else's request to an admin; approved, it is replaced and followed until it is back", async () => {
+    season6();
+    seasonReleases = [pack('good', NEW_PACK)];
+    const sent = agentReady();
+    actingAs = member;
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.OTHER,
+      message: 'The whole season is messed up, please replace it',
+      mediaId: slowHorses.id,
+      problemSeason: 6,
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const issueId = res.body.id;
+    const waitingNote = await commentOn(issueId);
+    assert.match(waitingNote, /waiting for an admin/);
+    assert.match(waitingNote, /Nothing changes until then/);
+    // Nothing has changed yet.
+    assert.deepEqual(grabbed, []);
+    assert.deepEqual(deleted, []);
+    const run = await getRepository(AgentRun).findOneOrFail({
+      where: { status: 'waiting' },
+    });
+    assert.equal(
+      run.question,
+      `Waiting for approval: Replace season 6 of Slow Horses: download ${NEW_PACK} and then remove the 5 current files.`
+    );
+    assert.equal(run.trigger, 'report');
+    assert.equal(run.requestedByName, member.displayName);
+    assert.match(sent[0]?.subject ?? '', /needs your approval/);
+
+    const proposal = (run.memory as { proposal: { id: string } }).proposal;
+    await agent.approve(run.id, proposal.id, admin);
+    const finished = await settled(run.id);
+    assert.equal(finished.status, 'done', finished.error ?? '');
+    assert.deepEqual(done, [
+      'grab:good',
+      'failed:9001',
+      'delete:1601',
+      'delete:1602',
+      'delete:1603',
+      'delete:1604',
+      'delete:1605',
+    ]);
+    const said = await commentsOn(issueId, 3);
+    assert.match(said[2], /^Admin agent: Approved by fix-admin\./);
+    assert.match(said[2], /grabbed the season pack/);
+
+    // Followed until the new files are in, then the reporter is told.
+    const follow = await getRepository(AgentRun).findOneOrFail({
+      where: { status: 'held' },
+    });
+    filesBack();
+    await agent.checkHeld();
+    const back = await commentsOn(issueId, 4);
+    assert.equal(
+      back[3],
+      'Automatic fix: Season 6 of Slow Horses is back: all 5 new files have been imported.'
+    );
+    assert.equal(
+      (
+        await getRepository(AgentRun).findOneOrFail({
+          where: { id: follow.id },
+        })
+      ).status,
+      'done'
+    );
+  });
+
+  it('changes nothing when an admin declines, and tells the reporter', async () => {
+    season6();
+    seasonReleases = [pack('good', NEW_PACK)];
+    agentReady();
+    actingAs = member;
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.OTHER,
+      message: 'Whole season 6 needs redownloading',
+      mediaId: slowHorses.id,
+      problemSeason: 6,
+    });
+    await commentOn(res.body.id);
+    const run = await getRepository(AgentRun).findOneOrFail({
+      where: { status: 'waiting' },
+    });
+    const proposal = (run.memory as { proposal: { id: string } }).proposal;
+    await agent.decline(run.id, proposal.id, admin);
+    const said = await commentsOn(res.body.id, 3);
+    assert.match(
+      said[2],
+      /^Admin agent: An admin declined this: Replace season 6/
+    );
+    assert.match(said[2], /Nothing was changed\./);
+    assert.deepEqual(grabbed, []);
+    assert.deepEqual(deleted, []);
+    assert.deepEqual(markedFailed, []);
+  });
+
+  it('says an admin is needed when no admin agent can ask for approval', async () => {
+    season6();
+    seasonReleases = [pack('good', NEW_PACK)];
+    const result = await autofix.run({
+      kind: 'replaceSeason',
+      media: slowHorses,
+      seasonNumber: 6,
+      user: member,
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.message, /needs an admin’s approval/);
+    assert.deepEqual(grabbed, []);
+    assert.equal(await getRepository(AgentRun).count(), 0);
+  });
+
+  it('follows an admin’s replacement on its issue until it is back', async () => {
+    season6();
+    seasonReleases = [pack('good', NEW_PACK)];
+    actingAs = admin;
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.OTHER,
+      message: 'Replace all of season 6',
+      mediaId: slowHorses.id,
+      problemSeason: 6,
+    });
+    assert.match(await commentOn(res.body.id), /grabbed the season pack/);
+    const follow = await getRepository(AgentRun).findOneOrFail({
+      where: { status: 'held' },
+    });
+    assert.deepEqual(
+      (follow.memory as { report: { follow: { episodeIds: number[] } } }).report
+        .follow.episodeIds,
+      [601, 602, 603, 604, 605]
+    );
+    // Not yet: still downloading.
+    mock.method(BackfillSonarr.prototype, 'getSeriesEpisodes', async () =>
+      episodes.map((ep) => ({ ...ep, hasFile: false }))
+    );
+    await agent.checkHeld();
+    assert.equal((await commentsOn(res.body.id, 2)).length, 2);
+    filesBack();
+    await agent.checkHeld();
+    assert.match(
+      (await commentsOn(res.body.id, 3))[2],
+      /^Automatic fix: Season 6 of Slow Horses is back/
+    );
+  });
+});
+
+describe('Auto-fix: a season from AI Search and issues', () => {
+  it('“Fix season 6 of slow horses” with nothing missing asks what is wrong, and replacing it then works', async () => {
+    season6();
+    actingAs = admin;
+    // As the model answered on the owner's server: missing episodes.
+    modelAnswer = JSON.stringify({
+      r: 'Looking for what is missing in season 6.',
+      titles: [{ t: 'Slow Horses', y: 2022, k: 'tv' }],
+      do: 'fix',
+      fx: 'missing',
+      se: 6,
+    });
+    const ask = 'Fix season 6 of slow horses';
+    const res = await call('POST', '/api/v1/ai/chat', { message: ask });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.match(
+      res.body.reply,
+      /^Sonarr has every aired episode of season 6, so nothing is missing\./
+    );
+    assert.match(
+      res.body.reply,
+      /replace the whole season, check it for mixed-up episodes, or fix its subtitles\?$/
+    );
+    assert.doesNotMatch(res.body.reply, /report it as/);
+    assert.equal(res.body.confirm, undefined);
+
+    // The answer: the model names the title from before, but not the
+    // season; it comes from the conversation.
+    modelAnswer = JSON.stringify({
+      r: 'Replacing season 6.',
+      titles: [{ t: 'Slow Horses', y: 2022, k: 'tv' }],
+      do: 'fix',
+      fx: 'replaceSeason',
+    });
+    const chosen = await call('POST', '/api/v1/ai/chat', {
+      message: 'Replace the whole season',
+      turns: [{ ask, reply: res.body.reply, offered: [] }],
+    });
+    assert.equal(chosen.status, 200, JSON.stringify(chosen.body));
+    assert.deepEqual(chosen.body.confirm, {
+      kind: 'replaceSeason',
+      mediaId: slowHorses.id,
+      seasonNumber: 6,
+      message: 'Replace the whole season',
+    });
+    assert.match(chosen.body.reply, /all of season 6 of Slow Horses/);
+
+    seasonReleases = [pack('good', NEW_PACK)];
+    const fixed = await call('POST', '/api/v1/ai/fix', chosen.body.confirm);
+    assert.equal(fixed.status, 200, JSON.stringify(fixed.body));
+    assert.match(
+      fixed.body.reply,
+      /^Reported it, and started replacing season 6/
+    );
+    const issueId = Number(fixed.body.fix.link.split('/').pop());
+    const issue = await getRepository(Issue).findOneOrFail({
+      where: { id: issueId },
+    });
+    assert.equal(issue.problemSeason, 6);
+    assert.match(await commentOn(issueId), /grabbed the season pack/);
+    assert.deepEqual(grabbed, ['good']);
+  });
+
+  it('“Whole season 6 is messed up of slow horses” is filed on season 6, not All Seasons, and replaced for an admin', async () => {
+    season6();
+    seasonReleases = [pack('good', NEW_PACK)];
+    actingAs = admin;
+    // As the model answered on the owner's server: the wrong episode, and
+    // no season.
+    modelAnswer = JSON.stringify({
+      r: 'Checking season 6.',
+      titles: [{ t: 'Slow Horses', y: 2022, k: 'tv' }],
+      do: 'fix',
+      fx: 'wrongEpisode',
+    });
+    const message = 'Whole season 6 is messed up of slow horses';
+    const asked = await call('POST', '/api/v1/ai/chat', { message });
+    assert.equal(asked.status, 200, JSON.stringify(asked.body));
+    assert.deepEqual(asked.body.confirm, {
+      kind: 'replaceSeason',
+      mediaId: slowHorses.id,
+      seasonNumber: 6,
+      message,
+    });
+    assert.match(asked.body.reply, /This replaces all of season 6/);
+    assert.match(asked.body.reply, /removed only once it is grabbed/);
+
+    const res = await call('POST', '/api/v1/ai/fix', asked.body.confirm);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    const issueId = Number(res.body.fix.link.split('/').pop());
+    const issue = await getRepository(Issue).findOneOrFail({
+      where: { id: issueId },
+    });
+    assert.equal(issue.problemSeason, 6, 'not All Seasons');
+    assert.equal(issue.problemEpisode, 0);
+    const comment = await commentOn(issueId);
+    assert.doesNotMatch(comment, /Say which season/);
+    assert.match(comment, /grabbed the season pack/);
+    assert.deepEqual(grabbed, ['good']);
+    assert.equal(deleted.length, 5);
+  });
+
+  it('“Whole season 6 is messed up of slow horses” from anyone else waits for an admin', async () => {
+    season6();
+    seasonReleases = [pack('good', NEW_PACK)];
+    agentReady();
+    modelAnswer = JSON.stringify({
+      r: 'Checking season 6.',
+      titles: [{ t: 'Slow Horses', y: 2022, k: 'tv' }],
+      do: 'fix',
+      fx: 'wrongEpisode',
+    });
+    const message = 'Whole season 6 is messed up of slow horses';
+    const asked = await call('POST', '/api/v1/ai/chat', { message });
+    assert.equal(asked.body.confirm.seasonNumber, 6);
+    assert.match(asked.body.reply, /An admin approves it first/);
+    const res = await call('POST', '/api/v1/ai/fix', asked.body.confirm);
+    assert.match(res.body.reply, /needs an admin’s approval/);
+    const issueId = Number(res.body.fix.link.split('/').pop());
+    const issue = await getRepository(Issue).findOneOrFail({
+      where: { id: issueId },
+    });
+    assert.equal(issue.problemSeason, 6);
+    assert.match(await commentOn(issueId), /waiting for an admin/);
+    assert.deepEqual(grabbed, []);
+    assert.deepEqual(deleted, []);
+  });
+
+  it('carries the season and episode said into the issue, whatever the model gave', async () => {
+    season6();
+    modelAnswer = JSON.stringify({
+      r: '',
+      titles: [{ t: 'Slow Horses', y: 2022, k: 'tv' }],
+      do: 'fix',
+      fx: 'wrongEpisode',
+      se: 1,
+    });
+    const asked = await call('POST', '/api/v1/ai/chat', {
+      message: 'S06E03 of slow horses is the wrong episode',
+    });
+    assert.equal(asked.body.confirm.seasonNumber, 6);
+    assert.equal(asked.body.confirm.episodeNumber, 3);
+    const res = await call('POST', '/api/v1/ai/fix', asked.body.confirm);
+    const issue = await getRepository(Issue).findOneOrFail({
+      where: { id: Number(res.body.fix.link.split('/').pop()) },
+    });
+    assert.equal(issue.problemSeason, 6);
+    assert.equal(issue.problemEpisode, 3);
+  });
+
+  it('reads the season from a report filed on All Seasons', async () => {
+    season6();
+    actingAs = admin;
+    seasonReleases = [pack('good', NEW_PACK)];
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.OTHER,
+      message: 'The whole season 6 is messed up',
+      mediaId: slowHorses.id,
+      problemSeason: 0,
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.match(await commentOn(res.body.id), /grabbed the season pack/);
+    const issue = await getRepository(Issue).findOneOrFail({
+      where: { id: res.body.id },
+    });
+    assert.equal(issue.problemSeason, 6);
+    assert.deepEqual(grabbed, ['good']);
   });
 });

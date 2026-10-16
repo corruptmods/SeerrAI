@@ -82,6 +82,7 @@ describe('single sign-on settings', () => {
     assert.equal(res.body.scopes, 'openid profile email');
     assert.equal(res.body.enabled, true);
     assert.equal(res.body.newUserSignUp, false, 'sign-up is off by default');
+    assert.deepEqual(res.body.requiredClaims, [], 'anyone may sign in');
     const [saved] = getSettings().oidc.providers;
     assert.equal(saved.clientSecret, fake.clientSecret);
   });
@@ -116,6 +117,7 @@ describe('single sign-on settings', () => {
           scopes: 'openid',
           enabled: true,
           newUserSignUp: false,
+          requiredClaims: [],
         },
       ],
     };
@@ -143,6 +145,7 @@ describe('single sign-on settings', () => {
       .send(body({ clientSecret: '', issuerUrl: `${fake.issuer}-other` }));
     assert.equal(moved.status, 400);
     assert.equal(moved.body.message, 'Enter the client secret.');
+    assert.equal(moved.body.problem, 'client-secret');
 
     const tested = await request(app)
       .post('/api/v1/settings/oidc/test')
@@ -153,6 +156,7 @@ describe('single sign-on settings', () => {
       });
     assert.equal(tested.status, 400);
     assert.equal(tested.body.message, 'Enter the client secret.');
+    assert.equal(tested.body.problem, 'client-secret');
   });
 
   it('tests a provider and says plainly what is wrong', async () => {
@@ -170,6 +174,9 @@ describe('single sign-on settings', () => {
       slash.body.message,
       `The provider gives its issuer URL as ${fake.issuer}. Enter exactly that (a slash at the end counts).`
     );
+    // And as a code the settings page puts in the admin's language.
+    assert.equal(slash.body.problem, 'issuer-mismatch');
+    assert.deepEqual(slash.body.params, { issuer: fake.issuer });
 
     const wrong = await request(app)
       .post('/api/v1/settings/oidc/test')
@@ -177,6 +184,8 @@ describe('single sign-on settings', () => {
     assert.equal(wrong.status, 400);
     assert.match(wrong.body.message, /No sign-in details were found/);
     assert.match(wrong.body.message, /404/);
+    assert.equal(wrong.body.problem, 'no-discovery');
+    assert.deepEqual(wrong.body.params, { status: 404 });
 
     fake.down = true;
     const down = await request(app)
@@ -191,6 +200,8 @@ describe('single sign-on settings', () => {
       .send(body({ issuerUrl: 'http://127.0.0.1:1/realms/x' }));
     assert.equal(nobody.status, 400);
     assert.match(nobody.body.message, /127\.0\.0\.1:1/);
+    assert.equal(nobody.body.problem, 'unreachable');
+    assert.deepEqual(nobody.body.params, { host: '127.0.0.1:1' });
   });
 
   it('only takes an issuer over https, but for one on this machine', async () => {
@@ -200,6 +211,7 @@ describe('single sign-on settings', () => {
 
     assert.equal(res.status, 400);
     assert.equal(res.body.message, 'The issuer URL must start with https://.');
+    assert.equal(res.body.problem, 'issuer-https');
     assert.equal(fake.discoveryCalls, 0);
   });
 
@@ -221,6 +233,7 @@ describe('single sign-on settings', () => {
       logoUrl: 'javascript:alert(1)',
     });
     assert.equal(logo.status, 400);
+    assert.equal(logo.body.problem, 'logo-url');
     const plain = await add({
       name: 'Google',
       logoUrl: 'http://example.com/g.svg',
@@ -275,5 +288,143 @@ describe('single sign-on settings', () => {
     assert.deepEqual(getSettings().fullPublicSettings.oidcProviders, [
       { id: 'authentik', name: 'Authentik', logoUrl: '/images/authentik.svg' },
     ]);
+  });
+
+  it('keeps who may sign in, trimmed, and shows it back', async () => {
+    const res = await add({
+      requiredClaims: [
+        { claim: ' groups ', value: ' seerr-users ' },
+        { claim: 'is_seerr_user', value: '' },
+        { claim: 'hd', value: 'example.com' },
+      ],
+    });
+    assert.equal(res.status, 201, res.text);
+    const expected = [
+      { claim: 'groups', value: 'seerr-users' },
+      { claim: 'is_seerr_user' },
+      { claim: 'hd', value: 'example.com' },
+    ];
+    assert.deepEqual(res.body.requiredClaims, expected);
+    assert.deepEqual(getSettings().oidc.providers[0].requiredClaims, expected);
+
+    const listed = await request(app).get('/api/v1/settings/oidc');
+    assert.deepEqual(listed.body.providers[0].requiredClaims, expected);
+
+    // Saved again unchanged, and emptied.
+    const same = await request(app)
+      .put('/api/v1/settings/oidc/authentik')
+      .send(body({ clientSecret: '', requiredClaims: expected }));
+    assert.equal(same.status, 200, same.text);
+    assert.deepEqual(same.body.requiredClaims, expected);
+    const emptied = await request(app)
+      .put('/api/v1/settings/oidc/authentik')
+      .send(body({ clientSecret: '', requiredClaims: [] }));
+    assert.deepEqual(emptied.body.requiredClaims, []);
+    assert.deepEqual(getSettings().oidc.providers[0].requiredClaims, []);
+
+    // Not something the sign-in page is told.
+    assert.ok(
+      !JSON.stringify(getSettings().fullPublicSettings).includes('seerr-users')
+    );
+  });
+
+  it('takes upstream’s space-separated names when saving', async () => {
+    const res = await add({ requiredClaims: ' is_seerr_user  other_claim ' });
+
+    assert.equal(res.status, 201, res.text);
+    assert.deepEqual(res.body.requiredClaims, [
+      { claim: 'is_seerr_user' },
+      { claim: 'other_claim' },
+    ]);
+    assert.deepEqual(getSettings().oidc.providers[0].requiredClaims, [
+      { claim: 'is_seerr_user' },
+      { claim: 'other_claim' },
+    ]);
+  });
+
+  it('reads upstream’s space-separated names from the settings file', async () => {
+    await add();
+    const [saved] = getSettings().oidc.providers;
+    // As pasted into settings.json from an upstream install.
+    getSettings().oidc = {
+      providers: [{ ...saved, requiredClaims: 'is_seerr_user' as never }],
+    };
+
+    assert.deepEqual(getSettings().oidc.providers[0].requiredClaims, [
+      { claim: 'is_seerr_user' },
+    ]);
+    const listed = await request(app).get('/api/v1/settings/oidc');
+    assert.deepEqual(listed.body.providers[0].requiredClaims, [
+      { claim: 'is_seerr_user' },
+    ]);
+
+    // And a provider saved before there were rules lets anyone in.
+    const older: Partial<typeof saved> = { ...saved };
+    delete older.requiredClaims;
+    getSettings().oidc = { providers: [older as typeof saved] };
+    assert.deepEqual(getSettings().oidc.providers[0].requiredClaims, []);
+  });
+
+  it('needs a claim name without spaces in each rule', async () => {
+    for (const requiredClaims of [
+      [{ claim: '', value: 'x' }],
+      [{ claim: '   ' }],
+      [{ claim: 'two words' }],
+      [{ value: 'seerr-users' }],
+    ]) {
+      const res = await add({ requiredClaims });
+      assert.equal(res.status, 400, JSON.stringify(requiredClaims));
+    }
+    const spaced = await add({ requiredClaims: [{ claim: 'two words' }] });
+    assert.equal(
+      spaced.body.message,
+      'Each rule needs a claim name, without spaces.'
+    );
+    assert.equal(spaced.body.problem, 'claim-name');
+    assert.equal(getSettings().oidc.providers.length, 0);
+  });
+
+  it('ties existing links to the issuer they were made at when it changes', async () => {
+    const other = createFakeOidcProvider();
+    await other.start();
+    try {
+      await add();
+      const links = getRepository(OidcLink);
+      const user = await getRepository(User).findOneByOrFail({ id: 1 });
+      // A link from before issuers were recorded on links.
+      await links.save(new OidcLink({ user, provider: 'authentik', sub: 's' }));
+
+      const same = await request(app)
+        .put('/api/v1/settings/oidc/authentik')
+        .send(body({ clientSecret: '', name: 'Renamed' }));
+      assert.equal(same.status, 200, same.text);
+      assert.equal((await links.findOneByOrFail({ sub: 's' })).issuer, null);
+
+      const moved = await request(app)
+        .put('/api/v1/settings/oidc/authentik')
+        .send(
+          body({
+            issuerUrl: other.issuer,
+            clientId: other.clientId,
+            clientSecret: other.clientSecret,
+          })
+        );
+      assert.equal(moved.status, 200, moved.text);
+      assert.equal(
+        (await links.findOneByOrFail({ sub: 's' })).issuer,
+        fake.issuer
+      );
+    } finally {
+      await other.stop();
+    }
+  });
+
+  it('says what is wrong with a request it cannot read, as a code too', async () => {
+    const res = await request(app)
+      .post('/api/v1/settings/oidc/test')
+      .send({ issuerUrl: fake.issuer, clientId: '  ' });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.problem, 'check-details');
   });
 });

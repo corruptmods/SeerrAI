@@ -7,12 +7,14 @@ import Header from '@app/components/Common/Header';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import useDebouncedState from '@app/hooks/useDebouncedState';
+import useNearScreen, { useLoadWhenNear } from '@app/hooks/useNearScreen';
 import useToasts from '@app/hooks/useToasts';
 import { useUpdateQueryParams } from '@app/hooks/useUpdateQueryParams';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
+import { pictureLoading } from '@app/utils/nearScreen';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -31,7 +33,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import type { ChangeEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { useInView } from 'react-intersection-observer';
 import { FormattedRelativeTime, useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -337,9 +338,9 @@ interface BlocklistedItemProps {
 const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const { addToast } = useToasts();
-  const { ref, inView } = useInView({
-    triggerOnce: true,
-  });
+  // The title, and with it the pictures, load once the row is near the
+  // screen, so they are there by the time it is scrolled to.
+  const { ref, near, nearness } = useNearScreen();
   const intl = useIntl();
   const { hasPermission } = useUser();
 
@@ -347,9 +348,8 @@ const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
     item.mediaType === 'movie'
       ? `/api/v1/movie/${item.tmdbId}`
       : `/api/v1/tv/${item.tmdbId}`;
-  const { data: title, error } = useSWR<MovieDetails | TvDetails>(
-    inView ? url : null
-  );
+  const titleKey = useLoadWhenNear(url, near);
+  const { data: title, error } = useSWR<MovieDetails | TvDetails>(titleKey);
 
   if (!title && !error) {
     return (
@@ -398,6 +398,7 @@ const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
             alt=""
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             fill
+            {...pictureLoading(nearness)}
           />
           <div
             className="absolute inset-0"
@@ -422,14 +423,15 @@ const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
               type="tmdb"
               src={
                 title?.posterPath
-                  ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${title.posterPath}`
+                  ? `https://image.tmdb.org/t/p/w300_and_h450_face${title.posterPath}`
                   : '/images/seerr_poster_not_found.png'
               }
               alt=""
               sizes="100vw"
               style={{ width: '100%', height: 'auto', objectFit: 'cover' }}
-              width={600}
-              height={900}
+              width={300}
+              height={450}
+              {...pictureLoading(nearness)}
             />
           </Link>
           <div className="flex flex-col justify-center overflow-hidden pl-2 xl:pl-4">

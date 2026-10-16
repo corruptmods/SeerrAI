@@ -61,7 +61,9 @@ export const leftOutAsAnime = (
  * agree. `leaveOut` is the admin's list of countries whose anime does not
  * count (see leftOutAsAnime); the server passes its setting, the pages the
  * same setting from the public settings. An override rule, or the Anime
- * switch on a request, can still send a left-out title as anime.
+ * switch on a request, can still send a left-out title as anime. An override
+ * rule that names the anime keyword goes by this decision (with the title's
+ * and the request's own choice over it), not by the keyword alone.
  *
  * TMDB's "anime" keyword (210024) is the strongest signal, from any
  * country, but it is missing from plenty of anime, which then went to

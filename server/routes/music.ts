@@ -15,6 +15,7 @@ import {
   markBeingAdded,
 } from '@server/lib/music/library';
 import { Permission } from '@server/lib/permissions';
+import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { requireMusic } from '@server/middleware/music';
@@ -46,9 +47,6 @@ const musicRoutes = Router();
 
 musicRoutes.use(requireMusic);
 
-const SEARCH_ARTISTS = 8;
-const SEARCH_ALBUMS = 12;
-
 /** MusicBrainz lists this many of an artist's albums a page. */
 const ALBUMS_PER_PAGE = 100;
 
@@ -70,7 +68,13 @@ const mbFailed = (next: NextFunction, e: unknown, what: string) => {
   return next({ status: 502, message: 'MusicBrainz did not answer.' });
 };
 
+// How much a search shows, and whether music can be searched anywhere at
+// all, are an admin's choice (Settings → Music).
 musicRoutes.get('/search', async (req, res, next) => {
+  const search = getSettings().music.search;
+  if (!search.inAll && !search.musicPage && !search.chip) {
+    return next({ status: 403, message: 'Music search is turned off.' });
+  }
   const query = String(req.query.query ?? '').trim();
   if (!query) {
     return res
@@ -80,8 +84,8 @@ musicRoutes.get('/search', async (req, res, next) => {
   try {
     const mb = musicBrainz();
     const [artists, albums] = await Promise.all([
-      mb.searchArtists(query, { limit: SEARCH_ARTISTS }),
-      mb.searchReleaseGroups(query, { limit: SEARCH_ALBUMS }),
+      mb.searchArtists(query, { limit: search.artists }),
+      mb.searchReleaseGroups(query, { limit: search.albums }),
     ]);
     const artistList = artists.artists ?? [];
     const albumList = albums['release-groups'] ?? [];

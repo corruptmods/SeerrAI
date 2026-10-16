@@ -28,12 +28,26 @@ Approval can be **Missing episodes only** (recommended), or **Missing and upgrad
 
 - **Backfill** in the sidebar: what is stuck, packs found, ignored and complete, with a search box. **Scan now**, **Start search…** (with extra names to search under) and **Search All Stuck**.
 - **A title's Backfill page**: what is missing and why Sonarr or Radarr didn't get it, each pack found with its file plan, approve or skip, history, Ignore, and **Get it with AI**.
-- **A download's page**: progress, pause, resume or end.
+- **A download's page**: progress, pause, resume or end. A failed one says what became of it, linked: **Replaced by #66**, **Backfill is searching for another release**, **The admin agent is looking for another release**, **Backfill offered the next pack**, or **Nothing else was found**. The title's list of downloads says the same under each failed one.
 - **On a title's own page**, admins see a Backfill box with what is missing, packs waiting and downloads running.
 
 ### Usenet posts it can't open
 
 A Usenet post packed in RAR archives, or with scrambled file names (only its PAR2 repair files named), can't be listed before it is downloaded. Backfill marks it as one it couldn't check. The admin agent can take such a post whole when its name is exactly the movie or one missing episode; once the Usenet client has it, its one video is imported.
+
+### When an indexer limits you
+
+Many indexers allow only so many searches, or so many downloads of a torrent or NZB file, a day. Once that is used up they answer "too many requests" until it resets. Backfill doesn't treat that as a failed download:
+
+- The download stays queued, and its page says so: for example "Tabula Rasa has reached its download limit; trying again at 5:10 PM".
+- It isn't tried again before then. When the indexer says how long to wait, Backfill waits that long; otherwise 15 minutes, then 30, an hour, two hours and so on, never more than 6 hours between tries.
+- Other downloads from the same indexer wait too, without asking it. Packs from other indexers carry on as usual. The waits are kept when Seerr AI restarts.
+- When Prowlarr itself is at its search limit, a search stops at the first name rather than spending more searches, and says so on the title's page.
+- After a day of waiting, Backfill gives up on that download. The pack stays on the title's page for you to approve by hand when the indexer has reset, and the notification says so.
+
+A download that couldn't start for any other reason (the indexer refused the API key, the download client didn't answer) is tried each minute and given up after ten tries. Whatever the reason, Backfill doesn't take a pack by itself again for a day after its download failed to start: it waits on the title's page, with why beside it, for you to approve it by hand.
+
+A download's activity says each thing once: when the same thing happens again, the line counts it ("tried 9 times, last at 3:53 PM") rather than being written again. Known problems are put in plain words ("SABnzbd did not answer", "Tabula Rasa refused the API key"); the exact error is in the server log. Each download says who approved it: the admin by name, "(API key)" after the name when it was approved through the API, "AI agent", or Backfill when it took the pack itself.
 
 ### What each download client does
 
@@ -60,17 +74,27 @@ An AI with tools that looks further when Backfill finds nothing usable for a req
 
 - **On its own** (on by default; **Step in on its own** in Settings → Backfill): when Backfill finds nothing for a requested title, or someone reports a title missing and nothing is found. Once per title.
 - **When asked:** from **Backfill → Agent**, or **Get it with AI** on a title's Backfill page.
-- **Limits** (Settings → Backfill → Advanced): 12 runs a day on its own, 10 downloads a day, 40 GB at most, 30 steps per go, carrying on by itself up to 3 times, as long as its last go started a download.
+- **Limits** (Settings → Backfill → Advanced): 12 runs a day on its own, 10 downloads a day, 40 GB at most, 30 steps per go, carrying on by itself up to 3 times, as long as its last go started a download. A change waiting for your approval, a replaced season being followed, and looking again after a failed download (below) aren't runs of its own: they don't count towards the 12, and don't keep it from looking into a title someone reports.
 - **Standing instructions**: what it should always do, in your words ("prefer Usenet", "nothing under 720p for new shows").
 - Every conversation is kept, step by step, with what it cost; you can reply to it or answer its questions. Finished ones are removed after 30 days.
 
 What it does shows in each title's history and in Backfill notifications.
+
+### When a download it started fails
+
+When a download the agent started fails (SABnzbd gives up on it, say, or a torrent stalls), Backfill first takes a good pack it already found for the same episodes, as it does for any failed download. If there is none, the download goes back to the agent, in the same conversation: "Download #63 failed (SABnzbd could not finish it: Aborted, cannot be completed). Find another release for S06E03; do not pick the same release or group again." It looks the way it did before, with the same say as before: a missing episode is simply downloaded again, even if deleting the old file needed your approval, while replacing a file that is there still waits for you. A release that failed is shown to it as failed and is never taken again for that title, wherever it is found.
+
+- If the conversation is still going, or waiting on your answer, it hears of the failure once that go is over.
+- It stops after three replacements for the same episodes have failed in a day, or when its downloads for the day are used up, and you get a Backfill notification saying so.
+- If it finds nothing, you're told the download failed and nothing else was found.
+- With **Replace failed downloads** off, nothing is replaced, by Backfill or the agent: the next pack is offered to you instead.
 
 ### Changes you approve
 
 When you ask it to, the agent can also change what's already there. It never does any of these by itself: it works out exactly what would happen, shows you, and waits. Nothing changes until you press **Approve** on the conversation's page.
 
 - **Replace a file** with a release it found (a better copy, or the right one). The old file stays, and keeps playing, until the new one has imported.
+- **Replace a whole season** ("season 6 is bad, replace it all"): the card says what it will download and how many files go after, for example "Replace season 6 of Slow Horses: download … and then remove the 5 current files". Approved, the new release is grabbed first; only then are the old releases marked failed in Sonarr and the old files removed so the new ones import. If nothing can be grabbed, nothing is removed. Asked to replace or fix something, the agent never proposes deleting the files first; deleting is only offered when deleting is what you asked for.
 - **Search for a better release**: Radarr or Sonarr searches and takes one only if your quality profile prefers it. (This one just runs; it's what they'd do anyway.)
 - **Block or unblock a release group** (see below).
 - **Mark a download as failed**: it's removed from the download client and blocklisted, and Radarr or Sonarr looks for another.
@@ -79,7 +103,7 @@ When you ask it to, the agent can also change what's already there. It never doe
 
 Each change is checked again when you approve it. If things have moved on (a new file arrived, the download already finished), it's left alone and the agent tells you. You'll get a notification when something is waiting for you. Answering in the chat instead of approving drops the proposal; declining ends the conversation without changing anything.
 
-Admins can ask for all of this from **AI Search** too ("this copy of The Odyssey is a cam, delete it and block the group"). AI Search hands it to the agent and links you to the conversation. Nobody else can.
+Admins can ask for all of this from **AI Search** too ("this copy of The Odyssey is a cam, delete it and block the group"). AI Search hands it to the agent and links you to the conversation. Nobody else can, with one exception: anyone who can report issues can ask for a whole season to be replaced (see [Auto-fix](./subtitles-and-autofix.md#auto-fix)), and that waits here for an admin to approve or decline, like any other change. When Auto-fix finds no other release for a season, the agent looks further and can only propose replacing it.
 
 ### Blocked release groups
 

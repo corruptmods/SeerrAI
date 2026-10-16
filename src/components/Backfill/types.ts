@@ -95,7 +95,26 @@ export interface LogLine {
   at: string;
   kind: 'info' | 'ok' | 'warn' | 'error';
   message: string;
+  /** The same line again: how many times, and when last. */
+  count?: number;
+  lastAt?: string;
 }
+
+/**
+ * What became of a failed download: replaced by another, Backfill or the
+ * admin agent looking for one, a pack offered to an admin, nothing else
+ * found, or the agent stopping (three failed replacements in a day, or its
+ * downloads for the day used up).
+ */
+export type JobFollowUp =
+  | 'replaced'
+  | 'searching'
+  | 'agent'
+  | 'offered'
+  | 'offeredAgain'
+  | 'none'
+  | 'gaveUp'
+  | 'limit';
 
 export interface JobView {
   id: number;
@@ -116,7 +135,14 @@ export interface JobView {
   rejected: number;
   fileCount: number;
   error: string | null;
+  /** Waiting on its indexer's download limit: when it is tried again. */
+  retryAt: string | null;
   approvedByName: string | null;
+  /** Once failed: what became of it, and the download that replaced it. */
+  followUp: JobFollowUp | null;
+  replacedById: number | null;
+  /** The admin agent's conversation that started it. */
+  agentRunId: number | null;
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;

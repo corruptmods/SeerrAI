@@ -1,6 +1,7 @@
 import { runRefreshMs } from '@app/components/Backfill/Agent/refresh';
 import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
+import useMediaQuery from '@app/hooks/useMediaQuery';
 import defineMessages from '@app/utils/defineMessages';
 import {
   ArrowDownTrayIcon,
@@ -27,6 +28,7 @@ export const messages = defineMessages('components.Backfill.Agent', {
   description:
     'An AI that works like you would: it reads why releases were turned down, tries other searches, opens packs to check their files, and downloads only what is missing.',
   placeholder: 'Ask it to find something: “Get the missing Casper episodes”',
+  placeholderShort: 'Ask it to find something',
   ask: 'Ask',
   asking: 'Starting…',
   askFailed: 'The agent could not start.',
@@ -256,6 +258,8 @@ export const AskAgent = ({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string>();
   const ready = !!title || text.trim().length >= 3;
+  // The example does not fit on a phone.
+  const wide = useMediaQuery('(min-width: 640px)');
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -291,7 +295,11 @@ export const AskAgent = ({
           maxLength={1000}
           onChange={(e) => setText(e.target.value)}
           placeholder={intl.formatMessage(
-            title ? messages.titlePlaceholder : messages.placeholder
+            title
+              ? messages.titlePlaceholder
+              : wide
+                ? messages.placeholder
+                : messages.placeholderShort
           )}
           disabled={!!problem || busy}
           className="min-w-0 flex-1 rounded-md border border-gray-500 bg-gray-700 px-3 py-2 text-sm text-white placeholder:text-gray-400 disabled:opacity-60"

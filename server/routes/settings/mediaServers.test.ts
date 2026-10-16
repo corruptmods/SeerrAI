@@ -7,6 +7,7 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import MusicAlbum from '@server/entity/MusicAlbum';
+import OidcLink from '@server/entity/OidcLink';
 import { User } from '@server/entity/User';
 import { scheduledJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
@@ -741,6 +742,30 @@ describe('removing a server', () => {
     assert.equal(signInAllowed('jellyfin'), false);
   });
 
+  it('stops its scans before taking its ids off titles', async (t) => {
+    connectJellyfin();
+    const { refreshMediaServerJobs } = await import('@server/job/schedule');
+    refreshMediaServerJobs();
+    const steps: string[] = [];
+    for (const job of scheduledJobs.filter((j) => j.server === 'jellyfin')) {
+      job.cancelFn = () => steps.push(`cancel ${job.id}`);
+    }
+    const media = getRepository(Media);
+    const update = media.update.bind(media);
+    t.mock.method(media, 'update', (...args: Parameters<typeof update>) => {
+      steps.push('take ids off');
+      return update(...args);
+    });
+
+    const res = await api('/media-servers/jellyfin', { method: 'DELETE' });
+    assert.equal(res.status, 200);
+    assert.deepEqual(steps.slice(0, 3), [
+      'cancel jellyfin-full-scan',
+      'cancel jellyfin-recently-added-scan',
+      'take ids off',
+    ]);
+  });
+
   it('makes the next connected server primary when the primary goes', async () => {
     connectJellyfin();
     getSettings().emby = { ...getSettings().jellyfin, connected: true };
@@ -798,6 +823,123 @@ describe('removing a server', () => {
       { passwordOnly: 1, noSignIn: 3 },
       'without password sign-in, only the owner may use theirs'
     );
+  });
+
+  it('counts single sign-on as a way in, while its provider is usable', async (t) => {
+    const settings = getSettings();
+    const before = {
+      oidc: settings.oidc,
+      applicationUrl: settings.main.applicationUrl,
+    };
+    t.after(() => {
+      settings.oidc = before.oidc;
+      settings.main.applicationUrl = before.applicationUrl;
+    });
+    settings.main.applicationUrl = 'https://seerr.example.com';
+    const provider = (id: string, enabled: boolean) => ({
+      id,
+      name: id,
+      issuerUrl: `https://${id}.example.com`,
+      clientId: 'c',
+      clientSecret: 's',
+      logoUrl: '',
+      scopes: 'openid',
+      enabled,
+      newUserSignUp: false,
+      requiredClaims: [],
+    });
+    settings.oidc = {
+      providers: [provider('on-sso', true), provider('off-sso', false)],
+    };
+    connectJellyfin();
+    const users = getRepository(User);
+    await users.update(1, { jellyfinUserId: ADMIN_ID });
+    // Jellyfin only, no password, but a provider that is on: unaffected.
+    const withSso = await users.save(
+      new User({
+        email: 'sso@seerr.dev',
+        userType: UserType.JELLYFIN,
+        jellyfinUserId: VIEWER_ID,
+        permissions: 0,
+        avatar: '',
+      })
+    );
+    // Jellyfin only, no password, a provider that is off: not at all.
+    const withOffSso = await users.save(
+      new User({
+        email: 'off@seerr.dev',
+        userType: UserType.JELLYFIN,
+        jellyfinUserId: OFF_ADMIN_ID,
+        permissions: 0,
+        avatar: '',
+      })
+    );
+    await getRepository(OidcLink).save([
+      new OidcLink({ user: withSso, provider: 'on-sso', sub: 'a' }),
+      new OidcLink({ user: withOffSso, provider: 'off-sso', sub: 'b' }),
+    ]);
+
+    assert.deepEqual(
+      await (await api('/media-servers/jellyfin/removal')).json(),
+      { passwordOnly: 0, noSignIn: 1 }
+    );
+  });
+});
+
+describe('Match Check on a title page', () => {
+  afterEach(() => fs.rm(REPORT_PATH, { force: true }));
+
+  const report = (problems: PlexMatchProblem[]) => {
+    (plexMatchCheck as unknown as { report: unknown }).report = {
+      finishedAt: null,
+      running: false,
+      checked: problems.length,
+      notChecked: 0,
+      problems,
+    };
+  };
+  const matchedTo = (
+    mediaServer: PlexMatchProblem['mediaServer'],
+    key: string
+  ): PlexMatchProblem => ({
+    kind: 'movie',
+    folder: `/films/${mediaServer}`,
+    expected: { title: 'Another Film', tmdbId: 999, server: 'Radarr' },
+    mediaServer,
+    matched: { title: 'Not This One', key },
+    reason: 'other',
+  });
+  const problemsFor = async (tmdbId: number, key: string) =>
+    (
+      (await (
+        await api(
+          `/plex-match-check/title?mediaType=movie&tmdbId=${tmdbId}&key=${key}`
+        )
+      ).json()) as { problems: PlexMatchProblem[] }
+    ).problems.map((p) => `${p.mediaServer} ${p.matched.key}`);
+
+  it("shows only problems with this title's own id on each server", async () => {
+    connectJellyfin();
+    getSettings().emby = { ...getSettings().jellyfin, connected: true };
+    // Emby and Plex number their items alike: Emby's 555 is another film.
+    report([matchedTo('Emby', '555'), matchedTo('Plex', '555')]);
+    await getRepository(Media).save([
+      new Media({
+        tmdbId: 501,
+        mediaType: MediaType.MOVIE,
+        status: MediaStatus.AVAILABLE,
+        ratingKey: '555',
+      }),
+      new Media({
+        tmdbId: 502,
+        mediaType: MediaType.MOVIE,
+        status: MediaStatus.AVAILABLE,
+        embyMediaId: '555',
+      }),
+    ]);
+
+    assert.deepEqual(await problemsFor(501, '555'), ['Plex 555']);
+    assert.deepEqual(await problemsFor(502, '555'), ['Emby 555']);
   });
 });
 

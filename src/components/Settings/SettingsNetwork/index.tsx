@@ -3,12 +3,17 @@ import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import Tooltip from '@app/components/Common/Tooltip';
 import SettingsBadge from '@app/components/Settings/SettingsBadge';
+import {
+  firstNonAddress,
+  proxyListFromText,
+  proxyListToText,
+} from '@app/components/Settings/SettingsNetwork/proxyList';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
 import type { NetworkSettings } from '@server/lib/settings';
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 import { Field, Form, Formik } from 'formik';
 import { useIntl } from 'react-intl';
 import useSWR, { mutate } from 'swr';
@@ -26,8 +31,16 @@ const messages = defineMessages('components.Settings.SettingsNetwork', {
   csrfProtectionHoverTip:
     'Do NOT enable this setting unless you understand what you are doing!',
   trustProxy: 'Enable Proxy Support',
-  trustProxyTip:
-    'Allow Seerr AI to correctly register client IP addresses behind a proxy',
+  trustProxyLocalTip:
+    'Take people’s addresses from a reverse proxy on this machine, your local network or Tailscale (such as Nginx, Caddy or Traefik in Docker). Proxies on public addresses are trusted only when you choose them below.',
+  trustCloudflare: 'Trust Cloudflare',
+  trustCloudflareTip:
+    'Turn on if Cloudflare’s proxy (the orange cloud) sits in front of your reverse proxy, so Seerr AI sees visitors’ real addresses.',
+  trustedProxies: 'Also Trust These Proxies',
+  trustedProxiesTip:
+    'Addresses or ranges of other proxies in front of Seerr AI, such as a reverse proxy on a rented server. Proxies on this machine, your local network and Tailscale are always trusted.',
+  validationTrustedProxy:
+    '{entry} is not an address or range, such as 203.0.113.5 or 203.0.113.0/24.',
   proxyEnabled: 'HTTP(S) Proxy',
   proxyEnabledTip:
     'Send ALL outgoing HTTP/HTTPS requests through a proxy server (host/port). Does NOT enable HTTPS, SSL, or certificate configuration.',
@@ -101,6 +114,20 @@ const SettingsNetwork = () => {
           .required(intl.formatMessage(messages.validationProxyPort)),
       otherwise: (schema) => schema.nullable(),
     }),
+    // Checked only while the field is shown, with Enable Proxy Support on.
+    trustedProxies: Yup.string().when('trustProxy', {
+      is: true,
+      then: (schema) =>
+        schema.test(
+          'addresses',
+          ({ value }) =>
+            intl.formatMessage(messages.validationTrustedProxy, {
+              entry: firstNonAddress(value),
+            }),
+          (value) => firstNonAddress(value) === undefined
+        ),
+      otherwise: (schema) => schema.nullable(),
+    }),
     apiRequestTimeout: Yup.number()
       .typeError(intl.formatMessage(messages.validationApiRequestTimeout))
       .required(intl.formatMessage(messages.validationApiRequestTimeout))
@@ -136,6 +163,8 @@ const SettingsNetwork = () => {
             dnsCacheForceMinTtl: data?.dnsCache.forceMinTtl,
             dnsCacheForceMaxTtl: data?.dnsCache.forceMaxTtl,
             trustProxy: data?.trustProxy,
+            trustCloudflare: data?.trustCloudflare,
+            trustedProxies: proxyListToText(data?.trustedProxies),
             proxyEnabled: data?.proxy?.enabled,
             proxyHostname: data?.proxy?.hostname,
             proxyPort: data?.proxy?.port,
@@ -151,12 +180,20 @@ const SettingsNetwork = () => {
           }}
           enableReinitialize
           validationSchema={NetworkSettingsSchema}
-          onSubmit={async (values) => {
+          onSubmit={async (values, { setFieldError }) => {
             try {
               await axios.post('/api/v1/settings/network', {
                 csrfProtection: values.csrfProtection,
                 forceIpv4First: values.forceIpv4First,
                 trustProxy: values.trustProxy,
+                // Only while they are shown: hidden, they are left as saved
+                // and can't stop the rest from saving.
+                ...(values.trustProxy
+                  ? {
+                      trustCloudflare: values.trustCloudflare,
+                      trustedProxies: proxyListFromText(values.trustedProxies),
+                    }
+                  : {}),
                 dnsCache: {
                   enabled: values.dnsCacheEnabled,
                   forceMinTtl: Number(values.dnsCacheForceMinTtl),
@@ -181,7 +218,21 @@ const SettingsNetwork = () => {
                 autoDismiss: true,
                 appearance: 'success',
               });
-            } catch {
+            } catch (e) {
+              // The server names an entry in Also Trust These Proxies that
+              // is not an address or range.
+              const invalidProxy = isAxiosError(e)
+                ? (e.response?.data as { invalidProxy?: string } | undefined)
+                    ?.invalidProxy
+                : undefined;
+              if (invalidProxy !== undefined) {
+                setFieldError(
+                  'trustedProxies',
+                  intl.formatMessage(messages.validationTrustedProxy, {
+                    entry: invalidProxy,
+                  })
+                );
+              }
               addToast(intl.formatMessage(messages.toastSettingsFailure), {
                 autoDismiss: true,
                 appearance: 'error',
@@ -208,7 +259,7 @@ const SettingsNetwork = () => {
                     </span>
                     <SettingsBadge badgeType="restartRequired" />
                     <span className="label-tip">
-                      {intl.formatMessage(messages.trustProxyTip)}
+                      {intl.formatMessage(messages.trustProxyLocalTip)}
                     </span>
                   </label>
                   <div className="form-input-area">
@@ -222,6 +273,63 @@ const SettingsNetwork = () => {
                     />
                   </div>
                 </div>
+                {values.trustProxy && (
+                  <div className="ml-4 mr-2">
+                    <div className="form-row">
+                      <label
+                        htmlFor="trustCloudflare"
+                        className="checkbox-label"
+                      >
+                        <span className="mr-2">
+                          {intl.formatMessage(messages.trustCloudflare)}
+                        </span>
+                        <SettingsBadge badgeType="restartRequired" />
+                        <span className="label-tip">
+                          {intl.formatMessage(messages.trustCloudflareTip)}
+                        </span>
+                      </label>
+                      <div className="form-input-area">
+                        <Field
+                          type="checkbox"
+                          id="trustCloudflare"
+                          name="trustCloudflare"
+                          onChange={() => {
+                            setFieldValue(
+                              'trustCloudflare',
+                              !values.trustCloudflare
+                            );
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-row">
+                      <label htmlFor="trustedProxies" className="text-label">
+                        <span className="mr-2">
+                          {intl.formatMessage(messages.trustedProxies)}
+                        </span>
+                        <SettingsBadge badgeType="restartRequired" />
+                        <span className="label-tip">
+                          {intl.formatMessage(messages.trustedProxiesTip)}
+                        </span>
+                      </label>
+                      <div className="form-input-area">
+                        <div className="form-input-field">
+                          <Field
+                            id="trustedProxies"
+                            name="trustedProxies"
+                            type="text"
+                            placeholder="203.0.113.5, 198.51.100.0/24"
+                          />
+                        </div>
+                        {errors.trustedProxies &&
+                          touched.trustedProxies &&
+                          typeof errors.trustedProxies === 'string' && (
+                            <div className="error">{errors.trustedProxies}</div>
+                          )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="form-row">
                   <label htmlFor="csrfProtection" className="checkbox-label">
                     <span className="mr-2">

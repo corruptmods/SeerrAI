@@ -1,8 +1,8 @@
 import TitleCard from '@app/components/TitleCard';
+import useNearScreen, { useLoadWhenNear } from '@app/hooks/useNearScreen';
 import { Permission, useUser } from '@app/hooks/useUser';
 import type { MovieDetails } from '@server/models/Movie';
 import type { TvDetails } from '@server/models/Tv';
-import { useInView } from 'react-intersection-observer';
 import useSWR from 'swr';
 
 export interface TmdbTitleCardProps {
@@ -30,14 +30,13 @@ const TmdbTitleCard = ({
 }: TmdbTitleCardProps) => {
   const { hasPermission } = useUser();
 
-  const { ref, inView } = useInView({
-    triggerOnce: true,
-  });
+  // The title loads once the card is near the screen, so it is ready (and
+  // its poster with it) by the time it is scrolled to.
+  const { ref, near } = useNearScreen();
   const url =
     type === 'movie' ? `/api/v1/movie/${tmdbId}` : `/api/v1/tv/${tmdbId}`;
-  const { data: title, error } = useSWR<MovieDetails | TvDetails>(
-    inView ? `${url}` : null
-  );
+  const titleKey = useLoadWhenNear(url, near);
+  const { data: title, error } = useSWR<MovieDetails | TvDetails>(titleKey);
 
   if (!title && !error) {
     return (
@@ -66,6 +65,7 @@ const TmdbTitleCard = ({
         title.mediaInfo?.watchlists?.length || isAddedToWatchlist
       }
       image={title.posterPath}
+      backdrop={title.backdropPath}
       status={title.mediaInfo?.status}
       summary={title.overview}
       title={title.title}
@@ -83,6 +83,7 @@ const TmdbTitleCard = ({
         title.mediaInfo?.watchlists?.length || isAddedToWatchlist
       }
       image={title.posterPath}
+      backdrop={title.backdropPath}
       status={title.mediaInfo?.status}
       summary={title.overview}
       title={title.name}

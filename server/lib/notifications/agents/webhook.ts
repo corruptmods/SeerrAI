@@ -91,6 +91,37 @@ export const KeyMap: Record<string, string | KeyMapFunction> = {
   commentedBy_settings_telegramChatId: 'comment.user.settings.telegramChatId',
 };
 
+/** A variable in a webhook's address or payload, such as {{subject}}. */
+const VARIABLE = /\{\{(\w+)\}\}/g;
+
+/** A variable's value for this notification, as text; '' when it has none. */
+const variableValue = (
+  key: string,
+  payload: NotificationPayload,
+  type: Notification
+): string => {
+  const keymapValue = KeyMap[key];
+  const value =
+    typeof keymapValue === 'function'
+      ? keymapValue(payload, type)
+      : get(payload, keymapValue);
+  return value == null ? '' : String(value);
+};
+
+/**
+ * Fills a template's variables in one pass over the template as written:
+ * every copy of each is filled, and a value goes in exactly as it is, so a
+ * "$" in it or a "{{…}}" someone typed into an issue is never read as part
+ * of the template. Anything in braces that is not a variable is left be.
+ */
+const fillVariables = (
+  template: string,
+  valueOf: (key: string) => string
+): string =>
+  template.replace(VARIABLE, (variable, key: string) =>
+    Object.hasOwn(KeyMap, key) ? valueOf(key) : variable
+  );
+
 class WebhookAgent
   extends BaseAgent<NotificationAgentWebhook>
   implements NotificationAgent
@@ -150,15 +181,9 @@ class WebhookAgent
       }
 
       if (typeof finalPayload[key] === 'string') {
-        Object.keys(KeyMap).forEach((keymapKey) => {
-          const keymapValue = KeyMap[keymapKey as keyof typeof KeyMap];
-          finalPayload[key] = (finalPayload[key] as string).replace(
-            `{{${keymapKey}}}`,
-            typeof keymapValue === 'function'
-              ? keymapValue(payload, type)
-              : (get(payload, keymapValue) ?? '')
-          );
-        });
+        finalPayload[key] = fillVariables(finalPayload[key] as string, (k) =>
+          variableValue(k, payload, type)
+        );
       } else if (finalPayload[key] && typeof finalPayload[key] === 'object') {
         finalPayload[key] = this.parseKeys(
           finalPayload[key] as Record<string, unknown>,
@@ -213,20 +238,17 @@ class WebhookAgent
 
     let webhookUrl = settings.options.webhookUrl;
 
+    // The test notification has no title or request behind it, so its
+    // address is filled with "test"; a real one gets each value, or nothing
+    // (a music title's TMDB id stays 0).
     if (settings.options.supportVariables) {
-      Object.keys(KeyMap).forEach((keymapKey) => {
-        const keymapValue = KeyMap[keymapKey as keyof typeof KeyMap];
-        const variableValue =
+      webhookUrl = fillVariables(webhookUrl, (key) =>
+        encodeURIComponent(
           type === Notification.TEST_NOTIFICATION
             ? 'test'
-            : typeof keymapValue === 'function'
-              ? keymapValue(payload, type)
-              : get(payload, keymapValue) || 'test';
-        webhookUrl = webhookUrl.replace(
-          new RegExp(`{{${keymapKey}}}`, 'g'),
-          encodeURIComponent(variableValue)
-        );
-      });
+            : variableValue(key, payload, type)
+        )
+      );
     }
 
     try {

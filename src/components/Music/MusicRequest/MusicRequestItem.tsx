@@ -14,6 +14,7 @@ import {
   useMusicRequest,
 } from '@app/components/Music/MusicRequest/shared';
 import RequestModal from '@app/components/RequestModal';
+import useNearScreen, { NearScreen, bothRefs } from '@app/hooks/useNearScreen';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -28,7 +29,7 @@ import { MediaRequestStatus } from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { NonFunctionProperties } from '@server/interfaces/api/common';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
 import { FormattedRelativeTime, useIntl } from 'react-intl';
 
@@ -89,7 +90,11 @@ const MusicRequestItem = ({
 }: MusicRequestItemProps) => {
   const intl = useIntl();
   const { user, hasPermission } = useUser();
-  const { ref, inView } = useInView();
+  // On screen now, for checking on the request; near the screen, for
+  // loading its picture before it is scrolled to.
+  const { ref: viewRef, inView } = useInView();
+  const { ref: nearRef, nearness } = useNearScreen();
+  const ref = useMemo(() => bothRefs(viewRef, nearRef), [viewRef, nearRef]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const {
@@ -154,13 +159,15 @@ const MusicRequestItem = ({
                 className="relative w-full"
                 style={{ paddingBottom: '100%' }}
               >
-                <MusicImage
-                  src={musicRequestImage(requestData)}
-                  fallback={
-                    requestData.albums?.length === 1 ? 'album' : 'artist'
-                  }
-                  sizes="3rem"
-                />
+                <NearScreen.Provider value={nearness}>
+                  <MusicImage
+                    src={musicRequestImage(requestData)}
+                    fallback={
+                      requestData.albums?.length === 1 ? 'album' : 'artist'
+                    }
+                    sizes="3rem"
+                  />
+                </NearScreen.Provider>
               </div>
             </Link>
             <div className="flex flex-col justify-center overflow-hidden pl-2 xl:pl-4">

@@ -541,7 +541,7 @@ const SettingsPlex = ({ isSetupSettings }: SettingsPlexProps) => {
                       inputMode="url"
                       id="webAppUrl"
                       name="webAppUrl"
-                      placeholder="https://your-server-fqdn.com/web/index.html"
+                      placeholder="https://plex.example.com/web/index.html"
                     />
                   </div>
                   {errors.webAppUrl &&

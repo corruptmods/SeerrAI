@@ -6,6 +6,7 @@ import {
   artistImageUrl,
   musicRequestStatus,
 } from '@app/components/Music/musicHelpers';
+import useRequestAction from '@app/hooks/useRequestAction';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -208,11 +209,13 @@ export const useMusicRequest = (request: Request, inView: boolean) => {
     }
   };
 
-  const remove = async () => {
-    await axios.delete(`/api/v1/request/${request.id}`);
-    mutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');
-    mutate('/api/v1/request/count');
-  };
+  const { run } = useRequestAction();
+  const remove = () =>
+    run(async () => {
+      await axios.delete(`/api/v1/request/${request.id}`);
+      mutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');
+      mutate('/api/v1/request/count');
+    }, messages.failedmodify);
 
   return {
     requestData: requestData ?? request,

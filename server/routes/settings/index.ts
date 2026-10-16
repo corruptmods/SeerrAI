@@ -49,6 +49,7 @@ import discoverSettingRoutes from '@server/routes/settings/discover';
 import { appDataPath } from '@server/utils/appDataVolume';
 import { getAppVersion } from '@server/utils/appVersion';
 import { dnsCache } from '@server/utils/dnsCache';
+import { isProxyAddress } from '@server/utils/trustedProxies';
 import type { DnsEntries, DnsStats } from 'dns-caching';
 import { Router } from 'express';
 import fs from 'fs';
@@ -216,8 +217,30 @@ settingsRoutes.get('/network', (req, res) => {
 
 settingsRoutes.post('/network', async (req, res) => {
   const settings = getSettings();
+  const { trustedProxies: asked, ...rest } = req.body as {
+    trustedProxies?: string[];
+  };
 
-  settings.network = merge(settings.network, req.body);
+  // Also Trust These Proxies: kept as entered, each checked the way Express
+  // will read it when the server starts, so a typo can't keep it from
+  // starting or quietly trust nothing.
+  const trustedProxies = asked
+    ?.map((entry) => entry.trim())
+    .filter((entry) => entry !== '');
+  const invalidProxy = trustedProxies?.find((entry) => !isProxyAddress(entry));
+  if (invalidProxy !== undefined) {
+    return res.status(400).json({
+      message: `"${invalidProxy}" is not an address or range, such as 203.0.113.5 or 203.0.113.0/24.`,
+      invalidProxy,
+    });
+  }
+
+  settings.network = merge(settings.network, rest);
+  // The whole list, set rather than merged: a merge keeps the entries past
+  // the end of a shorter list.
+  if (trustedProxies) {
+    settings.network.trustedProxies = trustedProxies;
+  }
   await settings.save();
 
   return res.status(200).json(settings.network);
@@ -782,12 +805,14 @@ settingsRoutes.get<
         })
       )
     : [];
+  // The id the page passed says nothing of which server it is on, so it is
+  // only used when Seerr does not have the title (as a Plex rating key).
   const problems = await plexMatchCheck.problemFor(
     req.query.mediaType === 'tv' ? 'series' : 'movie',
     {
       tmdbId,
       tvdbId: req.query.tvdbId ? Number(req.query.tvdbId) : undefined,
-      key: req.query.key,
+      key: media ? undefined : req.query.key,
       keys,
     }
   );

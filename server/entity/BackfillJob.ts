@@ -38,7 +38,43 @@ export interface BackfillLogLine {
   at: string;
   kind: 'info' | 'ok' | 'warn' | 'error';
   message: string;
+  /**
+   * The same line again and again (a try that keeps failing alike) is
+   * written once: how many times it came, and when it came last.
+   */
+  count?: number;
+  lastAt?: string;
 }
+
+/**
+ * The indexer a job's release comes from has reached its download limit:
+ * since when the job has waited on it, and when it is asked again.
+ */
+export interface BackfillIndexerWait {
+  indexer: string;
+  indexerId: number | null;
+  since: string;
+  until: string;
+  /** Limits in a row, each wait longer than the last. */
+  strikes: number;
+}
+
+/**
+ * What became of a failed download: another took its place (replacedById),
+ * Backfill is searching for one, the admin agent is looking (agentRunId),
+ * Backfill offered the next pack (or the same one again) to an admin,
+ * nothing else was found, or the agent stopped looking: after three failed
+ * replacements in a day, or with its downloads for the day used up.
+ */
+export type BackfillFollowUp =
+  | 'replaced'
+  | 'searching'
+  | 'agent'
+  | 'offered'
+  | 'offeredAgain'
+  | 'none'
+  | 'gaveUp'
+  | 'limit';
 
 /** An approved pack being downloaded and imported. */
 @Entity()
@@ -124,11 +160,27 @@ export class BackfillJob {
   @Column({ type: 'text', nullable: true })
   public error: string | null;
 
+  /** While waiting out its indexer's download limit; kept over restarts. */
+  @Column({ type: 'simple-json', nullable: true })
+  public indexerWait: BackfillIndexerWait | null;
+
   @Column({ type: 'integer', nullable: true })
   public approvedById: number | null;
 
   @Column({ type: 'varchar', nullable: true })
   public approvedByName: string | null;
+
+  /** The admin agent's conversation that started it, if it did. */
+  @Column({ type: 'integer', nullable: true })
+  public agentRunId: number | null;
+
+  /** Once failed: what became of it. */
+  @Column({ type: 'varchar', nullable: true })
+  public followUp: BackfillFollowUp | null;
+
+  /** Once failed: the download that took its place. */
+  @Column({ type: 'integer', nullable: true })
+  public replacedById: number | null;
 
   @DbAwareColumn({ type: 'datetime', nullable: true })
   public startedAt: Date | null;

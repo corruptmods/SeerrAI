@@ -1,5 +1,5 @@
 import type { MediaType } from '@server/constants/media';
-import { DbAwareColumn } from '@server/utils/DbColumnHelper';
+import { DbAwareColumn, resolveDbType } from '@server/utils/DbColumnHelper';
 import {
   Column,
   CreateDateColumn,
@@ -33,7 +33,7 @@ export class MediaDeletion {
   @DbAwareColumn({ type: 'datetime' })
   public deletedAt: Date;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: resolveDbType('datetime') })
   public createdAt: Date;
 
   constructor(init?: Partial<MediaDeletion>) {

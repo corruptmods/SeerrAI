@@ -349,6 +349,75 @@ describe('search', () => {
     ]);
   });
 
+  it('shows as many artists and albums as an admin chose', async () => {
+    getSettings().music.search = {
+      ...musicDefaults().search,
+      artists: 3,
+      albums: 20,
+    };
+    const searchArtists = mock.method(
+      MusicBrainz.prototype,
+      'searchArtists',
+      async () => ({ count: 0, offset: 0, artists: [] })
+    );
+    const searchAlbums = mock.method(
+      MusicBrainz.prototype,
+      'searchReleaseGroups',
+      async () => ({ count: 0, offset: 0, 'release-groups': [] })
+    );
+    assert.equal((await get('/music/search?query=radiohead')).status, 200);
+    assert.deepEqual(searchArtists.mock.calls[0].arguments[1], { limit: 3 });
+    assert.deepEqual(searchAlbums.mock.calls[0].arguments[1], { limit: 20 });
+  });
+
+  it('is refused when an admin left nowhere to search music', async () => {
+    const searchArtists = mock.method(
+      MusicBrainz.prototype,
+      'searchArtists',
+      async () => ({ count: 0, offset: 0, artists: [] })
+    );
+    mock.method(MusicBrainz.prototype, 'searchReleaseGroups', async () => ({
+      count: 0,
+      offset: 0,
+      'release-groups': [],
+    }));
+    const nowhere = {
+      ...musicDefaults().search,
+      inAll: false,
+      musicPage: false,
+      chip: false,
+    };
+    getSettings().music.search = nowhere;
+    const { status, body } = await get('/music/search?query=radiohead');
+    assert.equal(status, 403);
+    assert.equal(
+      (body as { message: string }).message,
+      'Music search is turned off.'
+    );
+    assert.equal(searchArtists.mock.callCount(), 0);
+
+    // Any one place is enough.
+    for (const place of ['inAll', 'musicPage', 'chip'] as const) {
+      getSettings().music.search = { ...nowhere, [place]: true };
+      assert.equal(
+        (await get('/music/search?query=radiohead')).status,
+        200,
+        place
+      );
+    }
+  });
+
+  it('is still refused to someone with music off for themselves', async () => {
+    getSettings().music.search = {
+      ...musicDefaults().search,
+      inAll: true,
+    };
+    actingAs = Object.assign(new User(), friend, {
+      settings: { disabledFeatures: ['music'] },
+    });
+    assert.equal((await get('/music/search?query=radiohead')).status, 403);
+  });
+
   it('says MusicBrainz is busy rather than keep someone waiting', async () => {
     mock.method(MusicBrainz.prototype, 'searchArtists', async () => {
       throw new MusicBrainzBusyError();

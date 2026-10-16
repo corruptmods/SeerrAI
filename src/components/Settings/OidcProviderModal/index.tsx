@@ -1,3 +1,5 @@
+import Alert from '@app/components/Common/Alert';
+import Button from '@app/components/Common/Button';
 import Modal from '@app/components/Common/Modal';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import CopyButton from '@app/components/Settings/CopyButton';
@@ -5,13 +7,17 @@ import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
+import { PlusIcon, TrashIcon } from '@heroicons/react/24/solid';
+import type { OidcProblem, OidcProblemCode } from '@server/constants/oidc';
 import {
   DEFAULT_OIDC_SCOPES,
+  normalizeIssuer,
   oidcCallbackUrl,
   oidcProviderId,
 } from '@server/constants/oidc';
 import type { OidcProviderSettings } from '@server/lib/settings';
 import axios, { isAxiosError } from 'axios';
+import type { FormikErrors } from 'formik';
 import { Field, Formik } from 'formik';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
@@ -32,8 +38,10 @@ const messages = defineMessages('components.Settings.OidcProviderModal', {
   issuerUrl: 'Issuer URL',
   issuerUrlTip:
     'Exactly as the provider shows it, a slash at the end included or not. For example https://auth.example.com/application/o/seerr/ (Authentik), https://auth.example.com (Authelia), https://sso.example.com/realms/home (Keycloak), https://accounts.google.com.',
-  issuerUrlLinked:
-    'People who linked this provider stay linked to it. To use a different provider, add it as a new one instead.',
+  issuerUrlEdit:
+    'Changing it means a different provider: links people made to this one stop working, and they have to link it again. To add a different provider, add it as a new one instead.',
+  issuerUrlChanged:
+    'With a new issuer URL, everyone’s links to this provider stop working. Each person has to sign in another way and link it again in their profile.',
   clientId: 'Client ID',
   clientSecret: 'Client Secret',
   clientSecretTip: 'Make the client "confidential" in the provider.',
@@ -49,6 +57,15 @@ const messages = defineMessages('components.Settings.OidcProviderModal', {
   newUserSignUp: 'Let New People Sign Up',
   newUserSignUpTip:
     'Someone who signs in with this provider and has no account here gets one, with the default permissions. When off, only people who have linked this provider in their profile can sign in with it.',
+  whoCanSignIn: 'Who Can Sign In',
+  whoCanSignInTip:
+    'Leave empty to let anyone with an account on {provider} in. Add a rule to only let in people whose login says so, for example the claim <code>groups</code> containing <code>seerr-users</code>.',
+  claim: 'Claim',
+  value: 'Value',
+  addRule: 'Add Rule',
+  removeRule: 'Remove Rule',
+  validationClaim: 'Enter a claim name',
+  validationClaimSpaces: 'A claim name has no spaces',
   toastTestSuccess: 'Found {issuer}.',
   toastTestFailure: 'Could not use this provider: {reason}',
   noAnswer: 'it did not answer.',
@@ -58,7 +75,52 @@ const messages = defineMessages('components.Settings.OidcProviderModal', {
   validationClientSecret: 'Enter the client secret',
   validationLogoUrl:
     'Enter an address starting with https://, or leave it blank',
+  problemCheckDetails: 'Check the provider details.',
+  problemIssuerUrl: 'Enter the issuer URL, starting with https://.',
+  problemIssuerQuery: 'The issuer URL cannot have a ? or # part.',
+  problemIssuerHttps: 'The issuer URL must start with https://.',
+  problemClientSecret: 'Enter the client secret.',
+  problemLogoUrl:
+    'The logo must be an address starting with https://, or left blank.',
+  problemClaimName: 'Each rule needs a claim name, without spaces.',
+  problemTimeout: '{host} did not answer within {seconds} seconds.',
+  problemIssuerMismatch:
+    'The provider gives its issuer URL as {issuer}. Enter exactly that (a slash at the end counts).',
+  problemIssuerMismatchUnsaid:
+    'The provider gives a different issuer URL. Enter it exactly as the provider shows it.',
+  problemNoDiscovery:
+    'No sign-in details were found at that address (it answered {status}). Check the issuer URL: Seerr AI reads /.well-known/openid-configuration under it.',
+  problemNoDiscoveryUnsaid:
+    'No sign-in details were found at that address. Check the issuer URL: Seerr AI reads /.well-known/openid-configuration under it.',
+  problemNotDiscovery:
+    'That address answered, but not with sign-in details. Check the issuer URL.',
+  problemHostNotFound: '{host} could not be found. Check the issuer URL.',
+  problemRefused: 'Nothing answered at {host}.',
+  problemCertificate: 'The certificate of {host} is not trusted ({reason}).',
+  problemUnreachable: 'Could not reach {host}.',
 });
+
+/** Each problem the server can name, in the admin's language. */
+const PROBLEM_MESSAGES: Record<
+  OidcProblemCode,
+  { id: string; defaultMessage: string }
+> = {
+  'check-details': messages.problemCheckDetails,
+  'issuer-url': messages.problemIssuerUrl,
+  'issuer-query': messages.problemIssuerQuery,
+  'issuer-https': messages.problemIssuerHttps,
+  'client-secret': messages.problemClientSecret,
+  'logo-url': messages.problemLogoUrl,
+  'claim-name': messages.problemClaimName,
+  timeout: messages.problemTimeout,
+  'issuer-mismatch': messages.problemIssuerMismatch,
+  'no-discovery': messages.problemNoDiscovery,
+  'not-discovery': messages.problemNotDiscovery,
+  'host-not-found': messages.problemHostNotFound,
+  refused: messages.problemRefused,
+  certificate: messages.problemCertificate,
+  unreachable: messages.problemUnreachable,
+};
 
 /** As the settings page is sent it: no secret, only that one is saved. */
 export type ShownOidcProvider = OidcProviderSettings & {
@@ -86,6 +148,13 @@ interface FormValues {
   scopes: string;
   enabled: boolean;
   newUserSignUp: boolean;
+  /** Who may sign in; a blank value means the claim must be true. */
+  requiredClaims: RuleValues[];
+}
+
+interface RuleValues {
+  claim: string;
+  value: string;
 }
 
 const OidcProviderModal = ({
@@ -132,6 +201,15 @@ const OidcProviderModal = ({
         /^(https:\/\/[^\s]+|\/[^/\\\s][^\s]*)?$/,
         intl.formatMessage(messages.validationLogoUrl)
       ),
+    requiredClaims: Yup.array().of(
+      Yup.object().shape({
+        claim: Yup.string()
+          .trim()
+          .required(intl.formatMessage(messages.validationClaim))
+          .matches(/^\S+$/, intl.formatMessage(messages.validationClaimSpaces)),
+        value: Yup.string(),
+      })
+    ),
   });
 
   const toBody = (values: FormValues) => ({
@@ -143,11 +221,34 @@ const OidcProviderModal = ({
     scopes: values.scopes.trim(),
     enabled: values.enabled,
     newUserSignUp: values.newUserSignUp,
+    requiredClaims: values.requiredClaims.map((rule) => {
+      const claim = rule.claim.trim();
+      const value = rule.value.trim();
+      return value ? { claim, value } : { claim };
+    }),
   });
 
-  const reasonOf = (e: unknown) =>
-    (isAxiosError(e) && (e.response?.data as { message?: string })?.message) ||
-    intl.formatMessage(messages.noAnswer);
+  // What the server said was wrong: by its code where there is one, in
+  // the admin's language; else its own words.
+  const reasonOf = (e: unknown) => {
+    const data = isAxiosError(e)
+      ? (e.response?.data as
+          | (Partial<OidcProblem> & { message?: string })
+          | undefined)
+      : undefined;
+    const problem = data?.problem;
+    const params = data?.params ?? {};
+    if (problem && Object.hasOwn(PROBLEM_MESSAGES, problem)) {
+      const message =
+        problem === 'issuer-mismatch' && params.issuer === undefined
+          ? messages.problemIssuerMismatchUnsaid
+          : problem === 'no-discovery' && params.status === undefined
+            ? messages.problemNoDiscoveryUnsaid
+            : PROBLEM_MESSAGES[problem];
+      return intl.formatMessage(message, params);
+    }
+    return data?.message || intl.formatMessage(messages.noAnswer);
+  };
 
   const test = async (values: FormValues) => {
     setIsTesting(true);
@@ -207,6 +308,10 @@ const OidcProviderModal = ({
           scopes: provider?.scopes ?? DEFAULT_OIDC_SCOPES,
           enabled: provider?.enabled ?? true,
           newUserSignUp: provider?.newUserSignUp ?? false,
+          requiredClaims: (provider?.requiredClaims ?? []).map((rule) => ({
+            claim: rule.claim,
+            value: rule.value ?? '',
+          })),
         }}
         validationSchema={schema}
         onSubmit={async (values) => {
@@ -240,6 +345,18 @@ const OidcProviderModal = ({
           isValid,
         }) => {
           const redirectUrl = redirectUrlFor(values.name);
+          // One rule's claim error, shown straight away: an empty rule
+          // keeps Save from being pressed, and has to say why.
+          const ruleError = (index: number) =>
+            (errors.requiredClaims as FormikErrors<RuleValues>[] | undefined)?.[
+              index
+            ]?.claim;
+          // Saved with another issuer URL than it has now.
+          const issuerChanged =
+            !!provider &&
+            !!values.issuerUrl.trim() &&
+            normalizeIssuer(values.issuerUrl) !==
+              normalizeIssuer(provider.issuerUrl);
           return (
             <Modal
               onCancel={onClose}
@@ -328,7 +445,7 @@ const OidcProviderModal = ({
                     <span className="label-tip">
                       {intl.formatMessage(
                         provider
-                          ? messages.issuerUrlLinked
+                          ? messages.issuerUrlEdit
                           : messages.issuerUrlTip
                       )}
                     </span>
@@ -345,6 +462,14 @@ const OidcProviderModal = ({
                     </div>
                     {errors.issuerUrl && touched.issuerUrl && (
                       <div className="error">{errors.issuerUrl}</div>
+                    )}
+                    {issuerChanged && (
+                      <div className="mt-2">
+                        <Alert
+                          type="warning"
+                          title={intl.formatMessage(messages.issuerUrlChanged)}
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
@@ -461,6 +586,102 @@ const OidcProviderModal = ({
                         setFieldValue('newUserSignUp', !values.newUserSignUp)
                       }
                     />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <span id="requiredClaims" className="text-label">
+                    {intl.formatMessage(messages.whoCanSignIn)}
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.whoCanSignInTip, {
+                        provider: values.name.trim() || 'Authentik',
+                        code: (chunks: React.ReactNode) => (
+                          <code>{chunks}</code>
+                        ),
+                      })}
+                    </span>
+                  </span>
+                  <div
+                    className="form-input-area space-y-2"
+                    role="group"
+                    aria-labelledby="requiredClaims"
+                  >
+                    {values.requiredClaims.length > 0 && (
+                      <div
+                        className="flex gap-2 text-sm text-gray-400"
+                        aria-hidden
+                      >
+                        <span className="flex-1">
+                          {intl.formatMessage(messages.claim)}
+                        </span>
+                        <span className="flex-1">
+                          {intl.formatMessage(messages.value)}
+                        </span>
+                        {/* Room for the remove buttons below. */}
+                        <span className="w-10" />
+                      </div>
+                    )}
+                    {values.requiredClaims.map((_rule, index) => (
+                      <div key={index}>
+                        <div className="flex gap-2">
+                          <div className="form-input-field flex-1">
+                            <Field
+                              name={`requiredClaims.${index}.claim`}
+                              type="text"
+                              autoComplete="off"
+                              placeholder="groups"
+                              aria-label={intl.formatMessage(messages.claim)}
+                            />
+                          </div>
+                          <div className="form-input-field flex-1">
+                            <Field
+                              name={`requiredClaims.${index}.value`}
+                              type="text"
+                              autoComplete="off"
+                              placeholder="true"
+                              aria-label={intl.formatMessage(messages.value)}
+                            />
+                          </div>
+                          <div className="flex items-center">
+                            <Button
+                              buttonType="danger"
+                              buttonSize="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setFieldValue(
+                                  'requiredClaims',
+                                  values.requiredClaims.filter(
+                                    (_r, i) => i !== index
+                                  )
+                                );
+                              }}
+                              aria-label={intl.formatMessage(
+                                messages.removeRule
+                              )}
+                              title={intl.formatMessage(messages.removeRule)}
+                            >
+                              <TrashIcon />
+                            </Button>
+                          </div>
+                        </div>
+                        {ruleError(index) && (
+                          <div className="error">{ruleError(index)}</div>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      buttonType="default"
+                      buttonSize="sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setFieldValue('requiredClaims', [
+                          ...values.requiredClaims,
+                          { claim: '', value: '' },
+                        ]);
+                      }}
+                    >
+                      <PlusIcon />
+                      <span>{intl.formatMessage(messages.addRule)}</span>
+                    </Button>
                   </div>
                 </div>
               </div>

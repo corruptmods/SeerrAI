@@ -80,6 +80,11 @@ export interface PublicSettingsResponse {
   traktReady: boolean;
   /** Lidarr is set up and music is not turned off for everyone. */
   musicReady: boolean;
+  /**
+   * Where music can be searched (Settings → Music): below films and series
+   * in All, on the Music page, and as its own kind on the search page.
+   */
+  musicSearch: { inAll: boolean; musicPage: boolean; chip: boolean };
 }
 
 export interface CacheItem {

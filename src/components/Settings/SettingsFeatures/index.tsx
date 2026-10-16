@@ -21,9 +21,13 @@ const messages = defineMessages('components.Settings.SettingsFeatures', {
   failed: 'Something went wrong while saving.',
 });
 
-const SettingsFeatures = () => {
+/**
+ * The features turned off for everyone, and a change to one, saved at once.
+ * Settings → Features and Settings → Music share it, so the Music switch is
+ * the one setting in both places.
+ */
+export const useFeaturesForEveryone = () => {
   const intl = useIntl();
-  const { currentSettings } = useSettings();
   const { addToast } = useToasts();
   const { mutate: globalMutate } = useSWRConfig();
   const { data, mutate } = useSWR<{ disabled: string[] }>(
@@ -64,6 +68,14 @@ const SettingsFeatures = () => {
     }
   };
 
+  return { disabled: data?.disabled, saving, change };
+};
+
+const SettingsFeatures = () => {
+  const intl = useIntl();
+  const { currentSettings } = useSettings();
+  const { disabled, saving, change } = useFeaturesForEveryone();
+
   return (
     <>
       <PageTitle
@@ -78,16 +90,16 @@ const SettingsFeatures = () => {
           {intl.formatMessage(messages.description)}
         </p>
       </div>
-      {data ? (
+      {disabled ? (
         <div className="section">
           <FeatureSwitches
-            disabled={data.disabled}
+            disabled={disabled}
             saving={saving}
             aiReady={currentSettings.aiReady}
             // Turned off for everyone, music is not "ready", but its switch
             // has to stay here to turn it back on.
             musicReady={
-              currentSettings.musicReady || data.disabled.includes('music')
+              currentSettings.musicReady || disabled.includes('music')
             }
             onChange={change}
           />

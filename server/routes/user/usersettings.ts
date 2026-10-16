@@ -37,10 +37,11 @@ import {
   isConnected,
   isJellyfinFamily,
   jellyfinAccountColumns,
+  jellyfinFamily,
   primaryServer,
   serverName,
 } from '@server/lib/mediaServers';
-import { usableProvider, usableProviderLinks } from '@server/lib/oidc';
+import { linkUsable, usableProviderLinks } from '@server/lib/oidc';
 import { passkeySummary } from '@server/lib/passkeys';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
@@ -462,6 +463,21 @@ const unlinkAccount = async (
       },
     };
   }
+  // A Jellyfin or Emby server with no account of its own chosen for Seerr
+  // is read as the owner's (jellyfinAdmin): without it, its scans fail.
+  if (
+    user.id === 1 &&
+    isJellyfinFamily(kind) &&
+    isConnected(kind) &&
+    !jellyfinFamily(kind).adminUserId
+  ) {
+    return {
+      status: 400,
+      body: {
+        message: `The owner's ${serverName(kind)} account cannot be unlinked while Seerr reads ${serverName(kind)} as it. Reconnect ${serverName(kind)} in Settings → Media Servers with another administrator first.`,
+      },
+    };
+  }
 
   const others = connectedServers().filter(
     (other) => other !== kind && !!user[USER_ID[other]]
@@ -735,7 +751,8 @@ userSettingsRoutes.delete<{ id: string }>(
 /*
  * Single sign-on links. Made by signing in at the provider (see
  * routes/oidc.ts); listed and removed here. A provider that is switched off
- * or removed keeps its links, shown as not available.
+ * or removed keeps its links, shown as not available, as are links made
+ * before its issuer URL changed.
  */
 userSettingsRoutes.get<{ id: string }>(
   '/linked-accounts/oidc',
@@ -755,7 +772,7 @@ userSettingsRoutes.get<{ id: string }>(
           name: provider?.name ?? link.provider,
           logoUrl: provider?.logoUrl ?? '',
           username: link.username ?? null,
-          available: !!usableProvider(link.provider),
+          available: linkUsable(link),
         };
       })
     );
@@ -800,7 +817,7 @@ userSettingsRoutes.delete<{ id: string; providerId: string }>(
       (await usableProviderLinks(user.id)).some(
         (other) => other.id !== link.id
       );
-    if (usableProvider(link.provider) && !otherWayIn) {
+    if (linkUsable(link) && !otherWayIn) {
       return res.status(400).json({
         message:
           'Set a password first, or link another account: without one this person could not sign in.',

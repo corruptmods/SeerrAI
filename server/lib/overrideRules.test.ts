@@ -16,6 +16,8 @@ import { after, beforeEach, describe, it } from 'node:test';
 /*
  * Override rules that match on a title's age rating: read from TMDB for the
  * server's Discover region, or the US rating when the title has none there.
+ * And rules that name TMDB's anime keyword, which go by whether Seerr
+ * decides the title is anime rather than by the keyword itself.
  */
 
 setupTestDb();
@@ -25,12 +27,14 @@ const saved = {
   radarr: settings.radarr,
   sonarr: settings.sonarr,
   region: settings.main.discoverRegion,
+  leaveOut: settings.main.animeExcludedCountries,
 };
 
 after(() => {
   settings.radarr = saved.radarr;
   settings.sonarr = saved.sonarr;
   settings.main.discoverRegion = saved.region;
+  settings.main.animeExcludedCountries = saved.leaveOut;
 });
 
 /** A film rated as given, by country; an empty rating is TMDB's "none". */
@@ -84,6 +88,7 @@ const movieFolder = async (tmdbMedia: TmdbMovieDetails) =>
 
 beforeEach(async () => {
   settings.main.discoverRegion = '';
+  settings.main.animeExcludedCountries = [];
   settings.radarr = [{ id: 0, isDefault: true, is4k: false } as RadarrSettings];
   settings.sonarr = [{ id: 0, isDefault: true, is4k: false } as SonarrSettings];
   requester = await getRepository(User).findOneOrFail({
@@ -241,5 +246,147 @@ describe("a title's age rating", () => {
       certification: 'PG-13',
     });
     assert.equal(titleCertification(film({ DE: ['12'] }), 'FR'), undefined);
+  });
+});
+
+describe("an override rule naming TMDB's anime keyword", () => {
+  const ANIME_KEYWORD = { id: 210024, name: 'anime' };
+  const ANIMATION = { id: 16, name: 'Animation' };
+
+  /** A series as TMDB describes it. */
+  const show = (init: Partial<TmdbTvDetails>) =>
+    ({
+      id: 3,
+      genres: [],
+      original_language: 'en',
+      origin_country: ['US'],
+      keywords: { results: [] },
+      ...init,
+    }) as unknown as TmdbTvDetails;
+
+  const folderFor = async (
+    tmdbMedia: TmdbTvDetails,
+    animeSetting: boolean | null = null
+  ) =>
+    (
+      await overrideRules({
+        mediaType: MediaType.TV,
+        is4k: false,
+        tmdbMedia,
+        requestUser: requester,
+        serviceId: 0,
+        animeSetting,
+      })
+    ).rootFolder;
+
+  beforeEach(async () => {
+    await rule({
+      sonarrServiceId: 0,
+      keywords: '210024',
+      rootFolder: '/anime-rule',
+    });
+    await rule({
+      sonarrServiceId: 0,
+      genre: '16',
+      rootFolder: '/cartoons',
+    });
+  });
+
+  it('takes anime TMDB tags as anime', async () => {
+    assert.equal(
+      await folderFor(
+        show({
+          original_language: 'ja',
+          origin_country: ['JP'],
+          keywords: { results: [ANIME_KEYWORD] },
+        })
+      ),
+      '/anime-rule'
+    );
+  });
+
+  it('takes Japanese animation without the keyword as anime too', async () => {
+    assert.equal(
+      await folderFor(
+        show({
+          genres: [ANIMATION],
+          original_language: 'ja',
+          origin_country: ['JP'],
+        })
+      ),
+      '/anime-rule'
+    );
+  });
+
+  it('takes a title set as anime as anime, keyword or not', async () => {
+    assert.equal(
+      await folderFor(show({ genres: [ANIMATION] }), true),
+      '/anime-rule'
+    );
+  });
+
+  it('leaves out a title set as not anime, though TMDB tags it', async () => {
+    assert.equal(
+      await folderFor(
+        show({ genres: [ANIMATION], keywords: { results: [ANIME_KEYWORD] } }),
+        false
+      ),
+      '/cartoons'
+    );
+  });
+
+  it('leaves out anime from a country the server leaves out', async () => {
+    settings.main.animeExcludedCountries = ['US'];
+    assert.equal(
+      await folderFor(
+        show({ genres: [ANIMATION], keywords: { results: [ANIME_KEYWORD] } })
+      ),
+      '/cartoons'
+    );
+  });
+
+  it('still matches on its other keywords for anything else', async () => {
+    await rule({
+      sonarrServiceId: 0,
+      keywords: '210024,9951',
+      rootFolder: '/anime-or-mecha',
+    });
+    assert.equal(
+      await folderFor(
+        show({ keywords: { results: [{ id: 9951, name: 'mecha' }] } })
+      ),
+      '/anime-or-mecha'
+    );
+  });
+
+  it('goes by the decision for a movie on a server without anime settings', async () => {
+    await rule({
+      radarrServiceId: 0,
+      keywords: '210024',
+      rootFolder: '/anime-movies',
+    });
+    const japanese = {
+      ...film({}),
+      genres: [ANIMATION],
+      original_language: 'ja',
+    } as TmdbMovieDetails;
+    assert.equal(await movieFolder(japanese), '/anime-movies');
+    assert.equal(
+      await movieFolder({
+        ...film({}),
+        production_countries: [{ iso_3166_1: 'US', name: 'United States' }],
+        keywords: { keywords: [ANIME_KEYWORD] },
+      } as TmdbMovieDetails),
+      '/anime-movies'
+    );
+    settings.main.animeExcludedCountries = ['US'];
+    assert.equal(
+      await movieFolder({
+        ...film({}),
+        production_countries: [{ iso_3166_1: 'US', name: 'United States' }],
+        keywords: { keywords: [ANIME_KEYWORD] },
+      } as TmdbMovieDetails),
+      null
+    );
   });
 });

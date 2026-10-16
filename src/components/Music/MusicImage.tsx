@@ -59,7 +59,8 @@ const MusicImage = ({
         setFailed(true);
         onMissing?.();
       }}
-      {...(priority ? { priority: true } : { loading: 'lazy' })}
+      // Otherwise loaded as its card nears the screen (see CachedImage).
+      {...(priority ? { priority: true } : {})}
     />
   );
 };

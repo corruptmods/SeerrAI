@@ -1,8 +1,14 @@
 import VoiceInputButton, {
   useVoiceInput,
 } from '@app/components/Common/VoiceInput';
+import {
+  musicSearchPlaces,
+  searchFindsMusic,
+} from '@app/components/Search/searchType';
 import useFeature from '@app/hooks/useFeature';
+import useMediaQuery from '@app/hooks/useMediaQuery';
 import useSearchInput from '@app/hooks/useSearchInput';
+import useSettings from '@app/hooks/useSettings';
 import defineMessages from '@app/utils/defineMessages';
 import { XCircleIcon } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/solid';
@@ -12,13 +18,24 @@ import { useIntl } from 'react-intl';
 const messages = defineMessages('components.Layout.SearchInput', {
   searchPlaceholder: 'Search Movies & Series',
   searchPlaceholderMusic: 'Search Movies, Series & Music',
+  searchPlaceholderShort: 'Search',
   clearSearch: 'Clear Search',
 });
 
 const SearchInput = () => {
   const intl = useIntl();
   const { searchValue, setSearchValue, setIsOpen, clear } = useSearchInput();
-  const musicOn = useFeature('music');
+  const { currentSettings } = useSettings();
+  // Music is in the hint only if searching here can find it.
+  const findsMusic = searchFindsMusic(
+    musicSearchPlaces(useFeature('music'), currentSettings.musicSearch)
+  );
+  // The full hint does not fit beside the header's buttons on a phone;
+  // the label says it all to a screen reader at any width.
+  const wide = useMediaQuery('(min-width: 640px)');
+  const fullHint = intl.formatMessage(
+    findsMusic ? messages.searchPlaceholderMusic : messages.searchPlaceholder
+  );
   const field = useRef<HTMLInputElement>(null);
   // Searches as the words come, as typing does.
   const voice = useVoiceInput(
@@ -37,7 +54,7 @@ const SearchInput = () => {
     <div className="flex flex-1">
       <div className="flex w-full">
         <label htmlFor="search_field" className="sr-only">
-          Search
+          {fullHint}
         </label>
         <div className="relative flex w-full items-center text-white focus-within:text-gray-200">
           <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center">
@@ -55,11 +72,11 @@ const SearchInput = () => {
                     : '',
             }}
             className="block w-full rounded-full border border-gray-600 bg-gray-900/80 py-2 pl-10 text-white placeholder-gray-300 hover:border-gray-500 focus:border-gray-500 focus:bg-gray-900 focus:placeholder-gray-400 focus:outline-none focus:ring-0 sm:text-base"
-            placeholder={intl.formatMessage(
-              musicOn
-                ? messages.searchPlaceholderMusic
-                : messages.searchPlaceholder
-            )}
+            placeholder={
+              wide
+                ? fullHint
+                : intl.formatMessage(messages.searchPlaceholderShort)
+            }
             type="search"
             autoComplete="off"
             value={searchValue}

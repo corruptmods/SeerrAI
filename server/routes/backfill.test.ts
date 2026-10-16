@@ -134,10 +134,15 @@ const ep = (id: number, hasFile: boolean, fileId = 0): SonarrEpisode => ({
   airDateUtc: '2005-01-01T00:00:00Z',
 });
 
-const call = async (method: string, url: string, body?: unknown) => {
+const call = async (
+  method: string,
+  url: string,
+  body?: unknown,
+  headers: Record<string, string> = {}
+) => {
   const res = await fetch(`http://127.0.0.1:${port}${url}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return { status: res.status, body: await res.json() };
@@ -449,6 +454,24 @@ describe('Backfill routes', () => {
     assert.equal(res.status, 400);
     assert.match(res.body.message, /replaces 1 file on disk/);
     assert.equal(await getRepository(BackfillJob).count(), 0);
+  });
+
+  it('say an approval made with the API key was made with it', async () => {
+    const { candidate } = await seed();
+    getSettings().main.apiKey = 'the-api-key';
+    const res = await call(
+      'POST',
+      `/api/v1/backfill/candidates/${candidate.id}/approve`,
+      { mode: 'missing' },
+      { 'X-Api-Key': 'the-api-key' }
+    );
+    assert.equal(res.status, 200);
+    const job = await getRepository(BackfillJob).findOneOrFail({
+      where: { id: res.body.id },
+    });
+    assert.equal(job.approvedByName, `${admin.displayName} (API key)`);
+    assert.equal(job.approvedById, admin.id);
+    assert.match(job.log[0].message, /\(API key\) approved 1 files/);
   });
 
   it('approve, download only the chosen files, import, clean up and tell admins', async () => {
@@ -812,7 +835,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
     assert.equal(res.status, 200, JSON.stringify(res.body));
 
     let now = Date.now();
-    mock.method(Date, 'now', () => now);
+    const clock = mock.method(Date, 'now', () => now);
     await backfill.tick();
     now += 11 * 60 * 60_000;
     await backfill.tick();
@@ -855,6 +878,24 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       ).notifiedAt instanceof Date,
       true
     );
+
+    // The failed download's page says what became of it, and so does the
+    // title's list of backfills.
+    const page = await call('GET', `/api/v1/backfill/jobs/${job.id}`);
+    assert.equal(page.status, 200);
+    assert.equal(page.body.followUp, 'offered');
+    assert.equal(page.body.replacedById, null);
+    // Once an admin takes the pack offered, it is what replaced it.
+    clock.mock.restore();
+    const taken = await call(
+      'POST',
+      `/api/v1/backfill/candidates/${next.id}/approve`,
+      { mode: 'missing' }
+    );
+    assert.equal(taken.status, 200, JSON.stringify(taken.body));
+    const replaced = await jobs.findOneOrFail({ where: { id: job.id } });
+    assert.equal(replaced.followUp, 'replaced');
+    assert.equal(replaced.replacedById, taken.body.id);
   });
 
   it('does not count time a torrent is paused or queued in qBittorrent as stalling', async () => {
@@ -953,6 +994,11 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       replacement.approvedByName,
       `Backfill (replacing #${failed.id})`
     );
+    assert.equal(failed.followUp, 'replaced');
+    assert.equal(failed.replacedById, replacement.id);
+    const page = await call('GET', `/api/v1/backfill/jobs/${failed.id}`);
+    assert.equal(page.body.followUp, 'replaced');
+    assert.equal(page.body.replacedById, replacement.id);
     assert.deepEqual(
       replacement.files.map((f) => f.episodeIds),
       [[101]]
@@ -991,6 +1037,101 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
     // Not again until ten minutes on.
     await backfill.tick();
     assert.deepEqual(deleted, ['old-probe']);
+  });
+
+  it('say when a download waiting on its indexer’s limit is tried again', async () => {
+    const { series } = await seed();
+    const until = new Date(Date.now() + 20 * 60_000).toISOString();
+    const waiting = await getRepository(BackfillJob).save(
+      new BackfillJob({
+        seriesId: series.id,
+        candidateId: null,
+        title: 'A pack',
+        status: 'queued',
+        stage: 'Tabula Rasa has reached its download limit',
+        mode: 'missing',
+        protocol: 'usenet',
+        clientId: 2,
+        downloadId: null,
+        files: [{ ...PLAN[0], state: 'waiting' }],
+        size: 400,
+        sizeLeft: 400,
+        commandIds: [],
+        log: [
+          {
+            at: new Date().toISOString(),
+            kind: 'warn',
+            message: 'Tabula Rasa has reached its download limit',
+            count: 3,
+            lastAt: new Date().toISOString(),
+          },
+        ],
+        indexerWait: {
+          indexer: 'Tabula Rasa',
+          indexerId: 7,
+          since: new Date().toISOString(),
+          until,
+          strikes: 3,
+        },
+      })
+    );
+    const detail = await call('GET', `/api/v1/backfill/jobs/${waiting.id}`);
+    assert.equal(detail.status, 200);
+    assert.equal(detail.body.retryAt, until);
+    assert.equal(detail.body.log[0].count, 3);
+    // Once the wait is over, there is no time to give.
+    await getRepository(BackfillJob).update(waiting.id, {
+      indexerWait: {
+        indexer: 'Tabula Rasa',
+        indexerId: 7,
+        since: new Date().toISOString(),
+        until: new Date(Date.now() - 60_000).toISOString(),
+        strikes: 3,
+      },
+    });
+    const over = await call('GET', `/api/v1/backfill/jobs/${waiting.id}`);
+    assert.equal(over.body.retryAt, null);
+  });
+
+  it('say which admin agent conversation looks for another release after its download failed', async () => {
+    const { series } = await seed();
+    const failed = await getRepository(BackfillJob).save(
+      new BackfillJob({
+        seriesId: series.id,
+        candidateId: null,
+        title: 'Naruto.S03E06.x264-HONE',
+        status: 'failed',
+        protocol: 'usenet',
+        clientId: 2,
+        files: [{ ...PLAN[0], state: 'waiting' }],
+        error: 'SABnzbd could not finish it: Aborted, cannot be completed',
+        approvedByName: 'AI agent',
+        agentRunId: 37,
+        followUp: 'agent',
+        finishedAt: new Date(),
+      })
+    );
+    const detail = await call('GET', `/api/v1/backfill/jobs/${failed.id}`);
+    assert.equal(detail.status, 200);
+    assert.equal(detail.body.followUp, 'agent');
+    assert.equal(detail.body.agentRunId, 37);
+    assert.equal(detail.body.replacedById, null);
+    // The title's list of backfills says it too (Sonarr left out of it).
+    mock.method(backfill, 'context', async () => {
+      throw new Error('Sonarr is down');
+    });
+    const title = await call('GET', `/api/v1/backfill/series/${series.id}`);
+    assert.equal(title.status, 200);
+    assert.deepEqual(
+      (
+        title.body.jobs as {
+          id: number;
+          followUp: string;
+          agentRunId: number;
+        }[]
+      ).map((j) => [j.id, j.followUp, j.agentRunId]),
+      [[failed.id, 'agent', 37]]
+    );
   });
 
   it('run a second download for other episodes, leaving out what one already fetches', async () => {

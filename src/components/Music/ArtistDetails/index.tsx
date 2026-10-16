@@ -18,6 +18,7 @@ import {
 } from '@app/components/Music/musicHelpers';
 import RequestModal from '@app/components/RequestModal';
 import useFeature from '@app/hooks/useFeature';
+import usePlayLinks from '@app/hooks/usePlayLinks';
 import { Permission, useUser } from '@app/hooks/useUser';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
@@ -240,6 +241,9 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
   const { data, error, mutate } = useSWR<MusicArtistDetails>(
     musicOn ? `/api/v1/music/artist/${artistId}` : null
   );
+  // Played the way a movie or series is: on an iPhone or iPad, Plex's app
+  // opens; the viewer's own servers come first.
+  const { links: playLinks } = usePlayLinks(data?.mediaInfo);
 
   // Opened from a status pill's "Manage Artist" link.
   useEffect(() => {
@@ -363,7 +367,7 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
               <span>{intl.formatMessage(messages.request)}</span>
             </Button>
           )}
-          {(data.mediaInfo?.playLinks ?? [])
+          {playLinks
             .filter((link) => link.url)
             .map((link) => (
               <Button

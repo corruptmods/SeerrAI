@@ -1039,7 +1039,9 @@ describe('Backfill when something goes wrong', () => {
     assert.equal(waiting.status, 'downloading', logOf(waiting));
     assert.deepEqual(removed, [], 'the download is kept');
     assert.equal(
-      waiting.log.filter((l) => l.message.startsWith('No answer')).length,
+      waiting.log.filter((l) =>
+        l.message.endsWith('did not answer; trying again each minute')
+      ).length,
       1,
       'said once, not every minute'
     );

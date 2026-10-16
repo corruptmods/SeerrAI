@@ -154,6 +154,7 @@ const DiscoverTv = () => {
           isLoadingInitialData || (isLoadingMore && (titles?.length ?? 0) > 0)
         }
         onScrollBottom={fetchMore}
+        searchAllType="tv"
       />
     </>
   );

@@ -2,10 +2,12 @@ import ButtonWithDropdown from '@app/components/Common/ButtonWithDropdown';
 import DeclineRequestModal from '@app/components/DeclineRequestModal';
 import RequestModal from '@app/components/RequestModal';
 import usePushDeviceState from '@app/hooks/usePushDeviceState';
+import useRequestAction from '@app/hooks/useRequestAction';
 import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { oneAfterAnother } from '@app/utils/requestActions';
 import {
   ArrowDownTrayIcon,
   BellAlertIcon,
@@ -130,29 +132,28 @@ const RequestButton = ({
       : undefined;
   }, [active4kRequests, user]);
 
-  const approveRequest = async (request: MediaRequest) => {
-    const response = await axios.post(`/api/v1/request/${request.id}/approve`);
+  const { run } = useRequestAction();
 
-    if (response) {
+  const approveRequest = (request: MediaRequest) =>
+    run(async () => {
+      await axios.post(`/api/v1/request/${request.id}/approve`);
       onUpdate();
       globalMutate('/api/v1/request/count');
-    }
-  };
+    });
 
-  const approveRequests = async (requests: MediaRequest[]): Promise<void> => {
-    if (!requests) {
-      return;
-    }
-
-    await Promise.all(
-      requests.map(async (request) => {
-        return axios.post(`/api/v1/request/${request.id}/approve`);
-      })
-    );
-
-    onUpdate();
-    globalMutate('/api/v1/request/count');
-  };
+  // One after another, as declining them is, and what did go through is
+  // shown even when one of them could not be approved.
+  const approveRequests = (requests: MediaRequest[]) =>
+    run(async () => {
+      const errors = await oneAfterAnother(requests, (request) =>
+        axios.post(`/api/v1/request/${request.id}/approve`)
+      );
+      onUpdate();
+      globalMutate('/api/v1/request/count');
+      if (errors.length) {
+        throw errors[0];
+      }
+    });
 
   const { data: watchState, mutate: revalidateWatch } = useSWR<{
     watching: boolean;

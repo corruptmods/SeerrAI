@@ -206,6 +206,7 @@ const PersonDetails = () => {
                       : media.firstAirDate
                   }
                   image={media.posterPath}
+                  backdrop={media.backdropPath}
                   summary={media.overview}
                   mediaType={media.mediaType as 'movie' | 'tv'}
                   status={statusOf(
@@ -259,6 +260,7 @@ const PersonDetails = () => {
                       : media.firstAirDate
                   }
                   image={media.posterPath}
+                  backdrop={media.backdropPath}
                   summary={media.overview}
                   mediaType={media.mediaType as 'movie' | 'tv'}
                   status={statusOf(

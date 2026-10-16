@@ -674,6 +674,16 @@ components:
         trustProxy:
           type: boolean
           example: false
+        trustCloudflare:
+          type: boolean
+          example: false
+          description: With trustProxy on, also trust Cloudflare's published proxy addresses.
+        trustedProxies:
+          type: array
+          items:
+            type: string
+          example: ['203.0.113.5', '198.51.100.0/24']
+          description: With trustProxy on, also trust these proxy addresses or ranges (IPv4 or IPv6). Proxies on loopback, link-local and private addresses and in 100.64.0.0/10 are always trusted.
         proxy:
           type: object
           properties:
@@ -1065,6 +1075,36 @@ components:
         hasPassword:
           type: boolean
           readOnly: true
+    OidcSettingsProblem:
+      type: object
+      description: What is wrong with a single sign-on provider's settings.
+      properties:
+        message:
+          type: string
+          description: In plain English.
+        problem:
+          type: string
+          description: A code the settings page shows in the admin's language.
+          enum:
+            - check-details
+            - issuer-url
+            - issuer-query
+            - issuer-https
+            - client-secret
+            - logo-url
+            - claim-name
+            - timeout
+            - issuer-mismatch
+            - no-discovery
+            - not-discovery
+            - host-not-found
+            - refused
+            - certificate
+            - unreachable
+        params:
+          type: object
+          description: The details the code's message needs, such as host, seconds, issuer, status or reason.
+          additionalProperties: true
     OidcProviderSettings:
       type: object
       description: A single sign-on (OpenID Connect) provider people can sign in with.
@@ -1102,6 +1142,20 @@ components:
         newUserSignUp:
           type: boolean
           description: Someone new signing in with this provider gets an account. Off by default.
+        requiredClaims:
+          description: >-
+            Who may sign in with this provider, checked on every sign-in, new
+            account and link against the ID token's claims merged with
+            userinfo's. Every rule must hold; empty (the default) lets anyone
+            with an account at the provider in. Always returned as a list. On
+            saving, upstream's form is taken too: claim names separated by
+            spaces, each of which must be true.
+          oneOf:
+            - type: array
+              items:
+                $ref: '#/components/schemas/OidcClaimRule'
+            - type: string
+              example: is_seerr_user other_claim
         hasClientSecret:
           type: boolean
           readOnly: true
@@ -1110,6 +1164,22 @@ components:
           nullable: true
           readOnly: true
           description: The redirect URL to register with the provider; null until the Application URL is set.
+    OidcClaimRule:
+      type: object
+      description: >-
+        One rule for who may sign in. Without a value, the claim must be true
+        (or the text "true"). With one, the claim must be exactly that text,
+        or, when it is a list such as groups, contain it.
+      required:
+        - claim
+      properties:
+        claim:
+          type: string
+          description: The claim's name, matched exactly at the top level. Required, without spaces.
+          example: groups
+        value:
+          type: string
+          example: seerr-users
     BazarrSettings:
       type: object
       required:
@@ -1564,6 +1634,16 @@ components:
         musicReady:
           type: boolean
           description: A default Lidarr is set up and music is not turned off for everyone.
+        musicSearch:
+          type: object
+          description: Where music can be searched. Set through /settings/music/search.
+          properties:
+            inAll:
+              type: boolean
+            musicPage:
+              type: boolean
+            chip:
+              type: boolean
         mediaServers:
           type: array
           description: The connected media servers, the primary one first.
@@ -1801,6 +1881,29 @@ components:
           example: 100
         hasTheAudioDbApiKey:
           type: boolean
+    MusicSearchSettings:
+      type: object
+      properties:
+        inAll:
+          type: boolean
+          description: Artists and albums below the films and series when searching for All.
+          example: false
+        musicPage:
+          type: boolean
+          description: The Music page's own search box.
+          example: true
+        chip:
+          type: boolean
+          description: Music among the kinds to choose from on the search page.
+          example: true
+        artists:
+          type: integer
+          description: The most artists one search shows (1 to 25).
+          example: 8
+        albums:
+          type: integer
+          description: The most albums one search shows (1 to 25).
+          example: 12
     MovieResult:
       type: object
       required:
@@ -3614,7 +3717,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MainSettings'
+                $ref: '#/components/schemas/NetworkSettings'
     post:
       summary: Update network settings
       description: Updates network settings with the provided values.
@@ -3633,6 +3736,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NetworkSettings'
+        '400':
+          description: An entry in trustedProxies is not an address or range; nothing was saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  invalidProxy:
+                    type: string
+                    example: proxy.example.com
   /settings/main/regenerate:
     post:
       summary: Get main settings with newly-generated API key
@@ -5446,7 +5561,7 @@ paths:
           type: number
     post:
       summary: 'Approve a pack'
-      description: "Replacing files on disk needs the series' name typed as confirm."
+      description: 'Replacing files on disk needs the series'' name typed as confirm. A pack approved with the API key records the account it acts as followed by "(API key)" as its approver.'
       tags:
         - backfill
       requestBody:
@@ -5497,6 +5612,7 @@ paths:
           type: number
     get:
       summary: 'A backfill, file by file, with its log'
+      description: "retryAt is when a download waiting on its indexer's download limit is tried again (null otherwise). A log line that came several times carries count and lastAt. Once failed, followUp says what became of it (replaced, searching, agent, offered, offeredAgain, none, gaveUp or limit), replacedById is the download that took its place, and agentRunId is the admin agent's conversation that started it (and, for agent, looks for another)."
       tags:
         - backfill
       responses:
@@ -6092,7 +6208,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/OidcProviderSettings'
         '400':
-          description: What is wrong, in plain words
+          description: What is wrong
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcSettingsProblem'
   /settings/oidc/test:
     post:
       summary: Check a single sign-on provider
@@ -6128,7 +6248,11 @@ paths:
                   issuer:
                     type: string
         '400':
-          description: What is wrong, in plain words
+          description: What is wrong
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcSettingsProblem'
   /settings/oidc/{providerId}:
     parameters:
       - in: path
@@ -6155,7 +6279,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/OidcProviderSettings'
         '400':
-          description: What is wrong, in plain words
+          description: What is wrong
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcSettingsProblem'
         '404':
           description: No such provider
     delete:
@@ -7055,6 +7183,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MusicSettings'
+  /settings/music/search:
+    get:
+      summary: Get how music is searched
+      description: Where music can be searched and how many artists and albums a search shows (Settings → Music). Refused (403) while music is turned off for everyone.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Music search settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicSearchSettings'
+    post:
+      summary: Save how music is searched
+      description: Saves them. Anything left out keeps its saved value.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                inAll:
+                  type: boolean
+                musicPage:
+                  type: boolean
+                chip:
+                  type: boolean
+                artists:
+                  type: integer
+                  minimum: 1
+                  maximum: 25
+                albums:
+                  type: integer
+                  minimum: 1
+                  maximum: 25
+      responses:
+        '200':
+          description: Music search settings saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicSearchSettings'
   /settings/public:
     get:
       summary: Get public settings
@@ -7132,7 +7306,7 @@ paths:
             type: string
         - in: query
           name: key
-          description: The media server's id for the title (Plex rating key, or Jellyfin/Emby item id)
+          description: A Plex rating key for the title, used only when Seerr does not have the title (its own ids on each server are used otherwise)
           schema:
             type: string
       responses:
@@ -8497,7 +8671,7 @@ paths:
               properties:
                 kind:
                   type: string
-                  enum: [broken, wrongEpisode]
+                  enum: [broken, wrongEpisode, replaceSeason]
                 mediaId:
                   type: number
                 seasonNumber:
@@ -8889,7 +9063,7 @@ paths:
   /auth/oidc/{providerId}/callback:
     get:
       summary: Where a single sign-on provider sends people back to
-      description: Finishes a sign-in or link (authorization code with PKCE, state and nonce, checked against the correlation cookie, which is cleared). Answers with a page that moves on to where it ends, with `?sso=` saying why when it did not go through.
+      description: Finishes a sign-in or link (authorization code with PKCE, state and nonce, checked against the correlation cookie, which is cleared). Answers with a page that moves on to where it ends, with `?sso=` saying why when it did not go through (`not-allowed` when the provider's claims for the person don't meet its rules for who may sign in).
       security: []
       x-eov-allow-unknown-query-parameters: true
       tags:
@@ -11163,7 +11337,7 @@ paths:
   /search:
     get:
       summary: Search for movies, TV shows, people, or collections
-      description: Returns a list of movies, TV shows, people, or collections as a JSON object.
+      description: Returns a list of movies, TV shows, people, or collections as a JSON object. With `type`, only movies (and their collections) or only TV shows.
       tags:
         - search
       parameters:
@@ -11184,6 +11358,12 @@ paths:
           schema:
             type: string
             example: en
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [all, movie, tv]
+            default: all
       responses:
         '200':
           description: Results
@@ -11292,7 +11472,7 @@ paths:
   /music/search:
     get:
       summary: Search music
-      description: Artists (up to 8) and albums (up to 12) from MusicBrainz. Refused while music is off for the person (403) or before Lidarr is set up (404); 503 when MusicBrainz is too busy to answer in time.
+      description: Artists and albums from MusicBrainz, as many as Settings → Music says (8 and 12 unless changed). Refused while music is off for the person (403), when an admin has left nowhere to search music (403), or before Lidarr is set up (404); 503 when MusicBrainz is too busy to answer in time.
       tags:
         - music
       parameters:

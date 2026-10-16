@@ -2,6 +2,7 @@ import Modal from '@app/components/Common/Modal';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { oneAfterAnother } from '@app/utils/requestActions';
 import { Transition } from '@headlessui/react';
 import { DECLINE_REASON_MAX_LENGTH } from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
@@ -64,21 +65,19 @@ const DeclineRequestModal = ({
     setIsDeclining(true);
     const declineReason = reason.trim();
 
-    const results = await Promise.allSettled(
-      requests.map((request) =>
+    // One after another: declined at the same time, each still saw the
+    // others as waiting, so the title was never set back to not requested.
+    const failed = (
+      await oneAfterAnother(requests, (request) =>
         axios.post(
           `/api/v1/request/${request.id}/decline`,
           declineReason ? { declineReason } : {}
         )
       )
-    );
+    ).length;
 
     setIsDeclining(false);
     mutate('/api/v1/request/count');
-
-    const failed = results.filter(
-      (result) => result.status === 'rejected'
-    ).length;
 
     if (failed > 0) {
       addToast(

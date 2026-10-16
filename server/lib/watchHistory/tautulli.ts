@@ -41,10 +41,15 @@ export class TautulliWatchSource implements WatchSource {
     return user.plexId ? String(user.plexId) : undefined;
   }
 
+  /** Once each: regular and 4K can be one Plex item, read once. */
   public titleIdsOf(media: Media): string[] {
-    return [media.ratingKey, media.ratingKey4k].filter(
-      (key): key is string => !!key
-    );
+    return [
+      ...new Set(
+        [media.ratingKey, media.ratingKey4k].filter(
+          (key): key is string => !!key
+        )
+      ),
+    ];
   }
 
   public async mediaFor(titleIds: string[]): Promise<Map<string, Media>> {

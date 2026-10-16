@@ -1,4 +1,5 @@
 import {
+  JobFollowUpNote,
   JobStatusBadge,
   ProgressBar,
   SeriesPoster,
@@ -6,6 +7,7 @@ import {
   episodeLabel,
   formatBytes,
   formatDuration,
+  jobStage,
 } from '@app/components/Backfill/shared';
 import type { JobView } from '@app/components/Backfill/types';
 import { ACTIVE_JOB } from '@app/components/Backfill/types';
@@ -35,6 +37,7 @@ const messages = defineMessages('components.Backfill.JobDetail', {
   backfill: 'Backfill',
   job: 'Backfill #{id}',
   approvedBy: 'Approved by {name}',
+  repeated: '{message} (tried {count} times, last at {time})',
   pause: 'Pause',
   mediaPage: 'Media page',
   resume: 'Resume',
@@ -182,13 +185,18 @@ const JobDetail = () => {
                   progress={data.progress}
                   kind={data.series?.kind}
                 />
-                {data.stage && <span>{data.stage}</span>}
+                {data.stage && <span>{jobStage(intl, data)}</span>}
                 {data.approvedByName && (
                   <span>
                     ·{' '}
                     {intl.formatMessage(messages.approvedBy, {
                       name: data.approvedByName,
                     })}
+                  </span>
+                )}
+                {data.status === 'failed' && data.followUp && (
+                  <span>
+                    · <JobFollowUpNote job={data} />
                   </span>
                 )}
               </div>
@@ -407,7 +415,15 @@ const JobDetail = () => {
                   <span className="whitespace-nowrap text-gray-500">
                     <FormattedTime value={line.at} />
                   </span>
-                  <span className={LOG_STYLE[line.kind]}>{line.message}</span>
+                  <span className={LOG_STYLE[line.kind]}>
+                    {line.count && line.lastAt
+                      ? intl.formatMessage(messages.repeated, {
+                          message: line.message,
+                          count: line.count,
+                          time: intl.formatTime(line.lastAt),
+                        })
+                      : line.message}
+                  </span>
                 </li>
               ))}
             </ol>

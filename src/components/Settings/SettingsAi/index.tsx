@@ -8,6 +8,7 @@ import CreditPanel from '@app/components/Settings/SettingsAi/CreditPanel';
 import type { ModelInfo } from '@app/components/Settings/SettingsAi/ModelPicker';
 import ModelPicker from '@app/components/Settings/SettingsAi/ModelPicker';
 import { aiErrorMessage } from '@app/hooks/useAi';
+import useMediaQuery from '@app/hooks/useMediaQuery';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -54,6 +55,7 @@ const messages = defineMessages('components.Settings.SettingsAi', {
   loadModels: 'Reload the Model List',
   chooseModel: 'Choose a model',
   typeModel: 'Type a model name, or add a key to list them',
+  typeModelShort: 'Type a model name',
   modelsFailed: 'The model list could not be loaded: {reason}',
   featureModels: 'Model for Each Feature',
   featureModelsTip:
@@ -93,6 +95,8 @@ interface AiSettingsForm {
 
 const SettingsAi = () => {
   const intl = useIntl();
+  // The whole hint does not fit the model field on a phone.
+  const wide = useMediaQuery('(min-width: 640px)');
   const { addToast } = useToasts();
   const { mutate: globalMutate } = useSWRConfig();
   const { data, mutate } = useSWR<AiSettingsForm>('/api/v1/settings/ai');
@@ -465,7 +469,11 @@ const SettingsAi = () => {
                   models={modelList}
                   loading={listing}
                   emptyLabel={intl.formatMessage(
-                    modelList.length ? messages.chooseModel : messages.typeModel
+                    modelList.length
+                      ? messages.chooseModel
+                      : wide
+                        ? messages.typeModel
+                        : messages.typeModelShort
                   )}
                 />
                 {listable && (

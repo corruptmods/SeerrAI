@@ -198,6 +198,14 @@ describe('the words on a request waiting for approval', () => {
  */
 const loadImageWorker = () => {
   const handlers: Record<string, Handler> = {};
+  // The worker's clock, moved on by the test: it trims its cache at most
+  // every few seconds, and keeps what was used last.
+  let now = Date.now();
+  class WorkerDate extends Date {
+    static now() {
+      return now;
+    }
+  }
   const stored = new Map<string, Response>();
   const fetched: string[] = [];
   const answer = {
@@ -241,6 +249,7 @@ const loadImageWorker = () => {
     Request: WorkerRequest,
     Response,
     URL,
+    Date: WorkerDate,
     AbortController,
     setTimeout,
     clearTimeout,
@@ -296,7 +305,11 @@ const loadImageWorker = () => {
     await Promise.all(waits);
   };
 
-  return { view, precache, fetched, answer, stored };
+  const wait = (ms: number) => {
+    now += ms;
+  };
+
+  return { view, precache, fetched, answer, stored, wait };
 };
 
 describe('images kept on the device', () => {
@@ -326,6 +339,29 @@ describe('images kept on the device', () => {
 
     await worker.view(cover);
     assert.equal(worker.fetched.length, 2, 'which is kept while fresh');
+  });
+
+  it('are kept for a long browse, then the least used make room', async () => {
+    // One trip through Discover, two titles, Movies and a person stores
+    // about 160 pictures; a few such trips should all still be there when
+    // the app is opened again.
+    const worker = loadImageWorker();
+    const poster = (n: number) =>
+      `/imageproxy/tmdb/t/p/w300_and_h450_face/${n}.jpg?f=avif`;
+    for (let n = 0; n < 1000; n++) {
+      worker.wait(6000);
+      await worker.view(poster(n));
+    }
+    assert.equal(worker.stored.size, 1000, 'all of them kept');
+
+    worker.wait(6000);
+    await worker.view(poster(0));
+    worker.wait(6000);
+    await worker.view(poster(1000));
+    assert.equal(worker.stored.size, 1000, 'no more than that');
+    assert.ok(worker.stored.has(`${ORIGIN}${poster(0)}`), 'seen again, kept');
+    assert.ok(!worker.stored.has(`${ORIGIN}${poster(1)}`), 'least used, gone');
+    assert.equal(worker.fetched.length, 1001, 'each fetched once');
   });
 
   it('are never kept when the server says not to', async () => {

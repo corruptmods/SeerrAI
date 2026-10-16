@@ -293,10 +293,14 @@ class ImageProxy {
               now > expireAt + EXPIRED_KEPT_MS &&
               now > mtimeMs + EXPIRED_KEPT_MS
             ) {
+              // The whole entry goes, so its other files (a write that
+              // never finished) need no look.
               await promises.rm(path.join(filePath), {
                 recursive: true,
+                force: true,
               });
               deletedImages += 1;
+              break;
             }
           }
         }

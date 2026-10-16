@@ -1,9 +1,13 @@
+import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowDownOnSquareIcon,
+  ArrowPathIcon,
+} from '@heroicons/react/24/outline';
 import type { Region } from '@server/lib/settings';
 import axios from 'axios';
 import sortBy from 'lodash/sortBy';
@@ -22,6 +26,7 @@ const messages = defineMessages('components.Settings.AnimeSettings', {
   noCountries: 'No country: anime from everywhere counts',
   saved: 'Anime settings saved.',
   saveFailed: 'Could not save the anime settings.',
+  loadFailed: 'The anime settings could not be loaded.',
 });
 
 type Option = { value: string; label: string };
@@ -34,7 +39,7 @@ type Option = { value: string; label: string };
 const AnimeSettings = () => {
   const intl = useIntl();
   const { addToast } = useToasts();
-  const { data, mutate } = useSWR<{ excludedCountries: string[] }>(
+  const { data, error, mutate } = useSWR<{ excludedCountries: string[] }>(
     '/api/v1/settings/anime'
   );
   const { data: regions } = useSWR<Region[]>('/api/v1/regions');
@@ -102,7 +107,16 @@ const AnimeSettings = () => {
       </div>
       <div className="section">
         {!chosen ? (
-          <LoadingSpinner />
+          error ? (
+            <Alert type="error" title={intl.formatMessage(messages.loadFailed)}>
+              <Button buttonSize="sm" onClick={() => mutate()}>
+                <ArrowPathIcon />
+                <span>{intl.formatMessage(globalMessages.retry)}</span>
+              </Button>
+            </Alert>
+          ) : (
+            <LoadingSpinner />
+          )
         ) : (
           <form
             onSubmit={(e) => {

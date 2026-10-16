@@ -41,7 +41,10 @@ import type {
   EntityManager,
   EntitySubscriberInterface,
   InsertEvent,
+  QueryRunner,
   RemoveEvent,
+  TransactionCommitEvent,
+  TransactionRollbackEvent,
   UpdateEvent,
 } from 'typeorm';
 import { EventSubscriber, In, Not } from 'typeorm';
@@ -295,6 +298,12 @@ const reconcileMonitoringAfterRemoval = async (
     }
   }
 };
+
+/**
+ * Music requests waiting to go to Lidarr until the save that approved them
+ * has committed, by the database connection that save runs on.
+ */
+const lidarrSendsAfterCommit = new WeakMap<QueryRunner, (() => void)[]>();
 
 @EventSubscriber()
 export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRequest> {
@@ -1193,9 +1202,9 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
 
   /**
    * Sends an approved music request to Lidarr. Which Lidarr is decided here,
-   * in the request's own save; talking to Lidarr then happens behind it
-   * (dispatchToLidarr), as Radarr and Sonarr are sent to, so approving does
-   * not wait on Lidarr and its metadata service.
+   * in the request's own save; talking to Lidarr then happens behind it,
+   * once that save has committed (dispatchToLidarr), so approving does not
+   * wait on Lidarr and its metadata service.
    */
   public async sendToLidarr(
     entity: MediaRequest,
@@ -1233,7 +1242,54 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     }
 
     // Never rejects: a failure marks the request failed and says why.
-    void this.dispatchToLidarr(entity, lidarrSettings);
+    const send = () => void this.dispatchToLidarr(entity, lidarrSettings);
+
+    // Sent once the request's own save has committed. Started inside it, a
+    // quick failure was written on another connection that could not see
+    // the new request yet (on Postgres), so the request stayed approved
+    // while "failed" went out to people.
+    const queryRunner = manager.queryRunner;
+    if (!queryRunner?.isTransactionActive) {
+      send();
+      return;
+    }
+    const waiting = lidarrSendsAfterCommit.get(queryRunner) ?? [];
+    waiting.push(() => {
+      // Unless that save was undone, or the request changed since.
+      getRepository(MediaRequest)
+        .exists({
+          where: { id: entity.id, status: MediaRequestStatus.APPROVED },
+        })
+        .then((approved) => {
+          if (approved) {
+            send();
+          }
+        })
+        .catch((e) => {
+          logger.error('Could not send an approved request to Lidarr', {
+            label: 'Media Request',
+            requestId: entity.id,
+            errorMessage: e instanceof Error ? e.message : String(e),
+          });
+        });
+    });
+    lidarrSendsAfterCommit.set(queryRunner, waiting);
+  }
+
+  public afterTransactionCommit(event: TransactionCommitEvent): void {
+    // Releasing a savepoint inside the transaction is not its commit.
+    if (event.queryRunner.isTransactionActive) {
+      return;
+    }
+    const waiting = lidarrSendsAfterCommit.get(event.queryRunner);
+    lidarrSendsAfterCommit.delete(event.queryRunner);
+    waiting?.forEach((send) => send());
+  }
+
+  public afterTransactionRollback(event: TransactionRollbackEvent): void {
+    if (!event.queryRunner.isTransactionActive) {
+      lidarrSendsAfterCommit.delete(event.queryRunner);
+    }
   }
 
   /**

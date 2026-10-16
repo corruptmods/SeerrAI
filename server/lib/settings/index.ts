@@ -1,6 +1,7 @@
 import type { AiFeature } from '@server/constants/features';
 import { DEFAULT_IMAGE_CACHE_MAX_MB } from '@server/constants/images';
-import { oidcApplicationUrl } from '@server/constants/oidc';
+import type { OidcClaimRule } from '@server/constants/oidc';
+import { oidcApplicationUrl, requiredClaimsFrom } from '@server/constants/oidc';
 import type { MediaServerKind } from '@server/constants/server';
 import {
   MEDIA_SERVER_KINDS,
@@ -102,6 +103,13 @@ export const musicDefaults = (): MusicSettings => ({
   listenBrainz: true,
   theAudioDbApiKey: '',
   maxAlbumsPerRequest: 100,
+  search: {
+    inAll: false,
+    musicPage: true,
+    chip: true,
+    artists: 8,
+    albums: 12,
+  },
 });
 
 /** A Jellyfin or Emby server that has not been set up. */
@@ -339,6 +347,11 @@ export interface OidcProviderSettings {
   enabled: boolean;
   /** Someone new to Seerr gets an account on signing in. Off by default. */
   newUserSignUp: boolean;
+  /**
+   * Who may sign in: every rule must hold for the claims the provider
+   * sends. Empty lets in anyone with an account there.
+   */
+  requiredClaims: OidcClaimRule[];
 }
 
 export interface OidcSettings {
@@ -441,7 +454,32 @@ export interface MusicSettings {
   theAudioDbApiKey: string;
   /** The most albums one request may ask for. */
   maxAlbumsPerRequest: number;
+  /** How music is searched (Settings → Music). */
+  search: MusicSearchSettings;
 }
+
+/**
+ * Where music can be searched, and how much a search shows. Music off for
+ * everyone, or for someone themselves, still wins over all of these.
+ */
+export interface MusicSearchSettings {
+  /** Artists and albums below the films and series in All. */
+  inAll: boolean;
+  /** The Music page's own search box. */
+  musicPage: boolean;
+  /** Music among the kinds to choose from on the search page. */
+  chip: boolean;
+  /** The most artists one search shows. */
+  artists: number;
+  /** The most albums one search shows. */
+  albums: number;
+}
+
+/** What people's pages are told about searching music. */
+export type PublicMusicSearch = Pick<
+  MusicSearchSettings,
+  'inAll' | 'musicPage' | 'chip'
+>;
 
 export const MUSICBRAINZ_URL = 'https://musicbrainz.org';
 
@@ -612,6 +650,13 @@ export interface NetworkSettings {
   csrfProtection: boolean;
   forceIpv4First: boolean;
   trustProxy: boolean;
+  /** With trustProxy on, also trust Cloudflare's proxy (the orange cloud). */
+  trustCloudflare: boolean;
+  /**
+   * With trustProxy on, also trust these addresses or ranges, such as a
+   * reverse proxy on a rented server. See utils/trustedProxies.
+   */
+  trustedProxies: string[];
   proxy: ProxySettings;
   dnsCache: DnsCacheSettings;
   apiRequestTimeout: number;
@@ -687,6 +732,8 @@ interface FullPublicSettings extends PublicSettings {
    * music can be searched, browsed and requested.
    */
   musicReady: boolean;
+  /** Where music can be searched; the numbers stay on the server. */
+  musicSearch: PublicMusicSearch;
 }
 
 export interface NotificationAgentConfig {
@@ -1218,6 +1265,8 @@ class Settings {
         csrfProtection: false,
         forceIpv4First: false,
         trustProxy: false,
+        trustCloudflare: false,
+        trustedProxies: [],
         proxy: {
           enabled: false,
           hostname: '',
@@ -1306,7 +1355,14 @@ class Settings {
   }
 
   get oidc(): OidcSettings {
-    return { providers: this.data.oidc?.providers ?? [] };
+    // Rules are read in either form, so a provider pasted from upstream's
+    // settings.json (claim names in one string) works as it did there.
+    return {
+      providers: (this.data.oidc?.providers ?? []).map((provider) => ({
+        ...provider,
+        requiredClaims: requiredClaimsFrom(provider.requiredClaims),
+      })),
+    };
   }
 
   set oidc(data: OidcSettings) {
@@ -1400,6 +1456,9 @@ class Settings {
     if (!this.data.music) {
       this.data.music = musicDefaults();
     }
+    if (!this.data.music.search) {
+      this.data.music.search = musicDefaults().search;
+    }
     return this.data.music;
   }
 
@@ -1492,6 +1551,11 @@ class Settings {
       musicReady:
         (this.data.lidarr ?? []).some((lidarr) => lidarr.isDefault) &&
         !(this.data.main.disabledFeatures ?? []).includes('music'),
+      musicSearch: {
+        inAll: this.music.search.inAll,
+        musicPage: this.music.search.musicPage,
+        chip: this.music.search.chip,
+      },
     };
   }
 

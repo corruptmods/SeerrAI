@@ -193,6 +193,46 @@ describe('image proxy cache', () => {
   });
 });
 
+describe('clearing old images from the cache', () => {
+  // Where the proxy keeps its cache, resolved as it does when it loads.
+  const cacheDir = process.env.CONFIG_DIRECTORY
+    ? join(process.env.CONFIG_DIRECTORY, 'cache/images')
+    : join(__dirname, '../../config/cache/images');
+  const key = `clear-${process.pid}-${Date.now()}`;
+
+  after(() =>
+    promises.rm(join(cacheDir, key), { recursive: true, force: true })
+  );
+
+  it('goes through every entry, even one holding more than one file', async () => {
+    const longAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+    const old = `86400.${longAgo}.etag.jpg`;
+    const fresh = `86400.${Date.now() + 86400000}.etag.jpg`;
+    const entries: Record<string, string[]> = {
+      // An old image beside a write that never finished.
+      one: [old, `${old}.123.456.tmp`],
+      two: [old, `${old}.123.789.tmp`],
+      three: [old, `${old}.124.111.tmp`],
+      four: [old],
+      kept: [fresh],
+    };
+    for (const [entry, files] of Object.entries(entries)) {
+      await promises.mkdir(join(cacheDir, key, entry), { recursive: true });
+      for (const file of files) {
+        const filePath = join(cacheDir, key, entry, file);
+        await promises.writeFile(filePath, 'x');
+        await promises.utimes(filePath, longAgo / 1000, longAgo / 1000);
+      }
+    }
+
+    await ImageProxy.clearCache(key);
+
+    assert.deepEqual((await promises.readdir(join(cacheDir, key))).sort(), [
+      'kept',
+    ]);
+  });
+});
+
 describe('what the image cache keeps, and how it serves it', () => {
   const unique = `${process.pid}-${Date.now()}-kept`;
 

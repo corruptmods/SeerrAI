@@ -1,8 +1,11 @@
 import { musicImageSrc } from '@app/components/Music/musicHelpers';
+import { NearScreen } from '@app/hooks/useNearScreen';
 import useSettings from '@app/hooks/useSettings';
-import { convertible, sourcesFor } from '@app/utils/imageSources';
+import { convertible, sourcesFor, tmdbImageSrc } from '@app/utils/imageSources';
+import { pictureLoading } from '@app/utils/nearScreen';
 import type { ImageLoader, ImageProps } from 'next/image';
 import Image from 'next/image';
+import { useContext } from 'react';
 
 const imageLoader: ImageLoader = ({ src }) => src;
 
@@ -22,15 +25,12 @@ export type CachedImageProps = ImageProps & {
  **/
 const CachedImage = ({ src, type, ...props }: CachedImageProps) => {
   const { currentSettings } = useSettings();
+  const nearness = useContext(NearScreen);
 
   let imageUrl: string;
 
   if (type === 'tmdb') {
-    // tmdb stuff
-    imageUrl =
-      currentSettings.cacheImages && !src.startsWith('/')
-        ? src.replace(/^https:\/\/image\.tmdb\.org\//, '/imageproxy/tmdb/')
-        : src;
+    imageUrl = tmdbImageSrc(src, currentSettings.cacheImages);
   } else if (type === 'tvdb') {
     imageUrl =
       currentSettings.cacheImages && !src.startsWith('/')
@@ -48,9 +48,21 @@ const CachedImage = ({ src, type, ...props }: CachedImageProps) => {
     return null;
   }
 
+  // Inside a card or row near the screen, the picture loads before it is
+  // scrolled to (see nearScreen).
+  const loading = pictureLoading(nearness, { loading: props.loading });
+
   // Only what the proxy can convert.
   if (!convertible(imageUrl)) {
-    return <Image unoptimized loader={imageLoader} src={imageUrl} {...props} />;
+    return (
+      <Image
+        unoptimized
+        loader={imageLoader}
+        src={imageUrl}
+        {...props}
+        {...(props.priority || props.preload ? {} : loading)}
+      />
+    );
   }
 
   // Next would preload the <img>'s own address for a priority image, which
@@ -76,7 +88,7 @@ const CachedImage = ({ src, type, ...props }: CachedImageProps) => {
         src={imageUrl}
         sizes={sizes}
         {...imageProps}
-        {...(urgent ? { loading: 'eager', fetchPriority: 'high' } : {})}
+        {...(urgent ? pictureLoading(null, { urgent }) : loading)}
       />
     </picture>
   );

@@ -254,31 +254,35 @@ Do not undo these without reading why first — each was tried the other way.
   viewer has an account on (the primary one first), else the first that
   has it (`pickPlayLink` in `src/utils/playLinks.ts`). Notifications link
   to Seerr's own page, which is the same for everyone.
-- **One GitHub Actions workflow: images.** `release.yml` builds and
-  publishes the image for an `ai-v*` tag, `:preview-<name>` for a
-  `preview-<name>` tag, and `:develop` when run by hand from `dev` (pushes
-  to `dev` publish nothing; run by hand from any other branch it builds
-  `:preview-<branch>`), so Seerr AI can be installed like Seerr, on its own.
-  It builds the way upstream does: amd64 and arm64 (the platforms upstream
-  ships) each on their own runner, arm64 on GitHub's arm64 runner rather
-  than under emulation, pushed by digest and joined into one multi-arch
-  image; to GHCR, and to Docker Hub only when the `DOCKERHUB_USERNAME` and
-  `DOCKERHUB_TOKEN` secrets are set (as `<username>/seerr-ai`, or the
-  `DOCKERHUB_IMAGE` repository variable); signed with cosign (keyless)
-  with a CycloneDX SBOM attestation from Trivy, both verified before a
-  release is published. Unlike upstream, every image is signed, not only
-  releases, and the version comes from the tag (written into
-  `package.json` for the build), not a release commit. The `ai-` prefix
-  keeps releases apart from Seerr's own `v1.0.0`…`v3.x` tags, which arrive
-  whenever Seerr is fetched as `upstream`; never `git push --tags`, which
-  would send those too. It builds only when asked, and it doesn't run the
-  tests. Run the tests locally (see Tests) before pushing. Upstream's
-  other workflows (docs, issue triage, Helm, its weekly Trivy scan to code
-  scanning, Discord notices, `create-tag`) and its Helm chart aren't
-  carried. Anyone can still build their own image with `build.sh`.
+- **Two GitHub Actions workflows: checks and images.** `ci.yml` checks
+  every push and pull request to `dev` and `main` (see Tests).
+  `release.yml` builds and publishes the image for an `ai-v*` tag,
+  `:preview-<name>` for a `preview-<name>` tag, and `:develop` when run by
+  hand from `dev` (pushes to `dev` publish nothing; run by hand from any
+  other branch it builds `:preview-<branch>`), so Seerr AI can be installed
+  like Seerr, on its own. It builds the way upstream does: amd64 and arm64
+  (the platforms upstream ships) each on their own runner, arm64 on
+  GitHub's arm64 runner rather than under emulation, pushed by digest and
+  joined into one multi-arch image; to GHCR, and to Docker Hub only when
+  the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets are set (as
+  `<username>/seerr-ai`, or the `DOCKERHUB_IMAGE` repository variable);
+  signed with cosign (keyless) with a CycloneDX SBOM attestation from
+  Trivy, both verified before a release is published. Unlike upstream,
+  every image is signed, not only releases, and the version comes from the
+  tag (written into `package.json` for the build), not a release commit.
+  The `ai-` prefix keeps releases apart from Seerr's own `v1.0.0`…`v3.x`
+  tags, which arrive whenever Seerr is fetched as `upstream`; never
+  `git push --tags`, which would send those too. It builds only when asked,
+  and doesn't run the tests itself: they are `ci.yml`'s, so check a
+  commit's run there (or run them locally, see Tests) before tagging it.
+  Upstream's other workflows (docs, issue triage, Helm, its weekly Trivy
+  scan to code scanning, Discord notices, `create-tag`) and its Helm chart
+  aren't carried. Anyone can still build their own image with `build.sh`.
 - **Update checks are against this repository.** `server/constants/project.ts`
   names it; Settings → About and the update check read its releases and
-  commits. Change it if the repository is renamed.
+  commits. Change it if the repository is renamed. Both pick the latest
+  release with `server/utils/releases.ts`: never a draft, a pre-release
+  only for an install running one, matched to the version by its tag.
 - **Two branches: `dev` and `main`.** Work and patches go onto `dev`, which
   a self-built server runs. `main` only moves for a release, fast-forwarded
   to `dev`, then tagged `ai-v…`. A release build checks for newer releases;
@@ -366,7 +370,11 @@ Do not undo these without reading why first — each was tried the other way.
 - **Single sign-on finds people by provider account only.** A provider
   (Settings → Users → Single Sign-On) signs someone in only through a
   link of the provider's id and its own id for them (`sub`, in
-  `oidc_link`), never by email: some providers let anyone put any email
+  `oidc_link`), made at the issuer the provider still has (a `sub` only
+  means someone at the issuer that gave it, so changing the issuer URL
+  leaves old links unusable; links from before issuers were recorded take
+  the current one when used, or the old one when it changes), never by
+  email: some providers let anyone put any email
   on an account, and an email match is how a Plex account could once take
   over the owner's. A new person is refused, unless the provider lets new
   people sign up; then they get an account, with the provider's email
@@ -383,7 +391,19 @@ Do not undo these without reading why first — each was tried the other way.
   protection on) is sent with the page it lands on. Everything is built
   from the Application URL, never the request's Host. A provider sign-in
   is proof enough on its own (no `maySignIn`), and signing out ends only
-  Seerr's session.
+  Seerr's session. A provider's rules for who may sign in
+  (`requiredClaims`, upstream's idea, kept as `{ claim, value? }` and read
+  from upstream's space-separated string too) are checked in the callback
+  before anything else happens, so signing in, a new account and linking
+  are all refused alike; they fail closed: a rule that can't be read, or
+  userinfo that can't be, lets nobody in. Failed callbacks count toward
+  the sign-in limit only with a genuine correlation cookie for that
+  provider, so made-up callbacks can't lock out an address.
+- **Trust Proxy trusts only proxies on the local network.** With it on,
+  Express takes `req.ip` through loopback, link-local and private hops
+  (`TRUSTED_PROXIES`), never every hop: with every hop trusted the address
+  is whatever the sender wrote first in X-Forwarded-For, and the sign-in
+  limits count by address.
 - **Admins can remove someone's passkeys, not add or rename them.** For a
   lost device. The owner's and other admins' passkeys are the owner's to
   manage, as with passwords.

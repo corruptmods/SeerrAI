@@ -26,7 +26,7 @@ import {
 import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import SeasonRequest from '@server/entity/SeasonRequest';
-import { User } from '@server/entity/User';
+import { User, countsTowardsQuota } from '@server/entity/User';
 import type {
   MediaRequestBody,
   MusicRequestBody,
@@ -112,6 +112,12 @@ const musicWithoutAdvancedOptions = (
 /** Music is listed and handled for this person: set up, and on for them. */
 const musicFor = (user?: User) => musicReady() && featureEnabled('music', user);
 
+/** The kinds of request listed and counted for this person. */
+const requestTypesFor = (user?: User): MediaType[] =>
+  musicFor(user)
+    ? [...VIDEO_MEDIA_TYPES, MediaType.MUSIC]
+    : [...VIDEO_MEDIA_TYPES];
+
 requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
   '/',
   async (req, res, next) => {
@@ -130,9 +136,7 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         .filter((id) => Number.isFinite(id));
 
       // Music only for someone who has it: set up, and not turned off.
-      const listedTypes = musicFor(req.user)
-        ? [...VIDEO_MEDIA_TYPES, MediaType.MUSIC]
-        : [...VIDEO_MEDIA_TYPES];
+      const listedTypes = requestTypesFor(req.user);
       const mediaTypes = splitParam(req.query.mediaType).filter(
         (type): type is MediaType => listedTypes.includes(type as MediaType)
       );
@@ -640,54 +644,60 @@ requestRoutes.get('/eta', async (req, res, next) => {
   }
 });
 
-requestRoutes.get('/count', async (_req, res, next) => {
+requestRoutes.get('/count', async (req, res, next) => {
   const requestRepository = getRepository(MediaRequest);
 
   try {
-    const query = requestRepository
-      .createQueryBuilder('request')
-      .innerJoinAndSelect('request.media', 'media');
+    // Only the kinds of request this person is shown in the list: music
+    // only where it is set up and on for them, so the pending badge never
+    // counts requests they cannot open.
+    const countedTypes = requestTypesFor(req.user);
+    const query = () =>
+      requestRepository
+        .createQueryBuilder('request')
+        .innerJoinAndSelect('request.media', 'media')
+        .where('request.type IN (:...countedTypes)', { countedTypes });
 
-    const totalCount = await query.getCount();
+    const totalCount = await query().getCount();
 
-    const movieCount = await query
-      .where('request.type = :requestType', {
+    const movieCount = await query()
+      .andWhere('request.type = :requestType', {
         requestType: MediaType.MOVIE,
       })
       .getCount();
 
-    const tvCount = await query
-      .where('request.type = :requestType', {
+    const tvCount = await query()
+      .andWhere('request.type = :requestType', {
         requestType: MediaType.TV,
       })
       .getCount();
 
-    const musicCount = await query
-      .where('request.type = :requestType', {
+    const musicCount = await query()
+      .andWhere('request.type = :requestType', {
         requestType: MediaType.MUSIC,
       })
       .getCount();
 
-    const pendingCount = await query
-      .where('request.status = :requestStatus', {
+    const pendingCount = await query()
+      .andWhere('request.status = :requestStatus', {
         requestStatus: MediaRequestStatus.PENDING,
       })
       .getCount();
 
-    const approvedCount = await query
-      .where('request.status = :requestStatus', {
+    const approvedCount = await query()
+      .andWhere('request.status = :requestStatus', {
         requestStatus: MediaRequestStatus.APPROVED,
       })
       .getCount();
 
-    const declinedCount = await query
-      .where('request.status = :requestStatus', {
+    const declinedCount = await query()
+      .andWhere('request.status = :requestStatus', {
         requestStatus: MediaRequestStatus.DECLINED,
       })
       .getCount();
 
-    const processingCount = await query
-      .where('request.status = :requestStatus', {
+    const processingCount = await query()
+      .andWhere('request.status = :requestStatus', {
         requestStatus: MediaRequestStatus.APPROVED,
       })
       .andWhere(
@@ -698,8 +708,8 @@ requestRoutes.get('/count', async (_req, res, next) => {
       )
       .getCount();
 
-    const availableCount = await query
-      .where('request.status = :requestStatus', {
+    const availableCount = await query()
+      .andWhere('request.status = :requestStatus', {
         requestStatus: MediaRequestStatus.APPROVED,
       })
       .andWhere(
@@ -710,8 +720,8 @@ requestRoutes.get('/count', async (_req, res, next) => {
       )
       .getCount();
 
-    const completedCount = await query
-      .where('request.status = :requestStatus', {
+    const completedCount = await query()
+      .andWhere('request.status = :requestStatus', {
         requestStatus: MediaRequestStatus.COMPLETED,
       })
       .getCount();
@@ -1024,12 +1034,9 @@ const editMusicRequest = async (
     const quotas = await requestUser.getQuota();
     // Albums the owner's quota already counted for this request are paid
     // for; a new owner is charged for all of them.
-    const windowStart = new Date();
-    if (quotas.music.days) {
-      windowStart.setDate(windowStart.getDate() - quotas.music.days);
-    }
     const countedAlready =
-      !ownerChanging && (!quotas.music.days || request.createdAt > windowStart);
+      !ownerChanging &&
+      countsTowardsQuota(request.createdAt, quotas.music.days);
     const required =
       kept.length + added.length - (countedAlready ? current.length : 0);
     if (quotas.music.limit && required > (quotas.music.remaining ?? 0)) {
@@ -1346,16 +1353,9 @@ requestRoutes.put<{ requestId: string }>(
 
                   // Only the seasons getQuota already counted for this owner are
                   // paid for, so the edit is charged for everything it left out
-                  const quotaWindowStart = new Date();
-                  if (quotas.tv.days) {
-                    quotaWindowStart.setDate(
-                      quotaWindowStart.getDate() - quotas.tv.days
-                    );
-                  }
-
                   const countedAlready =
                     !ownerChanging &&
-                    (!quotas.tv.days || request.createdAt > quotaWindowStart);
+                    countsTowardsQuota(request.createdAt, quotas.tv.days);
 
                   const priorSeasonCount = countedAlready
                     ? request.seasons.length

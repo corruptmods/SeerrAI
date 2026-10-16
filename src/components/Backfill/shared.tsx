@@ -2,6 +2,7 @@ import { durationParts } from '@app/components/Backfill/duration';
 import type {
   CandidateView,
   JobStatus,
+  JobView,
   SeriesStatus,
   TitleKind,
 } from '@app/components/Backfill/types';
@@ -9,6 +10,7 @@ import Badge from '@app/components/Common/Badge';
 import CachedImage from '@app/components/Common/CachedImage';
 import defineMessages from '@app/utils/defineMessages';
 import { FilmIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
 import type { IntlShape } from 'react-intl';
 import { useIntl } from 'react-intl';
 
@@ -40,6 +42,17 @@ const messages = defineMessages('components.Backfill', {
   upgradesMovie: 'upgrades the movie',
   hoursMinutes: '{hours} h {minutes} min',
   minutes: '{minutes} min',
+  tryingAgainAt: '{stage}; trying again at {time}',
+  followReplaced: 'Replaced by #{id}',
+  followSearching: 'Backfill is searching for another release',
+  followAgent: 'The admin agent is looking for another release',
+  followOffered: 'Backfill offered the next pack',
+  followOfferedAgain:
+    'The pack is offered again, to approve once that is put right',
+  followNone: 'Nothing else was found',
+  followGaveUp:
+    'The admin agent stopped looking: three replacements failed today',
+  followLimit: 'The admin agent’s downloads for today are used up',
 });
 
 export const appName = (kind: TitleKind) =>
@@ -66,6 +79,21 @@ export const formatDuration = (
     ? intl.formatMessage(messages.hoursMinutes, { hours, minutes })
     : intl.formatMessage(messages.minutes, { minutes });
 };
+
+/**
+ * Where a job is, in words; one waiting out its indexer's download limit
+ * says when it is tried again, in the viewer's own time.
+ */
+export const jobStage = (
+  intl: IntlShape,
+  job: Pick<JobView, 'stage' | 'retryAt'>
+): string =>
+  job.stage && job.retryAt
+    ? intl.formatMessage(messages.tryingAgainAt, {
+        stage: job.stage,
+        time: intl.formatTime(job.retryAt),
+      })
+    : (job.stage ?? '');
 
 /** Episode label: "E202 · S05E23" for anime, "S05E23" otherwise. */
 export const episodeLabel = (e: {
@@ -141,6 +169,56 @@ export const JobStatusBadge = ({
   } as const;
   const [type, text] = map[status];
   return <Badge badgeType={type}>{intl.formatMessage(text)}</Badge>;
+};
+
+/**
+ * What became of a failed download, linked to where it went on: the
+ * download that replaced it, the admin agent's conversation, or the
+ * title's page with the pack offered.
+ */
+export const JobFollowUpNote = ({
+  job,
+  className = '',
+}: {
+  job: Pick<
+    JobView,
+    'status' | 'followUp' | 'replacedById' | 'agentRunId' | 'seriesId'
+  >;
+  className?: string;
+}) => {
+  const intl = useIntl();
+  if (job.status !== 'failed' || !job.followUp) return null;
+  const conversation = job.agentRunId
+    ? `/backfill/agent/${job.agentRunId}`
+    : undefined;
+  const title = `/backfill/series/${job.seriesId}`;
+  const [text, href] = (
+    {
+      replaced: [
+        intl.formatMessage(messages.followReplaced, {
+          id: job.replacedById ?? '',
+        }),
+        job.replacedById ? `/backfill/jobs/${job.replacedById}` : undefined,
+      ],
+      searching: [intl.formatMessage(messages.followSearching), title],
+      agent: [intl.formatMessage(messages.followAgent), conversation],
+      offered: [intl.formatMessage(messages.followOffered), title],
+      offeredAgain: [intl.formatMessage(messages.followOfferedAgain), title],
+      none: [intl.formatMessage(messages.followNone), conversation],
+      gaveUp: [intl.formatMessage(messages.followGaveUp), conversation],
+      limit: [intl.formatMessage(messages.followLimit), conversation],
+    } as const
+  )[job.followUp];
+  return href ? (
+    <Link
+      href={href}
+      className={`text-indigo-300 hover:text-indigo-200 hover:underline ${className}`}
+    >
+      {text}
+    </Link>
+  ) : (
+    <span className={`text-gray-400 ${className}`}>{text}</span>
+  );
 };
 
 export const TypeBadge = ({

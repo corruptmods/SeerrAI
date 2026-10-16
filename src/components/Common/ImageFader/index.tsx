@@ -1,4 +1,5 @@
 import CachedImage from '@app/components/Common/CachedImage';
+import { mountedImages } from '@app/components/Common/ImageFader/mounted';
 import type { ForwardRefRenderFunction, HTMLAttributes } from 'react';
 import React, { useEffect, useState } from 'react';
 
@@ -22,12 +23,13 @@ const ImageFader: ForwardRefRenderFunction<HTMLDivElement, ImageFaderProps> = (
   ref
 ) => {
   const [activeIndex, setIndex] = useState(0);
+  const [rotated, setRotated] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(
-      () => setIndex((ai) => (ai + 1) % backgroundImages.length),
-      rotationSpeed
-    );
+    const interval = setInterval(() => {
+      setIndex((ai) => (ai + 1) % backgroundImages.length);
+      setRotated(true);
+    }, rotationSpeed);
 
     return () => {
       clearInterval(interval);
@@ -50,15 +52,7 @@ const ImageFader: ForwardRefRenderFunction<HTMLDivElement, ImageFaderProps> = (
     };
   }
 
-  // Only the image showing, the one fading out and the one coming next:
-  // mounting every one made the browser download them all at once, twenty
-  // large backdrops on the sign-in page before anyone had seen the second.
-  const count = Math.max(backgroundImages.length, 1);
-  const mounted = new Set([
-    activeIndex,
-    (activeIndex + 1) % count,
-    (activeIndex - 1 + count) % count,
-  ]);
+  const mounted = mountedImages(activeIndex, backgroundImages.length, rotated);
 
   return (
     <div ref={ref}>
@@ -78,6 +72,8 @@ const ImageFader: ForwardRefRenderFunction<HTMLDivElement, ImageFaderProps> = (
               src={imageUrl}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               fill
+              // The first is at the top of the page as it opens.
+              priority={i === 0}
               {...overrides}
             />
             <div

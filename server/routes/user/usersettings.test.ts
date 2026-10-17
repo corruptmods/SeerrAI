@@ -13,6 +13,7 @@ import {
   MediaServerType,
   typeOfKind,
 } from '@server/constants/server';
+import { SERVER_THEME_DEFAULTS } from '@server/constants/theme';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
@@ -538,6 +539,107 @@ describe('a person’s own sidebar', () => {
     ]) {
       assert.strictEqual(
         (await agent.post(`/user/${userId}/settings/sidebar`).send(body))
+          .status,
+        400,
+        JSON.stringify(body)
+      );
+    }
+  });
+});
+
+describe('a person’s own look', () => {
+  beforeEach(() => {
+    getSettings().appearance.default = { ...SERVER_THEME_DEFAULTS };
+  });
+
+  const look = {
+    mode: 'light',
+    accent: 'custom',
+    customAccent: '#0EA5E9',
+    background: 'black',
+    spacing: 'compact',
+    corners: 'square',
+    blur: false,
+    solidPanels: true,
+    seasonal: false,
+  };
+
+  it('is the server’s default until they choose one', async () => {
+    getSettings().appearance.default = {
+      mode: 'auto',
+      accent: 'teal',
+      background: 'slate',
+    };
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.get(`/user/${userId}/settings/appearance`);
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(res.body, {
+      appearance: null,
+      serverDefault: { mode: 'auto', accent: 'teal', background: 'slate' },
+    });
+    const me = (await agent.get('/auth/me')).body;
+    assert.strictEqual(me.settings?.appearance ?? null, null);
+  });
+
+  it('keeps their choice, tidied, for them alone, until they go back to the default', async () => {
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    const saved = await agent
+      .post(`/user/${userId}/settings/appearance`)
+      .send({ appearance: look });
+    assert.strictEqual(saved.status, 200);
+    const kept = { ...look, customAccent: '#0ea5e9' };
+    assert.deepStrictEqual(saved.body.appearance, kept);
+    assert.deepStrictEqual(
+      (await agent.get(`/user/${userId}/settings/appearance`)).body.appearance,
+      kept
+    );
+    // Pages read it from the signed-in person.
+    assert.deepStrictEqual(
+      (await agent.get('/auth/me')).body.settings.appearance,
+      kept
+    );
+
+    // Nobody else's changes.
+    const admin = await loginAs('admin@seerr.dev', 'test1234');
+    assert.strictEqual(
+      (await admin.agent.get('/user/1/settings/appearance')).body.appearance,
+      null
+    );
+
+    const reset = await agent
+      .post(`/user/${userId}/settings/appearance`)
+      .send({ appearance: null });
+    assert.strictEqual(reset.status, 200);
+    assert.strictEqual(reset.body.appearance, null);
+    const stored = await getRepository(UserSettings).findOneOrFail({
+      where: { user: { id: userId } },
+    });
+    assert.strictEqual(stored.appearance, null);
+  });
+
+  it('refuses someone else’s, and anything that is not a look', async () => {
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+    assert.strictEqual(
+      (
+        await agent
+          .post('/user/1/settings/appearance')
+          .send({ appearance: null })
+      ).status,
+      403
+    );
+    assert.strictEqual(
+      (await agent.get('/user/1/settings/appearance')).status,
+      403
+    );
+    for (const body of [
+      {},
+      { appearance: 'dark' },
+      { appearance: { ...look, mode: 'dim' } },
+      { appearance: { ...look, customAccent: 'url(evil)' } },
+      { appearance: { ...look, css: 'body{}' } },
+    ]) {
+      assert.strictEqual(
+        (await agent.post(`/user/${userId}/settings/appearance`).send(body))
           .status,
         400,
         JSON.stringify(body)

@@ -95,7 +95,7 @@ const UserWarnings: React.FC = () => {
                 ? () => logout()
                 : undefined
           }
-          className="service-error-banner mb-4 w-full cursor-pointer transition duration-300 hover:border-yellow-400 hover:bg-yellow-500/30"
+          className="service-error-banner mb-4 w-full cursor-pointer transition duration-300 hover:border-yellow-400 hover:bg-warning/30"
         >
           <ExclamationTriangleIcon className="h-5 w-5 flex-shrink-0" />
           <span className="flex-1 text-left">

@@ -215,7 +215,7 @@ const AreaChart = ({
             }`}
             style={{ left: `${markerLeft}%` }}
           >
-            <span className="font-semibold text-white">
+            <span className="font-semibold text-strong">
               {shown.v === null ? '–' : formatValue(shown.v)}
             </span>{' '}
             <span className="text-gray-400">{formatTime(shown.t)}</span>

@@ -64,7 +64,7 @@ const LogExplain = ({ log }: { log: LogMessage }) => {
           </>
         )}
         {error && (
-          <p className="text-red-300" role="alert">
+          <p className="text-red-300 light:text-danger-text" role="alert">
             {error}
           </p>
         )}

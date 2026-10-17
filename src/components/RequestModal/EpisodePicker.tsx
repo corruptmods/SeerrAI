@@ -77,7 +77,7 @@ const EpisodePicker = ({
     <div className="space-y-1 px-4 py-3">
       <div className="mb-2 flex space-x-3 text-xs">
         <button
-          className="text-indigo-400 hover:text-indigo-300"
+          className="text-indigo-400 hover:text-indigo-300 light:text-accent-text light:hover:text-accent-text"
           onClick={() => onChange(allNumbers, allNumbers.length)}
           type="button"
         >

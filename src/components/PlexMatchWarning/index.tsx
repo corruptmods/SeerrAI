@@ -95,15 +95,15 @@ const MatchProblem = ({
         : messages.identifyById;
 
   return (
-    <section className="mb-6 rounded-lg bg-yellow-900/30 p-4 ring-1 ring-yellow-600/60">
-      <h3 className="flex items-center gap-2 font-semibold text-yellow-200">
+    <section className="mb-6 rounded-lg bg-yellow-900/30 p-4 ring-1 ring-yellow-600/60 light:bg-warning-soft/20 light:ring-warning">
+      <h3 className="flex items-center gap-2 font-semibold text-yellow-200 light:text-warning-text">
         <ExclamationTriangleIcon className="h-5 w-5 flex-none" />
         {intl.formatMessage(messages.title, { mediaServer })}
       </h3>
-      <p className="mt-2 text-sm text-yellow-100/90">
+      <p className="mt-2 text-sm text-yellow-100/90 light:text-warning-text">
         {intl.formatMessage(text, values)}
       </p>
-      <p className="mt-2 text-sm text-yellow-100/70">
+      <p className="mt-2 text-sm text-yellow-100/70 light:text-default">
         {intl.formatMessage(fix, values)}
       </p>
     </section>

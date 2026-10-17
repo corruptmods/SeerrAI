@@ -55,6 +55,7 @@ import personRoutes from './person';
 import requestRoutes from './request';
 import searchRoutes from './search';
 import serviceRoutes from './service';
+import styleRoutes from './style';
 import subtitleRoutes from './subtitles';
 import tvRoutes from './tv';
 import user from './user';
@@ -187,6 +188,7 @@ router.use('/service', isAuthenticated(), serviceRoutes);
 router.use('/issue', isAuthenticated(), issueRoutes);
 router.use('/issueComment', isAuthenticated(), issueCommentRoutes);
 router.use('/auth', authRoutes);
+router.use('/style', styleRoutes);
 // Signed-in only at the group, as every other group is. Each list route also
 // checks for itself, but a future one that forgot would otherwise be public.
 router.use('/list', isAuthenticated(), listRoutes);

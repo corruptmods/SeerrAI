@@ -139,7 +139,9 @@ const SettingsDownloadClients = () => {
                   hostname={client.hostname}
                   port={client.port}
                   isSSL={client.useSsl}
-                  logo={<Logo className="h-10 w-10 flex-shrink-0" />}
+                  logo={
+                    <Logo className="service-logo h-10 w-10 flex-shrink-0" />
+                  }
                   detail={{
                     label: intl.formatMessage(messages.client),
                     value: intl.formatMessage(messages[client.type]),

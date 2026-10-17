@@ -241,6 +241,178 @@ components:
           example: [US]
       required:
         - excludedCountries
+    ThemeDefaults:
+      type: object
+      description: The server's default look, for everyone who has not chosen their own and the sign-in page.
+      properties:
+        mode:
+          type: string
+          enum: [dark, light, auto]
+          description: auto follows each device's own light or dark setting.
+        accent:
+          type: string
+          enum:
+            [indigo, seerr, teal, green, rose, amber, plex, jellyfin, custom]
+        customAccent:
+          type: string
+          pattern: '^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$'
+          description: The colour of a custom accent; only with accent custom.
+          example: '#0ea5e9'
+        background:
+          type: string
+          enum: [classic, black, slate, warm]
+          description: The background whenever it is dark.
+        theme:
+          $ref: '#/components/schemas/ThemeFile'
+      required:
+        - mode
+        - accent
+        - background
+    ThemeFile:
+      type: object
+      description: A theme file in use. Its colours take the place of the accent's and dark background's wherever it gives them. Checked strictly by the server (known keys, colours as '#rrggbb', at most 16 KB); see docs/seerr-ai/themes.md for its format.
+      properties:
+        seerrTheme:
+          type: integer
+          enum: [1]
+        name:
+          type: string
+          maxLength: 60
+        author:
+          type: string
+          maxLength: 60
+        dark:
+          type: object
+          description: Colours when dark, by name (page, surface, textStrong, …, gray).
+        light:
+          type: object
+          description: Colours when light.
+        accent:
+          type: object
+          description: The accent (fill, ink, scale, alt, dark, light).
+        extras:
+          type: object
+          description: Settings taken when it is imported (mode, spacing, corners, blur, solidPanels).
+      required:
+        - seerrTheme
+        - name
+    Appearance:
+      type: object
+      description: A person's own look. The extras may be left out, for their usual values.
+      properties:
+        mode:
+          type: string
+          enum: [dark, light, auto]
+        accent:
+          type: string
+          enum:
+            [indigo, seerr, teal, green, rose, amber, plex, jellyfin, custom]
+        customAccent:
+          type: string
+          pattern: '^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$'
+        background:
+          type: string
+          enum: [classic, black, slate, warm]
+        spacing:
+          type: string
+          enum: [comfortable, compact]
+        corners:
+          type: string
+          enum: [rounded, square]
+        blur:
+          type: boolean
+          description: The softened backdrop behind a film or series. Off unless chosen.
+        solidPanels:
+          type: boolean
+          description: Solid panels instead of see-through ones.
+        seasonal:
+          type: boolean
+          description: Seasonal themes shown on top of their own.
+        theme:
+          $ref: '#/components/schemas/ThemeFile'
+      required:
+        - mode
+        - accent
+        - background
+    AppearanceSettings:
+      type: object
+      description: How Seerr AI looks on this server.
+      properties:
+        default:
+          $ref: '#/components/schemas/ThemeDefaults'
+      required:
+        - default
+      additionalProperties: false
+    SeasonSetting:
+      type: object
+      description: One seasonal theme as an admin set it. Days are MM-DD; Lunar New Year and Diwali may leave both out to have them worked out each year.
+      properties:
+        enabled:
+          type: boolean
+        start:
+          type: string
+          pattern: '^\d{2}-\d{2}$'
+          example: '10-24'
+        end:
+          type: string
+          pattern: '^\d{2}-\d{2}$'
+          description: The last day, included. Earlier in the year than start means the next year.
+          example: '11-01'
+      required:
+        - enabled
+      additionalProperties: false
+    SeasonsSettings:
+      type: object
+      description: The seasonal themes a server runs. A save may leave seasons out, which stay as they were.
+      properties:
+        halloween:
+          $ref: '#/components/schemas/SeasonSetting'
+        holidays:
+          $ref: '#/components/schemas/SeasonSetting'
+        newyear:
+          $ref: '#/components/schemas/SeasonSetting'
+        lunarnewyear:
+          $ref: '#/components/schemas/SeasonSetting'
+        diwali:
+          $ref: '#/components/schemas/SeasonSetting'
+        pride:
+          $ref: '#/components/schemas/SeasonSetting'
+      additionalProperties: false
+    ServerCss:
+      type: object
+      properties:
+        css:
+          type: string
+          description: Styles for everyone; '' for none. At most 64 KB.
+        personalCss:
+          type: boolean
+          description: Whether people may add their own CSS.
+      required:
+        - css
+        - personalCss
+      additionalProperties: false
+    PersonalCss:
+      type: object
+      properties:
+        css:
+          type: string
+        allowed:
+          type: boolean
+          description: Whether an admin lets people add their own CSS.
+      required:
+        - css
+        - allowed
+    UserAppearance:
+      type: object
+      properties:
+        appearance:
+          type: object
+          nullable: true
+          description: Their own look (an Appearance), or null to use the server's default.
+        serverDefault:
+          $ref: '#/components/schemas/ThemeDefaults'
+      required:
+        - appearance
     Passkey:
       type: object
       properties:
@@ -1636,13 +1808,36 @@ components:
           description: A default Lidarr is set up and music is not turned off for everyone.
         musicSearch:
           type: object
-          description: Where music can be searched. Set through /settings/music/search.
+          description: Whether music comes below the films and series in All. Set through /settings/music.
           properties:
             inAll:
               type: boolean
-            musicPage:
-              type: boolean
-            chip:
+        themeDefault:
+          $ref: '#/components/schemas/ThemeDefaults'
+        seasons:
+          type: array
+          description: The seasonal themes that run, in order, with their days when they are fixed.
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                enum:
+                  [halloween, holidays, newyear, lunarnewyear, diwali, pride]
+              start:
+                type: string
+                example: '10-24'
+              end:
+                type: string
+                example: '11-01'
+        customCss:
+          type: object
+          description: The Server CSS's version, which pages load it by (null for none), and whether people may add their own CSS.
+          properties:
+            server:
+              type: string
+              nullable: true
+            personal:
               type: boolean
         mediaServers:
           type: array
@@ -1881,6 +2076,8 @@ components:
           example: 100
         hasTheAudioDbApiKey:
           type: boolean
+        search:
+          $ref: '#/components/schemas/MusicSearchSettings'
     MusicSearchSettings:
       type: object
       properties:
@@ -1888,22 +2085,6 @@ components:
           type: boolean
           description: Artists and albums below the films and series when searching for All.
           example: false
-        musicPage:
-          type: boolean
-          description: The Music page's own search box.
-          example: true
-        chip:
-          type: boolean
-          description: Music among the kinds to choose from on the search page.
-          example: true
-        artists:
-          type: integer
-          description: The most artists one search shows (1 to 25).
-          example: 8
-        albums:
-          type: integer
-          description: The most albums one search shows (1 to 25).
-          example: 12
     MovieResult:
       type: object
       required:
@@ -3675,6 +3856,155 @@ paths:
                 $ref: '#/components/schemas/AnimeSettings'
         '400':
           description: Not a list of country codes
+  /settings/appearance:
+    get:
+      summary: The server's default look
+      description: What everyone sees who has not chosen their own look, and the sign-in page.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: The appearance settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppearanceSettings'
+    post:
+      summary: Set the server's default look
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppearanceSettings'
+      responses:
+        '200':
+          description: The appearance settings, as saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppearanceSettings'
+        '400':
+          description: Not a look
+  /settings/appearance/seasons:
+    get:
+      summary: The seasonal themes this server runs
+      tags:
+        - settings
+      responses:
+        '200':
+          description: Every season, on or off, with its days
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  seasons:
+                    $ref: '#/components/schemas/SeasonsSettings'
+    post:
+      summary: Choose the seasonal themes this server runs, and when
+      description: Seasons left out stay as they were. Everyone can still switch seasonal themes off for themselves.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                seasons:
+                  $ref: '#/components/schemas/SeasonsSettings'
+              required:
+                - seasons
+              additionalProperties: false
+      responses:
+        '200':
+          description: Every season, as saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  seasons:
+                    $ref: '#/components/schemas/SeasonsSettings'
+        '400':
+          description: Not a season, or a day that does not exist
+  /settings/appearance/css:
+    get:
+      summary: Server CSS
+      description: Styles for everyone, the sign-in page included, and whether people may add their own CSS for their own screens.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: The Server CSS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerCss'
+    post:
+      summary: Set the Server CSS
+      description: The CSS may @import stylesheets from elsewhere; the pages' Content-Security-Policy then allows the places it names for stylesheets and fonts.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServerCss'
+      responses:
+        '200':
+          description: The Server CSS, as saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerCss'
+        '400':
+          description: Not text, or larger than 64 KB
+  /style/server.css:
+    get:
+      summary: The Server CSS, as a stylesheet
+      description: Loaded by every page, the sign-in page included. With `v` set to the current version (public settings' customCss.server) it may be kept for good; otherwise it is never kept.
+      security: []
+      tags:
+        - settings
+      parameters:
+        - in: query
+          name: v
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The stylesheet; empty when there is none
+          content:
+            text/css:
+              schema:
+                type: string
+  /style/personal.css:
+    get:
+      summary: The signed-in person's own CSS, as a stylesheet
+      description: Empty for someone not signed in, or while people may not add their own CSS. With `v` set to the current version (`/auth/me` settings.personalCssVersion) it may be kept by their browser.
+      security: []
+      tags:
+        - users
+      parameters:
+        - in: query
+          name: v
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The stylesheet; empty when there is none
+          content:
+            text/css:
+              schema:
+                type: string
   /settings/features:
     get:
       summary: Optional features turned off for everyone
@@ -7137,7 +7467,7 @@ paths:
   /settings/music:
     get:
       summary: Get music settings
-      description: Where music's details come from (Settings → Metadata → Music). TheAudioDB's key is never returned, only whether one is set. Refused (403) while music is turned off for everyone.
+      description: Where music's details come from, and whether music comes below the films and series in All (Settings → Music). TheAudioDB's key is never returned, only whether one is set. Refused (403) while music is turned off for everyone.
       tags:
         - settings
       responses:
@@ -7149,7 +7479,7 @@ paths:
                 $ref: '#/components/schemas/MusicSettings'
     post:
       summary: Save music settings
-      description: Saves them. Without a TheAudioDB key the saved one is kept; `removeTheAudioDbApiKey` clears it.
+      description: Saves them. Without a TheAudioDB key the saved one is kept; `removeTheAudioDbApiKey` clears it. Without `search` the saved one is kept.
       tags:
         - settings
       requestBody:
@@ -7176,6 +7506,12 @@ paths:
                   type: number
                   minimum: 1
                   maximum: 1000
+                search:
+                  type: object
+                  properties:
+                    inAll:
+                      type: boolean
+                      description: Artists and albums below the films and series in All.
       responses:
         '200':
           description: Music settings saved
@@ -7183,52 +7519,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MusicSettings'
-  /settings/music/search:
-    get:
-      summary: Get how music is searched
-      description: Where music can be searched and how many artists and albums a search shows (Settings → Music). Refused (403) while music is turned off for everyone.
-      tags:
-        - settings
-      responses:
-        '200':
-          description: Music search settings
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MusicSearchSettings'
-    post:
-      summary: Save how music is searched
-      description: Saves them. Anything left out keeps its saved value.
-      tags:
-        - settings
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                inAll:
-                  type: boolean
-                musicPage:
-                  type: boolean
-                chip:
-                  type: boolean
-                artists:
-                  type: integer
-                  minimum: 1
-                  maximum: 25
-                albums:
-                  type: integer
-                  minimum: 1
-                  maximum: 25
-      responses:
-        '200':
-          description: Music search settings saved
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MusicSearchSettings'
   /settings/public:
     get:
       summary: Get public settings
@@ -10830,6 +11120,156 @@ paths:
                 $ref: '#/components/schemas/HiddenSliders'
         '400':
           description: Nothing to save, or the Networks list was refused (`TOO_MANY_NETWORKS` or `INVALID_NETWORK_LIST`); nothing was saved
+  /user/{userId}/settings/appearance:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: number
+    get:
+      summary: A user's own look
+      description: Their look (light or dark, accent, dark background and extras), or null when they use the server's default, which is sent too. Requires `MANAGE_USERS` permission if viewing other users.
+      tags:
+        - users
+      responses:
+        '200':
+          description: Their look
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAppearance'
+    post:
+      summary: Set a user's own look
+      description: Replaces their look; null goes back to the server's default. It changes only their own screens. Requires `MANAGE_USERS` permission if editing other users.
+      tags:
+        - users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                appearance:
+                  type: object
+                  nullable: true
+                  description: An Appearance, checked in full by the server, or null for the server's default.
+              required:
+                - appearance
+      responses:
+        '200':
+          description: Their look, as saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAppearance'
+        '400':
+          description: Not a look
+  /user/{userId}/settings/appearance/season:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: number
+    post:
+      summary: Answer a seasonal theme's note
+      description: Keep the season showing, or turn it off until it ends. Kept with the account; only the person themselves can answer.
+      tags:
+        - users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                season:
+                  type: string
+                  description: The season and the year it started.
+                  example: halloween-2026
+                choice:
+                  type: string
+                  enum: [keep, off]
+              required:
+                - season
+                - choice
+              additionalProperties: false
+      responses:
+        '200':
+          description: The answer, as kept
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  seasonNote:
+                    type: string
+                    example: halloween-2026:off
+        '400':
+          description: Not a season and an answer
+        '403':
+          description: Not their own account
+  /user/{userId}/settings/css:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: number
+    get:
+      summary: A user's own CSS
+      description: Their CSS, and whether an admin lets people add their own. Requires `MANAGE_USERS` permission if viewing other users.
+      tags:
+        - users
+      responses:
+        '200':
+          description: Their CSS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonalCss'
+    post:
+      summary: Set a user's own CSS
+      description: For their own screens only. It may not @import, run anything, or use pictures and fonts from anywhere but this server's own paths (or data:); an empty one clears it. Requires `MANAGE_USERS` permission if editing other users.
+      tags:
+        - users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                css:
+                  type: string
+              required:
+                - css
+      responses:
+        '200':
+          description: Their CSS, as saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonalCss'
+        '400':
+          description: The CSS can't be used
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  problem:
+                    type: string
+                    enum: [notText, tooLarge, import, url, script]
+                  detail:
+                    type: string
+                    description: The address (for url) or what would run (for script).
+        '403':
+          description: People may not add their own CSS on this server
   /user/{userId}/settings/sidebar:
     parameters:
       - in: path
@@ -11472,7 +11912,7 @@ paths:
   /music/search:
     get:
       summary: Search music
-      description: Artists and albums from MusicBrainz, as many as Settings → Music says (8 and 12 unless changed). Refused while music is off for the person (403), when an admin has left nowhere to search music (403), or before Lidarr is set up (404); 503 when MusicBrainz is too busy to answer in time.
+      description: Artists (up to 8) and albums (up to 12) from MusicBrainz. Refused while music is off for the person (403) or before Lidarr is set up (404); 503 when MusicBrainz is too busy to answer in time.
       tags:
         - music
       parameters:

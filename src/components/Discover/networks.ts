@@ -8,6 +8,7 @@ export type { DiscoverNetwork };
  * in the row's data (see server/constants/discoverNetworks.ts).
  */
 
+/** A network's logo in white (CompanyCard turns it dark in light mode). */
 export const networkLogoUrl = (logoPath: string): string =>
   `https://image.tmdb.org/t/p/w780_filter(duotone,ffffff,bababa)${logoPath}`;
 

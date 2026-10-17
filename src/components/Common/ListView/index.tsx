@@ -233,7 +233,7 @@ const ListView = ({
         </div>
       )}
       {filtering && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-400">
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
           <span>
             {intl.formatMessage(messages.matches, {
               matches: matchCount,
@@ -246,7 +246,7 @@ const ListView = ({
                 pathname: '/search',
                 query: { query: debounced.trim(), type: searchAllType },
               }}
-              className="font-medium text-indigo-400 hover:text-indigo-300"
+              className="font-medium text-indigo-400 hover:text-indigo-300 light:text-accent-text light:hover:text-accent-text"
             >
               {intl.formatMessage(
                 searchAllType === 'movie'
@@ -259,12 +259,12 @@ const ListView = ({
         </div>
       )}
       {isEmpty && !filtering && (
-        <div className="mt-64 w-full text-center text-2xl text-gray-400">
+        <div className="mt-64 w-full text-center text-2xl text-muted">
           {intl.formatMessage(globalMessages.noresults)}
         </div>
       )}
       {filtering && !matchCount && !isLoading && !pending && !searching && (
-        <div className="mt-16 w-full text-center text-lg text-gray-400">
+        <div className="mt-16 w-full text-center text-lg text-muted">
           {intl.formatMessage(messages.nomatch, { query: debounced.trim() })}
         </div>
       )}
@@ -405,7 +405,7 @@ const ListView = ({
       */}
       {filtering &&
         (searching || isLoading || pending ? (
-          <div className="mt-6 flex items-center justify-center gap-3 text-sm text-gray-400">
+          <div className="mt-6 flex items-center justify-center gap-3 text-sm text-muted">
             <span className="h-5 w-5">
               <SmallLoadingSpinner />
             </span>
@@ -415,7 +415,7 @@ const ListView = ({
           </div>
         ) : (
           !isReachingEnd && (
-            <div className="mt-6 flex flex-col items-center gap-2 text-sm text-gray-400">
+            <div className="mt-6 flex flex-col items-center gap-2 text-sm text-muted">
               <span>
                 {intl.formatMessage(messages.lookedThrough, {
                   loaded: loadedCount,

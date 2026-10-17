@@ -281,7 +281,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
               MediaServersLink: (msg: React.ReactNode) => (
                 <Link
                   href="/settings/media-servers"
-                  className="text-white transition duration-300 hover:underline"
+                  className="text-strong transition duration-300 hover:underline"
                 >
                   {msg}
                 </Link>
@@ -350,7 +350,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
           <div className="relative mb-6 h-8 w-full overflow-hidden rounded-full bg-gray-600">
             {dataSync?.running && (
               <div
-                className="h-8 bg-indigo-600 transition-all duration-200 ease-in-out"
+                className="h-8 bg-accent transition-all duration-200 ease-in-out"
                 style={{
                   width: `${Math.round(
                     (dataSync.progress / dataSync.total) * 100
@@ -542,7 +542,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
                   <div className="form-row">
                     <label htmlFor="hostname" className="text-label">
                       {intl.formatMessage(messages.hostname)}
-                      <span className="text-red-500">*</span>
+                      <span className="text-danger-text">*</span>
                     </label>
                     <div className="form-input-area">
                       <div className="form-input-field">

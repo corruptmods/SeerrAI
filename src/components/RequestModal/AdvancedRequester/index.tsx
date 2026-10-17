@@ -789,7 +789,7 @@ const AdvancedRequester = ({
                   <Label>{intl.formatMessage(messages.requestas)}</Label>
                   <div className="relative">
                     <span className="inline-block w-full rounded-md shadow-sm">
-                      <ListboxButton className="focus:shadow-outline-blue relative w-full cursor-default rounded-md border border-gray-700 bg-gray-800 py-2 pl-3 pr-10 text-left text-white transition duration-150 ease-in-out focus:border-blue-300 focus:outline-none sm:text-sm sm:leading-5">
+                      <ListboxButton className="focus:shadow-outline-blue relative w-full cursor-default rounded-md border border-gray-700 bg-gray-800 py-2 pl-3 pr-10 text-left text-strong transition duration-150 ease-in-out focus:border-blue-300 focus:outline-none sm:text-sm sm:leading-5">
                         <span className="flex items-center">
                           <CachedImage
                             type="avatar"
@@ -836,7 +836,7 @@ const AdvancedRequester = ({
                               <div
                                 className={`${
                                   active
-                                    ? 'bg-indigo-600 text-white'
+                                    ? 'bg-accent text-on-accent'
                                     : 'text-gray-300'
                                 } relative cursor-default select-none py-2 pl-8 pr-4`}
                               >
@@ -866,7 +866,9 @@ const AdvancedRequester = ({
                                 {selected && (
                                   <span
                                     className={`${
-                                      active ? 'text-white' : 'text-indigo-600'
+                                      active
+                                        ? 'text-on-accent'
+                                        : 'text-indigo-600'
                                     } absolute inset-y-0 left-0 flex items-center pl-1.5`}
                                   >
                                     <CheckIcon className="h-5 w-5" />

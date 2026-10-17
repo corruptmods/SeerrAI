@@ -107,8 +107,8 @@ const Row = ({
   // Larger buttons side by side on a phone; stacked arrows in the sidebar,
   // where the width is narrow.
   const buttonBase =
-    'rounded hover:text-white focus:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:text-gray-700';
-  const arrow = `${buttonBase} text-gray-400 ${phone ? 'p-2' : 'p-0.5'}`;
+    'rounded hover:text-strong focus:text-strong focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:text-gray-700';
+  const arrow = `${buttonBase} text-muted ${phone ? 'p-2' : 'p-0.5'}`;
   const iconSize = phone ? 'h-5 w-5' : 'h-4 w-4';
 
   return (
@@ -117,7 +117,7 @@ const Row = ({
       {...dragProps}
       {...dropProps}
       data-testid={`nav-editor-${item.id}`}
-      className={`relative flex cursor-grab items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-2 ${
+      className={`relative flex cursor-grab items-center gap-2 rounded-md border border-subtle bg-surface px-2 ${
         phone ? 'py-1' : 'py-1.5'
       } ${isDragging ? 'opacity-50' : ''}`}
     >
@@ -133,12 +133,12 @@ const Row = ({
       />
       {cloneElement(item.icon, {
         className: `h-5 w-5 flex-shrink-0 ${
-          hidden ? 'text-gray-600' : 'text-gray-300'
+          hidden ? 'text-gray-600' : 'text-default'
         }`,
       })}
       <span
         className={`min-w-0 flex-1 truncate text-sm font-medium ${
-          hidden ? 'text-gray-500 line-through' : 'text-white'
+          hidden ? 'text-gray-500 line-through' : 'text-strong'
         }`}
       >
         {item.name}
@@ -174,7 +174,7 @@ const Row = ({
           type="button"
           ref={(el) => buttonRef(`${item.id}-show`, el)}
           className={`${buttonBase} flex-shrink-0 ${
-            hidden ? 'text-gray-500' : 'text-indigo-400'
+            hidden ? 'text-gray-500' : 'text-indigo-400 light:text-accent-text'
           } ${phone ? 'p-2' : 'p-1'}`}
           aria-label={intl.formatMessage(messages.show, { item: item.name })}
           title={intl.formatMessage(messages.show, { item: item.name })}
@@ -344,10 +344,10 @@ const NavEditor = ({
       data-testid="nav-editor"
     >
       <div>
-        <h2 className="text-sm font-semibold text-white">
+        <h2 className="text-sm font-semibold text-strong">
           {intl.formatMessage(messages.arrange)}
         </h2>
-        <p className="mt-1 text-xs text-gray-400">
+        <p className="mt-1 text-xs text-muted">
           {phone
             ? intl.formatMessage(messages.phoneTip, { count: NAV_BAR_SIZE })
             : intl.formatMessage(messages.tip)}
@@ -358,17 +358,17 @@ const NavEditor = ({
           <div className="space-y-2">
             <h3
               id={`${groupId}-bar`}
-              className="text-xs font-semibold text-gray-400"
+              className="text-xs font-semibold text-muted"
             >
               {intl.formatMessage(messages.onBar)}
             </h3>
             {list(onBar, 0, `${groupId}-bar`)}
           </div>
           {inMenu.length > 0 && (
-            <div className="space-y-2 border-t border-gray-700 pt-3">
+            <div className="space-y-2 border-t border-subtle pt-3">
               <h3
                 id={`${groupId}-menu`}
-                className="text-xs font-semibold text-gray-400"
+                className="text-xs font-semibold text-muted"
               >
                 {intl.formatMessage(messages.inMenu)}
               </h3>
@@ -381,7 +381,7 @@ const NavEditor = ({
       )}
       <button
         type="button"
-        className="flex items-center gap-2 rounded-md border border-gray-600 px-3 py-1.5 text-sm font-medium text-gray-200 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="flex items-center gap-2 rounded-md border border-strong px-3 py-1.5 text-sm font-medium text-gray-200 hover:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-indigo-500"
         onClick={() => {
           onChange({ order: [...NAV_ITEMS], hidden: [] });
           setAnnouncement(intl.formatMessage(messages.resetDone));

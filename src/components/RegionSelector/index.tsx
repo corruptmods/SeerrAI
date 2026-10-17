@@ -99,7 +99,7 @@ const RegionSelector = ({
         {({ open }) => (
           <div className="relative">
             <span className="inline-block w-full rounded-md shadow-sm">
-              <ListboxButton className="focus:shadow-outline-blue relative flex w-full cursor-default items-center rounded-md border border-gray-500 bg-gray-700 py-2 pl-3 pr-10 text-left text-white transition duration-150 ease-in-out focus:border-blue-300 focus:outline-none sm:text-sm sm:leading-5">
+              <ListboxButton className="focus:shadow-outline-blue relative flex w-full cursor-default items-center rounded-md border border-field-border bg-field py-2 pl-3 pr-10 text-left text-strong transition duration-150 ease-in-out focus:border-blue-300 focus:outline-none sm:text-sm sm:leading-5">
                 {((selectedRegion && hasFlag(selectedRegion?.iso_3166_1)) ||
                   (isUserSetting &&
                     !selectedRegion &&
@@ -147,7 +147,7 @@ const RegionSelector = ({
                     {({ selected, active }) => (
                       <div
                         className={`${
-                          active ? 'bg-indigo-600 text-white' : 'text-gray-300'
+                          active ? 'bg-accent text-on-accent' : 'text-gray-300'
                         } relative flex cursor-default select-none items-center py-2 pl-8 pr-4`}
                       >
                         <span className="mr-2 text-base">
@@ -171,7 +171,7 @@ const RegionSelector = ({
                         {selected && (
                           <span
                             className={`${
-                              active ? 'text-white' : 'text-indigo-600'
+                              active ? 'text-on-accent' : 'text-indigo-600'
                             } absolute inset-y-0 left-0 flex items-center pl-1.5`}
                           >
                             <CheckIcon className="h-5 w-5" />
@@ -186,7 +186,7 @@ const RegionSelector = ({
                     {({ selected, active }) => (
                       <div
                         className={`${
-                          active ? 'bg-indigo-600 text-white' : 'text-gray-300'
+                          active ? 'bg-accent text-on-accent' : 'text-gray-300'
                         } relative cursor-default select-none py-2 pl-8 pr-4`}
                       >
                         <span
@@ -199,7 +199,7 @@ const RegionSelector = ({
                         {selected && (
                           <span
                             className={`${
-                              active ? 'text-white' : 'text-indigo-600'
+                              active ? 'text-on-accent' : 'text-indigo-600'
                             } absolute inset-y-0 left-0 flex items-center pl-1.5`}
                           >
                             <CheckIcon className="h-5 w-5" />
@@ -214,7 +214,7 @@ const RegionSelector = ({
                     {({ selected, active }) => (
                       <div
                         className={`${
-                          active ? 'bg-indigo-600 text-white' : 'text-gray-300'
+                          active ? 'bg-accent text-on-accent' : 'text-gray-300'
                         } relative flex cursor-default select-none items-center py-2 pl-8 pr-4`}
                       >
                         <span className="mr-2 text-base">
@@ -234,7 +234,7 @@ const RegionSelector = ({
                         {selected && (
                           <span
                             className={`${
-                              active ? 'text-white' : 'text-indigo-600'
+                              active ? 'text-on-accent' : 'text-indigo-600'
                             } absolute inset-y-0 left-0 flex items-center pl-1.5`}
                           >
                             <CheckIcon className="h-5 w-5" />

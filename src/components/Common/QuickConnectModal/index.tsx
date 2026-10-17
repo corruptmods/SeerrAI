@@ -106,7 +106,7 @@ const QuickConnectModal = ({
 
             <div className="flex flex-col items-center space-y-2">
               <div className="rounded-lg bg-gray-700 px-8 py-4">
-                <span className="text-4xl font-bold tracking-wider text-white">
+                <span className="text-4xl font-bold tracking-wider text-strong">
                   {code}
                 </span>
               </div>
@@ -124,7 +124,7 @@ const QuickConnectModal = ({
         {hasError && (
           <div className="flex flex-col items-center space-y-4 py-4">
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-red-500">
+              <h3 className="text-lg font-semibold text-danger-text">
                 {intl.formatMessage(messages.error)}
               </h3>
               <p className="mt-2 text-gray-300">{errorMessage}</p>
@@ -135,7 +135,7 @@ const QuickConnectModal = ({
         {isExpired && (
           <div className="flex flex-col items-center space-y-4 py-4">
             <div className="text-center">
-              <h3 className="text-lg font-semibold text-yellow-500">
+              <h3 className="text-lg font-semibold text-warning-text">
                 {intl.formatMessage(messages.expired)}
               </h3>
               <p className="mt-2 text-gray-300">

@@ -162,7 +162,7 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
 
   return ReactDOM.createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/90 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-strong/90 px-4"
       // Keeps the card clear of the notch and home bar in the installed app,
       // which draws edge to edge; both are zero in a normal browser.
       style={{
@@ -170,16 +170,16 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
         paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
       }}
     >
-      <div className="w-full max-w-2xl rounded-xl border border-gray-700 bg-gray-800 p-5 shadow-2xl">
+      <div className="w-full max-w-2xl rounded-xl border border-subtle bg-surface p-5 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">
+          <h2 className="text-lg font-semibold text-strong">
             {isSpinning
               ? intl.formatMessage(messages.spinning)
               : intl.formatMessage(messages.yourpick)}
           </h2>
           <button
             aria-label={intl.formatMessage(messages.close)}
-            className="text-gray-400 hover:text-white"
+            className="text-muted hover:text-strong"
             onClick={onClose}
             type="button"
           >
@@ -188,13 +188,13 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
         </div>
 
         <div
-          className="relative overflow-hidden rounded-lg bg-gray-900 py-4"
+          className="relative overflow-hidden rounded-lg bg-page py-4"
           ref={viewportRef}
         >
           {/* Marker the reel lands under. */}
           <div className="pointer-events-none absolute inset-y-0 left-1/2 z-20 w-0.5 -translate-x-1/2 bg-indigo-500" />
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-gray-900 to-transparent" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-gray-900 to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-page to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-page to-transparent" />
 
           <div
             className="flex"
@@ -210,7 +210,7 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
           >
             {reel.map((item, index) => (
               <div
-                className={`flex-none overflow-hidden rounded-md bg-gray-800 transition duration-300 ${
+                className={`flex-none overflow-hidden rounded-md bg-surface transition duration-300 ${
                   !isSpinning && index === RUNWAY
                     ? 'ring-2 ring-indigo-400'
                     : !isSpinning
@@ -233,7 +233,7 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
         </div>
 
         <div className="mt-4 flex items-center justify-between">
-          <p className="min-w-0 truncate text-lg font-bold text-white">
+          <p className="min-w-0 truncate text-lg font-bold text-strong">
             {isSpinning ? '\u00A0' : (winner.title ?? '')}
           </p>
           <div className="ml-4 flex flex-none space-x-2">

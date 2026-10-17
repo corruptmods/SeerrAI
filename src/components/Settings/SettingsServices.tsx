@@ -236,7 +236,7 @@ const SettingsServices = () => {
                   title={intl.formatMessage(messages.noDefaultNon4kServer, {
                     serverType: 'Radarr',
                     strong: (msg: React.ReactNode) => (
-                      <strong className="font-semibold text-white">
+                      <strong className="font-semibold text-strong">
                         {msg}
                       </strong>
                     ),
@@ -324,7 +324,7 @@ const SettingsServices = () => {
                   title={intl.formatMessage(messages.noDefaultNon4kServer, {
                     serverType: 'Sonarr',
                     strong: (msg: React.ReactNode) => (
-                      <strong className="font-semibold text-white">
+                      <strong className="font-semibold text-strong">
                         {msg}
                       </strong>
                     ),

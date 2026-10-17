@@ -174,7 +174,7 @@ const NotificationsSlack = () => {
                     WebhookLink: (msg: React.ReactNode) => (
                       <a
                         href="https://my.slack.com/services/new/incoming-webhook/"
-                        className="text-white transition duration-300 hover:underline"
+                        className="text-strong transition duration-300 hover:underline"
                         target="_blank"
                         rel="noreferrer"
                       >

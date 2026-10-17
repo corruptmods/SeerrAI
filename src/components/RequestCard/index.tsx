@@ -108,14 +108,14 @@ const RequestCardError = ({ requestData }: RequestCardErrorProps) => {
 
   return (
     <div
-      className="relative flex w-72 overflow-hidden rounded-xl bg-gray-800 p-4 text-gray-400 shadow ring-1 ring-red-500 sm:w-96"
+      className="relative flex w-72 overflow-hidden rounded-xl bg-surface p-4 text-muted shadow ring-1 ring-red-500 sm:w-96"
       data-testid="request-card"
     >
       <div className="w-20 sm:w-28">
         <div className="w-full" style={{ paddingBottom: '150%' }}>
           <div className="absolute inset-0 z-10 flex min-w-0 flex-1 flex-col p-4">
             <div
-              className="whitespace-normal text-base font-bold text-white sm:text-lg"
+              className="whitespace-normal text-base font-bold text-strong sm:text-lg"
               data-testid="request-card-title"
             >
               {intl.formatMessage(messages.mediaerror, {
@@ -368,8 +368,9 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
         }}
       />
       <div
-        className="relative flex w-72 overflow-hidden rounded-xl bg-gray-800 bg-cover bg-center p-4 text-gray-400 shadow ring-1 ring-gray-700 sm:w-96"
+        className="relative flex w-72 overflow-hidden rounded-xl bg-surface bg-cover bg-center p-4 text-muted shadow ring-1 ring-subtle sm:w-96"
         data-testid="request-card"
+        data-seerr="request-card"
         ref={ref}
       >
         {title.backdropPath && (
@@ -388,7 +389,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
               className="absolute inset-0"
               style={{
                 backgroundImage:
-                  'linear-gradient(135deg, rgba(17, 24, 39, 0.47) 0%, rgba(17, 24, 39, 1) 75%)',
+                  'linear-gradient(135deg, rgb(var(--page) / var(--title-fade)) 0%, rgb(var(--page)) 75%)',
               }}
             />
           </div>
@@ -397,7 +398,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
           className="relative z-10 flex min-w-0 flex-1 flex-col pr-4"
           data-testid="request-card-title"
         >
-          <div className="hidden text-xs font-medium text-white sm:flex">
+          <div className="hidden text-xs font-medium text-strong sm:flex">
             {(isMovie(title) ? title.releaseDate : title.firstAirDate)?.slice(
               0,
               4
@@ -409,7 +410,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                 ? `/movie/${requestData.media.tmdbId}`
                 : `/tv/${requestData.media.tmdbId}`
             }
-            className="overflow-hidden overflow-ellipsis whitespace-nowrap text-base font-bold text-white hover:underline sm:text-lg"
+            className="overflow-hidden overflow-ellipsis whitespace-nowrap text-base font-bold text-strong hover:underline sm:text-lg"
           >
             {isMovie(title) ? title.title : title.name}
           </Link>
@@ -432,7 +433,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                     height={20}
                   />
                 </span>
-                <span className="truncate font-semibold group-hover:text-white group-hover:underline">
+                <span className="truncate font-semibold group-hover:text-strong group-hover:underline">
                   {requestData.requestedBy.displayName}
                 </span>
               </Link>

@@ -55,7 +55,7 @@ const DeviceItem = ({
             )}
           </div>
           <div className="flex flex-col justify-center overflow-hidden pl-2 xl:pl-4">
-            <div className="pt-0.5 text-xs font-medium text-white sm:pt-1">
+            <div className="pt-0.5 text-xs font-medium text-strong sm:pt-1">
               {device.createdAt
                 ? intl.formatDate(device.createdAt, {
                     year: 'numeric',
@@ -64,7 +64,7 @@ const DeviceItem = ({
                   })
                 : 'N/A'}
             </div>
-            <div className="mr-2 min-w-0 truncate text-lg font-bold text-white hover:underline xl:text-xl">
+            <div className="mr-2 min-w-0 truncate text-lg font-bold text-strong hover:underline xl:text-xl">
               {device.userAgent && parsedUserAgent.device.model
                 ? parsedUserAgent.device.model
                 : intl.formatMessage(messages.unknown)}

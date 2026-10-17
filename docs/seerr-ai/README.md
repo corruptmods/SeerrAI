@@ -10,6 +10,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 - **[AI](./ai.md)**: AI Search (from text or a photo), Pick for the Room, Catch Me Up, and what AI can and can't do.
 - **[Subtitles and fixing problems](./subtitles-and-autofix.md)**: subtitles from Bazarr, transcription, and problems fixed from a report.
 - **[Your account](./account.md)**: passkeys, turning features off for yourself, notifications.
+- **[Themes](./themes.md)**: light or dark, your accent colour, the dark background and a few extras, seasonal themes, theme files and custom CSS.
 
 ## For admins
 

@@ -111,7 +111,7 @@ const BackfillForTitle = ({
   return (
     <section className="mb-6 overflow-hidden rounded-lg bg-gray-800 ring-1 ring-gray-700">
       <div className="flex items-center justify-between gap-3 border-b border-gray-700 px-4 py-3">
-        <h3 className="flex items-center gap-2 font-semibold text-white">
+        <h3 className="flex items-center gap-2 font-semibold text-strong">
           <DocumentMagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
           {intl.formatMessage(messages.backfill)}
         </h3>
@@ -126,7 +126,7 @@ const BackfillForTitle = ({
             })}`}
         </div>
         {tracked.readyCount > 0 && (
-          <div className="text-sm text-yellow-300">
+          <div className="text-sm text-yellow-300 light:text-warning-text">
             {intl.formatMessage(messages.waiting, {
               count: tracked.readyCount,
             })}
@@ -143,7 +143,7 @@ const BackfillForTitle = ({
                   <div className="flex items-start justify-between gap-2">
                     {/* Two lines, so the episode in the release's name
                         shows on a narrow box. */}
-                    <div className="line-clamp-2 min-w-0 break-words text-sm text-white">
+                    <div className="line-clamp-2 min-w-0 break-words text-sm text-strong">
                       {job.title}
                     </div>
                     <span className="flex-shrink-0">

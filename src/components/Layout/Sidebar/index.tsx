@@ -1,6 +1,7 @@
 import Badge from '@app/components/Common/Badge';
 import BrandLogo from '@app/components/Layout/Sidebar/BrandLogo';
 import VersionStatus from '@app/components/Layout/VersionStatus';
+import SeasonMark from '@app/components/Seasonal/SeasonMark';
 import { loadNavEditor, useNavLayout } from '@app/context/NavLayoutContext';
 import useClickOutside from '@app/hooks/useClickOutside';
 import { useFeatureCheck } from '@app/hooks/useFeature';
@@ -70,6 +71,12 @@ interface SidebarLinkProps {
   permissionType?: 'and' | 'or';
   dataTestId?: string;
 }
+
+/** The page you are on, in the accent's gradient; the others plain. */
+const activeLink =
+  'text-on-accent bg-gradient-to-br from-accent to-accent-alt hover:from-accent-hover hover:to-accent-alt-hover';
+const inactiveLink =
+  'text-strong hover:bg-surface-raised focus:bg-surface-raised';
 
 /** In the usual order; each person can arrange their own. */
 const SidebarLinks: SidebarLinkProps[] = [
@@ -256,7 +263,7 @@ const Sidebar = ({
               leaveTo="opacity-0"
             >
               <div className="fixed inset-0">
-                <div className="absolute inset-0 bg-gray-900 opacity-90" />
+                <div className="absolute inset-0 bg-overlay-strong opacity-90" />
               </div>
             </TransitionChild>
             <TransitionChild
@@ -269,7 +276,10 @@ const Sidebar = ({
               leaveTo="-translate-x-full"
             >
               <>
-                <div className="sidebar relative flex h-full w-full max-w-xs flex-1 flex-col bg-gray-800">
+                <div
+                  className="sidebar relative flex h-full w-full max-w-xs flex-1 flex-col bg-sidebar"
+                  data-seerr="sidebar"
+                >
                   <div className="sidebar-close-button absolute right-0 -mr-14 p-1">
                     <button
                       className="flex h-12 w-12 items-center justify-center rounded-full focus:bg-gray-600 focus:outline-none"
@@ -285,8 +295,9 @@ const Sidebar = ({
                   >
                     <div className="flex flex-shrink-0 items-center px-2">
                       <span className="w-full px-4 text-xl text-gray-50">
-                        <Link href="/" className="block h-24 w-64">
+                        <Link href="/" className="relative block h-24 w-64">
                           <BrandLogo />
+                          <SeasonMark className="absolute right-6 top-3 h-6 w-6" />
                         </Link>
                       </span>
                     </div>
@@ -306,10 +317,10 @@ const Sidebar = ({
                               }}
                               role="button"
                               tabIndex={0}
-                              className={`flex items-center rounded-md px-2 py-2 text-base font-medium leading-6 text-white transition duration-150 ease-in-out focus:outline-none ${
+                              className={`flex items-center rounded-md px-2 py-2 text-base font-medium leading-6 transition duration-150 ease-in-out focus:outline-none ${
                                 router.pathname.match(sidebarLink.activeRegExp)
-                                  ? 'bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500'
-                                  : 'hover:bg-gray-700 focus:bg-gray-700'
+                                  ? activeLink
+                                  : inactiveLink
                               } `}
                               data-testid={`${sidebarLink.dataTestId}-mobile`}
                             >
@@ -338,13 +349,14 @@ const Sidebar = ({
       </div>
 
       <div className="fixed bottom-0 left-0 top-0 z-30 hidden lg:flex lg:flex-shrink-0">
-        <div className="sidebar flex w-64 flex-col">
+        <div className="sidebar flex w-64 flex-col" data-seerr="sidebar">
           <div className="flex h-0 flex-1 flex-col">
             <div className="flex flex-1 flex-col overflow-y-auto pb-4">
               <div className="flex flex-shrink-0 items-center">
                 <span className="w-full px-4 py-2 text-2xl text-gray-50">
-                  <Link href="/" className="block h-24">
+                  <Link href="/" className="relative block h-24">
                     <BrandLogo eager />
+                    <SeasonMark className="absolute right-0 top-3 h-6 w-6" />
                   </Link>
                 </span>
               </div>
@@ -356,10 +368,10 @@ const Sidebar = ({
                         key={`desktop-${sidebarLink.messagesKey}`}
                         href={sidebarLink.href}
                         as={sidebarLink.as}
-                        className={`group flex items-center rounded-md px-2 py-2 text-lg font-medium leading-6 text-white transition duration-150 ease-in-out focus:outline-none ${
+                        className={`group flex items-center rounded-md px-2 py-2 text-lg font-medium leading-6 transition duration-150 ease-in-out focus:outline-none ${
                           router.pathname.match(sidebarLink.activeRegExp)
-                            ? 'bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500'
-                            : 'hover:bg-gray-700 focus:bg-gray-700'
+                            ? activeLink
+                            : inactiveLink
                         } `}
                         data-testid={sidebarLink.dataTestId}
                       >
@@ -372,12 +384,19 @@ const Sidebar = ({
                           hasPermission(Permission.MANAGE_REQUESTS) && (
                             <div className="ml-auto flex">
                               <Badge
-                                className={`rounded-md bg-gradient-to-br ${
+                                badgeType={
                                   router.pathname.match(
                                     sidebarLink.activeRegExp
                                   )
-                                    ? 'border-indigo-600 from-indigo-700 to-purple-700'
-                                    : 'border-indigo-500 from-indigo-600 to-purple-600'
+                                    ? 'deep'
+                                    : 'default'
+                                }
+                                className={`rounded-md ${
+                                  router.pathname.match(
+                                    sidebarLink.activeRegExp
+                                  )
+                                    ? ''
+                                    : '!border-accent-hover bg-gradient-to-br from-accent to-accent-alt'
                                 }`}
                               >
                                 {pendingRequestsCount}
@@ -389,12 +408,19 @@ const Sidebar = ({
                           hasPermission(Permission.MANAGE_ISSUES) && (
                             <div className="ml-auto flex">
                               <Badge
-                                className={`rounded-md bg-gradient-to-br ${
+                                badgeType={
                                   router.pathname.match(
                                     sidebarLink.activeRegExp
                                   )
-                                    ? 'border-indigo-600 from-indigo-700 to-purple-700'
-                                    : 'border-indigo-500 from-indigo-600 to-purple-600'
+                                    ? 'deep'
+                                    : 'default'
+                                }
+                                className={`rounded-md ${
+                                  router.pathname.match(
+                                    sidebarLink.activeRegExp
+                                  )
+                                    ? ''
+                                    : '!border-accent-hover bg-gradient-to-br from-accent to-accent-alt'
                                 }`}
                               >
                                 {openIssuesCount}

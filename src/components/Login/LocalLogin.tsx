@@ -93,7 +93,7 @@ const LocalLogin = ({ revalidate }: LocalLoginProps) => {
           <>
             <Form data-form-type="login">
               <div>
-                <h2 className="-mt-1 mb-6 text-center text-lg font-bold text-neutral-200">
+                <h2 className="-mt-1 mb-6 text-center text-lg font-bold text-neutral-200 light:text-strong">
                   {intl.formatMessage(messages.loginwithapp, {
                     appName: settings.currentSettings.applicationTitle,
                   })}
@@ -109,7 +109,7 @@ const LocalLogin = ({ revalidate }: LocalLoginProps) => {
                       inputMode="email"
                       data-testid="email"
                       data-form-type="username,email"
-                      className="!bg-gray-700/80 placeholder:text-gray-400"
+                      className="!bg-gray-700/80 placeholder:text-gray-400 light:!bg-field"
                     />
                   </div>
                   {touched.email && values.email.match(/\s$/) && (
@@ -146,7 +146,7 @@ const LocalLogin = ({ revalidate }: LocalLoginProps) => {
                       autoComplete="current-password"
                       data-testid="password"
                       data-form-type="password"
-                      className="!bg-gray-700/80 placeholder:text-gray-400"
+                      className="!bg-gray-700/80 placeholder:text-gray-400 light:!bg-field"
                       data-1pignore="false"
                       data-lpignore="false"
                     />
@@ -161,7 +161,7 @@ const LocalLogin = ({ revalidate }: LocalLoginProps) => {
                     {passwordResetEnabled && (
                       <Link
                         href="/resetpassword"
-                        className="pt-2 text-sm text-indigo-500 hover:text-indigo-400"
+                        className="pt-2 text-sm text-accent-text hover:text-indigo-400 light:hover:text-accent-text"
                       >
                         {intl.formatMessage(messages.forgotpassword)}
                       </Link>

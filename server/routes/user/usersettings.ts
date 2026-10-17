@@ -7,6 +7,7 @@ import {
   cleanNavOrder,
   isDefaultNavOrder,
 } from '@server/constants/navigation';
+import { cleanAppearance } from '@server/constants/theme';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
@@ -44,6 +45,7 @@ import {
 import { linkUsable, usableProviderLinks } from '@server/lib/oidc';
 import { passkeySummary } from '@server/lib/passkeys';
 import { Permission } from '@server/lib/permissions';
+import { cleanSeasonNote, seasonNoteValue } from '@server/lib/seasons';
 import { getSettings } from '@server/lib/settings';
 import { endSessions } from '@server/lib/signIn';
 import logger from '@server/logger';
@@ -60,6 +62,7 @@ import gravatarUrl from 'gravatar-url';
 import net from 'net';
 import { Not } from 'typeorm';
 import { canMakePermissionsChange } from '.';
+import personalCssRoutes from './customCss';
 
 /**
  * Trakt usernames: letters, digits, dots, dashes and underscores, and not
@@ -68,6 +71,8 @@ import { canMakePermissionsChange } from '.';
 const TRAKT_USERNAME = /^(?=.*[\w-])[\w.-]{1,64}$/;
 
 const userSettingsRoutes = Router({ mergeParams: true });
+
+userSettingsRoutes.use('/css', personalCssRoutes);
 
 userSettingsRoutes.get<{ id: string }, UserSettingsGeneralResponse>(
   '/main',
@@ -1231,6 +1236,116 @@ userSettingsRoutes.post<{ id: string }>(
             ? networks
             : (user.settings?.discoverNetworks ?? null),
       });
+    } catch (e) {
+      return next({ status: 500, message: e.message });
+    }
+  }
+);
+
+/*
+ * A person's own look (Profile → Settings → Appearance): light or dark,
+ * accent, dark background and extras, or null to use the server's default.
+ * It changes only their own screens.
+ */
+userSettingsRoutes.get<{ id: string }>(
+  '/appearance',
+  isOwnProfileOrAdmin(),
+  async (req, res, next) => {
+    try {
+      const user = await getRepository(User).findOne({
+        where: { id: Number(req.params.id) },
+      });
+      if (!user) {
+        return next({ status: 404, message: 'User not found.' });
+      }
+      return res.status(200).json({
+        appearance: user.settings?.appearance ?? null,
+        serverDefault: getSettings().fullPublicSettings.themeDefault,
+      });
+    } catch (e) {
+      return next({ status: 500, message: e.message });
+    }
+  }
+);
+
+userSettingsRoutes.post<{ id: string }>(
+  '/appearance',
+  isOwnProfileOrAdmin(),
+  async (req, res, next) => {
+    const asked = (req.body as { appearance?: unknown }).appearance;
+    const appearance = asked === null ? null : cleanAppearance(asked);
+    if (appearance === undefined) {
+      return next({
+        status: 400,
+        message: 'A look, or null for the server’s default, is required.',
+      });
+    }
+    try {
+      const user = await getRepository(User).findOne({
+        where: { id: Number(req.params.id) },
+      });
+      if (!user) {
+        return next({ status: 404, message: 'User not found.' });
+      }
+      if (user.id === 1 && req.user?.id !== 1) {
+        return next({
+          status: 403,
+          message: "You do not have permission to modify this user's settings.",
+        });
+      }
+      const repository = getRepository(UserSettings);
+      if (user.settings) {
+        await repository.update(user.settings.id, { appearance });
+      } else {
+        await repository.save(new UserSettings({ user, appearance }));
+      }
+      return res.status(200).json({
+        appearance,
+        serverDefault: getSettings().fullPublicSettings.themeDefault,
+      });
+    } catch (e) {
+      return next({ status: 500, message: e.message });
+    }
+  }
+);
+
+/*
+ * Their answer to the note a seasonal theme shows the first time it shows
+ * for them: keep it, or turn it off until it ends. Kept with the account,
+ * so the note is not asked again on another device.
+ */
+userSettingsRoutes.post<{ id: string }>(
+  '/appearance/season',
+  isOwnProfile(),
+  async (req, res, next) => {
+    const body = req.body as Record<string, unknown>;
+    const seasonNote =
+      typeof body.season === 'string' &&
+      (body.choice === 'keep' || body.choice === 'off') &&
+      Object.keys(body).length === 2
+        ? cleanSeasonNote(seasonNoteValue(body.season, body.choice))
+        : undefined;
+    if (!seasonNote) {
+      return next({
+        status: 400,
+        message:
+          'A season, such as halloween-2026, and keep or off are required.',
+      });
+    }
+    try {
+      const user = await getRepository(User).findOne({
+        where: { id: Number(req.params.id) },
+      });
+      if (!user) {
+        return next({ status: 404, message: 'User not found.' });
+      }
+      const repository = getRepository(UserSettings);
+      if (user.settings) {
+        await repository.update(user.settings.id, { seasonNote });
+      } else {
+        await repository.save(new UserSettings({ user, seasonNote }));
+      }
+      return res.status(200).json({ seasonNote });
     } catch (e) {
       return next({ status: 500, message: e.message });
     }

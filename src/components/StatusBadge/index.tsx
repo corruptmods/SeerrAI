@@ -225,10 +225,10 @@ const StatusBadge = ({
     <div
       className={`absolute left-0 top-0 z-10 flex h-full ${
         status === MediaStatus.DELETED
-          ? 'bg-red-600/80'
+          ? 'bg-danger/fill'
           : status === MediaStatus.PROCESSING
-            ? 'bg-indigo-500/80'
-            : 'bg-green-500/80'
+            ? 'bg-info/fill'
+            : 'bg-success/fill'
       } transition-all duration-200 ease-in-out`}
       style={{
         width: `${download?.percent ?? 0}%`,
@@ -245,14 +245,14 @@ const StatusBadge = ({
             href={mediaLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-indigo-400 hover:text-indigo-300"
+            className="font-semibold text-indigo-400 hover:text-indigo-300 light:text-accent-text light:hover:text-accent-text"
           >
             {mediaLinkDescription}
           </a>
         ) : (
           <Link
             href={mediaLink}
-            className="font-semibold text-indigo-400 hover:text-indigo-300"
+            className="font-semibold text-indigo-400 hover:text-indigo-300 light:text-accent-text light:hover:text-accent-text"
           >
             {mediaLinkDescription}
           </Link>

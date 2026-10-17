@@ -118,7 +118,7 @@ const RequestItemError = ({
     <div className="flex h-64 w-full flex-col justify-center rounded-xl bg-gray-800 py-4 text-gray-400 shadow-md ring-1 ring-red-500 xl:h-28 xl:flex-row">
       <div className="flex w-full flex-col justify-between overflow-hidden sm:flex-row">
         <div className="flex w-full flex-col justify-center overflow-hidden pl-4 pr-4 sm:pr-0 xl:w-7/12 2xl:w-2/3">
-          <div className="flex text-lg font-bold text-white xl:text-xl">
+          <div className="flex text-lg font-bold text-strong xl:text-xl">
             {intl.formatMessage(messages.mediaerror, {
               mediaType: intl.formatMessage(
                 requestData?.type
@@ -493,13 +493,7 @@ const RequestItem = ({
               sizes="(min-width: 1280px) 66vw, 100vw"
               {...pictureLoading(nearness)}
             />
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage:
-                  'linear-gradient(90deg, rgba(31, 41, 55, 0.47) 0%, rgba(31, 41, 55, 1) 100%)',
-              }}
-            />
+            <div className="row-backdrop-fade absolute inset-0" />
           </div>
         )}
         <div className="relative flex w-full flex-col justify-between overflow-hidden sm:flex-row">
@@ -528,7 +522,7 @@ const RequestItem = ({
               />
             </Link>
             <div className="flex flex-col justify-center overflow-hidden pl-2 xl:pl-4">
-              <div className="pt-0.5 text-xs font-medium text-white sm:pt-1">
+              <div className="pt-0.5 text-xs font-medium text-strong sm:pt-1">
                 {(isMovie(title)
                   ? title.releaseDate
                   : title.firstAirDate
@@ -540,7 +534,7 @@ const RequestItem = ({
                     ? `/movie/${requestData.media.tmdbId}`
                     : `/tv/${requestData.media.tmdbId}`
                 }
-                className="mr-2 min-w-0 truncate text-lg font-bold text-white hover:underline xl:text-xl"
+                className="mr-2 min-w-0 truncate text-lg font-bold text-strong hover:underline xl:text-xl"
               >
                 {isMovie(title) ? title.title : title.name}
               </Link>
@@ -679,7 +673,7 @@ const RequestItem = ({
                               height={20}
                             />
                           </span>
-                          <span className="truncate text-sm font-semibold group-hover:text-white group-hover:underline">
+                          <span className="truncate text-sm font-semibold group-hover:text-strong group-hover:underline">
                             {requestData.requestedBy.displayName}
                           </span>
                         </Link>
@@ -739,7 +733,7 @@ const RequestItem = ({
                             height={20}
                           />
                         </span>
-                        <span className="truncate text-sm font-semibold group-hover:text-white group-hover:underline">
+                        <span className="truncate text-sm font-semibold group-hover:text-strong group-hover:underline">
                           {requestData.modifiedBy.displayName}
                         </span>
                       </Link>

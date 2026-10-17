@@ -631,7 +631,7 @@ const musicBrainzCheck = (): HealthCheck => {
         health.rateLimited === 1 ? 'time' : 'times'
       } in the last hour`,
       detail:
-        'MusicBrainz allows one request a second from each address. A MusicBrainz mirror (Settings → Metadata → Music) has no limit.',
+        'MusicBrainz allows one request a second from each address. A MusicBrainz mirror (Settings → Music) has no limit.',
     });
   }
   if (health.failed > 0) {

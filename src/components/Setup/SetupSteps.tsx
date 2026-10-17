@@ -20,19 +20,25 @@ const SetupSteps = ({
       <div className="flex items-center space-x-4 px-6 py-4 text-sm font-medium leading-5">
         <div
           className={`flex h-10 w-10 flex-shrink-0 items-center justify-center border-2 ${
-            active ? 'border-indigo-600' : 'border-white'
+            active ? 'border-indigo-600' : 'border-white light:border-strong'
           } ${completed ? 'border-indigo-600 bg-indigo-600' : ''} rounded-full`}
         >
-          {completed && <CheckIcon className="h-6 w-6 text-white" />}
+          {completed && <CheckIcon className="h-6 w-6 text-on-accent" />}
           {!completed && (
-            <p className={active ? 'text-white' : 'text-indigo-200'}>
+            <p
+              className={
+                active
+                  ? 'text-strong'
+                  : 'text-indigo-200 light:text-accent-text'
+              }
+            >
               {stepNumber}
             </p>
           )}
         </div>
         <p
           className={`text-sm font-medium leading-5 ${
-            active ? 'text-white' : 'text-indigo-200'
+            active ? 'text-strong' : 'text-indigo-200 light:text-accent-text'
           }`}
         >
           {description}

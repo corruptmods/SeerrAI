@@ -127,7 +127,7 @@ const Pill = ({
 }) => {
   const tones = {
     gray: 'bg-gray-700 text-gray-100',
-    indigo: 'bg-indigo-500 text-white',
+    indigo: 'bg-indigo-500 text-on-accent',
     yellow: 'bg-yellow-500 text-yellow-950',
     red: 'bg-red-600 text-white',
     green: 'bg-green-500 text-white',
@@ -158,7 +158,7 @@ const SettingsGuide = () => {
       <li className="py-1 text-sm text-gray-300">
         <Link
           href={href}
-          className="font-medium text-indigo-400 hover:underline"
+          className="font-medium text-indigo-400 hover:underline light:text-accent-text"
         >
           {name}
         </Link>
@@ -183,7 +183,7 @@ const SettingsGuide = () => {
       </Section>
 
       <Section title={t('pillsTitle')}>
-        <ul className="divide-y divide-gray-700/60">
+        <ul className="guide-pills divide-y divide-gray-700/60 light:divide-subtle">
           <Pill label={t('labelPending')} tone="yellow">
             {t('pillPending')}
           </Pill>

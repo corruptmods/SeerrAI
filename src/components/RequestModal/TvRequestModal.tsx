@@ -933,7 +933,7 @@ const TvRequestModal = ({
                                       expandedSeason === season.seasonNumber
                                     }
                                     aria-controls={`season-${season.seasonNumber}-episodes`}
-                                    className="rounded text-gray-400 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                                    className="rounded text-gray-400 hover:text-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                                     onClick={() =>
                                       setExpandedSeason(
                                         expandedSeason === season.seasonNumber

@@ -3,6 +3,7 @@ import PlexTvAPI from '@server/api/plextv';
 import { ApiErrorCode } from '@server/constants/error';
 import { MIN_IMAGE_CACHE_MAX_MB } from '@server/constants/images';
 import { MediaType } from '@server/constants/media';
+import { cleanThemeDefaults } from '@server/constants/theme';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
@@ -39,6 +40,7 @@ import type { MediaServerName } from '@server/lib/plexMatchCheck';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import { plexFullScanner } from '@server/lib/scanners/plex';
 import { searchAllMissing } from '@server/lib/searchMissing';
+import { cleanSeasons, seasonSettings } from '@server/lib/seasons';
 import type { JobId, MainSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -61,6 +63,7 @@ import { z } from 'zod';
 import aiSettingsRoutes from './ai';
 import backfillSettingsRoutes from './backfill';
 import bazarrSettingsRoutes from './bazarr';
+import serverCssRoutes from './customCss';
 import downloadClientRoutes from './downloadClients';
 import jellyfinSettingsRoutes from './jellyfin';
 import lidarrRoutes from './lidarr';
@@ -95,6 +98,7 @@ settingsRoutes.use('/jellyfin', jellyfinSettingsRoutes('jellyfin'));
 settingsRoutes.use('/emby', jellyfinSettingsRoutes('emby'));
 settingsRoutes.use('/media-servers', mediaServerRoutes);
 settingsRoutes.use('/oidc', oidcSettingsRoutes);
+settingsRoutes.use('/appearance/css', serverCssRoutes);
 
 const libraryUpdateSchema = z.object({
   enabled: z.boolean(),
@@ -207,6 +211,61 @@ settingsRoutes.post('/anime', async (req, res, next) => {
   settings.main.animeExcludedCountries = excludedCountries;
   await settings.save();
   return res.status(200).json({ excludedCountries });
+});
+
+/*
+ * The server's default look (Settings → Appearance): what everyone sees who
+ * has not chosen their own, and the sign-in page. Everyone can still choose
+ * their own in their profile.
+ */
+settingsRoutes.get('/appearance', (_req, res) => {
+  return res
+    .status(200)
+    .json({ default: getSettings().fullPublicSettings.themeDefault });
+});
+
+settingsRoutes.post('/appearance', async (req, res, next) => {
+  const body = req.body as Record<string, unknown>;
+  const asked = cleanThemeDefaults(body.default);
+  if (!asked || Object.keys(body).some((key) => key !== 'default')) {
+    return next({
+      status: 400,
+      message: 'A mode, accent and dark background are required.',
+    });
+  }
+  const settings = getSettings();
+  settings.appearance.default = asked;
+  await settings.save();
+  return res.status(200).json({ default: asked });
+});
+
+/*
+ * The seasonal themes this server runs, and when (Settings → Appearance).
+ * Everyone can still switch them off for themselves.
+ */
+settingsRoutes.get('/appearance/seasons', (_req, res) => {
+  return res
+    .status(200)
+    .json({ seasons: seasonSettings(getSettings().appearance.seasons) });
+});
+
+settingsRoutes.post('/appearance/seasons', async (req, res, next) => {
+  const body = req.body as Record<string, unknown>;
+  const settings = getSettings();
+  const seasons = cleanSeasons(
+    body.seasons,
+    seasonSettings(settings.appearance.seasons)
+  );
+  if (!seasons || Object.keys(body).some((key) => key !== 'seasons')) {
+    return next({
+      status: 400,
+      message:
+        'Each season needs to be on or off, with a first and last day such as 10-24.',
+    });
+  }
+  settings.appearance.seasons = seasons;
+  await settings.save();
+  return res.status(200).json({ seasons });
 });
 
 settingsRoutes.get('/network', (req, res) => {

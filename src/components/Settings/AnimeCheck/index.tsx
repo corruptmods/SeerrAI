@@ -57,8 +57,8 @@ interface Item {
   badges: { key: string; className: string; text: string }[];
 }
 
-const FOLDER = 'bg-indigo-500/20 text-indigo-200';
-const OTHER = 'bg-yellow-500/20 text-yellow-200';
+const FOLDER = 'bg-indigo-500/20 text-indigo-200 light:text-accent-text';
+const OTHER = 'bg-yellow-500/20 text-yellow-200 light:text-warning-text';
 
 const AnimeCheck = () => {
   const intl = useIntl();
@@ -90,7 +90,7 @@ const AnimeCheck = () => {
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                   <Link
                     href={item.href}
-                    className="font-semibold text-white hover:underline"
+                    className="font-semibold text-strong hover:underline"
                   >
                     {item.title}
                   </Link>
@@ -126,7 +126,7 @@ const AnimeCheck = () => {
         {!expanded[group] && items.length > SHOWN && (
           <button
             type="button"
-            className="text-sm text-indigo-400 hover:text-indigo-300"
+            className="text-sm text-indigo-400 hover:text-indigo-300 light:text-accent-text light:hover:text-accent-text"
             onClick={() => setExpanded({ ...expanded, [group]: true })}
           >
             {intl.formatMessage(messages.showAll, { count: items.length })}

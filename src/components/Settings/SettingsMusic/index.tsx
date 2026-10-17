@@ -1,19 +1,11 @@
-import Button from '@app/components/Common/Button';
-import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
-import useSettings from '@app/hooks/useSettings';
-import useToasts from '@app/hooks/useToasts';
-import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
-import axios from 'axios';
-import { Field, Form, Formik } from 'formik';
+import { Field, useFormikContext } from 'formik';
+import type { IntlShape } from 'react-intl';
 import { useIntl } from 'react-intl';
-import useSWR from 'swr';
 import * as Yup from 'yup';
 
-const messages = defineMessages('components.Settings.SettingsMusic', {
-  music: 'Music',
+export const messages = defineMessages('components.Settings.SettingsMusic', {
   musicDescription:
     'Where artists, albums and covers come from. MusicBrainz answers one request a second for each server, so busy servers can point Seerr AI at a mirror of their own.',
   musicbrainzUrl: 'MusicBrainz Address',
@@ -40,232 +32,178 @@ const messages = defineMessages('components.Settings.SettingsMusic', {
   saveFailed: 'Music settings could not be saved.',
 });
 
-interface ShownMusicSettings {
+/** Music's settings as the server shows them: no key, only that one is set. */
+export interface ShownMusicSettings {
   musicbrainzUrl: string;
   contactEmail: string;
   listenBrainz: boolean;
   maxAlbumsPerRequest: number;
   hasTheAudioDbApiKey: boolean;
+  search: { inAll: boolean };
 }
 
+export interface MusicSourceValues {
+  musicbrainzUrl: string;
+  contactEmail: string;
+  listenBrainz: boolean;
+  theAudioDbApiKey: string;
+  removeTheAudioDbApiKey: boolean;
+  maxAlbumsPerRequest: number | string;
+}
+
+/** The fields as the form starts: the public MusicBrainz shows as blank. */
+export const musicSourceValues = (
+  data: ShownMusicSettings
+): MusicSourceValues => ({
+  musicbrainzUrl:
+    data.musicbrainzUrl === 'https://musicbrainz.org'
+      ? ''
+      : data.musicbrainzUrl,
+  contactEmail: data.contactEmail,
+  listenBrainz: data.listenBrainz,
+  theAudioDbApiKey: '',
+  removeTheAudioDbApiKey: false,
+  maxAlbumsPerRequest: data.maxAlbumsPerRequest,
+});
+
+/** What the fields must be before they are saved. */
+export const musicSourceSchema = (intl: IntlShape) => ({
+  musicbrainzUrl: Yup.string()
+    .trim()
+    .matches(/^(https?:\/\/\S+)?$/, intl.formatMessage(messages.validationUrl)),
+  contactEmail: Yup.string()
+    .trim()
+    .email(intl.formatMessage(messages.validationEmail)),
+  maxAlbumsPerRequest: Yup.number()
+    .typeError(intl.formatMessage(messages.validationMaxAlbums))
+    .integer(intl.formatMessage(messages.validationMaxAlbums))
+    .min(1, intl.formatMessage(messages.validationMaxAlbums))
+    .max(1000, intl.formatMessage(messages.validationMaxAlbums))
+    .required(intl.formatMessage(messages.validationMaxAlbums)),
+});
+
 /*
- * Settings → Metadata → Music. Shown once Lidarr is set up, since there is
- * no music before; gone while music is turned off for everyone.
+ * Where music's details come from: MusicBrainz, ListenBrainz, TheAudioDB
+ * and the most albums one request may ask for. The fields of Settings →
+ * Music's form, which loads and saves them with the rest of the page.
  */
-const SettingsMusic = () => {
+const MusicSources = ({
+  hasTheAudioDbApiKey,
+}: {
+  hasTheAudioDbApiKey: boolean;
+}) => {
   const intl = useIntl();
-  const { addToast } = useToasts();
-  const { currentSettings } = useSettings();
-  const { data, error, mutate } = useSWR<ShownMusicSettings>(
-    currentSettings.musicReady ? '/api/v1/settings/music' : null
-  );
-
-  if (!currentSettings.musicReady) {
-    return null;
-  }
-
-  const schema = Yup.object().shape({
-    musicbrainzUrl: Yup.string()
-      .trim()
-      .matches(
-        /^(https?:\/\/\S+)?$/,
-        intl.formatMessage(messages.validationUrl)
-      ),
-    contactEmail: Yup.string()
-      .trim()
-      .email(intl.formatMessage(messages.validationEmail)),
-    maxAlbumsPerRequest: Yup.number()
-      .typeError(intl.formatMessage(messages.validationMaxAlbums))
-      .integer(intl.formatMessage(messages.validationMaxAlbums))
-      .min(1, intl.formatMessage(messages.validationMaxAlbums))
-      .max(1000, intl.formatMessage(messages.validationMaxAlbums))
-      .required(intl.formatMessage(messages.validationMaxAlbums)),
-  });
+  const { errors, touched, values } = useFormikContext<MusicSourceValues>();
 
   return (
-    <div className="mt-10">
-      <h3 className="heading">{intl.formatMessage(messages.music)}</h3>
-      <p className="description">
-        {intl.formatMessage(messages.musicDescription)}
-      </p>
-      <div className="section">
-        {!data && !error && <LoadingSpinner />}
-        {data && (
-          <Formik
-            initialValues={{
-              musicbrainzUrl:
-                data.musicbrainzUrl === 'https://musicbrainz.org'
-                  ? ''
-                  : data.musicbrainzUrl,
-              contactEmail: data.contactEmail,
-              listenBrainz: data.listenBrainz,
-              theAudioDbApiKey: '',
-              removeTheAudioDbApiKey: false,
-              maxAlbumsPerRequest: data.maxAlbumsPerRequest,
-            }}
-            validationSchema={schema}
-            enableReinitialize
-            onSubmit={async (values) => {
-              try {
-                const response = await axios.post<ShownMusicSettings>(
-                  '/api/v1/settings/music',
-                  {
-                    ...values,
-                    maxAlbumsPerRequest: Number(values.maxAlbumsPerRequest),
-                  }
-                );
-                mutate(response.data, { revalidate: false });
-                addToast(intl.formatMessage(messages.saved), {
-                  appearance: 'success',
-                  autoDismiss: true,
-                });
-              } catch {
-                addToast(intl.formatMessage(messages.saveFailed), {
-                  appearance: 'error',
-                  autoDismiss: true,
-                });
-              }
-            }}
-          >
-            {({ errors, touched, isSubmitting, isValid, values }) => (
-              <Form>
-                <div className="form-row">
-                  <label htmlFor="musicbrainzUrl" className="text-label">
-                    {intl.formatMessage(messages.musicbrainzUrl)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.musicbrainzUrlTip)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <div className="form-input-field">
-                      <Field
-                        id="musicbrainzUrl"
-                        name="musicbrainzUrl"
-                        type="text"
-                        inputMode="url"
-                        placeholder="https://musicbrainz.org"
-                      />
-                    </div>
-                    {errors.musicbrainzUrl && touched.musicbrainzUrl && (
-                      <div className="error">{errors.musicbrainzUrl}</div>
-                    )}
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="contactEmail" className="text-label">
-                    {intl.formatMessage(messages.contactEmail)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.contactEmailTip)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <div className="form-input-field">
-                      <Field
-                        id="contactEmail"
-                        name="contactEmail"
-                        type="email"
-                        inputMode="email"
-                      />
-                    </div>
-                    {errors.contactEmail && touched.contactEmail && (
-                      <div className="error">{errors.contactEmail}</div>
-                    )}
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="listenBrainz" className="checkbox-label">
-                    {intl.formatMessage(messages.listenBrainz)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.listenBrainzTip)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <Field
-                      type="checkbox"
-                      id="listenBrainz"
-                      name="listenBrainz"
-                    />
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="theAudioDbApiKey" className="text-label">
-                    {intl.formatMessage(messages.theAudioDbApiKey)}
-                    <span className="label-tip">
-                      {data.hasTheAudioDbApiKey
-                        ? intl.formatMessage(messages.theAudioDbSaved)
-                        : intl.formatMessage(messages.theAudioDbApiKeyTip)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <div className="form-input-field">
-                      <SensitiveInput
-                        as="field"
-                        id="theAudioDbApiKey"
-                        name="theAudioDbApiKey"
-                        autoComplete="off"
-                        disabled={values.removeTheAudioDbApiKey}
-                      />
-                    </div>
-                    {data.hasTheAudioDbApiKey && (
-                      <label className="mt-2 flex items-center gap-2 text-sm text-gray-300">
-                        <Field
-                          type="checkbox"
-                          id="removeTheAudioDbApiKey"
-                          name="removeTheAudioDbApiKey"
-                        />
-                        {intl.formatMessage(messages.removeKey)}
-                      </label>
-                    )}
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="maxAlbumsPerRequest" className="text-label">
-                    {intl.formatMessage(messages.maxAlbumsPerRequest)}
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.maxAlbumsPerRequestTip)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <Field
-                      id="maxAlbumsPerRequest"
-                      name="maxAlbumsPerRequest"
-                      type="text"
-                      inputMode="numeric"
-                      className="short"
-                    />
-                    {errors.maxAlbumsPerRequest &&
-                      touched.maxAlbumsPerRequest && (
-                        <div className="error">
-                          {errors.maxAlbumsPerRequest}
-                        </div>
-                      )}
-                  </div>
-                </div>
-                <div className="actions">
-                  <div className="flex justify-end">
-                    <span className="ml-3 inline-flex rounded-md shadow-sm">
-                      <Button
-                        buttonType="primary"
-                        type="submit"
-                        disabled={isSubmitting || !isValid}
-                      >
-                        <ArrowDownOnSquareIcon />
-                        <span>
-                          {isSubmitting
-                            ? intl.formatMessage(globalMessages.saving)
-                            : intl.formatMessage(globalMessages.save)}
-                        </span>
-                      </Button>
-                    </span>
-                  </div>
-                </div>
-              </Form>
-            )}
-          </Formik>
-        )}
+    <>
+      <div className="form-row">
+        <label htmlFor="musicbrainzUrl" className="text-label">
+          {intl.formatMessage(messages.musicbrainzUrl)}
+          <span className="label-tip">
+            {intl.formatMessage(messages.musicbrainzUrlTip)}
+          </span>
+        </label>
+        <div className="form-input-area">
+          <div className="form-input-field">
+            <Field
+              id="musicbrainzUrl"
+              name="musicbrainzUrl"
+              type="text"
+              inputMode="url"
+              placeholder="https://musicbrainz.org"
+            />
+          </div>
+          {errors.musicbrainzUrl && touched.musicbrainzUrl && (
+            <div className="error">{errors.musicbrainzUrl}</div>
+          )}
+        </div>
       </div>
-    </div>
+      <div className="form-row">
+        <label htmlFor="contactEmail" className="text-label">
+          {intl.formatMessage(messages.contactEmail)}
+          <span className="label-tip">
+            {intl.formatMessage(messages.contactEmailTip)}
+          </span>
+        </label>
+        <div className="form-input-area">
+          <div className="form-input-field">
+            <Field
+              id="contactEmail"
+              name="contactEmail"
+              type="email"
+              inputMode="email"
+            />
+          </div>
+          {errors.contactEmail && touched.contactEmail && (
+            <div className="error">{errors.contactEmail}</div>
+          )}
+        </div>
+      </div>
+      <div className="form-row">
+        <label htmlFor="listenBrainz" className="checkbox-label">
+          {intl.formatMessage(messages.listenBrainz)}
+          <span className="label-tip">
+            {intl.formatMessage(messages.listenBrainzTip)}
+          </span>
+        </label>
+        <div className="form-input-area">
+          <Field type="checkbox" id="listenBrainz" name="listenBrainz" />
+        </div>
+      </div>
+      <div className="form-row">
+        <label htmlFor="theAudioDbApiKey" className="text-label">
+          {intl.formatMessage(messages.theAudioDbApiKey)}
+          <span className="label-tip">
+            {hasTheAudioDbApiKey
+              ? intl.formatMessage(messages.theAudioDbSaved)
+              : intl.formatMessage(messages.theAudioDbApiKeyTip)}
+          </span>
+        </label>
+        <div className="form-input-area">
+          <div className="form-input-field">
+            <SensitiveInput
+              as="field"
+              id="theAudioDbApiKey"
+              name="theAudioDbApiKey"
+              autoComplete="off"
+              disabled={values.removeTheAudioDbApiKey}
+            />
+          </div>
+          {hasTheAudioDbApiKey && (
+            <label className="mt-2 flex items-center gap-2 text-sm text-gray-300">
+              <Field
+                type="checkbox"
+                id="removeTheAudioDbApiKey"
+                name="removeTheAudioDbApiKey"
+              />
+              {intl.formatMessage(messages.removeKey)}
+            </label>
+          )}
+        </div>
+      </div>
+      <div className="form-row">
+        <label htmlFor="maxAlbumsPerRequest" className="text-label">
+          {intl.formatMessage(messages.maxAlbumsPerRequest)}
+          <span className="label-tip">
+            {intl.formatMessage(messages.maxAlbumsPerRequestTip)}
+          </span>
+        </label>
+        <div className="form-input-area">
+          <Field
+            id="maxAlbumsPerRequest"
+            name="maxAlbumsPerRequest"
+            type="text"
+            inputMode="numeric"
+            className="short"
+          />
+          {errors.maxAlbumsPerRequest && touched.maxAlbumsPerRequest && (
+            <div className="error">{errors.maxAlbumsPerRequest}</div>
+          )}
+        </div>
+      </div>
+    </>
   );
 };
 
-export default SettingsMusic;
+export default MusicSources;

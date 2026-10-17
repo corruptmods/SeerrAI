@@ -139,9 +139,9 @@ const ApproveModal = ({
         onChange={() => setMode(value)}
       />
       <span>
-        <span className="font-semibold text-white">{label}</span>
+        <span className="font-semibold text-strong">{label}</span>
         {recommended && (
-          <span className="ml-2 rounded-full bg-green-500/20 px-2 py-0.5 text-xs text-green-300">
+          <span className="ml-2 rounded-full bg-green-500/20 px-2 py-0.5 text-xs text-green-300 light:text-success-text">
             {intl.formatMessage(messages.recommended)}
           </span>
         )}
@@ -225,7 +225,7 @@ const ApproveModal = ({
                 onChange={(e) => setIncludeAi(e.target.checked)}
               />
               <span>
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-strong">
                   {intl.formatMessage(messages.includeAi, { count: aiInMode })}
                 </span>
                 <span className="block text-sm text-gray-400">
@@ -252,7 +252,7 @@ const ApproveModal = ({
             >
               <label
                 htmlFor="backfill-confirm"
-                className="mb-1 mt-2 block text-sm text-red-100"
+                className="mb-1 mt-2 block text-sm text-red-100 light:text-danger-text"
               >
                 {intl.formatMessage(messages.typeToConfirm, {
                   series: seriesTitle,

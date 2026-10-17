@@ -1,4 +1,5 @@
 import { MediaServerType } from '@server/constants/server';
+import { SERVER_THEME_DEFAULTS } from '@server/constants/theme';
 import type { PublicSettingsResponse } from '@server/interfaces/api/settingsInterfaces';
 import React from 'react';
 import useSWR from 'swr';
@@ -42,7 +43,10 @@ const defaultSettings = {
   subtitlesReady: false,
   traktReady: false,
   musicReady: false,
-  musicSearch: { inAll: false, musicPage: true, chip: true },
+  musicSearch: { inAll: false },
+  themeDefault: SERVER_THEME_DEFAULTS,
+  seasons: [],
+  customCss: { server: null, personal: false },
 };
 
 export const SettingsContext = React.createContext<SettingsContextProps>({

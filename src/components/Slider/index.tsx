@@ -198,11 +198,16 @@ const Slider = ({
   };
 
   return (
-    <div className="relative" data-testid="media-slider" ref={rowRef}>
-      <div className="absolute right-0 -mt-10 flex text-gray-400">
+    <div
+      className="relative"
+      data-testid="media-slider"
+      data-seerr="slider"
+      ref={rowRef}
+    >
+      <div className="absolute right-0 -mt-10 flex text-muted">
         <button
           className={`${
-            scrollPos.isStart ? 'text-gray-800' : 'hover:text-white'
+            scrollPos.isStart ? 'text-gray-800' : 'hover:text-strong'
           }`}
           onClick={() => slide(Direction.LEFT)}
           disabled={scrollPos.isStart}
@@ -213,7 +218,7 @@ const Slider = ({
         </button>
         <button
           className={`${
-            scrollPos.isEnd ? 'text-gray-800' : 'hover:text-white'
+            scrollPos.isEnd ? 'text-gray-800' : 'hover:text-strong'
           }`}
           onClick={() => slide(Direction.RIGHT)}
           disabled={scrollPos.isEnd}
@@ -243,7 +248,7 @@ const Slider = ({
             </div>
           ))}
         {isEmpty && (
-          <div className="mb-16 mt-16 text-center font-medium text-gray-400">
+          <div className="mb-16 mt-16 text-center font-medium text-muted">
             {emptyMessage
               ? emptyMessage
               : intl.formatMessage(globalMessages.noresults)}

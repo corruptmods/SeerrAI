@@ -207,7 +207,7 @@ const DiscoverSliderEdit = ({
     <div
       key={`discover-slider-${slider.id}-editing`}
       data-testid="discover-slider-edit-mode"
-      className={`relative mb-4 rounded-lg bg-gray-800 shadow-md ${
+      className={`relative mb-4 rounded-lg bg-surface shadow-md ${
         isDragging ? 'opacity-0' : 'opacity-100'
       }`}
       {...(personalOnly ? {} : dragProps)}
@@ -224,7 +224,7 @@ const DiscoverSliderEdit = ({
           className={`absolute -bottom-2 left-0 w-full border-t-4 border-indigo-500`}
         />
       )}
-      <div className="flex w-full flex-col rounded-t-lg border-l border-r border-t border-gray-800 bg-gray-900 p-4 text-gray-400 md:flex-row md:items-center md:space-x-2">
+      <div className="flex w-full flex-col rounded-t-lg border-l border-r border-t border-gray-800 bg-page p-4 text-muted md:flex-row md:items-center md:space-x-2">
         <div
           className={`${slider.data ? 'mb-4' : 'mb-0'} flex space-x-2 md:mb-0`}
         >
@@ -297,7 +297,9 @@ const DiscoverSliderEdit = ({
               <button
                 type="button"
                 className={`absolute right-36 top-4 md:relative md:right-0 md:top-0 ${
-                  hiddenForMe ? 'text-indigo-400' : 'hover:text-white'
+                  hiddenForMe
+                    ? 'text-accent-soft light:text-accent-text'
+                    : 'hover:text-strong'
                 }`}
                 aria-label={intl.formatMessage(
                   hiddenForMe ? messages.hiddenForMe : messages.hideForMe
@@ -352,7 +354,7 @@ const DiscoverSliderEdit = ({
             )}
             <div className="absolute right-14 top-4 flex px-2 md:relative md:right-0 md:top-0">
               <button
-                className={'hover:text-white disabled:text-gray-800'}
+                className={'hover:text-strong disabled:text-gray-800'}
                 onClick={() =>
                   onPositionUpdate(Number(slider.id), Position.Above, true)
                 }
@@ -362,7 +364,7 @@ const DiscoverSliderEdit = ({
                 <ChevronUpIcon className="h-7 w-7 md:h-6 md:w-6" />
               </button>
               <button
-                className={'hover:text-white disabled:text-gray-800'}
+                className={'hover:text-strong disabled:text-gray-800'}
                 onClick={() =>
                   onPositionUpdate(Number(slider.id), Position.Below, true)
                 }

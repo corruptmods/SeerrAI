@@ -319,7 +319,7 @@ const ListDetail = () => {
           {isRenaming ? (
             <div className="mt-8 flex items-center space-x-2 md:mb-0">
               <input
-                className="min-w-0 flex-1 rounded border-gray-600 bg-gray-700 px-3 py-1 text-2xl font-bold leading-7 text-white sm:text-4xl sm:leading-9"
+                className="min-w-0 flex-1 rounded border-strong bg-field px-3 py-1 text-2xl font-bold leading-7 text-strong sm:text-4xl sm:leading-9"
                 disabled={isSavingName}
                 onChange={(e) => setDraftName(e.target.value)}
                 onKeyDown={(e) => {
@@ -350,7 +350,7 @@ const ListDetail = () => {
             <Header>{data.name}</Header>
           )}
           {!data.isOwner && (
-            <p className="mt-1 text-sm text-gray-400">
+            <p className="mt-1 text-sm text-muted">
               {intl.formatMessage(messages.sharedby, {
                 name: data.owner.displayName,
               })}
@@ -433,7 +433,7 @@ const ListDetail = () => {
             ))}
           </div>
           <div className="flex">
-            <span className="inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-800 px-3 text-gray-100">
+            <span className="inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-surface px-3 text-gray-100">
               <BarsArrowDownIcon className="h-5 w-5" />
             </span>
             <select
@@ -459,10 +459,10 @@ const ListDetail = () => {
       )}
 
       {data.isOwner && (
-        <label className="mb-4 flex items-center space-x-2 text-xs text-gray-400 sm:text-sm">
+        <label className="mb-4 flex items-center space-x-2 text-xs text-muted sm:text-sm">
           <input
             checked={!!data.watchedSync}
-            className="h-4 w-4 flex-none rounded border-gray-600 bg-gray-700 text-indigo-600"
+            className="h-4 w-4 flex-none rounded border-strong bg-field text-indigo-600"
             disabled={isSavingWatchedSync}
             onChange={toggleWatchedSync}
             type="checkbox"
@@ -473,7 +473,7 @@ const ListDetail = () => {
         </label>
       )}
       {data.isOwner && data.watchedSync && !!data.cannotCheck?.length && (
-        <p className="-mt-2 mb-4 text-xs text-yellow-400 sm:text-sm">
+        <p className="-mt-2 mb-4 text-xs text-yellow-400 light:text-warning-text sm:text-sm">
           {intl.formatMessage(messages.cannotcheck, {
             names: intl.formatList(
               data.cannotCheck.map((person) => person.displayName),
@@ -523,7 +523,7 @@ const ListDetail = () => {
           )}
         </>
       ) : (
-        <p className="text-gray-400">{intl.formatMessage(messages.empty)}</p>
+        <p className="text-muted">{intl.formatMessage(messages.empty)}</p>
       )}
     </>
   );

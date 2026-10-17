@@ -403,7 +403,7 @@ const SettingsLogs = () => {
             )}
 
             {data?.results.length === 0 && (
-              <tr className="relative h-24 p-2 text-white">
+              <tr className="relative h-24 p-2 text-strong">
                 <Table.TD colSpan={5} noPadding>
                   <div className="flex w-screen flex-col items-center justify-center p-6 md:w-full">
                     <span className="text-base">

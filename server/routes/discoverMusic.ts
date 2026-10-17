@@ -24,10 +24,9 @@ import { IsNull, Not } from 'typeorm';
 
 /*
  * Music's Discover rows. New releases and what is popular come from
- * ListenBrainz (switched off under Settings → Metadata → Music, they are
- * empty); Recently Added is what Seerr's own scans found. ListenBrainz
- * gives MusicBrainz ids and covers itself, so these cost MusicBrainz
- * nothing.
+ * ListenBrainz (switched off under Settings → Music, they are empty);
+ * Recently Added is what Seerr's own scans found. ListenBrainz gives
+ * MusicBrainz ids and covers itself, so these cost MusicBrainz nothing.
  */
 const discoverMusicRoutes = Router();
 

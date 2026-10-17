@@ -50,7 +50,7 @@ const IssueBlock = ({ issue }: IssueBlockProps) => {
                     ? '/profile'
                     : `/users/${issue.createdBy.id}`
                 }
-                className="font-semibold text-gray-100 transition duration-300 hover:text-white hover:underline"
+                className="font-semibold text-gray-100 transition duration-300 hover:text-strong hover:underline"
               >
                 {issue.createdBy.displayName}
               </Link>

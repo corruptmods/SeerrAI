@@ -3,7 +3,7 @@ import logger from '@server/logger';
 
 /*
  * TheAudioDB, for artist pictures Lidarr has none of. Optional: only with a
- * key an admin has entered (Settings → Metadata → Music). Looked up by the
+ * key an admin has entered (Settings → Music). Looked up by the
  * artist's MusicBrainz id.
  */
 

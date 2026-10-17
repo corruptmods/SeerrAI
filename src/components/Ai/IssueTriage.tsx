@@ -54,7 +54,7 @@ const IssueTriage = ({ issueId }: { issueId: number }) => {
       )}
       {error && (
         <div
-          className="rounded-lg border border-red-700 bg-red-900/40 px-3 py-2 text-sm text-red-100"
+          className="rounded-lg border border-red-700 bg-red-900/40 px-3 py-2 text-sm text-red-100 light:bg-danger-soft/15 light:text-danger-text"
           role="alert"
         >
           {error}
@@ -62,7 +62,7 @@ const IssueTriage = ({ issueId }: { issueId: number }) => {
       )}
       {answer && (
         <div className="rounded-lg bg-gray-800/60 p-4 text-sm ring-1 ring-indigo-700/60">
-          <div className="mb-2 flex items-center gap-2 font-semibold text-indigo-200">
+          <div className="mb-2 flex items-center gap-2 font-semibold text-indigo-200 light:text-accent-text">
             <SparklesIcon className="h-4 w-4" />
             {intl.formatMessage(messages.heading)}
           </div>

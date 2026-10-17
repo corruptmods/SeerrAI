@@ -6,7 +6,7 @@ type TBodyProps = {
 
 const TBody = ({ children }: TBodyProps) => {
   return (
-    <tbody className="divide-y divide-gray-700 bg-gray-800">{children}</tbody>
+    <tbody className="divide-y divide-subtle bg-surface">{children}</tbody>
   );
 };
 
@@ -16,7 +16,7 @@ const TH = ({
   ...props
 }: React.ComponentPropsWithoutRef<'th'>) => {
   const style = [
-    'px-4 py-3 bg-gray-500 text-left text-xs leading-4 font-medium text-gray-200 uppercase tracking-wider truncate',
+    'cell-head px-4 py-3 bg-gray-500 text-left text-xs leading-4 font-medium text-gray-200 uppercase tracking-wider truncate light:bg-surface-raised light:text-strong',
   ];
 
   if (className) {
@@ -42,7 +42,7 @@ const TD = ({
   className,
   ...props
 }: TDProps & React.ComponentPropsWithoutRef<'td'>) => {
-  const style = ['text-sm leading-5 text-white'];
+  const style = ['text-sm leading-5 text-strong'];
 
   switch (alignText) {
     case 'left':
@@ -57,7 +57,7 @@ const TD = ({
   }
 
   if (!noPadding) {
-    style.push('px-4 py-4');
+    style.push('cell-pad px-4 py-4');
   }
 
   if (className) {
@@ -81,7 +81,9 @@ const Table = ({ children }: TableProps) => {
       <div className="-mx-4 my-2 overflow-x-auto md:mx-0 lg:mx-0">
         <div className="inline-block min-w-full py-2 align-middle">
           <div className="overflow-hidden rounded-lg shadow md:mx-0 lg:mx-0">
-            <table className="min-w-full">{children}</table>
+            <table className="min-w-full" data-seerr="table">
+              {children}
+            </table>
           </div>
         </div>
       </div>

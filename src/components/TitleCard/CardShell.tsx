@@ -186,10 +186,10 @@ const CardShell = ({
   >
     {modals}
     <div
-      className={`relative transform-gpu cursor-default overflow-hidden rounded-xl bg-gray-800 bg-cover outline-none ring-1 transition duration-300 ${
+      className={`relative transform-gpu cursor-default overflow-hidden rounded-xl bg-surface bg-cover outline-none ring-1 transition duration-300 ${
         detail.showDetail
           ? 'scale-105 shadow-lg ring-gray-500'
-          : 'scale-100 shadow ring-gray-700'
+          : 'scale-100 shadow ring-subtle'
       }`}
       style={{
         paddingBottom: '150%',
@@ -197,14 +197,18 @@ const CardShell = ({
       {...detail.tileProps}
       role="link"
       tabIndex={0}
+      data-seerr="title-card"
     >
-      <div className="absolute inset-0 h-full w-full overflow-hidden">
+      <div
+        className="absolute inset-0 h-full w-full overflow-hidden"
+        data-seerr="poster"
+      >
         {image}
         <div className="absolute left-0 right-0 flex items-start justify-between p-2">
           <div
             className={`pointer-events-none z-40 self-start rounded-full border shadow-md ${badge.className}`}
           >
-            <div className="flex h-4 items-center px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-white sm:h-5">
+            <div className="flex h-4 items-center px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-on-media sm:h-5">
               {badge.label}
             </div>
           </div>
@@ -235,7 +239,7 @@ const CardShell = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="absolute inset-0 z-40 flex items-center justify-center rounded-xl bg-gray-800/75 text-white">
+          <div className="absolute inset-0 z-40 flex items-center justify-center rounded-xl bg-[rgb(var(--media-scrim-raised)/0.75)] text-on-media">
             <Spinner className="h-10 w-10" />
           </div>
         </Transition>
@@ -257,12 +261,12 @@ const CardShell = ({
               className="absolute inset-0 h-full w-full cursor-pointer overflow-hidden text-left"
               style={{
                 background:
-                  'linear-gradient(180deg, rgba(45, 55, 72, 0.4) 0%, rgba(45, 55, 72, 0.9) 100%)',
+                  'linear-gradient(180deg, rgb(var(--card-scrim) / 0.4) 0%, rgb(var(--card-scrim) / 0.9) 100%)',
               }}
             >
               <div className="flex h-full w-full items-end">
                 <div
-                  className={`px-2 text-white ${roomForActions ? 'pb-11' : 'pb-2'}`}
+                  className={`px-2 text-on-media ${roomForActions ? 'pb-11' : 'pb-2'}`}
                 >
                   {overline && (
                     <div className="text-sm font-medium">{overline}</div>

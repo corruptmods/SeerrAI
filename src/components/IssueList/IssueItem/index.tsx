@@ -129,13 +129,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
             sizes="(min-width: 1280px) 66vw, 100vw"
             {...pictureLoading(nearness)}
           />
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage:
-                'linear-gradient(90deg, rgba(31, 41, 55, 0.47) 0%, rgba(31, 41, 55, 1) 100%)',
-            }}
-          />
+          <div className="row-backdrop-fade absolute inset-0" />
         </div>
       )}
       <div className="relative flex w-full flex-col justify-between overflow-hidden sm:flex-row">
@@ -164,7 +158,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
             />
           </Link>
           <div className="flex flex-col justify-center overflow-hidden pl-2 xl:pl-4">
-            <div className="pt-0.5 text-xs text-white sm:pt-1">
+            <div className="pt-0.5 text-xs text-strong sm:pt-1">
               {(isMovie(title) ? title.releaseDate : title.firstAirDate)?.slice(
                 0,
                 4
@@ -176,7 +170,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
                   ? `/movie/${issue.media.tmdbId}`
                   : `/tv/${issue.media.tmdbId}`
               }
-              className="mr-2 min-w-0 truncate text-lg font-bold text-white hover:underline xl:text-xl"
+              className="mr-2 min-w-0 truncate text-lg font-bold text-strong hover:underline xl:text-xl"
             >
               {isMovie(title) ? title.title : title.name}
             </Link>
@@ -277,7 +271,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
                           width={20}
                           height={20}
                         />
-                        <span className="truncate text-sm font-semibold group-hover:text-white group-hover:underline">
+                        <span className="truncate text-sm font-semibold group-hover:text-strong group-hover:underline">
                           {issue.createdBy.displayName}
                         </span>
                       </Link>

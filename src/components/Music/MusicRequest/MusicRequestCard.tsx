@@ -100,7 +100,7 @@ const MusicRequestCard = ({
         }}
       />
       <div
-        className="relative flex w-72 overflow-hidden rounded-xl bg-gray-800 p-4 text-gray-400 shadow ring-1 ring-gray-700 sm:w-96"
+        className="relative flex w-72 overflow-hidden rounded-xl bg-surface p-4 text-muted shadow ring-1 ring-subtle sm:w-96"
         data-testid="request-card"
         ref={ref}
       >
@@ -108,12 +108,12 @@ const MusicRequestCard = ({
           className="relative z-10 flex min-w-0 flex-1 flex-col pr-4"
           data-testid="request-card-title"
         >
-          <div className="hidden text-xs font-medium text-white sm:flex">
+          <div className="hidden text-xs font-medium text-strong sm:flex">
             {intl.formatMessage(globalMessages.music)}
           </div>
           <Link
             href={href}
-            className="overflow-hidden overflow-ellipsis whitespace-nowrap text-base font-bold text-white hover:underline sm:text-lg"
+            className="overflow-hidden overflow-ellipsis whitespace-nowrap text-base font-bold text-strong hover:underline sm:text-lg"
           >
             {title}
           </Link>
@@ -137,7 +137,7 @@ const MusicRequestCard = ({
                       height={20}
                     />
                   </span>
-                  <span className="truncate font-semibold group-hover:text-white group-hover:underline">
+                  <span className="truncate font-semibold group-hover:text-strong group-hover:underline">
                     {requestData.requestedBy.displayName}
                   </span>
                 </Link>

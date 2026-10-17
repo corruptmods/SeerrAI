@@ -161,13 +161,13 @@ const IssueList = () => {
       </div>
       {data.results.map((issue) => {
         return (
-          <div className="py-2" key={`issue-item-${issue.id}`}>
+          <div className="list-row py-2" key={`issue-item-${issue.id}`}>
             <IssueItem issue={issue} />
           </div>
         );
       })}
       {data.results.length === 0 && (
-        <div className="flex w-full flex-col items-center justify-center py-24 text-white">
+        <div className="flex w-full flex-col items-center justify-center py-24 text-strong">
           <span className="text-2xl text-gray-400">
             {intl.formatMessage(globalMessages.noresults)}
           </span>

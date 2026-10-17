@@ -342,7 +342,7 @@ const AiBulkSheet = ({
       >
         <div className="space-y-4 text-sm" data-testid="ai-bulk-sheet">
           {error && (
-            <p className="rounded bg-red-900/40 px-3 py-2 text-red-200">
+            <p className="rounded bg-red-900/40 px-3 py-2 text-red-200 light:bg-danger-soft/15 light:text-danger-text">
               {error}
             </p>
           )}
@@ -370,7 +370,7 @@ const AiBulkSheet = ({
               {done.listId !== undefined && (
                 <Link
                   href={`/lists/${done.listId}`}
-                  className="inline-block pt-1 font-semibold text-indigo-300 hover:text-indigo-200"
+                  className="inline-block pt-1 font-semibold text-indigo-300 hover:text-indigo-200 light:text-accent-text light:hover:text-accent-text"
                   onClick={onClose}
                 >
                   {intl.formatMessage(messages.openList)}
@@ -453,7 +453,7 @@ const AiBulkSheet = ({
           {!done && choosable.length > 6 && (
             <button
               type="button"
-              className="text-xs font-semibold text-indigo-300 hover:text-indigo-200"
+              className="text-xs font-semibold text-indigo-300 hover:text-indigo-200 light:text-accent-text light:hover:text-accent-text"
               onClick={() =>
                 setChosen(allChosen ? new Set() : new Set(choosable.map(keyOf)))
               }

@@ -1,3 +1,4 @@
+import type { Appearance } from '@server/constants/theme';
 import { UserType } from '@server/constants/user';
 import type { PermissionCheckOptions } from '@server/lib/permissions';
 import { hasPermission, Permission } from '@server/lib/permissions';
@@ -50,6 +51,12 @@ export interface UserSettings {
   sidebarOrder?: string[];
   /** Sidebar and phone menu items they hid for themselves. */
   sidebarHidden?: string[];
+  /** Their own look; null to use the server's default. */
+  appearance?: Appearance | null;
+  /** Their answer to a seasonal theme's note, '<season>-<year>:keep|off'. */
+  seasonNote?: string | null;
+  /** The version of their own CSS pages load; null for none. */
+  personalCssVersion?: string | null;
 }
 
 interface UserHookResponse {

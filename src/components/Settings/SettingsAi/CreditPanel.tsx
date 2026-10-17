@@ -212,7 +212,7 @@ const CreditPanel = () => {
               href={links.billing}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 font-semibold text-white underline"
+              className="inline-flex items-center gap-1 font-semibold text-strong underline"
             >
               {intl.formatMessage(messages.addCredit)}
               <ArrowTopRightOnSquareIcon className="h-4 w-4" />
@@ -239,7 +239,7 @@ const CreditPanel = () => {
               <div className="text-sm text-gray-400">{tile.label}</div>
               <div
                 className={`mt-1 font-semibold ${
-                  tile.muted ? 'text-sm text-gray-400' : 'text-2xl text-white'
+                  tile.muted ? 'text-sm text-gray-400' : 'text-2xl text-strong'
                 }`}
               >
                 {tile.value}
@@ -315,16 +315,16 @@ const CreditPanel = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <div
                     id="aiAdminKey"
-                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-gray-500 bg-gray-700 px-3 py-2 text-sm text-white"
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-field-border bg-field px-3 py-2 text-sm text-strong"
                   >
                     {removeAdminKey ? (
                       <>
-                        <TrashIcon className="h-5 w-5 flex-none text-red-400" />
+                        <TrashIcon className="h-5 w-5 flex-none text-red-400 light:text-danger-text" />
                         <span>{intl.formatMessage(messages.keyRemoving)}</span>
                       </>
                     ) : (
                       <>
-                        <CheckCircleIcon className="h-5 w-5 flex-none text-green-400" />
+                        <CheckCircleIcon className="h-5 w-5 flex-none text-success-text" />
                         <span>{intl.formatMessage(messages.keySaved)}</span>
                       </>
                     )}
@@ -373,7 +373,7 @@ const CreditPanel = () => {
                   {replacing && (
                     <button
                       type="button"
-                      className="mt-2 text-sm text-gray-400 hover:text-white"
+                      className="mt-2 text-sm text-gray-400 hover:text-strong"
                       onClick={() => {
                         setReplacing(false);
                         setAdminKey('');
@@ -397,7 +397,7 @@ const CreditPanel = () => {
                     href={links.pricing}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 underline hover:text-white"
+                    className="inline-flex items-center gap-1 underline hover:text-strong"
                   >
                     {intl.formatMessage(messages.pricing)}
                     <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />

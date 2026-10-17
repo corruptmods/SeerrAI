@@ -134,7 +134,10 @@ const SettingsBackfill = () => {
         <h3 className="heading">{intl.formatMessage(messages.backfill)}</h3>
         <p className="description">
           {intl.formatMessage(messages.description)}{' '}
-          <Link href="/backfill" className="text-indigo-400 hover:underline">
+          <Link
+            href="/backfill"
+            className="text-indigo-400 hover:underline light:text-accent-text"
+          >
             {intl.formatMessage(messages.openBackfill)}
           </Link>
         </p>

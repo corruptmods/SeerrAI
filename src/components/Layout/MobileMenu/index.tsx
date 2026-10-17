@@ -281,9 +281,10 @@ const MobileMenu = ({
         leave="transition duration-500"
         leaveFrom="opacity-100 -translate-y-full"
         leaveTo="opacity-0 translate-y-0"
-        className={`absolute left-0 right-0 top-0 flex w-full -translate-y-full flex-col space-y-6 border-t border-gray-600 bg-gray-900/90 px-6 py-6 font-semibold text-gray-100 backdrop-blur ${
+        className={`absolute left-0 right-0 top-0 flex w-full -translate-y-full flex-col space-y-6 border-t border-strong bg-page/bar px-6 py-6 font-semibold text-gray-100 backdrop-blur ${
           editing ? 'max-h-[75vh] overflow-y-auto' : ''
         }`}
+        data-seerr="more-menu"
       >
         {draft && NavEditor ? (
           <NavEditor
@@ -304,7 +305,7 @@ const MobileMenu = ({
                 key={`mobile-menu-link-${link.href}`}
                 href={link.href}
                 className={`flex items-center ${
-                  isActive ? 'text-indigo-500' : ''
+                  isActive ? 'text-accent-text' : ''
                 }`}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -323,7 +324,7 @@ const MobileMenu = ({
                   pendingRequestsCount > 0 &&
                   hasPermission(Permission.MANAGE_REQUESTS) && (
                     <div className="ml-auto flex">
-                      <Badge className="rounded-md border-indigo-500 bg-gradient-to-br from-indigo-600 to-purple-600">
+                      <Badge className="rounded-md !border-accent-hover bg-gradient-to-br from-accent to-accent-alt">
                         {pendingRequestsCount}
                       </Badge>
                     </div>
@@ -332,7 +333,7 @@ const MobileMenu = ({
                   openIssuesCount > 0 &&
                   hasPermission(Permission.MANAGE_ISSUES) && (
                     <div className="ml-auto flex">
-                      <Badge className="rounded-md border-indigo-500 bg-gradient-to-br from-indigo-600 to-purple-600">
+                      <Badge className="rounded-md !border-accent-hover bg-gradient-to-br from-accent to-accent-alt">
                         {openIssuesCount}
                       </Badge>
                     </div>
@@ -342,7 +343,10 @@ const MobileMenu = ({
           })
         )}
       </Transition>
-      <div className="padding-bottom-safe border-t border-gray-600 bg-gray-800/90 backdrop-blur">
+      <div
+        className="padding-bottom-safe border-t border-strong bg-surface/bar backdrop-blur"
+        data-seerr="bottom-bar"
+      >
         <div className="flex h-full items-center justify-between px-3 py-4 text-gray-100 sm:px-6">
           {barLinks.map((link) => {
             const isActive =
@@ -357,7 +361,7 @@ const MobileMenu = ({
                 }
                 aria-current={isActive ? 'page' : undefined}
                 className={`relative flex flex-col items-center space-y-1 ${
-                  isActive ? 'text-indigo-500' : ''
+                  isActive ? 'text-accent-text' : ''
                 }`}
               >
                 {cloneElement(isActive ? link.svgIconSelected : link.svgIcon, {
@@ -368,10 +372,15 @@ const MobileMenu = ({
                   hasPermission(Permission.MANAGE_REQUESTS) && (
                     <div className="absolute bottom-3 left-3">
                       <Badge
-                        className={`bg-gradient-to-br ${
+                        badgeType={
                           router.pathname.match(link.activeRegExp)
-                            ? 'border-indigo-600 from-indigo-700 to-purple-700'
-                            : 'border-indigo-500 from-indigo-600 to-purple-600'
+                            ? 'deep'
+                            : 'default'
+                        }
+                        className={`${
+                          router.pathname.match(link.activeRegExp)
+                            ? ''
+                            : '!border-accent-hover bg-gradient-to-br from-accent to-accent-alt'
                         } flex ${
                           pendingRequestsCount > 99 ? 'w-6' : 'w-4'
                         } h-4 items-center justify-center !px-[5px] !py-[7px] text-[8px]`}
@@ -388,7 +397,9 @@ const MobileMenu = ({
           {editing ? (
             <button
               className={`flex flex-col items-center space-y-1 ${
-                isOpen ? 'text-indigo-500' : 'text-indigo-300'
+                isOpen
+                  ? 'text-accent-text'
+                  : 'text-indigo-300 light:text-accent-text'
               }`}
               onClick={() => toggle()}
               aria-label={intl.formatMessage(
@@ -407,7 +418,7 @@ const MobileMenu = ({
             hasMenu && (
               <button
                 className={`flex flex-col items-center space-y-1 ${
-                  isOpen ? 'text-indigo-500' : ''
+                  isOpen ? 'text-accent-text' : ''
                 }`}
                 onClick={() => toggle()}
                 aria-label={intl.formatMessage(

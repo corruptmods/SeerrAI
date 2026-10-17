@@ -43,17 +43,17 @@ const PersonCard = ({
       <div
         className={`relative ${
           canExpand ? 'w-full' : 'w-36 sm:w-36 md:w-44'
-        } transform-gpu cursor-pointer rounded-xl text-white shadow ring-1 transition duration-150 ease-in-out ${
+        } transform-gpu cursor-pointer rounded-xl text-strong shadow ring-1 transition duration-150 ease-in-out ${
           isHovered
             ? 'scale-105 bg-gray-700 ring-gray-500'
-            : 'scale-100 bg-gray-800 ring-gray-700'
+            : 'scale-100 bg-surface ring-subtle'
         }`}
       >
         <div style={{ paddingBottom: '150%' }}>
           <div className="absolute inset-0 flex h-full w-full flex-col items-center p-2">
             <div className="relative mb-4 mt-2 flex h-1/2 w-full justify-center">
               {profilePath ? (
-                <div className="relative h-full w-3/4 overflow-hidden rounded-full ring-1 ring-gray-700">
+                <div className="relative h-full w-3/4 overflow-hidden rounded-full ring-1 ring-subtle">
                   <NearScreen.Provider value={nearness}>
                     <CachedImage
                       type="tmdb"
@@ -75,7 +75,7 @@ const PersonCard = ({
             <div className="w-full truncate text-center font-bold">{name}</div>
             {subName && (
               <div
-                className="overflow-hidden whitespace-normal text-center text-sm text-gray-300"
+                className="overflow-hidden whitespace-normal text-center text-sm text-default"
                 style={{
                   WebkitLineClamp: 2,
                   display: '-webkit-box',
@@ -88,7 +88,7 @@ const PersonCard = ({
             )}
             <div
               className={`absolute bottom-0 left-0 right-0 h-12 rounded-b-xl bg-gradient-to-t ${
-                isHovered ? 'from-gray-800' : 'from-gray-900'
+                isHovered ? 'from-surface' : 'from-page'
               }`}
             />
           </div>

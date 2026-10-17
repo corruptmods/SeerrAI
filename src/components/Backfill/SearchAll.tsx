@@ -79,7 +79,7 @@ const SearchAllPanel = ({
       <div className="rounded-lg bg-gray-800 p-4 ring-1 ring-indigo-500/40">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="font-semibold text-white">
+            <p className="font-semibold text-strong">
               {intl.formatMessage(messages.running)}
             </p>
             <p className="text-sm text-gray-300">
@@ -115,7 +115,11 @@ const SearchAllPanel = ({
             </span>
           </Button>
         </div>
-        {problem && <p className="mt-2 text-sm text-red-300">{problem}</p>}
+        {problem && (
+          <p className="mt-2 text-sm text-red-300 light:text-danger-text">
+            {problem}
+          </p>
+        )}
         {ready && (
           <div className="mt-3 space-y-2">
             <ProgressBar
@@ -139,7 +143,11 @@ const SearchAllPanel = ({
         <p className="text-sm text-gray-300">
           {intl.formatMessage(messages.explain)}
         </p>
-        {problem && <p className="mt-2 text-sm text-red-300">{problem}</p>}
+        {problem && (
+          <p className="mt-2 text-sm text-red-300 light:text-danger-text">
+            {problem}
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <Button
             buttonType="primary"

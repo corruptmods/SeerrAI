@@ -8,6 +8,7 @@ import UserWarnings from '@app/components/Layout/UserWarnings';
 import WatchSuggestions from '@app/components/MediaLists/WatchSuggestions';
 import PasskeyNudge from '@app/components/PasskeyNudge';
 import PushOptInBanner from '@app/components/PushOptIn/PushOptInBanner';
+import SeasonalNote from '@app/components/Seasonal/SeasonalNote';
 import { NavLayoutProvider } from '@app/context/NavLayoutContext';
 import useLocale from '@app/hooks/useLocale';
 import useSettings from '@app/hooks/useSettings';
@@ -148,10 +149,10 @@ const Layout = ({ children }: LayoutProps) => {
   return (
     // Discover's customize mode and the menus share the menu being arranged.
     <NavLayoutProvider>
-      <div className="flex h-full min-h-full min-w-0 bg-gray-900">
-        <div className="pwa-only fixed inset-0 z-20 h-1 w-full border-gray-700 md:border-t" />
-        <div className="absolute top-0 h-64 w-full bg-gradient-to-bl from-gray-800 to-gray-900">
-          <div className="relative inset-0 h-full w-full bg-gradient-to-t from-gray-900 to-transparent" />
+      <div className="flex h-full min-h-full min-w-0 bg-page">
+        <div className="pwa-only fixed inset-0 z-20 h-1 w-full border-subtle md:border-t" />
+        <div className="absolute top-0 h-64 w-full bg-gradient-to-bl from-surface to-page">
+          <div className="relative inset-0 h-full w-full bg-gradient-to-t from-page to-transparent" />
         </div>
         <Sidebar
           open={isSidebarOpen}
@@ -174,16 +175,17 @@ const Layout = ({ children }: LayoutProps) => {
           <PullToRefresh />
           <div
             className={`searchbar fixed left-0 right-0 top-0 z-10 flex flex-shrink-0 transition duration-300 ${
-              isScrolled ? 'bg-gray-700/80' : 'bg-transparent'
+              isScrolled ? 'bg-surface-raised/panel' : 'bg-transparent'
             } lg:left-64`}
             style={{
               backdropFilter: isScrolled ? 'blur(5px)' : undefined,
               WebkitBackdropFilter: isScrolled ? 'blur(5px)' : undefined,
             }}
+            data-seerr="top-bar"
           >
             <div className="flex flex-1 items-center justify-between px-4 md:pl-4 md:pr-4">
               <button
-                className={`mr-2 hidden text-white sm:block ${
+                className={`mr-2 hidden text-strong sm:block ${
                   isScrolled ? 'opacity-90' : 'opacity-70'
                 } transition duration-300 focus:outline-none lg:hidden`}
                 aria-label={intl.formatMessage(messages.openSidebar)}
@@ -194,9 +196,9 @@ const Layout = ({ children }: LayoutProps) => {
               </button>
               <button
                 aria-label={intl.formatMessage(messages.goBack)}
-                className={`mr-2 text-white ${
+                className={`mr-2 text-strong ${
                   isScrolled ? 'opacity-90' : 'opacity-70'
-                } transition duration-300 hover:text-white focus:text-white focus:outline-none`}
+                } transition duration-300 hover:text-strong focus:text-strong focus:outline-none`}
                 onClick={goBack}
               >
                 <ArrowLeftIcon className="w-7" />
@@ -209,7 +211,11 @@ const Layout = ({ children }: LayoutProps) => {
             </div>
           </div>
 
-          <main className="relative top-16 z-0 focus:outline-none" tabIndex={0}>
+          <main
+            className="relative top-16 z-0 focus:outline-none"
+            tabIndex={0}
+            data-seerr="page"
+          >
             <div className="mb-6">
               <div className="max-w-8xl mx-auto px-4">
                 <UserWarnings />
@@ -217,6 +223,7 @@ const Layout = ({ children }: LayoutProps) => {
                 <PushOptInBanner />
                 <PasskeyNudge />
                 <WatchSuggestions />
+                <SeasonalNote />
                 {children}
               </div>
             </div>

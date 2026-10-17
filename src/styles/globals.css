@@ -2,6 +2,165 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme colours (src/utils/theme): Classic dark with Indigo, what the page
+ * shows before a theme is applied. The server writes each person's own look
+ * over these (pages/_document); theme.test.ts checks they stay the same as
+ * Classic's there.
+ */
+:root {
+  --gray-50: 249 250 251;
+  --gray-100: 243 244 246;
+  --gray-200: 229 231 235;
+  --gray-300: 209 213 219;
+  --gray-400: 156 163 175;
+  --gray-500: 107 114 128;
+  --gray-600: 75 85 99;
+  --gray-700: 55 65 81;
+  --gray-800: 31 41 55;
+  --gray-900: 17 24 39;
+  --gray-950: 3 7 18;
+  --accent-50: 238 242 255;
+  --accent-100: 224 231 255;
+  --accent-200: 199 210 254;
+  --accent-300: 165 180 252;
+  --accent-400: 129 140 248;
+  --accent-500: 99 102 241;
+  --accent-600: 79 70 229;
+  --accent-700: 67 56 202;
+  --accent-800: 55 48 163;
+  --accent-900: 49 46 129;
+  --accent-950: 30 27 75;
+  --accent-alt-50: 250 245 255;
+  --accent-alt-100: 243 232 255;
+  --accent-alt-200: 233 213 255;
+  --accent-alt-300: 216 180 254;
+  --accent-alt-400: 192 132 252;
+  --accent-alt-500: 168 85 247;
+  --accent-alt-600: 147 51 234;
+  --accent-alt-700: 126 34 206;
+  --accent-alt-800: 107 33 168;
+  --accent-alt-900: 88 28 135;
+  --accent-alt-950: 59 7 100;
+  --page: 17 24 39;
+  --surface: 31 41 55;
+  --surface-raised: 55 65 81;
+  --sidebar: 31 41 55;
+  --sidebar-to: 19 25 40;
+  --overlay: 31 41 55;
+  --overlay-strong: 17 24 39;
+  --media-scrim: 17 24 39;
+  --text-strong: 255 255 255;
+  --text-default: 209 213 219;
+  --text-muted: 156 163 175;
+  --on-accent: 255 255 255;
+  --on-media: 255 255 255;
+  --border-subtle: 55 65 81;
+  --border-strong: 75 85 99;
+  --field: 55 65 81;
+  --field-border: 107 114 128;
+  --accent: 79 70 229;
+  --accent-hover: 99 102 241;
+  --accent-text: 99 102 241;
+  --accent-soft: 129 140 248;
+  --accent-alt: 147 51 234;
+  --accent-alt-hover: 168 85 247;
+  --accent-chip: 99 102 241;
+  --on-accent-chip: 224 231 255;
+  --on-accent-deep: 224 231 255;
+  --success: 34 197 94;
+  --success-text: 74 222 128;
+  --success-soft: 34 197 94;
+  --warning: 234 179 8;
+  --warning-text: 234 179 8;
+  --warning-soft: 250 204 21;
+  --danger: 220 38 38;
+  --danger-text: 239 68 68;
+  --danger-soft: 220 38 38;
+  --info: 99 102 241;
+  --info-text: 99 102 241;
+  --info-soft: 129 140 248;
+  --fill-opacity: 0.8;
+  --accent-fill-opacity: 0.8;
+  --panel-opacity: 0.8;
+  --bar-opacity: 0.9;
+}
+
+/* Corners, and the other extras of a look (Profile → Settings → Appearance). */
+:root {
+  --radius-sm: 0.125rem;
+  --radius: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  /*
+   * How much the backdrop behind a film or series is softened: not at all
+   * unless someone turns on Blur behind title pages.
+   */
+  --title-blur: 0px;
+}
+
+:root[data-corners='square'] {
+  --radius: 0.125rem;
+  --radius-md: 0.125rem;
+  --radius-lg: 0.125rem;
+  --radius-xl: 0.125rem;
+  --radius-2xl: 0.125rem;
+  --radius-3xl: 0.125rem;
+}
+
+:root[data-blur='on'] {
+  --title-blur: 6px;
+}
+
+/*
+ * Pictures and the fades over them. A title page's backdrop fades into the
+ * page itself: in dark the page's colour covers half the picture at the
+ * top, as it always has; in light it covers more of it, so the dark text
+ * over it can be read. Text on posters and other pictures sits on a dark
+ * layer in every look (media-scrim, and these lighter ones), so it stays
+ * light. Classic keeps its own blue-greys; the other dark backgrounds use
+ * their own greys.
+ */
+:root {
+  --title-fade: 0.47;
+  /* The layer over a poster that is pointed at, Classic's blue-grey. */
+  --card-scrim: 45 55 72;
+  /* A lighter dark layer for banners: Classic's panel grey. */
+  --media-scrim-raised: 31 41 55;
+  /* The sign-in page's slideshow fades from the one into the other. */
+  --backdrop-fade-from: 45 55 72;
+  --backdrop-fade-to: 26 32 46;
+  --backdrop-fade-start: 0.47;
+  /* Over the picture behind a row in Requests, Issues and the Blocklist. */
+  --row-fade: 0.47;
+}
+
+:root[data-mode='dark']:is(:not([data-theme='classic']), [data-season]) {
+  --row-fade: 0.6;
+}
+
+:root[data-mode='dark']:not([data-theme='classic']) {
+  --card-scrim: var(--surface);
+  --media-scrim-raised: var(--surface);
+  --backdrop-fade-from: var(--surface);
+  --backdrop-fade-to: var(--page);
+}
+
+:root[data-mode='light'] {
+  --title-fade: 0.85;
+  --backdrop-fade-from: var(--page);
+  --backdrop-fade-to: var(--page);
+  /*
+   * The sign-in, setup and password pages write dark text and icons over
+   * their slideshow, so in light it starts as covered as a title page's.
+   */
+  --backdrop-fade-start: 0.85;
+  --row-fade: 0.85;
+}
+
 @layer base {
   /*
    * Room for the scrollbar is kept while a window is open and the page
@@ -13,11 +172,11 @@
     padding: env(safe-area-inset-top) env(safe-area-inset-right)
       calc(4rem + env(safe-area-inset-bottom)) env(safe-area-inset-left);
     scrollbar-width: thin;
-    scrollbar-color: #4b5563 #1f2937;
+    scrollbar-color: rgb(var(--gray-600)) rgb(var(--surface));
   }
 
   html:hover {
-    scrollbar-color: #6b7280 #1f2937;
+    scrollbar-color: rgb(var(--gray-500)) rgb(var(--surface));
   }
 
   /* WebKit scrollbar styles */
@@ -26,15 +185,15 @@
   }
 
   html::-webkit-scrollbar-track {
-    background: #1f2937;
+    background: rgb(var(--surface));
   }
 
   html::-webkit-scrollbar-thumb {
-    background-color: #4b5563;
+    background-color: rgb(var(--gray-600));
   }
 
   html:hover::-webkit-scrollbar-thumb {
-    background-color: #6b7280;
+    background-color: rgb(var(--gray-500));
   }
 
   @media (min-width: 640px) {
@@ -44,12 +203,12 @@
   }
 
   body {
-    @apply bg-gray-900;
+    @apply bg-page;
     -webkit-overflow-scrolling: touch;
   }
 
   code {
-    @apply rounded-md bg-gray-800 px-2 py-1;
+    @apply rounded-md bg-surface px-2 py-1;
   }
 
   input[type='search']::-webkit-search-cancel-button {
@@ -71,10 +230,14 @@
   }
 
   .sidebar {
-    @apply border-r border-gray-700;
+    @apply border-r border-subtle;
     padding-top: calc(0.75rem + env(safe-area-inset-top));
     padding-left: env(safe-area-inset-left);
-    background: linear-gradient(180deg, rgba(31, 41, 55, 1) 0%, #131928 100%);
+    background: linear-gradient(
+      180deg,
+      rgb(var(--sidebar)) 0%,
+      rgb(var(--sidebar-to)) 100%
+    );
   }
 
   .slideover {
@@ -87,8 +250,38 @@
   }
 
   .server-type-button {
-    @apply rounded-md border border-gray-500 bg-gray-700 px-4 py-2 text-white transition duration-150 ease-in-out hover:bg-gray-500;
+    @apply rounded-md border border-field-border bg-field px-4 py-2 text-strong transition duration-150 ease-in-out hover:bg-gray-500 light:hover:bg-surface-raised;
   }
+  /*
+   * Service logos (Plex, Radarr, qBittorrent, …) are drawn for a dark
+   * background, many with white parts, so in light mode they sit on a
+   * small dark tile.
+   */
+  :root[data-mode='light'] .service-logo {
+    @apply rounded-md bg-media-scrim p-1;
+  }
+
+  /*
+   * Links to other sites under a title's details (TMDB, IMDb, Trakt, …),
+   * dimmed until pointed at. Their logos are service logos too, so in light
+   * mode each sits on its dark tile. Half of a dark logo all but vanishes
+   * on light grey or on black, so there and on True black they are dimmed
+   * less.
+   */
+  .external-link {
+    @apply opacity-50 transition duration-300 hover:opacity-100;
+  }
+
+  :root[data-mode='light'] .external-link,
+  :root[data-mode='dark'][data-theme='black'] .external-link {
+    opacity: 0.8;
+  }
+
+  :root[data-mode='light'] .external-link:hover,
+  :root[data-mode='dark'][data-theme='black'] .external-link:hover {
+    opacity: 1;
+  }
+
   .jellyfin-server svg {
     @apply h-6 w-6;
   }
@@ -118,15 +311,15 @@
   }
 
   .service-error-banner {
-    @apply mb-2 flex items-center gap-2 rounded-md border border-yellow-500 bg-yellow-500/20 px-3 py-2 text-sm text-yellow-200;
+    @apply mb-2 flex items-center gap-2 rounded-md border border-warning bg-warning/20 px-3 py-2 text-sm text-yellow-200 light:text-warning-text;
   }
 
   .slider-title {
-    @apply inline-flex items-center text-xl font-bold leading-7 text-gray-300 sm:truncate sm:text-2xl sm:leading-9;
+    @apply inline-flex items-center text-xl font-bold leading-7 text-default sm:truncate sm:text-2xl sm:leading-9;
   }
 
   a.slider-title {
-    @apply transition duration-300 hover:text-white;
+    @apply transition duration-300 hover:text-strong;
   }
 
   a.slider-title svg {
@@ -198,10 +391,10 @@
   .list-card-gradient {
     background: linear-gradient(
       to top,
-      rgba(17, 24, 39, 0.97) 0%,
-      rgba(17, 24, 39, 0.72) 38%,
-      rgba(17, 24, 39, 0.08) 75%,
-      rgba(17, 24, 39, 0) 100%
+      rgb(var(--media-scrim) / 0.97) 0%,
+      rgb(var(--media-scrim) / 0.72) 38%,
+      rgb(var(--media-scrim) / 0.08) 75%,
+      rgb(var(--media-scrim) / 0) 100%
     );
   }
 
@@ -219,8 +412,27 @@
   }
 
   .media-page-bg-image {
-    @apply absolute inset-0 h-full w-full;
+    @apply absolute inset-0 h-full w-full overflow-hidden;
     z-index: -10;
+  }
+
+  /*
+   * Blur behind title pages (Profile → Settings → Appearance). Enlarged a
+   * little, so the softened edges fall outside the page.
+   */
+  :root[data-blur='on'] .media-page-bg-image img {
+    filter: blur(var(--title-blur));
+    transform: scale(1.04);
+  }
+
+  /* Fades a title page's backdrop into the page. */
+  .media-page-fade {
+    @apply absolute inset-0;
+    background-image: linear-gradient(
+      180deg,
+      rgb(var(--page) / var(--title-fade)) 0%,
+      rgb(var(--page)) 100%
+    );
   }
 
   .media-header {
@@ -248,7 +460,7 @@
    * keeps room to be read.
    */
   .media-title {
-    @apply mt-4 flex flex-1 flex-col text-center text-white 2xl:mr-4 2xl:mt-0 2xl:min-w-[18rem] 2xl:text-left;
+    @apply mt-4 flex flex-1 flex-col text-center text-strong 2xl:mr-4 2xl:mt-0 2xl:min-w-[18rem] 2xl:text-left;
   }
 
   .media-title > h1 {
@@ -260,11 +472,11 @@
   }
 
   .media-attributes {
-    @apply mt-1 flex flex-wrap items-center justify-center space-x-1 text-xs text-gray-300 sm:text-sm xl:text-base 2xl:mt-0 2xl:justify-start;
+    @apply mt-1 flex flex-wrap items-center justify-center space-x-1 text-xs text-default sm:text-sm xl:text-base 2xl:mt-0 2xl:justify-start;
   }
 
   .media-attributes a {
-    @apply transition duration-300 hover:text-white hover:underline;
+    @apply transition duration-300 hover:text-strong hover:underline;
   }
 
   /*
@@ -372,7 +584,7 @@
   }
 
   .media-overview {
-    @apply flex flex-col pb-4 pt-8 text-white lg:flex-row;
+    @apply flex flex-col pb-4 pt-8 text-strong lg:flex-row;
   }
 
   .media-overview-left {
@@ -380,15 +592,15 @@
   }
 
   .tagline {
-    @apply mb-4 text-xl italic text-gray-400 lg:text-2xl;
+    @apply mb-4 text-xl italic text-muted lg:text-2xl;
   }
 
   .media-overview h2 {
-    @apply text-xl font-bold text-gray-300 sm:text-2xl;
+    @apply text-xl font-bold text-default sm:text-2xl;
   }
 
   .media-overview p {
-    @apply pt-2 text-sm text-gray-400 sm:text-base;
+    @apply pt-2 text-sm text-muted sm:text-base;
   }
 
   ul.media-crew {
@@ -396,13 +608,13 @@
   }
 
   ul.media-crew > li {
-    @apply col-span-1 flex flex-col font-bold text-gray-300;
+    @apply col-span-1 flex flex-col font-bold text-default;
   }
 
   a.crew-name,
   .media-fact-value a,
   .media-fact-value button {
-    @apply font-normal text-gray-400 transition duration-300 hover:text-gray-100 hover:underline;
+    @apply font-normal text-muted transition duration-300 hover:text-gray-100 hover:underline;
   }
 
   .media-overview-right {
@@ -410,19 +622,19 @@
   }
 
   .media-facts {
-    @apply rounded-lg border border-gray-700 bg-gray-900 text-sm font-bold text-gray-300 shadow;
+    @apply rounded-lg border border-subtle bg-page text-sm font-bold text-default shadow;
   }
 
   .media-fact {
-    @apply flex justify-between border-b border-gray-700 px-4 py-2 last:border-b-0;
+    @apply flex justify-between border-b border-subtle px-4 py-2 last:border-b-0;
   }
 
   .media-fact-value {
-    @apply ml-2 text-right text-sm font-normal text-gray-400;
+    @apply ml-2 text-right text-sm font-normal text-muted;
   }
 
   .media-ratings {
-    @apply flex items-center justify-center space-x-5 border-b border-gray-700 px-4 py-2 font-medium last:border-b-0;
+    @apply flex items-center justify-center space-x-5 border-b border-subtle px-4 py-2 font-medium last:border-b-0;
   }
 
   .media-rating {
@@ -430,7 +642,7 @@
   }
 
   .error-message {
-    @apply relative bottom-0 left-0 right-0 top-0 flex h-screen flex-col items-center justify-center text-center text-gray-300;
+    @apply relative bottom-0 left-0 right-0 top-0 flex h-screen flex-col items-center justify-center text-center text-default;
   }
 
   .heading {
@@ -438,7 +650,7 @@
   }
 
   .description {
-    @apply mt-1 max-w-4xl text-sm leading-5 text-gray-400;
+    @apply mt-1 max-w-4xl text-sm leading-5 text-muted;
   }
 
   img.avatar-sm {
@@ -447,6 +659,21 @@
 
   .card-field {
     @apply flex items-center truncate py-0.5 text-sm sm:py-1;
+  }
+
+  /*
+   * The fade over the picture behind a row in Requests, Issues and the
+   * Blocklist, into the row's own colour: the picture shows faintly behind
+   * the title and is gone by the buttons. A light row needs more of it, so
+   * its dark title reads over any picture, and so do the other dark
+   * backgrounds, whose greys are a little dimmer than Classic's.
+   */
+  .row-backdrop-fade {
+    background-image: linear-gradient(
+      90deg,
+      rgb(var(--surface) / var(--row-fade)) 0%,
+      rgb(var(--surface)) 100%
+    );
   }
 
   .card-field-name {
@@ -458,7 +685,7 @@
   }
 
   .section {
-    @apply mb-10 mt-6 text-white;
+    @apply mb-10 mt-6 text-strong;
   }
 
   .form-row {
@@ -466,7 +693,7 @@
   }
 
   .form-input-area {
-    @apply text-sm text-white sm:col-span-2;
+    @apply text-sm text-strong sm:col-span-2;
   }
 
   .form-input-field {
@@ -474,12 +701,12 @@
   }
 
   .actions {
-    @apply mt-8 border-t border-gray-700 pt-5 text-white;
+    @apply mt-8 border-t border-subtle pt-5 text-strong;
   }
 
   label,
   .group-label {
-    @apply mb-1 block text-sm font-bold leading-5 text-gray-400;
+    @apply mb-1 block text-sm font-bold leading-5 text-muted;
   }
 
   label.checkbox-label {
@@ -491,15 +718,15 @@
   }
 
   label a {
-    @apply text-gray-100 transition duration-300 hover:text-white hover:underline;
+    @apply text-gray-100 transition duration-300 hover:text-strong hover:underline;
   }
 
   .label-required {
-    @apply ml-1 text-red-500;
+    @apply ml-1 text-danger-text;
   }
 
   .label-tip {
-    @apply block font-medium text-gray-500;
+    @apply block font-medium text-gray-500 light:text-muted;
   }
 
   button,
@@ -510,14 +737,24 @@
   }
 
   input[type='checkbox'] {
-    @apply h-6 w-6 rounded-md text-indigo-600 transition duration-150 ease-in-out;
+    @apply h-6 w-6 rounded-md text-accent transition duration-150 ease-in-out;
   }
 
+  /* Every kind of text box looks the same: an email or number field
+     otherwise keeps the forms plugin's white box. Search boxes are left
+     out; each one is styled where it is. */
   input[type='text'],
   input[type='password'],
+  input[type='email'],
+  input[type='url'],
+  input[type='number'],
+  input[type='tel'],
+  input[type='date'],
+  input[type='time'],
+  input[type='datetime-local'],
   select,
   textarea {
-    @apply block w-full min-w-0 flex-1 rounded-md border border-gray-500 bg-gray-700 text-white transition duration-150 ease-in-out sm:text-sm sm:leading-5;
+    @apply block w-full min-w-0 flex-1 rounded-md border border-field-border bg-field text-strong transition duration-150 ease-in-out sm:text-sm sm:leading-5;
   }
 
   input.rounded-l-only,
@@ -545,7 +782,7 @@
   }
 
   button.input-action {
-    @apply relative -ml-px inline-flex items-center border border-gray-500 bg-indigo-600/80 px-3 py-2 text-sm font-medium leading-5 text-white last:rounded-r-md sm:px-3.5;
+    @apply relative -ml-px inline-flex items-center border border-field-border bg-accent/accent-fill px-3 py-2 text-sm font-medium leading-5 text-on-accent last:rounded-r-md sm:px-3.5;
   }
 
   button.input-action[disabled] {
@@ -553,7 +790,7 @@
   }
 
   button.input-action:not([disabled]) {
-    @apply transition duration-150 ease-in-out hover:bg-indigo-600 active:bg-gray-100 active:text-gray-700;
+    @apply transition duration-150 ease-in-out hover:bg-accent active:bg-gray-100 active:text-gray-700;
   }
 
   .button-md :where(svg),
@@ -574,19 +811,19 @@
   }
 
   .protocol {
-    @apply inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-600 px-3 text-gray-100 sm:text-sm;
+    @apply inline-flex cursor-default items-center rounded-l-md border border-r-0 border-field-border bg-gray-600 px-3 text-gray-100 sm:text-sm;
   }
 
   .error {
-    @apply mt-2 text-sm text-red-500;
+    @apply mt-2 text-sm text-danger-text;
   }
 
   .warning {
-    @apply mt-2 text-sm text-yellow-500;
+    @apply mt-2 text-sm text-warning-text;
   }
 
   .form-group {
-    @apply mt-6 text-white;
+    @apply mt-6 text-strong;
   }
 
   .toast {
@@ -598,43 +835,43 @@
   }
 
   .react-select-container:has(+ .input-action) .react-select__control {
-    @apply rounded-r-none border border-gray-500 bg-gray-700 text-white hover:border-gray-500;
+    @apply rounded-r-none border border-field-border bg-field text-strong hover:border-field-border;
   }
 
   .react-select-container .react-select__control {
-    @apply rounded-md border border-gray-500 bg-gray-700 text-white hover:border-gray-500;
+    @apply rounded-md border border-field-border bg-field text-strong hover:border-field-border;
   }
 
   .react-select-container-dark .react-select__control {
-    @apply border border-gray-700 bg-gray-800;
+    @apply border border-subtle bg-surface;
   }
 
   .react-select-container .react-select__control--is-focused {
-    @apply rounded-md border border-gray-500 bg-gray-700 text-white shadow;
+    @apply rounded-md border border-field-border bg-field text-strong shadow;
   }
 
   .react-select-container-dark .react-select__control--is-focused {
-    @apply border-gray-600 bg-gray-800;
+    @apply border-strong bg-surface;
   }
 
   .react-select-container .react-select__menu {
-    @apply bg-gray-700 text-gray-300;
+    @apply bg-field text-default;
   }
 
   .react-select-container-dark .react-select__menu {
-    @apply bg-gray-800;
+    @apply bg-surface;
   }
 
   .react-select-container .react-select__option--is-focused {
-    @apply bg-gray-600 text-white;
+    @apply bg-gray-600 text-strong;
   }
 
   .react-select-container-dark .react-select__option--is-focused {
-    @apply bg-gray-700;
+    @apply bg-surface-raised;
   }
 
   .react-select-container .react-select__indicator-separator {
-    @apply bg-gray-500;
+    @apply bg-field-border;
   }
 
   .react-select-container .react-select__indicator {
@@ -646,11 +883,11 @@
   }
 
   .react-select-container .react-select__multi-value {
-    @apply rounded-md border border-gray-500 bg-gray-800;
+    @apply rounded-md border border-field-border bg-surface;
   }
 
   .react-select-container .react-select__multi-value__label {
-    @apply text-white;
+    @apply text-strong;
   }
 
   .react-select-container .react-select__multi-value__remove {
@@ -667,7 +904,7 @@
   }
 
   .react-select-container .react-select__input-container {
-    @apply text-white;
+    @apply text-strong;
   }
 
   .react-select-container .react-select__single-value {
@@ -676,6 +913,32 @@
 
   .react-select-container .react-select__placeholder {
     @apply text-sm text-gray-500;
+  }
+
+  /*
+   * The date picker draws itself with Tailwind's own greys (and slate for
+   * its dark background), so inside it they are put back to Tailwind's:
+   * the app's greys change with the background and, in light mode, run
+   * the other way round. In light mode its faintest text grey (other
+   * months' days, the placeholder, the icons) is a step darker so it can
+   * be read on white.
+   */
+  .datepicker-wrapper {
+    --gray-50: 249 250 251;
+    --gray-100: 243 244 246;
+    --gray-200: 229 231 235;
+    --gray-300: 209 213 219;
+    --gray-400: 156 163 175;
+    --gray-500: 107 114 128;
+    --gray-600: 75 85 99;
+    --gray-700: 55 65 81;
+    --gray-800: 31 41 55;
+    --gray-900: 17 24 39;
+    --gray-950: 3 7 18;
+  }
+
+  :root[data-mode='light'] .datepicker-wrapper {
+    --gray-400: 107 114 128;
   }
 
   .datepicker-wrapper > button {
@@ -712,6 +975,86 @@
     width: 16px;
     height: 16px;
     -webkit-appearance: none;
+  }
+
+  /*
+   * Compact spacing (Profile → Settings → Appearance): less room between
+   * rows, cards, form fields and menu items, so more fits on the screen.
+   */
+  :root[data-spacing='compact'] .section {
+    @apply mb-6 mt-4;
+  }
+
+  :root[data-spacing='compact'] .form-row {
+    @apply mt-3 sm:mt-3;
+  }
+
+  :root[data-spacing='compact'] ul.cards-vertical,
+  :root[data-spacing='compact'] ul.cards-horizontal {
+    @apply gap-2.5;
+  }
+
+  :root[data-spacing='compact'] .slider-header {
+    @apply mb-2 mt-4;
+  }
+
+  :root[data-spacing='compact'] .sidebar nav > * + * {
+    @apply mt-2;
+  }
+
+  :root[data-spacing='compact'] .form-group,
+  :root[data-spacing='compact'] .actions {
+    @apply mt-4;
+  }
+
+  :root[data-spacing='compact'] .card-field {
+    @apply py-0;
+  }
+
+  /* Rows in Requests, Issues, the Blocklist and every table. */
+  :root[data-spacing='compact'] .list-row {
+    @apply py-1;
+  }
+
+  :root[data-spacing='compact'] .cell-pad {
+    @apply py-2;
+  }
+
+  :root[data-spacing='compact'] .cell-head {
+    @apply py-2;
+  }
+
+  /*
+   * Classic keeps today's table headings and How It Works dividers, which
+   * are faint; True black, Slate, Warm and a season's night have no today
+   * to keep, so their headings sit on a darker grey and the dividers are
+   * drawn in full.
+   */
+  :root[data-mode='dark']:is(:not([data-theme='classic']), [data-season])
+    .cell-head {
+    background-color: rgb(var(--gray-700));
+  }
+
+  :root[data-mode='dark']:is(:not([data-theme='classic']), [data-season])
+    .guide-pills
+    > :not([hidden])
+    ~ :not([hidden]) {
+    border-color: rgb(var(--border-subtle));
+  }
+
+  /* Menu items and the items of drop-down lists. */
+  :root[data-spacing='compact'] .menu-item {
+    @apply py-1.5;
+  }
+
+  :root[data-spacing='compact'] .react-select-container .react-select__option {
+    @apply py-1.5;
+  }
+
+  /* Bold text and headings in notes and guides (Markdown) stand out from
+     the text around them in light mode, as they do in dark. */
+  :root[data-mode='light'] .prose :where(strong, h1, h2, h3, h4, h5, h6) {
+    @apply text-strong;
   }
 }
 
@@ -753,7 +1096,12 @@
   }
 
   .text-overseerr {
-    @apply bg-gradient-to-br from-indigo-400 to-purple-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-br from-indigo-400 to-accent-alt-400 bg-clip-text text-transparent;
+  }
+
+  /* The pale gradient reads on dark only; light mode takes its deep shades. */
+  :root[data-mode='light'] .text-overseerr {
+    @apply from-indigo-700 to-accent-alt-700;
   }
 
   @media all and (display-mode: browser) {
@@ -784,4 +1132,25 @@
 
 .ptr--box {
   margin-bottom: -13px !important;
+}
+
+/*
+ * A focus ring for keyboard use that shows in every theme. Many buttons and
+ * links switch the browser's own outline off (focus:outline-none) and show
+ * nothing in its place; these get a ring in the accent's text colour, which
+ * reads on every background. Those with a focus ring of their own, and text
+ * boxes, which show focus with their border, are left as they are.
+ */
+:is(.focus\:outline-none, .outline-none):focus-visible:not(
+    input,
+    textarea,
+    select
+  ):not(
+    [class*='focus:ring-1'],
+    [class*='focus:ring-2'],
+    [class*='focus-visible:ring-1'],
+    [class*='focus-visible:ring-2']
+  ) {
+  outline: 2px solid rgb(var(--accent-text));
+  outline-offset: 2px;
 }

@@ -47,10 +47,10 @@ const ShowMoreCard = ({ url, posters }: ShowMoreCardProps) => {
       tabIndex={0}
     >
       <div
-        className={`relative w-36 transform-gpu cursor-pointer overflow-hidden rounded-xl text-white shadow-lg ring-1 transition duration-150 ease-in-out sm:w-36 md:w-44 ${
+        className={`relative w-36 transform-gpu cursor-pointer overflow-hidden rounded-xl text-strong shadow-lg ring-1 transition duration-150 ease-in-out sm:w-36 md:w-44 ${
           isHovered
             ? 'scale-105 bg-gray-600 ring-gray-500'
-            : 'scale-100 bg-gray-800 ring-gray-700'
+            : 'scale-100 bg-surface ring-subtle'
         }`}
       >
         <div style={{ paddingBottom: '150%' }}>
@@ -105,7 +105,7 @@ const ShowMoreCard = ({ url, posters }: ShowMoreCardProps) => {
                 </div>
               )}
             </div>
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-white">
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-strong">
               <ArrowRightCircleIcon className="w-14" />
               <div className="mt-2 font-extrabold">
                 {intl.formatMessage(messages.seemore)}

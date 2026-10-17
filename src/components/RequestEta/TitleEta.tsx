@@ -79,8 +79,8 @@ const TitleEta = ({
   }
 
   return (
-    <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-gray-300 2xl:justify-start">
-      <ClockIcon className="h-4 w-4 flex-none text-gray-400" />
+    <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-default 2xl:justify-start">
+      <ClockIcon className="h-4 w-4 flex-none text-muted" />
       <span>{text}</span>
     </p>
   );

@@ -106,7 +106,7 @@ const MediaLists = () => {
 
       <div className="mb-6 flex max-w-lg items-center space-x-2">
         <input
-          className="min-w-0 flex-1 rounded border-gray-600 bg-gray-700 px-3 py-2 text-white"
+          className="min-w-0 flex-1 rounded border-strong bg-field px-3 py-2 text-strong"
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -146,7 +146,7 @@ const MediaLists = () => {
           ))}
         </ul>
       ) : (
-        <p className="text-gray-400">{intl.formatMessage(messages.empty)}</p>
+        <p className="text-muted">{intl.formatMessage(messages.empty)}</p>
       )}
     </>
   );

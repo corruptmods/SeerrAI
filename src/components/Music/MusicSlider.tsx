@@ -8,6 +8,7 @@ import type {
   MusicPage,
 } from '@server/models/Music';
 import Link from 'next/link';
+import { useEffect } from 'react';
 import useSWR from 'swr';
 
 interface MusicSliderProps {
@@ -20,6 +21,8 @@ interface MusicSliderProps {
   isLoading?: boolean;
   /** The whole list, from the row's title. */
   linkUrl?: string;
+  /** Told how many it has once its first page answers (none if it failed). */
+  onLoaded?: (count: number) => void;
 }
 
 /**
@@ -33,6 +36,7 @@ const MusicSlider = ({
   items,
   isLoading,
   linkUrl,
+  onLoaded,
 }: MusicSliderProps) => {
   const { data, error } = useSWR<
     MusicPage<MusicAlbumResult | MusicArtistResult>
@@ -40,6 +44,12 @@ const MusicSlider = ({
 
   const loading = url ? !data && !error : !!isLoading;
   const results = url ? (data?.results ?? []) : (items ?? []);
+
+  useEffect(() => {
+    if (!loading) {
+      onLoaded?.(results.length);
+    }
+  }, [loading, results.length, onLoaded]);
 
   if (!loading && !results.length) {
     return null;

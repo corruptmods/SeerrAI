@@ -523,7 +523,7 @@ const UserList = () => {
                   <Alert
                     title={intl.formatMessage(messages.localLoginDisabled, {
                       strong: (msg: React.ReactNode) => (
-                        <strong className="font-semibold text-white">
+                        <strong className="font-semibold text-strong">
                           {msg}
                         </strong>
                       ),

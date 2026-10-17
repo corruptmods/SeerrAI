@@ -70,7 +70,7 @@ const CoverArt = ({
     <div className="absolute inset-0 scale-150 blur-xl" aria-hidden="true">
       <MusicImage src={src} fallback="none" />
     </div>
-    <div className="absolute inset-0 bg-gray-900/40" />
+    <div className="absolute inset-0 bg-media-scrim/40" />
     <div className="absolute inset-x-0 top-1/2 aspect-square -translate-y-1/2 shadow-lg">
       <MusicImage src={src} fallback="none" onMissing={onMissing} />
     </div>
@@ -146,7 +146,7 @@ const MusicCard = ({
       }
       badge={{
         label: intl.formatMessage(messages[albumKind(album)]),
-        className: 'border-pink-600 bg-pink-600/80',
+        className: 'border-pink-600 bg-pink-600/fill light:bg-pink-700',
       }}
       indicators={
         <MusicStatusBadge

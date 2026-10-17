@@ -96,7 +96,7 @@ const BlockedGroups = ({ initial }: { initial: string[] }) => {
                 key={group}
                 className="flex items-center gap-1 rounded-full bg-gray-700 py-1 pl-3 pr-1 text-sm text-gray-100 ring-1 ring-gray-600"
               >
-                <NoSymbolIcon className="h-4 w-4 flex-none text-red-400" />
+                <NoSymbolIcon className="h-4 w-4 flex-none text-red-400 light:text-danger-text" />
                 <span className="break-all">{group}</span>
                 <button
                   type="button"
@@ -104,7 +104,7 @@ const BlockedGroups = ({ initial }: { initial: string[] }) => {
                   onClick={() => void change(group, false)}
                   aria-label={intl.formatMessage(messages.remove, { group })}
                   title={intl.formatMessage(messages.remove, { group })}
-                  className="rounded-full p-1 text-gray-400 hover:bg-gray-600 hover:text-white disabled:opacity-50"
+                  className="rounded-full p-1 text-gray-400 hover:bg-gray-600 hover:text-strong disabled:opacity-50"
                 >
                   <XMarkIcon className="h-4 w-4" />
                 </button>
@@ -138,7 +138,7 @@ const BlockedGroups = ({ initial }: { initial: string[] }) => {
               placeholder={intl.formatMessage(messages.placeholder)}
             />
             {typed && !valid && (
-              <p className="mt-1 text-sm text-red-400">
+              <p className="mt-1 text-sm text-red-400 light:text-danger-text">
                 {intl.formatMessage(messages.invalid)}
               </p>
             )}

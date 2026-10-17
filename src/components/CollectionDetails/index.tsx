@@ -316,13 +316,7 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
             fill
             priority
           />
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage:
-                'linear-gradient(180deg, rgba(17, 24, 39, 0.47) 0%, rgba(17, 24, 39, 1) 100%)',
-            }}
-          />
+          <div className="media-page-fade" />
         </div>
       )}
       <PageTitle title={data.name} />
@@ -411,7 +405,7 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
                 ))}
           </span>
           {inLibrary > 0 && inLibrary < data.parts.length && (
-            <span className="mt-1 block text-sm text-gray-300">
+            <span className="mt-1 block text-sm text-default">
               {intl.formatMessage(messages.inlibrary, {
                 have: inLibrary,
                 total: data.parts.length,

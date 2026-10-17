@@ -9,6 +9,10 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | Where | What | Defaults |
 |---|---|---|
 | **Settings → General** | **Image Cache Size Limit**, with Enable Image Caching: posters and backdrops are also kept as AVIF and WebP at three sizes; the least recently viewed go first past the limit. | 2048 MB (at least 256) |
+| **Settings → Appearance** | The look of everyone who hasn't chosen their own, and of the sign-in page: **Mode** (Dark, Light, Match the person's device), **Accent colour** (Custom takes any colour), **Dark background** (Classic, True black, Slate, Warm). Everyone can still choose their own. **Seasonal themes**: which seasons run, and when. See [Themes](./themes.md). | Dark, Indigo, Classic (as before themes); Halloween, Holidays and New Year on, Lunar New Year, Diwali and Pride Month off |
+| **Settings → Appearance → Theme file** | A [theme file](./themes.md#theme-files) as the default look, for everyone who hasn't chosen their own and the sign-in page. | None |
+| **Settings → Appearance → Server CSS** | Styles for everyone, the sign-in page included; may `@import` a stylesheet from elsewhere, such as theme.park. At most 64 KB. See [Custom CSS](./themes.md#custom-css). | Empty |
+| **Settings → Appearance → Let people add their own CSS** | Shows **Personal CSS** in everyone's Appearance settings; theirs only changes their own screens. | Off |
 | **Settings → Media Servers** | Connect, edit and remove Plex, Jellyfin and Emby, choose the primary one, and whether people may sign in with each. See [Plex, Jellyfin and Emby together](./media-servers.md). | The server chosen at setup, as primary |
 | **Settings → Users** | **Auto-Import Plex Users**: an account for everyone the Plex server is shared with, hourly. Only adds; someone deleted isn't brought back. | Off |
 | **Settings → Users → Single Sign-On** | Providers people can sign in with (Authentik, Authelia, Keycloak, Pocket ID, Google…): name, issuer URL, client ID and secret (never sent back to the browser), button logo, scopes, **Enabled**, **Let New People Sign Up**, **Who Can Sign In** (rules on the provider's claims, such as a group), **Test**, and the redirect URL to give the provider. Needs the Application URL. See [Single sign-on](./single-sign-on.md). | None; scopes `openid profile email`; enabled; sign-up off; no rules (anyone with an account at the provider) |
@@ -18,10 +22,9 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | **Settings → Services → Tautulli** | Watch history from Plex, for Suggested for You, "up next" on lists, Who Watched, Pick for the Room and Catch Me Up. Plex only; moved here from Settings → Plex. Its API key is never sent back to the browser. With Jellyfin or Emby there is nothing to set up: Seerr AI reads watch history from the server itself, with the API key in Settings → Jellyfin/Emby. | Port 8181 |
 | **Settings → Services → Trakt** | The Client ID of your own Trakt app, so people can import public Trakt lists and have their public Trakt watchlist requested. Make the app at [developer.trakt.tv/apps](https://developer.trakt.tv/apps) (Trakt asks for a verified GitHub account); nobody signs in to Trakt. Trakt deletes apps unused for 30 days, which regular watchlist syncing prevents. Never sent back to the browser. | |
 | **Settings → Services → Maintainerr** | One or more servers. Per server: show Deleting Soon badges, include in the Deleting Soon row, allow Keep for everyone, days Keep adds (0 restarts the rule's grace period), what counts as "soon". | Port 6246; badges, row and Keep on; 0 days; 14 days |
-| **Settings → Music** | The **Music** switch (the same one as in Features). **Include Music in All Search Results**: rows of artists and albums below the films and series in All; **Search on the Music Page**; **Music on the Search Page**; **Artists per Search** and **Albums per Search** (1 to 25). Links to music's other settings. There before Lidarr is added, saying where to start. See [Searching music](./music.md#searching-music). | On; off; on; on; 8 and 12 |
+| **Settings → Music** | The **Music** switch, for everyone (only here; Settings → Features points to it). **Include Music in All Search Results**: rows of artists and albums below the films and series in All. **Where Music Comes From**: **MusicBrainz Address** (a mirror of your own has no request limit), **Contact Email** sent to MusicBrainz, **New and Popular Music** from ListenBrainz, **TheAudioDB API Key** for pictures of artists, **Most Albums in One Request**. Links to music's other settings. There before Lidarr is added, saying where to start. See [Searching music](./music.md#searching-music). | On; off; public MusicBrainz; none; on; none; 100 |
 | **Settings → Services → Lidarr** | Music. Address, API key, quality and metadata profiles, root folder and tags for new artists; **Enable Scan** brings in what Lidarr already has; **Tag Requests** tags the artist with who asked. Music appears for everyone once one Lidarr is the default. See [Music](./music.md). | None |
 | **Settings → Plex / Jellyfin / Emby → Music Libraries** | The music libraries read to find which albums are here, apart from the film and series ones. With none switched on anywhere, Lidarr's files decide. | Off until switched on |
-| **Settings → Metadata → Music** | **MusicBrainz Address** (a mirror of your own has no request limit), **Contact Email** sent to MusicBrainz, **New and Popular Music** from ListenBrainz, **TheAudioDB API Key** for pictures of artists, **Most Albums in One Request**. | Public MusicBrainz; none; on; none; 100 |
 | **Settings → Users** | **Global Album Request Limit**: albums each person may request in a period, like seasons for series. Each person's own limit is on their settings. | Unlimited |
 | **Settings → Services → Radarr** | **Anime Quality Profile**, **Anime Root Folder**, **Anime Tags** for anime movies. | Unset (anime movies use the regular ones) |
 | **Settings → Services → Override Rules** | Sonarr rules can set **Series Type**; Radarr rules can set **Anime**. | Left to detection |
@@ -93,7 +96,7 @@ Seerr AI adds these to **Settings → Jobs & Cache**, where each can be reschedu
 
 ## Feature switches
 
-Every feature below is on unless an admin turns it off for everyone (**Settings → Features**) or a person turns it off for themselves (**Profile → Settings → Features**). Off for everyone wins, and the server enforces it, not only the buttons.
+Every feature below is on unless an admin turns it off for everyone (**Settings → Features**, or **Settings → Music** for music) or a person turns it off for themselves (**Profile → Settings → Features**). Off for everyone wins, and the server enforces it, not only the buttons.
 
 | Switch | What it turns off |
 |---|---|
@@ -107,7 +110,7 @@ Every feature below is on unless an admin turns it off for everyone (**Settings 
 | `passkeyPrompt` | The banner offering to add a passkey (passkeys still work) |
 | `subtitles` | The Subtitles panel and episode subtitle tags |
 | `autoFix` | Fixing reported problems automatically |
-| `music` | Music: the Music item, music in search and on Discover, requesting music, and the Lidarr and music settings. In Features, only once a Lidarr is added; Settings → Music always has it |
+| `music` | Music: the Music item, music in search and on Discover, requesting music, and the Lidarr and music settings. Switched for everyone under Settings → Music, which is there before a Lidarr is added |
 | `aiChat` | AI Search |
 | `aiReasons` | Why These Suggestions |
 | `aiPicker` | Pick for the Room |
@@ -125,6 +128,9 @@ The AI switches only appear once AI is set up.
 | Where | What |
 |---|---|
 | Profile → Settings → Features | Turn features off for yourself, music included |
+| Profile → Settings → Appearance | Your own look: mode, accent colour, dark background, seasonal themes and extras (spacing, corners, blur behind title pages, which is off unless chosen, and see-through panels), or the server's. See [Themes](./themes.md) |
+| Profile → Settings → Appearance → Themes | Built-in looks (Seerr Classic, Midnight, Daylight, Ember), **Import a Theme** and **Export My Theme**. See [Theme files](./themes.md#theme-files) |
+| Profile → Settings → Appearance → Personal CSS | Your own styles, when an admin allows it. See [Custom CSS](./themes.md#custom-css) |
 | Profile → Settings → Passkeys | Add, rename and remove passkeys |
 | Profile → Settings → Linked Accounts | Link or remove single sign-on providers, beside media server accounts |
 | Profile → Settings → General → Trakt Username | Your public Trakt watchlist is requested for you, with **Auto-Request Movies** and **Auto-Request Series** (once an admin has set up Trakt) |

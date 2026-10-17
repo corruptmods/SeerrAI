@@ -1,14 +1,17 @@
 import FeatureSwitches, {
   withFeature,
 } from '@app/components/Common/FeatureSwitches';
+import { NOT_ON_FEATURES_PAGE } from '@app/components/Common/FeatureSwitches/shown';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import type { Feature } from '@server/constants/features';
 import axios from 'axios';
+import Link from 'next/link';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR, { useSWRConfig } from 'swr';
@@ -19,12 +22,13 @@ const messages = defineMessages('components.Settings.SettingsFeatures', {
     'Optional features of this build. Turning one off here turns it off for everyone. Each person can also turn any of them off for themselves in their own settings.',
   saved: 'Saved.',
   failed: 'Something went wrong while saving.',
+  musicOwnPage: 'Music has its own page',
 });
 
 /**
  * The features turned off for everyone, and a change to one, saved at once.
- * Settings → Features and Settings → Music share it, so the Music switch is
- * the one setting in both places.
+ * Settings → Features switches all but music with it, and Settings → Music
+ * switches music, so both change the one list.
  */
 export const useFeaturesForEveryone = () => {
   const intl = useIntl();
@@ -96,11 +100,22 @@ const SettingsFeatures = () => {
             disabled={disabled}
             saving={saving}
             aiReady={currentSettings.aiReady}
-            // Turned off for everyone, music is not "ready", but its switch
-            // has to stay here to turn it back on.
-            musicReady={
-              currentSettings.musicReady || disabled.includes('music')
-            }
+            musicReady={currentSettings.musicReady}
+            // Music is switched on its own page, which this points to.
+            hidden={NOT_ON_FEATURES_PAGE}
+            instead={{
+              music: (
+                <p className="sm:col-span-3">
+                  <Link
+                    href="/settings/music"
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-400 hover:text-indigo-300 hover:underline light:text-accent-text light:hover:text-accent-text"
+                  >
+                    {intl.formatMessage(messages.musicOwnPage)}
+                    <ArrowRightIcon className="h-4 w-4" />
+                  </Link>
+                </p>
+              ),
+            }}
             onChange={change}
           />
         </div>

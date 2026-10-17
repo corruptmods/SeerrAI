@@ -53,7 +53,8 @@ const DiscoverTvNetwork = () => {
                 type="tmdb"
                 src={`https://image.tmdb.org/t/p/w780_filter(duotone,ffffff,bababa)${firstResultData.network.logoPath}`}
                 alt={firstResultData.network.name}
-                className="object-contain"
+                // White, for a dark page; dark on a light one.
+                className="object-contain light:invert"
                 fill
               />
             </div>

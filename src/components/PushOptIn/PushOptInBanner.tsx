@@ -99,7 +99,7 @@ const PushOptInBanner = () => {
       </div>
       <button
         aria-label={intl.formatMessage(messages.dismiss)}
-        className="text-gray-400 transition duration-150 hover:text-white"
+        className="text-gray-400 transition duration-150 hover:text-strong"
         onClick={handleDismiss}
         type="button"
       >

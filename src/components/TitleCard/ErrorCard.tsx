@@ -57,7 +57,7 @@ const ErrorCard = ({ id, tmdbId, tvdbId, type, canExpand }: ErrorCardProps) => {
       data-testid="title-card"
     >
       <div
-        className="relative transform-gpu cursor-default overflow-hidden rounded-xl bg-gray-800 bg-cover shadow outline-none ring-1 ring-gray-700 transition duration-300"
+        className="relative transform-gpu cursor-default overflow-hidden rounded-xl bg-surface bg-cover shadow outline-none ring-1 ring-subtle transition duration-300"
         style={{
           paddingBottom: '150%',
         }}
@@ -69,7 +69,7 @@ const ErrorCard = ({ id, tmdbId, tvdbId, type, canExpand }: ErrorCardProps) => {
                 type === 'movie' ? 'bg-blue-500' : 'bg-purple-600'
               }`}
             >
-              <div className="flex h-4 items-center px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-white sm:h-5">
+              <div className="flex h-4 items-center px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-on-media sm:h-5">
                 {type === 'movie'
                   ? intl.formatMessage(globalMessages.movie)
                   : intl.formatMessage(globalMessages.tvshow)}
@@ -83,7 +83,7 @@ const ErrorCard = ({ id, tmdbId, tvdbId, type, canExpand }: ErrorCardProps) => {
           </div>
 
           <div className="flex h-full w-full items-end">
-            <div className="px-2 pb-11 text-white">
+            <div className="px-2 pb-11 text-strong">
               <h1
                 className="whitespace-normal text-xl font-bold leading-tight"
                 style={{
@@ -114,14 +114,14 @@ const ErrorCard = ({ id, tmdbId, tvdbId, type, canExpand }: ErrorCardProps) => {
                 }}
               >
                 <div className="flex items-center">
-                  <span className="mr-2 font-bold text-gray-400">
+                  <span className="mr-2 font-bold text-muted">
                     {intl.formatMessage(messages.tmdbid)}
                   </span>
                   {tmdbId}
                 </div>
                 {!!tvdbId && (
                   <div className="mt-2 flex items-center sm:mt-1">
-                    <span className="mr-2 font-bold text-gray-400">
+                    <span className="mr-2 font-bold text-muted">
                       {intl.formatMessage(messages.tvdbid)}
                     </span>
                     {tvdbId}

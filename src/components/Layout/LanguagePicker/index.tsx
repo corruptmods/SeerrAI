@@ -23,8 +23,8 @@ const LanguagePicker = () => {
     <div className="relative">
       <div>
         <button
-          className={`rounded-full p-1 hover:bg-gray-600 hover:text-white focus:bg-gray-600 focus:text-white focus:outline-none focus:ring-1 focus:ring-gray-500 sm:p-2 ${
-            isDropdownOpen ? 'bg-gray-600 text-white' : 'text-gray-400'
+          className={`rounded-full p-1 hover:bg-gray-600 hover:text-strong focus:bg-gray-600 focus:text-strong focus:outline-none focus:ring-1 focus:ring-gray-500 sm:p-2 ${
+            isDropdownOpen ? 'bg-gray-600 text-strong' : 'text-gray-400'
           }`}
           aria-label={intl.formatMessage(messages.displaylanguage)}
           onClick={() => setDropdownOpen(true)}

@@ -188,7 +188,7 @@ const UserPasskeySettings = () => {
               className="flex flex-wrap items-center gap-4 rounded-lg bg-gray-800/50 px-4 py-5 shadow ring-1 ring-gray-700 sm:p-6"
             >
               <div className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-gray-700 sm:h-12 sm:w-12">
-                <FingerPrintIcon className="h-7 w-7 text-indigo-300" />
+                <FingerPrintIcon className="h-7 w-7 text-indigo-300 light:text-accent-text" />
               </div>
               <div className="min-w-0 flex-1">
                 {editing?.id === passkey.id ? (
@@ -212,11 +212,11 @@ const UserPasskeySettings = () => {
                   />
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-lg font-semibold text-white">
+                    <span className="truncate text-lg font-semibold text-strong">
                       {passkey.name}
                     </span>
                     {passkey.backedUp && (
-                      <span className="flex-none rounded-full bg-indigo-600/40 px-2 py-0.5 text-xs text-indigo-100">
+                      <span className="flex-none rounded-full bg-indigo-600/40 px-2 py-0.5 text-xs text-indigo-100 light:text-accent-text">
                         {intl.formatMessage(messages.synced)}
                       </span>
                     )}

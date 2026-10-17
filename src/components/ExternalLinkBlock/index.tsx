@@ -57,11 +57,11 @@ const ExternalLinkBlock = ({
             key={link.server}
             href={url}
             aria-label={link.name}
-            className="w-12 opacity-50 transition duration-300 hover:opacity-100"
+            className="external-link w-12"
             target="_blank"
             rel="noreferrer"
           >
-            <Logo />
+            <Logo className="service-logo" />
           </a>
         );
       })}
@@ -69,55 +69,55 @@ const ExternalLinkBlock = ({
         <a
           aria-label="TMDB"
           href={`https://www.themoviedb.org/${mediaType}/${tmdbId}?language=${locale}`}
-          className="w-8 opacity-50 transition duration-300 hover:opacity-100"
+          className="external-link w-8"
           target="_blank"
           rel="noreferrer"
         >
-          <TmdbLogo />
+          <TmdbLogo className="service-logo" />
         </a>
       )}
       {tvdbId && mediaType === MediaType.TV && (
         <a
           aria-label="TheTVDB"
           href={`http://www.thetvdb.com/?tab=series&id=${tvdbId}`}
-          className="w-9 opacity-50 transition duration-300 hover:opacity-100"
+          className="external-link w-9"
           target="_blank"
           rel="noreferrer"
         >
-          <TvdbLogo />
+          <TvdbLogo className="service-logo" />
         </a>
       )}
       {imdbId && mediaType !== 'person' && (
         <a
           aria-label="IMDb"
           href={`https://www.imdb.com/title/${imdbId}`}
-          className="w-8 opacity-50 transition duration-300 hover:opacity-100"
+          className="external-link w-8"
           target="_blank"
           rel="noreferrer"
         >
-          <ImdbLogo />
+          <ImdbLogo className="service-logo" />
         </a>
       )}
       {imdbId && mediaType === 'person' && (
         <a
           aria-label="IMDb"
           href={`https://www.imdb.com/name/${imdbId}`}
-          className="w-8 opacity-50 transition duration-300 hover:opacity-100"
+          className="external-link w-8"
           target="_blank"
           rel="noreferrer"
         >
-          <ImdbLogo />
+          <ImdbLogo className="service-logo" />
         </a>
       )}
       {rtUrl && (
         <a
           aria-label="Rotten Tomatoes"
           href={rtUrl}
-          className="w-14 opacity-50 transition duration-300 hover:opacity-100"
+          className="external-link w-14"
           target="_blank"
           rel="noreferrer"
         >
-          <RTLogo />
+          <RTLogo className="service-logo" />
         </a>
       )}
       {imdbId && mediaType !== 'person' && (
@@ -126,11 +126,11 @@ const ExternalLinkBlock = ({
           href={`https://trakt.tv/${
             mediaType === 'movie' ? 'movies' : 'shows'
           }/${imdbId}`}
-          className="w-8 opacity-50 transition duration-300 hover:opacity-100"
+          className="external-link w-8"
           target="_blank"
           rel="noreferrer"
         >
-          <TraktLogo />
+          <TraktLogo className="service-logo" />
         </a>
       )}
       {imdbId && mediaType !== 'person' && (
@@ -139,22 +139,22 @@ const ExternalLinkBlock = ({
             imdbId
           )}`}
           aria-label="Simkl"
-          className="w-8 opacity-50 transition duration-300 hover:opacity-100"
+          className="external-link w-8"
           target="_blank"
           rel="noreferrer"
         >
-          <SimklLogo />
+          <SimklLogo className="service-logo" />
         </a>
       )}
       {tmdbId && mediaType === MediaType.MOVIE && (
         <a
           aria-label="Letterboxd"
           href={`https://letterboxd.com/tmdb/${tmdbId}`}
-          className="w-8 opacity-50 transition duration-300 hover:opacity-100"
+          className="external-link w-8"
           target="_blank"
           rel="noreferrer"
         >
-          <LetterboxdLogo />
+          <LetterboxdLogo className="service-logo" />
         </a>
       )}
     </div>

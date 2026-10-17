@@ -58,7 +58,7 @@ const CertificationPicker = ({
 
   if (error) {
     return (
-      <div className="text-sm text-red-500">
+      <div className="text-sm text-danger-text">
         {intl.formatMessage(messages.loadFailed)}
       </div>
     );
@@ -155,7 +155,7 @@ const CertificationPicker = ({
                       onClick={() => toggle({ country, certification })}
                       className={`rounded-full px-3 py-1 text-sm font-medium transition-colors disabled:opacity-50 ${
                         on
-                          ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                          ? 'bg-accent text-on-accent hover:bg-indigo-700'
                           : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
                       }`}
                     >

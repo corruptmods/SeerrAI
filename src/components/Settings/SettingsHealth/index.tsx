@@ -409,7 +409,7 @@ const CheckRow = ({
                     {item.href ? (
                       <Link
                         href={item.href}
-                        className="line-clamp-2 break-words text-gray-100 hover:text-white hover:underline"
+                        className="line-clamp-2 break-words text-gray-100 hover:text-strong hover:underline"
                       >
                         {item.title}
                       </Link>
@@ -443,7 +443,7 @@ const CheckRow = ({
                 >
                   <button
                     type="button"
-                    className="py-1 pr-3 text-indigo-400 hover:text-indigo-300 disabled:text-gray-600"
+                    className="py-1 pr-3 text-indigo-400 hover:text-indigo-300 disabled:text-gray-600 light:text-accent-text light:hover:text-accent-text"
                     disabled={page === 1}
                     onClick={() => setPage(page - 1)}
                   >
@@ -454,7 +454,7 @@ const CheckRow = ({
                   </span>
                   <button
                     type="button"
-                    className="py-1 pl-3 text-indigo-400 hover:text-indigo-300 disabled:text-gray-600"
+                    className="py-1 pl-3 text-indigo-400 hover:text-indigo-300 disabled:text-gray-600 light:text-accent-text light:hover:text-accent-text"
                     disabled={page >= pages}
                     onClick={() => setPage(page + 1)}
                   >
@@ -552,7 +552,7 @@ const SettingsHealth = () => {
 
       {!data && !error && <LoadingSpinner />}
       {error && !data && (
-        <p className="text-sm text-red-300">
+        <p className="text-sm text-red-300 light:text-danger-text">
           {error?.response?.data?.message ?? error.message}
         </p>
       )}
@@ -569,7 +569,7 @@ const SettingsHealth = () => {
                     : 'ok'
               }
             />
-            <span className="text-lg font-semibold text-white">
+            <span className="text-lg font-semibold text-strong">
               {problems === 0
                 ? intl.formatMessage(messages.allClear)
                 : intl.formatMessage(messages.problems, { count: problems })}

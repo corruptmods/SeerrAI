@@ -110,7 +110,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
     return ReactDOM.createPortal(
       <TransitionChild
         as="div"
-        className="fixed bottom-0 left-0 right-0 top-0 z-50 flex h-full w-full items-center justify-center bg-gray-800/70"
+        className="fixed bottom-0 left-0 right-0 top-0 z-50 flex h-full w-full items-center justify-center bg-overlay/70"
         enter="transition-opacity duration-300"
         enterFrom="opacity-0"
         enterTo="opacity-100"
@@ -135,8 +135,9 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           </div>
         </Transition>
         <Transition
-          className={`hide-scrollbar relative inline-block w-full overflow-auto bg-gray-800 px-4 pb-4 pt-4 text-left align-bottom shadow-xl ring-1 ring-gray-700 transition-all focus:outline-none sm:my-8 sm:max-w-3xl sm:rounded-lg sm:align-middle ${dialogClass}`}
+          className={`hide-scrollbar relative inline-block w-full overflow-auto bg-surface px-4 pb-4 pt-4 text-left align-bottom shadow-xl ring-1 ring-subtle transition-all focus:outline-none sm:my-8 sm:max-w-3xl sm:rounded-lg sm:align-middle ${dialogClass}`}
           role="dialog"
+          data-seerr="modal"
           aria-modal="true"
           aria-labelledby={title ? titleId : subTitle ? subTitleId : undefined}
           aria-describedby={title && subTitle ? subTitleId : undefined}
@@ -166,7 +167,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
                 type="button"
                 onClick={onCancel}
                 aria-label={intl.formatMessage(globalMessages.close)}
-                className="-mr-1 -mt-1 h-8 w-8 rounded-md bg-gray-800/80 p-1 text-gray-400 transition duration-150 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="-mr-1 -mt-1 h-8 w-8 rounded-md bg-surface/panel p-1 text-muted transition duration-150 hover:text-strong focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <XMarkIcon className="h-6 w-6" />
               </button>
@@ -184,18 +185,19 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
                 // The dialog is at most 48rem wide.
                 sizes="(min-width: 640px) 768px, 100vw"
               />
+              {/* Fades into the window's own colour, light or dark. */}
               <div
                 className="absolute inset-0"
                 style={{
                   backgroundImage:
-                    'linear-gradient(180deg, rgba(31, 41, 55, 0.75) 0%, rgba(31, 41, 55, 1) 100%)',
+                    'linear-gradient(180deg, rgb(var(--surface) / 0.75) 0%, rgb(var(--surface)) 100%)',
                 }}
               />
             </div>
           )}
           <div className="relative -mx-4 overflow-x-hidden px-4 pt-0.5 sm:flex sm:items-center">
             <div
-              className={`mt-3 truncate text-center text-white sm:mt-0 sm:text-left ${
+              className={`mt-3 truncate text-center text-strong sm:mt-0 sm:text-left ${
                 showCloseButton ? 'px-8 sm:pl-0 sm:pr-10' : ''
               }`}
             >
@@ -225,7 +227,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           </div>
           {children && (
             <div
-              className={`relative mt-4 text-sm leading-5 text-gray-300 ${
+              className={`relative mt-4 text-sm leading-5 text-default ${
                 !(onCancel || onOk || onSecondary || onTertiary) ? 'mb-3' : ''
               }`}
             >

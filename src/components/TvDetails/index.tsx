@@ -562,13 +562,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
             fill
             priority
           />
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage:
-                'linear-gradient(180deg, rgba(17, 24, 39, 0.47) 0%, rgba(17, 24, 39, 1) 100%)',
-            }}
-          />
+          <div className="media-page-fade" />
         </div>
       )}
       <PageTitle title={data.name} />
@@ -628,8 +622,8 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
         revalidate={() => revalidate()}
         show={showManager}
       />
-      <div className="media-header">
-        <div className="media-poster">
+      <div className="media-header" data-seerr="title-header">
+        <div className="media-poster" data-seerr="poster">
           <CachedImage
             type="tmdb"
             src={
@@ -742,7 +736,9 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                       {isUpdating ? (
                         <Spinner />
                       ) : (
-                        <StarIcon className={'text-amber-300'} />
+                        <StarIcon
+                          className={'text-amber-300 light:text-amber-600'}
+                        />
                       )}
                     </Button>
                   </Tooltip>
@@ -889,7 +885,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
               <div className="mt-4 flex justify-end">
                 <Link
                   href={`/tv/${data.id}/crew`}
-                  className="flex items-center text-gray-400 transition duration-300 hover:text-gray-100"
+                  className="flex items-center text-muted transition duration-300 hover:text-gray-100"
                 >
                   <span>{intl.formatMessage(messages.viewfullcrew)}</span>
                   <ArrowRightCircleIcon className="ml-1.5 inline-block h-5 w-5" />
@@ -979,7 +975,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                     {({ open }) => (
                       <>
                         <DisclosureButton
-                          className={`mt-2 flex w-full items-center justify-between space-x-2 border-gray-700 bg-gray-800 px-4 py-2 text-gray-200 ${
+                          className={`mt-2 flex w-full items-center justify-between space-x-2 border-subtle bg-surface px-4 py-2 text-gray-200 ${
                             open
                               ? 'rounded-t-md border-l border-r border-t'
                               : 'rounded-md border'
@@ -1209,7 +1205,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                           // Not sure why this transition is adding a margin without this here
                           style={{ margin: '0px' }}
                         >
-                          <DisclosurePanel className="w-full rounded-b-md border-b border-l border-r border-gray-700 px-4 pb-2">
+                          <DisclosurePanel className="w-full rounded-b-md border-b border-l border-r border-subtle px-4 pb-2">
                             <Season
                               tvId={data.id}
                               seasonNumber={season.seasonNumber}

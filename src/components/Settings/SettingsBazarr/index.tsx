@@ -110,7 +110,9 @@ const SettingsBazarr = () => {
                 hostname={data.hostname}
                 port={data.port}
                 isSSL={data.useSsl}
-                logo={<BazarrLogo className="h-10 w-10 flex-shrink-0" />}
+                logo={
+                  <BazarrLogo className="service-logo h-10 w-10 flex-shrink-0" />
+                }
                 detail={{
                   label: intl.formatMessage(messages.subtitles),
                   value: intl.formatMessage(messages.onTitlePages),

@@ -109,7 +109,7 @@ const Fade = ({
 );
 
 const footerButton =
-  'relative inline-flex w-0 flex-1 items-center justify-center border border-transparent py-4 text-sm font-medium leading-5 text-gray-200 transition duration-150 ease-in-out hover:text-white focus:z-10 focus:border-gray-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50';
+  'relative inline-flex w-0 flex-1 items-center justify-center border border-transparent py-4 text-sm font-medium leading-5 text-gray-200 transition duration-150 ease-in-out hover:text-strong focus:z-10 focus:border-gray-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50';
 
 const SettingsMediaServers = () => {
   const intl = useIntl();
@@ -270,7 +270,7 @@ const SettingsMediaServers = () => {
                 <div className="flex flex-1 items-start justify-between space-x-4 p-6">
                   <div className="min-w-0 flex-1">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <h4 className="truncate font-medium leading-5 text-white">
+                      <h4 className="truncate font-medium leading-5 text-strong">
                         {name}
                       </h4>
                       {server.primary && (
@@ -331,7 +331,7 @@ const SettingsMediaServers = () => {
                   </div>
                   <Logo
                     aria-hidden="true"
-                    className={`h-10 w-10 flex-shrink-0 ${
+                    className={`service-logo h-10 w-10 flex-shrink-0 ${
                       server.connected ? '' : 'opacity-40'
                     }`}
                   />

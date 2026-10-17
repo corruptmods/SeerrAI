@@ -80,7 +80,7 @@ const AiPanel = ({
         )}
         {error && (
           <div
-            className="rounded-lg border border-red-700 bg-red-900/40 px-3 py-2 text-red-100"
+            className="rounded-lg border border-red-700 bg-red-900/40 px-3 py-2 text-red-100 light:bg-danger-soft/15 light:text-danger-text"
             role="alert"
           >
             {error}

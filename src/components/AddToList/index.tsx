@@ -204,7 +204,8 @@ const AddToList = ({ tmdbId, mediaType, compact }: AddToListProps) => {
       {compact ? (
         <button
           aria-label={intl.formatMessage(messages.addtolist)}
-          className="flex h-7 w-7 flex-none items-center justify-center rounded-md bg-gray-800/80 text-white ring-1 ring-gray-600 transition hover:bg-gray-700"
+          // On a poster, so dark in every look.
+          className="flex h-7 w-7 flex-none items-center justify-center rounded-md bg-[rgb(var(--media-scrim-raised)/0.8)] text-on-media ring-1 ring-gray-600 transition hover:bg-gray-700 light:hover:bg-[rgb(var(--media-scrim-raised))]"
           onClick={(e) => {
             e.preventDefault();
             setOpen((open) => !open);

@@ -1,4 +1,6 @@
 import type { MediaServerKind } from '@server/constants/server';
+import type { ThemeDefaults } from '@server/constants/theme';
+import type { SeasonCalendar } from '@server/lib/seasons';
 import type { DnsEntries, DnsStats } from 'dns-caching';
 import type { PaginatedResponse } from './common';
 
@@ -80,11 +82,14 @@ export interface PublicSettingsResponse {
   traktReady: boolean;
   /** Lidarr is set up and music is not turned off for everyone. */
   musicReady: boolean;
-  /**
-   * Where music can be searched (Settings → Music): below films and series
-   * in All, on the Music page, and as its own kind on the search page.
-   */
-  musicSearch: { inAll: boolean; musicPage: boolean; chip: boolean };
+  /** Whether music comes below the films and series in All (Settings → Music). */
+  musicSearch: { inAll: boolean };
+  /** The look of everyone who has not chosen their own (Settings → Appearance). */
+  themeDefault: ThemeDefaults;
+  /** The seasonal themes that run, and their days (Settings → Appearance). */
+  seasons: SeasonCalendar;
+  /** The Server CSS's version (null for none), and whether people may add their own. */
+  customCss: { server: string | null; personal: boolean };
 }
 
 export interface CacheItem {

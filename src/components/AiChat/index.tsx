@@ -58,7 +58,7 @@ const AiChat = () => {
           setWanted(true);
           setOpen(true);
         }}
-        className="ml-2 flex h-10 w-10 flex-none items-center justify-center rounded-full border border-gray-600 bg-gray-900/80 text-indigo-300 transition hover:border-gray-500 hover:text-indigo-200 focus:border-gray-500 focus:outline-none"
+        className="ml-2 flex h-10 w-10 flex-none items-center justify-center rounded-full border border-gray-600 bg-gray-900/80 text-indigo-300 transition hover:border-gray-500 hover:text-indigo-200 focus:border-gray-500 focus:outline-none light:text-accent-text light:hover:text-accent-text"
         aria-label={intl.formatMessage(messages.open)}
         title={intl.formatMessage(messages.open)}
         data-testid="ai-chat-open"

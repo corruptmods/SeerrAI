@@ -59,25 +59,49 @@ type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 // Class names written out in full: assembled ones are stripped from the
 // production stylesheet.
 const ICONS: Record<string, { icon: Icon; className: string }> = {
-  requested: { icon: ArrowDownTrayIcon, className: 'text-indigo-400' },
-  approved: { icon: CheckCircleIcon, className: 'text-green-400' },
-  declined: { icon: XCircleIcon, className: 'text-red-400' },
-  failed: { icon: ExclamationTriangleIcon, className: 'text-red-400' },
-  processing: { icon: ArrowPathIcon, className: 'text-indigo-400' },
-  partially_available: { icon: CheckBadgeIcon, className: 'text-green-400' },
-  available: { icon: CheckBadgeIcon, className: 'text-green-400' },
+  requested: {
+    icon: ArrowDownTrayIcon,
+    className: 'text-indigo-400 light:text-accent-text',
+  },
+  approved: { icon: CheckCircleIcon, className: 'text-success-text' },
+  declined: {
+    icon: XCircleIcon,
+    className: 'text-red-400 light:text-danger-text',
+  },
+  failed: {
+    icon: ExclamationTriangleIcon,
+    className: 'text-red-400 light:text-danger-text',
+  },
+  processing: {
+    icon: ArrowPathIcon,
+    className: 'text-indigo-400 light:text-accent-text',
+  },
+  partially_available: { icon: CheckBadgeIcon, className: 'text-success-text' },
+  available: { icon: CheckBadgeIcon, className: 'text-success-text' },
   removed: { icon: MinusCircleIcon, className: 'text-gray-400' },
-  files_removed: { icon: TrashIcon, className: 'text-red-400' },
-  blocklisted: { icon: EyeSlashIcon, className: 'text-red-400' },
+  files_removed: {
+    icon: TrashIcon,
+    className: 'text-red-400 light:text-danger-text',
+  },
+  blocklisted: {
+    icon: EyeSlashIcon,
+    className: 'text-red-400 light:text-danger-text',
+  },
   unblocklisted: { icon: EyeIcon, className: 'text-gray-400' },
-  kept: { icon: ShieldCheckIcon, className: 'text-green-400' },
-  searched: { icon: MagnifyingGlassIcon, className: 'text-indigo-400' },
+  kept: { icon: ShieldCheckIcon, className: 'text-success-text' },
+  searched: {
+    icon: MagnifyingGlassIcon,
+    className: 'text-indigo-400 light:text-accent-text',
+  },
   monitoring_failed: {
     icon: ExclamationTriangleIcon,
-    className: 'text-yellow-400',
+    className: 'text-yellow-400 light:text-warning-text',
   },
-  agent: { icon: SparklesIcon, className: 'text-indigo-300' },
-  added: { icon: PlusCircleIcon, className: 'text-green-400' },
+  agent: {
+    icon: SparklesIcon,
+    className: 'text-indigo-300 light:text-accent-text',
+  },
+  added: { icon: PlusCircleIcon, className: 'text-success-text' },
 };
 
 const SHOWN_AT_FIRST = 10;
@@ -186,7 +210,7 @@ const MediaHistory = (props: MediaHistoryProps) => {
         {!showAll && data.length > SHOWN_AT_FIRST && (
           <button
             type="button"
-            className="w-full border-t border-gray-700 px-4 py-2 text-sm text-indigo-400 hover:bg-gray-700/40 hover:text-indigo-300"
+            className="w-full border-t border-gray-700 px-4 py-2 text-sm text-indigo-400 hover:bg-gray-700/40 hover:text-indigo-300 light:text-accent-text light:hover:text-accent-text"
             onClick={() => setShowAll(true)}
           >
             {intl.formatMessage(messages.showAll, { count: data.length })}

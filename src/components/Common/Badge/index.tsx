@@ -9,7 +9,8 @@ interface BadgeProps {
     | 'warning'
     | 'success'
     | 'dark'
-    | 'light';
+    | 'light'
+    | 'deep';
   className?: string;
   href?: string;
   children: React.ReactNode;
@@ -29,16 +30,17 @@ const Badge = (
     badgeStyle.push('cursor-default');
   }
 
+  // Theme colours (tailwind.config.js); see Button.
   switch (badgeType) {
     case 'danger':
-      badgeStyle.push('bg-red-600/80 border-red-500 border !text-red-100');
+      badgeStyle.push('bg-danger/fill border-red-500 border !text-red-100');
       if (href) {
         badgeStyle.push('hover:bg-red-500');
       }
       break;
     case 'warning':
       badgeStyle.push(
-        'bg-yellow-500/80 border-yellow-500 border !text-yellow-100'
+        'bg-warning/fill border-yellow-500 border !text-yellow-100'
       );
       if (href) {
         badgeStyle.push('hover:bg-yellow-500');
@@ -46,30 +48,38 @@ const Badge = (
       break;
     case 'success':
       badgeStyle.push(
-        'bg-green-500/80 border border-green-500 !text-green-100'
+        'bg-success/fill border border-green-500 !text-green-100'
       );
       if (href) {
         badgeStyle.push('hover:bg-green-500');
       }
       break;
     case 'dark':
-      badgeStyle.push('bg-gray-900 !text-gray-400');
+      badgeStyle.push('bg-page !text-muted');
       if (href) {
-        badgeStyle.push('hover:bg-gray-800');
+        badgeStyle.push('hover:bg-surface');
       }
       break;
     case 'light':
-      badgeStyle.push('bg-gray-700 !text-gray-300');
+      badgeStyle.push('bg-surface-raised !text-default');
       if (href) {
         badgeStyle.push('hover:bg-gray-600');
       }
       break;
+    case 'deep':
+      // The accent's deep shades, as on the page you are on in the sidebar.
+      // The text is pale (Indigo's palest shade, as before) rather than the
+      // text chosen for its fill, which is dark for a light accent.
+      badgeStyle.push(
+        'bg-accent-chip/accent-fill border !border-accent bg-gradient-to-br from-indigo-700 to-accent-alt-700 !text-on-accent-deep'
+      );
+      break;
     default:
       badgeStyle.push(
-        'bg-indigo-500/80 border border-indigo-500 !text-indigo-100'
+        'bg-accent-chip/accent-fill border border-accent-chip !text-on-accent-chip'
       );
       if (href) {
-        badgeStyle.push('hover:bg-indigo-500');
+        badgeStyle.push('hover:bg-accent-chip');
       }
   }
 
@@ -84,6 +94,7 @@ const Badge = (
         target="_blank"
         rel="noopener noreferrer"
         className={badgeStyle.join(' ')}
+        data-seerr="badge"
         ref={ref as React.Ref<HTMLAnchorElement>}
       >
         {children}
@@ -94,6 +105,7 @@ const Badge = (
       <Link
         href={href}
         className={badgeStyle.join(' ')}
+        data-seerr="badge"
         ref={ref as React.Ref<HTMLAnchorElement>}
       >
         {children}
@@ -103,6 +115,7 @@ const Badge = (
     return (
       <span
         className={badgeStyle.join(' ')}
+        data-seerr="badge"
         ref={ref as React.Ref<HTMLSpanElement>}
       >
         {children}

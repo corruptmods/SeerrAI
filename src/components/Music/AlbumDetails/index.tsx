@@ -71,7 +71,7 @@ const TrackList = ({ albumId }: { albumId: string }) => {
       <div className="flex items-baseline justify-between gap-4">
         <h2>{intl.formatMessage(messages.tracks)}</h2>
         {data && tracks.length > 0 && (
-          <span className="text-sm text-gray-400">
+          <span className="text-sm text-muted">
             {intl.formatMessage(messages.trackCount, { count: tracks.length })}
             {total > 0 && ` · ${trackLength(total)}`}
           </span>
@@ -85,7 +85,7 @@ const TrackList = ({ albumId }: { albumId: string }) => {
         <>
           <button
             type="button"
-            className="mt-2 flex items-center gap-1 text-sm text-indigo-400 hover:text-indigo-300 sm:hidden"
+            className="mt-2 flex items-center gap-1 text-sm text-accent-soft hover:text-indigo-300 light:text-accent-text light:hover:text-accent-text sm:hidden"
             aria-expanded={open}
             onClick={() => setChosen(!open)}
           >
@@ -99,11 +99,11 @@ const TrackList = ({ albumId }: { albumId: string }) => {
             )}
           </button>
           {open && (
-            <ol className="mt-3 divide-y divide-gray-700 overflow-hidden rounded-lg border border-gray-700 bg-gray-900">
+            <ol className="mt-3 divide-y divide-subtle overflow-hidden rounded-lg border border-subtle bg-page">
               {discs.map((disc) => (
                 <Fragment key={disc}>
                   {discs.length > 1 && (
-                    <li className="bg-gray-800 px-4 py-2 text-sm font-semibold text-gray-300">
+                    <li className="bg-surface px-4 py-2 text-sm font-semibold text-default">
                       {tracks.find((t) => t.disc === disc)?.discTitle ||
                         intl.formatMessage(messages.disc, { number: disc })}
                     </li>
@@ -121,7 +121,7 @@ const TrackList = ({ albumId }: { albumId: string }) => {
                         <span className="min-w-0 flex-1 truncate text-gray-200">
                           {track.title}
                         </span>
-                        <span className="shrink-0 tabular-nums text-gray-400">
+                        <span className="shrink-0 tabular-nums text-muted">
                           {trackLength(track.length)}
                         </span>
                       </li>
@@ -262,7 +262,7 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
         </div>
       </div>
       {variousArtists && (
-        <p className="mt-4 text-sm text-gray-400">
+        <p className="mt-4 text-sm text-muted">
           {intl.formatMessage(messages.variousArtists)}
         </p>
       )}

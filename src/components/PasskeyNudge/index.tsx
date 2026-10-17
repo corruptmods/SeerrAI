@@ -147,9 +147,9 @@ const PasskeyNudge = () => {
 
   return (
     <div className="mb-4 flex w-full items-start gap-3 rounded-md border border-gray-700 bg-gray-800 p-4">
-      <FingerPrintIcon className="mt-0.5 h-6 w-6 flex-none text-indigo-300" />
+      <FingerPrintIcon className="mt-0.5 h-6 w-6 flex-none text-indigo-300 light:text-accent-text" />
       <div className="min-w-0 flex-1">
-        <p className="font-semibold text-white">
+        <p className="font-semibold text-strong">
           {intl.formatMessage(messages.title)}
         </p>
         <p className="mt-1 text-sm text-gray-300">
@@ -181,7 +181,7 @@ const PasskeyNudge = () => {
       </div>
       <button
         aria-label={intl.formatMessage(messages.notNow)}
-        className="text-gray-400 transition duration-150 hover:text-white"
+        className="text-gray-400 transition duration-150 hover:text-strong"
         onClick={snooze}
         type="button"
       >

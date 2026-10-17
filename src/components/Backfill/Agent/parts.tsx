@@ -91,21 +91,23 @@ export const RunStatusIcon = ({
 }) => {
   if (status === 'running') {
     return (
-      <SparklesIcon className="h-5 w-5 flex-none animate-pulse text-indigo-300" />
+      <SparklesIcon className="h-5 w-5 flex-none animate-pulse text-indigo-300 light:text-accent-text" />
     );
   }
   if (status === 'waiting') {
     return (
-      <QuestionMarkCircleIcon className="h-5 w-5 flex-none text-yellow-300" />
+      <QuestionMarkCircleIcon className="h-5 w-5 flex-none text-yellow-300 light:text-warning-text" />
     );
   }
   if (status === 'queued' || status === 'held') {
     return <ClockIcon className="h-5 w-5 flex-none text-gray-400" />;
   }
   if (status === 'failed') {
-    return <ExclamationCircleIcon className="h-5 w-5 flex-none text-red-400" />;
+    return (
+      <ExclamationCircleIcon className="h-5 w-5 flex-none text-red-400 light:text-danger-text" />
+    );
   }
-  return <CheckCircleIcon className="h-5 w-5 flex-none text-green-400" />;
+  return <CheckCircleIcon className="h-5 w-5 flex-none text-success-text" />;
 };
 
 export const Ago = ({ at }: { at: string }) => (
@@ -139,7 +141,7 @@ export const RunMeta = ({ run }: { run: AgentRunSummary }) => {
       {grabs > 0 && (
         <>
           <span aria-hidden>·</span>
-          <span className="inline-flex items-center gap-1 text-green-300">
+          <span className="inline-flex items-center gap-1 text-green-300 light:text-success-text">
             <ArrowDownTrayIcon className="h-3.5 w-3.5" />
             {intl.formatMessage(messages.downloads, { count: grabs })}
           </span>
@@ -148,7 +150,7 @@ export const RunMeta = ({ run }: { run: AgentRunSummary }) => {
       {requests > 0 && (
         <>
           <span aria-hidden>·</span>
-          <span className="text-indigo-300">
+          <span className="text-indigo-300 light:text-accent-text">
             {intl.formatMessage(messages.requests, { count: requests })}
           </span>
         </>
@@ -181,7 +183,9 @@ export const RunRow = ({
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-start justify-between gap-2">
-            <span className="truncate font-semibold text-white">{heading}</span>
+            <span className="truncate font-semibold text-strong">
+              {heading}
+            </span>
             <span className="flex-none">
               <RunStatusBadge status={run.status} />
             </span>
@@ -195,7 +199,7 @@ export const RunRow = ({
             <RunMeta run={run} />
           </span>
           {run.status === 'waiting' && run.question ? (
-            <span className="mt-1 line-clamp-2 text-sm text-yellow-200">
+            <span className="mt-1 line-clamp-2 text-sm text-yellow-200 light:text-warning-text">
               {run.question}
             </span>
           ) : (
@@ -215,7 +219,7 @@ export const RunRow = ({
             </span>
           )}
           {!run.summary && !run.error && run.status === 'running' && (
-            <span className="mt-1 block text-sm text-indigo-200">
+            <span className="mt-1 block text-sm text-indigo-200 light:text-accent-text">
               {intl.formatMessage(messages.working)}
             </span>
           )}
@@ -302,7 +306,7 @@ export const AskAgent = ({
                 : messages.placeholderShort
           )}
           disabled={!!problem || busy}
-          className="min-w-0 flex-1 rounded-md border border-gray-500 bg-gray-700 px-3 py-2 text-sm text-white placeholder:text-gray-400 disabled:opacity-60"
+          className="min-w-0 flex-1 rounded-md border border-field-border bg-field px-3 py-2 text-sm text-strong placeholder:text-gray-400 disabled:opacity-60"
         />
         <Button
           buttonType="primary"
@@ -317,7 +321,9 @@ export const AskAgent = ({
         </Button>
       </div>
       {(problem || failed) && (
-        <p className="text-sm text-yellow-300">{problem ?? failed}</p>
+        <p className="text-sm text-yellow-300 light:text-warning-text">
+          {problem ?? failed}
+        </p>
       )}
     </form>
   );
@@ -331,13 +337,13 @@ export const AgentPanel = () => {
   return (
     <section className="rounded-lg bg-gray-800 ring-1 ring-gray-700">
       <div className="flex flex-col gap-1 border-b border-gray-700 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
-          <SparklesIcon className="h-5 w-5 text-indigo-300" />
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-strong">
+          <SparklesIcon className="h-5 w-5 text-indigo-300 light:text-accent-text" />
           {intl.formatMessage(messages.agent)}
         </h3>
         <Link
           href="/backfill/agent"
-          className="text-sm font-medium text-indigo-300 hover:text-indigo-200"
+          className="text-sm font-medium text-indigo-300 hover:text-indigo-200 light:text-accent-text light:hover:text-accent-text"
         >
           {intl.formatMessage(messages.allRuns)} ({data.total})
         </Link>
@@ -399,8 +405,8 @@ export const AgentForTitle = ({
           : undefined
       }
     >
-      <h3 className="mb-2 flex items-center gap-2 text-xl font-bold text-white">
-        <SparklesIcon className="h-5 w-5 text-indigo-300" />
+      <h3 className="mb-2 flex items-center gap-2 text-xl font-bold text-strong">
+        <SparklesIcon className="h-5 w-5 text-indigo-300 light:text-accent-text" />
         {intl.formatMessage(messages.forTitle)}
       </h3>
       <div className="space-y-3">
@@ -408,7 +414,7 @@ export const AgentForTitle = ({
           {intl.formatMessage(messages.forTitleTip)}
         </p>
         {autoRanAt && (
-          <p className="text-sm text-yellow-200/90">
+          <p className="text-sm text-yellow-200/90 light:text-warning-text">
             {intl.formatMessage(messages.autoRan, {
               date: intl.formatDate(autoRanAt, { dateStyle: 'medium' }),
             })}
@@ -421,7 +427,7 @@ export const AgentForTitle = ({
               <span>{intl.formatMessage(messages.earlier)}</span>
               <Link
                 href="/backfill/agent"
-                className="font-medium normal-case tracking-normal text-indigo-300 hover:text-indigo-200"
+                className="font-medium normal-case tracking-normal text-indigo-300 hover:text-indigo-200 light:text-accent-text light:hover:text-accent-text"
               >
                 {intl.formatMessage(messages.allConversations)}
               </Link>

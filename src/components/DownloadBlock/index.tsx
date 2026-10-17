@@ -195,7 +195,7 @@ const DownloadBlock = ({
       </div>
       <div className="relative mb-2 h-6 min-w-0 overflow-hidden rounded-full bg-gray-700">
         <div
-          className="h-8 bg-indigo-600 transition-all duration-200 ease-in-out"
+          className="h-8 bg-accent transition-all duration-200 ease-in-out"
           style={{ width: `${percent}%` }}
         />
         <div className="absolute inset-0 flex h-6 w-full items-center justify-center text-xs">

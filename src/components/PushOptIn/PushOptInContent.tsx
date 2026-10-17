@@ -61,7 +61,7 @@ const PushOptInContent = ({
       <div className="flex items-start space-x-3">
         <ArrowUpOnSquareIcon className="h-6 w-6 flex-shrink-0 text-gray-300" />
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-white">
+          <p className="font-medium text-strong">
             {intl.formatMessage(messages.installtitle)}
           </p>
           <p className="mt-1 text-sm text-gray-400">
@@ -96,9 +96,9 @@ const PushOptInContent = ({
 
     return (
       <div className="flex items-start space-x-3">
-        <BellSlashIcon className="h-6 w-6 flex-shrink-0 text-yellow-400" />
+        <BellSlashIcon className="h-6 w-6 flex-shrink-0 text-yellow-400 light:text-warning-text" />
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-white">{intl.formatMessage(title)}</p>
+          <p className="font-medium text-strong">{intl.formatMessage(title)}</p>
           <p className="mt-1 text-sm text-gray-400">
             {intl.formatMessage(description)}
           </p>
@@ -112,7 +112,7 @@ const PushOptInContent = ({
       <div className="flex items-start space-x-3">
         <BellSlashIcon className="h-6 w-6 flex-shrink-0 text-gray-300" />
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-white">
+          <p className="font-medium text-strong">
             {intl.formatMessage(messages.webviewtitle)}
           </p>
           <p className="mt-1 text-sm text-gray-400">
@@ -125,9 +125,9 @@ const PushOptInContent = ({
 
   return (
     <div className="flex items-start space-x-3">
-      <BellAlertIcon className="h-6 w-6 flex-shrink-0 text-indigo-400" />
+      <BellAlertIcon className="h-6 w-6 flex-shrink-0 text-indigo-400 light:text-accent-text" />
       <div className="min-w-0 flex-1">
-        <p className="font-medium text-white">
+        <p className="font-medium text-strong">
           {intl.formatMessage(messages.prompttitle)}
         </p>
         <p className="mt-1 text-sm text-gray-400">

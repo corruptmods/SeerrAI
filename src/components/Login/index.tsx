@@ -5,12 +5,14 @@ import Button from '@app/components/Common/Button';
 import ImageFader from '@app/components/Common/ImageFader';
 import PageTitle from '@app/components/Common/PageTitle';
 import LanguagePicker from '@app/components/Layout/LanguagePicker';
+import { StackedLogo } from '@app/components/Layout/Sidebar/BrandLogo';
 import JellyfinLogin from '@app/components/Login/JellyfinLogin';
 import LocalLogin from '@app/components/Login/LocalLogin';
 import OidcLoginButton from '@app/components/Login/OidcLoginButton';
 import PasskeyLoginButton from '@app/components/Login/PasskeyLoginButton';
 import PlexLoginButton from '@app/components/Login/PlexLoginButton';
 import { singleSignOnOutcome } from '@app/components/Login/singleSignOnMessages';
+import SafeModeSignInLink from '@app/components/Themes/SafeModeSignInLink';
 import useSettings from '@app/hooks/useSettings';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
@@ -26,7 +28,6 @@ import type {
 import { isJellyfinFamily, typeOfKind } from '@server/constants/server';
 import axios from 'axios';
 import { useRouter } from 'next/dist/client/router';
-import Image from 'next/image';
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { useIntl } from 'react-intl';
 import { CSSTransition, SwitchTransition } from 'react-transition-group';
@@ -202,7 +203,10 @@ const Login = () => {
   ].filter((o): o is JSX.Element => !!o);
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-gray-900 py-14">
+    <div
+      className="relative flex min-h-screen flex-col bg-gray-900 py-14"
+      data-seerr="login"
+    >
       <PageTitle title={intl.formatMessage(messages.signin)} />
       <ImageFader
         backgroundImages={
@@ -216,12 +220,12 @@ const Login = () => {
       </div>
       <div className="relative z-40 mt-10 flex flex-col items-center px-4 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="relative h-48 w-full max-w-full">
-          <Image src="/logo_stacked_ai.svg" alt="Seerr AI" fill />
+          <StackedLogo />
         </div>
       </div>
       <div className="relative z-50 mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div
-          className="bg-gray-800/50 shadow sm:rounded-lg"
+          className="bg-gray-800/50 shadow light:bg-surface/90 sm:rounded-lg"
           style={{ backdropFilter: 'blur(5px)' }}
         >
           <>
@@ -291,7 +295,7 @@ const Login = () => {
                     <div className="flex-grow border-t border-gray-600" />
                   </div>
                 ) : (
-                  <h2 className="mb-6 text-center text-lg font-bold text-neutral-200">
+                  <h2 className="mb-6 text-center text-lg font-bold text-neutral-200 light:text-strong">
                     {intl.formatMessage(messages.signinheader)}
                   </h2>
                 ))}
@@ -303,6 +307,7 @@ const Login = () => {
               >
                 {additionalLoginOptions}
               </div>
+              <SafeModeSignInLink />
             </div>
           </>
         </div>

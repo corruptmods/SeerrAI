@@ -147,7 +147,7 @@ const CertificationSelector: React.FC<CertificationSelectorProps> = ({
 
   if (certificationError) {
     return (
-      <div className="text-red-500">
+      <div className="text-danger-text">
         {intl.formatMessage(messages.errorLoading)}
       </div>
     );

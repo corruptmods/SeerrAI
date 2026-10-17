@@ -208,7 +208,7 @@ const NotificationsTelegram = () => {
                     CreateBotLink: (msg: React.ReactNode) => (
                       <a
                         href="https://core.telegram.org/bots#6-botfather"
-                        className="text-white transition duration-300 hover:underline"
+                        className="text-strong transition duration-300 hover:underline"
                         target="_blank"
                         rel="noreferrer"
                       >
@@ -218,7 +218,7 @@ const NotificationsTelegram = () => {
                     GetIdBotLink: (msg: React.ReactNode) => (
                       <a
                         href="https://telegram.me/get_id_bot"
-                        className="text-white transition duration-300 hover:underline"
+                        className="text-strong transition duration-300 hover:underline"
                         target="_blank"
                         rel="noreferrer"
                       >

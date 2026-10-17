@@ -5,13 +5,15 @@ import PageTitle from '@app/components/Common/PageTitle';
 import MetadataSelector, {
   MetadataProviderType,
 } from '@app/components/MetadataSelector';
-import SettingsMusic from '@app/components/Settings/SettingsMusic';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowDownOnSquareIcon, BeakerIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import { Form, Formik } from 'formik';
+import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
@@ -40,6 +42,8 @@ const messages = defineMessages('components.Settings', {
   connectionTestFailed: 'Connection test failed',
   failedToSaveMetadataSettings: 'Failed to save metadata provider settings',
   metadataSettingsSaved: 'Metadata provider settings saved',
+  musicMoved:
+    'Where music comes from is set under <link>Settings → Music</link>.',
 });
 
 type ProviderStatus = 'ok' | 'not tested' | 'failed';
@@ -61,6 +65,7 @@ interface MetadataSettings {
 const SettingsMetadata = () => {
   const intl = useIntl();
   const { addToast } = useToasts();
+  const { currentSettings } = useSettings();
   const [isTesting, setIsTesting] = useState(false);
   const defaultStatus: ProviderResponse = {
     tmdb: 'not tested',
@@ -213,9 +218,9 @@ const SettingsMetadata = () => {
       case 'ok':
         return 'text-green-500';
       case 'not tested':
-        return 'text-yellow-500';
+        return 'text-warning-text';
       case 'failed':
-        return 'text-red-500';
+        return 'text-danger-text';
     }
   };
 
@@ -473,7 +478,22 @@ const SettingsMetadata = () => {
           }}
         </Formik>
       </div>
-      <SettingsMusic />
+      {/* Music's sources were here before Settings → Music had them. */}
+      {currentSettings.musicReady && (
+        <p className="mt-10 text-sm text-gray-400">
+          {intl.formatMessage(messages.musicMoved, {
+            link: (text: ReactNode) => (
+              <Link
+                key="link"
+                href="/settings/music"
+                className="font-medium text-indigo-400 hover:underline light:text-accent-text"
+              >
+                {text}
+              </Link>
+            ),
+          })}
+        </p>
+      )}
     </>
   );
 };

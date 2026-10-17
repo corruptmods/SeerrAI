@@ -220,7 +220,7 @@ const NotificationsDiscord = () => {
                     DiscordWebhookLink: (msg: React.ReactNode) => (
                       <a
                         href="https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks"
-                        className="text-white transition duration-300 hover:underline"
+                        className="text-strong transition duration-300 hover:underline"
                         target="_blank"
                         rel="noreferrer"
                       >

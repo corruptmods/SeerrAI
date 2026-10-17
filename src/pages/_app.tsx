@@ -1,13 +1,15 @@
 import { dismissBootScreen } from '@app/components/BootScreen';
 import Layout from '@app/components/Layout';
 import LoadingBar from '@app/components/LoadingBar';
-import PWAHeader from '@app/components/PWAHeader';
+import PWAHeader, { ThemeColour } from '@app/components/PWAHeader';
 import ServiceWorkerSetup from '@app/components/ServiceWorkerSetup';
 import StatusChecker from '@app/components/StatusChecker';
+import CustomCss from '@app/components/Themes/CustomCss';
 import { InteractionProvider } from '@app/context/InteractionContext';
 import { LanguageContext } from '@app/context/LanguageContext';
 import { NoticeQueueProvider } from '@app/context/NoticeQueue';
 import { SettingsProvider } from '@app/context/SettingsContext';
+import { deviceAppearanceFrom, ThemeProvider } from '@app/context/ThemeContext';
 import { UserContext } from '@app/context/UserContext';
 import { PushDeviceProvider } from '@app/hooks/usePushDeviceState';
 import type { User } from '@app/hooks/useUser';
@@ -18,7 +20,10 @@ import { polyfillIntl } from '@app/utils/polyfillIntl';
 import { getHostAndPort } from '@app/utils/urlHelper';
 import '@fontsource-variable/inter';
 import { MediaServerType } from '@server/constants/server';
+import type { Appearance } from '@server/constants/theme';
+import { SERVER_THEME_DEFAULTS } from '@server/constants/theme';
 import type { PublicSettingsResponse } from '@server/interfaces/api/settingsInterfaces';
+import { localDay } from '@server/lib/seasons';
 import type { AvailableLocale } from '@server/types/languages';
 import axios from 'axios';
 import type { AppInitialProps, AppProps } from 'next/app';
@@ -140,6 +145,10 @@ interface ExtendedAppProps extends AppProps {
   messages: MessagesType;
   locale: AvailableLocale;
   currentSettings: PublicSettingsResponse;
+  /** The look kept on this device, for pages before anyone signs in. */
+  deviceAppearance?: Appearance;
+  /** The day the page is made for, for seasonal themes. */
+  seasonDay?: string;
 }
 
 // Every API request carries the build this page is running, so the server
@@ -155,6 +164,8 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
   messages,
   locale,
   currentSettings,
+  deviceAppearance,
+  seasonDay,
 }: ExtendedAppProps) => {
   let component: React.ReactNode;
   const [loadedMessages, setMessages] = useState<MessagesType>(messages);
@@ -263,38 +274,45 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
         >
           <LoadingBar />
           <SettingsProvider currentSettings={currentSettings}>
-            <InteractionProvider>
-              <Head>
-                <title>{currentSettings.applicationTitle}</title>
-                <meta
-                  name="viewport"
-                  content="initial-scale=1, viewport-fit=cover, width=device-width"
+            <ThemeProvider
+              deviceAppearance={deviceAppearance}
+              seasonDay={seasonDay}
+            >
+              <InteractionProvider>
+                <Head>
+                  <title>{currentSettings.applicationTitle}</title>
+                  <meta
+                    name="viewport"
+                    content="initial-scale=1, viewport-fit=cover, width=device-width"
+                  />
+                  <meta name="apple-mobile-web-app-capable" content="yes" />
+                  <meta
+                    name="apple-mobile-web-app-status-bar-style"
+                    content="black-translucent"
+                  />
+                  <PWAHeader
+                    applicationTitle={currentSettings.applicationTitle}
+                  />
+                </Head>
+                <ThemeColour />
+                <CustomCss />
+                <NoticeQueueProvider>
+                  <StatusChecker />
+                  <ServiceWorkerSetup />
+                  <UserContext initialUser={user}>
+                    <PushDeviceProvider>{component}</PushDeviceProvider>
+                  </UserContext>
+                </NoticeQueueProvider>
+                <Toaster
+                  position="top-right"
+                  toastOptions={{ duration: 4000 }}
+                  containerStyle={{
+                    zIndex: 10000,
+                    top: 'calc(env(safe-area-inset-top) + 0.75rem)',
+                  }}
                 />
-                <meta name="apple-mobile-web-app-capable" content="yes" />
-                <meta
-                  name="apple-mobile-web-app-status-bar-style"
-                  content="black-translucent"
-                />
-                <PWAHeader
-                  applicationTitle={currentSettings.applicationTitle}
-                />
-              </Head>
-              <NoticeQueueProvider>
-                <StatusChecker />
-                <ServiceWorkerSetup />
-                <UserContext initialUser={user}>
-                  <PushDeviceProvider>{component}</PushDeviceProvider>
-                </UserContext>
-              </NoticeQueueProvider>
-              <Toaster
-                position="top-right"
-                toastOptions={{ duration: 4000 }}
-                containerStyle={{
-                  zIndex: 10000,
-                  top: 'calc(env(safe-area-inset-top) + 0.75rem)',
-                }}
-              />
-            </InteractionProvider>
+              </InteractionProvider>
+            </ThemeProvider>
           </SettingsProvider>
         </IntlProvider>
       </LanguageContext.Provider>
@@ -339,7 +357,10 @@ CoreApp.getInitialProps = async (initialProps) => {
     subtitlesReady: false,
     traktReady: false,
     musicReady: false,
-    musicSearch: { inAll: false, musicPage: true, chip: true },
+    musicSearch: { inAll: false },
+    themeDefault: SERVER_THEME_DEFAULTS,
+    seasons: [],
+    customCss: { server: null, personal: false },
   };
 
   if (ctx.res) {
@@ -419,7 +440,15 @@ CoreApp.getInitialProps = async (initialProps) => {
     polyfillIntl(),
   ]);
 
-  return { ...appInitialProps, user, messages, locale, currentSettings };
+  return {
+    ...appInitialProps,
+    user,
+    messages,
+    locale,
+    currentSettings,
+    deviceAppearance: deviceAppearanceFrom(ctx.req?.headers.cookie),
+    seasonDay: localDay(new Date()),
+  };
 };
 
 export default CoreApp;

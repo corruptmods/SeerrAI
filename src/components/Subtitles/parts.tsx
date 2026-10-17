@@ -139,9 +139,9 @@ export const Tag = ({
   <span
     className={
       tone === 'ai'
-        ? 'rounded border border-indigo-500 px-1 text-[10px] font-bold leading-4 tracking-wide text-indigo-200'
+        ? 'rounded border border-indigo-500 px-1 text-[10px] font-bold leading-4 tracking-wide text-indigo-200 light:text-accent-text'
         : tone === 'missing'
-          ? 'rounded border border-yellow-600 px-1 text-[10px] font-bold leading-4 tracking-wide text-yellow-200'
+          ? 'rounded border border-yellow-600 px-1 text-[10px] font-bold leading-4 tracking-wide text-yellow-200 light:text-warning-text'
           : 'rounded border border-gray-500 px-1 text-[10px] font-bold leading-4 tracking-wide text-gray-200'
     }
   >
@@ -159,7 +159,7 @@ export const Pill = ({
   <span
     className={
       tone === 'default'
-        ? 'rounded-full bg-indigo-600 px-2 text-[11px] font-semibold leading-4 text-indigo-50'
+        ? 'rounded-full bg-accent px-2 text-[11px] font-semibold leading-4 text-indigo-50'
         : 'rounded-full bg-gray-700 px-2 text-[11px] font-semibold leading-4 text-gray-300'
     }
   >
@@ -236,7 +236,7 @@ export const iconButtonClass =
   'inline-flex h-10 w-10 flex-none items-center justify-center rounded-md border border-gray-600 bg-gray-700 text-gray-200 transition hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50';
 
 export const deleteButtonClass =
-  'inline-flex h-10 w-10 flex-none items-center justify-center rounded-md border border-gray-600 bg-gray-700 text-red-300 transition hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50';
+  'inline-flex h-10 w-10 flex-none items-center justify-center rounded-md border border-gray-600 bg-gray-700 text-red-300 light:text-danger-text transition hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50';
 
 /**
  * One subtitle on disk, with Replace and Delete when allowed. A track
@@ -267,7 +267,7 @@ export const TrackRow = ({
     <li className="flex items-center gap-2.5 border-b border-gray-700 px-4 py-2.5">
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="font-semibold text-white">{track.name}</span>
+          <span className="font-semibold text-strong">{track.name}</span>
           <TrackTags track={track} />
           {isDefault && (
             <Pill tone="default">

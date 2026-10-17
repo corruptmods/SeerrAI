@@ -29,9 +29,9 @@ const TitleDeclineReason = ({ requests }: { requests?: MediaRequest[] }) => {
       {declined.map(({ reason, is4k }) => (
         <p
           key={is4k ? '4k' : 'standard'}
-          className="mt-2 flex items-start justify-center gap-1.5 text-sm text-gray-300 2xl:justify-start"
+          className="mt-2 flex items-start justify-center gap-1.5 text-sm text-default 2xl:justify-start"
         >
-          <XCircleIcon className="mt-0.5 h-4 w-4 flex-none text-red-400" />
+          <XCircleIcon className="mt-0.5 h-4 w-4 flex-none text-red-400 light:text-danger-text" />
           <span className="min-w-0 whitespace-pre-line break-words">
             {intl.formatMessage(
               is4k ? messages.declined4k : messages.declined,

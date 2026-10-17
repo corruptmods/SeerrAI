@@ -29,21 +29,21 @@ const ButtonWithDropdown = ({
 }: ButtonWithDropdownProps) => {
   const intl = useIntl();
   const styleClasses = {
-    mainButtonClasses: 'button-md text-white border',
+    mainButtonClasses: 'button-md border',
     dropdownSideButtonClasses: 'button-md border',
   };
 
   switch (buttonType) {
     case 'ghost':
       styleClasses.mainButtonClasses +=
-        ' bg-transparent border-gray-600 hover:border-gray-200 focus:border-gray-100 active:border-gray-100';
+        ' text-strong bg-transparent border-strong hover:border-gray-200 focus:border-gray-100 active:border-gray-100';
       styleClasses.dropdownSideButtonClasses = styleClasses.mainButtonClasses;
       break;
     default:
       styleClasses.mainButtonClasses +=
-        ' bg-indigo-600/80 border-indigo-500 hover:bg-indigo-600 hover:border-indigo-500 active:bg-indigo-700 active:border-indigo-700 focus:ring-blue';
+        ' text-on-accent bg-accent/accent-fill border-accent-hover hover:bg-accent hover:border-accent-hover active:bg-indigo-700 active:border-indigo-700 focus:ring-blue';
       styleClasses.dropdownSideButtonClasses +=
-        ' bg-indigo-600/80 border-indigo-500 hover:bg-indigo-600 active:bg-indigo-600 focus:ring-blue';
+        ' text-on-accent bg-accent/accent-fill border-accent-hover hover:bg-accent active:bg-accent focus:ring-blue';
   }
 
   const TriggerElement = props.as ?? 'button';
@@ -63,7 +63,7 @@ const ButtonWithDropdown = ({
         <span className="relative -ml-px block">
           <MenuButton
             type="button"
-            className={`relative z-10 inline-flex h-full items-center rounded-r-md px-2 py-2 text-sm font-medium leading-5 text-white transition duration-150 ease-in-out hover:z-20 focus:z-20 ${styleClasses.dropdownSideButtonClasses}`}
+            className={`relative z-10 inline-flex h-full items-center rounded-r-md px-2 py-2 text-sm font-medium leading-5 transition duration-150 ease-in-out hover:z-20 focus:z-20 ${styleClasses.dropdownSideButtonClasses}`}
             aria-label={intl.formatMessage(messages.more)}
           >
             {dropdownIcon ? dropdownIcon : <ChevronDownIcon />}

@@ -222,7 +222,7 @@ const Calendar = () => {
               {days.map(([key, items]) => (
                 <section
                   key={`calendar-day-${key}`}
-                  className="mb-6 xl:mb-0 xl:rounded-xl xl:border xl:border-gray-800 xl:bg-gray-800/30 xl:p-3"
+                  className="mb-6 xl:mb-0 xl:rounded-xl xl:border xl:border-gray-800 xl:bg-gray-800/30 xl:p-3 light:xl:border-subtle"
                 >
                   <h2
                     className={`mb-1 px-2 text-sm font-bold uppercase tracking-wider ${
@@ -231,7 +231,7 @@ const Calendar = () => {
                   >
                     {dayHeading(intl, key, todayKey)}
                   </h2>
-                  <div className="divide-y divide-gray-800">
+                  <div className="divide-y divide-gray-800 light:divide-subtle">
                     {items.map((item) => (
                       <Row
                         key={`${item.mediaType}-${item.tmdbId ?? item.title}-${item.kind}-${item.at}`}

@@ -14,7 +14,7 @@ const Failed = ({ error, onRetry }: { error: Error; onRetry: () => void }) => {
 
   return (
     <div className="my-4 flex items-start gap-2 rounded-md border border-gray-700 bg-gray-800 p-3 text-sm text-gray-300">
-      <ExclamationTriangleIcon className="h-5 w-5 flex-none text-yellow-500" />
+      <ExclamationTriangleIcon className="h-5 w-5 flex-none text-warning-text" />
       <div className="min-w-0 flex-1">
         <p>{intl.formatMessage(messages.failed)}</p>
         {/* Said on screen: on a phone there is no console to read it from. */}
@@ -23,7 +23,7 @@ const Failed = ({ error, onRetry }: { error: Error; onRetry: () => void }) => {
         </p>
       </div>
       <button
-        className="flex-none text-indigo-400 hover:text-indigo-300"
+        className="flex-none text-indigo-400 hover:text-indigo-300 light:text-accent-text light:hover:text-accent-text"
         onClick={onRetry}
         type="button"
       >

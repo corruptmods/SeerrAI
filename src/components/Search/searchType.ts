@@ -8,35 +8,21 @@ export type SearchType = 'all' | 'movie' | 'tv' | 'music';
 /** The kind of search in the address, if it is one this person can use. */
 export const searchType = (
   value: string | string[] | undefined,
-  musicChip: boolean
+  musicOn: boolean
 ): SearchType =>
-  value === 'movie' || value === 'tv' || (value === 'music' && musicChip)
+  value === 'movie' || value === 'tv' || (value === 'music' && musicOn)
     ? value
     : 'all';
 
-/** Where music can be searched. */
-export interface MusicSearchPlaces {
-  /** Artists and albums below the films and series in All. */
-  inAll: boolean;
-  /** The Music page's own search box. */
-  musicPage: boolean;
-  /** Music among the kinds on the search page. */
-  chip: boolean;
-}
-
 /**
- * Where this person can search music: where an admin chose, and nowhere
- * at all with music off for everyone or for themselves. A server that
- * does not say keeps things as they were before there was a choice.
+ * Whether this person's All has music below the films and series: when an
+ * admin chose it, and never with music off for everyone or for themselves.
+ * A server that does not say leaves it out, as it was before the choice.
  */
-export const musicSearchPlaces = (
+export const musicInAll = (
   musicOn: boolean,
-  chosen: Partial<MusicSearchPlaces> | undefined
-): MusicSearchPlaces => ({
-  inAll: musicOn && (chosen?.inAll ?? false),
-  musicPage: musicOn && (chosen?.musicPage ?? true),
-  chip: musicOn && (chosen?.chip ?? true),
-});
+  chosen: { inAll?: boolean } | undefined
+): boolean => musicOn && (chosen?.inAll ?? false);
 
 /**
  * Whether artists and albums go below a search's films and series: in All
@@ -45,13 +31,6 @@ export const musicSearchPlaces = (
  */
 export const musicBelowTitles = (
   type: SearchType,
-  places: MusicSearchPlaces,
+  inAll: boolean,
   titlesLoaded: boolean
-): boolean => type === 'all' && places.inAll && titlesLoaded;
-
-/**
- * Whether the search box at the top finds music: when Music is among the
- * kinds on the search page, or music comes below the films and series.
- */
-export const searchFindsMusic = (places: MusicSearchPlaces): boolean =>
-  places.chip || places.inAll;
+): boolean => type === 'all' && inAll && titlesLoaded;

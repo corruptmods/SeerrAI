@@ -30,7 +30,7 @@ export const requireMusic = (
 };
 
 /**
- * For music's settings (Lidarr, Metadata → Music): there while music is on
+ * For music's settings (Lidarr, Settings → Music): there while music is on
  * for everyone, even before a Lidarr is added, since adding one is how it
  * starts. An admin who turned music off for themselves still manages it.
  */

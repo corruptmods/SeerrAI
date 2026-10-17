@@ -53,7 +53,7 @@ export const DeletingSoonMarker = ({
 
   return (
     <span
-      className="flex h-4 w-4 items-center justify-center rounded-full border border-red-500 bg-red-600/90 shadow-md sm:h-5 sm:w-5"
+      className="flex h-4 w-4 items-center justify-center rounded-full border border-red-500 bg-red-600/90 shadow-md light:bg-red-600 sm:h-5 sm:w-5"
       title={label(when)}
     >
       <ClockIcon className="h-2.5 w-2.5 text-white sm:h-3 sm:w-3" />

@@ -224,7 +224,7 @@ const Blocklist = () => {
       {!data ? (
         <LoadingSpinner />
       ) : data.results.length === 0 ? (
-        <div className="flex w-full flex-col items-center justify-center py-24 text-white">
+        <div className="flex w-full flex-col items-center justify-center py-24 text-strong">
           <span className="text-2xl text-gray-400">
             {intl.formatMessage(globalMessages.noresults)}
           </span>
@@ -243,7 +243,7 @@ const Blocklist = () => {
         data.results.map((item: BlocklistItem) => {
           return (
             <div
-              className="py-2"
+              className="list-row py-2"
               key={`request-list-${item.mediaType}-${item.tmdbId}`}
             >
               <BlocklistedItem item={item} revalidateList={revalidate} />
@@ -400,13 +400,7 @@ const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
             fill
             {...pictureLoading(nearness)}
           />
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage:
-                'linear-gradient(90deg, rgba(31, 41, 55, 0.47) 0%, rgba(31, 41, 55, 1) 100%)',
-            }}
-          />
+          <div className="row-backdrop-fade absolute inset-0" />
         </div>
       )}
       <div className="relative flex w-full flex-col justify-between overflow-hidden sm:flex-row">
@@ -435,7 +429,7 @@ const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
             />
           </Link>
           <div className="flex flex-col justify-center overflow-hidden pl-2 xl:pl-4">
-            <div className="pt-0.5 text-xs font-medium text-white sm:pt-1">
+            <div className="pt-0.5 text-xs font-medium text-strong sm:pt-1">
               {title &&
                 (isMovie(title)
                   ? title.releaseDate
@@ -449,7 +443,7 @@ const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
                   : `/tv/${item.tmdbId}`
               }
             >
-              <span className="mr-2 min-w-0 truncate text-lg font-bold text-white hover:underline xl:text-xl">
+              <span className="mr-2 min-w-0 truncate text-lg font-bold text-strong hover:underline xl:text-xl">
                 {title && (isMovie(title) ? title.title : title.name)}
               </span>
             </Link>
@@ -492,7 +486,7 @@ const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
                           height={20}
                           style={{ objectFit: 'cover' }}
                         />
-                        <span className="ml-1 truncate text-sm font-semibold group-hover:text-white group-hover:underline">
+                        <span className="ml-1 truncate text-sm font-semibold group-hover:text-strong group-hover:underline">
                           {item.user.displayName}
                         </span>
                       </span>
@@ -525,13 +519,13 @@ const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
           )}
           <div className="card-field">
             {item.mediaType === 'movie' ? (
-              <div className="pointer-events-none z-40 self-start rounded-full border border-blue-500 bg-blue-600/80 shadow-md">
+              <div className="pointer-events-none z-40 self-start rounded-full border border-blue-500 bg-blue-600/fill shadow-md">
                 <div className="flex h-4 items-center px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-white sm:h-5">
                   {intl.formatMessage(globalMessages.movie)}
                 </div>
               </div>
             ) : (
-              <div className="pointer-events-none z-40 self-start rounded-full border border-purple-600 bg-purple-600/80 shadow-md">
+              <div className="pointer-events-none z-40 self-start rounded-full border border-purple-600 bg-purple-600/fill shadow-md">
                 <div className="flex h-4 items-center px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-white sm:h-5">
                   {intl.formatMessage(globalMessages.tvshow)}
                 </div>

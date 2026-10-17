@@ -172,11 +172,11 @@ const UserProfile = () => {
                 showMusic ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
               }`}
             >
-              <div className="overflow-hidden rounded-lg bg-gray-800/50 px-4 py-5 shadow ring-1 ring-gray-700 sm:p-6">
+              <div className="overflow-hidden rounded-lg bg-gray-800/50 px-4 py-5 shadow ring-1 ring-gray-700 light:bg-surface/90 sm:p-6">
                 <dt className="truncate text-sm font-bold text-gray-300">
                   {intl.formatMessage(messages.totalrequests)}
                 </dt>
-                <dd className="mt-1 text-3xl font-semibold text-white">
+                <dd className="mt-1 text-3xl font-semibold text-strong">
                   <Link
                     href={
                       currentHasPermission(
@@ -192,7 +192,7 @@ const UserProfile = () => {
                 </dd>
               </div>
               <div
-                className={`overflow-hidden rounded-lg bg-gray-800/50 px-4 py-5 shadow ring-1 ${
+                className={`overflow-hidden rounded-lg bg-gray-800/50 px-4 py-5 shadow ring-1 light:bg-surface/90 ${
                   quota.movie.restricted
                     ? 'bg-gradient-to-t from-red-900 to-transparent ring-red-500'
                     : 'ring-gray-700'
@@ -212,7 +212,7 @@ const UserProfile = () => {
                 </dt>
                 <dd
                   className={`mt-1 flex items-center text-sm ${
-                    quota.movie.restricted ? 'text-red-500' : 'text-white'
+                    quota.movie.restricted ? 'text-danger-text' : 'text-strong'
                   }`}
                 >
                   {quota.movie.limit ? (
@@ -247,7 +247,7 @@ const UserProfile = () => {
                 </dd>
               </div>
               <div
-                className={`overflow-hidden rounded-lg bg-gray-800/50 px-4 py-5 shadow ring-1 ${
+                className={`overflow-hidden rounded-lg bg-gray-800/50 px-4 py-5 shadow ring-1 light:bg-surface/90 ${
                   quota.tv.restricted
                     ? 'bg-gradient-to-t from-red-900 to-transparent ring-red-500'
                     : 'ring-gray-700'
@@ -267,7 +267,7 @@ const UserProfile = () => {
                 </dt>
                 <dd
                   className={`mt-1 flex items-center text-sm ${
-                    quota.tv.restricted ? 'text-red-500' : 'text-white'
+                    quota.tv.restricted ? 'text-danger-text' : 'text-strong'
                   }`}
                 >
                   {quota.tv.limit ? (
@@ -303,7 +303,7 @@ const UserProfile = () => {
               </div>
               {showMusic && (
                 <div
-                  className={`overflow-hidden rounded-lg bg-gray-800/50 px-4 py-5 shadow ring-1 ${
+                  className={`overflow-hidden rounded-lg bg-gray-800/50 px-4 py-5 shadow ring-1 light:bg-surface/90 ${
                     quota.music.restricted
                       ? 'bg-gradient-to-t from-red-900 to-transparent ring-red-500'
                       : 'ring-gray-700'
@@ -323,7 +323,9 @@ const UserProfile = () => {
                   </dt>
                   <dd
                     className={`mt-1 flex items-center text-sm ${
-                      quota.music.restricted ? 'text-red-500' : 'text-white'
+                      quota.music.restricted
+                        ? 'text-danger-text'
+                        : 'text-strong'
                     }`}
                   >
                     {quota.music.limit ? (
@@ -432,7 +434,7 @@ const UserProfile = () => {
                 PlexWatchlistSupportLink: (msg: React.ReactNode) => (
                   <a
                     href="https://support.plex.tv/articles/universal-watchlist/"
-                    className="text-white transition duration-300 hover:underline"
+                    className="text-strong transition duration-300 hover:underline"
                     target="_blank"
                     rel="noreferrer"
                   >

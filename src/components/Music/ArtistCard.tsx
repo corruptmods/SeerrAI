@@ -96,7 +96,7 @@ const ArtistCard = ({ artist, canExpand }: ArtistCardProps) => {
       }
       badge={{
         label: intl.formatMessage(messages.artist),
-        className: 'border-teal-600 bg-teal-600/80',
+        className: 'border-teal-600 bg-teal-600/fill light:bg-teal-700',
       }}
       indicators={<MusicStatusBadge status={status} mini />}
       updating={updating}

@@ -320,7 +320,7 @@ const UserLinkedAccountsSettings = () => {
                 <div className={`w-12 ${acct.connected ? '' : 'opacity-50'}`}>
                   {acct.kind === 'plex' ? (
                     <div className="flex aspect-square h-full items-center justify-center rounded-full bg-neutral-800">
-                      <Logo className="w-9" />
+                      <Logo className="service-logo w-9" />
                     </div>
                   ) : (
                     <Logo />
@@ -335,7 +335,7 @@ const UserLinkedAccountsSettings = () => {
                       </span>
                     )}
                   </div>
-                  <div className="truncate text-xl font-semibold text-white">
+                  <div className="truncate text-xl font-semibold text-strong">
                     {acct.username}
                   </div>
                 </div>
@@ -385,7 +385,7 @@ const UserLinkedAccountsSettings = () => {
                     </span>
                   )}
                 </div>
-                <div className="truncate text-xl font-semibold text-white">
+                <div className="truncate text-xl font-semibold text-strong">
                   {link.username}
                 </div>
               </div>

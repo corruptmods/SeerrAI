@@ -135,7 +135,9 @@ const SettingsMaintainerr = () => {
                 hostname={server.hostname}
                 port={server.port}
                 isSSL={server.useSsl}
-                logo={<MaintainerrLogo className="h-10 w-10 flex-shrink-0" />}
+                logo={
+                  <MaintainerrLogo className="service-logo h-10 w-10 flex-shrink-0" />
+                }
                 detail={{
                   label: intl.formatMessage(messages.features),
                   value: featureList(server),

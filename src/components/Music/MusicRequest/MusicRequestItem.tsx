@@ -69,7 +69,7 @@ const Person = ({
         height={20}
       />
     </span>
-    <span className="truncate text-sm font-semibold group-hover:text-white group-hover:underline">
+    <span className="truncate text-sm font-semibold group-hover:text-strong group-hover:underline">
       {person.displayName}
     </span>
   </Link>
@@ -171,12 +171,12 @@ const MusicRequestItem = ({
               </div>
             </Link>
             <div className="flex flex-col justify-center overflow-hidden pl-2 xl:pl-4">
-              <div className="pt-0.5 text-xs font-medium text-white sm:pt-1">
+              <div className="pt-0.5 text-xs font-medium text-strong sm:pt-1">
                 {intl.formatMessage(globalMessages.music)}
               </div>
               <Link
                 href={href}
-                className="mr-2 min-w-0 truncate text-lg font-bold text-white hover:underline xl:text-xl"
+                className="mr-2 min-w-0 truncate text-lg font-bold text-strong hover:underline xl:text-xl"
               >
                 {title}
               </Link>

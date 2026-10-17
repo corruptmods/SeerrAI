@@ -146,7 +146,7 @@ const Discography = ({
 
   if (!albums.length) {
     return (
-      <p className="mt-8 text-gray-400">
+      <p className="mt-8 text-muted">
         {intl.formatMessage(messages.noReleases)}
       </p>
     );
@@ -175,7 +175,7 @@ const Discography = ({
         (group) =>
           groups[group].length > 0 && (
             <section key={group} className="mt-8">
-              <h2 className="text-xl font-bold text-gray-300 sm:text-2xl">
+              <h2 className="text-xl font-bold text-default sm:text-2xl">
                 {intl.formatMessage(messages[group])}
               </h2>
               {grid(groups[group])}
@@ -184,10 +184,10 @@ const Discography = ({
       )}
       {groups.other.length > 0 && (
         <section className="mt-8">
-          <h2 className="text-xl font-bold text-gray-300 sm:text-2xl">
+          <h2 className="text-xl font-bold text-default sm:text-2xl">
             {intl.formatMessage(messages.other)}
           </h2>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-muted">
             {intl.formatMessage(messages.otherTip)}
           </p>
           <Button
@@ -309,13 +309,7 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
           fallback="none"
           priority
         />
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              'linear-gradient(180deg, rgba(17, 24, 39, 0.47) 0%, rgba(17, 24, 39, 1) 100%)',
-          }}
-        />
+        <div className="media-page-fade" />
       </div>
       <PageTitle title={data.name} />
       <div className="media-header">
@@ -424,7 +418,7 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
               </p>
               <button
                 type="button"
-                className="mt-2 text-sm text-indigo-400 hover:text-indigo-300"
+                className="mt-2 text-sm text-accent-soft hover:text-indigo-300 light:text-accent-text light:hover:text-accent-text"
                 aria-expanded={bioOpen}
                 onClick={() => setBioOpen(!bioOpen)}
               >
@@ -481,7 +475,7 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
         </div>
       </div>
       {variousArtists && (
-        <p className="mt-4 text-sm text-gray-400">
+        <p className="mt-4 text-sm text-muted">
           {intl.formatMessage(messages.variousArtists)}
         </p>
       )}

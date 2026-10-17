@@ -2,13 +2,10 @@ import Header from '@app/components/Common/Header';
 import ListView from '@app/components/Common/ListView';
 import PageTitle from '@app/components/Common/PageTitle';
 import MusicSearchResults from '@app/components/Music/MusicSearchResults';
-import type {
-  MusicSearchPlaces,
-  SearchType,
-} from '@app/components/Search/searchType';
+import type { SearchType } from '@app/components/Search/searchType';
 import {
   musicBelowTitles,
-  musicSearchPlaces,
+  musicInAll,
   searchType,
 } from '@app/components/Search/searchType';
 import useDiscover from '@app/hooks/useDiscover';
@@ -47,11 +44,11 @@ const TYPES: { type: SearchType; label: keyof typeof globalMessages }[] = [
 const TitleResults = ({
   query,
   type,
-  music,
+  inAll,
 }: {
   query: string;
   type: 'all' | 'movie' | 'tv';
-  music: MusicSearchPlaces;
+  inAll: boolean;
 }) => {
   const {
     isLoadingInitialData,
@@ -82,7 +79,7 @@ const TitleResults = ({
         isReachingEnd={isReachingEnd}
         onScrollBottom={fetchMore}
       />
-      {musicBelowTitles(type, music, !isLoadingInitialData) && (
+      {musicBelowTitles(type, inAll, !isLoadingInitialData) && (
         <MusicSearchResults query={query} rows />
       )}
     </>
@@ -93,13 +90,11 @@ const Search = () => {
   const intl = useIntl();
   const router = useRouter();
   const { currentSettings } = useSettings();
-  const music = musicSearchPlaces(
-    useFeature('music'),
-    currentSettings.musicSearch
-  );
+  const musicOn = useFeature('music');
+  const inAll = musicInAll(musicOn, currentSettings.musicSearch);
   const query =
     typeof router.query.query === 'string' ? router.query.query : '';
-  const type = searchType(router.query.type, music.chip);
+  const type = searchType(router.query.type, musicOn);
 
   return (
     <>
@@ -113,7 +108,7 @@ const Search = () => {
         aria-label={intl.formatMessage(messages.show)}
         className="mb-5 flex flex-wrap gap-2"
       >
-        {TYPES.filter((t) => t.type !== 'music' || music.chip).map((t) => (
+        {TYPES.filter((t) => t.type !== 'music' || musicOn).map((t) => (
           <Link
             key={t.type}
             href={{
@@ -124,8 +119,8 @@ const Search = () => {
             scroll={false}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
               type === t.type
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-800 text-gray-300 ring-1 ring-gray-700 hover:text-white'
+                ? 'bg-accent text-on-accent'
+                : 'bg-surface text-default ring-1 ring-subtle hover:text-strong'
             }`}
           >
             {intl.formatMessage(globalMessages[t.label])}
@@ -135,7 +130,7 @@ const Search = () => {
       {type === 'music' ? (
         <MusicSearchResults query={query} />
       ) : (
-        <TitleResults key={type} query={query} type={type} music={music} />
+        <TitleResults key={type} query={query} type={type} inAll={inAll} />
       )}
     </>
   );

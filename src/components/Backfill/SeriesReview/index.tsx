@@ -137,8 +137,8 @@ const verdictOf = (c: CandidateView, bestId?: number) => {
 };
 
 const ACTION_STYLE = {
-  fill: 'bg-red-500/20 text-red-200',
-  upgrade: 'bg-yellow-500/20 text-yellow-200',
+  fill: 'bg-red-500/20 text-red-200 light:text-danger-text',
+  upgrade: 'bg-yellow-500/20 text-yellow-200 light:text-warning-text',
   skip: 'bg-gray-600/40 text-gray-300',
   reject: 'bg-gray-700/60 text-gray-400',
 } as const;
@@ -265,7 +265,7 @@ const SeriesReview = () => {
         <div className="min-w-0 flex-1">
           <div className="flex flex-col justify-between gap-3 xl:flex-row">
             <div>
-              <h1 className="text-3xl font-bold text-white">
+              <h1 className="text-3xl font-bold text-strong">
                 {series.title}
                 {series.year && !series.title.includes(String(series.year)) && (
                   <span className="font-medium text-gray-400">
@@ -472,7 +472,7 @@ const SeriesReview = () => {
         <div className="flex min-w-0 flex-col gap-4">
           {sonarr && (
             <section className="rounded-lg bg-gray-800 ring-1 ring-gray-700">
-              <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-white">
+              <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-strong">
                 {intl.formatMessage(messages.coverage)}
               </h2>
               <div className="p-5">
@@ -486,7 +486,7 @@ const SeriesReview = () => {
           )}
           {movie && (
             <section className="rounded-lg bg-gray-800 ring-1 ring-gray-700">
-              <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-white">
+              <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-strong">
                 {intl.formatMessage(messages.movieOnDisk)}
               </h2>
               <p className="p-5 text-sm text-gray-200">
@@ -511,7 +511,7 @@ const SeriesReview = () => {
             </section>
           )}
           <section className="flex-1 rounded-lg bg-gray-800 ring-1 ring-gray-700">
-            <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-white">
+            <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-strong">
               {intl.formatMessage(messages.why, { app })}
             </h2>
             <ul className="space-y-3 p-5 text-sm text-gray-200">
@@ -564,7 +564,7 @@ const SeriesReview = () => {
         </div>
 
         <section className="rounded-lg bg-gray-800 ring-1 ring-gray-700">
-          <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-white">
+          <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-strong">
             {intl.formatMessage(messages.plan)}
           </h2>
           <div className="space-y-4 p-5">
@@ -574,7 +574,7 @@ const SeriesReview = () => {
               </p>
             ) : (
               <>
-                <div className="break-all text-sm font-semibold text-white">
+                <div className="break-all text-sm font-semibold text-strong">
                   {selected.title}
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -599,7 +599,7 @@ const SeriesReview = () => {
                         <span className={`h-3 w-3 rounded-sm ${dot}`} />
                         {intl.formatMessage(label)}
                       </dt>
-                      <dd className="whitespace-nowrap font-semibold text-white">
+                      <dd className="whitespace-nowrap font-semibold text-strong">
                         {intl.formatMessage(
                           series.kind === 'movie'
                             ? messages.filesCount
@@ -681,7 +681,7 @@ const SeriesReview = () => {
       />
 
       <section className="mt-4 rounded-lg bg-gray-800 ring-1 ring-gray-700">
-        <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-white">
+        <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-strong">
           {intl.formatMessage(messages.candidates)}
         </h2>
         {!data.candidates.length ? (
@@ -744,7 +744,7 @@ const SeriesReview = () => {
                           />
                         </td>
                         <td className="min-w-[16rem] max-w-xl px-4 py-3 align-top">
-                          <div className="break-all font-semibold text-white">
+                          <div className="break-all font-semibold text-strong">
                             {c.title}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-400">
@@ -754,7 +754,7 @@ const SeriesReview = () => {
                             {!!c.plan?.length && (
                               <button
                                 type="button"
-                                className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300"
+                                className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 light:text-accent-text light:hover:text-accent-text"
                                 onClick={() =>
                                   setExpanded(
                                     expanded === c.id ? undefined : c.id
@@ -847,7 +847,7 @@ const SeriesReview = () => {
                                     {entry.score}
                                   </span>
                                   {entry.matchedBy === 'ai' && (
-                                    <span className="rounded bg-purple-500/20 px-2 py-0.5 text-purple-200">
+                                    <span className="rounded bg-purple-500/20 px-2 py-0.5 text-purple-200 light:text-purple-700">
                                       {intl.formatMessage(messages.aiBadge)}
                                     </span>
                                   )}
@@ -857,7 +857,7 @@ const SeriesReview = () => {
                                     {intl.formatMessage(messages[entry.action])}
                                   </span>
                                   {entry.matchedBy === 'ai' && entry.why && (
-                                    <span className="basis-full pl-[7.75rem] text-purple-200/80">
+                                    <span className="basis-full pl-[7.75rem] text-purple-200/80 light:text-purple-700">
                                       {intl.formatMessage(messages.aiWhy, {
                                         why: entry.why,
                                       })}
@@ -883,7 +883,7 @@ const SeriesReview = () => {
       </section>
 
       <section className="mt-4 rounded-lg bg-gray-800 ring-1 ring-gray-700">
-        <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-white">
+        <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-strong">
           {intl.formatMessage(messages.history)}
         </h2>
         <ul className={`divide-y divide-gray-700 ${SCROLL_LIST}`}>

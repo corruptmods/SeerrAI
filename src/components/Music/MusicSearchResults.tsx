@@ -57,7 +57,7 @@ const MusicSearchResults = ({
 
   if (error) {
     return (
-      <p className="mt-8 text-center text-gray-400">
+      <p className="mt-8 text-center text-muted">
         {error.response?.status === 503
           ? intl.formatMessage(messages.busy)
           : intl.formatMessage(messages.failed)}
@@ -106,7 +106,7 @@ const MusicSearchResults = ({
 
   if (!artists.length && !albums.length) {
     return (
-      <div className="mt-16 w-full text-center text-2xl text-gray-400">
+      <div className="mt-16 w-full text-center text-2xl text-muted">
         {intl.formatMessage(globalMessages.noresults)}
       </div>
     );

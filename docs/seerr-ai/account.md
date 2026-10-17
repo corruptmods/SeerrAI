@@ -18,6 +18,10 @@ If your admin has set up single sign-on, the sign-in page has a **Sign in with �
 
 **Profile → Settings → Features** lists every optional feature. Turning one off there hides it for you, everywhere. A feature an admin turned off for everyone stays off. See the [list of switches](./configuration.md#feature-switches).
 
+## How it looks
+
+Light or dark, your accent colour and more, in **Profile → Settings → Appearance**. See [Themes](./themes.md).
+
 ## Your home page
 
 Use the pencil button on Discover. See [Discover and lists](./discover-and-lists.md#your-own-home-page).

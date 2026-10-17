@@ -70,16 +70,16 @@ const messages = defineMessages('components.Backfill.JobDetail', {
 
 const STATE_STYLE = {
   waiting: 'bg-gray-600/40 text-gray-300',
-  importing: 'bg-indigo-500/20 text-indigo-200',
-  imported: 'bg-green-500/20 text-green-200',
-  failed: 'bg-red-500/20 text-red-200',
+  importing: 'bg-indigo-500/20 text-indigo-200 light:text-accent-text',
+  imported: 'bg-green-500/20 text-green-200 light:text-success-text',
+  failed: 'bg-red-500/20 text-red-200 light:text-danger-text',
 } as const;
 
 const LOG_STYLE = {
-  info: 'text-indigo-300',
-  ok: 'text-green-400',
-  warn: 'text-yellow-400',
-  error: 'text-red-400',
+  info: 'text-indigo-300 light:text-accent-text',
+  ok: 'text-success-text',
+  warn: 'text-yellow-400 light:text-warning-text',
+  error: 'text-red-400 light:text-danger-text',
 } as const;
 
 const JobDetail = () => {
@@ -173,7 +173,7 @@ const JobDetail = () => {
         <div className="min-w-0 flex-1">
           <div className="flex flex-col justify-between gap-3 xl:flex-row">
             <div className="min-w-0">
-              <h1 className="text-3xl font-bold text-white">
+              <h1 className="text-3xl font-bold text-strong">
                 {data.series?.title}
               </h1>
               <div className="mt-1 break-all text-sm text-gray-400">
@@ -283,7 +283,7 @@ const JobDetail = () => {
                     done
                       ? 'bg-green-600 text-white'
                       : current
-                        ? 'bg-indigo-500 text-white ring-4 ring-indigo-500/30'
+                        ? 'bg-indigo-500 text-on-accent ring-4 ring-indigo-500/30'
                         : 'bg-gray-700 text-gray-400'
                   }`}
                 >
@@ -303,7 +303,7 @@ const JobDetail = () => {
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <section className="rounded-lg bg-gray-800 ring-1 ring-gray-700">
           <div className="flex items-center justify-between border-b border-gray-700 px-5 py-4">
-            <h2 className="text-lg font-semibold text-white">
+            <h2 className="text-lg font-semibold text-strong">
               {intl.formatMessage(messages.progress)}
             </h2>
             <span className="text-sm text-gray-400">
@@ -324,7 +324,7 @@ const JobDetail = () => {
           <div className="space-y-5 p-5">
             <div>
               <div className="mb-2 flex justify-between text-sm">
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-strong">
                   {intl.formatMessage(messages.overall)}
                 </span>
                 <span className="text-gray-400">
@@ -362,7 +362,7 @@ const JobDetail = () => {
                   <div className="text-xs text-gray-400">
                     {intl.formatMessage(label)}
                   </div>
-                  <div className="mt-1 text-2xl font-bold text-white">
+                  <div className="mt-1 text-2xl font-bold text-strong">
                     {value}
                   </div>
                 </div>
@@ -405,7 +405,7 @@ const JobDetail = () => {
         </section>
 
         <section className="flex flex-col rounded-lg bg-gray-800 ring-1 ring-gray-700">
-          <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-white">
+          <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-strong">
             {intl.formatMessage(messages.activity)}
           </h2>
           <div className="relative min-h-[16rem] flex-1">

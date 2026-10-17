@@ -376,7 +376,7 @@ const RequestList = () => {
             <Tooltip content={intl.formatMessage(messages.sortDirection)}>
               <Button
                 buttonType="default"
-                className="z-40 mr-2 rounded-l-none border !border-gray-500 !bg-gray-800 !px-3 !text-gray-500 hover:!bg-gray-400 hover:!text-white"
+                className="z-40 mr-2 rounded-l-none border !border-gray-500 !bg-gray-800 !px-3 !text-gray-500 hover:!bg-gray-400 hover:!text-strong"
                 buttonSize="md"
                 onClick={() =>
                   setCurrentSortDirection(
@@ -415,7 +415,7 @@ const RequestList = () => {
 
       {data.results.map((request) => {
         return (
-          <div className="py-2" key={`request-list-${request.id}`}>
+          <div className="list-row py-2" key={`request-list-${request.id}`}>
             <RequestItem
               eta={etaFor(request.id)}
               backfill={backfill?.find(
@@ -436,7 +436,7 @@ const RequestList = () => {
       })}
 
       {data.results.length === 0 && (
-        <div className="flex w-full flex-col items-center justify-center py-24 text-white">
+        <div className="flex w-full flex-col items-center justify-center py-24 text-strong">
           <span className="text-2xl text-gray-400">
             {intl.formatMessage(globalMessages.noresults)}
           </span>

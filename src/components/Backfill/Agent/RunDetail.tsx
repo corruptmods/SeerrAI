@@ -191,8 +191,8 @@ const changeColour = (icon: ChangeIcon): string =>
   icon === 'stop'
     ? 'text-gray-300'
     : icon === 'delete'
-      ? 'text-red-200'
-      : 'text-green-200';
+      ? 'text-red-200 light:text-danger-text'
+      : 'text-green-200 light:text-success-text';
 
 const WorkStep = ({ step }: { step: AgentStep }) => {
   const intl = useIntl();
@@ -217,8 +217,8 @@ const WorkStep = ({ step }: { step: AgentStep }) => {
   if (step.kind === 'error') {
     return (
       <div className="flex gap-2 pl-6">
-        <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 flex-none text-yellow-400" />
-        <p className="whitespace-pre-wrap text-xs leading-5 text-yellow-200">
+        <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 flex-none text-yellow-400 light:text-warning-text" />
+        <p className="whitespace-pre-wrap text-xs leading-5 text-yellow-200 light:text-warning-text">
           {step.text}
         </p>
       </div>
@@ -231,7 +231,7 @@ const WorkStep = ({ step }: { step: AgentStep }) => {
       <summary className="flex cursor-pointer list-none items-start gap-2 px-3 py-1.5 text-xs text-gray-300 marker:hidden">
         <span className="min-w-0 flex-1 truncate">{first}</span>
         {more && (
-          <span className="flex-none text-indigo-300 group-open/result:hidden">
+          <span className="flex-none text-indigo-300 group-open/result:hidden light:text-accent-text">
             {intl.formatMessage(runMessages.showResult)}
           </span>
         )}
@@ -257,7 +257,7 @@ const EntryView = ({ entry }: { entry: Entry }) => {
     return (
       <div className="flex justify-end">
         <div
-          className={`max-w-[85%] rounded-2xl rounded-br-sm px-4 py-2.5 text-white shadow ${
+          className={`max-w-[85%] rounded-2xl rounded-br-sm px-4 py-2.5 text-strong shadow ${
             entry.backfill ? 'bg-gray-600' : 'bg-indigo-600'
           }`}
         >
@@ -293,11 +293,11 @@ const EntryView = ({ entry }: { entry: Entry }) => {
           <div className="mb-0.5 flex items-center justify-between gap-3 text-[11px] text-gray-400">
             <span className="flex items-center gap-1">
               {entry.proposal ? (
-                <HandRaisedIcon className="h-3.5 w-3.5 text-yellow-300" />
+                <HandRaisedIcon className="h-3.5 w-3.5 text-yellow-300 light:text-warning-text" />
               ) : entry.question ? (
-                <QuestionMarkCircleIcon className="h-3.5 w-3.5 text-yellow-300" />
+                <QuestionMarkCircleIcon className="h-3.5 w-3.5 text-yellow-300 light:text-warning-text" />
               ) : (
-                <SparklesIcon className="h-3.5 w-3.5 text-indigo-300" />
+                <SparklesIcon className="h-3.5 w-3.5 text-indigo-300 light:text-accent-text" />
               )}
               {intl.formatMessage(
                 entry.proposal
@@ -494,8 +494,8 @@ const RunDetail = () => {
       </div>
       <div className="mt-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div className="min-w-0">
-          <h1 className="flex items-start gap-2 text-2xl font-bold text-white sm:text-3xl">
-            <SparklesIcon className="mt-1 h-6 w-6 flex-none text-indigo-300 sm:h-7 sm:w-7" />
+          <h1 className="flex items-start gap-2 text-2xl font-bold text-strong sm:text-3xl">
+            <SparklesIcon className="mt-1 h-6 w-6 flex-none text-indigo-300 light:text-accent-text sm:h-7 sm:w-7" />
             <span className="min-w-0 break-words">
               {data.title ?? intl.formatMessage(runMessages.untitled)}
             </span>
@@ -603,7 +603,7 @@ const RunDetail = () => {
               <EntryView key={`${entry.at}-${i}`} entry={entry} />
             ))}
             {working && (
-              <div className="flex items-center gap-2 text-sm text-indigo-200">
+              <div className="flex items-center gap-2 text-sm text-indigo-200 light:text-accent-text">
                 <SparklesIcon className="h-4 w-4 animate-pulse" />
                 {intl.formatMessage(messages.working)}
               </div>
@@ -614,7 +614,7 @@ const RunDetail = () => {
             <button
               type="button"
               onClick={toBottom}
-              className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-lg ring-1 ring-indigo-400 hover:bg-indigo-500"
+              className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-on-accent shadow-lg ring-1 ring-indigo-400 hover:bg-accent-hover"
             >
               <ArrowDownIcon className="h-3.5 w-3.5" />
               {intl.formatMessage(runMessages.newMessages)}
@@ -649,7 +649,7 @@ const RunDetail = () => {
                     ? runMessages.answerPlaceholder
                     : runMessages.replyPlaceholder
               )}
-              className="min-h-[44px] min-w-0 flex-1 resize-y rounded-md border border-gray-500 bg-gray-700 px-3 py-2 text-sm text-white placeholder:text-gray-400 disabled:opacity-60"
+              className="min-h-[44px] min-w-0 flex-1 resize-y rounded-md border border-field-border bg-field px-3 py-2 text-sm text-strong placeholder:text-gray-400 disabled:opacity-60"
             />
             {/* Just the arrow on a phone, leaving the box the room. */}
             <Button
@@ -669,7 +669,11 @@ const RunDetail = () => {
               </span>
             </Button>
           </div>
-          {failed && <p className="text-sm text-red-300">{failed}</p>}
+          {failed && (
+            <p className="text-sm text-red-300 light:text-danger-text">
+              {failed}
+            </p>
+          )}
         </form>
       </section>
       <p className="mt-2 px-1 text-right text-[11px] text-gray-500">

@@ -190,7 +190,7 @@ const PlexImportModal = ({ onCancel, onComplete }: PlexImportProps) => {
             <Alert
               title={intl.formatMessage(messages.newplexsigninenabled, {
                 strong: (msg: React.ReactNode) => (
-                  <strong className="font-semibold text-white">{msg}</strong>
+                  <strong className="font-semibold text-strong">{msg}</strong>
                 ),
               })}
               type="info"

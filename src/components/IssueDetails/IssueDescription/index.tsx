@@ -85,7 +85,7 @@ const IssueDescription = ({
                               onClick={() => setIsEditing(true)}
                               className={`block w-full px-4 py-2 text-left text-sm ${
                                 active
-                                  ? 'bg-gray-600 text-white'
+                                  ? 'bg-gray-600 text-strong'
                                   : 'text-gray-100'
                               }`}
                             >
@@ -102,7 +102,7 @@ const IssueDescription = ({
                               onClick={() => onDelete()}
                               className={`block w-full px-4 py-2 text-left text-sm ${
                                 active
-                                  ? 'bg-gray-600 text-white'
+                                  ? 'bg-gray-600 text-strong'
                                   : 'text-gray-100'
                               }`}
                             >

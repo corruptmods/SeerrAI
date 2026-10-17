@@ -83,7 +83,7 @@ const SuggestionReasons = ({
                 <li key={`${reason.mediaType}-${reason.tmdbId}`}>
                   <Link
                     href={`/${reason.mediaType}/${reason.tmdbId}`}
-                    className="font-semibold text-white hover:underline"
+                    className="font-semibold text-strong hover:underline"
                   >
                     {title.mediaType === 'movie' ? title.title : title.name}
                   </Link>

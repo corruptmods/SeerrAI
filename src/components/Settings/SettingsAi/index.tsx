@@ -373,16 +373,16 @@ const SettingsAi = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <div
                     id="aiApiKey"
-                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-gray-500 bg-gray-700 px-3 py-2 text-sm text-white"
+                    className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-field-border bg-field px-3 py-2 text-sm text-strong"
                   >
                     {form.removeApiKey ? (
                       <>
-                        <TrashIcon className="h-5 w-5 flex-none text-red-400" />
+                        <TrashIcon className="h-5 w-5 flex-none text-red-400 light:text-danger-text" />
                         <span>{intl.formatMessage(messages.keyRemoving)}</span>
                       </>
                     ) : (
                       <>
-                        <CheckCircleIcon className="h-5 w-5 flex-none text-green-400" />
+                        <CheckCircleIcon className="h-5 w-5 flex-none text-success-text" />
                         <span>{intl.formatMessage(messages.keySaved)}</span>
                       </>
                     )}
@@ -439,7 +439,7 @@ const SettingsAi = () => {
                   {replacing && (
                     <button
                       type="button"
-                      className="mt-2 text-sm text-gray-400 hover:text-white"
+                      className="mt-2 text-sm text-gray-400 hover:text-strong"
                       onClick={() => {
                         setReplacing(false);
                         setEnteredKey('');
@@ -479,7 +479,7 @@ const SettingsAi = () => {
                 {listable && (
                   <button
                     type="button"
-                    className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-md border border-gray-500 bg-gray-700 text-gray-300 transition hover:text-white disabled:opacity-50"
+                    className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-md border border-gray-500 bg-gray-700 text-gray-300 transition hover:text-strong disabled:opacity-50"
                     onClick={() => listModels(form, enteredKey.trim(), listFor)}
                     disabled={listing}
                     aria-label={intl.formatMessage(messages.loadModels)}
@@ -492,7 +492,10 @@ const SettingsAi = () => {
                 )}
               </div>
               {modelsProblem && (
-                <p className="mt-2 text-sm text-red-400" role="alert">
+                <p
+                  className="mt-2 text-sm text-red-400 light:text-danger-text"
+                  role="alert"
+                >
                   {modelsProblem}
                 </p>
               )}

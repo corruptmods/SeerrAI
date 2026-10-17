@@ -93,7 +93,7 @@ const ListItemCard = ({
       {item.mediaType === 'tv' &&
         !!item.totalEpisodes &&
         (item.availableEpisodes ?? 0) < item.totalEpisodes && (
-          <p className="mt-1 truncate text-xs text-gray-400">
+          <p className="mt-1 truncate text-xs text-muted">
             {intl.formatMessage(messages.episodeprogress, {
               available: item.availableEpisodes ?? 0,
               total: item.totalEpisodes,
@@ -109,8 +109,8 @@ const ListItemCard = ({
           <p
             className={
               progress.state === 'up_next'
-                ? 'mt-1 truncate text-xs font-medium text-indigo-300'
-                : 'mt-1 truncate text-xs text-gray-400'
+                ? 'mt-1 truncate text-xs font-medium text-indigo-300 light:text-accent-text'
+                : 'mt-1 truncate text-xs text-muted'
             }
           >
             {progress.state === 'up_next' && progress.next
@@ -123,7 +123,7 @@ const ListItemCard = ({
                 : intl.formatMessage(messages.notstarted)}
           </p>
           {progress.state === 'up_next' && progress.next && (
-            <p className="truncate text-xs text-gray-400">
+            <p className="truncate text-xs text-muted">
               {intl.formatMessage(messages.tocatchup, {
                 remaining: progress.remaining,
               })}

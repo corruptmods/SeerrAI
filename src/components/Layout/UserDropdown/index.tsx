@@ -52,7 +52,7 @@ const UserDropdown = () => {
       <div>
         {/* The same size and edge as the AI button beside it. */}
         <MenuButton
-          className="flex h-10 w-10 flex-none items-center justify-center overflow-hidden rounded-full border border-gray-600 text-sm transition hover:border-gray-500 focus:border-gray-500 focus:outline-none"
+          className="flex h-10 w-10 flex-none items-center justify-center overflow-hidden rounded-full border border-strong text-sm transition hover:border-gray-500 focus:border-gray-500 focus:outline-none"
           data-testid="user-menu"
           aria-label={intl.formatMessage(messages.accountMenu)}
         >
@@ -76,8 +76,11 @@ const UserDropdown = () => {
         leaveTo="opacity-0 scale-95"
         appear
       >
-        <MenuItems className="absolute right-0 mt-2 w-72 origin-top-right rounded-md shadow-lg">
-          <div className="divide-y divide-gray-700 rounded-md bg-gray-800/80 ring-1 ring-gray-700 backdrop-blur">
+        <MenuItems
+          className="absolute right-0 mt-2 w-72 origin-top-right rounded-md shadow-lg"
+          data-seerr="user-menu"
+        >
+          <div className="divide-y divide-subtle rounded-md bg-surface/panel ring-1 ring-subtle backdrop-blur">
             <div className="flex flex-col space-y-4 px-4 py-4">
               <div className="flex items-center space-x-2">
                 <CachedImage
@@ -93,7 +96,7 @@ const UserDropdown = () => {
                     {user?.displayName}
                   </span>
                   {user?.displayName?.toLowerCase() !== user?.email && (
-                    <span className="truncate text-sm text-gray-400">
+                    <span className="truncate text-sm text-muted">
                       {user?.email}
                     </span>
                   )}
@@ -108,7 +111,7 @@ const UserDropdown = () => {
                     href={`/profile`}
                     className={`flex items-center rounded px-4 py-2 text-sm font-medium text-gray-200 transition duration-150 ease-in-out ${
                       active
-                        ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white'
+                        ? 'bg-gradient-to-br from-accent to-accent-alt text-on-accent'
                         : ''
                     }`}
                     data-testid="user-menu-profile"
@@ -131,7 +134,7 @@ const UserDropdown = () => {
                     }
                     className={`flex items-center rounded px-4 py-2 text-sm font-medium text-gray-200 transition duration-150 ease-in-out ${
                       active
-                        ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white'
+                        ? 'bg-gradient-to-br from-accent to-accent-alt text-on-accent'
                         : ''
                     }`}
                     data-testid="user-menu-settings"
@@ -147,7 +150,7 @@ const UserDropdown = () => {
                     href={`/profile/settings`}
                     className={`flex items-center rounded px-4 py-2 text-sm font-medium text-gray-200 transition duration-150 ease-in-out ${
                       active
-                        ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white'
+                        ? 'bg-gradient-to-br from-accent to-accent-alt text-on-accent'
                         : ''
                     }`}
                     data-testid="user-menu-settings"
@@ -163,7 +166,7 @@ const UserDropdown = () => {
                     href="#"
                     className={`flex items-center rounded px-4 py-2 text-sm font-medium text-gray-200 transition duration-150 ease-in-out ${
                       active
-                        ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white'
+                        ? 'bg-gradient-to-br from-accent to-accent-alt text-on-accent'
                         : ''
                     }`}
                     onClick={() => logout()}

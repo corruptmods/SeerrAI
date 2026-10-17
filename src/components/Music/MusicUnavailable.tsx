@@ -31,7 +31,7 @@ const MusicUnavailable = ({
   }
 
   return (
-    <div className="mt-16 flex flex-col items-center gap-4 text-center text-gray-300">
+    <div className="mt-16 flex flex-col items-center gap-4 text-center text-default">
       <p>
         {intl.formatMessage(status === 503 ? messages.busy : messages.failed)}
       </p>

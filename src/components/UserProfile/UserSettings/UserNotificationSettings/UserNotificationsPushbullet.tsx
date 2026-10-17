@@ -115,7 +115,7 @@ const UserPushbulletSettings = () => {
                       PushbulletSettingsLink: (msg: React.ReactNode) => (
                         <a
                           href="https://www.pushbullet.com/#settings/account"
-                          className="text-white transition duration-300 hover:underline"
+                          className="text-strong transition duration-300 hover:underline"
                           target="_blank"
                           rel="noreferrer"
                         >

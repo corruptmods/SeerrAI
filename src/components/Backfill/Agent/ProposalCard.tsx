@@ -42,12 +42,12 @@ const ProposalCard = ({
     >
       <h2
         id="agent-proposal"
-        className="flex items-center gap-2 text-sm font-semibold text-yellow-100"
+        className="flex items-center gap-2 text-sm font-semibold text-yellow-100 light:text-warning-text"
       >
-        <HandRaisedIcon className="h-5 w-5 flex-none text-yellow-300" />
+        <HandRaisedIcon className="h-5 w-5 flex-none text-yellow-300 light:text-warning-text" />
         {intl.formatMessage(messages.proposalTitle)}
       </h2>
-      <p className="mt-1 text-xs text-yellow-100/80">
+      <p className="mt-1 text-xs text-yellow-100/80 light:text-warning-text">
         {intl.formatMessage(messages.proposalIntro)}
       </p>
       <ol className="mt-3 space-y-3">
@@ -56,7 +56,7 @@ const ProposalCard = ({
             key={`${change.kind}-${i}`}
             className="rounded-md bg-gray-900/60 px-3 py-2 ring-1 ring-gray-700"
           >
-            <div className="text-sm font-medium text-white">
+            <div className="text-sm font-medium text-strong">
               {change.headline}
             </div>
             <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-gray-300">

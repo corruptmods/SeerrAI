@@ -107,7 +107,9 @@ const SettingsTautulli = () => {
                 port={data.port ?? 8181}
                 isSSL={!!data.useSsl}
                 externalUrl={data.externalUrl || undefined}
-                logo={<TautulliLogo className="h-10 w-10 flex-shrink-0" />}
+                logo={
+                  <TautulliLogo className="service-logo h-10 w-10 flex-shrink-0" />
+                }
                 detail={{
                   label: intl.formatMessage(messages.watchHistory),
                   value: intl.formatMessage(messages.fromPlex),

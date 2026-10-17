@@ -2,12 +2,12 @@ import Button from '@app/components/Common/Button';
 import ImageFader from '@app/components/Common/ImageFader';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import LanguagePicker from '@app/components/Layout/LanguagePicker';
+import { StackedLogo } from '@app/components/Layout/Sidebar/BrandLogo';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { LifebuoyIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import { Form, Formik } from 'formik';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
@@ -67,7 +67,7 @@ const ResetPassword = () => {
       </div>
       <div className="relative z-40 mt-10 flex flex-col items-center px-4 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="relative h-48 w-full max-w-full">
-          <Image src="/logo_stacked_ai.svg" alt="Seerr AI" fill />
+          <StackedLogo />
         </div>
         <h2 className="mt-12 text-center text-3xl font-extrabold leading-9 text-gray-100">
           {intl.formatMessage(messages.resetpassword)}
@@ -75,7 +75,7 @@ const ResetPassword = () => {
       </div>
       <div className="relative z-50 mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div
-          className="bg-gray-800/50 shadow sm:rounded-lg"
+          className="bg-gray-800/50 shadow light:bg-surface/90 sm:rounded-lg"
           style={{ backdropFilter: 'blur(5px)' }}
         >
           <div className="px-10 py-8">
@@ -130,7 +130,7 @@ const ResetPassword = () => {
                               name="password"
                               type="password"
                               autoComplete="new-password"
-                              className="form-input-area block w-full min-w-0 flex-1 rounded-md border border-gray-500 bg-gray-700 text-white transition duration-150 ease-in-out sm:text-sm sm:leading-5"
+                              className="form-input-area block w-full min-w-0 flex-1 rounded-md border border-field-border bg-field text-strong transition duration-150 ease-in-out sm:text-sm sm:leading-5"
                             />
                           </div>
                           {errors.password &&
@@ -153,7 +153,7 @@ const ResetPassword = () => {
                               name="confirmPassword"
                               type="password"
                               autoComplete="new-password"
-                              className="form-input-area block w-full min-w-0 flex-1 rounded-md border border-gray-500 bg-gray-700 text-white transition duration-150 ease-in-out sm:text-sm sm:leading-5"
+                              className="form-input-area block w-full min-w-0 flex-1 rounded-md border border-field-border bg-field text-strong transition duration-150 ease-in-out sm:text-sm sm:leading-5"
                             />
                           </div>
                           {errors.confirmPassword &&

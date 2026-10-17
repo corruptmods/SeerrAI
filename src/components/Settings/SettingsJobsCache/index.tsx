@@ -537,7 +537,7 @@ const SettingsJobs = () => {
                 {data?.map((job) => (
                   <tr key={`job-list-${job.id}`}>
                     <Table.TD>
-                      <div className="flex items-center text-sm leading-5 text-white">
+                      <div className="flex items-center text-sm leading-5 text-strong">
                         <span>
                           {intl.formatMessage(
                             messages[job.id] ?? messages.unknownJob
@@ -559,7 +559,7 @@ const SettingsJobs = () => {
                       </Badge>
                     </Table.TD>
                     <Table.TD>
-                      <div className="text-sm leading-5 text-white">
+                      <div className="text-sm leading-5 text-strong">
                         <FormattedRelativeTime
                           value={Math.floor(
                             (new Date(job.nextExecutionTime).getTime() -
@@ -614,7 +614,7 @@ const SettingsJobs = () => {
                 className="rounded-lg border border-gray-700 bg-gray-800 p-4"
               >
                 <div className="flex items-start justify-between space-x-2">
-                  <div className="flex min-w-0 items-center text-sm font-medium leading-5 text-white">
+                  <div className="flex min-w-0 items-center text-sm font-medium leading-5 text-strong">
                     <span className="truncate">
                       {intl.formatMessage(
                         messages[job.id] ?? messages.unknownJob

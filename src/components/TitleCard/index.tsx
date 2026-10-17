@@ -444,18 +444,18 @@ const TitleCard = ({
               : intl.formatMessage(globalMessages.tvshow),
         className:
           mediaType === 'movie' || mediaType === 'collection'
-            ? 'border-blue-500 bg-blue-600/80'
-            : 'border-purple-600 bg-purple-600/80',
+            ? 'border-blue-500 bg-blue-600/fill'
+            : 'border-purple-600 bg-purple-600/fill',
       }}
       indicators={
         <>
           {onList && (
-            <span className="flex h-4 w-4 items-center justify-center rounded-full border border-indigo-500 bg-indigo-600/90 shadow-md sm:h-5 sm:w-5">
+            <span className="flex h-4 w-4 items-center justify-center rounded-full border border-indigo-500 bg-indigo-600/90 shadow-md light:bg-indigo-600 sm:h-5 sm:w-5">
               <BookmarkFilledIcon className="h-2.5 w-2.5 text-white sm:h-3 sm:w-3" />
             </span>
           )}
           {notified && (
-            <span className="flex h-4 w-4 items-center justify-center rounded-full border border-amber-500 bg-amber-600/90 shadow-md sm:h-5 sm:w-5">
+            <span className="flex h-4 w-4 items-center justify-center rounded-full border border-amber-500 bg-amber-600/90 shadow-md light:bg-amber-600 sm:h-5 sm:w-5">
               <BellAlertIcon className="h-2.5 w-2.5 text-white sm:h-3 sm:w-3" />
             </span>
           )}

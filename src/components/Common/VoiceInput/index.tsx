@@ -81,7 +81,7 @@ const VoiceInputButton = ({
       className={`flex flex-none items-center justify-center rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
         listening
           ? 'animate-pulse bg-red-600 text-white'
-          : 'text-gray-400 hover:text-white'
+          : 'text-gray-400 hover:text-strong'
       } ${className}`}
     >
       <MicrophoneIcon className="h-5 w-5" />

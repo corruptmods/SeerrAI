@@ -213,7 +213,7 @@ const JellyfinImportModal: React.FC<JellyfinImportProps> = ({
               title={intl.formatMessage(messages.newJellyfinsigninenabled, {
                 mediaServerName,
                 strong: (msg: React.ReactNode) => (
-                  <strong className="font-semibold text-white">{msg}</strong>
+                  <strong className="font-semibold text-strong">{msg}</strong>
                 ),
               })}
               type="info"

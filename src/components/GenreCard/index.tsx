@@ -19,9 +19,11 @@ const GenreCard = ({ image, url, name, canExpand = false }: GenreCardProps) => {
       className={`relative flex h-32 items-center justify-center sm:h-36 ${
         canExpand ? 'w-full' : 'w-56 sm:w-72'
       } transform-gpu cursor-pointer p-8 shadow ring-1 transition duration-300 ease-in-out ${
+        // Dark behind the white name in every look, before the picture
+        // arrives and around it.
         isHovered
-          ? 'scale-105 bg-gray-700/100 ring-gray-500'
-          : 'scale-100 bg-gray-800/80 ring-gray-700'
+          ? 'scale-105 bg-gray-700/100 ring-gray-500 light:bg-[rgb(var(--media-scrim-raised))]'
+          : 'scale-100 bg-[rgb(var(--media-scrim-raised)/0.8)] ring-subtle'
       } overflow-hidden rounded-xl bg-cover bg-center`}
       onMouseEnter={() => {
         setHovered(true);
@@ -44,10 +46,12 @@ const GenreCard = ({ image, url, name, canExpand = false }: GenreCardProps) => {
       />
       <div
         className={`absolute inset-0 z-10 h-full w-full transition duration-300 ${
-          isHovered ? 'bg-gray-800/10' : 'bg-gray-800/30'
+          isHovered
+            ? 'bg-[rgb(var(--media-scrim-raised)/0.1)]'
+            : 'bg-[rgb(var(--media-scrim-raised)/0.3)]'
         }`}
       />
-      <div className="relative z-20 w-full truncate whitespace-normal text-center text-2xl font-bold text-white sm:text-3xl">
+      <div className="relative z-20 w-full truncate whitespace-normal text-center text-2xl font-bold text-on-media sm:text-3xl">
         {name}
       </div>
     </Link>

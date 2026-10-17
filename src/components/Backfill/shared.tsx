@@ -212,7 +212,7 @@ export const JobFollowUpNote = ({
   return href ? (
     <Link
       href={href}
-      className={`text-indigo-300 hover:text-indigo-200 hover:underline ${className}`}
+      className={`text-indigo-300 hover:text-indigo-200 hover:underline light:text-accent-text light:hover:text-accent-text ${className}`}
     >
       {text}
     </Link>

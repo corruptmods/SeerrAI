@@ -102,7 +102,7 @@ const BlocklistBlock = ({
                         : `/users/${data.user.id}`
                     }
                   >
-                    <span className="font-semibold text-gray-100 transition duration-300 hover:text-white hover:underline">
+                    <span className="font-semibold text-gray-100 transition duration-300 hover:text-strong hover:underline">
                       {data.user.displayName}
                     </span>
                   </Link>

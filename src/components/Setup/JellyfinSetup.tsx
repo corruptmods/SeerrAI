@@ -161,7 +161,7 @@ function JellyfinSetup({
     >
       {({ errors, touched, values, setFieldValue, isSubmitting, isValid }) => (
         <Form>
-          <div className="sm:border-t sm:border-gray-800">
+          <div className="sm:border-t sm:border-gray-800 light:sm:border-subtle">
             <div className="flex flex-col sm:flex-row sm:gap-4">
               <div className="w-full">
                 <label htmlFor="hostname" className="text-label">

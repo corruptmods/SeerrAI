@@ -152,7 +152,7 @@ const JellyfinLogin = ({ revalidate, serverType }: JellyfinLoginProps) => {
             <>
               <Form data-form-type="login">
                 <div>
-                  <h2 className="-mt-1 mb-6 text-center text-lg font-bold text-neutral-200">
+                  <h2 className="-mt-1 mb-6 text-center text-lg font-bold text-neutral-200 light:text-strong">
                     {intl.formatMessage(messages.loginwithapp, {
                       appName: mediaServerFormatValues.mediaServerName,
                     })}
@@ -165,7 +165,7 @@ const JellyfinLogin = ({ revalidate, serverType }: JellyfinLoginProps) => {
                         name="username"
                         type="text"
                         placeholder={intl.formatMessage(messages.username)}
-                        className="!bg-gray-700/80 placeholder:text-gray-400"
+                        className="!bg-gray-700/80 placeholder:text-gray-400 light:!bg-field"
                         data-form-type="username"
                       />
                     </div>
@@ -191,7 +191,7 @@ const JellyfinLogin = ({ revalidate, serverType }: JellyfinLoginProps) => {
                         type="password"
                         autoComplete="current-password"
                         placeholder={intl.formatMessage(messages.password)}
-                        className="!bg-gray-700/80 placeholder:text-gray-400"
+                        className="!bg-gray-700/80 placeholder:text-gray-400 light:!bg-field"
                         data-form-type="password"
                         data-1pignore="false"
                         data-lpignore="false"
@@ -211,7 +211,7 @@ const JellyfinLogin = ({ revalidate, serverType }: JellyfinLoginProps) => {
                                   isEmby ? 'startup/' : ''
                                 }forgotpassword.html`
                           }
-                          className="pt-2 text-sm text-indigo-500 hover:text-indigo-400"
+                          className="pt-2 text-sm text-accent-text hover:text-indigo-400 light:hover:text-accent-text"
                         >
                           {intl.formatMessage(messages.forgotpassword)}
                         </a>

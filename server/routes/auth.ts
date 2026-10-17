@@ -7,6 +7,7 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { startJobs } from '@server/job/schedule';
+import { cssVersion } from '@server/lib/customCss';
 import {
   emailFree,
   mainAccountOn,
@@ -119,6 +120,12 @@ authRoutes.get('/me', isAuthenticated(), async (req, res) => {
       discoverNetworks: user.settings.discoverNetworks ?? null,
       sidebarOrder: user.settings.sidebarOrder,
       sidebarHidden: user.settings.sidebarHidden,
+      appearance: user.settings.appearance ?? null,
+      seasonNote: user.settings.seasonNote ?? null,
+      // The version of their own CSS that pages load, while it is allowed.
+      personalCssVersion: getSettings().appearance.personalCss
+        ? cssVersion(user.settings.customCss)
+        : null,
     },
   });
 });

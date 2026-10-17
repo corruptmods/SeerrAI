@@ -110,7 +110,7 @@ const TranscribeModal = ({
         className="h-5 w-5 border-gray-500 bg-gray-700 text-indigo-600"
       />
       <span className="flex flex-1 flex-col">
-        <span className="font-semibold text-white">{label}</span>
+        <span className="font-semibold text-strong">{label}</span>
         <span className="text-xs text-gray-400">
           {intl.formatMessage(messages.episodes, { count: n })}
         </span>
@@ -145,7 +145,7 @@ const TranscribeModal = ({
                 setSeason(Number(e.target.value));
                 setScope('season');
               }}
-              className="rounded-md border border-gray-500 bg-gray-700 py-1.5 text-white"
+              className="rounded-md border border-field-border bg-field py-1.5 text-strong"
             >
               {seasons.map((s) => (
                 <option key={s} value={s}>

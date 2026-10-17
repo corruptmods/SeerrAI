@@ -30,13 +30,14 @@ const statusMessages: Record<MediaRequestStatus, keyof typeof globalMessages> =
     [MediaRequestStatus.COMPLETED]: 'completed',
   };
 
-// Whole class names, so the stylesheet keeps them.
+// Whole class names, so the stylesheet keeps them. Light mode has darker
+// ones, readable on a light page.
 const statusColors: Record<MediaRequestStatus, string> = {
-  [MediaRequestStatus.PENDING]: 'text-yellow-500',
-  [MediaRequestStatus.APPROVED]: 'text-green-400',
-  [MediaRequestStatus.DECLINED]: 'text-red-400',
-  [MediaRequestStatus.FAILED]: 'text-red-400',
-  [MediaRequestStatus.COMPLETED]: 'text-green-400',
+  [MediaRequestStatus.PENDING]: 'text-yellow-500 light:text-warning-text',
+  [MediaRequestStatus.APPROVED]: 'text-green-400 light:text-success-text',
+  [MediaRequestStatus.DECLINED]: 'text-red-400 light:text-danger-text',
+  [MediaRequestStatus.FAILED]: 'text-red-400 light:text-danger-text',
+  [MediaRequestStatus.COMPLETED]: 'text-green-400 light:text-success-text',
 };
 
 /**
@@ -107,7 +108,7 @@ const RequestedBy = ({ requests }: { requests?: MediaRequest[] }) => {
                   </span>
                 </Link>
               )}
-              <span className="block text-xs text-gray-400">
+              <span className="block text-xs text-muted">
                 <span className={statusColors[request.status]}>
                   {intl.formatMessage(
                     globalMessages[statusMessages[request.status] ?? 'pending']
@@ -121,7 +122,7 @@ const RequestedBy = ({ requests }: { requests?: MediaRequest[] }) => {
         {!expanded && sorted.length > SHOWN && (
           <button
             type="button"
-            className="block text-indigo-400 hover:text-indigo-300"
+            className="block text-accent-soft hover:text-indigo-300 light:text-accent-text light:hover:text-accent-text"
             onClick={() => setExpanded(true)}
           >
             {intl.formatMessage(messages.showAll, {

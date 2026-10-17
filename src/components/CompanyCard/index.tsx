@@ -17,7 +17,7 @@ const CompanyCard = ({ image, url, name }: CompanyCardProps) => {
       className={`relative flex h-32 w-56 transform-gpu cursor-pointer items-center justify-center p-8 shadow ring-1 transition duration-300 ease-in-out sm:h-36 sm:w-72 ${
         isHovered
           ? 'scale-105 bg-gray-700 ring-gray-500'
-          : 'scale-100 bg-gray-800 ring-gray-700'
+          : 'scale-100 bg-surface ring-subtle'
       } rounded-xl`}
       onMouseEnter={() => {
         setHovered(true);
@@ -36,14 +36,16 @@ const CompanyCard = ({ image, url, name }: CompanyCardProps) => {
           type="tmdb"
           src={image}
           alt={name}
-          className="relative z-40 h-full w-full"
+          // Studio and network logos come white, for a dark card; in light
+          // mode they are turned dark, for a light one.
+          className="relative z-40 h-full w-full light:invert"
           style={{ width: '100%', height: '100%', objectFit: 'contain' }}
           fill
         />
       </div>
       <div
         className={`absolute bottom-0 left-0 right-0 z-0 h-12 rounded-b-xl bg-gradient-to-t ${
-          isHovered ? 'from-gray-800' : 'from-gray-900'
+          isHovered ? 'from-surface' : 'from-page'
         }`}
       />
     </Link>

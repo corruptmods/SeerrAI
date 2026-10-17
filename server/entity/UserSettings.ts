@@ -1,3 +1,5 @@
+import type { Appearance } from '@server/constants/theme';
+import { cleanAppearance } from '@server/constants/theme';
 import type { NotificationAgentTypes } from '@server/interfaces/api/userSettingsInterfaces';
 import { hasNotificationType, Notification } from '@server/lib/notifications';
 import { NotificationAgentKey } from '@server/lib/settings';
@@ -41,6 +43,19 @@ const jsonNumberArrayTransformer = {
   },
   to: (v: number[] | null): string | null =>
     v?.length ? JSON.stringify(v) : null,
+};
+
+/** A person's own look, as JSON; null (or anything unreadable) for none. */
+const appearanceTransformer = {
+  from: (v: string | null): Appearance | null => {
+    try {
+      return (v && cleanAppearance(JSON.parse(v))) || null;
+    } catch {
+      return null;
+    }
+  },
+  to: (v: Appearance | null | undefined): string | null | undefined =>
+    v === undefined ? undefined : v ? JSON.stringify(v) : null,
 };
 
 @Entity()
@@ -124,6 +139,28 @@ export class UserSettings {
   /** Sidebar and phone menu items this person hid for themselves. */
   @Column({ type: 'text', nullable: true, transformer: jsonArrayTransformer })
   public sidebarHidden: string[];
+
+  /**
+   * Their own look (Profile → Settings → Appearance); null to use the
+   * server's default.
+   */
+  @Column({ type: 'text', nullable: true, transformer: appearanceTransformer })
+  public appearance?: Appearance | null;
+
+  /**
+   * Their answer to the note a seasonal theme shows the first time:
+   * '<season>-<year it started>:keep' or ':off' (server/lib/seasons).
+   */
+  @Column({ type: 'text', nullable: true })
+  public seasonNote?: string | null;
+
+  /**
+   * Their own CSS (Profile → Settings → Appearance), used only while an
+   * admin lets people add their own; checked by checkPersonalCss before it
+   * is kept and again when it is served.
+   */
+  @Column({ type: 'text', nullable: true })
+  public customCss?: string | null;
 
   /**
    * Their Trakt username, for requesting what is on their public Trakt

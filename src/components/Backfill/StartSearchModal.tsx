@@ -170,7 +170,7 @@ const StartSearchModal = ({
                         picked?.kind === o.kind &&
                         picked.arrId === o.arrId &&
                         picked.serverId === o.serverId
-                          ? 'bg-indigo-600/30 text-white'
+                          ? 'bg-indigo-600/30 text-strong'
                           : 'text-gray-200'
                       }`}
                     >
@@ -218,7 +218,7 @@ const StartSearchModal = ({
               {terms.map((term) => (
                 <span
                   key={term}
-                  className="inline-flex items-center gap-1 rounded-full bg-indigo-600/30 px-3 py-0.5 text-sm text-indigo-100"
+                  className="inline-flex items-center gap-1 rounded-full bg-indigo-600/30 px-3 py-0.5 text-sm text-indigo-100 light:text-accent-text"
                 >
                   {term}
                   <button
@@ -250,7 +250,7 @@ const StartSearchModal = ({
               />
               <button
                 type="button"
-                className="rounded-md bg-gray-700 px-3 text-sm text-white hover:bg-gray-600"
+                className="rounded-md bg-gray-700 px-3 text-sm text-strong hover:bg-gray-600"
                 onClick={addTerm}
               >
                 {intl.formatMessage(messages.add)}

@@ -8,7 +8,15 @@ import {
   MediaServerType,
   kindOfType,
 } from '@server/constants/server';
+import type { ThemeDefaults } from '@server/constants/theme';
+import {
+  SERVER_THEME_DEFAULTS,
+  cleanThemeDefaults,
+} from '@server/constants/theme';
+import { cssVersion } from '@server/lib/customCss';
 import { Permission } from '@server/lib/permissions';
+import type { SeasonCalendar, SeasonsSettings } from '@server/lib/seasons';
+import { seasonCalendar, seasonSettings } from '@server/lib/seasons';
 import { runMigrations } from '@server/lib/settings/migrator';
 import type { AvailableLocale } from '@server/types/languages';
 import { randomBytes, randomUUID } from 'crypto';
@@ -103,13 +111,7 @@ export const musicDefaults = (): MusicSettings => ({
   listenBrainz: true,
   theAudioDbApiKey: '',
   maxAlbumsPerRequest: 100,
-  search: {
-    inAll: false,
-    musicPage: true,
-    chip: true,
-    artists: 8,
-    albums: 12,
-  },
+  search: { inAll: false },
 });
 
 /** A Jellyfin or Emby server that has not been set up. */
@@ -436,6 +438,26 @@ export interface LidarrSettings extends DVRSettings {
   activeMetadataProfileName: string;
 }
 
+/**
+ * How Seerr AI looks (Settings → Appearance). The default is what everyone
+ * sees who has not chosen their own look, and the sign-in page.
+ */
+export interface AppearanceSettings {
+  default: ThemeDefaults;
+  /**
+   * The seasonal themes this server runs, and when. Left out until an
+   * admin saves them: Halloween, Holidays and New Year run by default.
+   */
+  seasons?: SeasonsSettings;
+  /**
+   * Styles for everyone, the sign-in page included; may @import a
+   * stylesheet from elsewhere (server/constants/customCss.ts). '' for none.
+   */
+  serverCss?: string;
+  /** Whether people may add their own CSS, for their own screens. */
+  personalCss?: boolean;
+}
+
 /** Where music's details come from, and limits on requesting it. */
 export interface MusicSettings {
   /**
@@ -459,27 +481,14 @@ export interface MusicSettings {
 }
 
 /**
- * Where music can be searched, and how much a search shows. Music off for
- * everyone, or for someone themselves, still wins over all of these.
+ * How music is searched. While music is on for someone, the search page's
+ * Music and the Music page's own search box are always there for them;
+ * music off for everyone, or for themselves, wins over this too.
  */
 export interface MusicSearchSettings {
   /** Artists and albums below the films and series in All. */
   inAll: boolean;
-  /** The Music page's own search box. */
-  musicPage: boolean;
-  /** Music among the kinds to choose from on the search page. */
-  chip: boolean;
-  /** The most artists one search shows. */
-  artists: number;
-  /** The most albums one search shows. */
-  albums: number;
 }
-
-/** What people's pages are told about searching music. */
-export type PublicMusicSearch = Pick<
-  MusicSearchSettings,
-  'inAll' | 'musicPage' | 'chip'
->;
 
 export const MUSICBRAINZ_URL = 'https://musicbrainz.org';
 
@@ -732,8 +741,17 @@ interface FullPublicSettings extends PublicSettings {
    * music can be searched, browsed and requested.
    */
   musicReady: boolean;
-  /** Where music can be searched; the numbers stay on the server. */
-  musicSearch: PublicMusicSearch;
+  /** Whether music comes below the films and series in All. */
+  musicSearch: MusicSearchSettings;
+  /** The look of everyone who has not chosen their own. */
+  themeDefault: ThemeDefaults;
+  /** The seasonal themes that run, and their days. */
+  seasons: SeasonCalendar;
+  /**
+   * Custom CSS: the Server CSS's version (null for none), which pages load
+   * it by, and whether people may add their own.
+   */
+  customCss: { server: string | null; personal: boolean };
 }
 
 export interface NotificationAgentConfig {
@@ -923,6 +941,7 @@ export interface AllSettings {
   sonarr: SonarrSettings[];
   lidarr: LidarrSettings[];
   music: MusicSettings;
+  appearance: AppearanceSettings;
   public: PublicSettings;
   notifications: NotificationSettings;
   jobs: Record<JobId, JobSettings>;
@@ -1048,6 +1067,7 @@ class Settings {
       sonarr: [],
       lidarr: [],
       music: musicDefaults(),
+      appearance: { default: { ...SERVER_THEME_DEFAULTS } },
       public: {
         initialized: false,
       },
@@ -1466,6 +1486,17 @@ class Settings {
     this.data.music = data;
   }
 
+  get appearance(): AppearanceSettings {
+    if (!this.data.appearance) {
+      this.data.appearance = { default: { ...SERVER_THEME_DEFAULTS } };
+    }
+    return this.data.appearance;
+  }
+
+  set appearance(data: AppearanceSettings) {
+    this.data.appearance = data;
+  }
+
   get radarr(): RadarrSettings[] {
     return this.data.radarr;
   }
@@ -1551,10 +1582,14 @@ class Settings {
       musicReady:
         (this.data.lidarr ?? []).some((lidarr) => lidarr.isDefault) &&
         !(this.data.main.disabledFeatures ?? []).includes('music'),
-      musicSearch: {
-        inAll: this.music.search.inAll,
-        musicPage: this.music.search.musicPage,
-        chip: this.music.search.chip,
+      musicSearch: { inAll: this.music.search.inAll },
+      // Checked again here: settings.json can be edited by hand.
+      themeDefault:
+        cleanThemeDefaults(this.appearance.default) ?? SERVER_THEME_DEFAULTS,
+      seasons: seasonCalendar(seasonSettings(this.appearance.seasons)),
+      customCss: {
+        server: cssVersion(this.appearance.serverCss),
+        personal: this.appearance.personalCss === true,
       },
     };
   }

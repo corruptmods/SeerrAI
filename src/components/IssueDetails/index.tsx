@@ -209,13 +209,7 @@ const IssueDetails = () => {
             fill
             priority
           />
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage:
-                'linear-gradient(180deg, rgba(17, 24, 39, 0.47) 0%, rgba(17, 24, 39, 1) 100%)',
-            }}
-          />
+          <div className="media-page-fade" />
         </div>
       )}
       <div className="media-header">
@@ -235,7 +229,7 @@ const IssueDetails = () => {
             priority
           />
         </div>
-        <div className="media-title">
+        <div className="media-title light:text-strong">
           <div className="media-status">
             {issueData.status === IssueStatus.OPEN && (
               <Badge badgeType="warning">
@@ -281,7 +275,7 @@ const IssueDetails = () => {
                     width={20}
                     height={20}
                   />
-                  <span className="font-semibold text-gray-100 transition duration-300 group-hover:text-white group-hover:underline">
+                  <span className="font-semibold text-gray-100 transition duration-300 group-hover:text-strong group-hover:underline">
                     {issueData.createdBy.displayName}
                   </span>
                 </Link>

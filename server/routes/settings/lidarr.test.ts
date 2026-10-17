@@ -17,8 +17,8 @@ import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
 
 /*
  * Lidarr's settings (Settings → Services), music's own settings (Settings
- * → Metadata → Music) and what the request window reads about a Lidarr,
- * against a fake Lidarr that answers as Lidarr's API does.
+ * → Music) and what the request window reads about a Lidarr, against a
+ * fake Lidarr that answers as Lidarr's API does.
  */
 
 setupTestDb();
@@ -284,6 +284,7 @@ describe('music settings', () => {
       listenBrainz: false,
       maxAlbumsPerRequest: 50,
       hasTheAudioDbApiKey: true,
+      search: { inAll: false },
     });
     assert.equal(getSettings().music.theAudioDbApiKey, 'secret');
 
@@ -317,93 +318,70 @@ describe('music settings', () => {
 });
 
 describe('how music is searched', () => {
-  it('starts as it always was, then keeps what an admin saves', async () => {
-    const first = await call('GET', '/settings/music/search');
+  it('is saved with the rest of Settings → Music', async () => {
+    const first = await call('GET', '/settings/music');
     assert.equal(first.status, 200);
-    assert.deepEqual(first.body, {
+    assert.deepEqual((first.body as { search: unknown }).search, {
       inAll: false,
-      musicPage: true,
-      chip: true,
-      artists: 8,
-      albums: 12,
     });
 
-    const saved = await call('POST', '/settings/music/search', {
-      inAll: true,
-      musicPage: false,
-      chip: true,
-      artists: 4,
-      albums: 20,
+    const saved = await call('POST', '/settings/music', {
+      listenBrainz: false,
+      search: { inAll: true },
     });
     assert.equal(saved.status, 200);
-    const expected = {
+    assert.deepEqual((saved.body as { search: unknown }).search, {
       inAll: true,
-      musicPage: false,
-      chip: true,
-      artists: 4,
-      albums: 20,
-    };
-    assert.deepEqual(saved.body, expected);
+    });
+    assert.deepEqual(getSettings().music.search, { inAll: true });
+    assert.equal(getSettings().music.listenBrainz, false);
     assert.deepEqual(
-      (await call('GET', '/settings/music/search')).body,
-      expected
+      ((await call('GET', '/settings/music')).body as { search: unknown })
+        .search,
+      { inAll: true }
     );
-    assert.deepEqual(getSettings().music.search, expected);
 
-    // Saving Metadata → Music leaves them as they are.
-    await call('POST', '/settings/music', { listenBrainz: false });
-    assert.deepEqual(getSettings().music.search, expected);
+    // A save that leaves it out keeps it.
+    await call('POST', '/settings/music', { listenBrainz: true });
+    assert.deepEqual(getSettings().music.search, { inAll: true });
   });
 
-  it('keeps what a save leaves out', async () => {
-    await call('POST', '/settings/music/search', { artists: 3 });
-    await call('POST', '/settings/music/search', { chip: false });
-    assert.deepEqual(getSettings().music.search, {
-      inAll: false,
-      musicPage: true,
-      chip: false,
-      artists: 3,
-      albums: 12,
+  it('keeps nothing but whether music is in All', async () => {
+    // A page from before the trim may still send the settings that went.
+    const saved = await call('POST', '/settings/music', {
+      search: {
+        inAll: true,
+        musicPage: false,
+        chip: false,
+        artists: 3,
+        albums: 20,
+      },
     });
+    assert.equal(saved.status, 200);
+    assert.deepEqual(getSettings().music.search, { inAll: true });
   });
 
-  it('refuses a number of results out of bounds, changing nothing', async () => {
-    for (const body of [
-      { artists: 0 },
-      { artists: 26 },
-      { albums: 2.5 },
-      { albums: -1 },
-      { inAll: 'yes' },
-    ]) {
-      assert.equal(
-        (await call('POST', '/settings/music/search', body)).status,
-        400,
-        JSON.stringify(body)
-      );
-    }
-    assert.deepEqual(getSettings().music.search, musicDefaults().search);
+  it('refuses a choice that is not yes or no, changing nothing', async () => {
+    assert.equal(
+      (await call('POST', '/settings/music', { search: { inAll: 'yes' } }))
+        .status,
+      400
+    );
+    assert.deepEqual(getSettings().music.search, { inAll: false });
   });
 
-  it('tells everyone only what their pages need', async () => {
-    await call('POST', '/settings/music/search', {
-      inAll: true,
-      musicPage: false,
-      chip: false,
-      artists: 5,
-      albums: 6,
-    });
+  it('tells everyone only whether music is in All', async () => {
+    await call('POST', '/settings/music', { search: { inAll: true } });
     assert.deepEqual(getSettings().fullPublicSettings.musicSearch, {
       inAll: true,
-      musicPage: false,
-      chip: false,
     });
   });
 
   it('is gone while music is turned off for everyone', async () => {
     getSettings().main.disabledFeatures = ['music'];
-    assert.equal((await call('GET', '/settings/music/search')).status, 403);
     assert.equal(
-      (await call('POST', '/settings/music/search', { inAll: true })).status,
+      (await call('POST', '/settings/music', { search: { inAll: true } }))
+        .status,
       403
     );
     assert.equal(getSettings().music.search.inAll, false);
@@ -411,7 +389,7 @@ describe('how music is searched', () => {
 
   it('is there before a Lidarr is added, since music starts here', async () => {
     assert.equal(getSettings().lidarr.length, 0);
-    assert.equal((await call('GET', '/settings/music/search')).status, 200);
+    assert.equal((await call('GET', '/settings/music')).status, 200);
   });
 });
 

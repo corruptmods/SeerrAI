@@ -87,7 +87,7 @@ const WatchedBy = ({
                   className="mb-1 block last:mb-0"
                 >
                   <span className="block text-gray-200">{person.name}</span>
-                  <span className="block text-xs text-gray-400">
+                  <span className="block text-xs text-muted">
                     {counted &&
                       intl.formatMessage(
                         isShow ? messages.episodes : messages.plays,
@@ -108,7 +108,7 @@ const WatchedBy = ({
         {!expanded && data.people.length > SHOWN && (
           <button
             type="button"
-            className="block text-indigo-400 hover:text-indigo-300"
+            className="block text-accent-soft hover:text-indigo-300 light:text-accent-text light:hover:text-accent-text"
             onClick={() => setExpanded(true)}
           >
             {intl.formatMessage(messages.showAll, {

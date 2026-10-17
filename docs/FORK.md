@@ -366,7 +366,7 @@ Do not undo these without reading why first — each was tried the other way.
   is told it is busy instead. Answers are kept in the database too, so a
   restart asks nothing again. Health judges MusicBrainz from how that
   queue has fared rather than spending a request on a check. A mirror
-  (Settings → Metadata → Music) is not limited.
+  (Settings → Music) is not limited.
 - **Single sign-on finds people by provider account only.** A provider
   (Settings → Users → Single Sign-On) signs someone in only through a
   link of the provider's id and its own id for them (`sub`, in

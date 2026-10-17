@@ -36,12 +36,14 @@ const ImageFader: ForwardRefRenderFunction<HTMLDivElement, ImageFaderProps> = (
     };
   }, [backgroundImages, rotationSpeed]);
 
+  // Both follow the look (globals.css): the darker one fades into the page
+  // as a title page's backdrop does.
   let gradient =
-    'linear-gradient(180deg, rgba(45, 55, 72, 0.47) 0%, #1A202E 100%)';
+    'linear-gradient(180deg, rgb(var(--backdrop-fade-from) / var(--backdrop-fade-start)) 0%, rgb(var(--backdrop-fade-to)) 100%)';
 
   if (isDarker) {
     gradient =
-      'linear-gradient(180deg, rgba(17, 24, 39, 0.47) 0%, rgba(17, 24, 39, 1) 100%)';
+      'linear-gradient(180deg, rgb(var(--page) / var(--title-fade)) 0%, rgb(var(--page)) 100%)';
   }
 
   let overrides = {};

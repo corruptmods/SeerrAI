@@ -20,11 +20,11 @@ const ProgressCircle = ({
     color = 'text-green-500';
 
     if (progress <= 50) {
-      color = 'text-yellow-500';
+      color = 'text-warning-text';
     }
 
     if (progress <= 10) {
-      color = 'text-red-500';
+      color = 'text-danger-text';
     }
 
     if (progress === 0) {

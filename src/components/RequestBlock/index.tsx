@@ -132,7 +132,7 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
                       ? '/profile'
                       : `/users/${request.requestedBy.id}`
                   }
-                  className="flex items-center font-semibold text-gray-100 transition duration-300 hover:text-white hover:underline"
+                  className="flex items-center font-semibold text-gray-100 transition duration-300 hover:text-strong hover:underline"
                 >
                   <span className="avatar-sm">
                     <CachedImage
@@ -162,7 +162,7 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
                         ? '/profile'
                         : `/users/${request.modifiedBy.id}`
                     }
-                    className="flex items-center font-semibold text-gray-100 transition duration-300 hover:text-white hover:underline"
+                    className="flex items-center font-semibold text-gray-100 transition duration-300 hover:text-strong hover:underline"
                   >
                     <span className="avatar-sm">
                       <CachedImage

@@ -497,7 +497,7 @@ export class MusicBrainz extends ExternalAPI {
 
 let shared: { client: MusicBrainz; settings: string } | undefined;
 
-/** The server's MusicBrainz client, following Settings → Metadata → Music. */
+/** The server's MusicBrainz client, following Settings → Music. */
 export const musicBrainz = (): MusicBrainz => {
   const { musicbrainzUrl, contactEmail } = getSettings().music;
   const settings = JSON.stringify([musicbrainzUrl, contactEmail]);

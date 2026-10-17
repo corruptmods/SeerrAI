@@ -148,7 +148,9 @@ const SettingsLidarr = () => {
                   isSSL={server.useSsl}
                   isDefault={server.isDefault}
                   externalUrl={server.externalUrl}
-                  logo={<LidarrLogo className="h-10 w-10 flex-shrink-0" />}
+                  logo={
+                    <LidarrLogo className="service-logo h-10 w-10 flex-shrink-0" />
+                  }
                   onEdit={() => setEditModal({ open: true, lidarr: server })}
                   onDelete={() =>
                     setDeleteModal({ open: true, serverId: server.id })

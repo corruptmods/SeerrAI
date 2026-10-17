@@ -471,13 +471,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
             fill
             priority
           />
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage:
-                'linear-gradient(180deg, rgba(17, 24, 39, 0.47) 0%, rgba(17, 24, 39, 1) 100%)',
-            }}
-          />
+          <div className="media-page-fade" />
         </div>
       )}
       <PageTitle title={data.title} />
@@ -509,8 +503,8 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
         isUpdating={isBlocklistUpdating}
         removesFiles={blocklist.removesFiles}
       />
-      <div className="media-header">
-        <div className="media-poster">
+      <div className="media-header" data-seerr="title-header">
+        <div className="media-poster" data-seerr="poster">
           <CachedImage
             type="tmdb"
             src={
@@ -623,7 +617,9 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                       {isUpdating ? (
                         <Spinner />
                       ) : (
-                        <StarIcon className={'text-amber-300'} />
+                        <StarIcon
+                          className={'text-amber-300 light:text-amber-600'}
+                        />
                       )}
                     </Button>
                   </Tooltip>
@@ -755,7 +751,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
               <div className="mt-4 flex justify-end">
                 <Link
                   href={`/movie/${data.id}/crew`}
-                  className="flex items-center text-gray-400 transition duration-300 hover:text-gray-100"
+                  className="flex items-center text-muted transition duration-300 hover:text-gray-100"
                 >
                   <span>{intl.formatMessage(messages.viewfullcrew)}</span>
                   <ArrowRightCircleIcon className="ml-1.5 inline-block h-5 w-5" />
@@ -807,7 +803,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
           {data.collection && (
             <div className="mb-6">
               <Link href={`/collection/${data.collection.id}`}>
-                <div className="group relative z-0 scale-100 transform-gpu cursor-pointer overflow-hidden rounded-lg bg-gray-800 bg-cover bg-center shadow-md ring-1 ring-gray-700 transition duration-300 hover:scale-105 hover:ring-gray-500">
+                <div className="group relative z-0 scale-100 transform-gpu cursor-pointer overflow-hidden rounded-lg bg-surface bg-cover bg-center shadow-md ring-1 ring-subtle transition duration-300 hover:scale-105 hover:ring-gray-500">
                   <div className="absolute inset-0 z-0">
                     <CachedImage
                       type="tmdb"
@@ -824,11 +820,11 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
                       className="absolute inset-0"
                       style={{
                         backgroundImage:
-                          'linear-gradient(180deg, rgba(31, 41, 55, 0.47) 0%, rgba(31, 41, 55, 0.80) 100%)',
+                          'linear-gradient(180deg, rgb(var(--media-scrim-raised) / 0.47) 0%, rgb(var(--media-scrim-raised) / 0.8) 100%)',
                       }}
                     />
                   </div>
-                  <div className="relative z-10 flex h-full items-center justify-between p-4 text-gray-200 transition duration-300 group-hover:text-white">
+                  <div className="relative z-10 flex h-full items-center justify-between p-4 text-gray-200 transition duration-300 group-hover:text-on-media light:text-on-media/90">
                     <div>{data.collection.name}</div>
                     <Button buttonSize="sm">
                       {intl.formatMessage(globalMessages.view)}

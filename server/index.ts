@@ -9,6 +9,7 @@ import { startJobs } from '@server/job/schedule';
 import agent from '@server/lib/agent';
 import backfillNotices from '@server/lib/backfill/notices';
 import resourceMonitor from '@server/lib/containerResources';
+import { stylePolicy } from '@server/lib/customCss';
 import { splitEmbyData } from '@server/lib/embySplit';
 import { isConnected, rememberJellyfinAdmins } from '@server/lib/mediaServers';
 import notificationManager from '@server/lib/notifications';
@@ -313,7 +314,13 @@ app
     // before the Next.js catch-all so it is answered here.
     server.get('/sw-precache.json', swPrecacheHandler);
 
-    server.get('*path', (req, res) => handle(req, res));
+    // Pages may load stylesheets and fonts only from here and from the
+    // places the admin's Server CSS names (server/lib/customCss.ts).
+    server.get(
+      '*path',
+      stylePolicy(() => settings.appearance.serverCss ?? ''),
+      (req, res) => handle(req, res)
+    );
     server.use(
       (
         err: { status: number; message: string; errors: string[] },

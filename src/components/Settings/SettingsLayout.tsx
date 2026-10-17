@@ -7,6 +7,7 @@ import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Settings', {
   menuGeneralSettings: 'General',
+  menuAppearance: 'Appearance',
   menuUsers: 'Users',
   menuFeatures: 'Features',
   menuMusic: 'Music',
@@ -35,6 +36,11 @@ const SettingsLayout = ({ children }: SettingsLayoutProps) => {
       text: intl.formatMessage(messages.menuGeneralSettings),
       route: '/settings/main',
       regex: /^\/settings(\/main)?$/,
+    },
+    {
+      text: intl.formatMessage(messages.menuAppearance),
+      route: '/settings/appearance',
+      regex: /^\/settings\/appearance/,
     },
     {
       text: intl.formatMessage(messages.menuUsers),
@@ -122,7 +128,9 @@ const SettingsLayout = ({ children }: SettingsLayoutProps) => {
       <div className="mt-6">
         <SettingsTabs settingsRoutes={settingsRoutes} />
       </div>
-      <div className="mt-10 text-white">{children}</div>
+      <div className="mt-10 text-strong" data-seerr="settings">
+        {children}
+      </div>
     </>
   );
 };

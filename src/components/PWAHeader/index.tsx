@@ -1,3 +1,7 @@
+import { useTheme } from '@app/context/ThemeContext';
+import { themeColour } from '@app/utils/theme';
+import Head from 'next/head';
+
 interface PWAHeaderProps {
   applicationTitle?: string;
 }
@@ -259,9 +263,33 @@ const PWAHeader = ({ applicationTitle = 'Seerr AI' }: PWAHeaderProps) => {
       />
       <meta name="format-detection" content="telephone=no" />
       <meta name="mobile-web-app-capable" content="yes" />
-      <meta name="theme-color" content="#1f2937" />
       <meta name="application-name" content={applicationTitle} />
     </>
+  );
+};
+
+/**
+ * The browser's bar in the top bar's colour, for each mode the look can
+ * show ("Match my device" has one for each). Its own <Head>, as it reads
+ * the look, which only the app's components can.
+ */
+export const ThemeColour = () => {
+  const { appearance, season } = useTheme();
+  const colours = themeColour(appearance, season);
+  const modes = Object.keys(colours) as (keyof typeof colours)[];
+  return (
+    <Head>
+      {modes.map((mode) => (
+        <meta
+          key={`theme-color-${mode}`}
+          name="theme-color"
+          content={colours[mode]}
+          media={
+            modes.length > 1 ? `(prefers-color-scheme: ${mode})` : undefined
+          }
+        />
+      ))}
+    </Head>
   );
 };
 

@@ -330,14 +330,14 @@ const AiChatPanel = ({
                 type="button"
                 onClick={() => setPhoto(undefined)}
                 aria-label={intl.formatMessage(messages.removePhoto)}
-                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-gray-800 text-gray-200 ring-1 ring-gray-600 hover:text-white"
+                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-gray-800 text-gray-200 ring-1 ring-gray-600 hover:text-strong"
               >
                 <XMarkIcon className="h-4 w-4" />
               </button>
             </div>
           )}
           {photoProblem && (
-            <p className="text-xs text-red-300">
+            <p className="text-xs text-red-300 light:text-danger-text">
               {intl.formatMessage(messages.photoUnreadable)}
             </p>
           )}
@@ -367,7 +367,7 @@ const AiChatPanel = ({
               }
             }}
             placeholder={placeholder}
-            className="w-full rounded-full border border-gray-600 bg-gray-900/80 px-4 py-2 text-white placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-0"
+            className="w-full rounded-full border border-gray-600 bg-gray-900/80 px-4 py-2 text-strong placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-0"
           />
           {/* On a phone this offers the camera or the photo library. */}
           <input
@@ -387,7 +387,7 @@ const AiChatPanel = ({
           disabled={busy}
           aria-label={intl.formatMessage(messages.attachPhoto)}
           title={intl.formatMessage(messages.attachPhoto)}
-          className="flex h-10 w-10 flex-none items-center justify-center rounded-full border border-gray-600 bg-gray-900/80 text-gray-300 transition hover:text-white disabled:opacity-50"
+          className="flex h-10 w-10 flex-none items-center justify-center rounded-full border border-gray-600 bg-gray-900/80 text-gray-300 transition hover:text-strong disabled:opacity-50"
         >
           <CameraIcon className="h-5 w-5" />
         </button>
@@ -397,7 +397,7 @@ const AiChatPanel = ({
             className={`h-10 w-10 ${
               voice.listening
                 ? ''
-                : 'bg-indigo-600 !text-white hover:bg-indigo-500'
+                : 'bg-accent !text-on-accent hover:bg-accent-hover'
             }`}
             listening={voice.listening}
             onToggle={() => {
@@ -411,7 +411,7 @@ const AiChatPanel = ({
           <button
             type="submit"
             disabled={busy || (!text.trim() && !photo)}
-            className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-indigo-600 text-white transition hover:bg-indigo-500 disabled:opacity-50"
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-accent text-on-accent transition hover:bg-accent-hover disabled:opacity-50"
             aria-label={intl.formatMessage(messages.send)}
           >
             <PaperAirplaneIcon className="h-5 w-5" />
@@ -444,8 +444,8 @@ const AiChatPanel = ({
               onClick={() => setView(tab)}
               className={`rounded-full px-3 py-1 text-sm ${
                 showing === tab
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-900/60 text-gray-300 ring-1 ring-gray-700 hover:text-white'
+                  ? 'bg-accent text-on-accent'
+                  : 'bg-gray-900/60 text-gray-300 ring-1 ring-gray-700 hover:text-strong'
               }`}
             >
               {intl.formatMessage(
@@ -464,7 +464,7 @@ const AiChatPanel = ({
           {turns.length > 0 && (
             <button
               type="button"
-              className="mb-3 self-end text-xs text-gray-400 hover:text-white"
+              className="mb-3 self-end text-xs text-gray-400 hover:text-strong"
               onClick={() => {
                 setTurns([]);
                 setChoosing(undefined);
@@ -517,13 +517,13 @@ const AiChatPanel = ({
                     />
                   )}
                   {turn.ask && (
-                    <div className="w-full rounded-lg bg-indigo-700/60 px-3 py-2 text-sm text-white">
+                    <div className="w-full rounded-lg bg-indigo-700/60 px-3 py-2 text-sm text-on-accent light:bg-accent">
                       {turn.ask}
                     </div>
                   )}
                 </div>
                 {turn.error && (
-                  <div className="rounded-lg border border-red-700 bg-red-900/40 px-3 py-2 text-sm text-red-100">
+                  <div className="rounded-lg border border-red-700 bg-red-900/40 px-3 py-2 text-sm text-red-100 light:bg-danger-soft/15 light:text-danger-text">
                     {turn.error}
                   </div>
                 )}
@@ -546,7 +546,7 @@ const AiChatPanel = ({
                     type="button"
                     disabled={busy}
                     onClick={() => confirmFix(i)}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-50"
                   >
                     <WrenchScrewdriverIcon className="h-4 w-4" />
                     {intl.formatMessage(messages.confirmFix)}
@@ -556,7 +556,7 @@ const AiChatPanel = ({
                   <button
                     type="button"
                     onClick={() => router.push(turn.fix!.link!)}
-                    className="text-sm font-semibold text-indigo-300 hover:text-indigo-200"
+                    className="text-sm font-semibold text-indigo-300 hover:text-indigo-200 light:text-accent-text light:hover:text-accent-text"
                   >
                     {intl.formatMessage(messages.openFix)} →
                   </button>
@@ -623,7 +623,7 @@ const AiChatPanel = ({
                                 <CheckCircleIcon
                                   className={`h-7 w-7 rounded-full ${
                                     picked
-                                      ? 'bg-indigo-500 text-white'
+                                      ? 'bg-indigo-500 text-on-accent'
                                       : 'bg-gray-900/70 text-gray-400'
                                   }`}
                                 />
@@ -639,7 +639,7 @@ const AiChatPanel = ({
                       choosing?.turn !== i && (
                         <button
                           type="button"
-                          className="text-sm font-semibold text-indigo-300 hover:text-indigo-200"
+                          className="text-sm font-semibold text-indigo-300 hover:text-indigo-200 light:text-accent-text light:hover:text-accent-text"
                           onClick={() =>
                             setExpanded((now) => new Set(now).add(i))
                           }
@@ -746,8 +746,8 @@ const ResultActions = ({
         aria-pressed={!!choosing}
         className={`${chip} ${
           choosing
-            ? 'bg-indigo-600 text-white'
-            : 'bg-gray-900/60 text-gray-300 ring-1 ring-gray-700 hover:text-white'
+            ? 'bg-accent text-on-accent'
+            : 'bg-gray-900/60 text-gray-300 ring-1 ring-gray-700 hover:text-strong'
         }`}
       >
         {choosing
@@ -759,7 +759,7 @@ const ResultActions = ({
         type="button"
         disabled={none}
         onClick={() => onOpen('list', picked)}
-        className={`${chip} bg-gray-900/60 text-gray-200 ring-1 ring-gray-700 hover:text-white`}
+        className={`${chip} bg-gray-900/60 text-gray-200 ring-1 ring-gray-700 hover:text-strong`}
       >
         <BookmarkIcon className="h-4 w-4" />
         {choosing
@@ -771,7 +771,7 @@ const ResultActions = ({
           type="button"
           disabled={none}
           onClick={() => onOpen('request', picked)}
-          className={`${chip} bg-indigo-600/80 text-white hover:bg-indigo-600`}
+          className={`${chip} bg-accent/accent-fill text-on-accent hover:bg-accent`}
         >
           <ArrowDownTrayIcon className="h-4 w-4" />
           {choosing

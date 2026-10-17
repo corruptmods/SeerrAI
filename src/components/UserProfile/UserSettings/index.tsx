@@ -18,6 +18,7 @@ import useSWR from 'swr';
 const messages = defineMessages('components.UserProfile.UserSettings', {
   menuGeneralSettings: 'General',
   menuFeatures: 'Features',
+  menuAppearance: 'Appearance',
   menuChangePass: 'Password',
   menuLinkedAccounts: 'Linked Accounts',
   menuPasskeys: 'Passkeys',
@@ -59,6 +60,11 @@ const UserSettings = ({ children }: UserSettingsProps) => {
       text: intl.formatMessage(messages.menuFeatures),
       route: '/settings/features',
       regex: /\/settings\/features/,
+    },
+    {
+      text: intl.formatMessage(messages.menuAppearance),
+      route: '/settings/appearance',
+      regex: /\/settings\/appearance/,
     },
     {
       text: intl.formatMessage(messages.menuChangePass),
@@ -150,7 +156,9 @@ const UserSettings = ({ children }: UserSettingsProps) => {
       <div className="mt-6">
         <SettingsTabs settingsRoutes={settingsRoutes} />
       </div>
-      <div className="mt-10 text-white">{children}</div>
+      <div className="mt-10 text-strong" data-seerr="settings">
+        {children}
+      </div>
     </>
   );
 };

@@ -10,10 +10,10 @@ import {
 /*
  * One notice at a time. Banners and pop-ups that ask something of you (the
  * app was updated, your Plex sign-in expired, finished-watching suggestions,
- * turning on notifications, adding a passkey) each report whether they have
- * something to say; only the most important one is shown, and the next takes
- * its place once it is dealt with. Nothing stacks, and two dialogs never
- * open over each other.
+ * turning on notifications, adding a passkey, a seasonal theme starting)
+ * each report whether they have something to say; only the most important
+ * one is shown, and the next takes its place once it is dealt with.
+ * Nothing stacks, and two dialogs never open over each other.
  */
 
 /** Lower comes first. */
@@ -23,6 +23,7 @@ export const NOTICE_PRIORITY = {
   watchSuggestions: 20,
   pushOptIn: 30,
   passkey: 40,
+  seasonal: 50,
 } as const;
 
 export type NoticeId = keyof typeof NOTICE_PRIORITY;

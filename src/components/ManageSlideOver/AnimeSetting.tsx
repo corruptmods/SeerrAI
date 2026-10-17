@@ -180,7 +180,7 @@ const AnimeSetting = ({
         {intl.formatMessage(messages.anime)}
       </h3>
       {error ? (
-        <p className="text-sm text-red-400">
+        <p className="text-sm text-red-400 light:text-danger-text">
           {intl.formatMessage(messages.loadError, { error: errorOf(error) })}
         </p>
       ) : !data ? (
@@ -231,7 +231,7 @@ const AnimeSetting = ({
                         {server.is4k && <Badge badgeType="warning">4K</Badge>}
                       </div>
                       {server.error ? (
-                        <p className="text-red-400">
+                        <p className="text-red-400 light:text-danger-text">
                           {intl.formatMessage(messages.serverError, {
                             server: server.serverName,
                             error: server.error,
@@ -256,14 +256,14 @@ const AnimeSetting = ({
                               {badges.map((badge) => (
                                 <span
                                   key={badge}
-                                  className="rounded bg-yellow-500/20 px-2 py-0.5 text-yellow-200"
+                                  className="rounded bg-yellow-500/20 px-2 py-0.5 text-yellow-200 light:text-warning-text"
                                 >
                                   {badge}
                                 </span>
                               ))}
                             </div>
                           ) : (
-                            <p className="text-xs text-green-400">
+                            <p className="text-xs text-success-text">
                               {intl.formatMessage(messages.inPlace)}
                             </p>
                           )}

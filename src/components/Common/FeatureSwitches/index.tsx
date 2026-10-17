@@ -1,6 +1,8 @@
+import { shownFeatures } from '@app/components/Common/FeatureSwitches/shown';
 import defineMessages from '@app/utils/defineMessages';
 import type { Feature } from '@server/constants/features';
 import { FEATURES, isAiFeature } from '@server/constants/features';
+import type { ReactNode } from 'react';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Common.FeatureSwitches', {
@@ -90,6 +92,8 @@ interface FeatureSwitchesProps {
   forPerson?: boolean;
   /** Features this person has no use for (admin tools, say). */
   hidden?: readonly Feature[];
+  /** Shown where a hidden feature's switch would be: where it went, say. */
+  instead?: Partial<Record<Feature, ReactNode>>;
   onChange: (feature: Feature, on: boolean) => void;
 }
 
@@ -102,6 +106,7 @@ const FeatureSwitches = ({
   musicReady,
   forPerson = false,
   hidden = [],
+  instead = {},
   onChange,
 }: FeatureSwitchesProps) => {
   const intl = useIntl();
@@ -133,16 +138,21 @@ const FeatureSwitches = ({
     );
   };
 
-  const visible = FEATURES.filter(
-    (feature) =>
-      !hidden.includes(feature) && (feature !== 'music' || musicReady)
-  );
+  const visible = shownFeatures(hidden, musicReady);
   const ai = visible.filter(isAiFeature);
   const showAi = ai.length > 0 && (aiReady || !forPerson);
 
   return (
     <>
-      {visible.filter((feature) => !isAiFeature(feature)).map((f) => row(f))}
+      {FEATURES.filter((feature) => !isAiFeature(feature)).map((feature) =>
+        visible.includes(feature) ? (
+          row(feature)
+        ) : instead[feature] ? (
+          <div className="form-row" key={feature}>
+            {instead[feature]}
+          </div>
+        ) : null
+      )}
       {showAi && (
         <>
           <div className="mb-4 mt-10">

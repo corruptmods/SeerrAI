@@ -393,7 +393,7 @@ const ManageSlideOver = ({
                                 days: 7,
                               })}
                             </div>
-                            <div className="text-white">
+                            <div className="text-strong">
                               {styledPlayCount(watchData.data.playCount7Days)}
                             </div>
                           </div>
@@ -403,7 +403,7 @@ const ManageSlideOver = ({
                                 days: 30,
                               })}
                             </div>
-                            <div className="text-white">
+                            <div className="text-strong">
                               {styledPlayCount(watchData.data.playCount30Days)}
                             </div>
                           </div>
@@ -411,7 +411,7 @@ const ManageSlideOver = ({
                             <div className="font-bold">
                               {intl.formatMessage(messages.alltime)}
                             </div>
-                            <div className="text-white">
+                            <div className="text-strong">
                               {styledPlayCount(watchData.data.playCount)}
                             </div>
                           </div>
@@ -553,7 +553,7 @@ const ManageSlideOver = ({
                                 days: 7,
                               })}
                             </div>
-                            <div className="text-white">
+                            <div className="text-strong">
                               {styledPlayCount(watchData.data4k.playCount7Days)}
                             </div>
                           </div>
@@ -563,7 +563,7 @@ const ManageSlideOver = ({
                                 days: 30,
                               })}
                             </div>
-                            <div className="text-white">
+                            <div className="text-strong">
                               {styledPlayCount(
                                 watchData.data4k.playCount30Days
                               )}
@@ -573,7 +573,7 @@ const ManageSlideOver = ({
                             <div className="font-bold">
                               {intl.formatMessage(messages.alltime)}
                             </div>
-                            <div className="text-white">
+                            <div className="text-strong">
                               {styledPlayCount(watchData.data4k.playCount)}
                             </div>
                           </div>

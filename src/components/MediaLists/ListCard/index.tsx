@@ -149,7 +149,7 @@ const ListCard = ({
 
   return (
     <Link
-      className="group relative block aspect-[16/10] overflow-hidden rounded-xl border border-gray-700 bg-gray-800 shadow transition duration-200 hover:border-gray-500 hover:shadow-lg"
+      className="group relative block aspect-[16/10] overflow-hidden rounded-xl border border-subtle bg-surface shadow transition duration-200 hover:border-gray-500 hover:shadow-lg"
       href={`/lists/${id}`}
     >
       {posters.length > 0 ? (
@@ -174,10 +174,10 @@ const ListCard = ({
       <div className="list-card-gradient absolute inset-0" />
 
       <div className="absolute inset-x-0 bottom-0 p-4">
-        <h3 className="truncate text-lg font-bold text-white drop-shadow">
+        <h3 className="truncate text-lg font-bold text-on-media drop-shadow">
           {name}
         </h3>
-        <div className="mt-1 flex items-center space-x-3 text-xs text-gray-300">
+        <div className="mt-1 flex items-center space-x-3 text-xs text-gray-300 light:text-on-media/80">
           <span>
             {!itemCount
               ? intl.formatMessage(messages.emptylist)

@@ -15,6 +15,17 @@ describe('pickNotice', () => {
     );
   });
 
+  it('puts a seasonal theme’s note after everything else', () => {
+    assert.deepEqual(
+      pickNotice({ seasonal: show, passkey: show }, undefined, at),
+      { next: 'passkey' }
+    );
+    assert.deepEqual(
+      pickNotice({ seasonal: show, passkey: hide }, 'passkey', at),
+      { next: 'seasonal' }
+    );
+  });
+
   it('shows the next one once the first is dealt with', () => {
     assert.deepEqual(
       pickNotice({ passkey: show, pushOptIn: hide }, 'pushOptIn', at),

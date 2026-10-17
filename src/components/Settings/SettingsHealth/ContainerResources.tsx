@@ -121,7 +121,7 @@ const ContainerResources = () => {
                 onClick={() => setRange(option)}
                 className={`px-3 py-1 transition ${
                   range === option
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-accent text-on-accent'
                     : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                 }`}
               >
@@ -145,7 +145,7 @@ const ContainerResources = () => {
               {intl.formatMessage(messages.cpu)}
             </div>
             <div className="mb-3 flex flex-wrap items-baseline gap-x-2">
-              <span className="text-2xl font-semibold text-white">
+              <span className="text-2xl font-semibold text-strong">
                 {current.cpu?.percent == null
                   ? intl.formatMessage(messages.measuring)
                   : percent(current.cpu.percent)}
@@ -170,7 +170,7 @@ const ContainerResources = () => {
               {intl.formatMessage(messages.memory)}
             </div>
             <div className="mb-3 flex flex-wrap items-baseline gap-x-2">
-              <span className="text-2xl font-semibold text-white">
+              <span className="text-2xl font-semibold text-strong">
                 {current.memory ? bytes(current.memory.used) : '–'}
               </span>
               {current.memory && (

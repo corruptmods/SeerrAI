@@ -1,5 +1,6 @@
 import Button from '@app/components/Common/Button';
 import { SmallLoadingSpinner } from '@app/components/Common/LoadingSpinner';
+import { OPTION_BUTTON } from '@app/components/Login/signInOptions';
 import messages from '@app/components/Login/singleSignOnMessages';
 import { KeyIcon } from '@heroicons/react/24/outline';
 import { oidcApplicationUrl } from '@server/constants/oidc';
@@ -11,6 +12,11 @@ interface OidcLoginButtonProps {
   applicationUrl: string;
   /** Where to go once signed in: a path on this site. */
   redirect: string;
+  /**
+   * Under "Or sign in with": the button shows just the provider's name
+   * (its full "Sign in with …" is what a screen reader says).
+   */
+  compact?: boolean;
 }
 
 /**
@@ -22,8 +28,12 @@ const OidcLoginButton = ({
   provider,
   applicationUrl,
   redirect,
+  compact,
 }: OidcLoginButtonProps) => {
   const intl = useIntl();
+  const signInWith = intl.formatMessage(messages.signInWith, {
+    provider: provider.name,
+  });
   const [leaving, setLeaving] = useState(false);
   const query =
     redirect && redirect !== '/'
@@ -37,7 +47,8 @@ const OidcLoginButton = ({
         provider.id
       )}/sign-in${query}`}
       onClick={() => setLeaving(true)}
-      className="relative flex-1 bg-transparent"
+      className={`${OPTION_BUTTON} bg-transparent`}
+      aria-label={compact ? signInWith : undefined}
       data-testid="oidc-login-button"
     >
       {leaving && (
@@ -51,14 +62,12 @@ const OidcLoginButton = ({
         <img
           src={provider.logoUrl}
           alt=""
-          className="mr-2 h-5 w-5 object-contain"
+          className="mr-2 h-5 w-5 shrink-0 object-contain"
         />
       ) : (
         <KeyIcon />
       )}
-      <span>
-        {intl.formatMessage(messages.signInWith, { provider: provider.name })}
-      </span>
+      <span className="truncate">{compact ? provider.name : signInWith}</span>
     </Button>
   );
 };

@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Adja meg a Client Secretet.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "A(z) {host} nem található. Ellenőrizze a kibocsátó URL-jét.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "A kibocsátó URL-jének https:// kezdetűnek kell lennie.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "A szolgáltató kibocsátó URL-jeként ezt adja meg: {issuer}. Pontosan ezt írja be (a végén lévő perjel is számít).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "A szolgáltató kibocsátó URL-jeként ezt adja meg: {issuer}. Pontosan ezt írja be.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "A szolgáltató más kibocsátó URL-t ad meg. Pontosan úgy írja be, ahogy a szolgáltató mutatja.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "A kibocsátó URL-jében nem lehet ? vagy # rész.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Adja meg a kibocsátó https:// kezdetű URL-jét.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Szerver alapértelmezésének használata",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "A szerver alapértelmezését használja. Bármit módosít itt, csak Önre vonatkozik.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Egy szín, például #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Megjelenés"
+  "components.UserProfile.UserSettings.menuAppearance": "Megjelenés",
+  "components.Settings.MusicLibraries.musicOff": "A zenei könyvtárak akkor jelennek meg, ha a zene be van kapcsolva itt: <link>Beállítások → Zene</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Egyes szolgáltatók minden alkalmazásnak saját címet adnak: az Authentikben ez {origin}/application/o/<slug>alkalmazás-slug</slug>/, és a szolgáltatónak egy alkalmazáshoz kell tartoznia.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Filmek és sorozatok",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Zene",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Egy sem található.",
+  "components.Login.PlexSignIn.closed": "A Plex-ablak bezárult, mielőtt bejelentkezett volna. Próbálja újra.",
+  "components.Login.PlexSignIn.popup": "A Plex bejelentkezési ablaka nem nyílt meg. Engedélyezze a felugró ablakokat ehhez a webhelyhez, és próbálja újra.",
+  "components.Login.PlexSignIn.unreachable": "A Plex nem érhető el. Ellenőrizze a kapcsolatot, és próbálja újra.",
+  "components.Login.passkey": "Hozzáférési kulcs"
 }

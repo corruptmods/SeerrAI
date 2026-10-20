@@ -15,6 +15,7 @@ import SetupSteps from '@app/components/Setup/SetupSteps';
 import useLocale from '@app/hooks/useLocale';
 import useSettings from '@app/hooks/useSettings';
 import defineMessages from '@app/utils/defineMessages';
+import { hasPlexReturn } from '@app/utils/plexSameTab';
 import { MediaServerType } from '@server/constants/server';
 import type { Library } from '@server/lib/settings';
 import axios from 'axios';
@@ -83,6 +84,15 @@ const Setup = () => {
   const mediaServerSettingsComplete = !!mediaServerSettings?.libraries?.some(
     (library) => library.enabled
   );
+
+  // Back from signing in to Plex in this tab (the Plex window could not
+  // open): to the sign-in step, which finishes it.
+  useEffect(() => {
+    if (hasPlexReturn('setup')) {
+      setMediaServerType(MediaServerType.PLEX);
+      setCurrentStep(2);
+    }
+  }, []);
 
   const { data: backdrops } = useSWR<string[]>('/api/v1/backdrops', {
     refreshInterval: 0,

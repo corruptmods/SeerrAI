@@ -607,7 +607,10 @@ const SettingsPlex = ({ isSetupSettings }: SettingsPlexProps) => {
           ))}
         </ul>
       </div>
-      {!isSetupSettings && <MusicLibraries endpoint="/api/v1/settings/plex" />}
+      <MusicLibraries
+        endpoint="/api/v1/settings/plex"
+        isSetup={isSetupSettings}
+      />
       <div className="mb-6 mt-10">
         <h3 className="heading">{intl.formatMessage(messages.manualscan)}</h3>
         <p className="description">

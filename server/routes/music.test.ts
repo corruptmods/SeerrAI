@@ -1,5 +1,9 @@
 import ListenBrainzAPI from '@server/api/listenbrainz';
-import { MusicBrainz, MusicBrainzBusyError } from '@server/api/musicbrainz';
+import {
+  MusicBrainz,
+  MusicBrainzBusyError,
+  musicBrainz,
+} from '@server/api/musicbrainz';
 import type {
   MbArtist,
   MbReleaseGroup,
@@ -26,6 +30,7 @@ import imageproxy, { useSessionForImages } from '@server/routes/imageproxy';
 import musicRoutes from '@server/routes/music';
 import { setupTestDb } from '@server/test/db';
 import { MUSIC_FIXTURE_IDS, seedMusicFixtures } from '@server/utils/seedTestDb';
+import type { AxiosInstance } from 'axios';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
@@ -179,6 +184,177 @@ const album = (id: string, title: string, date: string): MbReleaseGroup => ({
     },
   ],
 });
+
+/*
+ * A search for "Thriller", shaped like a real MusicBrainz answer observed
+ * on 2026-10-19 (release-group search, limit 100): 338 results in all, the
+ * first 98 of them exact titles that all score 100, in no useful order,
+ * then weaker matches scoring 85. The first five, and the four albums
+ * named below (their ids, release counts and places in the list), are as
+ * MusicBrainz gave them; the other exact matches stand in for the many
+ * small acts' albums and singles it listed (their ids are made up, their
+ * release counts 1 or 2 as theirs were). The artists are made up.
+ */
+const THRILLER = {
+  /** Michael Jackson's album: 98th, with 85 releases. */
+  album: 'f32fab67-77dd-3937-addc-9062e28e4c37',
+  /** His single: about 82nd, with 7. */
+  single: '3a7817b5-22cb-32c3-a31b-2c8309fbf92e',
+  /** Augustus Pablo's album: about 56th, with 7. */
+  pablo: 'ac52cdf1-81a9-405f-974b-987fea6d3995',
+  /** Killer's album: about 69th, with 4. */
+  killer: '7c943020-eede-4e54-8841-000d670b8d11',
+};
+const THRILLER_TOTAL = 338;
+
+const thrillerBand = (n: number) =>
+  `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const madeUp = (n: number) =>
+  `00000000-0000-4000-9000-${String(n).padStart(12, '0')}`;
+
+/** Each act a made-up id of its own. */
+const actIds = new Map<string, string>();
+const credit = (name: string) => {
+  if (!actIds.has(name)) {
+    actIds.set(name, madeUp(5000 + actIds.size));
+  }
+  const id = actIds.get(name) as string;
+  return [{ name, artist: { id, name } }];
+};
+
+const releaseGroup = (
+  id: string,
+  title: string,
+  artistName: string,
+  {
+    score = 100,
+    count = 1,
+    type = 'Album',
+    date,
+  }: { score?: number; count?: number; type?: string; date?: string } = {}
+): MbReleaseGroup => ({
+  id,
+  title,
+  score,
+  count,
+  'primary-type': type,
+  'secondary-types': [],
+  'first-release-date': date,
+  'artist-credit': credit(artistName),
+});
+
+/** One of the small acts' exact matches, numbered from 0. */
+const smallMatch = (n: number, score = 100) =>
+  releaseGroup(madeUp(n), 'Thriller', `Small act ${n}`, {
+    score,
+    count: 1 + (n % 2),
+    type: ['Album', 'Single', 'EP'][n % 3],
+  });
+
+/** The first page of the real answer, as above. */
+const thrillerAlbums = () => {
+  const named: Record<number, MbReleaseGroup> = {
+    1: releaseGroup(madeUp(9001), 'Thriller!', 'Cold Blood'),
+    2: releaseGroup(madeUp(9002), 'Thriller', 'Swoop'),
+    3: releaseGroup(madeUp(9003), 'Thriller', 'Eddie and the Hot Rods', {
+      count: 2,
+    }),
+    4: releaseGroup(madeUp(9004), 'Thriller', 'Part Chimp', { count: 2 }),
+    5: releaseGroup(madeUp(9005), 'Thriller', 'Brown Betty'),
+    56: releaseGroup(THRILLER.pablo, 'Thriller', 'Augustus Pablo', {
+      count: 7,
+    }),
+    69: releaseGroup(THRILLER.killer, 'Thriller', 'Killer', { count: 4 }),
+    82: releaseGroup(THRILLER.single, 'Thriller', 'Michael Jackson', {
+      count: 7,
+      type: 'Single',
+    }),
+    98: releaseGroup(THRILLER.album, 'Thriller', 'Michael Jackson', {
+      count: 85,
+      date: '1982-11-30',
+    }),
+    99: releaseGroup(madeUp(9099), 'Bad Thriller', 'Small act 99', {
+      score: 85,
+    }),
+    100: releaseGroup(madeUp(9100), 'Gold Thriller', 'Small act 100', {
+      score: 85,
+    }),
+  };
+  const groups = Array.from(
+    { length: 100 },
+    (_, i) => named[i + 1] ?? smallMatch(i)
+  );
+  return { count: THRILLER_TOTAL, offset: 0, 'release-groups': groups };
+};
+
+/**
+ * The same search had there been more exact matches: the first page all
+ * ties without Michael Jackson's album, which is 20th on the second page,
+ * and that page ends on weaker matches.
+ */
+const thrillerAlbumsAt = (offset: number) => {
+  const groups =
+    offset === 0
+      ? Array.from({ length: 100 }, (_, i) => smallMatch(i))
+      : Array.from({ length: 100 }, (_, i) =>
+          i === 19
+            ? releaseGroup(THRILLER.album, 'Thriller', 'Michael Jackson', {
+                count: 85,
+                date: '1982-11-30',
+              })
+            : smallMatch(offset + i, i < 60 ? 100 : 85)
+        );
+  return { count: THRILLER_TOTAL, offset, 'release-groups': groups };
+};
+
+const thrillerArtists = () => ({
+  count: 25,
+  offset: 0,
+  artists: Array.from({ length: 25 }, (_, n) => ({
+    id: thrillerBand(n),
+    name: 'Thriller',
+    score: 100,
+    tags: n === 7 ? [{ name: 'hard rock', count: 2 }] : [],
+  })),
+});
+
+/**
+ * MusicBrainz on a mirror (so nothing waits a second between requests),
+ * answering searches as given; what it was asked, by path and offset.
+ */
+const mirrorAnswering = (
+  albumsAt: (offset: number) => unknown,
+  artists: () => unknown = thrillerArtists
+) => {
+  getSettings().music = {
+    ...musicDefaults(),
+    musicbrainzUrl: 'http://mirror.local:5000',
+  };
+  cacheManager.getCache('musicbrainz').flush();
+  const client = musicBrainz();
+  const asked = mock.method(
+    (client as unknown as { axios: AxiosInstance }).axios,
+    'get',
+    async (
+      pathname: string,
+      config: { params: Record<string, string | number> }
+    ) => ({
+      data:
+        pathname === '/ws/2/artist'
+          ? artists()
+          : albumsAt(Number(config.params.offset)),
+    })
+  );
+  const requests = () =>
+    asked.mock.calls.map((call) => {
+      const [pathname, config] = call.arguments as unknown as [
+        string,
+        { params: Record<string, string | number> },
+      ];
+      return `${pathname} ${config.params.limit}@${config.params.offset}`;
+    });
+  return { requests };
+};
 
 let admin: User;
 let friend: User;
@@ -345,7 +521,7 @@ describe('search', () => {
     );
     assert.deepEqual(searchArtists.mock.calls[0].arguments.slice(0, 2), [
       'radiohead',
-      { limit: 8 },
+      { limit: 25, offset: 0 },
     ]);
   });
 
@@ -370,8 +546,87 @@ describe('search', () => {
       async () => ({ count: 0, offset: 0, 'release-groups': [] })
     );
     assert.equal((await get('/music/search?query=radiohead')).status, 200);
-    assert.deepEqual(searchArtists.mock.calls[0].arguments[1], { limit: 8 });
-    assert.deepEqual(searchAlbums.mock.calls[0].arguments[1], { limit: 12 });
+    // More are asked for than shown, so the best can be picked from them.
+    assert.deepEqual(searchArtists.mock.calls[0].arguments[1], {
+      limit: 25,
+      offset: 0,
+    });
+    assert.deepEqual(searchAlbums.mock.calls[0].arguments[1], {
+      limit: 100,
+      offset: 0,
+    });
+  });
+
+  it('shows the album you most likely mean first, from many more asked for', async () => {
+    const { requests } = mirrorAnswering(thrillerAlbums);
+    const { status, body } = await get('/music/search?query=Thriller');
+    assert.equal(status, 200);
+    const { artists, albums } = body as {
+      artists: { id: string }[];
+      albums: { id: string; artistName: string; primaryType: string }[];
+    };
+    assert.equal(albums.length, 12);
+    // As ranked from the real answer: Michael Jackson's album (85
+    // releases), Augustus Pablo's and his single (7 each, the album
+    // first), then Killer's (4).
+    assert.deepEqual(
+      albums.slice(0, 4).map((a) => [a.id, a.artistName, a.primaryType]),
+      [
+        [THRILLER.album, 'Michael Jackson', 'Album'],
+        [THRILLER.pablo, 'Augustus Pablo', 'Album'],
+        [THRILLER.single, 'Michael Jackson', 'Single'],
+        [THRILLER.killer, 'Killer', 'Album'],
+      ]
+    );
+    // The weaker matches come after every exact one.
+    assert.ok(!albums.some((a) => [madeUp(9099), madeUp(9100)].includes(a.id)));
+    // The first page ends on weaker matches: nothing more is asked for.
+    assert.deepEqual(requests().sort(), [
+      '/ws/2/artist 25@0',
+      '/ws/2/release-group 100@0',
+    ]);
+    assert.equal(artists.length, 8);
+    // The band with the most tags first, then MusicBrainz's order.
+    assert.deepEqual(
+      artists.slice(0, 3).map((a) => a.id),
+      [thrillerBand(7), thrillerBand(0), thrillerBand(1)]
+    );
+  });
+
+  it('looks on the next page while the results are still tied', async () => {
+    const { requests } = mirrorAnswering(thrillerAlbumsAt);
+    const { status, body } = await get('/music/search?query=Thriller');
+    assert.equal(status, 200);
+    assert.equal(
+      (body as { albums: { id: string }[] }).albums[0].id,
+      THRILLER.album
+    );
+    // The second page ends below the top score, so there is no third,
+    // though MusicBrainz has more.
+    assert.deepEqual(
+      requests().filter((r) => r.startsWith('/ws/2/release-group')),
+      ['/ws/2/release-group 100@0', '/ws/2/release-group 100@100']
+    );
+  });
+
+  it('asks MusicBrainz once for a search made twice', async () => {
+    const { requests } = mirrorAnswering(thrillerAlbumsAt);
+    for (const query of ['Thriller', ' thriller ']) {
+      const { status, body } = await get(
+        `/music/search?query=${encodeURIComponent(query)}`
+      );
+      assert.equal(status, 200);
+      assert.equal(
+        (body as { albums: { id: string }[] }).albums[0].id,
+        THRILLER.album
+      );
+    }
+    assert.deepEqual(requests().sort(), [
+      '/ws/2/artist 25@0',
+      '/ws/2/release-group 100@0',
+      '/ws/2/release-group 100@100',
+    ]);
+    cacheManager.getCache('musicbrainz').flush();
   });
 
   it('is there whether or not music is in All', async () => {

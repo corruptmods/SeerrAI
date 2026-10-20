@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Въведете Client Secret.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "{host} не може да бъде намерен. Проверете URL адреса на издателя.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "URL адресът на издателя трябва да започва с https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Доставчикът посочва своя URL адрес на издателя като {issuer}. Въведете точно него (наклонената черта в края има значение).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Доставчикът посочва своя URL адрес на издателя като {issuer}. Въведете точно него.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Доставчикът посочва различен URL адрес на издателя. Въведете го точно както го показва доставчикът.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "URL адресът на издателя не може да има част с ? или #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Въведете URL адреса на издателя, започващ с https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Използване на сървърните настройки",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Използвате сървърните настройки по подразбиране. Всичко, което промените тук, важи само за Вас.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Цвят като #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Изглед"
+  "components.UserProfile.UserSettings.menuAppearance": "Изглед",
+  "components.Settings.MusicLibraries.musicOff": "Музикалните библиотеки се появяват, след като музиката бъде включена в <link>Настройки → Музика</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Някои доставчици дават на всяко приложение собствен адрес: в Authentik той е {origin}/application/o/<slug>slug на приложението</slug>/, а доставчикът трябва да е свързан с приложение.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Филми и сериали",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Музика",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Не бяха намерени.",
+  "components.Login.PlexSignIn.closed": "Прозорецът на Plex беше затворен, преди да влезете. Опитайте отново.",
+  "components.Login.PlexSignIn.popup": "Прозорецът за вход в Plex не можа да се отвори. Разрешете изскачащите прозорци за този сайт и опитайте отново.",
+  "components.Login.PlexSignIn.unreachable": "Plex не е достъпен. Проверете връзката си и опитайте отново.",
+  "components.Login.passkey": "Ключ за достъп"
 }

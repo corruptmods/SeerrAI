@@ -26,7 +26,7 @@ Artist and album details come from MusicBrainz, which answers one request a seco
 
 ### Searching music
 
-While music is on, **Music** is beside All, Movies and Series in search results, and the Music page has its own search box. A search shows up to 8 artists and 12 albums.
+While music is on, **Music** is beside All, Movies and Series in search results, and the Music page has its own search box. A search shows up to 8 artists and 12 albums, the ones you most likely mean first: of the albums that match equally well, the one with the most releases (editions, pressings, countries), then albums before EPs and singles; of the artists, those of the albums shown, then the ones with the most tags on MusicBrainz.
 
 **Include Music in All Search Results** (**Settings → Music**, off to start): **All** also shows a row of artists and a row of albums, below the films, series, collections and people. They're asked for once those have loaded, so music never slows the rest down, and they never come above them.
 

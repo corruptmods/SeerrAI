@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "请输入客户端密钥。",
   "components.Settings.OidcProviderModal.problemHostNotFound": "找不到 {host}。请检查颁发者 URL。",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "颁发者 URL 必须以 https:// 开头。",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "提供方给出的颁发者 URL 是 {issuer}。请原样输入（末尾的斜杠也算）。",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "提供方给出的颁发者 URL 是 {issuer}。请原样输入。",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "提供方给出的颁发者 URL 与此不同。请按提供方显示的内容原样输入。",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "颁发者 URL 不能包含 ? 或 # 部分。",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "请输入以 https:// 开头的颁发者 URL。",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "使用服务器默认设置",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "你正在使用服务器默认设置。你在这里所做的任何更改只对你自己生效。",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "颜色，例如 #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "外观"
+  "components.UserProfile.UserSettings.menuAppearance": "外观",
+  "components.Settings.MusicLibraries.musicOff": "在<link>设定 → 音乐</link>中开启音乐后，音乐库就会显示。",
+  "components.Settings.OidcProviderModal.problemAppAddress": "有些提供方会给每个应用单独的地址：在 Authentik 中是 {origin}/application/o/<slug>应用标识</slug>/，并且提供方必须关联到某个应用。",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "电影和电视节目",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "音乐",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "没有找到。",
+  "components.Login.PlexSignIn.closed": "Plex 窗口在你登录前被关闭了。请重试。",
+  "components.Login.PlexSignIn.popup": "无法打开 Plex 登录窗口。请允许此网站显示弹出窗口后重试。",
+  "components.Login.PlexSignIn.unreachable": "无法连接到 Plex。请检查网络连接后重试。",
+  "components.Login.passkey": "通行密钥"
 }

@@ -1275,7 +1275,7 @@ components:
             - unreachable
         params:
           type: object
-          description: The details the code's message needs, such as host, seconds, issuer, status or reason.
+          description: The details the code's message needs, such as host, seconds, issuer, status, origin or reason.
           additionalProperties: true
     OidcProviderSettings:
       type: object
@@ -1296,7 +1296,7 @@ components:
           example: Authentik
         issuerUrl:
           type: string
-          description: The provider's issuer URL, exactly as it gives it. https, or http on this machine only.
+          description: The provider's issuer URL, exactly as it gives it. https, or http on this machine only. Its configuration address (ending in /.well-known/openid-configuration) is taken too, and saved as the issuer it is under.
           example: https://auth.example.com/application/o/seerr/
         clientId:
           type: string
@@ -6577,6 +6577,10 @@ paths:
                 properties:
                   issuer:
                     type: string
+                    description: What the provider calls itself.
+                  issuerUrl:
+                    type: string
+                    description: The issuer URL as it would be saved. A configuration address (ending in /.well-known/openid-configuration) is taken back to its issuer, and one that differs from the provider's own only by a slash at the end becomes the provider's.
         '400':
           description: What is wrong
           content:
@@ -11912,7 +11916,7 @@ paths:
   /music/search:
     get:
       summary: Search music
-      description: Artists (up to 8) and albums (up to 12) from MusicBrainz. Refused while music is off for the person (403) or before Lidarr is set up (404); 503 when MusicBrainz is too busy to answer in time.
+      description: Artists (up to 8) and albums (up to 12) from MusicBrainz, the likeliest first. More are asked for than shown (100 albums and 25 artists, and further pages, up to 300 and 50, while every one still has the top score) and ranked by how well they match, then (albums) by how many releases they have, album before EP and single, and official releases before bootlegs; (artists) the artists of the albums shown, then the most tagged. Refused while music is off for the person (403) or before Lidarr is set up (404); 503 when MusicBrainz is too busy to answer in time.
       tags:
         - music
       parameters:

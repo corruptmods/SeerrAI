@@ -11,6 +11,7 @@ import { PlusIcon, TrashIcon } from '@heroicons/react/24/solid';
 import type { OidcProblem, OidcProblemCode } from '@server/constants/oidc';
 import {
   DEFAULT_OIDC_SCOPES,
+  issuerFromEntered,
   normalizeIssuer,
   oidcCallbackUrl,
   oidcProviderId,
@@ -85,13 +86,15 @@ const messages = defineMessages('components.Settings.OidcProviderModal', {
   problemClaimName: 'Each rule needs a claim name, without spaces.',
   problemTimeout: '{host} did not answer within {seconds} seconds.',
   problemIssuerMismatch:
-    'The provider gives its issuer URL as {issuer}. Enter exactly that (a slash at the end counts).',
+    'The provider gives its issuer URL as {issuer}. Enter exactly that.',
   problemIssuerMismatchUnsaid:
     'The provider gives a different issuer URL. Enter it exactly as the provider shows it.',
   problemNoDiscovery:
     'No sign-in details were found at that address (it answered {status}). Check the issuer URL: Seerr AI reads /.well-known/openid-configuration under it.',
   problemNoDiscoveryUnsaid:
     'No sign-in details were found at that address. Check the issuer URL: Seerr AI reads /.well-known/openid-configuration under it.',
+  problemAppAddress:
+    'Some providers give each app its own address: in Authentik it’s {origin}/application/o/<slug>app slug</slug>/, and the provider must be attached to an application.',
   problemNotDiscovery:
     'That address answered, but not with sign-in details. Check the issuer URL.',
   problemHostNotFound: '{host} could not be found. Check the issuer URL.',
@@ -168,10 +171,13 @@ const OidcProviderModal = ({
   const { addToast } = useToasts();
   const [isTesting, setIsTesting] = useState(false);
 
-  // A saved secret is only kept for the issuer it was saved for.
+  // A saved secret is only kept for the issuer it was saved for (with or
+  // without a slash at the end, or as its configuration address).
+  const sameIssuer = (issuerUrl: string) =>
+    !!provider &&
+    normalizeIssuer(issuerUrl) === normalizeIssuer(provider.issuerUrl);
   const secretSaved = (values: FormValues) =>
-    !!provider?.hasClientSecret &&
-    values.issuerUrl.trim() === provider.issuerUrl;
+    !!provider?.hasClientSecret && sameIssuer(values.issuerUrl);
 
   const schema = Yup.object().shape({
     name: Yup.string()
@@ -189,8 +195,7 @@ const OidcProviderModal = ({
       .required(intl.formatMessage(messages.validationClientId)),
     clientSecret: Yup.string().when('issuerUrl', {
       is: (issuerUrl: string) =>
-        !!provider?.hasClientSecret &&
-        (issuerUrl ?? '').trim() === provider.issuerUrl,
+        !!provider?.hasClientSecret && sameIssuer(issuerUrl ?? ''),
       then: (s) => s,
       otherwise: (s) =>
         s.required(intl.formatMessage(messages.validationClientSecret)),
@@ -214,7 +219,7 @@ const OidcProviderModal = ({
 
   const toBody = (values: FormValues) => ({
     name: values.name.trim(),
-    issuerUrl: values.issuerUrl.trim(),
+    issuerUrl: issuerFromEntered(values.issuerUrl),
     clientId: values.clientId.trim(),
     clientSecret: values.clientSecret,
     logoUrl: values.logoUrl.trim(),
@@ -245,23 +250,40 @@ const OidcProviderModal = ({
           : problem === 'no-discovery' && params.status === undefined
             ? messages.problemNoDiscoveryUnsaid
             : PROBLEM_MESSAGES[problem];
-      return intl.formatMessage(message, params);
+      const said = intl.formatMessage(message, params);
+      // Only a host was entered: where Authentik keeps it.
+      return problem === 'no-discovery' && params.origin !== undefined
+        ? `${said} ${intl.formatMessage(messages.problemAppAddress, {
+            origin: params.origin,
+            slug: (chunks: string[]) => `<${chunks.join('')}>`,
+          })}`
+        : said;
     }
     return data?.message || intl.formatMessage(messages.noAnswer);
   };
 
-  const test = async (values: FormValues) => {
+  const test = async (
+    values: FormValues,
+    setIssuerUrl: (issuerUrl: string) => void
+  ) => {
     setIsTesting(true);
+    const issuerUrl = issuerFromEntered(values.issuerUrl);
+    setIssuerUrl(issuerUrl);
     try {
-      const { data } = await axios.post<{ issuer: string }>(
+      const { data } = await axios.post<{ issuer: string; issuerUrl?: string }>(
         '/api/v1/settings/oidc/test',
         {
           ...(provider ? { id: provider.id } : {}),
-          issuerUrl: values.issuerUrl.trim(),
+          issuerUrl,
           clientId: values.clientId.trim(),
           clientSecret: values.clientSecret,
         }
       );
+      // The provider's own form of it, as it will be saved (a slash at
+      // the end or not).
+      if (data.issuerUrl) {
+        setIssuerUrl(data.issuerUrl);
+      }
       addToast(
         intl.formatMessage(messages.toastTestSuccess, { issuer: data.issuer }),
         { appearance: 'success', autoDismiss: true }
@@ -339,6 +361,7 @@ const OidcProviderModal = ({
           errors,
           touched,
           values,
+          handleBlur,
           handleSubmit,
           setFieldValue,
           isSubmitting,
@@ -374,7 +397,13 @@ const OidcProviderModal = ({
                   ? intl.formatMessage(globalMessages.testing)
                   : intl.formatMessage(globalMessages.test)
               }
-              onSecondary={() => test(values)}
+              onSecondary={() =>
+                test(values, (issuerUrl) => {
+                  if (issuerUrl !== values.issuerUrl) {
+                    setFieldValue('issuerUrl', issuerUrl);
+                  }
+                })
+              }
               secondaryDisabled={
                 !values.issuerUrl ||
                 !values.clientId ||
@@ -383,7 +412,14 @@ const OidcProviderModal = ({
                 isSubmitting
               }
               okDisabled={isSubmitting || isTesting || !isValid}
-              onOk={() => handleSubmit()}
+              onOk={() => {
+                // The address as it will be saved, so the admin sees it.
+                const issuerUrl = issuerFromEntered(values.issuerUrl);
+                if (issuerUrl !== values.issuerUrl) {
+                  setFieldValue('issuerUrl', issuerUrl);
+                }
+                handleSubmit();
+              }}
               title={intl.formatMessage(
                 provider ? messages.editProvider : messages.addProvider
               )}
@@ -458,6 +494,15 @@ const OidcProviderModal = ({
                         type="text"
                         inputMode="url"
                         placeholder="https://"
+                        onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                          handleBlur(e);
+                          // A pasted configuration address becomes the
+                          // issuer it is under, here where it can be seen.
+                          const issuerUrl = issuerFromEntered(e.target.value);
+                          if (issuerUrl !== e.target.value) {
+                            setFieldValue('issuerUrl', issuerUrl);
+                          }
+                        }}
                       />
                     </div>
                     {errors.issuerUrl && touched.issuerUrl && (

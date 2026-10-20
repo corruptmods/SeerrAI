@@ -35,6 +35,11 @@ export interface FakeOidcProvider {
   tokenRequests: URLSearchParams[];
   /** Answers discovery with a server error while set. */
   down: boolean;
+  /**
+   * The issuer discovery and ID tokens give, when not `issuer` itself:
+   * with a slash at the end, as Authentik's has, or another address.
+   */
+  issuerSaid?: string;
   /** Puts these claims only in userinfo, not in the ID token. */
   claimsInUserinfoOnly: boolean;
   /** More claims for the ID token, as a provider's mappers would add. */
@@ -130,6 +135,7 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
       fake.discoveryCalls = 0;
       fake.tokenRequests = [];
       fake.down = false;
+      fake.issuerSaid = undefined;
       fake.claimsInUserinfoOnly = false;
       fake.idTokenClaims = {};
       fake.userinfoClaims = {};
@@ -176,7 +182,11 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
-    const path = url.pathname.replace(/^\/realms\/test/, '');
+    // Everything is under the realm, as with Keycloak (or under the
+    // application, with Authentik): nothing answers at the host itself.
+    const path = url.pathname.startsWith('/realms/test/')
+      ? url.pathname.slice('/realms/test'.length)
+      : '';
 
     if (path === '/.well-known/openid-configuration') {
       fake.discoveryCalls += 1;
@@ -184,7 +194,7 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
         return json(res, 500, { error: 'down' });
       }
       return json(res, 200, {
-        issuer: fake.issuer,
+        issuer: fake.issuerSaid ?? fake.issuer,
         authorization_endpoint: `${fake.issuer}/authorize`,
         token_endpoint: `${fake.issuer}/token`,
         userinfo_endpoint: `${fake.issuer}/userinfo`,
@@ -239,7 +249,7 @@ export const createFakeOidcProvider = (): FakeOidcProvider => {
       const accessToken = randomBytes(16).toString('hex');
       accessTokens.set(accessToken, issued.account);
       const idToken = signJwt(privateKey, kid, {
-        iss: fake.issuer,
+        iss: fake.issuerSaid ?? fake.issuer,
         aud: fake.clientId,
         iat: now,
         exp: now + 300,

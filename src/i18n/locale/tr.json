@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "İstemci gizli anahtarını girin.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "{host} bulunamadı. Issuer URL’sini kontrol edin.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "Issuer URL’si https:// ile başlamalıdır.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Sağlayıcı, Issuer URL’sini {issuer} olarak bildiriyor. Tam olarak bunu girin (sondaki eğik çizgi de önemlidir).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Sağlayıcı, Issuer URL’sini {issuer} olarak bildiriyor. Tam olarak bunu girin.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Sağlayıcı farklı bir Issuer URL’si bildiriyor. Onu sağlayıcının gösterdiği şekliyle tam olarak girin.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "Issuer URL’sinde ? veya # kısmı olamaz.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "https:// ile başlayan Issuer URL’sini girin.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Sunucunun Varsayılanını Kullan",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Sunucunun varsayılanını kullanıyorsunuz. Burada değiştirdiğiniz her şey yalnızca sizin içindir.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "#0ea5e9 gibi bir renk",
-  "components.UserProfile.UserSettings.menuAppearance": "Görünüm"
+  "components.UserProfile.UserSettings.menuAppearance": "Görünüm",
+  "components.Settings.MusicLibraries.musicOff": "Müzik kütüphaneleri, <link>Ayarlar → Müzik</link> bölümünde müzik açıldığında görünür.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Bazı sağlayıcılar her uygulamaya kendi adresini verir: Authentik’te bu {origin}/application/o/<slug>uygulama kısa adı</slug>/ şeklindedir ve sağlayıcının bir uygulamaya bağlı olması gerekir.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Filmler ve Diziler",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Müzik",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Hiçbiri bulunamadı.",
+  "components.Login.PlexSignIn.closed": "Plex penceresi siz giriş yapmadan kapatıldı. Tekrar deneyin.",
+  "components.Login.PlexSignIn.popup": "Plex giriş penceresi açılamadı. Bu site için açılır pencerelere izin verip tekrar deneyin.",
+  "components.Login.PlexSignIn.unreachable": "Plex'e ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
+  "components.Login.passkey": "Geçiş anahtarı"
 }

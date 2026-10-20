@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Ange klienthemligheten.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "{host} kunde inte hittas. Kontrollera utfärdar-URL:en.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "Utfärdar-URL:en måste börja med https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Leverantören anger sin utfärdar-URL som {issuer}. Ange exakt den (ett snedstreck i slutet räknas).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Leverantören anger sin utfärdar-URL som {issuer}. Ange exakt den.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Leverantören anger en annan utfärdar-URL. Ange den exakt som leverantören visar den.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "Utfärdar-URL:en får inte ha någon ?- eller #-del.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Ange utfärdar-URL:en, som börjar med https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Använd serverns standard",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Du använder serverns standard. Allt du ändrar här gäller bara dig.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "En färg som #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Utseende"
+  "components.UserProfile.UserSettings.menuAppearance": "Utseende",
+  "components.Settings.MusicLibraries.musicOff": "Musikbibliotek visas när musik är påslaget under <link>Inställningar → Musik</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Vissa leverantörer ger varje app en egen adress: i Authentik är det {origin}/application/o/<slug>appens slug</slug>/, och leverantören måste vara kopplad till en applikation.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Filmer och serier",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Musik",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Inga hittades.",
+  "components.Login.PlexSignIn.closed": "Plex-fönstret stängdes innan du loggade in. Försök igen.",
+  "components.Login.PlexSignIn.popup": "Plex inloggningsfönster kunde inte öppnas. Tillåt popup-fönster för den här webbplatsen och försök igen.",
+  "components.Login.PlexSignIn.unreachable": "Det gick inte att nå Plex. Kontrollera anslutningen och försök igen.",
+  "components.Login.passkey": "Nyckel"
 }

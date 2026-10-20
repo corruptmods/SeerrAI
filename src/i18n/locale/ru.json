@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Введите секрет клиента.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "Не удалось найти {host}. Проверьте URL издателя.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "URL издателя должен начинаться с https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Провайдер указывает свой URL издателя как {issuer}. Введите именно его (косая черта в конце имеет значение).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Провайдер указывает свой URL издателя как {issuer}. Введите именно его.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Провайдер указывает другой URL издателя. Введите его точно так, как его показывает провайдер.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "URL издателя не может содержать часть с ? или #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Введите URL издателя, начинающийся с https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Использовать настройки сервера",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Вы используете настройки сервера по умолчанию. Всё, что вы здесь измените, касается только вас.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Цвет, например #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Оформление"
+  "components.UserProfile.UserSettings.menuAppearance": "Оформление",
+  "components.Settings.MusicLibraries.musicOff": "Музыкальные библиотеки появятся, когда музыка будет включена в разделе <link>Настройки → Музыка</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Некоторые провайдеры дают каждому приложению собственный адрес: в Authentik это {origin}/application/o/<slug>slug приложения</slug>/, и провайдер должен быть привязан к приложению.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Фильмы и сериалы",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Музыка",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Ничего не найдено.",
+  "components.Login.PlexSignIn.closed": "Окно Plex было закрыто до входа. Попробуйте ещё раз.",
+  "components.Login.PlexSignIn.popup": "Не удалось открыть окно входа Plex. Разрешите всплывающие окна для этого сайта и попробуйте ещё раз.",
+  "components.Login.PlexSignIn.unreachable": "Не удалось связаться с Plex. Проверьте подключение и попробуйте ещё раз.",
+  "components.Login.passkey": "Ключ доступа"
 }

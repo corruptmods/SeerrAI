@@ -19,7 +19,7 @@ import type { JellyfinSettings } from '@server/lib/settings';
 import axios from 'axios';
 import { Field, Formik } from 'formik';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import useSWR, { mutate } from 'swr';
 import * as Yup from 'yup';
@@ -233,6 +233,18 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
     }
   };
 
+  // In first-time setup the server has only just been connected: its
+  // libraries are listed straight away, without pressing Sync Libraries.
+  const syncedForSetup = useRef(false);
+  useEffect(() => {
+    if (isSetupSettings && data?.ip && !syncedForSetup.current) {
+      syncedForSetup.current = true;
+      syncLibraries();
+    }
+    // Once, when the settings first arrive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSetupSettings, data?.ip]);
+
   const startScan = async () => {
     await axios.post(`${endpoint}/sync`, {
       start: true,
@@ -333,7 +345,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
           ))}
         </ul>
       </div>
-      {!isSetupSettings && <MusicLibraries endpoint={endpoint} />}
+      <MusicLibraries endpoint={endpoint} isSetup={isSetupSettings} />
       <div className="mb-6 mt-10">
         <h3 className="heading">
           <FormattedMessage {...messages.manualscanJellyfin} />

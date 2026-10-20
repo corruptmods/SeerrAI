@@ -1,12 +1,14 @@
+import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import PlexLoginButton from '@app/components/Login/PlexLoginButton';
+import { plexLoginFailure } from '@app/components/Login/plexLoginFailure';
 import JellyfinSetup from '@app/components/Setup/JellyfinSetup';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { MediaServerType } from '@server/constants/server';
 import axios from 'axios';
 import { useEffect, useState } from 'react';
-import { FormattedMessage } from 'react-intl';
+import { FormattedMessage, useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Setup', {
   welcome: 'Welcome to Seerr AI',
@@ -29,7 +31,9 @@ const SetupLogin: React.FC<LoginWithMediaServerProps> = ({
   onCancel,
   onComplete,
 }) => {
+  const intl = useIntl();
   const [authToken, setAuthToken] = useState<string | undefined>(undefined);
+  const [error, setError] = useState('');
   const [mediaServerType, setMediaServerType] = useState<MediaServerType>(
     MediaServerType.NOT_CONFIGURED
   );
@@ -50,14 +54,15 @@ const SetupLogin: React.FC<LoginWithMediaServerProps> = ({
           const { data: user } = await axios.get('/api/v1/auth/me');
           revalidate(user, false);
         }
-      } catch {
-        // auth failed silently and user can attempt again
+      } catch (e) {
+        setError(plexLoginFailure(intl, e));
+        setAuthToken(undefined);
       }
     };
     if (authToken && mediaServerType == MediaServerType.PLEX) {
       login();
     }
-  }, [authToken, mediaServerType, revalidate]);
+  }, [authToken, mediaServerType, revalidate, intl]);
 
   useEffect(() => {
     if (user) {
@@ -81,13 +86,17 @@ const SetupLogin: React.FC<LoginWithMediaServerProps> = ({
       </div>
       {serverType === MediaServerType.PLEX && (
         <>
+          {error && <Alert type="error" title={error} />}
           <div className="flex justify-center bg-black/30 px-10 py-8">
             <PlexLoginButton
               large
+              purpose="setup"
               onAuthToken={(authToken) => {
+                setError('');
                 setMediaServerType(MediaServerType.PLEX);
                 setAuthToken(authToken);
               }}
+              onError={setError}
             />
           </div>
           <div className="mt-4">

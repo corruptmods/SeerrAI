@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Zadajte tajný kľúč klienta.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "Server {host} sa nepodarilo nájsť. Skontrolujte URL vydavateľa.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "URL vydavateľa musí začínať https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Poskytovateľ uvádza svoju URL vydavateľa ako {issuer}. Zadajte presne túto (lomka na konci sa počíta).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Poskytovateľ uvádza svoju URL vydavateľa ako {issuer}. Zadajte presne túto.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Poskytovateľ uvádza inú URL vydavateľa. Zadajte ju presne tak, ako ju poskytovateľ zobrazuje.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "URL vydavateľa nesmie obsahovať časť s ? ani #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Zadajte URL vydavateľa, ktorá začína https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Použiť predvolené nastavenie servera",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Používate predvolené nastavenie servera. Čokoľvek tu zmeníte, platí len pre vás.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Farba ako #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Vzhľad"
+  "components.UserProfile.UserSettings.menuAppearance": "Vzhľad",
+  "components.Settings.MusicLibraries.musicOff": "Hudobné knižnice sa zobrazia, keď je hudba zapnutá v <link>Nastavenia → Hudba</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Niektorí poskytovatelia dávajú každej aplikácii vlastnú adresu: v Authentiku je to {origin}/application/o/<slug>slug aplikácie</slug>/ a poskytovateľ musí byť priradený k aplikácii.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Filmy a seriály",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Hudba",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Nenašli sa žiadne.",
+  "components.Login.PlexSignIn.closed": "Okno Plexu sa zatvorilo skôr, ako ste sa prihlásili. Skúste to znova.",
+  "components.Login.PlexSignIn.popup": "Prihlasovacie okno Plexu sa nepodarilo otvoriť. Povoľte pre túto stránku vyskakovacie okná a skúste to znova.",
+  "components.Login.PlexSignIn.unreachable": "Plex nie je dostupný. Skontrolujte pripojenie a skúste to znova.",
+  "components.Login.passkey": "Prístupový kľúč"
 }

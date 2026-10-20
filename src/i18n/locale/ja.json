@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Client Secret を入力してください。",
   "components.Settings.OidcProviderModal.problemHostNotFound": "{host} が見つかりませんでした。Issuer URL を確認してください。",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "Issuer URL は https:// で始まる必要があります。",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "プロバイダーは Issuer URL を {issuer} としています。これと完全に同じものを入力してください（末尾のスラッシュも区別されます）。",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "プロバイダーは Issuer URL を {issuer} としています。これと完全に同じものを入力してください。",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "プロバイダーは別の Issuer URL を示しています。プロバイダーの表示どおりに正確に入力してください。",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "Issuer URL に ? や # の部分を含めることはできません。",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "https:// で始まる Issuer URL を入力してください。",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "サーバーのデフォルトを使う",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "サーバーのデフォルトを使用中です。ここで変更した内容はあなただけに適用されます。",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "#0ea5e9 のような色",
-  "components.UserProfile.UserSettings.menuAppearance": "外観"
+  "components.UserProfile.UserSettings.menuAppearance": "外観",
+  "components.Settings.MusicLibraries.musicOff": "音楽ライブラリは、<link>設定 → 音楽</link>で音楽をオンにすると表示されます。",
+  "components.Settings.OidcProviderModal.problemAppAddress": "アプリごとに別のアドレスを割り当てるプロバイダーもあります。Authentik では {origin}/application/o/<slug>アプリのスラッグ</slug>/ で、プロバイダーをアプリケーションに割り当てておく必要があります。",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "映画とシリーズ",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "音楽",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "見つかりませんでした。",
+  "components.Login.PlexSignIn.closed": "ログインする前に Plex のウィンドウが閉じられました。もう一度お試しください。",
+  "components.Login.PlexSignIn.popup": "Plex のログインウィンドウを開けませんでした。このサイトのポップアップを許可して、もう一度お試しください。",
+  "components.Login.PlexSignIn.unreachable": "Plex に接続できませんでした。接続を確認して、もう一度お試しください。",
+  "components.Login.passkey": "パスキー"
 }

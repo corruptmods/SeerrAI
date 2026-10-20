@@ -1,5 +1,11 @@
 import axios from 'axios';
 import Bowser from 'bowser';
+import type { PendingPlexSignIn, PlexSignInPurpose } from './plexSameTab';
+import {
+  plexForwardUrl,
+  savePendingPlexSignIn,
+  sessionStore,
+} from './plexSameTab';
 
 interface PlexHeaders extends Record<string, string> {
   Accept: string;
@@ -20,11 +26,54 @@ export interface PlexPin {
   code: string;
 }
 
+/** Plex's sign-in page, which takes its settings after `#!?`. */
+const PLEX_AUTH_URL = 'https://app.plex.tv/auth/#!';
+
+/** How long a single request to plex.tv may take. */
+const PLEX_TIMEOUT_MS = 15000;
+
+/**
+ * Why signing in with Plex did not happen, for the page to say in plain
+ * words:
+ * - popup: the Plex window could not open, and the page could not go to
+ *   Plex itself either;
+ * - closed: the Plex window was closed before Plex was reached;
+ * - unreachable: plex.tv could not be reached, or did not answer in time;
+ * - expired: the sign-in took too long, or was started in another tab;
+ * - notSignedIn: they came back from Plex without signing in;
+ * - failed: anything else.
+ */
+export type PlexSignInProblem =
+  | 'popup'
+  | 'closed'
+  | 'unreachable'
+  | 'expired'
+  | 'notSignedIn'
+  | 'failed';
+
+export class PlexSignInError extends Error {
+  public problem: PlexSignInProblem;
+
+  constructor(problem: PlexSignInProblem, cause?: unknown) {
+    super(cause instanceof Error ? cause.message : `Plex sign-in: ${problem}`);
+    this.name = 'PlexSignInError';
+    this.problem = problem;
+  }
+}
+
+/** The problem behind any error from signing in with Plex. */
+export const plexSignInProblemOf = (e: unknown): PlexSignInProblem =>
+  e instanceof PlexSignInError ? e.problem : 'failed';
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 class PlexOAuth {
   private plexHeaders?: PlexHeaders;
 
   private pin?: PlexPin;
   private popup?: Window;
+  /** The last window asked for could not be opened at all. */
+  private popupBlocked = false;
 
   private authToken?: string;
 
@@ -67,7 +116,7 @@ class PlexOAuth {
     const response = await axios.post(
       'https://plex.tv/api/v2/pins?strong=true',
       undefined,
-      { headers: this.plexHeaders }
+      { headers: this.plexHeaders, timeout: PLEX_TIMEOUT_MS }
     );
 
     this.pin = { id: response.data.id, code: response.data.code };
@@ -79,20 +128,108 @@ class PlexOAuth {
     this.openPopup({ title: 'Plex Auth', w: 600, h: 700 });
   }
 
-  public async login(plexClientIdentifier: string): Promise<string> {
+  /**
+   * Signs in with Plex in the window opened by preparePopup, and resolves
+   * to the Plex token once Plex says the person has signed in.
+   *
+   * When that window could not be opened and `sameTab` says what the
+   * sign-in is for, this tab goes to Plex instead and comes back to the
+   * same page (see plexSameTab.ts), which finishes it with finishSameTab;
+   * it then resolves to undefined as the page is left. Every failure is a
+   * PlexSignInError.
+   */
+  public async login(
+    plexClientIdentifier: string,
+    sameTab?: PlexSignInPurpose
+  ): Promise<string | undefined> {
     try {
       this.initializeHeaders(plexClientIdentifier);
+    } catch (e) {
+      this.closePopup();
+      throw new PlexSignInError('failed', e);
+    }
+    try {
       await this.getPin();
     } catch (e) {
       this.closePopup();
-      throw e;
+      throw new PlexSignInError('unreachable', e);
     }
 
     if (!this.plexHeaders || !this.pin) {
-      throw new Error('Unable to call login if class is not initialized.');
+      throw new PlexSignInError('failed');
     }
 
-    const params = {
+    if (!this.popup || this.popup.closed) {
+      const blocked = this.popupBlocked || !this.popup;
+      this.popup = undefined;
+      if (!blocked) {
+        // They closed the window themselves while it was loading.
+        throw new PlexSignInError('closed');
+      }
+      if (sameTab && this.goToPlex(sameTab)) {
+        return undefined;
+      }
+      throw new PlexSignInError('popup');
+    }
+
+    this.popup.location.href = this.authUrl();
+
+    return this.pinPoll();
+  }
+
+  /**
+   * Finishes a sign-in this tab went to Plex for: asks Plex whether the
+   * PIN was signed in to, a few times over a couple of seconds in case
+   * Plex sent them back a moment before it had noted it. Resolves to the
+   * Plex token.
+   */
+  public async finishSameTab(
+    plexClientIdentifier: string,
+    pending: PendingPlexSignIn
+  ): Promise<string> {
+    try {
+      this.initializeHeaders(plexClientIdentifier);
+    } catch (e) {
+      throw new PlexSignInError('failed', e);
+    }
+    this.pin = { id: pending.id, code: pending.code };
+
+    // Plex forgets a PIN once it has expired; a PIN it doesn't know of yet
+    // is looked for again, as the window's polling does.
+    let unknownPin = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await wait(1000);
+      }
+      let data: { authToken?: string | null } | undefined;
+      try {
+        const response = await axios.get(
+          `https://plex.tv/api/v2/pins/${pending.id}`,
+          { headers: this.plexHeaders, timeout: PLEX_TIMEOUT_MS }
+        );
+        data = response.data;
+        unknownPin = false;
+      } catch (e) {
+        if (axios.isAxiosError(e) && e.response?.status === 404) {
+          unknownPin = true;
+          continue;
+        }
+        throw new PlexSignInError('unreachable', e);
+      }
+      if (data?.authToken) {
+        this.authToken = data.authToken;
+        return data.authToken;
+      }
+    }
+    throw new PlexSignInError(unknownPin ? 'expired' : 'notSignedIn');
+  }
+
+  /** Plex's sign-in page for the current PIN, coming back to `forwardUrl`. */
+  private authUrl(forwardUrl?: string): string {
+    if (!this.plexHeaders || !this.pin) {
+      throw new PlexSignInError('failed');
+    }
+    const params: Record<string, string> = {
       clientID: this.plexHeaders['X-Plex-Client-Identifier'],
       'context[device][product]': this.plexHeaders['X-Plex-Product'],
       'context[device][version]': this.plexHeaders['X-Plex-Version'],
@@ -106,19 +243,28 @@ class PlexOAuth {
         this.plexHeaders['X-Plex-Device-Screen-Resolution'],
       'context[device][layout]': 'desktop',
       code: this.pin.code,
+      ...(forwardUrl ? { forwardUrl } : {}),
     };
+    return `${PLEX_AUTH_URL}?${this.encodeData(params)}`;
+  }
 
-    if (!this.popup || this.popup.closed) {
-      throw new Error(
-        'Unable to open the Plex login window. Please allow popups for this site and try again.'
-      );
-    }
-
-    this.popup.location.href = `https://app.plex.tv/auth/#!?${this.encodeData(
-      params
-    )}`;
-
-    return this.pinPoll();
+  /**
+   * Sends this tab to Plex's sign-in, to come back to the page it is on.
+   * False, and nowhere sent, when the PIN can't be kept for the return.
+   */
+  private goToPlex(purpose: PlexSignInPurpose): boolean {
+    if (!this.pin) return false;
+    const kept = savePendingPlexSignIn(sessionStore(), {
+      id: this.pin.id,
+      code: this.pin.code,
+      purpose,
+      startedAt: Date.now(),
+    });
+    if (!kept) return false;
+    window.location.assign(
+      this.authUrl(plexForwardUrl(window.location.href, this.pin.id))
+    );
+    return true;
   }
 
   private async pinPoll(): Promise<string> {
@@ -132,12 +278,12 @@ class PlexOAuth {
     ) => {
       try {
         if (!this.pin) {
-          throw new Error('Unable to poll when pin is not initialized.');
+          throw new PlexSignInError('failed');
         }
 
         const response = await axios.get(
           `https://plex.tv/api/v2/pins/${this.pin.id}`,
-          { headers: this.plexHeaders }
+          { headers: this.plexHeaders, timeout: PLEX_TIMEOUT_MS }
         );
 
         if (response.data?.authToken) {
@@ -150,7 +296,7 @@ class PlexOAuth {
             : deadline;
           if (Date.now() >= Math.min(expiresAt, deadline)) {
             this.closePopup();
-            reject(new Error('Plex PIN expired before login completed.'));
+            reject(new PlexSignInError('expired'));
             return;
           }
           setTimeout(executePoll, 1000, resolve, reject);
@@ -162,7 +308,7 @@ class PlexOAuth {
           return;
         }
         this.closePopup();
-        reject(e);
+        reject(new PlexSignInError('unreachable', e));
       }
     };
 
@@ -219,11 +365,14 @@ class PlexOAuth {
         ', left=' +
         left
     );
-    if (newWindow) {
+    // Some blockers hand back a window that is already closed.
+    this.popupBlocked = !newWindow || newWindow.closed;
+    if (newWindow && !newWindow.closed) {
       newWindow.focus();
       this.popup = newWindow;
       return this.popup;
     }
+    this.popup = undefined;
   }
 
   private encodeData(data: Record<string, string>): string {

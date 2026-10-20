@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Syötä Client Secret.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "Palvelinta {host} ei löytynyt. Tarkista myöntäjän URL-osoite.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "Myöntäjän URL-osoitteen täytyy alkaa https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Palveluntarjoaja ilmoittaa myöntäjän URL-osoitteekseen {issuer}. Syötä täsmälleen se (lopun kauttaviiva lasketaan).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Palveluntarjoaja ilmoittaa myöntäjän URL-osoitteekseen {issuer}. Syötä täsmälleen se.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Palveluntarjoaja ilmoittaa eri myöntäjän URL-osoitteen. Syötä se täsmälleen niin kuin palveluntarjoaja sen näyttää.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "Myöntäjän URL-osoitteessa ei voi olla ?- tai #-osaa.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Syötä myöntäjän URL-osoite, joka alkaa https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Käytä palvelimen oletusta",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Käytät palvelimen oletusta. Kaikki, mitä muutat täällä, koskee vain sinua.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Väri, kuten #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Ulkoasu"
+  "components.UserProfile.UserSettings.menuAppearance": "Ulkoasu",
+  "components.Settings.MusicLibraries.musicOff": "Musiikkikirjastot näkyvät, kun musiikki on otettu käyttöön kohdassa <link>Asetukset → Musiikki</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Jotkin palveluntarjoajat antavat jokaiselle sovellukselle oman osoitteen: Authentikissa se on {origin}/application/o/<slug>sovelluksen slug</slug>/, ja palveluntarjoajan on oltava liitetty sovellukseen.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Elokuvat ja sarjat",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Musiikki",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Yhtään ei löytynyt.",
+  "components.Login.PlexSignIn.closed": "Plex-ikkuna suljettiin ennen kuin kirjauduit. Yritä uudelleen.",
+  "components.Login.PlexSignIn.popup": "Plexin kirjautumisikkunaa ei voitu avata. Salli ponnahdusikkunat tälle sivustolle ja yritä uudelleen.",
+  "components.Login.PlexSignIn.unreachable": "Plexiin ei saatu yhteyttä. Tarkista yhteytesi ja yritä uudelleen.",
+  "components.Login.passkey": "Pääsyavain"
 }

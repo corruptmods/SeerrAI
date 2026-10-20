@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "הזן את ה-Client Secret.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "לא ניתן היה למצוא את {host}. בדוק את כתובת המנפיק.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "כתובת המנפיק חייבת להתחיל ב-https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "הספק מציין את כתובת המנפיק שלו כ-{issuer}. הזן בדיוק את זו (לוכסן בסוף משנה).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "הספק מציין את כתובת המנפיק שלו כ-{issuer}. הזן בדיוק את זו.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "הספק מציין כתובת מנפיק אחרת. הזן אותה בדיוק כפי שהספק מציג אותה.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "כתובת המנפיק לא יכולה לכלול חלק עם ? או #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "הזן את כתובת המנפיק, שמתחילה ב-https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "שימוש בברירת המחדל של השרת",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "אתה משתמש בברירת המחדל של השרת. כל מה שתשנה כאן חל רק עליך.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "צבע כמו #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "מראה"
+  "components.UserProfile.UserSettings.menuAppearance": "מראה",
+  "components.Settings.MusicLibraries.musicOff": "ספריות מוזיקה מופיעות כשהמוזיקה מופעלת ב<link>הגדרות ← מוזיקה</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "יש ספקים שנותנים לכל אפליקציה כתובת משלה: ב-Authentik היא {origin}/application/o/<slug>מזהה האפליקציה</slug>/, והספק חייב להיות משויך לאפליקציה.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "סרטים וסדרות",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "מוזיקה",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "לא נמצאו.",
+  "components.Login.PlexSignIn.closed": "חלון Plex נסגר לפני שהתחברת. נסה שוב.",
+  "components.Login.PlexSignIn.popup": "לא ניתן היה לפתוח את חלון ההתחברות של Plex. אפשר חלונות קופצים לאתר זה ונסה שוב.",
+  "components.Login.PlexSignIn.unreachable": "לא ניתן היה להגיע ל-Plex. בדוק את החיבור ונסה שוב.",
+  "components.Login.passkey": "מפתח גישה"
 }

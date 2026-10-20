@@ -224,6 +224,16 @@ const CERTIFICATE_PROBLEMS = new Set([
   'ERR_TLS_CERT_ALTNAME_INVALID',
 ]);
 
+/** The address's scheme, host and port, when it has no path after them. */
+const bareOrigin = (issuerUrl: string): string | undefined => {
+  try {
+    const url = new URL(issuerUrl);
+    return url.pathname === '/' ? url.origin : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * Why a provider could not be used, for the admin setting it up. Nothing
  * secret is in it: no client secret, token or code.
@@ -258,9 +268,16 @@ export const discoveryProblem = (
   }
   if (code === 'OAUTH_RESPONSE_IS_NOT_CONFORM') {
     const status = (cause as { status?: unknown } | undefined)?.status;
-    return typeof status === 'number'
-      ? { problem: 'no-discovery', params: { status } }
-      : { problem: 'no-discovery' };
+    if (typeof status !== 'number') {
+      return { problem: 'no-discovery' };
+    }
+    // Only a host, and nothing there: Authentik, for one, gives each app
+    // its own address under it, which is easy to miss.
+    const origin = status === 404 ? bareOrigin(issuerUrl) : undefined;
+    return {
+      problem: 'no-discovery',
+      params: origin ? { status, origin } : { status },
+    };
   }
   if (code === 'OAUTH_RESPONSE_IS_NOT_JSON' || code === 'OAUTH_PARSE_ERROR') {
     return { problem: 'not-discovery' };
@@ -301,12 +318,16 @@ export const problemText = ({ problem, params = {} }: OidcProblem): string => {
       return `${params.host} did not answer within ${params.seconds} seconds.`;
     case 'issuer-mismatch':
       return params.issuer !== undefined
-        ? `The provider gives its issuer URL as ${params.issuer}. Enter exactly that (a slash at the end counts).`
+        ? `The provider gives its issuer URL as ${params.issuer}. Enter exactly that.`
         : 'The provider gives a different issuer URL. Enter it exactly as the provider shows it.';
     case 'no-discovery':
       return `No sign-in details were found at that address${
         params.status !== undefined ? ` (it answered ${params.status})` : ''
-      }. Check the issuer URL: Seerr reads /.well-known/openid-configuration under it.`;
+      }. Check the issuer URL: Seerr reads /.well-known/openid-configuration under it.${
+        params.origin !== undefined
+          ? ` Some providers give each app its own address: in Authentik it's ${params.origin}/application/o/<app slug>/, and the provider must be attached to an application.`
+          : ''
+      }`;
     case 'not-discovery':
       return 'That address answered, but not with sign-in details. Check the issuer URL.';
     case 'host-not-found':

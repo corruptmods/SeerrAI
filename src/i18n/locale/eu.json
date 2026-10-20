@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Idatzi Client Secret-a.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "Ezin izan da {host} aurkitu. Egiaztatu jaulkitzailearen URLa.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "Jaulkitzailearen URLak https://-z hasi behar du.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Hornitzaileak {issuer} ematen du bere jaulkitzailearen URL gisa. Idatzi zehazki hori (amaierako barrak ere balio du).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Hornitzaileak {issuer} ematen du bere jaulkitzailearen URL gisa. Idatzi zehazki hori.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Hornitzaileak beste jaulkitzaile-URL bat ematen du. Idatzi zehazki hornitzaileak erakusten duen bezala.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "Jaulkitzailearen URLak ezin du ? edo # zatirik izan.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Idatzi jaulkitzailearen URLa, https:// hasita.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Erabili zerbitzariaren lehenetsia",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Zerbitzariaren lehenetsia erabiltzen ari zara. Hemen aldatzen duzun guztia zuretzat bakarrik da.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Kolore bat, adibidez #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Itxura"
+  "components.UserProfile.UserSettings.menuAppearance": "Itxura",
+  "components.Settings.MusicLibraries.musicOff": "Musika-liburutegiak musika aktibatuta dagoenean agertzen dira: <link>Ezarpenak → Musika</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Hornitzaile batzuek aplikazio bakoitzari bere helbidea ematen diote: Authentik-en {origin}/application/o/<slug>aplikazioaren sluga</slug>/ da, eta hornitzaileak aplikazio bati lotuta egon behar du.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Filmak eta telesailak",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Musika",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Ez da bat ere aurkitu.",
+  "components.Login.PlexSignIn.closed": "Plex-en leihoa itxi egin da saioa hasi aurretik. Saiatu berriro.",
+  "components.Login.PlexSignIn.popup": "Ezin izan da Plex-en saio-hasierako leihoa ireki. Baimendu gune honetako leiho gainerakorrak eta saiatu berriro.",
+  "components.Login.PlexSignIn.unreachable": "Ezin izan da Plex-ekin konektatu. Egiaztatu konexioa eta saiatu berriro.",
+  "components.Login.passkey": "Sarbide-gakoa"
 }

@@ -18,7 +18,7 @@ In **Settings → Users → Single Sign-On**, press **Add Provider**:
 
 1. Type a **Name**. It's on the button: "Sign in with {name}". The **Redirect URL** below it fills in by itself, for example `https://seerr.example.com/api/v1/auth/oidc/authentik/callback`. Copy it.
 2. In your provider, make a client (an "application") for Seerr AI, using that redirect URL. The steps for each provider are below. Make it a **confidential** client: one with a client secret.
-3. Back in Seerr AI, fill in the **Issuer URL**, **Client ID** and **Client Secret** the provider gave you, and press **Test**. Seerr AI asks the provider about itself and says plainly if something is wrong: a wrong address, a slash too many or too few at the end of the issuer URL, a provider that doesn't answer.
+3. Back in Seerr AI, fill in the **Issuer URL**, **Client ID** and **Client Secret** the provider gave you, and press **Test**. Seerr AI asks the provider about itself and says plainly if something is wrong: a wrong address, a provider that doesn't answer. The provider's whole configuration address (ending in `/.well-known/openid-configuration`) can be pasted instead of the issuer URL; Seerr AI takes it back to the issuer it is under.
 4. Leave **Scopes** as `openid profile email` unless you have a reason to change them (to let in only some people by their groups, some providers need `groups` added; see [Only let some people in](#only-let-some-people-in)), and press **Add Provider**.
 
 The other settings:
@@ -93,7 +93,8 @@ Wherever a step asks for the redirect URL, paste the one shown in Seerr AI. The 
 
 1. **Applications → Applications → Create with provider**. Name it "Seerr AI", choose **OAuth2/OpenID Provider**.
 2. **Client type: Confidential**. Under **Redirect URIs/Origins**, add the redirect URL (strict). Pick a **Signing Key** (the self-signed certificate is fine).
-3. Finish, then open the provider: it shows the **Client ID**, **Client Secret** and **OpenID Configuration Issuer**, such as `https://auth.example.com/application/o/seerr-ai/`. Use that issuer exactly, with the slash at the end.
+3. Finish, then open the provider: it shows the **Client ID**, **Client Secret** and **OpenID Configuration Issuer**, such as `https://auth.example.com/application/o/seerr-ai/`. Use that issuer, or paste the **OpenID Configuration URL** shown beside it.
+4. The provider has to be attached to an application, or Authentik answers 404 at that address. **Create with provider** does that; a provider made on its own under **Applications → Providers** needs one: **Applications → Applications → Create**, and pick the provider.
 
 ### Authelia
 
@@ -143,8 +144,8 @@ In Seerr AI, the issuer URL is Authelia's own address, such as `https://auth.exa
 
 ## When something goes wrong
 
-- **The Test button says the provider gives a different issuer URL**: enter exactly the one it names. A slash at the end counts.
-- **"No sign-in details were found at that address"**: the issuer URL is wrong. Seerr AI reads `/.well-known/openid-configuration` under it; opening that address in a browser should show a page of JSON.
+- **The Test button says the provider gives a different issuer URL**: enter exactly the one it names. A slash at the end doesn't matter: Seerr AI uses the provider's own.
+- **"No sign-in details were found at that address"**: the issuer URL is wrong. Seerr AI reads `/.well-known/openid-configuration` under it; opening that address in a browser should show a page of JSON. Pasting that whole address into **Issuer URL** is fine too. Authentik keeps it under each application, `https://auth.example.com/application/o/<app slug>/`, not at its own address, and only once the provider is attached to an application.
 - **"That took too long, or was started in another window"**: signing in has to finish within ten minutes, in the same browser it was started in. It also shows when the provider sends people back to a different address than the Application URL they started from.
 - **"Something went wrong with {provider}"**: often a client secret or redirect URL that doesn't match the provider's. **Settings → Logs** says more; it never shows secrets, codes or tokens.
 - **"Your {provider} account isn't allowed to use this server"**: the provider's rules under **Who Can Sign In** turned them away. **Settings → Logs** names the claims they failed. Often the provider isn't sending the claim at all: check the scopes (see [Only let some people in](#only-let-some-people-in)) and that the value matches exactly, capitals included.

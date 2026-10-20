@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Įveskite kliento paslaptį.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "Nepavyko rasti {host}. Patikrinkite išdavėjo URL.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "Išdavėjo URL turi prasidėti https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Teikėjas nurodo savo išdavėjo URL kaip {issuer}. Įveskite būtent jį (pasvirasis brūkšnys gale svarbus).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Teikėjas nurodo savo išdavėjo URL kaip {issuer}. Įveskite būtent jį.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Teikėjas nurodo kitą išdavėjo URL. Įveskite jį tiksliai taip, kaip rodo teikėjas.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "Išdavėjo URL negali turėti dalies su ? ar #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Įveskite išdavėjo URL, prasidedantį https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Naudoti serverio numatytąją",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Naudojate serverio numatytąją išvaizdą. Viskas, ką čia pakeisite, galioja tik Jums.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Spalva, pavyzdžiui, #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Išvaizda"
+  "components.UserProfile.UserSettings.menuAppearance": "Išvaizda",
+  "components.Settings.MusicLibraries.musicOff": "Muzikos bibliotekos atsiranda, kai muzika įjungta skiltyje <link>Nustatymai → Muzika</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Kai kurie teikėjai kiekvienai programai suteikia atskirą adresą: Authentik sistemoje jis yra {origin}/application/o/<slug>programos slug</slug>/, o teikėjas turi būti priskirtas programai.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Filmai ir serialai",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Muzika",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Nieko nerasta.",
+  "components.Login.PlexSignIn.closed": "Plex langas buvo uždarytas prieš jums prisijungiant. Bandykite dar kartą.",
+  "components.Login.PlexSignIn.popup": "Nepavyko atidaryti Plex prisijungimo lango. Leiskite iššokančiuosius langus šioje svetainėje ir bandykite dar kartą.",
+  "components.Login.PlexSignIn.unreachable": "Nepavyko pasiekti Plex. Patikrinkite ryšį ir bandykite dar kartą.",
+  "components.Login.passkey": "Prieigos raktas"
 }

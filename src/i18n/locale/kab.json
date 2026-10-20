@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Sekcem Client Secret.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "{host} ur d-yettwaf ara. Senqed URL n umeffay.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "URL n umeffay ilaq ad yebdu s https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Asaǧǧaw yefka URL n umeffay-is d {issuer}. Sekcem-it s tidet akken yella (afeggag deg taggara yettwaḥsab).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Asaǧǧaw yefka URL n umeffay-is d {issuer}. Sekcem-it s tidet akken yella.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Asaǧǧaw yefka URL n umeffay nniḍen. Sekcem-it s tidet akken i t-id-yesskan usaǧǧaw.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "URL n umeffay ur yezmir ara ad yesɛu aḥric s ? neɣ #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Sekcem URL n umeffay, ara yebdun s https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Seqdec amezwer n uqeddac",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Tesseqdaceḍ amezwer n uqeddac. Ayen ara tbeddleḍ dagi i kečč kan.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Ini am #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Arwes"
+  "components.UserProfile.UserSettings.menuAppearance": "Arwes",
+  "components.Settings.MusicLibraries.musicOff": "Timkarḍiyin n uẓawan ad d-banent mi ara yermed uẓawan deg <link>Iɣewwaren → Aẓawan</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Kra n yisaǧǧawen fkan i yal asnas tansa-s: deg Authentik d {origin}/application/o/<slug>slug n usnas</slug>/, yerna asaǧǧaw ilaq ad yettwaqqen ɣer usnas.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Isura d tisnasliwin",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Aẓawan",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Ulac i d-yettwafen.",
+  "components.Login.PlexSignIn.closed": "Asfaylu n Plex yemdel uqbel ad teqqneḍ. Ɛreḍ tikkelt nniḍen.",
+  "components.Login.PlexSignIn.popup": "Asfaylu n tuqqna ɣer Plex ur yezmir ara ad yeldi. Sireg isfuyla udhimen i usmel-a, syen ɛreḍ tikkelt nniḍen.",
+  "components.Login.PlexSignIn.unreachable": "Ur nezmir ara ad naweḍ ɣer Plex. Senqed tuqqna-k, syen ɛreḍ tikkelt nniḍen.",
+  "components.Login.passkey": "Tasarut n uɛeddi"
 }

@@ -19,6 +19,11 @@ import type {
 } from '@server/lib/scanners/baseScanner';
 import BaseScanner from '@server/lib/scanners/baseScanner';
 import { RecentRetries, titleKey } from '@server/lib/scanners/plex/recent';
+import type { ItemLabel } from '@server/lib/scanners/unidentified';
+import {
+  NotIdentifiedError,
+  UnidentifiedTitles,
+} from '@server/lib/scanners/unidentified';
 import type { Library } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { uniqWith } from 'lodash';
@@ -37,6 +42,24 @@ const hamaTvdbRegex = new RegExp(/hama:\/\/tvdb[0-9]?-([0-9]+)/);
 const hamaAnidbRegex = new RegExp(/hama:\/\/anidb[0-9]?-([0-9]+)/);
 const HAMA_AGENT = 'com.plexapp.agents.hama';
 
+/**
+ * An item as the log names it: never Plex's whole record. An episode (from
+ * a recently added scan) is named by its show.
+ */
+const labelOf = (item: PlexLibraryItem): ItemLabel =>
+  item.type === 'episode' && item.grandparentTitle
+    ? {
+        name: item.grandparentTitle,
+        type: 'show',
+        id: item.grandparentRatingKey ?? item.ratingKey,
+      }
+    : {
+        name: item.title,
+        ...(item.year ? { year: item.year } : {}),
+        type: item.type,
+        id: item.ratingKey,
+      };
+
 type SyncStatus = StatusBase & {
   currentLibrary: Library;
   libraries: Library[];
@@ -52,6 +75,12 @@ class PlexScanner
   private isRecentOnly = false;
   /** Titles a recently added scan could not place yet, for another look. */
   public readonly retries = new RecentRetries();
+  /** Titles this scan skipped because Plex hasn't matched them yet. */
+  private unidentified = new UnidentifiedTitles({
+    server: 'Plex',
+    verb: 'matched',
+    hint: "refresh the library's metadata, or use Match on a title",
+  });
 
   public constructor(isRecentOnly = false) {
     super('Plex Scan', { bundleSize: 50 });
@@ -76,6 +105,7 @@ class PlexScanner
 
     const settings = getSettings();
     const sessionId = this.startRun();
+    this.unidentified.clear();
     try {
       const userRepository = getRepository(User);
       const admin = await userRepository.findOne({
@@ -182,6 +212,11 @@ class PlexScanner
           await this.paginateLibrary(library, { sessionId });
         }
       }
+      const skipped = this.unidentified.summary();
+      if (skipped) {
+        this.log(skipped.message, 'info', { examples: skipped.examples });
+      }
+
       this.log(
         this.isRecentOnly
           ? 'Recently Added Scan Complete'
@@ -272,10 +307,18 @@ class PlexScanner
       }
       return null;
     } catch (e) {
-      this.log('Failed to process Plex media', 'error', {
-        errorMessage: e.message,
-        title: plexitem.title,
-      });
+      // A title Plex hasn't matched yet is normal for new files: noted and
+      // counted, not an error. It is still tried again like any other.
+      if (e instanceof NotIdentifiedError) {
+        this.log(this.unidentified.add(e.kind, e.item), 'debug', {
+          item: e.item,
+        });
+      } else {
+        this.log('Failed to process Plex media', 'error', {
+          errorMessage: e.message,
+          item: labelOf(plexitem),
+        });
+      }
       return e instanceof Error ? e.message : String(e);
     }
   }
@@ -487,7 +530,9 @@ class PlexScanner
 
       // If there is no Guid field at all, then we bail
       if (!metadata.Guid) {
-        throw new Error(
+        throw new NotIdentifiedError(
+          plexitem.type === 'movie' ? 'film' : 'series',
+          labelOf(plexitem),
           'No Guid metadata for this title. Skipping. (Try refreshing the metadata in Plex for this media!)'
         );
       }
@@ -621,7 +666,15 @@ class PlexScanner
     }
 
     if (!mediaIds.tmdbId) {
-      throw new Error('Unable to find TMDB ID');
+      // A HAMA AniDB id with no TMDB entry in the anime list is a real gap;
+      // anything else without an id is a title Plex hasn't matched yet.
+      if (plexitem.guid.match(hamaAnidbRegex)) {
+        throw new Error('Unable to find TMDB ID');
+      }
+      throw new NotIdentifiedError(
+        plexitem.type === 'movie' ? 'film' : 'series',
+        labelOf(plexitem)
+      );
     }
 
     // We check above if we have the TMDB ID, so we can safely assert the type below

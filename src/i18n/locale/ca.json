@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Introduïu el Client Secret.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "No s’ha trobat {host}. Comproveu la URL de l’emissor.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "La URL de l’emissor ha de començar per https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "El proveïdor indica {issuer} com a URL de l’emissor. Introduïu exactament aquesta (la barra final compta).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "El proveïdor indica {issuer} com a URL de l’emissor. Introduïu exactament aquesta.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "El proveïdor indica una URL de l’emissor diferent. Introduïu-la exactament com la mostra el proveïdor.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "La URL de l’emissor no pot tenir una part amb ? o #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Introduïu la URL de l’emissor, que comenci per https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Fes servir el predeterminat del servidor",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Feu servir el predeterminat del servidor. El que canvieu aquí és només per a vós.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Un color com ara #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Aparença"
+  "components.UserProfile.UserSettings.menuAppearance": "Aparença",
+  "components.Settings.MusicLibraries.musicOff": "Les biblioteques de música apareixen quan la música està activada a <link>Configuració → Música</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Alguns proveïdors donen a cada aplicació la seva pròpia adreça: a Authentik és {origin}/application/o/<slug>slug de l’aplicació</slug>/, i el proveïdor ha d’estar associat a una aplicació.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Pel·lícules i sèries",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Música",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "No se n’ha trobat cap.",
+  "components.Login.PlexSignIn.closed": "La finestra de Plex s’ha tancat abans que inicieu la sessió. Torneu-ho a provar.",
+  "components.Login.PlexSignIn.popup": "No s’ha pogut obrir la finestra d’inici de sessió de Plex. Permeteu les finestres emergents per a aquest lloc i torneu-ho a provar.",
+  "components.Login.PlexSignIn.unreachable": "No s’ha pogut connectar amb Plex. Comproveu la connexió i torneu-ho a provar.",
+  "components.Login.passkey": "Clau d’accés"
 }

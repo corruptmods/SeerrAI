@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Nhập Client Secret.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "Không tìm thấy {host}. Kiểm tra Issuer URL.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "Issuer URL phải bắt đầu bằng https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Nhà cung cấp cho biết Issuer URL của mình là {issuer}. Nhập chính xác như vậy (dấu gạch chéo ở cuối cũng tính).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Nhà cung cấp cho biết Issuer URL của mình là {issuer}. Nhập chính xác như vậy.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Nhà cung cấp cho biết một Issuer URL khác. Nhập chính xác như nhà cung cấp hiển thị.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "Issuer URL không được có phần ? hoặc #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Nhập Issuer URL, bắt đầu bằng https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Dùng mặc định của máy chủ",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Bạn đang dùng mặc định của máy chủ. Mọi thay đổi ở đây chỉ áp dụng cho bạn.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Một màu như #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Giao diện"
+  "components.UserProfile.UserSettings.menuAppearance": "Giao diện",
+  "components.Settings.MusicLibraries.musicOff": "Thư viện nhạc sẽ hiện khi nhạc được bật trong <link>Cài đặt → Nhạc</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Một số nhà cung cấp cấp cho mỗi ứng dụng một địa chỉ riêng: trong Authentik, đó là {origin}/application/o/<slug>slug của ứng dụng</slug>/, và nhà cung cấp phải được gắn với một ứng dụng.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Phim và phim bộ",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Nhạc",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Không tìm thấy.",
+  "components.Login.PlexSignIn.closed": "Cửa sổ Plex đã bị đóng trước khi bạn đăng nhập. Hãy thử lại.",
+  "components.Login.PlexSignIn.popup": "Không thể mở cửa sổ đăng nhập Plex. Hãy cho phép cửa sổ bật lên cho trang này và thử lại.",
+  "components.Login.PlexSignIn.unreachable": "Không thể kết nối tới Plex. Hãy kiểm tra kết nối và thử lại.",
+  "components.Login.passkey": "Passkey"
 }

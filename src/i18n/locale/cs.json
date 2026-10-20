@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Zadejte Client Secret.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "Server {host} se nepodařilo najít. Zkontrolujte URL vydavatele.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "URL vydavatele musí začínat https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Poskytovatel uvádí svou URL vydavatele jako {issuer}. Zadejte přesně tuto (lomítko na konci se počítá).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Poskytovatel uvádí svou URL vydavatele jako {issuer}. Zadejte přesně tuto.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Poskytovatel uvádí jinou URL vydavatele. Zadejte ji přesně tak, jak ji poskytovatel zobrazuje.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "URL vydavatele nesmí obsahovat část s ? ani #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Zadejte URL vydavatele začínající https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Použít výchozí nastavení serveru",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Používáte výchozí nastavení serveru. Cokoli tu změníte, platí jen pro vás.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Barva jako #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Vzhled"
+  "components.UserProfile.UserSettings.menuAppearance": "Vzhled",
+  "components.Settings.MusicLibraries.musicOff": "Hudební knihovny se zobrazí, jakmile je hudba zapnutá v <link>Nastavení → Hudba</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Někteří poskytovatelé dávají každé aplikaci vlastní adresu: v Authentiku je to {origin}/application/o/<slug>slug aplikace</slug>/ a poskytovatel musí být přiřazen k aplikaci.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Filmy a seriály",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Hudba",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Nebyly nalezeny žádné.",
+  "components.Login.PlexSignIn.closed": "Okno Plexu bylo zavřeno dřív, než jste se přihlásili. Zkuste to znovu.",
+  "components.Login.PlexSignIn.popup": "Přihlašovací okno Plexu se nepodařilo otevřít. Povolte pro tento web vyskakovací okna a zkuste to znovu.",
+  "components.Login.PlexSignIn.unreachable": "Plex není dostupný. Zkontrolujte připojení a zkuste to znovu.",
+  "components.Login.passkey": "Přístupový klíč"
 }

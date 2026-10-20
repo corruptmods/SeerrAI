@@ -1,5 +1,6 @@
 import Button from '@app/components/Common/Button';
 import { SmallLoadingSpinner } from '@app/components/Common/LoadingSpinner';
+import { OPTION_BUTTON } from '@app/components/Login/signInOptions';
 import {
   isCancelled,
   preloadPasskeys,
@@ -12,20 +13,28 @@ import { isAxiosError } from 'axios';
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 
-const messages = defineMessages('components.Login', {
+export const passkeyMessages = defineMessages('components.Login', {
   signinwithpasskey: 'Sign in with a passkey',
+  passkey: 'Passkey',
   passkeyfailed: 'That passkey could not sign you in.',
 });
+const messages = passkeyMessages;
 
 interface PasskeyLoginButtonProps {
   onSignedIn: () => void;
   onError: (message: string) => void;
+  /**
+   * Under "Or sign in with": the button just says "Passkey" (its full
+   * "Sign in with a passkey" is what a screen reader says).
+   */
+  compact?: boolean;
 }
 
 /** Only shown where the browser can use passkeys. */
 const PasskeyLoginButton = ({
   onSignedIn,
   onError,
+  compact,
 }: PasskeyLoginButtonProps) => {
   const intl = useIntl();
   const { supported } = usePasskeySupport();
@@ -60,9 +69,12 @@ const PasskeyLoginButton = ({
 
   return (
     <Button
-      className="relative flex-1 bg-transparent"
+      className={`${OPTION_BUTTON} bg-transparent`}
       onClick={signIn}
       disabled={busy}
+      aria-label={
+        compact ? intl.formatMessage(messages.signinwithpasskey) : undefined
+      }
       data-testid="passkey-login-button"
     >
       {busy && (
@@ -70,8 +82,12 @@ const PasskeyLoginButton = ({
           <SmallLoadingSpinner />
         </div>
       )}
-      <FingerPrintIcon />
-      <span>{intl.formatMessage(messages.signinwithpasskey)}</span>
+      <FingerPrintIcon className="shrink-0" />
+      <span className="truncate">
+        {intl.formatMessage(
+          compact ? messages.passkey : messages.signinwithpasskey
+        )}
+      </span>
     </Button>
   );
 };

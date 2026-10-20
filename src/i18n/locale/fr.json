@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Saisissez le Client Secret.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "{host} est introuvable. Vérifiez l’URL de l’émetteur.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "L’URL de l’émetteur doit commencer par https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Le fournisseur indique {issuer} comme URL d’émetteur. Saisissez exactement celle-ci (la barre oblique finale compte).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Le fournisseur indique {issuer} comme URL d’émetteur. Saisissez exactement celle-ci.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Le fournisseur indique une autre URL d’émetteur. Saisissez-la exactement comme le fournisseur l’affiche.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "L’URL de l’émetteur ne peut pas contenir de partie ? ou #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Saisissez l’URL de l’émetteur, commençant par https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Utiliser l’apparence du serveur",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Vous utilisez l’apparence par défaut du serveur. Tout ce que vous changez ici ne concerne que vous.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Une couleur comme #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Apparence"
+  "components.UserProfile.UserSettings.menuAppearance": "Apparence",
+  "components.Settings.MusicLibraries.musicOff": "Les bibliothèques musicales apparaissent une fois la musique activée dans <link>Paramètres → Musique</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Certains fournisseurs donnent à chaque application sa propre adresse : dans Authentik, c’est {origin}/application/o/<slug>slug de l’application</slug>/, et le fournisseur doit être rattaché à une application.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Films et séries",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Musique",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Aucune n’a été trouvée.",
+  "components.Login.PlexSignIn.closed": "La fenêtre Plex a été fermée avant que vous vous connectiez. Réessayez.",
+  "components.Login.PlexSignIn.popup": "La fenêtre de connexion Plex n’a pas pu s’ouvrir. Autorisez les fenêtres pop-up pour ce site et réessayez.",
+  "components.Login.PlexSignIn.unreachable": "Impossible de joindre Plex. Vérifiez votre connexion et réessayez.",
+  "components.Login.passkey": "Clé d’accès"
 }

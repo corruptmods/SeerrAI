@@ -1,6 +1,7 @@
 import RadarrLogo from '@app/assets/services/radarr.svg';
 import SonarrLogo from '@app/assets/services/sonarr.svg';
 import Badge from '@app/components/Common/Badge';
+import CardFooter from '@app/components/Settings/CardFooter';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/solid';
@@ -126,28 +127,21 @@ const ServerInstance = ({
             ))}
         </a>
       </div>
-      <div className="border-t border-gray-500">
-        <div className="-mt-px flex">
-          <div className="flex w-0 flex-1 border-r border-gray-500">
-            <button
-              onClick={() => onEdit()}
-              className="focus:ring-blue relative -mr-px inline-flex w-0 flex-1 items-center justify-center rounded-bl-lg border border-transparent py-4 text-sm font-medium leading-5 text-gray-200 transition duration-150 ease-in-out hover:text-strong focus:z-10 focus:border-gray-500 focus:outline-none"
-            >
-              <PencilIcon className="mr-2 h-5 w-5" />
-              <span>{intl.formatMessage(globalMessages.edit)}</span>
-            </button>
-          </div>
-          <div className="-ml-px flex w-0 flex-1">
-            <button
-              onClick={() => onDelete()}
-              className="focus:ring-blue relative inline-flex w-0 flex-1 items-center justify-center rounded-br-lg border border-transparent py-4 text-sm font-medium leading-5 text-gray-200 transition duration-150 ease-in-out hover:text-strong focus:z-10 focus:border-gray-500 focus:outline-none"
-            >
-              <TrashIcon className="mr-2 h-5 w-5" />
-              <span>{intl.formatMessage(globalMessages.delete)}</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <CardFooter
+        room={2}
+        actions={[
+          {
+            label: intl.formatMessage(globalMessages.edit),
+            icon: PencilIcon,
+            onClick: () => onEdit(),
+          },
+          {
+            label: intl.formatMessage(globalMessages.delete),
+            icon: TrashIcon,
+            onClick: () => onDelete(),
+          },
+        ]}
+      />
     </li>
   );
 };

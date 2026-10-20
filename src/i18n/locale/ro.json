@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Introduceți secretul clientului.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "{host} nu a putut fi găsit. Verificați URL-ul emitentului.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "URL-ul emitentului trebuie să înceapă cu https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Furnizorul își indică URL-ul emitentului ca {issuer}. Introduceți exact acest URL (bara de la final contează).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Furnizorul își indică URL-ul emitentului ca {issuer}. Introduceți exact acest URL.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Furnizorul indică un alt URL al emitentului. Introduceți-l exact cum îl afișează furnizorul.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "URL-ul emitentului nu poate avea o parte cu ? sau #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Introduceți URL-ul emitentului, care începe cu https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Folosește setarea implicită a serverului",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Folosiți setarea implicită a serverului. Orice schimbați aici este doar pentru dumneavoastră.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "O culoare precum #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Aspect"
+  "components.UserProfile.UserSettings.menuAppearance": "Aspect",
+  "components.Settings.MusicLibraries.musicOff": "Bibliotecile de muzică apar după ce muzica este pornită în <link>Setări → Muzică</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Unii furnizori dau fiecărei aplicații propria adresă: în Authentik este {origin}/application/o/<slug>slug-ul aplicației</slug>/, iar furnizorul trebuie să fie atașat unei aplicații.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Filme și seriale",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Muzică",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Nu s-a găsit niciuna.",
+  "components.Login.PlexSignIn.closed": "Fereastra Plex a fost închisă înainte să vă autentificați. Încercați din nou.",
+  "components.Login.PlexSignIn.popup": "Fereastra de autentificare Plex nu s-a putut deschide. Permiteți ferestrele pop-up pentru acest site și încercați din nou.",
+  "components.Login.PlexSignIn.unreachable": "Plex nu a putut fi accesat. Verificați conexiunea și încercați din nou.",
+  "components.Login.passkey": "Cheie de acces"
 }

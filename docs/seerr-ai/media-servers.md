@@ -13,7 +13,7 @@ Everything is in **Settings → Media Servers**. There is a card for each of the
 - **Plex.** Only the owner (the first account) can connect Plex, because Seerr AI reaches Plex through the owner's Plex account. Sign in with the Plex account that owns the server: it is linked to your account here, and your email address here stays as it is. A Plex account that is already someone else's here is refused. Then pick one of your Plex servers, or enter its address by hand.
 - **Jellyfin and Emby.** Enter the server's address, then either an administrator's username and password, from which Seerr AI makes its own API key, or an API key and the administrator to read libraries as. Tick **This is my account** to link that administrator account to yours, so you can sign in with it too. The **External URL** is the address people use, for Play links.
 
-Then choose the libraries to scan. They are scanned straight away, then on the usual schedule; no restart is needed. Each server's scans are listed by name in **Settings → Jobs & Cache**.
+Then choose the libraries to scan: the window lists the server's libraries as soon as it is connected, films and series apart from music. Music libraries are listed while music is on (**Settings → Music**); otherwise they can be switched on later under the server's **Edit**. They are scanned straight away, then on the usual schedule; no restart is needed. Each server's scans are listed by name in **Settings → Jobs & Cache**.
 
 Once Plex is connected, the Plex extras work whatever the primary server is: Tautulli in **Settings → Services**, **Auto-Import Plex Users** in **Settings → Users**, and Plex watchlists.
 

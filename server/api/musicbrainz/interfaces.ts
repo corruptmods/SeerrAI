@@ -34,6 +34,8 @@ export interface MbArtist {
   genres?: MbGenre[];
   aliases?: { name: string; 'sort-name'?: string; type?: string | null }[];
   relations?: MbUrlRelation[];
+  /** Search results only: the tags people gave it, with their votes. */
+  tags?: MbGenre[];
   /** Search results only: how well it matched, out of 100. */
   score?: number;
 }
@@ -65,6 +67,8 @@ export interface MbReleaseGroup {
   'artist-credit'?: MbArtistCredit[];
   releases?: MbReleaseSummary[];
   genres?: MbGenre[];
+  /** Search results only: how many releases it has. */
+  count?: number;
   /** Search results only: how well it matched, out of 100. */
   score?: number;
 }

@@ -8,12 +8,14 @@ import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
 import PageTitle from '@app/components/Common/PageTitle';
 import SlideCheckbox from '@app/components/Common/SlideCheckbox';
+import CardFooter from '@app/components/Settings/CardFooter';
 import { SERVER_NAMES } from '@app/components/Settings/SettingsMediaServers/names';
 import useLazyModule, { preloadModule } from '@app/hooks/useLazyModule';
 import useToasts from '@app/hooks/useToasts';
 import { useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
+import { hasPlexReturn } from '@app/utils/plexSameTab';
 import { Transition } from '@headlessui/react';
 import {
   ArrowPathIcon,
@@ -28,7 +30,6 @@ import type {
   MediaServerSummary,
 } from '@server/interfaces/api/mediaServerInterfaces';
 import axios from 'axios';
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR, { mutate } from 'swr';
@@ -108,9 +109,6 @@ const Fade = ({
   </Transition>
 );
 
-const footerButton =
-  'relative inline-flex w-0 flex-1 items-center justify-center border border-transparent py-4 text-sm font-medium leading-5 text-gray-200 transition duration-150 ease-in-out hover:text-strong focus:z-10 focus:border-gray-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50';
-
 const SettingsMediaServers = () => {
   const intl = useIntl();
   const { addToast } = useToasts();
@@ -127,6 +125,14 @@ const SettingsMediaServers = () => {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => preloadModule(loadConnect), []);
+
+  // Back from signing in to Plex in this tab, to connect it (the Plex
+  // window could not open): the Connect dialog finishes that.
+  useEffect(() => {
+    if (hasPlexReturn('connect')) {
+      setConnecting('plex');
+    }
+  }, []);
 
   const connectModule = useLazyModule(loadConnect, !!connecting, () => {
     addToast(intl.formatMessage(messages.couldNotOpen), {
@@ -336,54 +342,47 @@ const SettingsMediaServers = () => {
                     }`}
                   />
                 </div>
-                <div className="flex border-t border-gray-500">
-                  {server.connected ? (
-                    <>
-                      <Link
-                        href={`/settings/${server.kind}`}
-                        className={`${footerButton} rounded-bl-lg`}
-                      >
-                        <PencilIcon className="mr-2 h-5 w-5" />
-                        <span>{intl.formatMessage(globalMessages.edit)}</span>
-                      </Link>
-                      {!server.primary && (
-                        <button
-                          type="button"
-                          onClick={() => makePrimary(server)}
-                          className={`${footerButton} border-l-gray-500`}
-                        >
-                          <StarIcon className="mr-2 h-5 w-5" />
-                          <span>
-                            {intl.formatMessage(messages.makePrimary)}
-                          </span>
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setRemoving(server.kind)}
-                        disabled={connectedCount === 1}
-                        title={
-                          connectedCount === 1
-                            ? intl.formatMessage(messages.lastServer)
-                            : undefined
-                        }
-                        className={`${footerButton} rounded-br-lg border-l-gray-500`}
-                      >
-                        <TrashIcon className="mr-2 h-5 w-5" />
-                        <span>{intl.formatMessage(messages.remove)}</span>
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setConnecting(server.kind)}
-                      className={`${footerButton} rounded-b-lg`}
-                    >
-                      <LinkIcon className="mr-2 h-5 w-5" />
-                      <span>{intl.formatMessage(messages.connect)}</span>
-                    </button>
-                  )}
-                </div>
+                <CardFooter
+                  room={3}
+                  actions={
+                    server.connected
+                      ? [
+                          {
+                            label: intl.formatMessage(globalMessages.edit),
+                            icon: PencilIcon,
+                            href: `/settings/${server.kind}`,
+                          },
+                          ...(!server.primary
+                            ? [
+                                {
+                                  label: intl.formatMessage(
+                                    messages.makePrimary
+                                  ),
+                                  icon: StarIcon,
+                                  onClick: () => makePrimary(server),
+                                },
+                              ]
+                            : []),
+                          {
+                            label: intl.formatMessage(messages.remove),
+                            icon: TrashIcon,
+                            onClick: () => setRemoving(server.kind),
+                            disabled: connectedCount === 1,
+                            title:
+                              connectedCount === 1
+                                ? intl.formatMessage(messages.lastServer)
+                                : undefined,
+                          },
+                        ]
+                      : [
+                          {
+                            label: intl.formatMessage(messages.connect),
+                            icon: LinkIcon,
+                            onClick: () => setConnecting(server.kind),
+                          },
+                        ]
+                  }
+                />
               </li>
             );
           })}

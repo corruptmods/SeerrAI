@@ -14,6 +14,11 @@ import {
   artistStatuses,
   markBeingAdded,
 } from '@server/lib/music/library';
+import {
+  rankAlbums,
+  rankArtists,
+  searchWhileTied,
+} from '@server/lib/music/searchRank';
 import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
@@ -49,6 +54,18 @@ musicRoutes.use(requireMusic);
 const SEARCH_ARTISTS = 8;
 const SEARCH_ALBUMS = 12;
 
+/*
+ * How many a search asks MusicBrainz for, to pick the ones shown from: a
+ * page of each, and further pages (up to these many) only while the
+ * results are still tied on the top score. MusicBrainz scores every exact
+ * match the same, so the album most people mean can be far down its list
+ * (see lib/music/searchRank).
+ */
+const ARTIST_PAGE = 25;
+const ARTIST_PAGES = 2;
+const ALBUM_PAGE = 100;
+const ALBUM_PAGES = 3;
+
 /** MusicBrainz lists this many of an artist's albums a page. */
 const ALBUMS_PER_PAGE = 100;
 
@@ -80,11 +97,29 @@ musicRoutes.get('/search', async (req, res, next) => {
   try {
     const mb = musicBrainz();
     const [artists, albums] = await Promise.all([
-      mb.searchArtists(query, { limit: SEARCH_ARTISTS }),
-      mb.searchReleaseGroups(query, { limit: SEARCH_ALBUMS }),
+      searchWhileTied(
+        async (offset) => {
+          const page = await mb.searchArtists(query, {
+            limit: ARTIST_PAGE,
+            offset,
+          });
+          return { count: page.count, items: page.artists ?? [] };
+        },
+        { pageSize: ARTIST_PAGE, maxPages: ARTIST_PAGES }
+      ),
+      searchWhileTied(
+        async (offset) => {
+          const page = await mb.searchReleaseGroups(query, {
+            limit: ALBUM_PAGE,
+            offset,
+          });
+          return { count: page.count, items: page['release-groups'] ?? [] };
+        },
+        { pageSize: ALBUM_PAGE, maxPages: ALBUM_PAGES }
+      ),
     ]);
-    const artistList = artists.artists ?? [];
-    const albumList = albums['release-groups'] ?? [];
+    const albumList = rankAlbums(albums, SEARCH_ALBUMS);
+    const artistList = rankArtists(artists, albumList, SEARCH_ARTISTS);
     const [knownArtists, knownAlbums] = await Promise.all([
       artistStatuses(artistList.map((a) => a.id)),
       albumStatuses(albumList.map((a) => a.id)),

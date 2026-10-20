@@ -131,12 +131,26 @@ export const oidcApplicationUrl = (applicationUrl?: string): string => {
   }
 };
 
+/** Where a provider says what it is, under its issuer: Seerr adds it. */
+const DISCOVERY_PATH = /\/\.well-known\/openid-configuration\/*$/i;
+
+/**
+ * An issuer URL as an admin entered it, ready to use. Authentik and others
+ * show the provider's whole configuration address beside the issuer
+ * (…/.well-known/openid-configuration); pasted, it is taken back to the
+ * issuer it is under, keeping the slash before it, as Authentik's issuer
+ * has one. Anything else is left as it is, without spaces around it.
+ */
+export const issuerFromEntered = (entered: string): string =>
+  entered.trim().replace(DISCOVERY_PATH, '/');
+
 /**
  * An issuer URL as links remember it: without a slash at the end, so the
- * same provider typed with or without one is the same provider.
+ * same provider typed with or without one, or as its configuration
+ * address, is the same provider.
  */
 export const normalizeIssuer = (issuerUrl: string): string =>
-  issuerUrl.trim().replace(/\/+$/, '');
+  issuerFromEntered(issuerUrl).replace(/\/+$/, '');
 
 /**
  * What is wrong with a provider in Settings → Users → Single Sign-On, as a
@@ -162,7 +176,11 @@ export type OidcProblemCode =
   | 'timeout'
   /** The provider calls itself by another issuer URL (`issuer`, if said). */
   | 'issuer-mismatch'
-  /** Nothing at the discovery address (`status`, if it answered). */
+  /**
+   * Nothing at the discovery address (`status`, if it answered). With only
+   * a host entered and a 404, `origin` too: some providers (Authentik) give
+   * each app its own address under it.
+   */
   | 'no-discovery'
   /** Something answered, but not with a discovery document. */
   | 'not-discovery'

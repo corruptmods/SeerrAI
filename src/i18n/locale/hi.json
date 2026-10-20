@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Client Secret डालें।",
   "components.Settings.OidcProviderModal.problemHostNotFound": "{host} नहीं मिला। Issuer URL जाँचें।",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "Issuer URL https:// से शुरू होना चाहिए।",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "प्रदाता अपना Issuer URL {issuer} बताता है। ठीक यही डालें (अंत का स्लैश भी मायने रखता है)।",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "प्रदाता अपना Issuer URL {issuer} बताता है। ठीक यही डालें।",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "प्रदाता कोई दूसरा Issuer URL बताता है। इसे ठीक वैसे ही डालें जैसे प्रदाता दिखाता है।",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "Issuer URL में ? या # वाला हिस्सा नहीं हो सकता।",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "https:// से शुरू होने वाला Issuer URL डालें।",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "सर्वर का डिफ़ॉल्ट इस्तेमाल करें",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "आप सर्वर का डिफ़ॉल्ट इस्तेमाल कर रहे हैं। यहाँ आप जो भी बदलेंगे, वह सिर्फ़ आपके लिए होगा।",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "कोई रंग, जैसे #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "रूप-रंग"
+  "components.UserProfile.UserSettings.menuAppearance": "रूप-रंग",
+  "components.Settings.MusicLibraries.musicOff": "संगीत लाइब्रेरी तब दिखती हैं जब <link>सेटिंग्स → संगीत</link> में संगीत चालू हो।",
+  "components.Settings.OidcProviderModal.problemAppAddress": "कुछ प्रदाता हर ऐप को उसका अपना पता देते हैं: Authentik में यह {origin}/application/o/<slug>ऐप स्लग</slug>/ होता है, और प्रदाता को किसी एप्लिकेशन से जुड़ा होना चाहिए।",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "फिल्में और शृंखला",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "संगीत",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "कोई नहीं मिली।",
+  "components.Login.PlexSignIn.closed": "आपके साइन इन करने से पहले Plex विंडो बंद हो गई। फिर से कोशिश करें।",
+  "components.Login.PlexSignIn.popup": "Plex साइन-इन विंडो नहीं खुल सकी। इस साइट के लिए पॉप-अप की अनुमति दें और फिर से कोशिश करें।",
+  "components.Login.PlexSignIn.unreachable": "Plex तक नहीं पहुँचा जा सका। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
+  "components.Login.passkey": "पासकी"
 }

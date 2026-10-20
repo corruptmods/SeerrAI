@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "أدخل سرّ العميل.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "تعذّر العثور على {host}. تحقّق من رابط المُصدِر.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "يجب أن يبدأ رابط المُصدِر بـ https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "يذكر المزوّد أن رابط المُصدِر الخاص به هو {issuer}. أدخله كما هو تمامًا (الشرطة المائلة في النهاية مهمة).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "يذكر المزوّد أن رابط المُصدِر الخاص به هو {issuer}. أدخله كما هو تمامًا.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "يذكر المزوّد رابط مُصدِر مختلفًا. أدخله تمامًا كما يعرضه المزوّد.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "لا يمكن أن يحتوي رابط المُصدِر على جزء بـ ? أو #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "أدخل رابط المُصدِر، بادئًا بـ https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "استخدام الإعداد الافتراضي للخادم",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "أنت تستخدم الإعداد الافتراضي للخادم. أي شيء تغيّره هنا يخصك وحدك.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "لون مثل #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "المظهر"
+  "components.UserProfile.UserSettings.menuAppearance": "المظهر",
+  "components.Settings.MusicLibraries.musicOff": "تظهر مكتبات الموسيقى بعد تشغيل الموسيقى في <link>الإعدادات ← الموسيقى</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "بعض المزوّدين يعطون كل تطبيق عنوانًا خاصًا به: في Authentik يكون {origin}/application/o/<slug>معرّف التطبيق</slug>/، ويجب ربط المزوّد بتطبيق.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "الأفلام والمسلسلات",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "الموسيقى",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "لم يُعثر على أي منها.",
+  "components.Login.PlexSignIn.closed": "أُغلقت نافذة Plex قبل أن تسجّل الدخول. حاول مرة أخرى.",
+  "components.Login.PlexSignIn.popup": "تعذّر فتح نافذة تسجيل الدخول إلى Plex. اسمح بالنوافذ المنبثقة لهذا الموقع وحاول مرة أخرى.",
+  "components.Login.PlexSignIn.unreachable": "تعذّر الوصول إلى Plex. تحقّق من اتصالك وحاول مرة أخرى.",
+  "components.Login.passkey": "مفتاح مرور"
 }

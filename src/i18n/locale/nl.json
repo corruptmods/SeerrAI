@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Voer het clientgeheim in.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "{host} is niet gevonden. Controleer de issuer-URL.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "De issuer-URL moet beginnen met https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "De provider geeft {issuer} op als zijn issuer-URL. Voer precies die in (een slash aan het eind telt mee).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "De provider geeft {issuer} op als zijn issuer-URL. Voer precies die in.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "De provider geeft een andere issuer-URL op. Voer die precies zo in als de provider hem toont.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "De issuer-URL mag geen ?- of #-deel hebben.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Voer de issuer-URL in, beginnend met https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Standaard van de server gebruiken",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Je gebruikt de standaard van de server. Wat je hier verandert, geldt alleen voor jou.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Een kleur zoals #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Weergave"
+  "components.UserProfile.UserSettings.menuAppearance": "Weergave",
+  "components.Settings.MusicLibraries.musicOff": "Muziekbibliotheken verschijnen zodra muziek aanstaat bij <link>Instellingen → Muziek</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Sommige providers geven elke app een eigen adres: in Authentik is dat {origin}/application/o/<slug>app-slug</slug>/, en de provider moet aan een applicatie gekoppeld zijn.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Films en series",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Muziek",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Geen gevonden.",
+  "components.Login.PlexSignIn.closed": "Het Plex-venster is gesloten voordat je was aangemeld. Probeer het opnieuw.",
+  "components.Login.PlexSignIn.popup": "Het aanmeldvenster van Plex kon niet worden geopend. Sta pop-ups toe voor deze site en probeer het opnieuw.",
+  "components.Login.PlexSignIn.unreachable": "Plex is niet bereikbaar. Controleer je verbinding en probeer het opnieuw.",
+  "components.Login.passkey": "Passkey"
 }

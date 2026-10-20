@@ -3,6 +3,7 @@ import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
+import CardFooter from '@app/components/Settings/CardFooter';
 import CopyButton from '@app/components/Settings/CopyButton';
 import type { ShownOidcProvider } from '@app/components/Settings/OidcProviderModal';
 import useLazyModule from '@app/hooks/useLazyModule';
@@ -240,28 +241,21 @@ const SingleSignOn = () => {
                     )}
                   </div>
                 </div>
-                <div className="border-t border-gray-500">
-                  <div className="-mt-px flex">
-                    <div className="flex w-0 flex-1 border-r border-gray-500">
-                      <button
-                        onClick={() => setEditing({ provider })}
-                        className="relative -mr-px inline-flex w-0 flex-1 items-center justify-center rounded-bl-lg border border-transparent py-4 text-sm font-medium leading-5 text-gray-200 transition duration-150 ease-in-out hover:text-strong focus:z-10 focus:border-gray-500 focus:outline-none"
-                      >
-                        <PencilIcon className="mr-2 h-5 w-5" />
-                        <span>{intl.formatMessage(globalMessages.edit)}</span>
-                      </button>
-                    </div>
-                    <div className="-ml-px flex w-0 flex-1">
-                      <button
-                        onClick={() => setDeleting(provider)}
-                        className="relative inline-flex w-0 flex-1 items-center justify-center rounded-br-lg border border-transparent py-4 text-sm font-medium leading-5 text-gray-200 transition duration-150 ease-in-out hover:text-strong focus:z-10 focus:border-gray-500 focus:outline-none"
-                      >
-                        <TrashIcon className="mr-2 h-5 w-5" />
-                        <span>{intl.formatMessage(globalMessages.delete)}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <CardFooter
+                  room={2}
+                  actions={[
+                    {
+                      label: intl.formatMessage(globalMessages.edit),
+                      icon: PencilIcon,
+                      onClick: () => setEditing({ provider }),
+                    },
+                    {
+                      label: intl.formatMessage(globalMessages.delete),
+                      icon: TrashIcon,
+                      onClick: () => setDeleting(provider),
+                    },
+                  ]}
+                />
               </li>
             ))}
             <li className="col-span-1 h-32 rounded-lg border-2 border-dashed border-gray-400 shadow sm:h-44">

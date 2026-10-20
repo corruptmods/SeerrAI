@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Skriv inn klienthemmeligheten.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "Fant ikke {host}. Sjekk utsteder-URL-en.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "Utsteder-URL-en må begynne med https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Leverandøren oppgir utsteder-URL-en sin som {issuer}. Skriv inn nøyaktig den (en skråstrek på slutten teller).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Leverandøren oppgir utsteder-URL-en sin som {issuer}. Skriv inn nøyaktig den.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Leverandøren oppgir en annen utsteder-URL. Skriv den inn nøyaktig slik leverandøren viser den.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "Utsteder-URL-en kan ikke ha en ?- eller #-del.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Skriv inn utsteder-URL-en, som begynner med https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Bruk serverens standard",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Du bruker serverens standard. Alt du endrer her, gjelder bare deg.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "En farge som #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Utseende"
+  "components.UserProfile.UserSettings.menuAppearance": "Utseende",
+  "components.Settings.MusicLibraries.musicOff": "Musikkbiblioteker vises når musikk er slått på under <link>Innstillinger → Musikk</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Noen leverandører gir hver app sin egen adresse: i Authentik er den {origin}/application/o/<slug>appens slug</slug>/, og leverandøren må være knyttet til en applikasjon.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Filmer og serier",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Musikk",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Fant ingen.",
+  "components.Login.PlexSignIn.closed": "Plex-vinduet ble lukket før du logget inn. Prøv igjen.",
+  "components.Login.PlexSignIn.popup": "Innloggingsvinduet til Plex kunne ikke åpnes. Tillat popup-vinduer for dette nettstedet og prøv igjen.",
+  "components.Login.PlexSignIn.unreachable": "Fikk ikke kontakt med Plex. Sjekk tilkoblingen din og prøv igjen.",
+  "components.Login.passkey": "Passnøkkel"
 }

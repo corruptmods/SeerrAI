@@ -7,12 +7,12 @@ import Dropdown from '@app/components/Common/Dropdown';
 import PageTitle from '@app/components/Common/PageTitle';
 import { singleSignOnOutcome } from '@app/components/Login/singleSignOnMessages';
 import LinkJellyfinQuickConnectModal from '@app/components/UserProfile/UserSettings/UserLinkedAccountsSettings/LinkJellyfinQuickConnectModal';
+import usePlexLogin from '@app/hooks/usePlexLogin';
 import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { SERVER_NAMES, accountServers } from '@app/utils/mediaServerAccounts';
-import PlexOAuth from '@app/utils/plex';
 import { KeyIcon } from '@heroicons/react/24/outline';
 import { TrashIcon } from '@heroicons/react/24/solid';
 import { oidcApplicationUrl } from '@server/constants/oidc';
@@ -22,7 +22,7 @@ import type {
 } from '@server/constants/server';
 import axios from 'axios';
 import { useRouter } from 'next/router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 import LinkJellyfinModal from './LinkJellyfinModal';
@@ -48,8 +48,6 @@ const messages = defineMessages(
     linkAccount: 'Link Account',
   }
 );
-
-const plexOAuth = new PlexOAuth();
 
 const SERVER_LOGOS: Record<MediaServerKind, typeof PlexLogo> = {
   plex: PlexLogo,
@@ -125,35 +123,48 @@ const UserLinkedAccountsSettings = () => {
     }));
   }, [user, mediaServers]);
 
-  const linkPlexAccount = async () => {
-    setError(null);
-    try {
-      const authToken = await plexOAuth.login(
-        settings.currentSettings.plexClientIdentifier
-      );
-      await axios.post(
-        `/api/v1/user/${user?.id}/settings/linked-accounts/plex`,
-        {
-          authToken,
+  // Linking Plex: signing in to Plex (in a window, or in this tab, coming
+  // back here), then linking the account it gave once this page knows
+  // whose settings these are.
+  const [plexToken, setPlexToken] = useState<string>();
+  const plexLogin = usePlexLogin({
+    purpose: 'link',
+    onAuthToken: (authToken) => {
+      setError(null);
+      setPlexToken(authToken);
+    },
+    onError: setError,
+  });
+
+  const userId = user?.id;
+  useEffect(() => {
+    if (!plexToken || !userId) return;
+    setPlexToken(undefined);
+    const link = async () => {
+      try {
+        await axios.post(
+          `/api/v1/user/${userId}/settings/linked-accounts/plex`,
+          { authToken: plexToken }
+        );
+        await revalidateUser();
+      } catch (e) {
+        switch (e?.response?.status) {
+          case 401:
+            setError(intl.formatMessage(messages.plexErrorUnauthorized));
+            break;
+          case 403:
+            setError(intl.formatMessage(messages.plexErrorNoAccess));
+            break;
+          case 422:
+            setError(intl.formatMessage(messages.plexErrorExists));
+            break;
+          default:
+            setError(intl.formatMessage(messages.errorUnknown));
         }
-      );
-      await revalidateUser();
-    } catch (e) {
-      switch (e?.response?.status) {
-        case 401:
-          setError(intl.formatMessage(messages.plexErrorUnauthorized));
-          break;
-        case 403:
-          setError(intl.formatMessage(messages.plexErrorNoAccess));
-          break;
-        case 422:
-          setError(intl.formatMessage(messages.plexErrorExists));
-          break;
-        default:
-          setError(intl.formatMessage(messages.errorUnknown));
       }
-    }
-  };
+    };
+    link();
+  }, [plexToken, userId, revalidateUser, intl]);
 
   // Each connected server, and each single sign-on provider, they have no
   // account linked from yet. A provider is linked by signing in there, by
@@ -166,8 +177,8 @@ const UserLinkedAccountsSettings = () => {
         name: SERVER_NAMES[kind],
         action: () => {
           if (kind === 'plex') {
-            plexOAuth.preparePopup();
-            setTimeout(() => linkPlexAccount(), 1500);
+            setError(null);
+            plexLogin.login();
           } else {
             setJellyfinModalKind(kind);
           }

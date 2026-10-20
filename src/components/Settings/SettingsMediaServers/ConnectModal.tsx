@@ -3,26 +3,33 @@ import Button from '@app/components/Common/Button';
 import { SmallLoadingSpinner } from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
 import LibraryItem from '@app/components/Settings/LibraryItem';
+import {
+  MusicLibrariesOff,
+  musicLibrariesKey,
+  useMusicLibraries,
+} from '@app/components/Settings/MusicLibraries';
 import { SERVER_NAMES } from '@app/components/Settings/SettingsMediaServers/names';
-import useSettings from '@app/hooks/useSettings';
+import usePlexLogin from '@app/hooks/usePlexLogin';
 import defineMessages from '@app/utils/defineMessages';
-import PlexOAuth from '@app/utils/plex';
 import { ArrowPathIcon } from '@heroicons/react/24/solid';
 import type {
   MediaServerAdmin,
   MediaServerSummary,
 } from '@server/interfaces/api/mediaServerInterfaces';
 import type { PlexDevice } from '@server/interfaces/api/plexInterfaces';
-import type { Library } from '@server/lib/settings';
+import type { Library, MusicLibrary } from '@server/lib/settings';
 import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
+import { mutate } from 'swr';
 
 /*
  * Connecting a media server from Settings → Media Servers, loaded only when
  * Connect is pressed. Plex: the owner signs in with Plex, then picks one of
  * their servers. Jellyfin and Emby: the address, then an administrator's
- * sign-in or an API key. Then, for any of them, the libraries to scan.
+ * sign-in or an API key. Then, for any of them, the libraries it has, found
+ * there and then: films and series, and music (while music is on), each to
+ * switch on or off before the dialog is closed.
  */
 
 const messages = defineMessages(
@@ -73,6 +80,9 @@ const messages = defineMessages(
     connecting: 'Connecting…',
     librariesDescription:
       'Choose the libraries Seerr AI scans for titles. They can be changed later from Edit.',
+    filmsAndSeries: 'Films and Series',
+    music: 'Music',
+    noneFound: 'None were found.',
     syncingLibraries: 'Finding libraries…',
     librariesFailed:
       'The libraries could not be listed. Try again, or choose them later from Edit.',
@@ -100,11 +110,8 @@ interface ConnectModalProps {
 
 type Step = 'account' | 'server' | 'libraries';
 
-const plexOAuth = new PlexOAuth();
-
 const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
   const intl = useIntl();
-  const settings = useSettings();
   const kind = server.kind;
   const name = SERVER_NAMES[kind];
   const isPlex = kind === 'plex';
@@ -143,6 +150,8 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
   const [librariesFailed, setLibrariesFailed] = useState(false);
 
   const settingsEndpoint = `/api/v1/settings/${kind}`;
+  // Read once the libraries have been synced, below.
+  const music = useMusicLibraries(settingsEndpoint, !!libraries);
 
   const errorFor = (e: unknown): string => {
     const response = (
@@ -169,13 +178,20 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
     return intl.formatMessage(messages.errorUnknown, { server: name });
   };
 
-  const signInWithPlex = async () => {
+  // Signing in to Plex: in a window, or in this tab, coming back to this
+  // dialog (Settings → Media Servers opens it again), then linking the
+  // account it gave.
+  const plexLogin = usePlexLogin({
+    purpose: 'connect',
+    enabled: isPlex,
+    onAuthToken: (authToken) => linkPlexOwner(authToken),
+    onError: (message) => setError(message),
+  });
+
+  const linkPlexOwner = async (authToken: string) => {
     setError(undefined);
     setBusy(true);
     try {
-      const authToken = await plexOAuth.login(
-        settings.currentSettings.plexClientIdentifier
-      );
       const res = await axios.post<{ plexUsername: string }>(
         '/api/v1/settings/media-servers/plex/account',
         { authToken }
@@ -246,9 +262,19 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
     setLibrariesFailed(false);
     setLibraries(undefined);
     try {
+      // Lists every library the server has now, music ones included.
       const res = await axios.post<Library[]>(
         `${settingsEndpoint}/library/sync`
       );
+      // The music ones as this sync found them, not as last seen.
+      if (music.ready) {
+        const key = musicLibrariesKey(settingsEndpoint);
+        await mutate(
+          key,
+          axios.get<MusicLibrary[]>(key).then((r) => r.data),
+          { revalidate: false }
+        ).catch(() => mutate(key, undefined, { revalidate: false }));
+      }
       setLibraries(res.data);
     } catch {
       setLibrariesFailed(true);
@@ -343,16 +369,63 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
             <span>{intl.formatMessage(messages.syncingLibraries)}</span>
           </div>
         ) : (
-          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {libraries.map((library) => (
-              <LibraryItem
-                key={library.id}
-                name={library.name}
-                isEnabled={library.enabled}
-                onToggle={() => toggleLibrary(library)}
-              />
-            ))}
-          </ul>
+          <div className="space-y-6">
+            <section aria-labelledby="connect-libraries-video">
+              <h4
+                id="connect-libraries-video"
+                className="mb-3 font-medium text-strong"
+              >
+                {intl.formatMessage(messages.filmsAndSeries)}
+              </h4>
+              {libraries.length === 0 ? (
+                <p className="text-sm text-gray-400">
+                  {intl.formatMessage(messages.noneFound)}
+                </p>
+              ) : (
+                <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {libraries.map((library) => (
+                    <LibraryItem
+                      key={library.id}
+                      name={library.name}
+                      isEnabled={library.enabled}
+                      onToggle={() => toggleLibrary(library)}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+            <section aria-labelledby="connect-libraries-music">
+              <h4
+                id="connect-libraries-music"
+                className="mb-3 font-medium text-strong"
+              >
+                {intl.formatMessage(messages.music)}
+              </h4>
+              {!music.ready ? (
+                <MusicLibrariesOff linked />
+              ) : !music.data ? (
+                <div className="flex items-center gap-2 text-gray-300">
+                  <SmallLoadingSpinner />
+                  <span>{intl.formatMessage(messages.syncingLibraries)}</span>
+                </div>
+              ) : music.data.length === 0 ? (
+                <p className="text-sm text-gray-400">
+                  {intl.formatMessage(messages.noneFound)}
+                </p>
+              ) : (
+                <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {music.data.map((library) => (
+                    <LibraryItem
+                      key={library.id}
+                      name={library.name}
+                      isEnabled={library.enabled}
+                      onToggle={() => music.toggle(library)}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
         )}
         <p className="mt-4 text-sm text-gray-400">
           {intl.formatMessage(messages.doneTip)}
@@ -377,20 +450,25 @@ const ConnectModal = ({ server, isOwner, onClose }: ConnectModalProps) => {
             <div className="mt-6 flex flex-wrap gap-3">
               <Button
                 buttonType="primary"
-                disabled={busy}
+                disabled={busy || plexLogin.loading}
                 onClick={() => {
-                  plexOAuth.preparePopup();
-                  setTimeout(() => signInWithPlex(), 1500);
+                  setError(undefined);
+                  plexLogin.login();
                 }}
               >
                 <span>
                   {intl.formatMessage(
-                    busy ? messages.plexSigningIn : messages.plexSignIn
+                    busy || plexLogin.loading
+                      ? messages.plexSigningIn
+                      : messages.plexSignIn
                   )}
                 </span>
               </Button>
               {plexAccount && (
-                <Button disabled={busy} onClick={() => setStep('server')}>
+                <Button
+                  disabled={busy || plexLogin.loading}
+                  onClick={() => setStep('server')}
+                >
                   <span>
                     {intl.formatMessage(messages.plexContinueAs, {
                       name: plexAccount,

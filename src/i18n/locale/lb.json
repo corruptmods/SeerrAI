@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Gitt de Client-Secret an.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "{host} gouf net fonnt. Kontrolléiert d’Aussteller-URL.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "D’Aussteller-URL muss mat https:// ufänken.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "De Provider gëtt seng Aussteller-URL als {issuer} un. Gitt genee déi an (e Schréistrich um Enn zielt mat).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "De Provider gëtt seng Aussteller-URL als {issuer} un. Gitt genee déi an.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "De Provider gëtt eng aner Aussteller-URL un. Gitt se genee esou an, wéi de Provider se weist.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "D’Aussteller-URL däerf keen ?- oder #-Deel hunn.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Gitt d’Aussteller-URL an, mat https:// am Ufank.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Standard vum Server benotzen",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Dir benotzt de Standard vum Server. Alles, wat Dir hei ännert, gëllt nëmme fir Iech.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Eng Faarf wéi #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Ausgesinn"
+  "components.UserProfile.UserSettings.menuAppearance": "Ausgesinn",
+  "components.Settings.MusicLibraries.musicOff": "Musekbibliothéike erschéngen, soubal d’Musek ënner <link>Astellungen → Musek</link> ageschalt ass.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Verschidde Provider ginn all App hir eegen Adress: an Authentik ass et {origin}/application/o/<slug>App-Slug</slug>/, an de Provider muss enger Applikatioun zougeuerdent sinn.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Filmer a Serien",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Musek",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Keng fonnt.",
+  "components.Login.PlexSignIn.closed": "D’Plex-Fënster gouf zougemaach, ier Dir Iech ugemellt hutt. Probéiert et nach eng Kéier.",
+  "components.Login.PlexSignIn.popup": "D’Plex-Umeldefënster konnt net opgemaach ginn. Erlaabt Pop-ups fir dëse Site a probéiert et nach eng Kéier.",
+  "components.Login.PlexSignIn.unreachable": "Plex ass net erreechbar. Kontrolléiert Är Verbindung a probéiert et nach eng Kéier.",
+  "components.Login.passkey": "Passkey"
 }

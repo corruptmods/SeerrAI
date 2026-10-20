@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Vnesite skrivnost odjemalca.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "{host} ni bilo mogoče najti. Preverite URL izdajatelja.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "URL izdajatelja se mora začeti s https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Ponudnik navaja svoj URL izdajatelja kot {issuer}. Vnesite natanko tega (poševnica na koncu šteje).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Ponudnik navaja svoj URL izdajatelja kot {issuer}. Vnesite natanko tega.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Ponudnik navaja drugačen URL izdajatelja. Vnesite ga natanko tako, kot ga prikazuje ponudnik.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "URL izdajatelja ne sme imeti dela s ? ali #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Vnesite URL izdajatelja, ki se začne s https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Uporabi privzeto nastavitev strežnika",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Uporabljate privzeto nastavitev strežnika. Karkoli tukaj spremenite, velja samo za vas.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Barva, kot je #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Videz"
+  "components.UserProfile.UserSettings.menuAppearance": "Videz",
+  "components.Settings.MusicLibraries.musicOff": "Glasbene knjižnice se prikažejo, ko je glasba vklopljena v <link>Nastavitve → Glasba</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Nekateri ponudniki vsaki aplikaciji dajo svoj naslov: v Authentiku je to {origin}/application/o/<slug>slug aplikacije</slug>/, ponudnik pa mora biti povezan z aplikacijo.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Filmi in serije",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Glasba",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Nobena ni bila najdena.",
+  "components.Login.PlexSignIn.closed": "Okno Plex se je zaprlo, preden ste se prijavili. Poskusite znova.",
+  "components.Login.PlexSignIn.popup": "Okna za prijavo v Plex ni bilo mogoče odpreti. Dovolite pojavna okna za to spletno mesto in poskusite znova.",
+  "components.Login.PlexSignIn.unreachable": "Plex ni dosegljiv. Preverite povezavo in poskusite znova.",
+  "components.Login.passkey": "Ključ za dostop"
 }

@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Sisesta Client Secret.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "Serverit {host} ei leitud. Kontrolli väljastaja URL-i.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "Väljastaja URL peab algama https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Teenusepakkuja annab oma väljastaja URL-iks {issuer}. Sisesta täpselt see (lõpus olev kaldkriips loeb).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Teenusepakkuja annab oma väljastaja URL-iks {issuer}. Sisesta täpselt see.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Teenusepakkuja annab teise väljastaja URL-i. Sisesta see täpselt nii, nagu teenusepakkuja seda näitab.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "Väljastaja URL-is ei tohi olla ?- ega #-osa.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Sisesta väljastaja URL, mis algab https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Kasuta serveri vaikeseadet",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Kasutad serveri vaikeseadet. Kõik, mida siin muudad, kehtib ainult sulle.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Värv nagu #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Välimus"
+  "components.UserProfile.UserSettings.menuAppearance": "Välimus",
+  "components.Settings.MusicLibraries.musicOff": "Muusikakogud ilmuvad, kui muusika on sisse lülitatud jaotises <link>Seaded → Muusika</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Mõni teenusepakkuja annab igale rakendusele oma aadressi: Authentikus on see {origin}/application/o/<slug>rakenduse slug</slug>/ ja teenusepakkuja peab olema rakendusega seotud.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Filmid ja sarjad",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Muusika",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Ühtegi ei leitud.",
+  "components.Login.PlexSignIn.closed": "Plexi aken suleti enne, kui sisse logisid. Proovi uuesti.",
+  "components.Login.PlexSignIn.popup": "Plexi sisselogimisakent ei õnnestunud avada. Luba selle saidi hüpikaknad ja proovi uuesti.",
+  "components.Login.PlexSignIn.unreachable": "Plexiga ei õnnestunud ühendust saada. Kontrolli ühendust ja proovi uuesti.",
+  "components.Login.passkey": "Pääsuvõti"
 }

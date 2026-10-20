@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Εισαγάγετε το Client Secret.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "Δεν βρέθηκε το {host}. Ελέγξτε το URL του εκδότη.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "Το URL του εκδότη πρέπει να ξεκινά με https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Ο πάροχος δηλώνει ως URL εκδότη το {issuer}. Εισαγάγετε ακριβώς αυτό (η κάθετος στο τέλος μετράει).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Ο πάροχος δηλώνει ως URL εκδότη το {issuer}. Εισαγάγετε ακριβώς αυτό.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Ο πάροχος δηλώνει διαφορετικό URL εκδότη. Εισαγάγετέ το ακριβώς όπως το εμφανίζει ο πάροχος.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "Το URL του εκδότη δεν μπορεί να έχει τμήμα με ? ή #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Εισαγάγετε το URL του εκδότη, που ξεκινά με https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Χρήση της προεπιλογής του διακομιστή",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Χρησιμοποιείτε την προεπιλογή του διακομιστή. Ό,τι αλλάξετε εδώ ισχύει μόνο για εσάς.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Ένα χρώμα όπως #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Εμφάνιση"
+  "components.UserProfile.UserSettings.menuAppearance": "Εμφάνιση",
+  "components.Settings.MusicLibraries.musicOff": "Οι μουσικές βιβλιοθήκες εμφανίζονται μόλις ενεργοποιηθεί η μουσική στις <link>Ρυθμίσεις → Μουσική</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Ορισμένοι πάροχοι δίνουν σε κάθε εφαρμογή τη δική της διεύθυνση: στο Authentik είναι {origin}/application/o/<slug>slug εφαρμογής</slug>/, και ο πάροχος πρέπει να είναι συνδεδεμένος με μια εφαρμογή.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Ταινίες και σειρές",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Μουσική",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Δεν βρέθηκαν.",
+  "components.Login.PlexSignIn.closed": "Το παράθυρο του Plex έκλεισε πριν συνδεθείτε. Δοκιμάστε ξανά.",
+  "components.Login.PlexSignIn.popup": "Δεν ήταν δυνατό να ανοίξει το παράθυρο σύνδεσης του Plex. Επιτρέψτε τα αναδυόμενα παράθυρα για αυτόν τον ιστότοπο και δοκιμάστε ξανά.",
+  "components.Login.PlexSignIn.unreachable": "Δεν ήταν δυνατή η πρόσβαση στο Plex. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
+  "components.Login.passkey": "Passkey"
 }

@@ -26,6 +26,12 @@ import type {
   StatusBase,
 } from '@server/lib/scanners/baseScanner';
 import BaseScanner from '@server/lib/scanners/baseScanner';
+import type { ItemLabel } from '@server/lib/scanners/unidentified';
+import {
+  NotIdentifiedError,
+  UnidentifiedTitles,
+  nameOf,
+} from '@server/lib/scanners/unidentified';
 import type { Library } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { uniqWith } from 'lodash';
@@ -47,6 +53,25 @@ const resolutionUnknown = (item: {
     )
   );
 
+/**
+ * An item as the log names it: never the server's whole record. An episode
+ * or season (from a recently added scan) is named by its series, whose id
+ * the scan uses.
+ */
+const labelOf = (item: JellyfinLibraryItem): ItemLabel =>
+  item.SeriesName && (item.Type === 'Episode' || item.Type === 'Season')
+    ? { name: item.SeriesName, type: 'Series', id: item.SeriesId ?? item.Id }
+    : {
+        name: item.Name,
+        ...(item.ProductionYear ? { year: item.ProductionYear } : {}),
+        type: item.Type,
+        id: item.Id,
+      };
+
+/** Whether the server has given the title any id to match it by. */
+const hasAnyId = (ids: JellyfinLibraryItemExtended['ProviderIds']): boolean =>
+  !!(ids.Tmdb || ids.TheMovieDb || ids.Imdb || ids.Tvdb || ids.AniDB);
+
 interface JellyfinSyncStatus extends StatusBase {
   currentLibrary: Library;
   libraries: Library[];
@@ -63,6 +88,8 @@ class JellyfinScanner
   private processedAnidbSeason: Map<number, Map<number, number>>;
   /** Jellyfin or Emby: the server this scanner reads. */
   public readonly kind: JellyfinFamilyKind;
+  /** Titles this scan skipped because the server hasn't identified them. */
+  private unidentified: UnidentifiedTitles;
 
   constructor({
     isRecentOnly,
@@ -71,6 +98,28 @@ class JellyfinScanner
     super(`${serverName(kind)} Sync`);
     this.isRecentOnly = isRecentOnly ?? false;
     this.kind = kind;
+    this.unidentified = new UnidentifiedTitles({
+      server: serverName(kind),
+      verb: 'identified',
+      hint: "refresh the library's metadata, or use Identify on a title",
+    });
+  }
+
+  /** A title the server hasn't identified yet: noted, counted, not an error. */
+  private skipUnidentified(e: NotIdentifiedError) {
+    this.log(this.unidentified.add(e.kind, e.item), 'debug', {
+      item: e.item,
+    });
+  }
+
+  /** A title that failed for a real reason: one line, naming it. */
+  private failed(item: JellyfinLibraryItem, e: Error) {
+    const label = labelOf(item);
+    this.log(
+      `Failed to process ${serverName(this.kind)} item ${nameOf(label)}`,
+      'error',
+      { errorMessage: e.message, item: label }
+    );
   }
 
   private async extractMovieIds(jellyfinitem: JellyfinLibraryItem): Promise<{
@@ -82,7 +131,7 @@ class JellyfinScanner
 
     if (!metadata?.Id) {
       this.log('No Id metadata for this title. Skipping', 'debug', {
-        jellyfinItemId: jellyfinitem.Id,
+        item: labelOf(jellyfinitem),
       });
       return null;
     }
@@ -107,6 +156,12 @@ class JellyfinScanner
     }
 
     if (!tmdbId) {
+      // No id at all: the server hasn't identified it yet, which is normal
+      // while it works through new files. An AniDB id the anime list has no
+      // TMDB entry for is a real gap, and stays an error.
+      if (!hasAnyId(metadata.ProviderIds)) {
+        throw new NotIdentifiedError('film', labelOf(metadata));
+      }
       throw new Error('Unable to find TMDb ID');
     }
 
@@ -121,7 +176,7 @@ class JellyfinScanner
       );
       if (!season) {
         this.log('No season found for anidb movie', 'debug', {
-          jellyfinitem,
+          item: labelOf(jellyfinitem),
         });
         return null;
       }
@@ -131,14 +186,14 @@ class JellyfinScanner
       );
       if (!episodes[0]) {
         this.log('No episode found for anidb movie', 'debug', {
-          jellyfinitem,
+          item: labelOf(jellyfinitem),
         });
         return null;
       }
       metadata = await this.jfClient.getItemData(episodes[0].Id);
       if (!metadata) {
         this.log('No metadata found for anidb movie', 'debug', {
-          jellyfinitem,
+          item: labelOf(jellyfinitem),
         });
         return null;
       }
@@ -200,14 +255,11 @@ class JellyfinScanner
         });
       }
     } catch (e) {
-      this.log(
-        `Failed to process Jellyfin item, id: ${jellyfinitem.Id}`,
-        'error',
-        {
-          errorMessage: e.message,
-          jellyfinitem,
-        }
-      );
+      if (e instanceof NotIdentifiedError) {
+        this.skipUnidentified(e);
+      } else {
+        this.failed(jellyfinitem, e);
+      }
     }
   }
 
@@ -255,9 +307,13 @@ class JellyfinScanner
 
       if (!metadata?.Id) {
         this.log('No Id metadata for this title. Skipping', 'debug', {
-          jellyfinItemId: jellyfinitem.Id,
+          item: labelOf(jellyfinitem),
         });
         return;
+      }
+
+      if (!hasAnyId(metadata.ProviderIds)) {
+        throw new NotIdentifiedError('series', labelOf(metadata));
       }
 
       if (metadata.ProviderIds.Tmdb || metadata.ProviderIds.TheMovieDb) {
@@ -267,10 +323,12 @@ class JellyfinScanner
               metadata.ProviderIds.Tmdb || metadata.ProviderIds.TheMovieDb
             ),
           });
-        } catch {
-          this.log('Unable to find TMDb ID for this title.', 'debug', {
-            jellyfinitem,
-          });
+        } catch (e) {
+          this.log(
+            `Couldn't find ${nameOf(labelOf(metadata))} on TMDB by its TMDB id`,
+            'debug',
+            { item: labelOf(metadata), errorMessage: e.message }
+          );
         }
       }
 
@@ -279,10 +337,12 @@ class JellyfinScanner
           tvShow = await this.getTvShow({
             tvdbId: Number(metadata.ProviderIds.Tvdb),
           });
-        } catch {
-          this.log('Unable to find TVDb ID for this title.', 'debug', {
-            jellyfinitem,
-          });
+        } catch (e) {
+          this.log(
+            `Couldn't find ${nameOf(labelOf(metadata))} on TMDB by its TVDB id`,
+            'debug',
+            { item: labelOf(metadata), errorMessage: e.message }
+          );
         }
       }
 
@@ -296,10 +356,12 @@ class JellyfinScanner
             tvShow = await this.tmdb.getShowByTvdbIdForScan({
               tvdbId: result.tvdbId,
             });
-          } catch {
-            this.log('Unable to find AniDB ID for this title.', 'debug', {
-              jellyfinitem,
-            });
+          } catch (e) {
+            this.log(
+              `Couldn't find ${nameOf(labelOf(metadata))} on TMDB by its AniDB id`,
+              'debug',
+              { item: labelOf(metadata), errorMessage: e.message }
+            );
           }
         }
         // With AniDB we can have mixed libraries with movies in a "show" library
@@ -461,19 +523,15 @@ class JellyfinScanner
         this.log(
           `No information found for the show: ${metadata.Name}`,
           'debug',
-          {
-            jellyfinitem,
-          }
+          { item: labelOf(metadata) }
         );
       }
     } catch (e) {
-      this.log(
-        `Failed to process Jellyfin item. Id: ${
-          jellyfinitem.SeriesId ?? jellyfinitem.SeasonId ?? jellyfinitem.Id
-        }`,
-        'error',
-        { errorMessage: e.message, jellyfinitem }
-      );
+      if (e instanceof NotIdentifiedError) {
+        this.skipUnidentified(e);
+      } else {
+        this.failed(jellyfinitem, e);
+      }
     }
   }
 
@@ -496,6 +554,7 @@ class JellyfinScanner
     }
 
     const sessionId = this.startRun();
+    this.unidentified.clear();
 
     try {
       const admin = await jellyfinAdmin(this.kind);
@@ -556,6 +615,11 @@ class JellyfinScanner
           this.items = await this.jfClient.getLibraryContents(library.id);
           await this.loop(this.processItem.bind(this), { sessionId });
         }
+      }
+
+      const skipped = this.unidentified.summary();
+      if (skipped) {
+        this.log(skipped.message, 'info', { examples: skipped.examples });
       }
 
       this.log(

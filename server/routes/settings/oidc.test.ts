@@ -166,17 +166,21 @@ describe('single sign-on settings', () => {
     assert.equal(ok.status, 200, ok.text);
     assert.equal(ok.body.issuer, fake.issuer);
 
-    const slash = await request(app)
+    fake.issuerSaid = 'https://elsewhere.example/realms/test';
+    const elsewhere = await request(app)
       .post('/api/v1/settings/oidc/test')
-      .send(body({ issuerUrl: `${fake.issuer}/` }));
-    assert.equal(slash.status, 400);
+      .send(body());
+    assert.equal(elsewhere.status, 400);
     assert.equal(
-      slash.body.message,
-      `The provider gives its issuer URL as ${fake.issuer}. Enter exactly that (a slash at the end counts).`
+      elsewhere.body.message,
+      'The provider gives its issuer URL as https://elsewhere.example/realms/test. Enter exactly that.'
     );
     // And as a code the settings page puts in the admin's language.
-    assert.equal(slash.body.problem, 'issuer-mismatch');
-    assert.deepEqual(slash.body.params, { issuer: fake.issuer });
+    assert.equal(elsewhere.body.problem, 'issuer-mismatch');
+    assert.deepEqual(elsewhere.body.params, {
+      issuer: 'https://elsewhere.example/realms/test',
+    });
+    fake.issuerSaid = undefined;
 
     const wrong = await request(app)
       .post('/api/v1/settings/oidc/test')
@@ -202,6 +206,128 @@ describe('single sign-on settings', () => {
     assert.match(nobody.body.message, /127\.0\.0\.1:1/);
     assert.equal(nobody.body.problem, 'unreachable');
     assert.deepEqual(nobody.body.params, { host: '127.0.0.1:1' });
+  });
+
+  it('takes the issuer with or without a slash at the end, as the provider gives it', async () => {
+    const slash = await request(app)
+      .post('/api/v1/settings/oidc/test')
+      .send(body({ issuerUrl: `${fake.issuer}/` }));
+    assert.equal(slash.status, 200, slash.text);
+    assert.deepEqual(slash.body, {
+      issuer: fake.issuer,
+      issuerUrl: fake.issuer,
+    });
+
+    const saved = await add({ issuerUrl: `${fake.issuer}/` });
+    assert.equal(saved.status, 201, saved.text);
+    assert.equal(saved.body.issuerUrl, fake.issuer);
+    assert.equal(getSettings().oidc.providers[0].issuerUrl, fake.issuer);
+
+    // Authentik's issuer ends in a slash.
+    getSettings().oidc = { providers: [] };
+    fake.issuerSaid = `${fake.issuer}/`;
+    const authentik = await add({ name: 'Other', issuerUrl: fake.issuer });
+    assert.equal(authentik.status, 201, authentik.text);
+    assert.equal(authentik.body.issuerUrl, `${fake.issuer}/`);
+  });
+
+  it('takes the whole configuration address, and keeps the issuer under it', async () => {
+    const discovery = `${fake.issuer}/.well-known/openid-configuration`;
+
+    const tested = await request(app)
+      .post('/api/v1/settings/oidc/test')
+      .send(body({ issuerUrl: discovery }));
+    assert.equal(tested.status, 200, tested.text);
+    assert.deepEqual(tested.body, {
+      issuer: fake.issuer,
+      issuerUrl: fake.issuer,
+    });
+
+    const added = await add({ issuerUrl: discovery });
+    assert.equal(added.status, 201, added.text);
+    assert.equal(added.body.issuerUrl, fake.issuer);
+    assert.equal(getSettings().oidc.providers[0].issuerUrl, fake.issuer);
+
+    // Authentik's, with its slash, pasted with one at the end too.
+    getSettings().oidc = { providers: [] };
+    fake.issuerSaid = `${fake.issuer}/`;
+    const authentik = await add({
+      name: 'Other',
+      issuerUrl: ` ${discovery}/ `,
+    });
+    assert.equal(authentik.status, 201, authentik.text);
+    assert.equal(authentik.body.issuerUrl, `${fake.issuer}/`);
+    const [saved] = getSettings().oidc.providers;
+    assert.equal(saved.issuerUrl, `${fake.issuer}/`);
+    assert.equal(saved.clientSecret, fake.clientSecret);
+
+    const res = await request(app).get('/api/v1/settings/oidc');
+    assert.equal(res.body.providers[0].issuerUrl, `${fake.issuer}/`);
+  });
+
+  it('keeps a saved provider as it was when its configuration address is pasted', async () => {
+    await add();
+    const links = getRepository(OidcLink);
+    const user = await getRepository(User).findOneByOrFail({ id: 1 });
+    // A link from before issuers were recorded, and one made since.
+    await links.save(new OidcLink({ user, provider: 'authentik', sub: 'old' }));
+    const other = await getRepository(User).save(
+      new User({ email: 'sam@example.com', username: 'Sam', avatar: '' })
+    );
+    await links.save(
+      new OidcLink({
+        user: other,
+        provider: 'authentik',
+        sub: 'new',
+        issuer: fake.issuer,
+      })
+    );
+
+    // The secret left blank: it is the same provider, so it is kept.
+    const pasted = await request(app)
+      .put('/api/v1/settings/oidc/authentik')
+      .send(
+        body({
+          clientSecret: '',
+          issuerUrl: `${fake.issuer}/.well-known/openid-configuration`,
+        })
+      );
+    assert.equal(pasted.status, 200, pasted.text);
+    const [saved] = getSettings().oidc.providers;
+    assert.equal(saved.issuerUrl, fake.issuer);
+    assert.equal(saved.clientSecret, fake.clientSecret);
+    // Not a new issuer: nobody's link is touched.
+    assert.equal((await links.findOneByOrFail({ sub: 'old' })).issuer, null);
+    assert.equal(
+      (await links.findOneByOrFail({ sub: 'new' })).issuer,
+      fake.issuer
+    );
+
+    // One saved without a configuration address stays exactly as it is.
+    const untouched = await request(app)
+      .put('/api/v1/settings/oidc/authentik')
+      .send(body({ clientSecret: '', name: 'Renamed' }));
+    assert.equal(untouched.status, 200, untouched.text);
+    assert.equal(getSettings().oidc.providers[0].issuerUrl, fake.issuer);
+    assert.equal((await links.findOneByOrFail({ sub: 'old' })).issuer, null);
+  });
+
+  it('says where Authentik keeps it when only the host is entered', async () => {
+    const origin = new URL(fake.issuer).origin;
+    for (const issuerUrl of [origin, `${origin}/`]) {
+      const res = await request(app)
+        .post('/api/v1/settings/oidc/test')
+        .send(body({ issuerUrl }));
+      assert.equal(res.status, 400);
+      assert.equal(res.body.problem, 'no-discovery');
+      assert.deepEqual(res.body.params, { status: 404, origin });
+      assert.match(
+        res.body.message,
+        new RegExp(
+          `in Authentik it's ${origin}/application/o/<app slug>/, and the provider must be attached to an application\\.$`
+        )
+      );
+    }
   });
 
   it('only takes an issuer over https, but for one on this machine', async () => {

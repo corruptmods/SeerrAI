@@ -25,6 +25,7 @@ import { User } from '@server/entity/User';
 import { plexFullScanner } from '@server/lib/scanners/plex';
 import type { Library, RadarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import logger from '@server/logger';
 import { setupTestDb } from '@server/test/db';
 import { runWithMockTimers } from '@server/test/runWithMockTimers';
 import assert from 'node:assert/strict';
@@ -407,6 +408,148 @@ describe('Plex Scanner', () => {
 
       assert.strictEqual(media.status, MediaStatus.AVAILABLE);
       assert.notStrictEqual(media.status4k, MediaStatus.AVAILABLE);
+    });
+  });
+
+  /*
+   * Plex lists a file before its agent has matched it. Such a title is
+   * skipped quietly and counted; the scan says once, at the end, how many.
+   */
+  describe('titles Plex has not matched yet', () => {
+    type Line = {
+      level: string;
+      message: string;
+      meta: Record<string, unknown>;
+    };
+    let lines: Line[] = [];
+    let restore: (() => void)[] = [];
+    const resolveImdb = Object.getOwnPropertyDescriptor(
+      plexFullScanner.tmdb,
+      'resolveImdbIdForScan'
+    );
+
+    beforeEach(() => {
+      lines = [];
+      restore = (['error', 'warn', 'info', 'debug'] as const).map((level) => {
+        const capture = mock.method(
+          logger,
+          level,
+          (message: string, meta: Record<string, unknown> = {}) => {
+            lines.push({ level, message, meta });
+            return logger;
+          }
+        );
+        return () => capture.mock.restore();
+      });
+      configurePlexWithLibrary([movieLibrary]);
+      getLibrariesImpl = async () => [
+        {
+          key: movieLibrary.id,
+          title: 'Movies',
+          type: 'movie',
+          agent: 'tv.plex.agents.movie',
+        },
+      ];
+      Object.defineProperty(plexFullScanner.tmdb, 'resolveImdbIdForScan', {
+        value: async () => {
+          throw new Error('[TMDB] Failed to find media using external IMDb ID');
+        },
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      restore.forEach((undo) => undo());
+      if (resolveImdb) {
+        Object.defineProperty(
+          plexFullScanner.tmdb,
+          'resolveImdbIdForScan',
+          resolveImdb
+        );
+      }
+    });
+
+    const item = (
+      ratingKey: string,
+      title: string,
+      guid: string,
+      year?: number
+    ): PlexLibraryItem => ({
+      ratingKey,
+      title,
+      year,
+      guid,
+      addedAt: 1700000000,
+      updatedAt: 1700000000,
+      type: 'movie',
+      Media: [],
+    });
+
+    it('skips them without an error each, and says how many once', async () => {
+      getLibraryContentsImpl = async () => ({
+        totalSize: 4,
+        items: [
+          // Never matched (the "none" agent): no id at all.
+          item('901', 'Home Video', 'local://901', 2020),
+          // The new agent before it has matched: no Guid list yet.
+          item('902', 'Blood', 'plex://movie/5d776'),
+          // Matched, but TMDB can't be asked: a real failure.
+          item('903', 'Gone Film', 'imdb://tt0000003', 1999),
+          { ...fakePlexMovieItem('904', 6210, ['1080']), title: 'Fine' },
+        ],
+      });
+      getMetadataImpl = async (key) =>
+        key === '902'
+          ? ({ ...item('902', 'Blood', 'plex://movie/5d776') } as never)
+          : undefined;
+
+      await runWithMockTimers(() => plexFullScanner.run());
+
+      const all = lines
+        .map((l) => `${l.message} ${JSON.stringify(l.meta)}`)
+        .join('\n');
+      const errors = lines.filter((l) => l.level === 'error');
+      assert.equal(errors.length, 1, all);
+      assert.equal(errors[0].message, 'Failed to process Plex media');
+      assert.deepEqual(errors[0].meta, {
+        label: 'Plex Scan',
+        errorMessage: '[TMDB] Failed to find media using external IMDb ID',
+        item: { name: 'Gone Film', year: 1999, type: 'movie', id: '903' },
+      });
+
+      const summaries = lines.filter((l) => /matched by Plex/.test(l.message));
+      assert.equal(summaries.length, 1);
+      assert.equal(summaries[0].level, 'info');
+      assert.equal(
+        summaries[0].message,
+        "Plex: 2 films aren't matched by Plex yet, so they were skipped. They'll be picked up once Plex has matched them (in Plex: refresh the library's metadata, or use Match on a title)."
+      );
+      assert.deepEqual([...(summaries[0].meta.examples as string[])].sort(), [
+        'Blood',
+        'Home Video (2020)',
+      ]);
+      const skipped = lines.filter((l) => l.message.startsWith('Skipped '));
+      assert.ok(skipped.every((l) => l.level === 'debug'));
+      assert.deepEqual(
+        skipped
+          .map((l) => l.meta.item)
+          .sort((a, b) =>
+            String((a as { id: string }).id).localeCompare(
+              String((b as { id: string }).id)
+            )
+          ),
+        [
+          { name: 'Home Video', year: 2020, type: 'movie', id: '901' },
+          { name: 'Blood', type: 'movie', id: '902' },
+        ]
+      );
+
+      // What is stored is as before.
+      const media = await getRepository(Media).find();
+      assert.deepEqual(
+        media.map((m) => m.tmdbId),
+        [6210]
+      );
     });
   });
 });

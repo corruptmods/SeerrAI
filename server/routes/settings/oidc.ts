@@ -1,6 +1,7 @@
 import type { OidcProblem } from '@server/constants/oidc';
 import {
   DEFAULT_OIDC_SCOPES,
+  issuerFromEntered,
   normalizeIssuer,
   oidcApplicationUrl,
   oidcCallbackUrl,
@@ -41,9 +42,12 @@ const oidcSettingsRoutes = Router();
 const refuse = (res: Response, problem: OidcProblem) =>
   res.status(400).json({ message: problemText(problem), ...problem });
 
+/** The issuer URL, or the provider's configuration address pasted. */
+const issuerUrl = z.string().trim().min(1).transform(issuerFromEntered);
+
 const providerBody = z.object({
   name: z.string().trim().min(1).max(60),
-  issuerUrl: z.string().trim().min(1),
+  issuerUrl,
   clientId: z.string().trim().min(1),
   clientSecret: z.string().default(''),
   logoUrl: z.string().trim().default(''),
@@ -61,7 +65,7 @@ const providerBody = z.object({
 
 const testBody = z.object({
   id: z.string().optional(),
-  issuerUrl: z.string().trim().min(1),
+  issuerUrl,
   clientId: z.string().trim().min(1),
   clientSecret: z.string().default(''),
 });
@@ -142,14 +146,28 @@ const takenIds = async (): Promise<string[]> => {
   ];
 };
 
+type CheckTarget = Pick<
+  OidcProviderSettings,
+  'issuerUrl' | 'clientId' | 'clientSecret'
+>;
+
+/** What the provider calls itself, asked afresh. */
+const issuerOf = async (target: CheckTarget): Promise<string> =>
+  (await discover(target, { fresh: true })).serverMetadata().issuer;
+
 /**
  * Checks a provider can be used: its issuer URL is acceptable, a secret is
- * there, and the provider answers. Gives what the provider calls itself, or
- * what is wrong in plain words.
+ * there, and the provider answers. Gives what the provider calls itself and
+ * the issuer URL to keep, or what is wrong in plain words.
+ *
+ * An issuer URL that differs from the provider's own only by a slash at the
+ * end is the provider's: links already treat the two as one, and an admin
+ * pasting the configuration address can't tell which the provider uses
+ * (Authentik's has one, Keycloak's doesn't).
  */
 const check = async (
-  target: Pick<OidcProviderSettings, 'issuerUrl' | 'clientId' | 'clientSecret'>
-): Promise<{ issuer: string } | OidcProblem> => {
+  target: CheckTarget
+): Promise<{ issuer: string; issuerUrl: string } | OidcProblem> => {
   const problem = issuerUrlProblem(target.issuerUrl);
   if (problem) {
     return problem;
@@ -157,18 +175,32 @@ const check = async (
   if (!target.clientSecret) {
     return { problem: 'client-secret' };
   }
+  let found: OidcProblem;
   try {
-    const config = await discover(target, { fresh: true });
-    return { issuer: config.serverMetadata().issuer };
+    return { issuer: await issuerOf(target), issuerUrl: target.issuerUrl };
   } catch (e) {
-    const found = discoveryProblem(e, target.issuerUrl);
-    logger.warn('Single sign-on provider check failed', {
-      label: 'Settings',
-      issuerUrl: target.issuerUrl,
-      problem: problemText(found),
-    });
-    return found;
+    found = discoveryProblem(e, target.issuerUrl);
   }
+  const said =
+    found.problem === 'issuer-mismatch' ? found.params?.issuer : undefined;
+  if (
+    typeof said === 'string' &&
+    said !== target.issuerUrl &&
+    normalizeIssuer(said) === normalizeIssuer(target.issuerUrl)
+  ) {
+    try {
+      const own = { ...target, issuerUrl: said };
+      return { issuer: await issuerOf(own), issuerUrl: said };
+    } catch (e) {
+      found = discoveryProblem(e, said);
+    }
+  }
+  logger.warn('Single sign-on provider check failed', {
+    label: 'Settings',
+    issuerUrl: target.issuerUrl,
+    problem: problemText(found),
+  });
+  return found;
 };
 
 oidcSettingsRoutes.get('/', async (_req, res) => {
@@ -231,7 +263,9 @@ const toSave = async (
     requiredClaims: requiredClaimsFrom(body.requiredClaims),
   };
   const result = await check(provider);
-  return 'problem' in result ? result : provider;
+  return 'problem' in result
+    ? result
+    : { ...provider, issuerUrl: result.issuerUrl };
 };
 
 oidcSettingsRoutes.post('/', async (req, res) => {

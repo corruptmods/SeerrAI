@@ -21,17 +21,24 @@ import Media from '@server/entity/Media';
 import MediaRequest from '@server/entity/MediaRequest';
 import Season from '@server/entity/Season';
 import { User } from '@server/entity/User';
-import { jellyfinFullScanner } from '@server/lib/scanners/jellyfin';
+import {
+  embyFullScanner,
+  embyRecentScanner,
+  jellyfinFullScanner,
+} from '@server/lib/scanners/jellyfin';
 import type {
   Library,
   RadarrSettings,
   SonarrSettings,
 } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import logger from '@server/logger';
 import { setupTestDb } from '@server/test/db';
 import { runWithMockTimers } from '@server/test/runWithMockTimers';
 import assert from 'node:assert/strict';
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 // --- Mock animeList.sync to avoid filesystem/network I/O in tests ---
 Object.defineProperty(animeList, 'sync', {
@@ -121,13 +128,15 @@ Object.defineProperty(TheMovieDb.prototype, 'getTvShowForScan', {
 });
 
 // both are assigned in the constructor, so the prototype stubs miss the
-// instance jellyfinFullScanner built when it was first imported
-for (const method of ['getTvShow', 'getTvShowForScan'] as const) {
-  Object.defineProperty(jellyfinFullScanner.tmdb, method, {
-    value: async (args: { tvId: number; language?: string }) =>
-      getTvShowImpl(args),
-    configurable: true,
-  });
+// instances the scanners built when they were first imported
+for (const scanner of [jellyfinFullScanner, embyFullScanner]) {
+  for (const method of ['getTvShow', 'getTvShowForScan'] as const) {
+    Object.defineProperty(scanner.tmdb, method, {
+      value: async (args: { tvId: number; language?: string }) =>
+        getTvShowImpl(args),
+      configurable: true,
+    });
+  }
 }
 
 setupTestDb();
@@ -726,6 +735,244 @@ describe('Jellyfin Scanner', () => {
       assert.strictEqual(season?.status, MediaStatus.PARTIALLY_AVAILABLE);
       assert.strictEqual(season?.status4k, MediaStatus.PARTIALLY_AVAILABLE);
       assert.strictEqual(media.status, MediaStatus.PARTIALLY_AVAILABLE);
+    });
+  });
+
+  /*
+   * A server still identifying a new library lists titles with no TMDB or
+   * TVDB id yet. That is normal: the scan skips them quietly and says once,
+   * at the end, how many and why. Every line names the server scanned.
+   */
+  describe('a server still identifying a new library', () => {
+    type Line = {
+      level: string;
+      message: string;
+      meta: Record<string, unknown>;
+    };
+    let lines: Line[] = [];
+    let restore: (() => void)[] = [];
+
+    beforeEach(() => {
+      lines = [];
+      restore = (['error', 'warn', 'info', 'debug'] as const).map((level) => {
+        const capture = mock.method(
+          logger,
+          level,
+          (message: string, meta: Record<string, unknown> = {}) => {
+            lines.push({ level, message, meta });
+            return logger;
+          }
+        );
+        return () => capture.mock.restore();
+      });
+    });
+
+    afterEach(() => {
+      restore.forEach((undo) => undo());
+      getSettings().main.mediaServerType = MediaServerType.JELLYFIN;
+    });
+
+    const movieLibrary: Library = {
+      id: 'movies',
+      name: 'Films',
+      enabled: true,
+      type: 'movie',
+    };
+    const showLibrary: Library = {
+      id: 'shows',
+      name: 'Series',
+      enabled: true,
+      type: 'show',
+    };
+
+    const listed = (
+      Id: string,
+      Name: string,
+      Type: 'Movie' | 'Series',
+      ProductionYear?: number
+    ): JellyfinLibraryItem => ({
+      Name,
+      Id,
+      Type,
+      ProductionYear,
+      HasSubtitles: false,
+      LocationType: 'FileSystem',
+      MediaType: 'Video',
+    });
+
+    /** Each library's items, and what the server says about each. */
+    const serve = (
+      items: Record<string, JellyfinLibraryItem[]>,
+      providerIds: Record<string, JellyfinLibraryItemExtended['ProviderIds']>
+    ) => {
+      const all = Object.values(items).flat();
+      getLibraryContentsImpl = async (id) => items[id] ?? [];
+      getItemDataImpl = async (id) => {
+        if (id === 'broken') throw new Error('database is locked');
+        const item = all.find((i) => i.Id === id);
+        return item && { ...item, ProviderIds: providerIds[id] ?? {} };
+      };
+    };
+
+    const unidentifiedLibrary = () =>
+      serve(
+        {
+          movies: [
+            listed('3426', 'Arrival', 'Movie', 2016),
+            listed('3427', 'Home Movies', 'Movie'),
+            listed('broken', 'Broken Film', 'Movie', 2001),
+            listed('known', 'Known Film', 'Movie', 2020),
+          ],
+          shows: [
+            listed('e44cc', 'Severance', 'Series', 2022),
+            listed('lost', 'Lost Show', 'Series', 2004),
+          ],
+        },
+        {
+          known: { Tmdb: '6400' },
+          // TMDB has no such series: looked up, not found, nothing stored.
+          lost: { Tmdb: '777' },
+        }
+      );
+
+    const everything = () =>
+      lines.map((l) => `${l.message} ${JSON.stringify(l.meta)}`).join('\n');
+
+    it("says Emby on an Emby server, and only once what it couldn't place yet", async () => {
+      const settings = getSettings();
+      settings.main.mediaServerType = MediaServerType.EMBY;
+      settings.emby = {
+        ...settings.emby,
+        apiKey: 'test-api-key',
+        libraries: [movieLibrary, showLibrary],
+      };
+      getTvShowImpl = async () => {
+        throw new Error('[TMDB] 404');
+      };
+      unidentifiedLibrary();
+
+      await runWithMockTimers(() => embyFullScanner.run());
+
+      assert.doesNotMatch(everything(), /jellyfin/i);
+      assert.ok(lines.every((l) => l.meta.label === 'Emby Sync'));
+
+      // Titles Emby hasn't identified are not errors.
+      const errors = lines.filter((l) => l.level === 'error');
+      assert.equal(errors.length, 1, everything());
+      assert.equal(
+        errors[0].message,
+        'Failed to process Emby item Broken Film (2001)'
+      );
+      assert.deepEqual(errors[0].meta, {
+        label: 'Emby Sync',
+        errorMessage: 'database is locked',
+        item: { name: 'Broken Film', year: 2001, type: 'Movie', id: 'broken' },
+      });
+
+      const summaries = lines.filter((l) =>
+        l.message.includes('identified by Emby yet')
+      );
+      assert.equal(summaries.length, 1);
+      assert.equal(summaries[0].level, 'info');
+      assert.equal(
+        summaries[0].message,
+        "Emby: 2 films and 1 series aren't identified by Emby yet, so they were skipped. They'll be picked up once Emby has identified them (in Emby: refresh the library's metadata, or use Identify on a title)."
+      );
+      assert.deepEqual([...(summaries[0].meta.examples as string[])].sort(), [
+        'Arrival (2016)',
+        'Home Movies',
+        'Severance (2022)',
+      ]);
+
+      // Each one skipped is a debug line naming it, never the whole item.
+      const skipped = lines.filter((l) => l.message.startsWith('Skipped '));
+      assert.equal(skipped.length, 3);
+      assert.ok(skipped.every((l) => l.level === 'debug'));
+      assert.deepEqual(
+        skipped.find((l) => l.message.startsWith('Skipped Arrival'))?.meta,
+        {
+          label: 'Emby Sync',
+          item: { name: 'Arrival', year: 2016, type: 'Movie', id: '3426' },
+        }
+      );
+      for (const line of lines) {
+        assert.ok(!('jellyfinitem' in line.meta));
+        assert.doesNotMatch(
+          JSON.stringify(line.meta),
+          /ProviderIds|LocationType|HasSubtitles/
+        );
+      }
+
+      // What is stored is as before: the identified film, nothing else.
+      const media = await getRepository(Media).find();
+      assert.deepEqual(
+        media.map((m) => [m.tmdbId, m.embyMediaId]),
+        [[6400, 'known']]
+      );
+    });
+
+    it('says Jellyfin on a Jellyfin server', async () => {
+      configureJellyfinWithLibrary([movieLibrary]);
+      serve({ movies: [listed('3426', 'Arrival', 'Movie', 2016)] }, {});
+
+      await runWithMockTimers(() => jellyfinFullScanner.run());
+
+      assert.doesNotMatch(everything(), /emby/i);
+      assert.equal(lines.filter((l) => l.level === 'error').length, 0);
+      const summary = lines.find((l) => l.message.startsWith('Jellyfin: '));
+      assert.equal(
+        summary?.message,
+        "Jellyfin: 1 film isn't identified by Jellyfin yet, so it was skipped. It'll be picked up once Jellyfin has identified it (in Jellyfin: refresh the library's metadata, or use Identify on a title)."
+      );
+      assert.deepEqual(summary?.meta.examples, ['Arrival (2016)']);
+    });
+
+    it('says nothing more when every title is identified', async () => {
+      configureJellyfinWithLibrary([movieLibrary]);
+      serve(
+        { movies: [listed('known', 'Known Film', 'Movie', 2020)] },
+        { known: { Tmdb: '6400' } }
+      );
+
+      await runWithMockTimers(() => jellyfinFullScanner.run());
+
+      assert.equal(lines.filter((l) => l.level === 'error').length, 0);
+      assert.ok(!lines.some((l) => /identified by/.test(l.message)));
+    });
+
+    it("names Emby when Emby can't be read", async () => {
+      // A stand-in Emby that fails every request.
+      const server = http.createServer((_req, res) => {
+        res.statusCode = 500;
+        res.end();
+      });
+      await new Promise<void>((resolve) =>
+        server.listen(0, '127.0.0.1', resolve)
+      );
+      try {
+        const settings = getSettings();
+        settings.main.mediaServerType = MediaServerType.EMBY;
+        settings.emby = {
+          ...settings.emby,
+          ip: '127.0.0.1',
+          port: (server.address() as AddressInfo).port,
+          useSsl: false,
+          urlBase: '',
+          apiKey: 'test-api-key',
+          libraries: [movieLibrary],
+        };
+
+        await embyRecentScanner.run();
+      } finally {
+        await new Promise((resolve) => server.close(resolve));
+      }
+
+      assert.doesNotMatch(everything(), /jellyfin/i);
+      const failed = lines.find((l) => l.meta.label === 'Emby API');
+      assert.match(
+        failed?.message ?? '',
+        /^Something went wrong while getting library content from the Emby server/
+      );
     });
   });
 });

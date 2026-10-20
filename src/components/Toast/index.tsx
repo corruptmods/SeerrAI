@@ -58,7 +58,10 @@ const Toast = ({
                     <ExclamationTriangleIcon className="h-6 w-6 text-orange-400 light:text-warning-text" />
                   )}
                 </div>
-                <div className="ml-3 w-0 flex-1 text-strong">{children}</div>
+                {/* Long words and addresses wrap rather than run off the edge. */}
+                <div className="ml-3 w-0 flex-1 text-strong [overflow-wrap:anywhere]">
+                  {children}
+                </div>
                 <div className="ml-4 flex flex-shrink-0">
                   <button
                     onClick={() => onDismiss()}

@@ -88,6 +88,8 @@ export interface JellyfinLibraryItem {
   HasSubtitles: boolean;
   Type: 'Movie' | 'Episode' | 'Season' | 'Series';
   LocationType: 'FileSystem' | 'Offline' | 'Remote' | 'Virtual';
+  /** The year, as the server has it; it names the title in the log. */
+  ProductionYear?: number;
   SeriesName?: string;
   SeriesId?: string;
   SeasonId?: string;
@@ -244,6 +246,11 @@ class JellyfinAPI extends ExternalAPI {
     this.kind = serverKind;
   }
 
+  /** Jellyfin or Emby, as the log names the server spoken to. */
+  private get serverName(): string {
+    return this.kind === 'emby' ? 'Emby' : 'Jellyfin';
+  }
+
   public async login(
     Username?: string,
     Password?: string,
@@ -267,7 +274,7 @@ class JellyfinAPI extends ExternalAPI {
       return await authenticate(true);
     } catch (e) {
       logger.debug('Failed to authenticate with headers', {
-        label: 'Jellyfin API',
+        label: `${this.serverName} API`,
         error: e.response?.statusText,
         ip: ClientIP,
       });
@@ -289,9 +296,9 @@ class JellyfinAPI extends ExternalAPI {
       }
 
       logger.error(
-        `Something went wrong while authenticating with the Jellyfin server: ${e.message}`,
+        `Something went wrong while authenticating with the ${this.serverName} server: ${e.message}`,
         {
-          label: 'Jellyfin API',
+          label: `${this.serverName} API`,
           error: e.response?.status,
           ip: ClientIP,
         }
@@ -315,7 +322,7 @@ class JellyfinAPI extends ExternalAPI {
     } catch (e) {
       logger.error(
         `Something went wrong while initiating Quick Connect: ${e.message}`,
-        { label: 'Jellyfin API', error: e.response?.status }
+        { label: `${this.serverName} API`, error: e.response?.status }
       );
 
       if (!e.response) {
@@ -339,7 +346,7 @@ class JellyfinAPI extends ExternalAPI {
     } catch (e) {
       logger.error(
         `Something went wrong while getting Quick Connect status: ${e.message}`,
-        { label: 'Jellyfin API', error: e.response?.status }
+        { label: `${this.serverName} API`, error: e.response?.status }
       );
 
       if (!e.response) {
@@ -362,7 +369,7 @@ class JellyfinAPI extends ExternalAPI {
     } catch (e) {
       logger.error(
         `Something went wrong while authenticating with Quick Connect: ${e.message}`,
-        { label: 'Jellyfin API', error: e.response?.status }
+        { label: `${this.serverName} API`, error: e.response?.status }
       );
 
       if (!e.response) {
@@ -401,8 +408,8 @@ class JellyfinAPI extends ExternalAPI {
       return serverResponse.ServerName;
     } catch (e) {
       logger.error(
-        `Something went wrong while getting the server name from the Jellyfin server: ${e.message}`,
-        { label: 'Jellyfin API', error: e.response?.status }
+        `Something went wrong while getting the server name from the ${this.serverName} server: ${e.message}`,
+        { label: `${this.serverName} API`, error: e.response?.status }
       );
 
       if (!e.response) {
@@ -420,8 +427,8 @@ class JellyfinAPI extends ExternalAPI {
       return { users: userReponse };
     } catch (e) {
       logger.error(
-        `Something went wrong while getting the account from the Jellyfin server: ${e.message}`,
-        { label: 'Jellyfin API', error: e.response?.status }
+        `Something went wrong while getting the account from the ${this.serverName} server: ${e.message}`,
+        { label: `${this.serverName} API`, error: e.response?.status }
       );
 
       if (!e.response) {
@@ -440,8 +447,8 @@ class JellyfinAPI extends ExternalAPI {
       return userReponse;
     } catch (e) {
       logger.error(
-        `Something went wrong while getting the account from the Jellyfin server: ${e.message}`,
-        { label: 'Jellyfin API', error: e.response?.status }
+        `Something went wrong while getting the account from the ${this.serverName} server: ${e.message}`,
+        { label: `${this.serverName} API`, error: e.response?.status }
       );
 
       if (!e.response) {
@@ -469,9 +476,9 @@ class JellyfinAPI extends ExternalAPI {
         return mediaFolderResponse.Items;
       } catch (e) {
         logger.error(
-          `Something went wrong while getting libraries from the Jellyfin server: ${e.message}`,
+          `Something went wrong while getting libraries from the ${this.serverName} server: ${e.message}`,
           {
-            label: 'Jellyfin API',
+            label: `${this.serverName} API`,
             error: e.response?.status,
           }
         );
@@ -552,8 +559,8 @@ class JellyfinAPI extends ExternalAPI {
       );
     } catch (e) {
       logger.error(
-        `Something went wrong while getting library content from the Jellyfin server: ${e.message}`,
-        { label: 'Jellyfin API', error: e?.response?.status }
+        `Something went wrong while getting library content from the ${this.serverName} server: ${e.message}`,
+        { label: `${this.serverName} API`, error: e?.response?.status }
       );
 
       if (!e.response) {
@@ -579,8 +586,8 @@ class JellyfinAPI extends ExternalAPI {
       return itemResponse;
     } catch (e) {
       logger.error(
-        `Something went wrong while getting library content from the Jellyfin server: ${e.message}`,
-        { label: 'Jellyfin API', error: e.response?.status }
+        `Something went wrong while getting library content from the ${this.serverName} server: ${e.message}`,
+        { label: `${this.serverName} API`, error: e.response?.status }
       );
 
       if (!e.response) {
@@ -611,8 +618,8 @@ class JellyfinAPI extends ExternalAPI {
       }
 
       logger.error(
-        `Something went wrong while getting library content from the Jellyfin server: ${e.message}`,
-        { label: 'Jellyfin API', error: e.response?.status }
+        `Something went wrong while getting library content from the ${this.serverName} server: ${e.message}`,
+        { label: `${this.serverName} API`, error: e.response?.status }
       );
       if (!e.response) {
         throw new ApiError(502, ApiErrorCode.ConnectionError);
@@ -629,8 +636,8 @@ class JellyfinAPI extends ExternalAPI {
       return seasonResponse.Items;
     } catch (e) {
       logger.error(
-        `Something went wrong while getting the list of seasons from the Jellyfin server: ${e.message}`,
-        { label: 'Jellyfin API', error: e.response?.status }
+        `Something went wrong while getting the list of seasons from the ${this.serverName} server: ${e.message}`,
+        { label: `${this.serverName} API`, error: e.response?.status }
       );
 
       if (!e.response) {
@@ -664,8 +671,8 @@ class JellyfinAPI extends ExternalAPI {
       );
     } catch (e) {
       logger.error(
-        `Something went wrong while getting the list of episodes from the Jellyfin server: ${e.message}`,
-        { label: 'Jellyfin API', error: e.response?.status }
+        `Something went wrong while getting the list of episodes from the ${this.serverName} server: ${e.message}`,
+        { label: `${this.serverName} API`, error: e.response?.status }
       );
 
       if (!e.response) {
@@ -788,8 +795,8 @@ class JellyfinAPI extends ExternalAPI {
       ).AccessToken;
     } catch (e) {
       logger.error(
-        `Something went wrong while creating an API key from the Jellyfin server: ${e.message}`,
-        { label: 'Jellyfin API', error: e.response?.status }
+        `Something went wrong while creating an API key from the ${this.serverName} server: ${e.message}`,
+        { label: `${this.serverName} API`, error: e.response?.status }
       );
 
       if (!e.response) {

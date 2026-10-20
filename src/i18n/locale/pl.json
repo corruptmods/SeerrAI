@@ -3826,7 +3826,7 @@
   "components.Settings.OidcProviderModal.problemClientSecret": "Wpisz sekret klienta.",
   "components.Settings.OidcProviderModal.problemHostNotFound": "Nie znaleziono {host}. Sprawdź URL wystawcy.",
   "components.Settings.OidcProviderModal.problemIssuerHttps": "URL wystawcy musi zaczynać się od https://.",
-  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Dostawca podaje swój URL wystawcy jako {issuer}. Wpisz dokładnie ten adres (ukośnik na końcu ma znaczenie).",
+  "components.Settings.OidcProviderModal.problemIssuerMismatch": "Dostawca podaje swój URL wystawcy jako {issuer}. Wpisz dokładnie ten adres.",
   "components.Settings.OidcProviderModal.problemIssuerMismatchUnsaid": "Dostawca podaje inny URL wystawcy. Wpisz go dokładnie tak, jak pokazuje go dostawca.",
   "components.Settings.OidcProviderModal.problemIssuerQuery": "URL wystawcy nie może zawierać części z ? ani #.",
   "components.Settings.OidcProviderModal.problemIssuerUrl": "Wpisz URL wystawcy zaczynający się od https://.",
@@ -4110,5 +4110,14 @@
   "components.UserProfile.UserSettings.UserAppearanceSettings.useServerDefault": "Użyj ustawień domyślnych serwera",
   "components.UserProfile.UserSettings.UserAppearanceSettings.usingServerDefault": "Używasz ustawień domyślnych serwera. Wszystko, co tu zmienisz, dotyczy tylko Ciebie.",
   "components.UserProfile.UserSettings.UserAppearanceSettings.validationColour": "Kolor, np. #0ea5e9",
-  "components.UserProfile.UserSettings.menuAppearance": "Wygląd"
+  "components.UserProfile.UserSettings.menuAppearance": "Wygląd",
+  "components.Settings.MusicLibraries.musicOff": "Biblioteki muzyczne pojawią się, gdy muzyka zostanie włączona w <link>Ustawienia → Muzyka</link>.",
+  "components.Settings.OidcProviderModal.problemAppAddress": "Niektórzy dostawcy dają każdej aplikacji własny adres: w Authentik jest to {origin}/application/o/<slug>slug aplikacji</slug>/, a dostawca musi być przypisany do aplikacji.",
+  "components.Settings.SettingsMediaServers.ConnectModal.filmsAndSeries": "Filmy i seriale",
+  "components.Settings.SettingsMediaServers.ConnectModal.music": "Muzyka",
+  "components.Settings.SettingsMediaServers.ConnectModal.noneFound": "Nie znaleziono żadnych.",
+  "components.Login.PlexSignIn.closed": "Okno Plex zostało zamknięte przed zalogowaniem. Spróbuj ponownie.",
+  "components.Login.PlexSignIn.popup": "Nie udało się otworzyć okna logowania Plex. Zezwól na wyskakujące okna dla tej witryny i spróbuj ponownie.",
+  "components.Login.PlexSignIn.unreachable": "Nie udało się połączyć z Plex. Sprawdź połączenie i spróbuj ponownie.",
+  "components.Login.passkey": "Klucz dostępu"
 }

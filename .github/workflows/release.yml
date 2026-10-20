@@ -12,7 +12,8 @@
 # Release with:  git tag ai-v1.2.3 && git push origin ai-v1.2.3
 # CHANGELOG.md needs a "## 1.2.3" section (a date after it is fine, like
 # "## 1.2.3 (14 October 2026)"): it becomes the release notes, so rename
-# "Coming next" to the version before tagging. A version with a "-"
+# "Coming next" to the version before tagging. The changelog only lists
+# released versions, plus "Coming next" while dev has unreleased changes. A version with a "-"
 # (ai-v1.3.0-beta.1) is a pre-release: it gets only its own tag, and does not
 # move :1.2, :1 or :latest; without its own section, it uses "Coming next".
 # A preview never touches any of them either.
@@ -102,7 +103,7 @@ jobs:
               notes "Coming next"
             fi
             if [[ ! -s release-notes.md ]]; then
-              echo "::error::CHANGELOG.md has no \"## ${VERSION}\" section. Rename \"## Coming next\" to \"## ${VERSION} (date)\", push it, and move the tag."
+              echo "::error::CHANGELOG.md has no \"## ${VERSION}\" section. Add one (or rename \"## Coming next\") as \"## ${VERSION} (date)\", push it, and move the tag."
               exit 1
             fi
             TAGS="${VERSION}"

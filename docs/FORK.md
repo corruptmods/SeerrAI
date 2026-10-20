@@ -200,15 +200,18 @@ Each of these came from a bug that reached a running server.
 
 [CHANGELOG.md](https://github.com/corruptmods/SeerrAI/blob/main/CHANGELOG.md)
 is for the people running Seerr AI, not developers. A change they would
-notice gets one short line under **Coming next**, in plain words, in
+notice gets one short line under **Coming next** (added at the top when
+the first unreleased change lands), in plain words, in
 **New**, **Changed** or **Fixed**; details go in the guide (docs/seerr-ai),
 linked once where useful. No code names, file names or jargon. Changes
 nobody would notice (tests, refactors, the build) are left out.
 
-A release renames **Coming next** to its version, `## 1.2.3 (date)`, and
-starts a new, empty one above it; `release.yml` uses that section as the
-release notes. A pre-release does the same with its own version, such as
-`## 2.0.0-beta.1 (unreleased)`, starting with one line saying what it
+A release renames **Coming next** to its version, `## 1.2.3 (date)`;
+`release.yml` uses that section as the release notes. No empty section is
+left behind: the changelog lists only what has been released, and **Coming
+next** comes back with the next change. A pre-release does the same with
+its own version, such as `## 2.0.0-beta.2 (date)`, listing what changed
+since the last one; the first starts with one line saying what it
 previews.
 
 ## Layout of the fork's own code

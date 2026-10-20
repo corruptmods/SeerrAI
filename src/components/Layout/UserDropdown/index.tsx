@@ -15,6 +15,7 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import { CogIcon, UserIcon } from '@heroicons/react/24/solid';
+import { shownEmail } from '@server/constants/oidc';
 import type { LinkProps } from 'next/link';
 import Link from 'next/link';
 import { Fragment, forwardRef } from 'react';
@@ -95,7 +96,7 @@ const UserDropdown = () => {
                   <span className="truncate text-xl font-semibold text-gray-200">
                     {user?.displayName}
                   </span>
-                  {user?.displayName?.toLowerCase() !== user?.email && (
+                  {shownEmail(user?.displayName, user?.email) && (
                     <span className="truncate text-sm text-muted">
                       {user?.email}
                     </span>

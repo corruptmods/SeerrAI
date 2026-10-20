@@ -4,6 +4,7 @@ import {
   normalizeIssuer,
   oidcApplicationUrl,
   oidcCallbackUrl,
+  standInEmail,
 } from '@server/constants/oidc';
 import { UserType } from '@server/constants/user';
 import dataSource, { getRepository } from '@server/datasource';
@@ -667,7 +668,7 @@ export const accountForSignIn = async (
   ) {
     return { refused: 'existing-account' };
   }
-  const email = identity.email ?? `${provider.id}:${randomUUID()}`;
+  const email = identity.email ?? standInEmail(provider.id, randomUUID());
   const settings = getSettings();
 
   const user = await dataSource.transaction(async (manager) => {

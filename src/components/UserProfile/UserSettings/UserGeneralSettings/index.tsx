@@ -16,6 +16,7 @@ import defineMessages from '@app/utils/defineMessages';
 import { connectedAccountServers } from '@app/utils/mediaServerAccounts';
 import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
 import { ApiErrorCode } from '@server/constants/error';
+import { isStandInEmail } from '@server/constants/oidc';
 import type { UserSettingsGeneralResponse } from '@server/interfaces/api/userSettingsInterfaces';
 import type { AvailableLocale } from '@server/types/languages';
 import axios from 'axios';
@@ -117,9 +118,13 @@ const UserGeneralSettings = () => {
         intl.formatMessage(messages.validationtraktusername)
       ),
     email:
-      // email is required for everybody except non-admin jellyfin users
+      // Required for everybody but Jellyfin and Emby users other than the
+      // owner, and people who signed up through a provider that gave no
+      // email: they keep their stand-in until they add one.
       user?.id === 1 ||
-      (user?.userType !== UserType.JELLYFIN && user?.userType !== UserType.EMBY)
+      (user?.userType !== UserType.JELLYFIN &&
+        user?.userType !== UserType.EMBY &&
+        !isStandInEmail(user?.email))
         ? Yup.string()
             .test(
               'email',

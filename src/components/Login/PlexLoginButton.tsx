@@ -38,9 +38,8 @@ const PlexLoginButton = ({
       className={`${OPTION_BUTTON} border-[#cc7b19] bg-[rgba(204,123,25,0.3)] hover:border-[#cc7b19] hover:bg-[rgba(204,123,25,0.7)] disabled:opacity-50 light:bg-[#cc7b19] light:hover:bg-[#b86d14]`}
       onClick={login}
       disabled={loading || isProcessing}
-      aria-label={
-        large ? undefined : intl.formatMessage(messages.signinwithplex)
-      }
+      // The logo stands for the word "Plex", so the name is given in full.
+      aria-label={intl.formatMessage(messages.signinwithplex)}
       data-testid="plex-login-button"
     >
       {loading && (

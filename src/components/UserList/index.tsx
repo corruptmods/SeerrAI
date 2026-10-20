@@ -34,6 +34,7 @@ import {
   PencilIcon,
   UserPlusIcon,
 } from '@heroicons/react/24/solid';
+import { isStandInEmail, shownEmail } from '@server/constants/oidc';
 import type { MediaServerKind } from '@server/constants/server';
 import type { UserResultsResponse } from '@server/interfaces/api/userInterfaces';
 import { hasPermission } from '@server/lib/permissions';
@@ -937,14 +938,17 @@ const UserList = () => {
                         user.jellyfinUsername ||
                         user.embyUsername ||
                         user.plexUsername ||
-                        user.email}
+                        (isStandInEmail(user.email)
+                          ? `#${user.id}`
+                          : user.email)}
                     </Link>
-                    {(
+                    {shownEmail(
                       user.username ||
-                      user.jellyfinUsername ||
-                      user.embyUsername ||
-                      user.plexUsername
-                    )?.toLowerCase() !== user.email && (
+                        user.jellyfinUsername ||
+                        user.embyUsername ||
+                        user.plexUsername,
+                      user.email
+                    ) && (
                       <div className="text-sm leading-5 text-gray-300">
                         {user.email}
                       </div>

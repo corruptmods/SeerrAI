@@ -7,6 +7,33 @@
 /** What a new provider asks for: who someone is, their name and email. */
 export const DEFAULT_OIDC_SCOPES = 'openid profile email';
 
+/**
+ * The email given to someone who signed up through a provider that gave
+ * none (or none it had verified): "<provider id>:<random id>". It is never
+ * shown as an email, and they can replace it with a real one.
+ */
+export const standInEmail = (providerId: string, id: string): string =>
+  `${providerId}:${id}`;
+
+const STAND_IN =
+  /^[a-z0-9-]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** Whether an email is a stand-in, not one to show or write to. */
+export const isStandInEmail = (email: string | null | undefined): boolean =>
+  !!email && STAND_IN.test(email);
+
+/**
+ * The email to show beside a name, if any: not a stand-in, and not the
+ * name again.
+ */
+export const shownEmail = (
+  name: string | null | undefined,
+  email: string | null | undefined
+): string | undefined =>
+  email && !isStandInEmail(email) && name?.toLowerCase() !== email.toLowerCase()
+    ? email
+    : undefined;
+
 /** The longest id a provider gets from its name. */
 const MAX_ID_LENGTH = 40;
 

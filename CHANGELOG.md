@@ -62,6 +62,7 @@ A preview of Seerr AI 2.0: themes, single sign-on, Plex, Jellyfin and Emby toget
 - Builds from the dev branch no longer always say they're out of date.
 - A Backfill search cut short by a restart no longer shows "Searching…" for hours.
 - The admin agent's reply box grows as you type; AI Search hints fit on a phone.
+- People who signed up through single sign-on without an email can save their settings, and no stand-in address is shown.
 - Settings sections that fail to load say so, with Retry.
 - Icon-only buttons have names for screen readers.
 

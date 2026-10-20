@@ -4,6 +4,7 @@ import type { User } from '@app/hooks/useUser';
 import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { CogIcon, UserIcon } from '@heroicons/react/24/solid';
+import { shownEmail } from '@server/constants/oidc';
 import Link from 'next/link';
 import { useIntl } from 'react-intl';
 
@@ -66,7 +67,7 @@ const ProfileHeader = ({ user, isSettingsPage }: ProfileHeaderProps) => {
             >
               {user.displayName}
             </Link>
-            {user.email && user.displayName.toLowerCase() !== user.email && (
+            {shownEmail(user.displayName, user.email) && (
               <span className="text-sm text-gray-400 sm:ml-2 sm:text-lg">
                 ({user.email})
               </span>

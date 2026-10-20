@@ -1,4 +1,10 @@
-import { issuerFromEntered, normalizeIssuer } from '@server/constants/oidc';
+import {
+  isStandInEmail,
+  issuerFromEntered,
+  normalizeIssuer,
+  shownEmail,
+  standInEmail,
+} from '@server/constants/oidc';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -102,5 +108,36 @@ describe('an issuer as links remember it', () => {
       ),
       'https://sso.example.com/realms/home'
     );
+  });
+});
+
+describe('stand-in emails', () => {
+  const standIn = standInEmail(
+    'authentik',
+    '6ac47894-de62-42c9-91f8-1fc5f085da26'
+  );
+
+  it('knows its own stand-ins, and nothing else', () => {
+    assert.equal(isStandInEmail(standIn), true);
+    for (const other of [
+      'robin@example.com',
+      'robin',
+      'authentik:robin',
+      '',
+      null,
+      undefined,
+    ]) {
+      assert.equal(isStandInEmail(other), false, String(other));
+    }
+  });
+
+  it('shows an email beside a name only when it is one, and not the name', () => {
+    assert.equal(shownEmail('test', standIn), undefined);
+    assert.equal(shownEmail('Robin', 'robin@example.com'), 'robin@example.com');
+    assert.equal(
+      shownEmail('robin@example.com', 'Robin@example.com'),
+      undefined
+    );
+    assert.equal(shownEmail('Robin', undefined), undefined);
   });
 });

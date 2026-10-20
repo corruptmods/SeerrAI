@@ -17,6 +17,7 @@ import {
   Transition,
 } from '@headlessui/react';
 import { CheckIcon, ChevronDownIcon } from '@heroicons/react/24/solid';
+import { shownEmail } from '@server/constants/oidc';
 import type { SeriesType } from '@server/constants/seriesType';
 import type {
   ServiceCommonServer,
@@ -801,8 +802,10 @@ const AdvancedRequester = ({
                           <span className="ml-3 block">
                             {selectedUser.displayName}
                           </span>
-                          {selectedUser.displayName.toLowerCase() !==
-                            selectedUser.email && (
+                          {shownEmail(
+                            selectedUser.displayName,
+                            selectedUser.email
+                          ) && (
                             <span className="ml-1 truncate text-gray-400">
                               ({selectedUser.email})
                             </span>
@@ -855,8 +858,7 @@ const AdvancedRequester = ({
                                   <span className="ml-3 block flex-shrink-0">
                                     {user.displayName}
                                   </span>
-                                  {user.displayName.toLowerCase() !==
-                                    user.email && (
+                                  {shownEmail(user.displayName, user.email) && (
                                     <span className="ml-1 truncate text-gray-400">
                                       ({user.email})
                                     </span>

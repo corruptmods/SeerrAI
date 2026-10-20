@@ -6,6 +6,7 @@ import { User } from '@server/entity/User';
 import { initI18n } from '@server/i18n';
 import { startJobs } from '@server/job/schedule';
 import agent from '@server/lib/agent';
+import backfill from '@server/lib/backfill/engine';
 import backfillNotices from '@server/lib/backfill/notices';
 import resourceMonitor from '@server/lib/containerResources';
 import { stylePolicy } from '@server/lib/customCss';
@@ -202,6 +203,13 @@ app
     const userRepository = getRepository(User);
     const totalUsers = await userRepository.count();
     if (totalUsers > 0) {
+      // A Backfill search cut short by the restart isn't still running.
+      await backfill.unstickSearches().catch((e) =>
+        logger.warn('Could not reset Backfill searches cut short', {
+          label: 'Server',
+          errorMessage: e instanceof Error ? e.message : String(e),
+        })
+      );
       startJobs();
       // The admin agent picks up its queue and hears of empty searches.
       agent.init().catch((e) =>

@@ -49,7 +49,6 @@ const messages = defineMessages('components.Backfill.SeriesReview', {
   profile: 'Profile: {name}',
   episodes: '{count, plural, one {# episode} other {# episodes}}',
   searchAgain: 'Search again',
-  searching: 'Searching…',
   ignore: 'Ignore series',
   mediaPage: 'Media page',
   askAgent: 'Get it with AI',
@@ -293,7 +292,7 @@ const SeriesReview = () => {
                 )}
               </div>
             </div>
-            <div className="flex flex-wrap items-start gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-start xl:flex-none xl:flex-nowrap">
               {series.tmdbId && (
                 <Link
                   href={`/${series.kind === 'movie' ? 'movie' : 'tv'}/${
@@ -352,25 +351,14 @@ const SeriesReview = () => {
                   </Button>
                 </Link>
               )}
-              {!blocked && (
+              {/* While it searches, the badge and the note below say so. */}
+              {!blocked && series.status !== 'searching' && (
                 <Button
                   onClick={() => setSearchOpen(true)}
-                  disabled={
-                    !data.readiness.ready || series.status === 'searching'
-                  }
+                  disabled={!data.readiness.ready}
                 >
-                  <ArrowPathIcon
-                    className={
-                      series.status === 'searching' ? 'animate-spin' : undefined
-                    }
-                  />
-                  <span>
-                    {intl.formatMessage(
-                      series.status === 'searching'
-                        ? messages.searching
-                        : messages.searchAgain
-                    )}
-                  </span>
+                  <ArrowPathIcon />
+                  <span>{intl.formatMessage(messages.searchAgain)}</span>
                 </Button>
               )}
               <Button

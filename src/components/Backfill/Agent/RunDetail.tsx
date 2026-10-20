@@ -65,7 +65,7 @@ const runMessages = defineMessages('components.Backfill.Agent.Run', {
   untitled: 'Admin agent',
   started: 'Backfill came up empty for {title}, so it looked further.',
   question: 'It needs your answer',
-  replyPlaceholder: 'Correct it or ask for more: “check it is English first”',
+  replyPlaceholder: 'Correct it or ask for more…',
   answerPlaceholder: 'Answer its question…',
   send: 'Send',
   sending: 'Sending…',
@@ -369,6 +369,15 @@ const RunDetail = () => {
   const router = useRouter();
   const id = Number(router.query.runId);
   const [text, setText] = useState('');
+  // The reply box starts one line high and grows with what's typed, up to
+  // its max height, then scrolls.
+  const replyBox = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const box = replyBox.current;
+    if (!box) return;
+    box.style.height = 'auto';
+    box.style.height = `${box.scrollHeight + box.offsetHeight - box.clientHeight}px`;
+  }, [text]);
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState<string>();
   // The conversation scrolls inside its own box. It follows the newest
@@ -631,7 +640,8 @@ const RunDetail = () => {
             </label>
             <textarea
               id="agent-reply"
-              rows={2}
+              ref={replyBox}
+              rows={1}
               value={text}
               maxLength={1000}
               disabled={working || sending}
@@ -649,14 +659,14 @@ const RunDetail = () => {
                     ? runMessages.answerPlaceholder
                     : runMessages.replyPlaceholder
               )}
-              className="min-h-[44px] min-w-0 flex-1 resize-y rounded-md border border-field-border bg-field px-3 py-2 text-sm text-strong placeholder:text-gray-400 disabled:opacity-60"
+              className="block max-h-40 min-h-[44px] min-w-0 flex-1 resize-none rounded-md border border-field-border bg-field px-3 py-[11px] text-sm leading-5 text-strong placeholder:truncate placeholder:text-gray-400 disabled:opacity-60"
             />
             {/* Just the arrow on a phone, leaving the box the room. */}
             <Button
               buttonType="primary"
               type="submit"
               disabled={working || sending || !text.trim()}
-              className="flex-none"
+              className="h-11 flex-none"
               aria-label={intl.formatMessage(
                 sending ? runMessages.sending : runMessages.send
               )}

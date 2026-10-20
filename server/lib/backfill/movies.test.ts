@@ -1352,6 +1352,26 @@ describe('Backfill when something goes wrong', () => {
     );
   });
 
+  it('shows a title left mid-search as stuck, and resets it at startup', async () => {
+    const row = await titles().save(
+      new BackfillSeries({
+        kind: 'movie',
+        serverId: 0,
+        arrId: 57,
+        title: SECRETS.title,
+        status: 'searching',
+      })
+    );
+    assert.equal(backfill.isSearching(row.id), false);
+    assert.equal(backfill.statusOf(row), 'stuck', 'nothing is searching');
+    await backfill.unstickSearches();
+    assert.equal(
+      (await titles().findOneOrFail({ where: { id: row.id } })).status,
+      'stuck'
+    );
+    assert.equal(backfill.statusOf({ id: row.id, status: 'found' }), 'found');
+  });
+
   it('takes nothing for done when Radarr’s wanted list was too long to read whole', async () => {
     const row = await titles().save(
       new BackfillSeries({

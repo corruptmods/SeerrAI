@@ -1176,6 +1176,17 @@ class Backfill {
     return this.searching.has(id);
   }
 
+  /**
+   * A title's status as it is now. A title saved as searching that no
+   * search here is running for was left by a restart, and is stuck.
+   */
+  public statusOf(
+    row: Pick<BackfillSeries, 'id' | 'status'>
+  ): BackfillSeries['status'] {
+    if (this.searching.has(row.id)) return 'searching';
+    return row.status === 'searching' ? 'stuck' : row.status;
+  }
+
   /* ----------------------------- settings ----------------------------- */
 
   public readiness(): BackfillReadiness {
@@ -1475,10 +1486,10 @@ class Backfill {
 
   /**
    * Titles left "searching" by a search that never finished, because Seerr
-   * stopped while it ran: no scan picks a title in that state, so each goes
-   * back to stuck, to be searched again.
+   * stopped while it ran: each goes back to stuck, to be searched again.
+   * Run at startup and before each scan.
    */
-  private async unstickSearches(): Promise<void> {
+  public async unstickSearches(): Promise<void> {
     const repo = getRepository(BackfillSeries);
     const left = await repo.find({
       where: { status: 'searching' },

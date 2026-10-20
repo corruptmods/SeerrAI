@@ -721,7 +721,9 @@ class Agent {
             (c.status === 'queued' || c.status === 'started') &&
             (c.body?.movieIds ?? []).includes(arrId)
         );
-        if (searching || row?.status === 'searching') return { wait: true };
+        if (searching || (row && backfill.isSearching(row.id))) {
+          return { wait: true };
+        }
       }
       const movie = await radarr.getMovieDetail(arrId);
       if (movie.hasFile) {
@@ -744,7 +746,9 @@ class Agent {
             (c.body?.seriesId === arrId ||
               (c.body?.episodeIds ?? []).some((id) => ids.has(id)))
         );
-        if (searching || row?.status === 'searching') return { wait: true };
+        if (searching || (row && backfill.isSearching(row.id))) {
+          return { wait: true };
+        }
       }
       const queued = new Set(
         await sonarr.getSeriesQueueEpisodes(arrId).catch(() => [] as number[])

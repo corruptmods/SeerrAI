@@ -59,6 +59,9 @@ A preview of Seerr AI 2.0: themes, single sign-on, Plex, Jellyfin and Emby toget
 - Emails show the logo in Gmail and Outlook.
 - Pages scroll again after a dialog closes on a phone.
 - A beta release no longer tells stable installs an update is available.
+- Builds from the dev branch no longer always say they're out of date.
+- A Backfill search cut short by a restart no longer shows "Searching…" for hours.
+- The admin agent's reply box grows as you type; AI Search hints fit on a phone.
 - Settings sections that fail to load say so, with Retry.
 - Icon-only buttons have names for screen readers.
 

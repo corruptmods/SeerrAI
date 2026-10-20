@@ -141,7 +141,7 @@ const seriesView = (row: BackfillSeries) => ({
   year: row.year,
   seriesType: row.seriesType,
   poster: row.poster,
-  status: backfill.isSearching(row.id) ? 'searching' : row.status,
+  status: backfill.statusOf(row),
   missing: row.missing,
   belowCutoff: row.belowCutoff,
   searchTerms: row.searchTerms ?? [],

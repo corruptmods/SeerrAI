@@ -20,7 +20,7 @@ import useSWR, { useSWRConfig } from 'swr';
 const messages = defineMessages('components.Settings.SettingsLidarr', {
   lidarrSettings: 'Lidarr Settings',
   lidarrSettingsDescription:
-    'Connect Lidarr to bring music to Seerr AI: once a default Lidarr is added, everyone with music on can find artists and albums in search, on Discover and on their own pages. You can connect several Lidarr servers; one is the default.',
+    'Connect Lidarr to bring music to Seerr AI. Music appears once one server is the default.',
   addlidarr: 'Add Lidarr Server',
   noDefault:
     'Mark one Lidarr server as the default: music appears once one is.',

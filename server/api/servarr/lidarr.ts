@@ -198,6 +198,30 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
+  /** One album, with its releases and artist. */
+  public getAlbum = async (id: number): Promise<LidarrAlbum> => {
+    try {
+      return (await this.axios.get<LidarrAlbum>(`/album/${id}`)).data;
+    } catch (e) {
+      this.fail('retrieve the album', e);
+    }
+  };
+
+  /** An album's track files: where it sits on disk. */
+  public getTrackFiles = async (
+    albumId: number
+  ): Promise<{ id: number; path?: string }[]> => {
+    try {
+      const response = await this.axios.get<{ id: number; path?: string }[]>(
+        '/trackfile',
+        { params: { albumId } }
+      );
+      return response.data;
+    } catch (e) {
+      this.fail('retrieve track files', e);
+    }
+  };
+
   /** Adds an artist from a lookup, set up as given. */
   public addArtist = async (
     artist: LidarrArtist,

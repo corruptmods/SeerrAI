@@ -27,19 +27,19 @@ import * as Yup from 'yup';
 const messages = defineMessages('components.Settings', {
   jellyfinsettings: '{mediaServerName} Settings',
   jellyfinsettingsDescription:
-    'Configure the settings for your {mediaServerName} server. {mediaServerName} scans your {mediaServerName} libraries to see what content is available.',
+    'Seerr AI scans your {mediaServerName} libraries to see what’s available.',
   timeout: 'Timeout',
   save: 'Save Changes',
   saving: 'Saving…',
   jellyfinlibraries: '{mediaServerName} Libraries',
   jellyfinlibrariesDescription:
-    'The libraries {mediaServerName} scans for titles. Click the button below if no libraries are listed.',
+    'The {mediaServerName} libraries Seerr AI scans. None listed? Use the button below.',
   jellyfinSettingsFailure:
     'Something went wrong while saving {mediaServerName} settings.',
   jellyfinSettingsSuccess: '{mediaServerName} settings saved successfully!',
   jellyfinSettings: '{mediaServerName} Settings',
   jellyfinSettingsDescription:
-    'Optionally configure the internal and external endpoints for your {mediaServerName} server. In most cases, the external URL is different to the internal URL. A custom password reset URL can also be set for {mediaServerName} login, in case you would like to redirect to a different password reset page. You can also change the Jellyfin API key, which was automatically generated previously.',
+    'Optional internal and external addresses for {mediaServerName}, a password reset page, and its API key.',
   externalUrl: 'External URL',
   hostname: 'Hostname or IP Address',
   port: 'Port',
@@ -53,14 +53,14 @@ const messages = defineMessages('components.Settings', {
   jellyfinSyncFailedGenericError:
     'Something went wrong while syncing libraries',
   jellyfinSyncFailedConnectionError:
-    'Unable to reach the {mediaServerName} server. Check that it is running and reachable from Seerr AI.',
+    'Can’t reach {mediaServerName}. Check it’s running and reachable from Seerr AI.',
   toggleLibraryFailure: 'Failed to update library.',
   invalidurlerror: 'Unable to connect to {mediaServerName} server.',
   syncing: 'Syncing',
   syncJellyfin: 'Sync Libraries',
   manualscanJellyfin: 'Manual Library Scan',
   manualscanDescriptionJellyfin:
-    "Normally, this will only be run once every 24 hours. Seerr AI will check your {mediaServerName} server's recently added more aggressively. If this is your first time configuring Seerr AI, a one-time full manual library scan is recommended!",
+    'Runs once a day; recently added items are checked more often. Do a full scan after first setup.',
   notrunning: 'Not Running',
   currentlibrary: 'Current Library: {name}',
   librariesRemaining: 'Libraries Remaining: {count}',
@@ -74,7 +74,7 @@ const messages = defineMessages('components.Settings', {
   validationUrlBaseTrailingSlash: 'URL base must not end in a trailing slash',
   tip: 'Tip',
   scanbackground:
-    'Scanning will run in the background. You can continue the setup process in the meantime.',
+    'The scan runs in the background; you can carry on with setup.',
   jellyfinNotConnected:
     'Seerr AI is not connected to {mediaServerName}. Connect it under <MediaServersLink>Media Servers</MediaServersLink>.',
 });

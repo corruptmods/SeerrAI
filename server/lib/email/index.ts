@@ -8,22 +8,29 @@ import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { URL } from 'url';
 import { openpgpEncrypt } from './openpgpEncrypt';
 
-// Seerr AI's logo, light on the emails' dark background.
-const PUBLIC_LOGO_URL = `https://raw.githubusercontent.com/${PROJECT_REPO}/${PROJECT_BRANCH}/public/logo_ai_dark.svg`;
+// Seerr AI's logo, light on the emails' dark background. A PNG: Gmail and
+// Outlook don't show SVG pictures at all.
+const LOGO_FILE = 'logo_ai_dark.png';
+const PUBLIC_LOGO_URL = `https://raw.githubusercontent.com/${PROJECT_REPO}/${PROJECT_BRANCH}/public/${LOGO_FILE}`;
 
 /**
  * The logo at the top of every email: the copy in the repository when the
  * email settings say to use the public logo, else this server's own (which
  * needs the Application URL). Without either, emails show the application's
- * name instead.
+ * name instead. A test email passes the settings being tested, which may
+ * not be saved yet.
  */
-export const emailLogoUrl = (): string | undefined => {
-  const settings = getSettings();
-  const { applicationUrl } = settings.main;
-  if (settings.notifications.agents.email.options.usePublicLogo) {
+export const emailLogoUrl = (
+  options: Pick<
+    NotificationAgentEmail['options'],
+    'usePublicLogo'
+  > = getSettings().notifications.agents.email.options
+): string | undefined => {
+  if (options.usePublicLogo) {
     return PUBLIC_LOGO_URL;
   }
-  return applicationUrl ? `${applicationUrl}/logo_ai_dark.svg` : undefined;
+  const { applicationUrl } = getSettings().main;
+  return applicationUrl ? `${applicationUrl}/${LOGO_FILE}` : undefined;
 };
 
 const getSocket: SMTPTransport.Options['getSocket'] = (options, callback) => {

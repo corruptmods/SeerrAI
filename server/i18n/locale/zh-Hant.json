@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "音樂請求已被拒絕",
   "notifications.events.musicFailed": "音樂請求失敗",
   "notifications.events.musicPending": "新的音樂請求",
-  "notifications.events.musicRequestAvailable": "請求的音樂現已可用"
+  "notifications.events.musicRequestAvailable": "請求的音樂現已可用",
+  "notifications.events.wrongMatch": "配對錯誤"
 }

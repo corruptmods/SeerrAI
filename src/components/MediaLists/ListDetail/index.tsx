@@ -64,10 +64,10 @@ const messages = defineMessages('components.MediaLists.ListDetail', {
   'sort-release-asc': 'Oldest release',
   actionfailed: 'That did not work: {detail}',
   acceptprompt:
-    '{name} shared this list with you. If you accept, what you watch can be used to tell when everyone on it has finished a title, and when someone on it uses Pick for the Room. Leave the list to turn it down.',
+    '{name} shared this list with you. If you accept, your watch history is used for its watched sync and Pick for the Room.',
   accept: 'Accept',
   cannotcheck:
-    'Watch sync cannot see what {names} watched (no account on the media server), so it will not suggest removing anything from this list.',
+    'Watch sync can’t see what {names} watched (no media server account), so it won’t suggest removals.',
 });
 
 /** The order you last chose, on this device, for every list. */

@@ -18,7 +18,7 @@ import useSWR, { mutate as globalMutate } from 'swr';
 const messages = defineMessages('components.Settings.SettingsBazarr', {
   title: 'Bazarr',
   description:
-    'Link Bazarr to show each title’s subtitles on its page, and to search, replace, delete or transcribe them from there. Bazarr does the work; Seerr AI asks it.',
+    'Shows each title’s subtitles on its page, and lets you search, replace or transcribe them.',
   addBazarr: 'Add Bazarr',
   subtitles: 'Subtitles',
   onTitlePages: 'On title pages',

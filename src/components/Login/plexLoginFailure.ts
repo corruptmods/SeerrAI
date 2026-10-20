@@ -10,7 +10,7 @@ import type { IntlShape } from 'react-intl';
 
 const messages = defineMessages('components.Login', {
   plexExistingAccount:
-    'Another account here already has the email of this Plex account. Sign in with that account, then link Plex from your profile.',
+    'Another account here uses this Plex email. Sign in with it, then link Plex in your profile.',
 });
 
 /**

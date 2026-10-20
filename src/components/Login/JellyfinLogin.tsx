@@ -36,7 +36,7 @@ const messages = defineMessages('components.Login', {
   quickconnect: 'Quick Connect',
   quickconnecterror: 'Quick Connect failed. Please try again.',
   existingaccounterror:
-    'Another account here already has this {mediaServerName} name as its email. Sign in with that account, then link {mediaServerName} from your profile.',
+    'Another account here uses this name as its email. Sign in with it, then link {mediaServerName} in your profile.',
 });
 
 interface JellyfinLoginProps {

@@ -532,7 +532,13 @@ class Media {
       );
     }
 
-    if (this.downloadStatus?.length || this.downloadStatus4k?.length) {
+    // A title only waiting on its server's match has nothing in a queue to
+    // follow.
+    if (
+      [...(this.downloadStatus ?? []), ...(this.downloadStatus4k ?? [])].some(
+        (item) => !item.matching
+      )
+    ) {
       downloadTracker.keepFresh();
     }
   }

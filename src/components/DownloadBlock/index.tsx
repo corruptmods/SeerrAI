@@ -16,7 +16,7 @@ const messages = defineMessages('components.DownloadBlock', {
   waitingDetail:
     'Held by {arr}’s delay profile, in case a better release turns up',
   waitingFor:
-    'Held by {arr}’s delay profile, in case a better release turns up; sent for download in {time}',
+    'Held by {arr}’s delay profile for a better release; downloads in {time}',
   hoursMinutes: '{hours} h {minutes} min',
   minutes: '{minutes} min',
   queued: 'Queued',
@@ -34,6 +34,7 @@ const messages = defineMessages('components.DownloadBlock', {
   failedDetail: 'Download failed; looking for another',
   imported: 'Imported',
   importedDetail: 'In the library folder; showing up in a moment',
+  importedMatching: 'Waiting for {mediaServer} to match it',
   stepVerifying: 'Downloaded; being verified',
   stepRepairing: 'Downloaded; being repaired',
   stepUnpacking: 'Downloaded; being unpacked',
@@ -141,8 +142,11 @@ const DownloadBlock = ({
   const percent = downloadedPercent(downloadItem);
   // A copy saved before stages were sent counts as downloading.
   const stage = STAGES[downloadItem.stage] ?? STAGES.downloading;
-  const detail =
-    stepDetail(downloadItem.stage, downloadItem.step) ?? stage.detail;
+  // Imported, but the media server filed it under another title: it waits
+  // for an admin to put that right (they are told; this says no more).
+  const detail = downloadItem.matching
+    ? 'importedMatching'
+    : (stepDetail(downloadItem.stage, downloadItem.step) ?? stage.detail);
   const arr =
     downloadItem.mediaType === MediaType.MOVIE
       ? 'Radarr'
@@ -217,7 +221,10 @@ const DownloadBlock = ({
           {heldFor
             ? intl.formatMessage(messages.waitingFor, { arr, time: heldFor })
             : detail
-              ? intl.formatMessage(messages[detail], { arr })
+              ? intl.formatMessage(messages[detail], {
+                  arr,
+                  mediaServer: downloadItem.matching,
+                })
               : estimate && estimate.getTime() > Date.now()
                 ? intl.formatMessage(messages.estimatedtime, {
                     time: (

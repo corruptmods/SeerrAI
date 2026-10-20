@@ -21,7 +21,7 @@ const messages = defineMessages(
   'components.UserProfile.UserSettings.UserPasswordChange',
   {
     localPasswordDescription:
-      'This password is used for signing in with the {applicationTitle} local login form. It is separate from your media server password.',
+      'For signing in with email and password, separate from your media server password.',
     password: 'Password',
     currentpassword: 'Current Password',
     newpassword: 'New Password',
@@ -29,17 +29,16 @@ const messages = defineMessages(
     toastSettingsSuccess: 'Password saved successfully!',
     toastSettingsFailure: 'Something went wrong while saving the password.',
     toastSettingsFailureVerifyCurrent:
-      'Something went wrong while saving the password. Was your current password entered correctly?',
+      'Couldn’t save the password. Was your current password right?',
     validationCurrentPassword: 'You must provide your current password',
     validationNewPassword: 'You must provide a new password',
-    validationNewPasswordLength:
-      'Password is too short; should be a minimum of 8 characters',
+    validationNewPasswordLength: 'Use at least 8 characters',
     validationConfirmPassword: 'You must confirm the new password',
     validationConfirmPasswordSame: 'Passwords must match',
     noPasswordSet:
-      'This user account currently does not have a password set. Configure a password below to enable this account to sign in as a "local user."',
+      'This account has no password. Set one below to let it sign in with email and password.',
     noPasswordSetOwnAccount:
-      'Your account currently does not have a password set. Configure a password below to enable sign-in as a "local user" using your email address.',
+      'Your account has no password. Set one below to sign in with your email and password.',
     nopermissionDescription:
       "You do not have permission to modify this user's password.",
   }

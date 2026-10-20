@@ -9,12 +9,12 @@ import {
   escapeHtml,
 } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
+import notificationHttp from '@server/lib/notifications/http';
 import { mediaPagePath } from '@server/lib/notifications/mediaPage';
 import type { NotificationAgentPushover } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import type { AvailableLocale } from '@server/types/languages';
-import axios from 'axios';
 import {
   Notification,
   hasNotificationType,
@@ -74,7 +74,7 @@ class PushoverAgent
     imageUrl: string
   ): Promise<Partial<PushoverImagePayload>> {
     try {
-      const response = await axios.get(imageUrl, {
+      const response = await notificationHttp.get(imageUrl, {
         responseType: 'arraybuffer',
       });
       const base64 = Buffer.from(response.data, 'binary').toString('base64');
@@ -253,7 +253,7 @@ class PushoverAgent
           payload
         );
 
-        await axios.post(endpoint, {
+        await notificationHttp.post(endpoint, {
           ...notificationPayload,
           token: settings.options.accessToken,
           user: settings.options.userToken,
@@ -301,7 +301,7 @@ class PushoverAgent
             payload.notifyUser.settings?.locale as AvailableLocale
           );
 
-          await axios.post(endpoint, {
+          await notificationHttp.post(endpoint, {
             ...notificationPayload,
             token: payload.notifyUser.settings.pushoverApplicationToken,
             user: payload.notifyUser.settings.pushoverUserKey,
@@ -357,7 +357,7 @@ class PushoverAgent
                   user.settings?.locale as AvailableLocale
                 );
 
-                await axios.post(endpoint, {
+                await notificationHttp.post(endpoint, {
                   ...notificationPayload,
                   token: user.settings.pushoverApplicationToken,
                   user: user.settings.pushoverUserKey,

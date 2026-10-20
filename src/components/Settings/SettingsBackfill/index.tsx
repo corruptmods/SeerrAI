@@ -19,7 +19,7 @@ import useSWR from 'swr';
 const messages = defineMessages('components.Settings.SettingsBackfill', {
   backfill: 'Backfill',
   description:
-    'Backfill looks for series Sonarr has searched for and not found, searches Prowlarr directly under every name the show goes by, opens the likeliest packs and checks each file with Sonarr, then downloads and imports only what an admin approves. Approvals arrive as a Backfill notification; tap it to review.',
+    'Finds what Sonarr couldn’t by searching Prowlarr under every name, checks each file, and downloads only what you approve.',
   enabled: 'Enable Backfill',
   enabledTip: 'Scans run on a schedule (Settings → Jobs & Cache).',
   prowlarr: 'Prowlarr',
@@ -40,25 +40,23 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
   noClients: 'Add a download client under Services → Download clients first.',
   category: 'Category',
   categoryTip:
-    'Backfill’s downloads go here, apart from Sonarr’s and Radarr’s, so neither imports them on its own.',
+    'Keeps Backfill’s downloads apart, so Sonarr and Radarr don’t import them on their own.',
   when: 'When a title is stuck',
   includeMovies: 'Movies too',
-  includeMoviesTip:
-    'Follow movies Radarr has searched for and not found, as well as series.',
+  includeMoviesTip: 'Also follow movies Radarr couldn’t find.',
   stuckAfterHours: 'Hours since Sonarr’s or Radarr’s last search',
   includeCutoffUnmet: 'Treat files below the cutoff as gaps',
-  includeCutoffUnmetTip:
-    'Off: a pack that only upgrades files is not offered. Packs that fill gaps still show their upgrades.',
+  includeCutoffUnmetTip: 'Off: packs that only upgrade files aren’t offered.',
   includeSpecials: 'Include specials (season 0)',
   searchesPerScan: 'Titles searched per scan',
   researchAfterDays: 'Days before searching a title again',
   approval: 'Approval',
   autoApprove: 'Approve some packs automatically',
   autoApproveTip:
-    'Only a pack that fills what is missing and replaces nothing on disk, with at least this score and no bigger than this. Anything else waits for an admin.',
+    'Packs that only fill gaps, within this score and size. Anything else waits for an admin.',
   replaceFailed: 'Replace failed downloads',
   replaceFailedTip:
-    'When a download fails or stalls, the next pack that clears the score and size below is downloaded in its place, searching again if need be, until none is left. Anything else waits for an admin.',
+    'When a download fails or stalls, the next pack within the score and size below replaces it.',
   minScore: 'Minimum score',
   maxSizeGb: 'Largest download (GB)',
   safety: 'Limits',
@@ -66,37 +64,36 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
   maxActiveJobsTip:
     'Counted for torrents and Usenet apart. A download being imported does not count.',
   stallHours: 'Give up on a torrent after this many hours without progress',
-  stallHoursTip:
-    'Only time it is meant to be downloading counts: paused, queued or checking in the torrent client does not. It is then replaced or offered like any failed download. 0 waits forever.',
+  stallHoursTip: 'Paused or queued time doesn’t count. 0 waits forever.',
   minFreeSpaceGb: 'Keep free on the series’ disk (GB)',
   historyDays: 'Days to keep finished downloads',
   historyDaysTip:
-    'Then the nightly Database Maintenance job removes them and the packs they came from. Packs you turned down are kept. 0 keeps everything.',
+    'Older ones are removed nightly; packs you turned down are kept. 0 keeps everything.',
   saved: 'Backfill settings saved.',
   saveFailed: 'Backfill settings could not be saved.',
   loadFailed: 'Backfill settings could not be loaded.',
   openBackfill: 'Open Backfill',
   agent: 'Admin agent',
   agentTip:
-    'An AI that looks further when Backfill finds nothing usable for a requested title: it reads why releases were turned down, searches other ways, opens packs to check their files and downloads only what is missing. On its own it never replaces a file on disk; replacing files, blocking a release group or deleting files happens only when an admin asks and then approves it. It needs AI set up, with Admin Agent on.',
+    'An AI that digs further when Backfill finds nothing (needs AI and Admin Agent on). It replaces or deletes nothing without your approval.',
   agentAutoRun: 'Step in on its own',
   agentAutoRunTip:
-    'When Backfill finds nothing for a requested title, and when someone reports a title missing and Sonarr, Radarr and Backfill find nothing. Off: it only works when an admin asks.',
+    'Steps in when Backfill finds nothing for a requested or reported title. Off: only when an admin asks.',
   agentMaxAutoRunsPerDay: 'Times it may start on its own in a day',
   agentMaxGrabsPerDay: 'Downloads it may start in a day',
   agentMaxSizeGb: 'Largest download it may start (GB)',
   agentMaxSteps: 'Steps it may take in one go',
   agentAutoContinue: 'Times it carries on by itself',
   agentAutoContinueTip:
-    'When its steps run out mid-task it takes another go on its own, this many times, as long as the last go started a download. 0 always waits for you to reply.',
+    'Extra goes it takes on its own when out of steps, if the last started a download. 0 waits for you.',
   agentKeepDays: 'Days to keep finished conversations',
   agentKeepDaysTip:
-    'Older ones are deleted on their own; 0 keeps them. Ones waiting on your answer stay, and what they downloaded is never touched.',
+    'Older ones are deleted; 0 keeps them. Downloads are never touched.',
   agentInstructions: 'Standing instructions',
   agentInstructionsTip:
-    'What it should always do, in your words. For example: always check it is English before downloading; prefer usenet; never take anything under 720p for new shows.',
+    'Standing rules in your words, such as “prefer usenet” or “nothing under 720p”.',
   agentMaxStepsTip:
-    'Each time it looks at what it found and decides what next is a step; searches it runs at once count as one. Fewer steps cost less.',
+    'Each decision it makes is one step. Fewer steps cost less.',
 });
 
 interface Shown extends Omit<BackfillSettings, 'prowlarr'> {

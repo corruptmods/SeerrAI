@@ -21,6 +21,8 @@ import { mediaEvent } from '@server/lib/notifications/eventTitles';
 import overrideRules from '@server/lib/overrideRules';
 import { Permission } from '@server/lib/permissions';
 import { expectedOnApproval } from '@server/lib/requestEta';
+import type { RequestServerIssue } from '@server/lib/requestServers';
+import { requestServerIssue } from '@server/lib/requestServers';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { DbAwareColumn, resolveDbType } from '@server/utils/DbColumnHelper';
@@ -1070,6 +1072,19 @@ export class MediaRequest {
   @Column({ default: false })
   public ignoreQuota: boolean;
 
+  /**
+   * Why a request still to be sent (pending or failed) has no server to go
+   * to: its Radarr, Sonarr or Lidarr server was removed, or there is none.
+   * Worked out from the settings whenever it is loaded; never stored.
+   */
+  public serverIssue?: RequestServerIssue;
+
+  /**
+   * A line for the title's history to go with the change of status this
+   * save makes (where Retry sent it, say). Never stored.
+   */
+  public historyNote?: string;
+
   constructor(init?: Partial<MediaRequest>) {
     Object.assign(this, init);
   }
@@ -1204,6 +1219,15 @@ export class MediaRequest {
   @AfterLoad()
   private rememberStatus() {
     savedStatus.set(this, this.status);
+  }
+
+  @AfterLoad()
+  public noteServerIssue(): void {
+    this.serverIssue =
+      this.status === MediaRequestStatus.PENDING ||
+      this.status === MediaRequestStatus.FAILED
+        ? requestServerIssue(this)
+        : undefined;
   }
 
   @AfterLoad()

@@ -45,6 +45,13 @@ import { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import { defaultRegion, estimateRequest } from '@server/lib/requestEta';
 import { requestMissing } from '@server/lib/requestMissing';
+import {
+  defaultServerFor,
+  hasServersFor,
+  requestServerIssue,
+  serverExists,
+  serviceName,
+} from '@server/lib/requestServers';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
@@ -1169,10 +1176,38 @@ requestRoutes.put<{ requestId: string }>(
           req.body.tags = request.tags;
         }
 
-        if (request.status !== MediaRequestStatus.PENDING) {
+        // A failed request can be put right by a request manager (another
+        // server, say, when its own was removed) before it is retried.
+        if (
+          request.status !== MediaRequestStatus.PENDING &&
+          !(
+            request.status === MediaRequestStatus.FAILED &&
+            req.user?.hasPermission(Permission.MANAGE_REQUESTS)
+          )
+        ) {
           return next({
             status: 409,
-            message: 'Only pending requests can be modified.',
+            message:
+              'Only pending requests can be modified, and failed ones by a request manager.',
+          });
+        }
+
+        // A server it does not already have must exist. The one it has is
+        // kept even if it was removed, so changing seasons still works;
+        // Retry then sends it to the default server. With no server of its
+        // kind at all (requests fulfilled by hand), the id means nothing
+        // and is kept as given, as before.
+        if (
+          req.body.serverId !== undefined &&
+          req.body.serverId !== null &&
+          req.body.serverId >= 0 &&
+          req.body.serverId !== request.serverId &&
+          hasServersFor(request.type) &&
+          !serverExists(request.type, req.body.serverId)
+        ) {
+          return next({
+            status: 400,
+            message: 'That server no longer exists. Choose another.',
           });
         }
 
@@ -1259,6 +1294,7 @@ requestRoutes.put<{ requestId: string }>(
             request.requestedBy = requestUser as User;
 
             await requestRepository.save(request);
+            request.noteServerIssue();
           } else if (req.body.mediaType === MediaType.TV) {
             const mediaRepository = getRepository(Media);
             request.serverId = req.body.serverId;
@@ -1395,6 +1431,7 @@ requestRoutes.put<{ requestId: string }>(
                 }
 
                 await requestRepository.save(request);
+                request.noteServerIssue();
 
                 return res.status(200).json(request);
               }
@@ -1475,6 +1512,44 @@ requestRoutes.post<{
           });
         }
 
+        // Its server was removed, or none is the default: the default server
+        // of its kind takes it, starting from that server's own profile, folder and
+        // tags (the old server's mean nothing there). With no default, a
+        // manager has to choose one, and retrying would only fail again.
+        const serverIssue = requestServerIssue(request);
+        if (serverIssue) {
+          const name = serviceName(serverIssue.service, request.is4k);
+          const fallback = serverIssue.usesDefault
+            ? defaultServerFor(request)
+            : undefined;
+          if (!fallback) {
+            return res.status(409).json({
+              message:
+                serverIssue.reason === 'none'
+                  ? `No ${name} server is set up. Add one in Settings → Services, then retry.`
+                  : `This request has no ${name} server to go to. Edit it to choose one, then retry.`,
+              code: serverIssue.reason === 'none' ? 'noServer' : 'chooseServer',
+              serverIssue,
+            });
+          }
+          const note = `Sent to the default ${name} server, ${fallback.name}, as its own server was removed.`;
+          logger.info(note, {
+            label: 'Media Request',
+            requestId: request.id,
+            removedServerId: request.serverId,
+            serverId: fallback.id,
+          });
+          Object.assign(request, {
+            serverId: fallback.id,
+            profileId: null,
+            rootFolder: null,
+            languageProfileId: null,
+            metadataProfileId: null,
+            tags: null,
+          });
+          request.historyNote = note;
+        }
+
         // The failure was reported once; without letting go of that, a
         // second failure after this retry would never be reported at all.
         await releaseDelivery(request.id, Notification.MEDIA_FAILED);
@@ -1483,6 +1558,8 @@ requestRoutes.post<{
         request.status = MediaRequestStatus.APPROVED;
         request.modifiedBy = req.user;
         await requestRepository.save(request);
+        delete request.historyNote;
+        request.noteServerIssue();
 
         return res.status(200).json(request);
       });

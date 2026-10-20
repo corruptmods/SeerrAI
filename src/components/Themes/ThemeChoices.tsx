@@ -20,7 +20,7 @@ import { useIntl } from 'react-intl';
 const messages = defineMessages('components.Themes.ThemeChoices', {
   themes: 'Themes',
   description:
-    'Ready-made looks, or one someone shared with you. A theme file only holds colours and settings, so updates can’t break it.',
+    'Ready-made looks, or one shared with you. Updates can’t break theme files.',
   classic: 'Seerr Classic',
   midnight: 'Midnight',
   daylight: 'Daylight',
@@ -33,7 +33,7 @@ const messages = defineMessages('components.Themes.ThemeChoices', {
   saveToKeep: 'Save Changes to keep it.',
   stopUsing: 'Stop Using It',
   safeMode:
-    'Safe mode is on in this tab, so theme files aren’t shown. A theme you choose is still saved.',
+    'Safe mode is on in this tab, so theme files aren’t shown. Your choice is still saved.',
 });
 
 /** The gallery's names, by id. */

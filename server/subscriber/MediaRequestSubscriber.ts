@@ -30,6 +30,10 @@ import type { NotificationPayload } from '@server/lib/notifications/agents/agent
 import { requestAvailableEvent } from '@server/lib/notifications/eventTitles';
 import { radarrRouting } from '@server/lib/radarrRouting';
 import { markUndispatchable } from '@server/lib/requestDispatch';
+import {
+  describeServerIssue,
+  requestServerIssue,
+} from '@server/lib/requestServers';
 import { resolveSeasonMonitorTarget } from '@server/lib/seasonMonitorTarget';
 import type { LidarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
@@ -531,6 +535,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       try {
         const mediaRepository = manager.getRepository(Media);
         const settings = getSettings();
+        // No Radarr at all is a choice (requests fulfilled by hand): the
+        // request stays approved.
         if (settings.radarr.length === 0 && !settings.radarr[0]) {
           logger.info(
             'No Radarr server configured, skipping request processing',
@@ -539,6 +545,18 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
               requestId: entity.id,
               mediaId: entity.media.id,
             }
+          );
+          return;
+        }
+
+        // Its server was removed, or none is the default: failed, saying
+        // which, rather than left approved with nothing ever sent.
+        const serverIssue = requestServerIssue(entity, settings);
+        if (serverIssue) {
+          await markUndispatchable(
+            entity,
+            describeServerIssue(serverIssue, entity.is4k),
+            manager
           );
           return;
         }
@@ -566,15 +584,6 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         }
 
         if (!radarrSettings) {
-          await markUndispatchable(
-            entity,
-            `There is no default ${
-              entity.is4k ? '4K ' : ''
-            }Radarr server configured. Did you set any of your ${
-              entity.is4k ? '4K ' : ''
-            }Radarr servers as default?`,
-            manager
-          );
           return;
         }
 
@@ -862,6 +871,16 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           return;
         }
 
+        const serverIssue = requestServerIssue(entity, settings);
+        if (serverIssue) {
+          await markUndispatchable(
+            entity,
+            describeServerIssue(serverIssue, entity.is4k),
+            manager
+          );
+          return;
+        }
+
         let sonarrSettings = settings.sonarr.find(
           (sonarr) => sonarr.isDefault && sonarr.is4k === entity.is4k
         );
@@ -885,15 +904,6 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         }
 
         if (!sonarrSettings) {
-          await markUndispatchable(
-            entity,
-            `There is no default ${
-              entity.is4k ? '4K ' : ''
-            }Sonarr server configured. Did you set any of your ${
-              entity.is4k ? '4K ' : ''
-            }Sonarr servers as default?`,
-            manager
-          );
           return;
         }
 
@@ -1220,24 +1230,32 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       return;
     }
 
-    const servers = getSettings().lidarr;
+    const settings = getSettings();
+    // As for Radarr and Sonarr: no Lidarr at all leaves it approved.
+    if (!settings.lidarr.length) {
+      logger.info('No Lidarr server configured, skipping request processing', {
+        label: 'Media Request',
+        requestId: entity.id,
+        mediaId: entity.media?.id,
+      });
+      return;
+    }
+    const serverIssue = requestServerIssue(entity, settings);
+    if (serverIssue) {
+      await markUndispatchable(
+        entity,
+        describeServerIssue(serverIssue),
+        manager
+      );
+      return;
+    }
     const lidarrSettings =
       entity.serverId !== null &&
       entity.serverId !== undefined &&
       entity.serverId >= 0
-        ? servers.find((server) => server.id === entity.serverId)
-        : servers.find((server) => server.isDefault);
-
+        ? settings.lidarr.find((server) => server.id === entity.serverId)
+        : settings.lidarr.find((server) => server.isDefault);
     if (!lidarrSettings) {
-      await markUndispatchable(
-        entity,
-        entity.serverId !== null &&
-          entity.serverId !== undefined &&
-          entity.serverId >= 0
-          ? 'The Lidarr server chosen for this request no longer exists.'
-          : 'There is no default Lidarr server configured. Did you set one of your Lidarr servers as default?',
-        manager
-      );
       return;
     }
 
@@ -1947,11 +1965,15 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           type,
           userId:
             type === MediaEventType.FAILED ? null : request.modifiedBy?.id,
-          // Why it was declined, when whoever declined it said.
+          // Why it was declined, when whoever declined it said; where a
+          // retry sent it, when it went to another server. Only on the
+          // approval: sending it on can fail within the same save.
           detail:
             type === MediaEventType.DECLINED
               ? request.declineReason || undefined
-              : undefined,
+              : type === MediaEventType.APPROVED
+                ? request.historyNote
+                : undefined,
         },
         manager
       );

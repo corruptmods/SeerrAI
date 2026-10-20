@@ -10,11 +10,13 @@ The webhook notification agent enables you to send a custom JSON payload to any 
 
 ## Configuration
 
+### Support URL Variables (optional)
+
+With this on, the **Webhook URL** can use the [template variables](#template-variables) below, for example `https://example.com/hook?tmdb={{media_tmdbid}}`. Each value is URL-encoded, a variable with no value for the notification is left empty, and the test notification fills every variable with `test`. The ones under [Special](#special) only work as keys in the JSON payload. It's off unless you turn it on.
+
 ### Webhook URL
 
 The URL you would like to post notifications to. Your JSON will be sent as the body of the request.
-
-With **Support URL Variables** on, the URL can use the [template variables](#template-variables) below. Each value is URL-encoded, a variable with no value for the notification is left empty, and the test notification fills every variable with `test`.
 
 ### Authorization Header (optional)
 
@@ -49,7 +51,7 @@ Customize the JSON payload to suit your needs. Seerr provides several [template 
 | `{{event}}`             | A friendly description of the notification event                                                                                    |
 | `{{subject}}`           | The notification subject (typically the media title)                                                                                |
 | `{{message}}`           | The notification message body (the media overview/synopsis for request notifications; the issue description for issue notificatons) |
-| `{{image}}`             | The notification image (typically the media poster)                                                                                 |
+| `{{image}}`             | The notification image (typically the media poster, or the album's cover for music)                                                 |
 
 ### Notify User
 

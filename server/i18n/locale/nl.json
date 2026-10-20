@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Muziekaanvraag afgewezen",
   "notifications.events.musicFailed": "Muziekaanvraag mislukt",
   "notifications.events.musicPending": "Nieuwe muziekaanvraag",
-  "notifications.events.musicRequestAvailable": "Aangevraagde muziek nu beschikbaar"
+  "notifications.events.musicRequestAvailable": "Aangevraagde muziek nu beschikbaar",
+  "notifications.events.wrongMatch": "Verkeerde match"
 }

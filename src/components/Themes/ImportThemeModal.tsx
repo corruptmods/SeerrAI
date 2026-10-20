@@ -26,7 +26,7 @@ const messages = defineMessages('components.Themes.ImportThemeModal', {
   dark: 'Dark',
   light: 'Light',
   hardToRead:
-    'Some text in this theme may be hard to read. You can still use it, and go back with Use the Server’s Default.',
+    'Some text in this theme may be hard to read. Use the Server’s Default to go back.',
   tooLarge: 'This file is too large to be a theme file (16 KB at most).',
   notJson: 'This isn’t a theme file: it isn’t JSON.',
   notThemeFile: 'This isn’t a Seerr AI theme file.',

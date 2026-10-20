@@ -31,7 +31,17 @@ const on = (day: string, calendar: SeasonCalendar = defaults) =>
   activeSeason(calendar, day)?.id;
 
 describe('the seasons a new server has', () => {
-  it('runs Halloween, Holidays and New Year, and not the others', () => {
+  it('are Halloween, Holidays, New Year and Lunar New Year', () => {
+    assert.deepEqual(SEASON_IDS, [
+      'halloween',
+      'holidays',
+      'newyear',
+      'lunarnewyear',
+    ]);
+    assert.deepEqual(Object.keys(SEASON_DEFAULTS), SEASON_IDS);
+  });
+
+  it('runs Halloween, Holidays and New Year, and not Lunar New Year', () => {
     assert.deepEqual(
       defaults.map((season) => season.id),
       ['halloween', 'holidays', 'newyear']
@@ -51,13 +61,7 @@ describe('the seasons a new server has', () => {
       start: '12-29',
       end: '01-02',
     });
-    assert.deepEqual(SEASON_DEFAULTS.pride, {
-      enabled: false,
-      start: '06-01',
-      end: '06-30',
-    });
     assert.deepEqual(SEASON_DEFAULTS.lunarnewyear, { enabled: false });
-    assert.deepEqual(SEASON_DEFAULTS.diwali, { enabled: false });
   });
 
   it('starts and ends each season on the days it says, both included', () => {
@@ -69,7 +73,7 @@ describe('the seasons a new server has', () => {
     assert.equal(on('2026-12-01'), 'holidays');
     assert.equal(on('2026-12-28'), 'holidays');
     assert.equal(on('2026-06-15'), undefined);
-    assert.equal(on('2026-06-15', everything), 'pride');
+    assert.equal(on('2026-06-15', everything), undefined);
   });
 });
 
@@ -111,20 +115,20 @@ describe('a season across New Year', () => {
 
   it('is a single day when it starts and ends on the same one', () => {
     const calendar: SeasonCalendar = [
-      { id: 'pride', start: '06-28', end: '06-28' },
+      { id: 'holidays', start: '12-24', end: '12-24' },
     ];
-    assert.equal(on('2026-06-27', calendar), undefined);
-    assert.equal(on('2026-06-28', calendar), 'pride');
-    assert.equal(on('2026-06-29', calendar), undefined);
+    assert.equal(on('2026-12-23', calendar), undefined);
+    assert.equal(on('2026-12-24', calendar), 'holidays');
+    assert.equal(on('2026-12-25', calendar), undefined);
   });
 
   it('copes with 29 February in years without one', () => {
     const calendar: SeasonCalendar = [
-      { id: 'pride', start: '02-20', end: '02-29' },
+      { id: 'lunarnewyear', start: '02-20', end: '02-29' },
     ];
-    assert.equal(on('2027-02-28', calendar), 'pride');
+    assert.equal(on('2027-02-28', calendar), 'lunarnewyear');
     assert.equal(on('2027-03-01', calendar), undefined);
-    assert.equal(on('2028-02-29', calendar), 'pride');
+    assert.equal(on('2028-02-29', calendar), 'lunarnewyear');
     assert.deepEqual(seasonDates(calendar[0], 2027), {
       start: '2027-02-20',
       end: '2027-02-28',
@@ -144,38 +148,40 @@ describe('seasons that overlap', () => {
     assert.equal(on('2027-01-01', calendar), 'newyear');
   });
 
-  it('let Diwali take over from Halloween when they meet', () => {
-    // Diwali 2027 is on 29 October; its five days start on the 27th.
-    assert.equal(on('2027-10-26', everything), 'halloween');
-    assert.equal(on('2027-10-27', everything), 'diwali');
-    assert.equal(on('2027-10-31', everything), 'diwali');
-    assert.equal(on('2027-11-01', everything), 'halloween');
+  it('hand back to the one they interrupted when they end', () => {
+    // Lunar New Year set by hand inside Halloween.
+    const calendar: SeasonCalendar = [
+      { id: 'halloween', start: '10-24', end: '11-01' },
+      { id: 'lunarnewyear', start: '10-27', end: '10-31' },
+    ];
+    assert.equal(on('2027-10-26', calendar), 'halloween');
+    assert.equal(on('2027-10-27', calendar), 'lunarnewyear');
+    assert.equal(on('2027-10-31', calendar), 'lunarnewyear');
+    assert.equal(on('2027-11-01', calendar), 'halloween');
   });
 
   it('go in the usual order when they start on the same day', () => {
     const calendar: SeasonCalendar = [
-      { id: 'pride', start: '06-01', end: '06-30' },
+      { id: 'lunarnewyear', start: '06-01', end: '06-30' },
       { id: 'halloween', start: '06-01', end: '06-10' },
     ];
     assert.equal(on('2026-06-05', calendar), 'halloween');
   });
 });
 
-describe('Lunar New Year and Diwali', () => {
-  it('come from a table of each year’s date, with its source', () => {
-    for (const id of ['lunarnewyear', 'diwali'] as const) {
-      const moving = MOVING_SEASONS[id];
-      assert.ok(moving.source.length > 20, id);
-      for (const [year, day] of Object.entries(moving.days)) {
-        assert.match(day, /^\d{2}-\d{2}$/, `${id} ${year}`);
-      }
+describe('Lunar New Year', () => {
+  it('comes from a table of each year’s date, with its source', () => {
+    assert.deepEqual(Object.keys(MOVING_SEASONS), ['lunarnewyear']);
+    const moving = MOVING_SEASONS.lunarnewyear;
+    assert.ok(moving.source.length > 20);
+    for (const [year, day] of Object.entries(moving.days)) {
+      assert.match(day, /^\d{2}-\d{2}$/, year);
     }
-    assert.equal(MOVING_SEASONS.lunarnewyear.days[2027], '02-06');
-    assert.equal(MOVING_SEASONS.lunarnewyear.days[2030], '02-03');
-    assert.equal(MOVING_SEASONS.diwali.days[2026], '11-08');
+    assert.equal(moving.days[2027], '02-06');
+    assert.equal(moving.days[2030], '02-03');
   });
 
-  it('run from New Year’s Eve to the Lantern Festival', () => {
+  it('runs from New Year’s Eve to the Lantern Festival', () => {
     // 2026: New Year on 17 February.
     assert.deepEqual(seasonDates({ id: 'lunarnewyear' }, 2026), {
       start: '2026-02-16',
@@ -192,25 +198,18 @@ describe('Lunar New Year and Diwali', () => {
     });
   });
 
-  it('run Diwali’s five days, from Dhanteras to Bhai Dooj', () => {
-    assert.deepEqual(seasonDates({ id: 'diwali' }, 2026), {
-      start: '2026-11-06',
-      end: '2026-11-10',
-    });
-  });
-
-  it('do nothing in a year the table does not reach', () => {
-    assert.equal(seasonDates({ id: 'diwali' }, 2099), undefined);
+  it('does nothing in a year the table does not reach', () => {
     assert.equal(seasonDates({ id: 'lunarnewyear' }, 2099), undefined);
     assert.equal(on('2099-02-10', everything), undefined);
   });
 
-  it('use dates an admin set instead, every year', () => {
+  it('uses dates an admin set instead, every year', () => {
+    // The table's New Year in 2031 is 23 January.
     const calendar: SeasonCalendar = [
-      { id: 'diwali', start: '11-01', end: '11-03' },
+      { id: 'lunarnewyear', start: '02-01', end: '02-03' },
     ];
-    assert.equal(on('2031-11-02', calendar), 'diwali');
-    assert.equal(on('2031-11-14', calendar), undefined);
+    assert.equal(on('2031-02-02', calendar), 'lunarnewyear');
+    assert.equal(on('2031-01-23', calendar), undefined);
   });
 });
 
@@ -307,16 +306,18 @@ describe('what an admin can save', () => {
     assert.deepEqual(
       cleanSeasons({
         halloween: { enabled: false, start: '10-01', end: '10-31' },
-        diwali: { enabled: true },
         lunarnewyear: { enabled: true, start: '02-01', end: '02-07' },
       }),
       {
         ...SEASON_DEFAULTS,
         halloween: { enabled: false, start: '10-01', end: '10-31' },
-        diwali: { enabled: true },
         lunarnewyear: { enabled: true, start: '02-01', end: '02-07' },
       }
     );
+    assert.deepEqual(cleanSeasons({ lunarnewyear: { enabled: true } }), {
+      ...SEASON_DEFAULTS,
+      lunarnewyear: { enabled: true },
+    });
   });
 
   it('refuses anything else', () => {
@@ -325,6 +326,9 @@ describe('what an admin can save', () => {
       [],
       'halloween',
       { easter: { enabled: true } },
+      // Seasons there are no longer.
+      { diwali: { enabled: true } },
+      { pride: { enabled: false, start: '06-01', end: '06-30' } },
       { halloween: { enabled: 'yes', start: '10-24', end: '11-01' } },
       { halloween: { enabled: true } },
       { halloween: { enabled: true, start: '10-24' } },
@@ -333,7 +337,7 @@ describe('what an admin can save', () => {
       { halloween: { enabled: true, start: '10-24', end: '11-31' } },
       { halloween: { enabled: true, start: '1024', end: '11-01' } },
       { halloween: { enabled: true, start: '10-24', end: '11-01', x: 1 } },
-      { diwali: { enabled: true, start: '11-01' } },
+      { lunarnewyear: { enabled: true, start: '02-01' } },
     ]) {
       assert.equal(cleanSeasons(value), undefined, JSON.stringify(value));
     }
@@ -346,6 +350,8 @@ describe('what an admin can save', () => {
         halloween: { enabled: false, start: '10-24', end: '11-01' },
         holidays: { enabled: true, start: 'soon' },
         easter: { enabled: true },
+        diwali: { enabled: true },
+        pride: { enabled: true, start: '06-01', end: '06-30' },
       }),
       {
         ...SEASON_DEFAULTS,
@@ -363,6 +369,8 @@ describe('the answer to a season’s note', () => {
       'halloween-2026',
       'halloween:off',
       'easter-2026:off',
+      'diwali-2026:off',
+      'pride-2026:keep',
       'halloween-26:off',
       'halloween-2026:maybe',
       ' halloween-2026:off',
@@ -388,10 +396,67 @@ describe('the dates shown for a season', () => {
       start: '2026-12-29',
       end: '2027-01-02',
     });
-    assert.deepEqual(upcomingDates({ id: 'diwali' }, '2026-11-11'), {
-      start: '2027-10-27',
-      end: '2027-10-31',
+    assert.deepEqual(upcomingDates({ id: 'lunarnewyear' }, '2026-03-04'), {
+      start: '2027-02-05',
+      end: '2027-02-20',
     });
-    assert.equal(upcomingDates({ id: 'diwali' }, '2098-12-01'), undefined);
+    assert.equal(
+      upcomingDates({ id: 'lunarnewyear' }, '2098-12-01'),
+      undefined
+    );
+  });
+});
+
+/*
+ * Diwali and Pride Month were seasons once. A settings file or an answer
+ * to a note saved then still reads, as if they had never been there.
+ */
+describe('a server that ran Diwali or Pride Month', () => {
+  const stored = {
+    halloween: { enabled: true, start: '10-24', end: '11-01' },
+    holidays: { enabled: true, start: '12-01', end: '12-28' },
+    newyear: { enabled: true, start: '12-29', end: '01-02' },
+    lunarnewyear: { enabled: true },
+    diwali: { enabled: true },
+    pride: { enabled: true, start: '06-01', end: '06-30' },
+  };
+  const calendar = seasonCalendar(seasonSettings(stored));
+
+  it('runs the other seasons as they were set', () => {
+    assert.deepEqual(seasonSettings(stored), {
+      ...SEASON_DEFAULTS,
+      lunarnewyear: { enabled: true },
+    });
+    assert.deepEqual(
+      calendar.map((season) => season.id),
+      ['halloween', 'holidays', 'newyear', 'lunarnewyear']
+    );
+  });
+
+  it('shows everyone their own look on what were their days', () => {
+    // Diwali 2026 was 6 to 10 November; Pride Month all of June.
+    for (const today of ['2026-11-08', '2026-06-15']) {
+      assert.equal(activeSeason(calendar, today), undefined, today);
+      for (const note of [null, 'diwali-2026:keep', 'pride-2026:off']) {
+        assert.equal(
+          shownSeason({ calendar, seasonal: true, note, today }),
+          undefined,
+          `${today} ${note}`
+        );
+      }
+    }
+    // Diwali 2027 fell inside Halloween, which now runs all the way.
+    assert.equal(activeSeason(calendar, '2027-10-28')?.id, 'halloween');
+  });
+
+  it('asks about the next season as usual after an old answer', () => {
+    for (const note of ['diwali-2026:off', 'pride-2026:off']) {
+      assert.equal(
+        shownSeason({ calendar, seasonal: true, note, today: '2026-12-05' })
+          ?.id,
+        'holidays',
+        note
+      );
+    }
   });
 });

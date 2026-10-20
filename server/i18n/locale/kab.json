@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Asuter n uẓawan yettwagi",
   "notifications.events.musicFailed": "Asuter n uẓawan yecceḍ",
   "notifications.events.musicPending": "Asuter amaynut n uẓawan",
-  "notifications.events.musicRequestAvailable": "Aẓawan yettwasutren yella tura"
+  "notifications.events.musicRequestAvailable": "Aẓawan yettwasutren yella tura",
+  "notifications.events.wrongMatch": "Amṣada ur nelhi"
 }

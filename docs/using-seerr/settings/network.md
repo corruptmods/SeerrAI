@@ -27,7 +27,7 @@ You can force resolution to prefer IPv4 by going to `Settings > Network`, enabli
 
 ## HTTP(S) Proxy
 
-If you can't change your DNS servers or force IPV4 resolution, you can use Seerr through a proxy.
+If you can't change your DNS servers or force IPV4 resolution, you can use Seerr through a proxy. It carries all of Seerr AI's outgoing HTTP and HTTPS requests; it doesn't set up HTTPS, SSL or certificates for Seerr AI itself.
 
 In some places (like China), the ISP blocks not only the DNS resolution but also the connection to the TMDB API.
 
@@ -35,7 +35,7 @@ In some places (like China), the ISP blocks not only the DNS resolution but also
 
 If you have Seerr behind a reverse proxy, enable this setting to allow Seerr to correctly register client IP addresses. For details, please see the [Express Documentation](https://expressjs.com/en/guide/behind-proxies.html).
 
-Seerr AI only takes the address from a proxy it trusts. Always trusted are proxies on the same machine, on your local network and on Tailscale (loopback, link-local and private addresses such as `10.x.x.x`, `172.16.x.x`–`172.31.x.x`, `192.168.x.x` and `fc00::/7`, and `100.64.0.0/10`, where Tailscale and carrier-grade NAT give out addresses and which nobody on the internet can connect from), which is where a reverse proxy or a Docker network sits. The address used is the last one a trusted proxy added, so nobody can choose their own by sending a made-up `X-Forwarded-For` header: the sign-in attempt limits count by address.
+Seerr AI only takes the address from a proxy it trusts. Always trusted are proxies on the same machine, on your local network and on Tailscale (loopback, link-local and private addresses such as `10.x.x.x`, `172.16.x.x`–`172.31.x.x`, `192.168.x.x` and `fc00::/7`, and `100.64.0.0/10`, where Tailscale and carrier-grade NAT give out addresses and which nobody on the internet can connect from), which is where a reverse proxy (Nginx, Caddy or Traefik in Docker, say) or a Docker network sits. The address used is the last one a trusted proxy added, so nobody can choose their own by sending a made-up `X-Forwarded-For` header: the sign-in attempt limits count by address.
 
 A proxy on a public address in front of your reverse proxy is only trusted if you say so, under the switch:
 
@@ -55,13 +55,13 @@ This setting is **disabled** by default.
 **This is an advanced setting.** Please only enable this setting if you are familiar with CSRF protection and how it works.
 :::
 
-CSRF stands for [cross-site request forgery](https://en.wikipedia.org/wiki/Cross-site_request_forgery). When this setting is enabled, all external API access that alters Seerr application data is blocked.
+CSRF stands for [cross-site request forgery](https://en.wikipedia.org/wiki/Cross-site_request_forgery). With this on, every change made from a browser must carry a token Seerr AI gave that browser, so another website can't make your signed-in browser change things.
 
-If you do not use Seerr integrations with third-party applications to add/modify/delete requests or users, you can consider enabling this setting to protect against malicious attacks.
+Apps and scripts that use an API key (the server's, or a [personal one](../../seerr-ai/account.md#api-keys)) in the `X-Api-Key` header are not affected: they never use the browser's sign-in, so they need no token and can still make changes. A wrong key is always refused.
 
-One caveat, however, is that HTTPS is required, meaning that once this setting is enabled, you will no longer be able to access your Seerr instance over _HTTP_ (including using an IP address and port number).
+The token's cookie is only sent over HTTPS, so with this on you can no longer use Seerr AI from a browser over plain _HTTP_ (including an IP address and port).
 
-If you enable this setting and find yourself unable to access Seerr, you can disable the setting by modifying `settings.json` in `/app/config`.
+It takes effect after Seerr AI restarts. If you turn it on and can't get in, turn it off again by setting `csrfProtection` to `false` under `network` in `settings.json` in `/app/config`, and restart.
 
 This setting is **disabled** by default.
 

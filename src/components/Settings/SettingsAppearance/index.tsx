@@ -35,7 +35,7 @@ import * as Yup from 'yup';
 const messages = defineMessages('components.Settings.SettingsAppearance', {
   appearance: 'Appearance',
   description:
-    'How Seerr AI looks for people who haven’t picked their own look, and on the sign-in page. Everyone can still choose their own in their profile.',
+    'The default look, and the sign-in page’s. Everyone can still pick their own.',
   defaultTheme: 'Default theme',
   mode: 'Mode',
   modeAuto: 'Match the person’s device',

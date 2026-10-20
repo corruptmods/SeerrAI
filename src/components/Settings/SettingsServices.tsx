@@ -34,7 +34,7 @@ const messages = defineMessages('components.Settings', {
   radarrsettings: 'Radarr Settings',
   sonarrsettings: 'Sonarr Settings',
   serviceSettingsDescription:
-    'Configure your {serverType} server(s) below. You can connect multiple {serverType} servers, but only two of them can be marked as defaults (one non-4K and one 4K). Administrators are able to override the server used to process new requests prior to approval.',
+    'Connect one or more {serverType} servers. Up to two can be defaults: one non-4K, one 4K.',
   deleteserverconfirm: 'Are you sure you want to delete this server?',
   ssl: 'SSL',
   default: 'Default',
@@ -45,17 +45,17 @@ const messages = defineMessages('components.Settings', {
   addradarr: 'Add Radarr Server',
   addsonarr: 'Add Sonarr Server',
   noDefaultServer:
-    'At least one {serverType} server must be marked as default in order for {mediaType} requests to be processed.',
+    'Mark a {serverType} server as default so {mediaType} requests can be processed.',
   noDefaultNon4kServer:
-    'If you only have a single {serverType} server for both non-4K and 4K content (or if you only download 4K content), your {serverType} server should <strong>NOT</strong> be designated as a 4K server.',
+    'With one {serverType} server for both non-4K and 4K, or only 4K, do <strong>NOT</strong> mark it as a 4K server.',
   noDefault4kServer:
-    'A 4K {serverType} server must be marked as default in order to enable users to submit 4K {mediaType} requests.',
+    'Mark a 4K {serverType} server as default to allow 4K {mediaType} requests.',
   mediaTypeMovie: 'movie',
   mediaTypeSeries: 'series',
   deleteServer: 'Delete {serverType} Server',
   overrideRules: 'Override Rules',
   overrideRulesDescription:
-    'Override rules allow you to specify properties that will be replaced if a request matches the rule.',
+    'Override rules change a request’s settings when it matches.',
   addrule: 'New Override Rule',
 });
 

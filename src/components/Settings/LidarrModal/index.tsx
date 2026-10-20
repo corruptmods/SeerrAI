@@ -54,7 +54,7 @@ const messages = defineMessages('components.Settings.LidarrModal', {
   qualityprofile: 'Quality Profile',
   metadataprofile: 'Metadata Profile',
   metadataprofileHelp:
-    'Which kinds of release (albums, EPs, singles, live albums) Lidarr lists for an artist it adds. The request window starts with these kinds ticked.',
+    'Which release kinds Lidarr lists for new artists. Requests start with these ticked.',
   rootfolder: 'Root Folder',
   selectQualityProfile: 'Select quality profile',
   selectMetadataProfile: 'Select metadata profile',
@@ -70,8 +70,7 @@ const messages = defineMessages('components.Settings.LidarrModal', {
   tags: 'Tags',
   enableSearch: 'Enable Automatic Search',
   tagRequests: 'Tag Requests',
-  tagRequestsInfo:
-    "Automatically add an additional tag with the requester's user ID & display name to the artist",
+  tagRequestsInfo: 'Tag each artist with the requester’s user ID and name',
   validationApplicationUrl: 'You must provide a valid URL',
   validationApplicationUrlTrailingSlash: 'URL must not end in a trailing slash',
   validationBaseUrlLeadingSlash: 'URL base must have a leading slash',
@@ -80,13 +79,12 @@ const messages = defineMessages('components.Settings.LidarrModal', {
   selecttags: 'Select tags',
   apiKeyHelp: 'Find it in Lidarr: Settings > General > Security > API Key',
   baseUrlHelp:
-    'If you set a URL Base in Lidarr (Settings > General > Host), enter it here (e.g. /lidarr). Leave blank otherwise.',
+    'Only if Lidarr has a URL Base (Settings > General > Host), such as /lidarr.',
   externalUrlHelp:
-    'For clickable links on artist pages when the hostname is not reachable from outside your network.',
+    'For links on artist pages, if the address above isn’t reachable from outside.',
   syncEnabledHelp:
-    'Scan Lidarr for the artists and albums it already has, so they show as available and are not requested again.',
-  enableSearchHelp:
-    'Automatically trigger a search in Lidarr when a request is approved.',
+    'Mark what Lidarr already has as available, so it isn’t requested again.',
+  enableSearchHelp: 'Search in Lidarr as soon as a request is approved.',
 });
 
 interface LidarrModalProps {

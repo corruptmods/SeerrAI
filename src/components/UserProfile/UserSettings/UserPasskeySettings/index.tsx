@@ -31,7 +31,7 @@ const messages = defineMessages(
   'components.UserProfile.UserSettings.UserPasskeySettings',
   {
     passkeys: 'Passkeys',
-    hint: 'Sign in with Face ID, Touch ID, Windows Hello or a security key instead of your Plex account. Add one on each device you use; a passkey saved to a password manager also works on your other devices signed in to it.',
+    hint: 'Sign in with Face ID, Touch ID, Windows Hello or a security key. Add one on each device you use.',
     add: 'Add a Passkey',
     none: 'No passkeys yet.',
     added: 'Added {date}',
@@ -49,7 +49,7 @@ const messages = defineMessages(
       'This browser cannot use passkeys. Passkeys you have added on other devices still work there.',
     onlyYours: 'Passkeys can only be managed by their owner.',
     othersHint:
-      'Remove a passkey for a device that is lost or no longer theirs. Only they can add a passkey.',
+      'Remove a passkey for a lost or old device. Only they can add one.',
     othersNone: 'No passkeys.',
   }
 );

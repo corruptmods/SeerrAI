@@ -14,6 +14,7 @@ import {
   useMusicRequest,
 } from '@app/components/Music/MusicRequest/shared';
 import RequestModal from '@app/components/RequestModal';
+import RequestServerIssue from '@app/components/RequestServerIssue';
 import useNearScreen, { NearScreen, bothRefs } from '@app/hooks/useNearScreen';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -197,6 +198,7 @@ const MusicRequestItem = ({
                   className="py-0.5 sm:py-1"
                 />
               )}
+            <RequestServerIssue request={requestData} className="py-0.5" />
             <div className="card-field">
               <span className="card-field-name">
                 {intl.formatMessage(messages.requested)}
@@ -226,23 +228,42 @@ const MusicRequestItem = ({
           </div>
         </div>
         <div className="z-10 mt-4 flex w-full flex-col justify-center space-y-2 pl-4 pr-4 xl:mt-0 xl:w-96 xl:items-end xl:pl-0">
+          {/* Retry, or first send it to another Lidarr, profile or
+              folder. Side by side, as Approve and Decline are. */}
           {requestData.status === MediaRequestStatus.FAILED && manages && (
-            <Button
-              className="w-full"
-              buttonType="primary"
-              disabled={isRetrying}
-              onClick={() => retry()}
-            >
-              <ArrowPathIcon
-                className={isRetrying ? 'animate-spin' : ''}
-                style={{ animationDirection: 'reverse' }}
-              />
-              <span>
-                {intl.formatMessage(
-                  isRetrying ? globalMessages.retrying : globalMessages.retry
-                )}
+            <div className="flex w-full flex-row space-x-2">
+              <span className="w-full">
+                <Button
+                  className="w-full"
+                  buttonType="primary"
+                  disabled={isRetrying}
+                  onClick={() => retry()}
+                >
+                  <ArrowPathIcon
+                    className={isRetrying ? 'animate-spin' : ''}
+                    style={{ animationDirection: 'reverse' }}
+                  />
+                  <span>
+                    {intl.formatMessage(
+                      isRetrying
+                        ? globalMessages.retrying
+                        : globalMessages.retry
+                    )}
+                  </span>
+                </Button>
               </span>
-            </Button>
+              <span className="w-full">
+                <Button
+                  className="w-full"
+                  buttonType="default"
+                  disabled={isRetrying}
+                  onClick={() => setShowEditModal(true)}
+                >
+                  <PencilIcon />
+                  <span>{intl.formatMessage(globalMessages.edit)}</span>
+                </Button>
+              </span>
+            </div>
           )}
           {!pending && manages && (
             <ConfirmButton

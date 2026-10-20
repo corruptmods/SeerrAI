@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Το αίτημα μουσικής απορρίφθηκε",
   "notifications.events.musicFailed": "Το αίτημα μουσικής απέτυχε",
   "notifications.events.musicPending": "Νέο αίτημα μουσικής",
-  "notifications.events.musicRequestAvailable": "Η μουσική που ζητήθηκε είναι πλέον διαθέσιμη"
+  "notifications.events.musicRequestAvailable": "Η μουσική που ζητήθηκε είναι πλέον διαθέσιμη",
+  "notifications.events.wrongMatch": "Λάθος αντιστοίχιση"
 }

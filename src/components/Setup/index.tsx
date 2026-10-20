@@ -40,7 +40,7 @@ const messages = defineMessages('components.Setup', {
   configuremediaserver: 'Configure Media Server',
   configureservices: 'Configure Services',
   librarieserror:
-    'Unable to load libraries from your media server. Check that it is reachable and still configured correctly.',
+    'Couldn’t load libraries. Check the media server is reachable and set up.',
 });
 
 const Setup = () => {

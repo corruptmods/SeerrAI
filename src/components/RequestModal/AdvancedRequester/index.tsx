@@ -50,8 +50,7 @@ const messages = defineMessages('components.RequestModal.AdvancedRequester', {
   selecttags: 'Select tags',
   notagoptions: 'No tags.',
   ignoreQuotaTitle: 'Bypass User Quota',
-  ignoreQuotaDescription:
-    "This request will not count against the user's quota limits. Use with caution.",
+  ignoreQuotaDescription: 'Won’t count against the user’s quota.',
 });
 
 export type RequestOverrides = {

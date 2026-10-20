@@ -12,7 +12,7 @@ import useSWR from 'swr';
 const messages = defineMessages('components.Discover.PlexWatchlistSlider', {
   plexwatchlist: 'Your Watchlist',
   emptywatchlist:
-    'Media added to your <PlexWatchlistSupportLink>Plex Watchlist</PlexWatchlistSupportLink> will appear here.',
+    'Titles on your <PlexWatchlistSupportLink>Plex Watchlist</PlexWatchlistSupportLink> show here.',
   emptywatchlistSeerr: 'Titles you add to your watchlist will appear here.',
 });
 

@@ -10,8 +10,7 @@ import useSWR from 'swr';
 
 const messages = defineMessages('components.MediaLists.ShareListModal', {
   title: 'Share "{name}"',
-  description:
-    'Choose who can see this list. Only you and the people you pick will see it. You can change this later.',
+  description: 'Only you and the people you pick can see this list.',
   save: 'Share',
   skip: 'Keep Private',
   nousers: 'There are no other users to share with.',

@@ -11,15 +11,14 @@ import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.PushOptIn', {
   prompttitle: 'Get notified when it is ready',
-  promptdescription:
-    'This device is not set up for notifications yet. It only takes a moment.',
+  promptdescription: 'This device isn’t set up for notifications yet.',
   promptaction: 'Enable notifications',
   deniedtitle: 'Notifications are blocked',
   denieddescription:
-    'Your browser will not ask again. Allow notifications for this site in your browser settings, then reload this page.',
+    'Allow notifications for this site in your browser settings, then reload.',
   blockedtitle: 'This browser will not allow notifications',
   blockeddescription:
-    'Some browsers disable push notifications by default. Check your browser privacy settings, or use a different browser.',
+    'This browser blocks push notifications. Check its privacy settings, or try another browser.',
   installtitle: 'Add Seerr AI to your home screen',
   installdescription:
     'iPhone and iPad only allow notifications from installed apps.',
@@ -28,10 +27,10 @@ const messages = defineMessages('components.PushOptIn', {
   installstepopen: 'Open Seerr AI from the new icon',
   webviewtitle: 'Open Seerr AI in your browser',
   webviewdescription:
-    'Notifications are not available inside this app. Open this page in Safari or Chrome to turn them on.',
+    'Notifications don’t work in this app. Open this page in Safari or Chrome.',
   unsupportedtitle: 'Notifications are not available here',
   unsupporteddescription:
-    'This browser does not support push notifications. You can still be notified by email or Discord from your notification settings.',
+    'This browser can’t do push notifications. Email or Discord still work.',
 });
 
 interface PushOptInContentProps {

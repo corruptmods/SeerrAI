@@ -40,8 +40,7 @@ const messages = defineMessages('components.RequestList', {
   sortAdded: 'Most Recent',
   sortModified: 'Last Modified',
   sortDirection: 'Toggle Sort Direction',
-  unableToConnect:
-    'Unable to connect to {services}. Some information may be unavailable.',
+  unableToConnect: 'Can’t reach {services}, so some details may be missing.',
 });
 
 enum Filter {

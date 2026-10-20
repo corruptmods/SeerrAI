@@ -27,7 +27,7 @@ describe('coming back turned away by a provider', () => {
         { id: 'components.Login.SingleSignOn.notAllowed' },
         { provider: 'Our Authentik' }
       ),
-      "Your Our Authentik account isn't allowed to use this server. Ask an admin if you think it should be."
+      'Your Our Authentik account isn’t allowed here. Ask an admin if that’s wrong.'
     );
   });
 

@@ -429,7 +429,7 @@ const UserGeneralSettings = () => {
                 </div>
               </div>
               <div className="form-row">
-                <label htmlFor="streamingRegionTip" className="text-label">
+                <label htmlFor="streamingRegion" className="text-label">
                   <span>{intl.formatMessage(messages.streamingRegion)}</span>
                   <span className="label-tip">
                     {intl.formatMessage(messages.streamingRegionTip)}

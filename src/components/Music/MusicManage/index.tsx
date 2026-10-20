@@ -28,13 +28,13 @@ const messages = defineMessages('components.Music.MusicManage', {
   openInLidarr: 'Open in Lidarr',
   searchMissing: 'Search Lidarr for Missing Albums',
   searchMissingHelp:
-    'Asks Lidarr to search now for each album asked for that it has no files for yet.',
+    'Asks Lidarr to search now for requested albums it has no files for.',
   searchStarted:
     '{count, plural, one {Searching for # missing album} other {Searching for # missing albums}} in {service}.',
   searchFailed: 'Could not start the search.',
   clearData: 'Clear Data',
   clearDataWarning:
-    '* This removes everything Seerr AI keeps about this artist, their albums and every request for them. Nothing is taken out of Lidarr. Albums in your {mediaServerName} music library come back with the next music scan.',
+    '* Removes all Seerr AI data and requests for this artist. Lidarr is untouched; albums on {mediaServerName} return with the next scan.',
   clearDataFailed: 'Something went wrong while clearing the artist’s data.',
 });
 

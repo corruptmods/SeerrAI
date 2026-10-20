@@ -21,19 +21,19 @@ const messages = defineMessages('components.Backfill.ApproveModal', {
   missingMovie: 'The missing movie',
   missingDetail: '{files} files · {size} · nothing on disk is touched',
   onlyFiles:
-    'Only these files are downloaded; the torrent client skips the rest of the pack. Once {app} has imported them, the download is removed, with no seeding.',
+    'Only these files are downloaded. After {app} imports them, the torrent is removed without seeding.',
   usenetWhole:
-    'The Usenet client downloads the whole NZB; only these files are imported. The job is removed from it afterwards.',
+    'The whole NZB is downloaded, but only these files are imported.',
   deleteWarning:
-    '{count} {count, plural, one {file} other {files}} on disk will be permanently deleted as their replacements import ({app}’s recycle bin is off).',
+    '{count} {count, plural, one {file is} other {files are}} deleted for good as replacements import ({app}’s recycle bin is off).',
   typeToConfirm: 'Type {series} to confirm',
   includeAi:
     'Include the {count} {count, plural, one {file} other {files}} the AI placed',
   includeAiTip:
-    'Their names did not say which episode they are; the AI matched them, and Sonarr agreed with the episode. Check them under Show files first.',
+    'Their names didn’t say which episode; the AI placed them. Check under Show files first.',
   failed: 'The pack could not be approved.',
   unavailable:
-    'This pack is no longer waiting for approval: it was approved, skipped or dropped since this opened. Close this and choose again.',
+    'This pack is no longer waiting for approval. Close this and choose again.',
 });
 
 const ApproveModal = ({

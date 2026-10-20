@@ -1,3 +1,4 @@
+import type { PersonalApiKeyAccess } from '@server/constants/apiKeys';
 import type { MediaServerKind } from '@server/constants/server';
 import type { ThemeDefaults } from '@server/constants/theme';
 import type { SeasonCalendar } from '@server/lib/seasons';
@@ -46,6 +47,8 @@ export interface PublicSettingsResponse {
   hideRequested: boolean;
   localLogin: boolean;
   mediaServerLogin: boolean;
+  /** Who may make their own API keys, for the profile's API Keys tab. */
+  personalApiKeys: PersonalApiKeyAccess;
   /** The connected media servers, the primary one first. */
   mediaServers: {
     kind: MediaServerKind;

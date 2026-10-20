@@ -19,7 +19,7 @@ const messages = defineMessages('components.Backfill.StartSearchModal', {
   movie: 'Movie',
   searchNames: 'Search names',
   searchNamesTip:
-    'Prowlarr is searched under the title and aliases Sonarr or Radarr has. Add the names release groups use, such as a romanised or original title.',
+    'Extra names to search, such as the romanised or original title release groups use.',
   addName: 'Add a name',
   add: 'Add',
   remove: 'Remove {name}',
@@ -27,7 +27,7 @@ const messages = defineMessages('components.Backfill.StartSearchModal', {
   starting: 'Starting…',
   failed: 'The search could not be started.',
   takesAWhile:
-    'Searching every indexer and opening the most likely packs takes a few minutes. Its page shows what was found.',
+    'This takes a few minutes. The title’s page shows what was found.',
 });
 
 export interface LibraryTitle {

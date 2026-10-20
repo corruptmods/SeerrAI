@@ -6,11 +6,11 @@ import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
 import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
+import notificationHttp from '@server/lib/notifications/http';
 import type { NotificationAgentPushbullet } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import type { AvailableLocale } from '@server/types/languages';
-import axios from 'axios';
 import {
   Notification,
   hasNotificationType,
@@ -149,7 +149,7 @@ class PushbulletAgent
       try {
         const notificationPayload = this.getNotificationPayload(type, payload);
 
-        await axios.post(
+        await notificationHttp.post(
           endpoint,
           { ...notificationPayload, channel_tag: settings.options.channelTag },
           {
@@ -197,7 +197,7 @@ class PushbulletAgent
             payload.notifyUser.settings?.locale as AvailableLocale
           );
 
-          await axios.post(endpoint, notificationPayload, {
+          await notificationHttp.post(endpoint, notificationPayload, {
             headers: {
               'Access-Token': payload.notifyUser.settings.pushbulletAccessToken,
             },
@@ -251,7 +251,7 @@ class PushbulletAgent
                   user.settings?.locale as AvailableLocale
                 );
 
-                await axios.post(endpoint, notificationPayload, {
+                await notificationHttp.post(endpoint, notificationPayload, {
                   headers: {
                     'Access-Token': user.settings.pushbulletAccessToken,
                   },

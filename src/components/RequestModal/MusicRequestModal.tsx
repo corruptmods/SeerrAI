@@ -12,6 +12,9 @@ import {
   requestable,
   yearOf,
 } from '@app/components/Music/musicHelpers';
+import FailedRequestAlert, {
+  failedMessages,
+} from '@app/components/RequestModal/FailedRequestAlert';
 import type { MusicOverrides } from '@app/components/RequestModal/MusicAdvancedRequester';
 import MusicAdvancedRequester from '@app/components/RequestModal/MusicAdvancedRequester';
 import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
@@ -19,7 +22,12 @@ import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import { MediaStatus, VARIOUS_ARTISTS_MBID } from '@server/constants/media';
+import { retryErrorMessage } from '@app/utils/requestServerIssue';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  VARIOUS_ARTISTS_MBID,
+} from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { NonFunctionProperties } from '@server/interfaces/api/common';
 import type {
@@ -71,8 +79,7 @@ const messages = defineMessages('components.RequestModal.MusicRequestModal', {
   noReleases: 'MusicBrainz lists no releases for this artist.',
   variousArtists:
     'Lidarr cannot add Various Artists, so their compilations cannot be requested.',
-  fromProfile:
-    'Ticked to begin with: what the Lidarr metadata profile lists for an artist.',
+  fromProfile: 'Starts with what the Lidarr metadata profile lists.',
 });
 
 interface MusicRequestModalProps {
@@ -118,14 +125,19 @@ const MusicRequestModal = ({
         ? [albumMbid]
         : null
   );
+  // A request whose Lidarr was removed starts from the default server and
+  // that server's own settings, as a new request would.
+  const kept = editRequest?.serverIssue ? undefined : editRequest;
   const [overrides, setOverrides] = useState<MusicOverrides>({
-    server: editRequest?.serverId ?? undefined,
-    profile: editRequest?.profileId ?? undefined,
-    metadataProfile: editRequest?.metadataProfileId ?? undefined,
-    folder: editRequest?.rootFolder ?? undefined,
-    tags: editRequest?.tags ?? undefined,
+    server: kept?.serverId ?? undefined,
+    profile: kept?.profileId ?? undefined,
+    metadataProfile: kept?.metadataProfileId ?? undefined,
+    folder: kept?.rootFolder ?? undefined,
+    tags: kept?.tags ?? undefined,
     userId: editRequest?.requestedBy.id,
   });
+  // A failed request is changed by a request manager and then retried.
+  const isFailed = editRequest?.status === MediaRequestStatus.FAILED;
   const advanced = hasPermission(
     [Permission.REQUEST_ADVANCED, Permission.MANAGE_REQUESTS],
     { type: 'or' }
@@ -319,14 +331,20 @@ const MusicRequestModal = ({
         ...choices(),
         userId: overrides.userId,
       });
-      if (alsoApprove) {
+      if (isFailed) {
+        await axios.post(`/api/v1/request/${editRequest.id}/retry`);
+      } else if (alsoApprove) {
         await axios.post(`/api/v1/request/${editRequest.id}/approve`);
       }
       refresh();
       addToast(
         <span>
           {intl.formatMessage(
-            alsoApprove ? messages.requestApproved : messages.requestedited,
+            isFailed
+              ? failedMessages.retried
+              : alsoApprove
+                ? messages.requestApproved
+                : messages.requestedited,
             {
               title,
               strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
@@ -335,12 +353,22 @@ const MusicRequestModal = ({
         </span>,
         { appearance: 'success', autoDismiss: true }
       );
-      onComplete?.(MediaStatus.PENDING);
+      onComplete?.(isFailed ? MediaStatus.PROCESSING : MediaStatus.PENDING);
     } catch (e) {
-      addToast(errorMessage(e) ?? intl.formatMessage(messages.errorediting), {
-        appearance: 'error',
-        autoDismiss: true,
-      });
+      addToast(
+        isFailed
+          ? retryErrorMessage(
+              e,
+              intl,
+              false,
+              intl.formatMessage(messages.errorediting)
+            )
+          : (errorMessage(e) ?? intl.formatMessage(messages.errorediting)),
+        {
+          appearance: 'error',
+          autoDismiss: true,
+        }
+      );
     } finally {
       setIsUpdating(false);
     }
@@ -530,25 +558,37 @@ const MusicRequestModal = ({
         loading={!artist && !artistError}
         backgroundClickable
         onCancel={onCancel}
-        title={intl.formatMessage(messages.pendingrequest)}
+        title={intl.formatMessage(
+          isFailed ? failedMessages.title : messages.pendingrequest
+        )}
         subTitle={artist?.name}
         onOk={() => updateRequest(manages)}
         okDisabled={isUpdating || !chosen.length}
-        okText={intl.formatMessage(manages ? messages.approve : messages.edit)}
-        okButtonType={manages ? 'success' : 'primary'}
-        onSecondary={isOwner ? () => cancelRequest() : undefined}
+        okText={intl.formatMessage(
+          isFailed
+            ? failedMessages.saveAndRetry
+            : manages
+              ? messages.approve
+              : messages.edit
+        )}
+        okButtonType={manages && !isFailed ? 'success' : 'primary'}
+        onSecondary={isOwner && !isFailed ? () => cancelRequest() : undefined}
         secondaryDisabled={isUpdating}
         secondaryText={
-          isOwner ? intl.formatMessage(messages.cancel) : undefined
+          isOwner && !isFailed ? intl.formatMessage(messages.cancel) : undefined
         }
         secondaryButtonType="danger"
         cancelText={intl.formatMessage(globalMessages.close)}
       >
-        {isOwner
-          ? intl.formatMessage(messages.pendingapproval)
-          : intl.formatMessage(messages.requestfrom, {
-              username: editRequest.requestedBy.displayName,
-            })}
+        {isFailed ? (
+          <FailedRequestAlert request={editRequest} />
+        ) : isOwner ? (
+          intl.formatMessage(messages.pendingapproval)
+        ) : (
+          intl.formatMessage(messages.requestfrom, {
+            username: editRequest.requestedBy.displayName,
+          })
+        )}
         {albumList}
         {advancedOptions}
       </Modal>

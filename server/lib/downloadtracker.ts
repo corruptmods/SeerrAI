@@ -51,6 +51,11 @@ export interface DownloadingItem {
   episode?: EpisodeNumberResult;
   /** Music: the album it is for. `externalId` is then Lidarr's artist. */
   album?: { id: number; title: string; foreignAlbumId: string };
+  /**
+   * Imported, but this media server matched it to another title (or none)
+   * and has yet to be put right: the title waits for it (lib/matchWatch).
+   */
+  matching?: string;
 }
 
 interface QueueFields {
@@ -224,11 +229,24 @@ export const IMPORTED_SCAN_DELAY_MS = 60_000;
  */
 export const IMPORTED_SCAN_TRIES = 4;
 
+/**
+ * A title imported that a media server matched wrongly, still to be put
+ * right: for Lidarr, `externalId` is the artist and `albumId` the album.
+ */
+export interface MatchWait {
+  kind: ImportedDownload['kind'];
+  serverId: number;
+  externalId: number;
+  albumId?: number;
+  mediaServer: string;
+  title: string;
+}
+
 /** Stages from which leaving the queue means it was imported. */
 const DONE_STAGES: DownloadStage[] = ['importing', 'finishing'];
 
 /** A download that left the queue because it was imported, held a while. */
-interface ImportedDownload {
+export interface ImportedDownload {
   kind: 'movie' | 'series' | 'music';
   serverId: number;
   item: DownloadingItem;
@@ -262,7 +280,79 @@ class DownloadTracker {
   /** Imported downloads still shown until the media server lists them. */
   private imported = new Map<string, ImportedDownload>();
   private onImport?: () => Promise<void> | void;
+  private onImported?: (imported: ImportedDownload[]) => Promise<void> | void;
   private importTimer?: ReturnType<typeof setTimeout>;
+  private matchWaits: MatchWait[] = [];
+
+  /**
+   * What to do with each import as soon as it is seen (the check of new
+   * requests' matches). Set again, it replaces what was set.
+   */
+  public onEachImport(
+    run: (imported: ImportedDownload[]) => Promise<void> | void
+  ) {
+    this.onImported = run;
+  }
+
+  /** Titles a media server has yet to match rightly (lib/matchWatch). */
+  public setMatchWaits(waits: MatchWait[]) {
+    this.matchWaits = waits;
+  }
+
+  /**
+   * A title imported but matched wrongly, once its import is no longer
+   * shown: still being added to the library, waiting for the server.
+   */
+  private waitingFor(
+    kind: ImportedDownload['kind'],
+    serverId: number,
+    externalId: number
+  ): DownloadingItem[] {
+    return this.matchWaits
+      .filter(
+        (w) =>
+          w.kind === kind &&
+          w.serverId === serverId &&
+          w.externalId === externalId
+      )
+      .map((w) => ({
+        mediaType:
+          kind === 'movie'
+            ? MediaType.MOVIE
+            : kind === 'music'
+              ? MediaType.MUSIC
+              : MediaType.TV,
+        externalId,
+        // All in: what is left is the server's part.
+        size: 1,
+        sizeLeft: 0,
+        status: 'imported',
+        stage: 'imported',
+        timeLeft: '',
+        title: w.title,
+        downloadId: `match:${w.mediaServer}:${w.albumId ?? externalId}`,
+        album: w.albumId
+          ? { id: w.albumId, title: w.title, foreignAlbumId: '' }
+          : undefined,
+        matching: w.mediaServer,
+      }));
+  }
+
+  /** What was imported for a title, or else what waits on its match. */
+  private importedOrWaiting(
+    kind: ImportedDownload['kind'],
+    serverId: number,
+    externalId: number
+  ): DownloadingItem[] {
+    const imported = this.importedFor(kind, serverId, externalId);
+    // The import itself is shown for as long as it is held; an album only
+    // gives way to its own import, not to another album's.
+    const waiting = this.waitingFor(kind, serverId, externalId).filter(
+      (w) =>
+        !imported.some((i) => kind !== 'music' || i.album?.id === w.album?.id)
+    );
+    return [...imported, ...waiting];
+  }
 
   /**
    * What to do a minute after downloads are imported (the media server's
@@ -285,15 +375,14 @@ class DownloadTracker {
     now = Date.now()
   ) {
     const still = new Set(after.map(itemKey));
-    let any = false;
+    const imported: ImportedDownload[] = [];
     for (const item of before) {
       if (still.has(itemKey(item)) || !leftImported(item)) continue;
-      any = true;
       for (const serverId of serverIds) {
-        this.hold(kind, serverId, item, now);
+        imported.push(this.hold(kind, serverId, item, now));
       }
     }
-    if (any) this.importedNow();
+    if (imported.length) this.importedNow(imported);
   }
 
   /** Shows a download as being added to the library, until it is listed. */
@@ -302,8 +391,8 @@ class DownloadTracker {
     serverId: number,
     item: DownloadingItem,
     now: number
-  ) {
-    this.imported.set(`${kind}:${serverId}:${itemKey(item)}`, {
+  ): ImportedDownload {
+    const held: ImportedDownload = {
       kind,
       serverId,
       at: now,
@@ -315,12 +404,24 @@ class DownloadTracker {
         timeLeft: '',
         estimatedCompletionTime: undefined,
       },
-    });
+    };
+    this.imported.set(`${kind}:${serverId}:${itemKey(item)}`, held);
+    return held;
   }
 
-  private importedNow() {
+  private importedNow(imported: ImportedDownload[]) {
     // Several imports close together make one scan.
     if (this.onImport) this.scanSoon(1);
+    if (this.onImported) {
+      Promise.resolve()
+        .then(() => this.onImported?.(imported))
+        .catch((e) =>
+          logger.warn('Could not note what was imported', {
+            label: 'Download Tracker',
+            errorMessage: e instanceof Error ? e.message : String(e),
+          })
+        );
+    }
   }
 
   private scanSoon(attempt: number) {
@@ -450,14 +551,13 @@ class DownloadTracker {
     now = Date.now()
   ) {
     const shown = new Set(this.backfill.map(backfillKey));
-    let any = false;
+    const held: ImportedDownload[] = [];
     for (const done of imported) {
       if (!shown.has(backfillKey(done))) continue;
-      any = true;
-      this.hold(done.kind, done.serverId, done.item, now);
+      held.push(this.hold(done.kind, done.serverId, done.item, now));
     }
     this.backfill = downloads;
-    if (any) this.importedNow();
+    if (held.length) this.importedNow(held);
   }
 
   private backfillFor(
@@ -489,7 +589,7 @@ class DownloadTracker {
       ...this.backfillFor('movie', serverId, externalServiceId),
     ]
       .map(this.withLive)
-      .concat(this.importedFor('movie', serverId, externalServiceId));
+      .concat(this.importedOrWaiting('movie', serverId, externalServiceId));
   }
 
   public getSeriesProgress(
@@ -503,7 +603,7 @@ class DownloadTracker {
       ...this.backfillFor('series', serverId, externalServiceId),
     ]
       .map(this.withLive)
-      .concat(this.importedFor('series', serverId, externalServiceId));
+      .concat(this.importedOrWaiting('series', serverId, externalServiceId));
   }
 
   /**
@@ -520,7 +620,9 @@ class DownloadTracker {
     return (this.lidarrServers[serverId] ?? [])
       .filter((item) => item.externalId === artistId && forAlbum(item))
       .map(this.withLive)
-      .concat(this.importedFor('music', serverId, artistId).filter(forAlbum));
+      .concat(
+        this.importedOrWaiting('music', serverId, artistId).filter(forAlbum)
+      );
   }
 
   public async resetDownloadTracker() {

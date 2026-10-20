@@ -30,18 +30,17 @@ const messages = defineMessages('components.UserList', {
     'Plex import completed. No users were created or refreshed.',
   importfromplexsynced:
     'Plex users synced successfully. Existing users were refreshed.',
-  syncnotice:
-    'You can still click Sync to refresh existing Plex users, such as updated email or username details.',
+  syncnotice: 'Sync refreshes existing Plex users’ email and username.',
   importedfromplex:
-    '<strong>{userCount}</strong> Plex {userCount, plural, one {user} other {users}} imported successfully!',
+    '<strong>{userCount}</strong> Plex {userCount, plural, one {user} other {users}} imported.',
   importedPlexUsersNoPassword:
-    'Imported users do not have a {applicationTitle} password set. If you disable Plex sign-in, they will need to set a password from their profile or via a password reset link.',
+    'Imported users have no {applicationTitle} password. Without Plex sign-in, they’ll need to set one.',
   user: 'User',
   nouserstoimport: 'There are no Plex users to import.',
   plexImportSkipped:
-    'Not imported, as another account already has their email: {names}. They can sign in with that account and link Plex from their profile.',
+    'Not imported, as another account already has their email: {names}. They can sign in with it and link Plex.',
   newplexsigninenabled:
-    'The <strong>Enable New Plex Sign-In</strong> setting is currently enabled. Plex users with library access do not need to be imported in order to sign in.',
+    '<strong>Enable New Plex Sign-In</strong> is on, so Plex users with library access can sign in without being imported.',
 });
 
 const PlexImportModal = ({ onCancel, onComplete }: PlexImportProps) => {

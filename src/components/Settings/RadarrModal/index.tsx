@@ -50,12 +50,10 @@ const messages = defineMessages('components.Settings.RadarrModal', {
   animequalityprofile: 'Anime Quality Profile',
   animerootfolder: 'Anime Root Folder',
   animeTags: 'Anime Tags',
-  animeHelp:
-    "For anime movies: TMDB's anime keyword, or Japanese animation. Left unset, anime uses the settings above.",
+  animeHelp: 'For anime movies. Left unset, anime uses the settings above.',
   minimumAvailability: 'Minimum Availability',
   server4k: '4K Server',
-  server4kHelp:
-    'Only if you have a separate 4K instance. Leave unchecked for a single server.',
+  server4kHelp: 'Only for a separate 4K instance.',
   selectQualityProfile: 'Select quality profile',
   selectRootFolder: 'Select root folder',
   selectMinimumAvailability: 'Select minimum availability',
@@ -68,8 +66,7 @@ const messages = defineMessages('components.Settings.RadarrModal', {
   tags: 'Tags',
   enableSearch: 'Enable Automatic Search',
   tagRequests: 'Tag Requests',
-  tagRequestsInfo:
-    "Automatically add an additional tag with the requester's user ID & display name",
+  tagRequestsInfo: 'Tag each title with the requester’s user ID and name',
   validationApplicationUrl: 'You must provide a valid URL',
   validationApplicationUrlTrailingSlash: 'URL must not end in a trailing slash',
   validationBaseUrlLeadingSlash: 'URL base must have a leading slash',
@@ -81,13 +78,12 @@ const messages = defineMessages('components.Settings.RadarrModal', {
   released: 'Released',
   apiKeyHelp: 'Find it in Radarr: Settings > General > Security > API Key',
   baseUrlHelp:
-    'If you set a URL Base in Radarr (Settings > General > Host), enter it here (e.g. /radarr). Leave blank otherwise.',
+    'Only if Radarr has a URL Base (Settings > General > Host), such as /radarr.',
   externalUrlHelp:
-    'For clickable links on media pages when the hostname is not reachable from outside your network.',
+    'For links on title pages, if the address above isn’t reachable from outside.',
   syncEnabledHelp:
-    'Scan Radarr for existing media and request status so users cannot request content already available.',
-  enableSearchHelp:
-    'Automatically trigger a search in Radarr when a request is approved.',
+    'Mark what Radarr already has as available, so it isn’t requested again.',
+  enableSearchHelp: 'Search in Radarr as soon as a request is approved.',
 });
 
 interface RadarrModalProps {
@@ -664,6 +660,7 @@ const RadarrModal = ({ onClose, radarr, onSave }: RadarrModalProps) => {
                   </label>
                   <div className="form-input-area">
                     <Select<OptionType, true>
+                      inputId="tags"
                       options={
                         isValidated
                           ? testResponse.tags.map((tag) => ({

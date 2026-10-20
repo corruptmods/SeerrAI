@@ -32,24 +32,22 @@ const messages = defineMessages('components.Settings.OidcProviderModal', {
   nameTip: 'Shown on the sign-in button: "Sign in with {name}".',
   redirectUrl: 'Redirect URL',
   redirectUrlTip:
-    'Paste this into the provider as the redirect (callback) URL of the client you make there for Seerr AI.',
+    'Paste this into the provider as the redirect (callback) URL.',
   redirectUrlCopied: 'Redirect URL copied.',
-  noApplicationUrl:
-    'Set the Application URL in Settings → General first: it is the start of this address.',
+  noApplicationUrl: 'Set the Application URL in Settings → General first.',
   issuerUrl: 'Issuer URL',
   issuerUrlTip:
-    'Exactly as the provider shows it, a slash at the end included or not. For example https://auth.example.com/application/o/seerr/ (Authentik), https://auth.example.com (Authelia), https://sso.example.com/realms/home (Keycloak), https://accounts.google.com.',
+    'Exactly as the provider shows it, including any trailing slash.',
   issuerUrlEdit:
-    'Changing it means a different provider: links people made to this one stop working, and they have to link it again. To add a different provider, add it as a new one instead.',
+    'Changing it breaks people’s links to this provider. For a different provider, add a new one.',
   issuerUrlChanged:
-    'With a new issuer URL, everyone’s links to this provider stop working. Each person has to sign in another way and link it again in their profile.',
+    'A new issuer URL breaks everyone’s links to this provider. They’ll need to link it again.',
   clientId: 'Client ID',
   clientSecret: 'Client Secret',
   clientSecretTip: 'Make the client "confidential" in the provider.',
   savedSecret: 'Saved. Leave blank to keep it.',
   logoUrl: 'Button Logo',
-  logoUrlTip:
-    'An https:// address of a small picture for the sign-in button. Optional.',
+  logoUrlTip: 'Optional https:// image for the sign-in button.',
   scopes: 'Scopes',
   scopesTip:
     'What Seerr AI asks the provider for. "openid" is always asked for.',
@@ -57,10 +55,10 @@ const messages = defineMessages('components.Settings.OidcProviderModal', {
   enabledTip: 'Show this provider on the sign-in page and in Linked Accounts.',
   newUserSignUp: 'Let New People Sign Up',
   newUserSignUpTip:
-    'Someone who signs in with this provider and has no account here gets one, with the default permissions. When off, only people who have linked this provider in their profile can sign in with it.',
+    'Creates an account, with default permissions, for anyone new. Off: only people who linked it can sign in.',
   whoCanSignIn: 'Who Can Sign In',
   whoCanSignInTip:
-    'Leave empty to let anyone with an account on {provider} in. Add a rule to only let in people whose login says so, for example the claim <code>groups</code> containing <code>seerr-users</code>.',
+    'Empty lets in anyone on {provider}. Rules limit it, such as <code>groups</code> containing <code>seerr-users</code>.',
   claim: 'Claim',
   value: 'Value',
   addRule: 'Add Rule',
@@ -90,11 +88,11 @@ const messages = defineMessages('components.Settings.OidcProviderModal', {
   problemIssuerMismatchUnsaid:
     'The provider gives a different issuer URL. Enter it exactly as the provider shows it.',
   problemNoDiscovery:
-    'No sign-in details were found at that address (it answered {status}). Check the issuer URL: Seerr AI reads /.well-known/openid-configuration under it.',
+    'No sign-in details at that address (it answered {status}). Check the issuer URL.',
   problemNoDiscoveryUnsaid:
-    'No sign-in details were found at that address. Check the issuer URL: Seerr AI reads /.well-known/openid-configuration under it.',
+    'No sign-in details at that address. Check the issuer URL.',
   problemAppAddress:
-    'Some providers give each app its own address: in Authentik it’s {origin}/application/o/<slug>app slug</slug>/, and the provider must be attached to an application.',
+    'Some providers use an address per app: in Authentik, {origin}/application/o/<slug>app slug</slug>/, with the provider attached to an application.',
   problemNotDiscovery:
     'That address answered, but not with sign-in details. Check the issuer URL.',
   problemHostNotFound: '{host} could not be found. Check the issuer URL.',

@@ -16,7 +16,7 @@ import type { MusicLibrary } from '@server/lib/settings';
 const PAGE_SIZE = 500;
 
 /** A provider id, whatever its case; the first when several are given. */
-const providerId = (
+export const providerId = (
   item: JellyfinMusicItem | undefined,
   name: string
 ): string | undefined => {

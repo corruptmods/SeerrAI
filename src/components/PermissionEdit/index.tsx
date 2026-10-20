@@ -9,87 +9,74 @@ import { useIntl } from 'react-intl';
 
 export const messages = defineMessages('components.PermissionEdit', {
   admin: 'Admin',
-  adminDescription:
-    'Full administrator access. Bypasses all other permission checks.',
+  adminDescription: 'Full access. Skips all other permission checks.',
   users: 'Manage Users',
-  usersDescription:
-    'Grant permission to manage users. Users with this permission cannot modify users with or grant the Admin privilege.',
+  usersDescription: 'Can manage users, except admins. Can’t grant Admin.',
   managerequests: 'Manage Requests',
   managerequestsDescription:
-    'Grant permission to manage media requests. All requests made by a user with this permission will be automatically approved.',
+    'Can manage requests. Their own requests are approved automatically.',
   request: 'Request',
-  requestDescription: 'Grant permission to submit requests for non-4K media.',
+  requestDescription: 'Can request in non-4K.',
   requestMovies: 'Request Movies',
-  requestMoviesDescription:
-    'Grant permission to submit requests for non-4K movies.',
+  requestMoviesDescription: 'Can request movies in non-4K.',
   requestTv: 'Request Series',
-  requestTvDescription:
-    'Grant permission to submit requests for non-4K series.',
+  requestTvDescription: 'Can request series in non-4K.',
   requestMusic: 'Request Music',
-  requestMusicDescription:
-    'Grant permission to submit requests for albums, sent to Lidarr.',
+  requestMusicDescription: 'Can request albums, sent to Lidarr.',
   autoapprove: 'Auto-Approve',
-  autoapproveDescription:
-    'Grant automatic approval for all non-4K media requests.',
+  autoapproveDescription: 'All non-4K requests are approved automatically.',
   autoapproveMovies: 'Auto-Approve Movies',
   autoapproveMoviesDescription:
-    'Grant automatic approval for non-4K movie requests.',
+    'Non-4K movie requests are approved automatically.',
   autoapproveSeries: 'Auto-Approve Series',
   autoapproveSeriesDescription:
-    'Grant automatic approval for non-4K series requests.',
+    'Non-4K series requests are approved automatically.',
   autoapproveMusic: 'Auto-Approve Music',
-  autoapproveMusicDescription: 'Grant automatic approval for music requests.',
+  autoapproveMusicDescription: 'Music requests are approved automatically.',
   autoapprove4k: 'Auto-Approve 4K',
-  autoapprove4kDescription:
-    'Grant automatic approval for all 4K media requests.',
+  autoapprove4kDescription: 'All 4K requests are approved automatically.',
   autoapprove4kMovies: 'Auto-Approve 4K Movies',
   autoapprove4kMoviesDescription:
-    'Grant automatic approval for 4K movie requests.',
+    '4K movie requests are approved automatically.',
   autoapprove4kSeries: 'Auto-Approve 4K Series',
   autoapprove4kSeriesDescription:
-    'Grant automatic approval for 4K series requests.',
+    '4K series requests are approved automatically.',
   request4k: 'Request 4K',
-  request4kDescription: 'Grant permission to submit requests for 4K media.',
+  request4kDescription: 'Can request in 4K.',
   request4kMovies: 'Request 4K Movies',
-  request4kMoviesDescription:
-    'Grant permission to submit requests for 4K movies.',
+  request4kMoviesDescription: 'Can request movies in 4K.',
   request4kTv: 'Request 4K Series',
-  request4kTvDescription: 'Grant permission to submit requests for 4K series.',
+  request4kTvDescription: 'Can request series in 4K.',
   advancedrequest: 'Advanced Requests',
-  advancedrequestDescription:
-    'Grant permission to modify advanced media request options.',
+  advancedrequestDescription: 'Can change advanced request options.',
   autorequest: 'Auto-Request',
   autorequestDescription:
-    'Grant permission to automatically submit requests for non-4K media via Plex Watchlist.',
+    'Titles on their watchlist can be requested automatically, in non-4K.',
   autorequestMovies: 'Auto-Request Movies',
   autorequestMoviesDescription:
-    'Grant permission to automatically submit requests for non-4K movies via Plex Watchlist.',
+    'Movies on their watchlist can be requested automatically, in non-4K.',
   autorequestSeries: 'Auto-Request Series',
   autorequestSeriesDescription:
-    'Grant permission to automatically submit requests for non-4K series via Plex Watchlist.',
+    'Series on their watchlist can be requested automatically, in non-4K.',
   viewrequests: 'View Requests',
-  viewrequestsDescription:
-    'Grant permission to view media requests submitted by other users.',
+  viewrequestsDescription: 'Can see other users’ requests.',
   manageissues: 'Manage Issues',
-  manageissuesDescription: 'Grant permission to manage media issues.',
+  manageissuesDescription: 'Can manage issues.',
   createissues: 'Report Issues',
-  createissuesDescription: 'Grant permission to report media issues.',
+  createissuesDescription: 'Can report issues.',
   viewissues: 'View Issues',
-  viewissuesDescription:
-    'Grant permission to view media issues reported by other users.',
+  viewissuesDescription: 'Can see issues others reported.',
   viewrecent: 'View Recently Added',
-  viewrecentDescription:
-    'Grant permission to view the list of recently added media.',
+  viewrecentDescription: 'Can see recently added titles.',
   viewwatchlists: 'View {mediaServerName} Watchlists',
   viewwatchlistsDescription:
-    "Grant permission to view other users' {mediaServerName} Watchlists.",
+    'Can see other users’ {mediaServerName} Watchlists.',
   manageblocklist: 'Manage Blocklist',
-  manageblocklistDescription: 'Grant permission to manage blocklisted media.',
+  manageblocklistDescription: 'Can manage the blocklist.',
   blocklistedItems: 'Blocklist media.',
-  blocklistedItemsDescription: 'Grant permission to blocklist media.',
+  blocklistedItemsDescription: 'Can blocklist titles.',
   viewblocklistedItems: 'View blocklisted media.',
-  viewblocklistedItemsDescription:
-    'Grant permission to view blocklisted media.',
+  viewblocklistedItemsDescription: 'Can see blocklisted titles.',
 });
 
 interface PermissionEditProps {

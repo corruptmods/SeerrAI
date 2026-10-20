@@ -51,31 +51,29 @@ const messages = defineMessages('components.Settings.SettingsMain', {
     'Language used for blocklist content scanning (independent of discover settings)',
   blocklistedTags: 'Blocklist Content with Tags',
   blocklistedTagsTip:
-    'Automatically add content with tags to the blocklist using the "Process Blocklisted Tags" job',
+    'Automatically blocklist titles with these tags ("Process Blocklisted Tags" job)',
   blocklistedTagsLimit: 'Limit Content Blocklisted per Tag',
   blocklistedTagsLimitTip:
-    'The "Process Blocklisted Tags" job will blocklist this many pages into each sort. Larger numbers will create a more accurate blocklist, but use more space.',
+    'Pages per sort the "Process Blocklisted Tags" job blocklists. More is more accurate but uses more space.',
   streamingRegion: 'Streaming Region',
   streamingRegionTip: 'Show streaming sites by regional availability',
   hideBlocklisted: 'Hide Blocklisted Items',
   hideBlocklistedTip:
-    'Hide blocklisted items from discover pages for all users with the "Manage Blocklist" permission',
+    'Hide blocklisted titles from Discover, even for people with "Manage Blocklist"',
   toastApiKeySuccess: 'New API key generated successfully!',
   toastApiKeyFailure: 'Something went wrong while generating a new API key.',
   toastSettingsSuccess: 'Settings saved successfully!',
   toastSettingsFailure: 'Something went wrong while saving settings.',
   hideAvailable: 'Hide Available Media',
-  hideAvailableTip:
-    'Hide available media from the discover pages but not search results',
+  hideAvailableTip: 'Hide available titles from Discover, not from search',
   hideRequested: 'Hide Requested Media',
-  hideRequestedTip:
-    'Hide media that has been requested from the discover pages but not search results',
+  hideRequestedTip: 'Hide requested titles from Discover, not from search',
   cacheImages: 'Enable Image Caching',
   cacheImagesTip:
     'Cache externally sourced images (requires a significant amount of disk space)',
   imageCacheMaxMb: 'Image Cache Size Limit',
   imageCacheMaxMbTip:
-    'In MB. Past this, the least recently viewed images are removed. The smaller AVIF and WebP copies of each image count towards it.',
+    'In MB. Past this, the least recently viewed images go first.',
   validationImageCacheMaxMb: 'Must be a whole number of MB, at least {min}',
   validationApplicationTitle: 'You must provide an application title',
   validationApplicationUrl: 'You must provide a valid URL',
@@ -84,8 +82,7 @@ const messages = defineMessages('components.Settings.SettingsMain', {
   enableSpecialEpisodes: 'Allow Special Episodes Requests',
   locale: 'Display Language',
   youtubeUrl: 'YouTube URL',
-  youtubeUrlTip:
-    'Base URL for YouTube videos if a self-hosted YouTube instance is used.',
+  youtubeUrlTip: 'For a self-hosted YouTube instance',
   versionCheck: 'Version Check',
   versionCheckTip: 'Automatically check for new versions on GitHub.',
   validationUrl: 'You must provide a valid URL',

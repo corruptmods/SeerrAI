@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Kërkesa për muzikë u refuzua",
   "notifications.events.musicFailed": "Kërkesa për muzikë dështoi",
   "notifications.events.musicPending": "Kërkesë e re për muzikë",
-  "notifications.events.musicRequestAvailable": "Muzika e kërkuar tani është e disponueshme"
+  "notifications.events.musicRequestAvailable": "Muzika e kërkuar tani është e disponueshme",
+  "notifications.events.wrongMatch": "Përputhje e gabuar"
 }

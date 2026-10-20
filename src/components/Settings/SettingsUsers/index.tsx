@@ -35,18 +35,16 @@ const messages = defineMessages('components.Settings.SettingsUsers', {
   loginMethods: 'Login Methods',
   loginMethodsTip: 'Configure login methods for users.',
   localLogin: 'Enable Local Sign-In',
-  localLoginTip:
-    'Allow users to sign in using their email address and password',
+  localLoginTip: 'Sign in with email and password',
   mediaServerLogin: 'Enable {mediaServerName} Sign-In',
-  mediaServerLoginTip:
-    'Allow users to sign in using their {mediaServerName} account',
+  mediaServerLoginTip: 'Sign in with a {mediaServerName} account',
   atLeastOneAuth: 'At least one authentication method must be selected.',
   newPlexLogin: 'Enable New {mediaServerName} Sign-In',
   newPlexLoginTip:
-    'Allow {mediaServerName} users to sign in without first being imported',
+    '{mediaServerName} users can sign in without being imported first',
   autoImportPlexUsers: 'Auto-Import Plex Users',
   autoImportPlexUsersTip:
-    'Every hour, give everyone you share your Plex server with an account, with the default permissions below. Existing accounts are left as they are',
+    'Hourly, give everyone you share your Plex server with an account, with the default permissions below',
   movieRequestLimitLabel: 'Global Movie Request Limit',
   tvRequestLimitLabel: 'Global Series Request Limit',
   musicRequestLimitLabel: 'Global Album Request Limit',
@@ -54,24 +52,30 @@ const messages = defineMessages('components.Settings.SettingsUsers', {
   defaultPermissionsTip: 'Initial permissions assigned to new users',
   defaultWatchlistSync: 'Watchlist Sync for New Users',
   defaultWatchlistSyncTip:
-    'Whether new users start with their Plex or Trakt watchlist requested automatically. Existing users keep their own choice, and anyone can change theirs in their profile. Requests are only made for users with an Auto-Request permission',
+    'Whether new users’ Plex or Trakt watchlists are requested automatically. Needs an Auto-Request permission',
   defaultWatchlistSyncMovies: 'Movies',
   defaultWatchlistSyncMoviesTip: 'Request movies added to their watchlist',
   defaultWatchlistSyncTv: 'Series',
   defaultWatchlistSyncTvTip: 'Request series added to their watchlist',
   disabledMediaServerLoginWarning:
-    'Some users may not have a {applicationTitle} password set. Disabling {mediaServerName} sign-in could lock them out. Affected users will need to set a password from their profile or via a password reset link.',
+    'Users with no {applicationTitle} password can’t sign in without {mediaServerName}. They can set one in their profile or by password reset.',
   mediaServersLogin: 'Enable Media Server Sign-In',
   mediaServersLoginTip:
-    'Allow users to sign in with their account on any connected media server. Each server can also be turned on or off on its own under Media Servers',
+    'Sign in with an account on any connected media server. Set each server under Media Servers',
   newMediaServersLogin: 'Enable New Media Server Sign-In',
   newMediaServersLoginTip:
-    'Allow media server users to sign in without first being imported',
+    'Media server users can sign in without being imported first',
   disabledMediaServersLoginWarning:
-    'Some users may not have a {applicationTitle} password set. Disabling media server sign-in could lock them out. Affected users will need to set a password from their profile or via a password reset link.',
+    'Users with no {applicationTitle} password can’t sign in without a media server. They can set one in their profile or by password reset.',
+  personalApiKeys: 'Let People Make Their Own API Keys',
+  personalApiKeysTip:
+    'Keys for apps and scripts, each acting as the person who made it. Off stops existing keys',
+  personalApiKeysWho: 'Who Can Make Them',
+  personalApiKeysManagers: 'Admins and people who can manage users',
+  personalApiKeysEveryone: 'Everyone',
   importUsers: 'Import Users',
   importUsersTip:
-    'Give people on a connected media server an account here, with the default permissions above. People already imported are refreshed',
+    'Give people on a connected media server an account, with the default permissions above',
   importFrom: 'Import {mediaServerName} Users',
   couldNotOpen:
     'That could not be opened. Check your connection and try again.',
@@ -166,6 +170,7 @@ const SettingsUsers = () => {
             mediaServerLogin: data?.mediaServerLogin,
             newPlexLogin: data?.newPlexLogin,
             autoImportPlexUsers: data?.autoImportPlexUsers ?? false,
+            personalApiKeys: data?.personalApiKeys ?? 'off',
             movieQuotaLimit: data?.defaultQuotas.movie.quotaLimit ?? 0,
             movieQuotaDays: data?.defaultQuotas.movie.quotaDays ?? 7,
             tvQuotaLimit: data?.defaultQuotas.tv.quotaLimit ?? 0,
@@ -186,6 +191,7 @@ const SettingsUsers = () => {
                 mediaServerLogin: values.mediaServerLogin,
                 newPlexLogin: values.newPlexLogin,
                 autoImportPlexUsers: values.autoImportPlexUsers,
+                personalApiKeys: values.personalApiKeys,
                 defaultQuotas: {
                   movie: {
                     quotaLimit: values.movieQuotaLimit,
@@ -347,6 +353,55 @@ const SettingsUsers = () => {
                           );
                         }}
                       />
+                    </div>
+                  </div>
+                )}
+                <div className="form-row">
+                  <label htmlFor="personalApiKeys" className="checkbox-label">
+                    {intl.formatMessage(messages.personalApiKeys)}
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.personalApiKeysTip)}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <input
+                      type="checkbox"
+                      id="personalApiKeys"
+                      checked={values.personalApiKeys !== 'off'}
+                      onChange={() =>
+                        // Turned on, it starts with the narrower choice.
+                        setFieldValue(
+                          'personalApiKeys',
+                          values.personalApiKeys === 'off' ? 'managers' : 'off'
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+                {values.personalApiKeys !== 'off' && (
+                  <div className="form-row">
+                    <label htmlFor="personalApiKeysWho" className="text-label">
+                      {intl.formatMessage(messages.personalApiKeysWho)}
+                    </label>
+                    <div className="form-input-area">
+                      <div className="form-input-field">
+                        <Field
+                          as="select"
+                          id="personalApiKeysWho"
+                          name="personalApiKeys"
+                        >
+                          <option value="managers">
+                            {intl.formatMessage(
+                              messages.personalApiKeysManagers
+                            )}
+                          </option>
+                          <option value="everyone">
+                            {intl.formatMessage(
+                              messages.personalApiKeysEveryone
+                            )}
+                          </option>
+                        </Field>
+                      </div>
                     </div>
                   </div>
                 )}

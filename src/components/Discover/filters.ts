@@ -1,3 +1,7 @@
+import {
+  leftOutServices,
+  readServiceIds,
+} from '@server/constants/streamingServices';
 import type { ParsedUrlQuery } from 'querystring';
 
 /*
@@ -26,6 +30,7 @@ const TEXT_FILTERS = [
   'voteCountGte',
   'watchRegion',
   'watchProviders',
+  'excludeWatchProviders',
   'status',
   'certification',
   'certificationGte',
@@ -132,6 +137,16 @@ export const prepareFilterValues = (
     filterValues.watchProviders = values.watchProviders;
   }
 
+  // Services left out, without anything that is not one or that is also
+  // shown, so a mistyped link still opens.
+  const leftOut = leftOutServices(
+    values.watchProviders,
+    values.excludeWatchProviders
+  );
+  if (leftOut.length) {
+    filterValues.excludeWatchProviders = leftOut.join('|');
+  }
+
   if (values.watchRegion) {
     filterValues.watchRegion = values.watchRegion;
   }
@@ -185,11 +200,9 @@ export const countActiveFilters = (filterValues: FilterOptions): number => {
     delete clonedFilters.withRuntimeLte;
   }
 
-  if (clonedFilters.watchProviders) {
-    totalCount += 1;
-    delete clonedFilters.watchProviders;
-    delete clonedFilters.watchRegion;
-  }
+  // Services shown and services left out are a filter each; their country
+  // is part of them, not one more.
+  delete clonedFilters.watchRegion;
 
   if (
     clonedFilters.certification ||
@@ -209,3 +222,62 @@ export const countActiveFilters = (filterValues: FilterOptions): number => {
 
   return totalCount;
 };
+
+/*
+ * Streaming services in Filters. Each one is shown only, left out, or
+ * neither; choosing one again moves it along.
+ */
+
+export type ServiceChoice = 'on' | 'notOn' | undefined;
+
+export interface ChosenServices {
+  on: number[];
+  notOn: number[];
+}
+
+export const servicesOf = (filters: FilterOptions): ChosenServices => ({
+  on: readServiceIds(filters.watchProviders),
+  notOn: leftOutServices(filters.watchProviders, filters.excludeWatchProviders),
+});
+
+export const serviceChoiceOf = (
+  services: ChosenServices,
+  id: number
+): ServiceChoice =>
+  services.on.includes(id)
+    ? 'on'
+    : services.notOn.includes(id)
+      ? 'notOn'
+      : undefined;
+
+/** Shown only, then left out, then neither. */
+export const nextServiceChoice = (choice: ServiceChoice): ServiceChoice =>
+  choice === undefined ? 'on' : choice === 'on' ? 'notOn' : undefined;
+
+export const chooseService = (
+  services: ChosenServices,
+  id: number,
+  choice: ServiceChoice
+): ChosenServices => {
+  const on = services.on.filter((other) => other !== id);
+  const notOn = services.notOn.filter((other) => other !== id);
+  if (choice === 'on') on.push(id);
+  if (choice === 'notOn') notOn.push(id);
+  return { on, notOn };
+};
+
+/**
+ * The address's streaming service filters. With no service chosen the
+ * country goes too, as it narrows nothing on its own.
+ */
+export const serviceFilters = (
+  region: string,
+  { on, notOn }: ChosenServices
+): Pick<
+  FilterOptions,
+  'watchRegion' | 'watchProviders' | 'excludeWatchProviders'
+> => ({
+  watchRegion: on.length || notOn.length ? region : undefined,
+  watchProviders: on.length ? on.join('|') : undefined,
+  excludeWatchProviders: notOn.length ? notOn.join('|') : undefined,
+});

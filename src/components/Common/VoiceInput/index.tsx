@@ -9,12 +9,11 @@ import { useIntl } from 'react-intl';
 const messages = defineMessages('components.Common.VoiceInput', {
   speak: 'Speak instead of typing',
   stop: 'Stop listening',
-  unsupported:
-    'This browser can’t listen. Speaking a search works in Chrome, Edge and Safari.',
+  unsupported: 'This browser can’t listen. Try Chrome, Edge or Safari.',
   blocked:
-    'The microphone is blocked for this site. Allow it in the browser’s site settings to speak your search.',
+    'The microphone is blocked. Allow it in your browser’s site settings.',
   unavailable:
-    'This browser can’t listen right now. On a Mac, Dictation needs to be turned on in System Settings.',
+    'This browser can’t listen right now. On a Mac, turn on Dictation in System Settings.',
   noSpeech:
     'Didn’t hear anything. Try again a little closer to the microphone.',
   noMicrophone: 'No microphone was found.',

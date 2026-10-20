@@ -5,6 +5,7 @@ import type { MediaServerKind } from '@server/constants/server';
 import { MEDIA_SERVER_KINDS, MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
+import { MatchProblem } from '@server/entity/MatchWatch';
 import Media from '@server/entity/Media';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import OidcLink from '@server/entity/OidcLink';
@@ -940,6 +941,40 @@ describe('Match Check on a title page', () => {
 
     assert.deepEqual(await problemsFor(501, '555'), ['Plex 555']);
     assert.deepEqual(await problemsFor(502, '555'), ['Emby 555']);
+  });
+
+  it('shows at once what the check of new requests found, one a server', async () => {
+    const media = await getRepository(Media).save(
+      new Media({
+        tmdbId: 929590,
+        mediaType: MediaType.MOVIE,
+        status: MediaStatus.PROCESSING,
+      })
+    );
+    const found = (key: string, title: string, resolvedAt?: Date) =>
+      getRepository(MatchProblem).insert({
+        key,
+        mediaId: media.id,
+        mediaServer: 'Plex',
+        kind: 'movie',
+        problem: JSON.stringify({
+          ...matchedTo('Plex', key),
+          expected: { title: 'Civil War', tmdbId: 929590, server: 'Radarr' },
+          matched: { title, key },
+        }),
+        foundAt: new Date(),
+        resolvedAt,
+      });
+    await found('old', 'Fixed Since', new Date());
+    await found('new', 'Guerra Civil');
+    // The nightly report has an older finding on the same server.
+    report([
+      {
+        ...matchedTo('Plex', 'nightly'),
+        expected: { title: 'Civil War', tmdbId: 929590, server: 'Radarr' },
+      },
+    ]);
+    assert.deepEqual(await problemsFor(929590, 'x'), ['Plex new']);
   });
 });
 

@@ -6,9 +6,9 @@
 
 With Bazarr connected (**Settings → Services → Bazarr**), title pages have a **Subtitles** panel and each episode a subtitle tag, read from Bazarr, with where each subtitle came from.
 
-- **Everyone** can see them, and set their own default subtitle in Plex.
-- **Request managers** can search the providers, use a result (download or replace), and search for whatever is missing.
-- **Transcribe**: when no provider has a subtitle, request managers can have Bazarr's WhisperAI provider make one, for the missing episodes, one season, or everything. Jobs run one at a time. If Bazarr has paused WhisperAI after an error (often because Whisper is busy), **Transcribe** says so, and the Health page shows it.
+- **Everyone** can see them, and with Plex set their own default subtitle.
+- **Request managers** can search the providers, use a result (download or replace), and search for whatever is missing. Bazarr does the work; subtitles show on the page as they arrive.
+- **Transcribe**: when no provider has a subtitle, request managers can have Bazarr's WhisperAI provider make one, for the missing episodes, one season, or everything: Whisper listens to each episode. Jobs run one at a time, and each subtitle shows on the page when it's done. If Bazarr has paused WhisperAI after an error (often because Whisper is busy), **Transcribe** says so, and the Health page shows it.
 - Only admins can delete subtitle files.
 
 Switch: `subtitles`.

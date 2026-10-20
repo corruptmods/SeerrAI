@@ -110,3 +110,50 @@ describe('discovering titles by where they were made', () => {
     );
   });
 });
+
+describe('discovering titles by streaming service', () => {
+  const capture = (tmdb: TheMovieDb) => {
+    const asked: Record<string, unknown>[] = [];
+    (
+      tmdb as unknown as {
+        axios: { get: (url: string, config: { params: object }) => unknown };
+      }
+    ).axios = {
+      get: async (_url, config) => {
+        asked.push(config.params as Record<string, unknown>);
+        return { data: { page: 1, total_pages: 1, results: [] } };
+      },
+    };
+    return asked;
+  };
+  const services = (params: Record<string, unknown>) => ({
+    region: params.watch_region,
+    on: params.with_watch_providers,
+    notOn: params.without_watch_providers,
+  });
+
+  it('asks TMDB for titles on some services and not on others', async () => {
+    const tmdb = new TheMovieDb();
+    const asked = capture(tmdb);
+    const options = {
+      watchRegion: 'US',
+      watchProviders: '8|9',
+      excludeWatchProviders: '337|350',
+    };
+    await tmdb.getDiscoverMovies(options);
+    await tmdb.getDiscoverTv(options);
+    const expected = { region: 'US', on: '8|9', notOn: '337|350' };
+    assert.deepEqual(asked.map(services), [expected, expected]);
+  });
+
+  it('leaves nothing out unless asked', async () => {
+    const tmdb = new TheMovieDb();
+    const asked = capture(tmdb);
+    await tmdb.getDiscoverMovies({ watchRegion: 'US', watchProviders: '8' });
+    await tmdb.getDiscoverTv({ watchRegion: 'US', watchProviders: '8' });
+    assert.deepEqual(
+      asked.map((params) => params.without_watch_providers),
+      [undefined, undefined]
+    );
+  });
+});

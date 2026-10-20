@@ -37,7 +37,7 @@ import useSWR, { mutate } from 'swr';
 const messages = defineMessages('components.Settings.SettingsMediaServers', {
   mediaServers: 'Media Servers',
   mediaServersDescription:
-    'Connect Plex, Jellyfin and Emby in any combination. A title is available when it is on any of them, people sign in with an account on whichever they have, and title pages offer Play on each server the title is on. The primary server comes first: its play link is the one other apps are given.',
+    'Connect any mix of Plex, Jellyfin and Emby. A title is available if any of them has it.',
   primary: 'Primary',
   notConnected: 'Not connected',
   libraries:
@@ -52,7 +52,7 @@ const messages = defineMessages('components.Settings.SettingsMediaServers', {
     'Seerr AI needs at least one media server: connect another before removing this one.',
   removeTitle: 'Remove {server}?',
   removeDescription:
-    'Seerr AI stops scanning {server}, and its Play links go. Its address and libraries are kept, so connecting it again is quick.',
+    'Seerr AI stops scanning {server} and drops its Play links. Its settings are kept for a quick reconnect.',
   removePrimary: '{next} becomes the primary server.',
   removePasswordOnly:
     '{count, plural, one {# person} other {# people}} could then sign in only with a password.',
@@ -67,7 +67,7 @@ const messages = defineMessages('components.Settings.SettingsMediaServers', {
   primaryChanged: '{server} is now the primary server.',
   changeFailed: 'Something went wrong saving that.',
   signInFailedLast:
-    'At least one way to sign in must stay on. Turn on sign-in with a password, or with another server, first.',
+    'At least one way to sign in must stay on. Turn on password or another server’s sign-in first.',
   couldNotOpen:
     'That could not be opened. Check your connection and try again.',
   loadFailed: 'The media servers could not be loaded.',

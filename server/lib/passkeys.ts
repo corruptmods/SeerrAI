@@ -60,12 +60,17 @@ interface ChallengeSession {
   };
 }
 
+// A request made with an API key has no session (server/index.ts), so
+// there is nowhere to keep a challenge and none to take: passkeys are set up
+// and used in a browser.
 export const rememberChallenge = (
-  session: ChallengeSession,
+  session: ChallengeSession | undefined,
   value: string,
   purpose: ChallengePurpose
 ) => {
-  session.passkeyChallenge = { value, purpose, issuedAt: Date.now() };
+  if (session) {
+    session.passkeyChallenge = { value, purpose, issuedAt: Date.now() };
+  }
 };
 
 /**
@@ -73,12 +78,12 @@ export const rememberChallenge = (
  * replayed against it, and one issued for setup cannot finish a sign-in.
  */
 export const takeChallenge = (
-  session: ChallengeSession,
+  session: ChallengeSession | undefined,
   purpose: ChallengePurpose,
   now = Date.now()
 ): string | undefined => {
-  const challenge = session.passkeyChallenge;
-  delete session.passkeyChallenge;
+  const challenge = session?.passkeyChallenge;
+  delete session?.passkeyChallenge;
 
   if (
     !challenge ||

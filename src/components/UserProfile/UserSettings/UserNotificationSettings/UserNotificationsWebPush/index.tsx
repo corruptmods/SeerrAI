@@ -294,7 +294,8 @@ const UserWebPushSettings = () => {
                   Notification.MEDIA_FAILED |
                   Notification.LIST_ACTIVITY |
                   Notification.BACKFILL |
-                  Notification.HEALTH
+                  Notification.HEALTH |
+                  Notification.WRONG_MATCH
                 }
                 currentTypes={values.types}
                 onUpdate={(newTypes) => {

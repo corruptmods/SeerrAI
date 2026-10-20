@@ -21,8 +21,7 @@ const messages = defineMessages('components.Settings.MaintainerrModal', {
   ssl: 'Use SSL',
   urlBase: 'URL Base',
   apiKey: 'API Key',
-  apiKeyTip:
-    'Maintainerr does not need one. Only set this if a proxy in front of it asks for a key.',
+  apiKeyTip: 'Only if a proxy in front of Maintainerr asks for one.',
   features: 'Features',
   showBadges: 'Show "Deleting soon" badges',
   showBadgesTip: 'On posters and title pages, for this server’s titles.',
@@ -34,7 +33,7 @@ const messages = defineMessages('components.Settings.MaintainerrModal', {
   days: 'days',
   allowKeep: 'Allow anyone to keep a title',
   allowKeepTip:
-    'Shows a Keep button, where Request normally sits, to everyone signed in. It postpones the deletion; it never excludes a title for good.',
+    'Lets everyone postpone a deletion with a Keep button. It never excludes a title for good.',
   keepDays: 'Keep adds',
   keepDaysTip: '0 restarts the rule’s whole grace period.',
   toastTestSuccess: 'Maintainerr connection established successfully!',

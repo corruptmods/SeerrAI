@@ -43,8 +43,7 @@ const messages = defineMessages('components.Backfill.JobDetail', {
   resume: 'Resume',
   end: 'End backfill',
   endTitle: 'End this backfill?',
-  endBody:
-    'The download and its partial files are removed. Files already imported stay in your library.',
+  endBody: 'The download and partial files are removed. Imported files stay.',
   stepApproved: 'Approved',
   stepDownloading: 'Downloading',
   stepImporting: 'Importing',

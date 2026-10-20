@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Musika-eskaera baztertuta",
   "notifications.events.musicFailed": "Musika-eskaerak huts egin du",
   "notifications.events.musicPending": "Musika-eskaera berria",
-  "notifications.events.musicRequestAvailable": "Eskatutako musika eskuragarri dago orain"
+  "notifications.events.musicRequestAvailable": "Eskatutako musika eskuragarri dago orain",
+  "notifications.events.wrongMatch": "Bat-etortze okerra"
 }

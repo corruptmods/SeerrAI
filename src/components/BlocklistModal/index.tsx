@@ -32,7 +32,7 @@ const messages = defineMessages('component.BlocklistModal', {
   reason: 'Reason',
   reasonplaceholder: 'Reason (optional)',
   removesfiles:
-    'This will also remove it from {arr} and permanently delete its files, and decline any open requests for it. This cannot be undone.',
+    'Also removes it from {arr}, deletes its files and declines open requests. This can’t be undone.',
 });
 
 const isCollection = (

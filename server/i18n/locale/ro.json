@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Solicitare de muzică respinsă",
   "notifications.events.musicFailed": "Solicitarea de muzică a eșuat",
   "notifications.events.musicPending": "Solicitare nouă de muzică",
-  "notifications.events.musicRequestAvailable": "Muzica solicitată este disponibilă acum"
+  "notifications.events.musicRequestAvailable": "Muzica solicitată este disponibilă acum",
+  "notifications.events.wrongMatch": "Potrivire greșită"
 }

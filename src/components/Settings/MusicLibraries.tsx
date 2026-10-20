@@ -12,7 +12,7 @@ import useSWR from 'swr';
 const messages = defineMessages('components.Settings.MusicLibraries', {
   musicLibraries: 'Music Libraries',
   musicLibrariesDescription:
-    'The music libraries Seerr AI reads to find which albums are here. Sync Libraries above lists them. While no music library is switched on, on any server, Lidarr’s files decide what is here.',
+    'The music libraries that show which albums are here. With none on, anywhere, Lidarr’s files decide.',
   noMusicLibraries:
     'No music libraries were found. Sync Libraries above to look again.',
   musicOff:

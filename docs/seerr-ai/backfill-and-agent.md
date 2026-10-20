@@ -9,7 +9,7 @@ Sonarr and Radarr search their indexers and give up quietly when nothing matches
 1. Every 6 hours (the **Backfill Scan** job) it finds series and movies that Sonarr or Radarr searched for and didn't grab, once their last search is older than **Stuck after** (24 hours by default).
 2. It searches Prowlarr itself, under every name the title goes by, a few titles per scan (requested titles first).
 3. It opens the likeliest packs (reading the torrent or NZB, without downloading it) and asks Sonarr or Radarr how they would import each file and whether it meets the quality profile.
-4. It offers the packs that fill what is missing, with a score and a plan for each file, and sends a **Backfill** notification.
+4. It offers the packs that fill what is missing, with a score and a plan for each file, and sends a **Backfill** notification; tap it to review.
 5. When a pack is approved, it downloads only the chosen files to its own category, imports them through Sonarr or Radarr, and cleans up. Torrents aren't seeded afterwards.
 
 Approval can be **Missing episodes only** (recommended), or **Missing and upgrades**, which replaces files on disk and asks you to type the title's name to confirm.
@@ -19,15 +19,18 @@ Approval can be **Missing episodes only** (recommended), or **Missing and upgrad
 **Settings → Backfill**:
 
 - **Prowlarr**: address and API key.
-- **Downloads**: which download client takes torrent packs and which takes Usenet packs (any of the clients under **Settings → Services → Download Clients**: qBittorrent, Transmission, Deluge or rTorrent for torrents, SABnzbd or NZBGet for Usenet), and the **category** Backfill uses, kept apart so Sonarr and Radarr don't import on their own.
-- **When a title is stuck**: hours since the last search, movies too, whether files below the cutoff count as gaps.
-- **Approval**: approve some packs automatically (only ones that fill what is missing, replace nothing, score at least 700 and are no bigger than 25 GB, by default), and **Replace failed downloads** (on by default: the next good pack is taken when one fails or stalls).
-- **Advanced**: titles searched per scan, days before searching again, specials, downloads at once, space to keep free, when to give up on a stalled torrent, how long to keep history, and the agent's limits. The defaults suit most servers.
+- **Downloads**: the client for torrent packs (qBittorrent, Transmission, Deluge or rTorrent) and for Usenet packs (SABnzbd or NZBGet), from **Settings → Services → Download Clients**, and the **category** Backfill uses, kept apart so Sonarr and Radarr don't import on their own.
+- **When a title is stuck**: hours since the last search, movies too, and whether files below the cutoff count as gaps (packs that fill gaps still show their upgrades either way).
+- **Approval**: approve some packs automatically (only ones that fill what is missing and replace nothing on disk, score at least 700 and are at most 25 GB, by default), and **Replace failed downloads** (on by default): when a download fails or stalls, the next good pack is taken, searching again if need be until none is left; anything outside the limits waits for you.
+- **Advanced**: titles per scan, days before searching again, specials, downloads at once, space to keep free, when to give up on a stalled torrent (time spent "checking" doesn't count; a stalled one is then replaced or offered like a failed one), how long to keep history (removed by the nightly **Database Maintenance** job, with the packs it came from), and the agent's limits. The defaults suit most servers.
 
 ### The Backfill pages
 
-- **Backfill** in the sidebar: what is stuck, packs found, ignored and complete, with a search box. **Scan now**, **Start search…** (with extra names to search under) and **Search All Stuck**.
-- **A title's Backfill page**: what is missing and why Sonarr or Radarr didn't get it, each pack found with its file plan, approve or skip, history, Ignore, and **Get it with AI**.
+- **Backfill** in the sidebar: what is stuck, packs found, ignored and complete, with a search box. **Scan now**, **Start search…** and **Search All Stuck**.
+  - **Start search…** searches one title now; Prowlarr is always searched under the title and the aliases Sonarr or Radarr has, plus any names you add.
+  - **Search All Stuck** searches every stuck title once, one query per title to every indexer, with a pause between titles. Titles Sonarr or Radarr searched today are included; ones Backfill searched in the last day aren't. Packs that pass auto-approve start downloading as they're found.
+- **A title's Backfill page**: what is missing and why Sonarr or Radarr didn't get it (often their own search passed a release over because it couldn't match its title), each pack found with its file plan, approve or skip, history, Ignore, and **Get it with AI**.
+- **Approving a pack**: only the chosen files download; the torrent client skips the rest, and a Usenet job is removed from the client afterwards. **Include the files the AI placed** adds files whose names didn't say which episode they are: the AI matched them and Sonarr agreed; check them under **Show files** first. If the pack was approved, skipped or dropped while the window was open, it says so instead.
 - **A download's page**: progress, pause, resume or end. A failed one says what became of it, linked: **Replaced by #66**, **Backfill is searching for another release**, **The admin agent is looking for another release**, **Backfill offered the next pack**, or **Nothing else was found**. The title's list of downloads says the same under each failed one.
 - **On a title's own page**, admins see a Backfill box with what is missing, packs waiting and downloads running.
 
@@ -37,17 +40,16 @@ A Usenet post packed in RAR archives, or with scrambled file names (only its PAR
 
 ### When an indexer limits you
 
-Many indexers allow only so many searches, or so many downloads of a torrent or NZB file, a day. Once that is used up they answer "too many requests" until it resets. Backfill doesn't treat that as a failed download:
+Many indexers allow only so many searches or downloads a day, then answer "too many requests" until they reset. Backfill doesn't count that as a failure:
 
-- The download stays queued, and its page says so: for example "Tabula Rasa has reached its download limit; trying again at 5:10 PM".
-- It isn't tried again before then. When the indexer says how long to wait, Backfill waits that long; otherwise 15 minutes, then 30, an hour, two hours and so on, never more than 6 hours between tries.
-- Other downloads from the same indexer wait too, without asking it. Packs from other indexers carry on as usual. The waits are kept when Seerr AI restarts.
-- When Prowlarr itself is at its search limit, a search stops at the first name rather than spending more searches, and says so on the title's page.
-- After a day of waiting, Backfill gives up on that download. The pack stays on the title's page for you to approve by hand when the indexer has reset, and the notification says so.
+- The download stays queued, saying when it will try again ("Tabula Rasa has reached its download limit; trying again at 5:10 PM").
+- It waits as long as the indexer says, or 15 minutes, then 30, an hour and so on, at most 6 hours between tries. Other downloads from that indexer wait too; other indexers carry on. Waits survive a restart.
+- When Prowlarr is at its own search limit, a search stops at the first name and says so.
+- After a day, Backfill gives up on that download; the pack stays on the title's page to approve by hand later, and the notification says so.
 
-A download that couldn't start for any other reason (the indexer refused the API key, the download client didn't answer) is tried each minute and given up after ten tries. Whatever the reason, Backfill doesn't take a pack by itself again for a day after its download failed to start: it waits on the title's page, with why beside it, for you to approve it by hand.
+A download that can't start for another reason (a refused API key, a client not answering) is tried each minute, ten times. After any download fails to start, Backfill won't take that pack by itself for a day: it waits on the title's page, with the reason.
 
-A download's activity says each thing once: when the same thing happens again, the line counts it ("tried 9 times, last at 3:53 PM") rather than being written again. Known problems are put in plain words ("SABnzbd did not answer", "Tabula Rasa refused the API key"); the exact error is in the server log. Each download says who approved it: the admin by name, "(API key)" after the name when it was approved through the API, "AI agent", or Backfill when it took the pack itself.
+A download's activity counts repeats ("tried 9 times, last at 3:53 PM"), puts known problems in plain words ("SABnzbd did not answer"), and says who approved it: an admin (with "(API key)" if through the API), "AI agent", or Backfill itself. The exact error is in the server log.
 
 ### What each download client does
 
@@ -68,26 +70,26 @@ Without a category or label, a magnet link Backfill was reading when Seerr AI st
 
 An AI with tools that looks further when Backfill finds nothing usable for a requested title. It needs AI set up, with **Admin Agent** on.
 
-**It can:** find a title and see what it has; run Sonarr's or Radarr's own search; search Prowlarr with any words; list a release's files and check its language; download what is missing; relink a file that holds two episodes; ask you a question; stop its own download; request a title that isn't in the library yet.
+**It can:** read why Sonarr and Radarr turned releases down; find a title and see what it has; run Sonarr's or Radarr's own search; search Prowlarr with any words; list a release's files and check its language; download what is missing; relink a file that holds two episodes; ask you a question; stop its own download; request a title that isn't in the library yet.
 
 **It can't, on its own:** replace or touch a file already on disk; download a language other than English or the title's original language; go past its size or daily limits.
 
-- **On its own** (on by default; **Step in on its own** in Settings → Backfill): when Backfill finds nothing for a requested title, or someone reports a title missing and nothing is found. Once per title.
+- **On its own** (on by default; **Step in on its own** in Settings → Backfill): when Backfill finds nothing for a requested title, or someone reports a title missing and Sonarr, Radarr and Backfill find nothing. Once per title; after that Sonarr, Radarr and Backfill keep searching without it.
 - **When asked:** from **Backfill → Agent**, or **Get it with AI** on a title's Backfill page.
-- **Limits** (Settings → Backfill → Advanced): 12 runs a day on its own, 10 downloads a day, 40 GB at most, 30 steps per go, carrying on by itself up to 3 times, as long as its last go started a download. A change waiting for your approval, a replaced season being followed, and looking again after a failed download (below) aren't runs of its own: they don't count towards the 12, and don't keep it from looking into a title someone reports.
-- **Standing instructions**: what it should always do, in your words ("prefer Usenet", "nothing under 720p for new shows").
-- Every conversation is kept, step by step, with what it cost; you can reply to it or answer its questions. Finished ones are removed after 30 days.
+- **Limits** (Settings → Backfill → Advanced): 12 runs a day on its own, 10 downloads a day, 40 GB at most, 30 steps per go (searches run at once count as one), carrying on by itself with a fresh go up to 3 times, as long as its last go started a download. A change waiting for your approval, a replaced season being followed, and looking again after a failed download (below) aren't runs of its own: they don't count towards the 12, and don't keep it from looking into a title someone reports.
+- **Standing instructions**: what it should always do, in your words ("always check it's English before downloading", "prefer Usenet", "nothing under 720p for new shows").
+- Every conversation is kept, step by step, with what it cost; you can reply to it or answer its questions. Finished ones are removed after 30 days; ones waiting for your answer are kept. **Clear finished** removes them now, except those whose downloads are still going, and never touches what they downloaded.
 
 What it does shows in each title's history and in Backfill notifications.
 
 ### When a download it started fails
 
-When a download the agent started fails (SABnzbd gives up on it, say, or a torrent stalls), Backfill first takes a good pack it already found for the same episodes, as it does for any failed download. If there is none, the download goes back to the agent, in the same conversation: "Download #63 failed (SABnzbd could not finish it: Aborted, cannot be completed). Find another release for S06E03; do not pick the same release or group again." It looks the way it did before, with the same say as before: a missing episode is simply downloaded again, even if deleting the old file needed your approval, while replacing a file that is there still waits for you. A release that failed is shown to it as failed and is never taken again for that title, wherever it is found.
+Backfill first takes a good pack it already found for the same episodes. If there's none, the agent gets the failure in the same conversation ("Download #63 failed … Find another release for S06E03; do not pick the same release or group again") and looks again, with the same say as before: a missing episode is just downloaded, while replacing a file still on disk waits for you. A release that failed is never taken again for that title.
 
-- If the conversation is still going, or waiting on your answer, it hears of the failure once that go is over.
-- It stops after three replacements for the same episodes have failed in a day, or when its downloads for the day are used up, and you get a Backfill notification saying so.
-- If it finds nothing, you're told the download failed and nothing else was found.
-- With **Replace failed downloads** off, nothing is replaced, by Backfill or the agent: the next pack is offered to you instead.
+- If the conversation is busy or waiting on you, it hears once that go is over.
+- It stops after three failed replacements for the same episodes in a day, or when its daily downloads are used up, and sends a Backfill notification.
+- If it finds nothing, you're told.
+- With **Replace failed downloads** off, nothing is replaced: the next pack is offered to you.
 
 ### Changes you approve
 

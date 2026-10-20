@@ -52,6 +52,7 @@ const messages = defineMessages('notifications.events', {
     '{issueType, select, video {New Comment on Video Issue} audio {New Comment on Audio Issue} subtitles {New Comment on Subtitle Issue} other {New Comment on Issue}}',
   backfill: 'Backfill',
   health: 'Health',
+  wrongMatch: 'Wrong match',
   adminAgent: 'Admin agent',
 });
 
@@ -174,6 +175,8 @@ export const issueEvent = (
 
 export const backfillEvent = (): NotificationEvent => titled(messages.backfill);
 export const healthEvent = (): NotificationEvent => titled(messages.health);
+export const wrongMatchEvent = (): NotificationEvent =>
+  titled(messages.wrongMatch);
 export const adminAgentEvent = (): NotificationEvent =>
   titled(messages.adminAgent);
 

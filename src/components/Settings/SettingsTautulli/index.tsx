@@ -18,7 +18,7 @@ import useSWR from 'swr';
 const messages = defineMessages('components.Settings.SettingsTautulli', {
   title: 'Tautulli',
   description:
-    'Link Tautulli for what people have watched on Plex: Suggested for You, “up next” on lists, Who Watched, Pick for the Room and Catch Me Up.',
+    'What people watch on Plex, for Suggested for You, Who Watched, Pick for the Room and more.',
   addTautulli: 'Add Tautulli',
   watchHistory: 'Watch history',
   fromPlex: 'From Plex',

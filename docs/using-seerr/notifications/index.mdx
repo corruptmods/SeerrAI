@@ -18,8 +18,15 @@ import DocCardList from '@theme/DocCardList';
 
 Simply configure your desired notification agents in **Settings -> Notifications** in the Seerr web UI.
 
-Users can customize their notification preferences in their own user notification settings.
+Each person chooses what reaches them in **Profile → Settings → Notifications**.
+
+## Settings Most Services Share
+
+- **Embed Poster** adds the poster of the film or series (or the album's cover) to notifications about it. Each service's page says how it looks there and whether it starts on. The picture comes from TMDB (or the Cover Art Archive for music), not from your server, so it shows even when Seerr AI can't be reached from outside your home. Pushbullet and webhooks don't have the setting; a webhook's `{{image}}` always has the picture. The test notification isn't about any title, so it never has a poster: you'll see one on the first real notification.
+- **Notification Types** choose what is sent to the service. Besides requests and issues, Seerr AI adds **Backfill** (a pack waiting for approval, and a backfill that finished or failed), **Health** (a connected service that newly has a problem) and **Wrong Match** (a media server filed a newly imported request under the wrong title; on wherever Health was). **List Activity** isn't on these pages: it's personal, and only ever goes to the people a list is shared with, through their own notification settings (email, web push, Telegram, Pushbullet or Pushover), never to a channel. A choice saved for a channel before it was taken off these pages does nothing. Email and web push have no types on their page, because they go to each person for the notifications that person chooses in their own settings.
+- **Test** sends a test notification using what's on the page, so you can check it before you save.
+- Seerr AI waits up to 15 seconds for a service to answer. One that doesn't is given up on, for a test as for a real notification, and **Settings → Logs** says it didn't answer in time.
 
 ## Requesting New Notification Agents
 
-If we do not currently support your preferred notification agent, feel free to [submit a feature request on GitHub](https://github.com/seerr-team/seerr/issues). However, please be sure to search first and confirm that there is not already an existing request for the agent!
+If we do not currently support your preferred notification agent, feel free to [submit a feature request on GitHub](https://github.com/corruptmods/SeerrAI/issues). However, please be sure to search first and confirm that there is not already an existing request for the agent!

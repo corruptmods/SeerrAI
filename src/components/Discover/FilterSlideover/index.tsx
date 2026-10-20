@@ -2,7 +2,11 @@ import Button from '@app/components/Common/Button';
 import MultiRangeSlider from '@app/components/Common/MultiRangeSlider';
 import SlideOver from '@app/components/Common/SlideOver';
 import type { FilterOptions } from '@app/components/Discover/filters';
-import { countActiveFilters } from '@app/components/Discover/filters';
+import {
+  countActiveFilters,
+  serviceFilters,
+  servicesOf,
+} from '@app/components/Discover/filters';
 import LanguageSelector from '@app/components/LanguageSelector';
 import {
   CompanySelector,
@@ -339,22 +343,10 @@ const FilterSlideover = ({
         <WatchProviderSelector
           type={type}
           region={currentFilters.watchRegion}
-          activeProviders={
-            currentFilters.watchProviders?.split('|').map((v) => Number(v)) ??
-            []
-          }
-          onChange={(region, providers) => {
-            if (providers.length) {
-              batchUpdateQueryParams({
-                watchRegion: region,
-                watchProviders: providers.join('|'),
-              });
-            } else {
-              batchUpdateQueryParams({
-                watchRegion: undefined,
-                watchProviders: undefined,
-              });
-            }
+          activeProviders={servicesOf(currentFilters).on}
+          excludedProviders={servicesOf(currentFilters).notOn}
+          onChange={(region, on, notOn) => {
+            batchUpdateQueryParams(serviceFilters(region, { on, notOn }));
           }}
         />
         <div className="pt-4">

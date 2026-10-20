@@ -12,6 +12,11 @@ import type {
   TmdbKeywordSearchResponse,
 } from '@server/api/themoviedb/interfaces';
 import { DiscoverSliderType } from '@server/constants/discover';
+import {
+  readStreamingRow,
+  streamingServiceQuery,
+  writeStreamingRow,
+} from '@server/constants/streamingServices';
 import type DiscoverSlider from '@server/entity/DiscoverSlider';
 import type { GenreSliderItem } from '@server/interfaces/api/discoverInterfaces';
 import type { Keyword, ProductionCompany } from '@server/models/common';
@@ -154,6 +159,9 @@ const CreateSlider = ({ onCreate, slider }: CreateSliderProps) => {
     }
   }, [slider]);
 
+  // A streaming services row's country and services, as it was saved.
+  const savedServices = readStreamingRow(slider?.data);
+
   const CreateSliderSchema = Yup.object().shape({
     title: Yup.string().required(
       intl.formatMessage(messages.validationTitlerequired)
@@ -285,14 +293,12 @@ const CreateSlider = ({ onCreate, slider }: CreateSliderProps) => {
       type: DiscoverSliderType.TMDB_MOVIE_STREAMING_SERVICES,
       title: intl.formatMessage(sliderTitles.tmdbmoviestreamingservices),
       dataUrl: '/api/v1/discover/movies',
-      params: 'watchRegion=$regionValue&watchProviders=$providersValue',
       titlePlaceholderText: intl.formatMessage(messages.slidernameplaceholder),
     },
     {
       type: DiscoverSliderType.TMDB_TV_STREAMING_SERVICES,
       title: intl.formatMessage(sliderTitles.tmdbtvstreamingservices),
       dataUrl: '/api/v1/discover/tv',
-      params: 'watchRegion=$regionValue&watchProviders=$providersValue',
       titlePlaceholderText: intl.formatMessage(messages.slidernameplaceholder),
     },
   ];
@@ -440,15 +446,14 @@ const CreateSlider = ({ onCreate, slider }: CreateSliderProps) => {
             dataInput = (
               <WatchProviderSelector
                 type={'movie'}
-                region={slider?.data?.split(',')[0]}
-                activeProviders={
-                  slider?.data
-                    ?.split(',')[1]
-                    .split('|')
-                    .map((v) => Number(v)) ?? []
-                }
-                onChange={(region, providers) => {
-                  setFieldValue('data', `${region},${providers.join('|')}`);
+                region={savedServices.region}
+                activeProviders={savedServices.on}
+                excludedProviders={savedServices.notOn}
+                onChange={(region, on, notOn) => {
+                  setFieldValue(
+                    'data',
+                    writeStreamingRow({ region, on, notOn })
+                  );
                 }}
               />
             );
@@ -457,15 +462,14 @@ const CreateSlider = ({ onCreate, slider }: CreateSliderProps) => {
             dataInput = (
               <WatchProviderSelector
                 type={'tv'}
-                region={slider?.data?.split(',')[0]}
-                activeProviders={
-                  slider?.data
-                    ?.split(',')[1]
-                    .split('|')
-                    .map((v) => Number(v)) ?? []
-                }
-                onChange={(region, providers) => {
-                  setFieldValue('data', `${region},${providers.join('|')}`);
+                region={savedServices.region}
+                activeProviders={savedServices.on}
+                excludedProviders={savedServices.notOn}
+                onChange={(region, on, notOn) => {
+                  setFieldValue(
+                    'data',
+                    writeStreamingRow({ region, on, notOn })
+                  );
                 }}
               />
             );
@@ -546,15 +550,7 @@ const CreateSlider = ({ onCreate, slider }: CreateSliderProps) => {
                       DiscoverSliderType.TMDB_MOVIE_STREAMING_SERVICES ||
                     activeOption.type ===
                       DiscoverSliderType.TMDB_TV_STREAMING_SERVICES
-                      ? activeOption.params
-                          ?.replace(
-                            '$regionValue',
-                            encodeURIExtraParams(values?.data.split(',')[0])
-                          )
-                          .replace(
-                            '$providersValue',
-                            encodeURIExtraParams(values?.data.split(',')[1])
-                          )
+                      ? streamingServiceQuery(readStreamingRow(values.data))
                       : activeOption.params?.replace(
                           '$value',
                           encodeURIExtraParams(values.data)

@@ -6,34 +6,44 @@
 
 **Settings → Health** (admins) checks everything Seerr AI depends on and lists what has quietly gone wrong, each with a link to fix it.
 
-- **Services**: whether Plex (or Jellyfin or Emby, with its version), Radarr, Sonarr, Prowlarr, each download client, Bazarr, the AI provider, Tautulli, each Maintainerr server and the PostgreSQL connection pool answer, plus what they report themselves: Radarr's and Sonarr's own health warnings and disks running low, indexers Prowlarr has paused, subtitle providers Bazarr has paused (WhisperAI included), an AI account out of credit. Each download client shows which one it is and its version ("Transmission 4.0.6"), and the one Backfill sends to also lists what keeps Backfill from using it fully: Deluge's Label plugin off, rTorrent refusing to run commands, Transmission older than 3.0, NZBGet older than 16.
+- **Services**: whether each connected service answers (media servers with their version, Radarr, Sonarr, Lidarr, Prowlarr, download clients, Bazarr, the AI provider, Tautulli, Maintainerr, the PostgreSQL pool), plus their own warnings: low disks, paused indexers or subtitle providers, an AI account out of credit. The download client Backfill uses also lists what it's missing (Deluge's Label plugin, rTorrent commands, Transmission 3.0+, NZBGet 16+).
 - **Backfill**: titles it couldn't search, packs waiting for approval, downloads that failed this week.
 - **Requests**: failed, approved but never sent, waiting on approval for over a week, and requests no longer linked to a title (with a button to remove them).
-- **Titles**: processing for over a week (with **Search now** for each and **Search all**), series requests with no TVDB id, folders Plex matched to the wrong title, collections partly in the library.
-- **Music** (once a Lidarr is added): Lidarr checked like Radarr and Sonarr; albums Lidarr has that no media server lists after a day; requested albums with no release found a week after approval (with **Search now** for each); and whether MusicBrainz has been answering, from how its requests have fared over the last hour rather than a call of its own. See [Music](./music.md#for-admins).
+- **Titles**: processing for over a week (with **Search now** for each and **Search all**, which searches a season missing entirely as one), series requests with no TVDB id, folders a server matched to the wrong title, collections partly in the library.
+- **Music** (once Lidarr is added): albums no server lists after a day, requested albums with no release after a week (with **Search now**), and whether MusicBrainz is answering. See [Music](./music.md#keeping-track).
 - **Users**: expired Plex sign-ins.
 - **Resources**: Seerr AI's own CPU and memory over the last hour or day.
 
 ### Health alerts
 
-Every 10 minutes (the **Health Alerts** job) the service checks run, and admins get a **Health** notification when something newly goes wrong: a service down, an indexer or provider paused, a disk filling up. A problem is reported once it has been seen twice in a row (a moment's timeout isn't), once only, and again only if it clears and comes back. It arrives by web push, and on Discord or any other agent with **Health** ticked.
+Every 10 minutes (the **Health Alerts** job) the service checks run, and admins get a **Health** notification when something newly goes wrong: a service down, an indexer or provider paused, a disk filling up. A problem is reported once it has been seen twice in a row (a moment's timeout isn't), once only, and again only if it clears and comes back. It arrives by web push, and on any notification service with **Health** ticked.
 
-## Plex Match Check
+## Match Check: titles matched wrongly
 
-Plex matches files to titles by their names; Sonarr and Radarr by their own ids. When the two disagree, nothing says so, and the wrong title shows as available while the right one shows nothing. For example, a new show called "Carrie" can be matched to "The Carrie Diaries".
+Media servers match files to titles by name; Sonarr, Radarr and Lidarr by id. When they disagree, the wrong title shows as available and the right one shows nothing. A new show called "Carrie" might be matched to "The Carrie Diaries".
 
-Every night (04:20, the **Match Check** job), Seerr AI reads each library on your media server (Plex, Jellyfin or Emby), finds each item's folder in Sonarr or Radarr, and compares their ids, not their names. Folders matched to another title, or to none, are listed on the Health page with both sides' ids, and the title's page warns admins what the server matched it to and how to fix it: **Fix Match** in Plex, or **Identify** in Jellyfin and Emby, with the id to enter. The next check clears it once they agree. To check now, use **Run now** on Settings → Jobs & Cache.
+**Every night** (04:20, the **Match Check** job), Seerr AI reads each library on each connected server, finds each item's folder in Sonarr or Radarr, and compares ids. Problems are listed on Health, and the title's page tells admins what the server matched it to and how to fix it: **Fix Match** in Plex, or **Identify** in Jellyfin and Emby (open the title there), with the id to enter. Until it's fixed, episodes and subtitles can be wrong too. The next check, nightly or after an import, clears it once they agree. **Run now** in Settings → Jobs & Cache runs it straight away.
+
+**As requests arrive**, too: a few minutes after Radarr, Sonarr or Lidarr imports a requested film, episodes or album, Seerr AI checks each server's match the same way.
+
+- **When:** about 2, 7, 22, 52 and 112 minutes after the import, then it stops. A wrong title is reported at once; "not matched" only after about two hours.
+- **Who hears:** admins, by the **Wrong Match** notification (on wherever **Health** was), on web push, email, Discord or any service with it ticked. The requester isn't told; their request shows "Waiting for Plex to match it".
+- **No floods:** each problem is told once, and not at all if the nightly check already listed it. Problems within 10 minutes go out together, at most 5 messages a day; the rest wait on Health. Fixed problems clear quietly.
+- **Music** is compared by MusicBrainz ids, or by artist, title and year, and only reported when clearly different.
+
+To see them, open **Settings → Health** and, under **Titles**, **Folders matched to another title**. It lists **Recent requests** (newest first) and the **Nightly check**, and has the switch **Check new requests as they're imported**.
 
 What a row can say:
 
-| It says | What it means | Fix |
+| It says | Meaning | Fix |
 |---|---|---|
-| Plex matched "Civil War (2024)" to Guerra Civil (2024) | Plex picked another title. | **Fix Match** in Plex, searching the id shown (for example `tmdb-929590`), which finds exactly that title. |
-| …to a different film named Americana (2025) | Two titles share the name and year; Plex picked the other one. The ids are what differ. | The same. |
-| Plex and Radarr use different entries for… | The same title by its IMDb id, but Plex and Radarr point at different TMDB (or TVDB) entries for it, usually because one was replaced. Seerr marks Plex's entry as in the library, so the request isn't. | **Fix Match** searching the id shown; if Plex finds nothing, Radarr's entry may be the outdated one. |
-| Plex has not matched "…" | Plex has no match for the folder. | **Fix Match** in Plex. |
+| Plex matched "Civil War (2024)" to Guerra Civil (2024) | The server picked another title. | **Fix Match** (Plex) or **Identify** (Jellyfin, Emby) with the id shown, such as `tmdb-929590`. |
+| …to a different film named Americana (2025) | Two titles share a name and year. | The same. |
+| Plex and Radarr use different entries for… | Same title, but different TMDB or TVDB entries, usually because one was replaced. | Fix the match with the id shown; if nothing is found, Radarr's entry may be outdated. |
+| Plex has not matched "…" | No match for the folder. | Fix the match. |
+| A length far off the film's (`file 21 min, film 107 min`) | The file is probably another film. | Replace it in Radarr rather than fixing the match. |
 
-Items it couldn't compare (no folder, or no id on both sides) are counted apart, not called fine.
+A file not named after the film gets a hint to rename it in Radarr, since that's what the server matched on. Items with no folder or no id can't be compared; they're counted apart.
 
 ## Anime Check
 

@@ -14,6 +14,10 @@ Users can optionally opt-in to being mentioned in Discord notifications by confi
 
 ## Configuration
 
+### Embed Poster
+
+Notifications about a film, series or album show its poster (or the album's cover) as a small picture in the corner of the message. It's on unless you turn it off.
+
 ### Webhook URL
 
 You can find the webhook URL in the Discord application, at **Server Settings &rarr; Integrations &rarr; Webhooks**.
@@ -29,6 +33,16 @@ If you would like to override the name you configured for your bot in Discord, y
 ### Bot Avatar URL (optional)
 
 Similar to the bot username, you can override the avatar for your bot.
+
+### Thread ID (optional)
+
+To post in a thread instead of the webhook's channel, such as a post in a forum channel, set this to the thread's ID. With Developer Mode on in Discord (**User Settings → Advanced**), right-click the thread and copy its ID. Leave it empty to post in the channel itself.
+
+### Enable Mentions
+
+When this is on, a notification mentions the people it's about, so Discord alerts them: the person who made the request or reported the issue, and admins for notifications meant for them. Each person is only mentioned if they've added their Discord user ID in their own notification settings and turned that notification on for Discord. It's on unless you turn it off.
+
+With it off, nobody is mentioned by name. The **Notification Role ID** above is still mentioned either way.
 
 ### Use Notification Recipient Locale
 

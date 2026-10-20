@@ -23,7 +23,7 @@ import useSWR from 'swr';
 const messages = defineMessages('components.Settings.SettingsDownloadClients', {
   title: 'Download Clients',
   description:
-    'Link your download clients so download progress updates every few seconds, with what the client is doing (repairing, unpacking, running its script, no one to download from): SABnzbd, NZBGet, qBittorrent, Transmission, Deluge or rTorrent. Radarr and Sonarr still send the downloads; Seerr AI only reads them. Backfill can send what it finds to any of them.',
+    'Shows live download progress and what the client is doing. Radarr and Sonarr still send downloads; Backfill can use any.',
   addClient: 'Add Download Client',
   client: 'Client',
   sabnzbd: 'SABnzbd',
@@ -33,7 +33,7 @@ const messages = defineMessages('components.Settings.SettingsDownloadClients', {
   deluge: 'Deluge',
   rtorrent: 'rTorrent',
   deleteClient: 'Delete Download Client',
-  deleteClientConfirm: 'Are you sure you want to delete this download client?',
+  deleteClientConfirm: 'Delete this download client?',
   deleteFailed: 'Could not delete the download client.',
 });
 

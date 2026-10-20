@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Sol·licitud de música rebutjada",
   "notifications.events.musicFailed": "Ha fallat la sol·licitud de música",
   "notifications.events.musicPending": "Sol·licitud de música nova",
-  "notifications.events.musicRequestAvailable": "La música sol·licitada ja està disponible"
+  "notifications.events.musicRequestAvailable": "La música sol·licitada ja està disponible",
+  "notifications.events.wrongMatch": "Coincidència errònia"
 }

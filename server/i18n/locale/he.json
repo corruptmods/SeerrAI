@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "בקשת המוזיקה נדחתה",
   "notifications.events.musicFailed": "בקשת המוזיקה נכשלה",
   "notifications.events.musicPending": "בקשת מוזיקה חדשה",
-  "notifications.events.musicRequestAvailable": "המוזיקה שהתבקשה זמינה עכשיו"
+  "notifications.events.musicRequestAvailable": "המוזיקה שהתבקשה זמינה עכשיו",
+  "notifications.events.wrongMatch": "התאמה שגויה"
 }

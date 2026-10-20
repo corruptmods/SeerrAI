@@ -1,4 +1,3 @@
-import csurf from '@dr.pogodin/csurf';
 import PlexAPI from '@server/api/plexapi';
 import dataSource, { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
@@ -27,7 +26,9 @@ import checkOverseerrMerge from '@server/lib/overseerrMerge';
 import { sessionStoreFor } from '@server/lib/sessionStore';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import { unlessApiKey } from '@server/middleware/auth';
 import clearCookies from '@server/middleware/clearcookies';
+import { csrfProtection } from '@server/middleware/csrf';
 import { aiChatBody, jsonBody } from '@server/middleware/jsonBody';
 import warmPosters from '@server/middleware/warmPosters';
 import routes from '@server/routes';
@@ -42,6 +43,7 @@ import createCustomProxyAgent, {
 } from '@server/utils/customProxyAgent';
 import { isPgsql } from '@server/utils/dbType';
 import { initializeDnsCache } from '@server/utils/dnsCache';
+import { rollBackOnRelease } from '@server/utils/nestedTransaction';
 import restartFlag from '@server/utils/restartFlag';
 import { trustedProxies } from '@server/utils/trustedProxies';
 import '@server/utils/userAgent';
@@ -92,6 +94,7 @@ app
     const dbConnection = dataSource.isInitialized
       ? dataSource
       : await dataSource.initialize();
+    rollBackOnRelease(dbConnection);
 
     // Run migrations in production
     if (process.env.NODE_ENV === 'production') {
@@ -239,24 +242,7 @@ app
     server.use(jsonBody);
     server.use(express.urlencoded({ extended: true }));
     if (settings.network.csrfProtection) {
-      server.use(
-        csurf({
-          cookie: {
-            httpOnly: true,
-            sameSite: true,
-            secure: !dev,
-            key: '_csrf',
-            path: '/',
-          },
-        })
-      );
-      server.use((req, res, next) => {
-        res.cookie('XSRF-TOKEN', req.csrfToken(), {
-          sameSite: true,
-          secure: !dev,
-        });
-        next();
-      });
+      server.use(csrfProtection(!dev));
     }
 
     // Set up sessions
@@ -274,7 +260,9 @@ app
       },
       store: sessionStore,
     });
-    server.use('/api', sessions);
+    // A request made with an API key is the key's alone, so the session
+    // cookie that came with it isn't read, changed or ended.
+    server.use('/api', unlessApiKey(sessions));
     server.use(aiChatBody);
     // The image cache only takes new images for someone signed in.
     useSessionForImages({

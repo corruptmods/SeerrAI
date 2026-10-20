@@ -30,8 +30,7 @@ const messages = defineMessages('components.Settings', {
   copyBlocklistedTagsTip: 'Copy blocklisted tag configuration',
   copyBlocklistedTagsEmpty: 'Nothing to copy',
   importBlocklistedTagsTip: 'Import blocklisted tag configuration',
-  clearBlocklistedTagsConfirm:
-    'Are you sure you want to clear the blocklisted tags?',
+  clearBlocklistedTagsConfirm: 'Clear the blocklisted tags?',
   yes: 'Yes',
   no: 'No',
   searchKeywords: 'Search keywords…',
@@ -41,7 +40,7 @@ const messages = defineMessages('components.Settings', {
   blocklistedTagImportInstructions: 'Paste blocklist tag configuration below.',
   valueRequired: 'You must provide a value.',
   noSpecialCharacters:
-    'Configuration must be a comma delimited list of TMDB keyword ids, and must not start or end with a comma.',
+    'Must be TMDB keyword ids separated by commas, without a comma at either end.',
   invalidKeyword: '{keywordId} is not a TMDB keyword.',
 });
 

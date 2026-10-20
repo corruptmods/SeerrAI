@@ -34,6 +34,10 @@ const hex = (channels: string) =>
     .join('')}`;
 
 describe('every season', () => {
+  it('has a look, and no season that was retired keeps one', () => {
+    assert.deepEqual(Object.keys(SEASON_LOOKS), [...SEASON_IDS]);
+  });
+
   it('has text that reads on its night-time pages and panels', () => {
     for (const id of SEASON_IDS) {
       const n = SEASON_LOOKS[id].night;
@@ -182,15 +186,15 @@ describe('a look with a season on top', () => {
   });
 
   it('is named on <html>', () => {
-    assert.deepEqual(themeAttributes(classic, 'diwali'), {
+    assert.deepEqual(themeAttributes(classic, 'lunarnewyear'), {
       ...themeAttributes(classic),
-      'data-season': 'diwali',
+      'data-season': 'lunarnewyear',
     });
     assert.equal(themeAttributes(classic)['data-season'], undefined);
   });
 
   it('is in the stylesheet for each mode in use, as variables only', () => {
-    const css = themeCss(look({ mode: 'auto' }), 'pride');
+    const css = themeCss(look({ mode: 'auto' }), 'lunarnewyear');
     assert.match(css, /data-mode="dark"\]\{[^}]*--season-mark:/);
     assert.match(css, /data-mode="light"\]\{[^}]*--season-mark:/);
     assert.match(

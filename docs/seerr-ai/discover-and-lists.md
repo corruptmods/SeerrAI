@@ -4,19 +4,37 @@
 
 ## Your own home page
 
-Everyone has the pencil button at the bottom right of Discover.
+Press the pencil button at the bottom right of Discover.
 
-- **Everyone:** **Choose what your home page shows**. Each row has a **Show on my home page** switch. That choice is kept for you alone; **Show All Rows** undoes it.
-- **Admins:** **Customize Discover** arranges the page for everyone (order, rows on or off, new rows, reset). The switch on each row is **Shown to everyone**; the eye beside it hides that row for you only.
-- **Your networks:** while editing, the **Networks** row lets you add networks by their TMDB id, reorder or remove them (up to 50), or go back to the usual list. Each person's list is their own.
-- **Your menu:** while editing, the sidebar (and on a phone, the **Arrange menu** button on the bar at the bottom) lets you drag items into your own order, or move them with their arrows, and hide the ones you don't use with the eye. **Reset Menu** puts back the usual order with everything shown. It's saved or dropped with the rest of the page, and is yours alone. Discover and Settings can't be hidden: Discover is where you change this, and on a phone the menu is the only way back to it. The sidebar and the phone menu use the same order; on a phone the first five items you show go on the bar, under **On the bar** while you arrange them, and the rest are in its menu. Items you can't use, or that are switched off, stay hidden whatever you choose, and items added in later versions appear in their usual place.
+- **Rows**: each row has **Show on my home page**. Your choice is yours alone; **Show All Rows** undoes it.
+- **Admins** get **Customize Discover** to arrange the page for everyone: order, rows on or off, new rows. There, a row's switch is **Shown to everyone**, and the eye hides it for you only. Resetting to default clears what everyone hid.
+- **Your networks**: in the **Networks** row, add networks by TMDB id, reorder or remove them (up to 50), or go back to the usual list.
+- **Your menu**: the sidebar shows a handle, arrows and an eye on each item. Drag or move items into your order, and hide the ones you don't use. On a phone, press **Arrange menu** on the bar at the bottom; the first five items you show go on the bar (**On the bar**), the rest in its menu. **Reset Menu** puts everything back.
 
-Resetting the rows to default clears what everyone hid, because the rows are created again.
+Save keeps it all; leaving drops it. Discover and Settings can't be hidden. Items you can't use stay hidden, and new items appear in their usual place.
 
 ### Rows Seerr AI adds
 
-- **Deleting Soon** (first by default): what Maintainerr is about to delete, soonest first, each with a **Keep** button. Hidden when nothing is due. Switch: `deletingSoon`.
-- **Suggested for You**: built from what you finished watching recently (from Tautulli with Plex, or straight from Jellyfin or Emby) and TMDB's recommendations, with recent watching counting more. Leaves out what you have started or what is blocklisted, and has its own page. Hidden when there is nothing to go on (Plex without Tautulli, no linked media server account, no history). Switch: `suggestedForYou`.
+- **Deleting Soon** (first by default): what Maintainerr is about to delete, each with **Keep**. Hidden when nothing is due. Switch: `deletingSoon`.
+- **Suggested for You**: from what you finished watching recently and TMDB's recommendations. Leaves out what you've started or is blocklisted. Hidden when there's nothing to go on. Switch: `suggestedForYou`.
+- **Anime This Season**: anime series airing now. Open it for the **Anime** page: **This Season**, **Next Season**, **Last Season**, **Popular Series** and **Films**, narrowed with **Made in** (Japan, South Korea, China, the United States or anywhere else). Anime is what Seerr AI counts as anime everywhere (see [Anime](./requests-and-downloads.md#anime)), whatever your Discover language.
+- **Music** rows, once music is set up. See [Music](./music.md).
+
+## Leaving out streaming services
+
+On the **Movies** or **Series** page, open **Filters** and find **Streaming Services**. Each logo has three states:
+
+1. Pick it once: only what's on that service (**Only on**).
+2. Pick it again: everything on it is left out (**Not on**); the logo is dimmed with a red ring.
+3. Pick it a third time: cleared.
+
+The chosen services are listed under **Only on** and **Not on** with a button to clear each. So "popular films not on the services I pay for" is a few taps. The choice stays in the page's address, so Back and shared links keep it.
+
+Admins' custom streaming service rows on Discover (Customize Discover → **Create Custom Slider**) can leave services out the same way.
+
+## Searching
+
+Search results start with **All**, **Movies**, **Series** and, when music is on for you, **Music**. All is films, series, collections and people. The one you pick stays in the address. Filtering the Movies or Series page offers a link to search everything for the same words.
 
 ## Filter any page of posters
 
@@ -30,12 +48,12 @@ Every grid of posters (Discover pages, search, watchlists, recommendations, Sugg
 
 **Watch Lists** in the sidebar. Anyone signed in can make lists of movies and series and add to them from **Add to List** on posters and title pages, or from **Also add to** when requesting.
 
-- **Sharing:** the owner shares a list with people, who can then add, remove and mark watched, or leave it. Only the owner renames, shares, deletes or imports. A list is seen only by its owner and the people it is shared with.
+- **Sharing:** the owner shares a list with people (and can change who later). Each is invited first: **Accept** lets the list tell when everyone has finished a title and include them in Pick for the Room; **Leave List** turns it down. People on a list can add, remove and mark watched, or leave it. Only the owner renames, shares, deletes or imports. A list is seen only by its owner and the people it is shared with.
 - **Sections:** **To watch** (here now), **Not Available Yet**, and **Watched**.
 - **Where you are in each series:** series show "Up next S2E4 · 6 to catch up", "Not started" or "Caught up", from your own watch history (with Plex this needs Tautulli and a linked Plex account; with Jellyfin or Emby, a linked account on the server).
 - **Sorting:** recently added, oldest added, title, newest or oldest release. Remembered on each device.
 - **Activity:** people on a list are notified when someone adds, removes or marks something watched (the **List Activity** notification). Private lists send nothing.
-- **Import:** the owner can paste a list of titles, one per line. Each line is matched to TMDB and **you review every match** before anything is added; nothing is added on a guess. A collection adds all its films. Optionally, anything not already in the library is requested (at most 20 per import, with your usual permissions).
+- **Import:** the owner can paste a list of titles, one per line (bullets, numbers and years are fine). Each line is matched to TMDB and **you review every match** before anything is added; nothing is added on a guess. A collection adds all its films. Optionally, anything not already in the library is requested (at most 20 per import, with your usual permissions).
 - **Import from Trakt:** paste the link to a public Trakt list, or to someone's public Trakt watchlist, instead (once an admin has set up Trakt in Settings → Services). Its titles come matched by their ids, up to 500, for you to review the same way.
 - **Finished watching?** If the owner ticks the option on a list, Seerr AI notices when everyone on the list has watched a title, and offers to remove it. Nothing is removed on its own, and **Keep** stops it asking about that title. Switch: `watchSuggestions`.
 

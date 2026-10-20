@@ -344,7 +344,7 @@ const MobileMenu = ({
         )}
       </Transition>
       <div
-        className="padding-bottom-safe border-t border-strong bg-surface/bar backdrop-blur"
+        className="tab-bar-blur padding-bottom-safe border-t border-strong bg-surface/bar"
         data-seerr="bottom-bar"
       >
         <div className="flex h-full items-center justify-between px-3 py-4 text-gray-100 sm:px-6">

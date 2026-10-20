@@ -20,6 +20,7 @@ const defaultSettings = {
   hideRequested: false,
   localLogin: true,
   mediaServerLogin: true,
+  personalApiKeys: 'off' as const,
   mediaServers: [],
   oidcProviders: [],
   movie4kEnabled: false,

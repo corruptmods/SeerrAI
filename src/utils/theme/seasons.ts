@@ -25,11 +25,8 @@ export interface SeasonLook {
   night: Neutrals;
   /** The mark by the logo, in dark and in light. */
   mark: { dark: string; light: string };
-  /**
-   * The mark's drawing: lines on a 24-unit square, in the mark's colour
-   * unless one has its own.
-   */
-  icon: { d: string; colour?: string }[];
+  /** The mark's drawing: lines on a 24-unit square, in the mark's colour. */
+  icon: { d: string }[];
 }
 
 const oklch = (hex: string): Oklch => toOklch(hexToRgb(hex));
@@ -115,21 +112,6 @@ const SPARK =
   'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6';
 const LANTERN =
   'M12 2v2.5M9.5 4.5h5M12 4.5c3.3 0 6 2.5 6 6s-2.7 6-6 6-6-2.5-6-6 2.7-6 6-6ZM12 4.5c-1.6 1.6-2.4 3.6-2.4 6s.8 4.4 2.4 6M12 4.5c1.6 1.6 2.4 3.6 2.4 6s-.8 4.4-2.4 6M9.5 16.5h5M12 16.5V22';
-const DIYA_FLAME =
-  'M12 3c1.8 2.2 2.6 3.9 2.6 5.3a2.6 2.6 0 0 1-5.2 0C9.4 6.9 10.2 5.2 12 3Z';
-const DIYA_BOWL = 'M3 14h18c-.8 3.5-4.4 6-9 6s-8.2-2.5-9-6Z';
-/** The Pride flag's six colours, as arcs of a rainbow. */
-const RAINBOW = [
-  '#e40303',
-  '#ff8c00',
-  '#ffed00',
-  '#008026',
-  '#004dff',
-  '#750787',
-].map((colour, i) => {
-  const r = 9.5 - i * 1.5;
-  return { d: `M${12 - r} 19a${r} ${r} 0 0 1 ${2 * r} 0`, colour };
-});
 
 export const SEASON_LOOKS: Record<SeasonId, SeasonLook> = {
   // Pumpkin orange on a deep purple night, with a crescent moon.
@@ -208,43 +190,5 @@ export const SEASON_LOOKS: Record<SeasonId, SeasonLook> = {
     }),
     mark: { dark: '#fbbf24', light: '#b91c1c' },
     icon: [{ d: LANTERN }],
-  },
-  // Marigold on a warm, lamp-lit night, with a diya.
-  diwali: {
-    accent: asDesigned(
-      accentFromColour('#d97706'),
-      WARM_INK,
-      '#fbbf24',
-      '#92400e'
-    ),
-    night: night({
-      page: '#160f0a',
-      sidebarTo: '#1e140d',
-      surface: '#271a11',
-      raised: '#412c1d',
-      text: '#fff8ef',
-      muted: '#c4ae98',
-    }),
-    mark: { dark: '#fbbf24', light: '#b45309' },
-    icon: [{ d: DIYA_FLAME }, { d: DIYA_BOWL }],
-  },
-  // Violet, with the Pride flag's rainbow.
-  pride: {
-    accent: asDesigned(
-      accentFromColour('#7c3aed'),
-      '#ffffff',
-      '#c4b5fd',
-      '#6d28d9'
-    ),
-    night: night({
-      page: '#100d1c',
-      sidebarTo: '#161127',
-      surface: '#1d1733',
-      raised: '#302750',
-      text: '#f7f5ff',
-      muted: '#aba3c8',
-    }),
-    mark: { dark: '#c4b5fd', light: '#6d28d9' },
-    icon: RAINBOW,
   },
 };

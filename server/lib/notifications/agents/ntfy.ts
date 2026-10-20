@@ -6,12 +6,12 @@ import {
   escapeMarkdown,
 } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
+import notificationHttp from '@server/lib/notifications/http';
 import { mediaPagePath } from '@server/lib/notifications/mediaPage';
 import type { NotificationAgentNtfy } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import type { AvailableLocale } from '@server/types/languages';
-import axios from 'axios';
 import { Notification, hasNotificationType } from '..';
 import type { NotificationAgent, NotificationPayload } from './agent';
 import { BaseAgent } from './agent';
@@ -176,7 +176,7 @@ class NtfyAgent
         authHeader = `Bearer ${settings.options.token}`;
       }
 
-      await axios.post(
+      await notificationHttp.post(
         settings.options.url,
         this.buildPayload(type, payload),
         authHeader

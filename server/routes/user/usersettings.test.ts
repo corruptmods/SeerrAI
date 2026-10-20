@@ -21,6 +21,7 @@ import { User } from '@server/entity/User';
 import UserPasskey from '@server/entity/UserPasskey';
 import { UserPushSubscription } from '@server/entity/UserPushSubscription';
 import { UserSettings } from '@server/entity/UserSettings';
+import { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
@@ -1160,5 +1161,35 @@ describe('linked accounts with several media servers', () => {
     const after = await friend();
     assert.strictEqual(after.jellyfinUserId, 'jf-link-user-001');
     assert.strictEqual(after.userType, UserType.PLEX);
+  });
+});
+
+/*
+ * List activity goes to a person on their own: Discord only ever posts to
+ * the channel, so it isn't offered on a person's Discord settings even when
+ * the channel's saved types still include it.
+ */
+describe('a person’s Discord notification types', () => {
+  afterEach(() => {
+    getSettings().notifications.agents.discord.enabled = false;
+    getSettings().notifications.agents.discord.types = 0;
+  });
+
+  it('are the channel’s, without list activity', async () => {
+    const discord = getSettings().notifications.agents.discord;
+    discord.enabled = true;
+    discord.options.enableMentions = true;
+    discord.types =
+      Notification.MEDIA_AVAILABLE |
+      Notification.LIST_ACTIVITY |
+      Notification.ISSUE_CREATED;
+    const { agent, userId } = await loginAs('friend@seerr.dev', 'test1234');
+
+    const res = await agent.get(`/user/${userId}/settings/notifications`);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(
+      res.body.discordEnabledTypes,
+      Notification.MEDIA_AVAILABLE | Notification.ISSUE_CREATED
+    );
   });
 });

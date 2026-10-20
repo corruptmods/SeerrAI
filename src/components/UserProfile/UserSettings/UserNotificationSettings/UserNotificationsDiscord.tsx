@@ -24,12 +24,12 @@ const messages = defineMessages(
   'components.UserProfile.UserSettings.UserNotificationSettings',
   {
     discordNotificationsNotEnabled:
-      'The server owner has not enabled Discord notifications. This information will only be used if the server owner configures an external service.',
+      'Discord notifications aren’t set up on this server, so this isn’t used yet.',
     discordsettingssaved: 'Discord notification settings saved successfully!',
     discordsettingsfailed: 'Discord notification settings failed to save.',
     discordId: 'User IDs',
     discordIdTip:
-      'The <FindDiscordIdLink>multi-digit ID number</FindDiscordIdLink> associated with your user account. For multiple household accounts you can add more than one Discord user ID.',
+      'Your <FindDiscordIdLink>Discord user ID</FindDiscordIdLink>. You can add several for a household.',
     discordIdPlaceholder: 'Discord User ID',
     discordIdAdd: 'Add User ID',
     discordIdRemove: 'Remove',
@@ -130,7 +130,8 @@ const UserNotificationsDiscord = () => {
               />
             )}
             <div className="form-row">
-              <label className="text-label">
+              {/* Names the list of IDs below, however many there are. */}
+              <label id="discordIdsLabel" className="text-label">
                 {intl.formatMessage(messages.discordId)}
                 {!!data?.discordEnabledTypes && (
                   <span className="label-required">*</span>
@@ -152,7 +153,11 @@ const UserNotificationsDiscord = () => {
                 )}
               </label>
               <div className="form-input-area">
-                <div className="space-y-2">
+                <div
+                  role="group"
+                  aria-labelledby="discordIdsLabel"
+                  className="space-y-2"
+                >
                   {values.discordIds.map((_id: string, index: number) => (
                     <div key={index} className="flex gap-2">
                       <div className="flex-1">
@@ -161,6 +166,9 @@ const UserNotificationsDiscord = () => {
                             name={`discordIds.${index}`}
                             type="text"
                             placeholder={intl.formatMessage(
+                              messages.discordIdPlaceholder
+                            )}
+                            aria-label={intl.formatMessage(
                               messages.discordIdPlaceholder
                             )}
                           />

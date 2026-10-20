@@ -8,6 +8,7 @@ import episodeSync from '@server/lib/episodeSync';
 import futureSeasons from '@server/lib/futureSeasons';
 import healthAlerts from '@server/lib/healthAlerts';
 import ImageProxy, { IMAGE_CACHES } from '@server/lib/imageproxy';
+import matchWatch from '@server/lib/matchWatch';
 import type { MediaServerKind } from '@server/lib/mediaServers';
 import { connectedServers, serverName } from '@server/lib/mediaServers';
 import { musicReady } from '@server/lib/music/access';
@@ -389,7 +390,9 @@ export const startJobs = (): void => {
     cancelFn: () => availabilitySync.cancel(),
   });
 
-  // Run download sync every minute
+  // Run download sync every minute. Requested titles just imported are
+  // looked for on each media server alongside it, in case one matched them
+  // to another title (lib/matchWatch).
   scheduledJobs.push({
     id: 'download-sync',
     name: 'Download Sync',
@@ -398,14 +401,21 @@ export const startJobs = (): void => {
     cronSchedule: jobs['download-sync'].schedule,
     job: schedule.scheduleJob(
       jobs['download-sync'].schedule,
-      runJob('Download Sync', () => {
+      runJob('Download Sync', async () => {
         logger.debug('Starting scheduled job: Download Sync', {
           label: 'Jobs',
         });
-        return downloadTracker.updateDownloads();
+        try {
+          await downloadTracker.updateDownloads();
+        } finally {
+          // It reads the media servers, not the queues: it goes on when
+          // a queue cannot be read.
+          await matchWatch.run();
+        }
       })
     ),
   });
+  downloadTracker.onEachImport((imported) => matchWatch.noteImports(imported));
 
   // A minute after Radarr or Sonarr imports something, every connected
   // media server's recently added scan runs (and again each minute, a few

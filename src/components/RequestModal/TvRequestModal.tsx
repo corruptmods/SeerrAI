@@ -7,6 +7,9 @@ import AnimeChoice, {
   useAnimeChoice,
 } from '@app/components/RequestModal/AnimeChoice';
 import EpisodePicker from '@app/components/RequestModal/EpisodePicker';
+import FailedRequestAlert, {
+  failedMessages,
+} from '@app/components/RequestModal/FailedRequestAlert';
 import FollowNewSeasons from '@app/components/RequestModal/FollowNewSeasons';
 import followByDefault from '@app/components/RequestModal/FollowNewSeasons/followByDefault';
 import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
@@ -20,6 +23,7 @@ import { useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import { addToLists } from '@app/utils/addToLists';
 import defineMessages from '@app/utils/defineMessages';
+import { retryErrorMessage } from '@app/utils/requestServerIssue';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
@@ -207,6 +211,9 @@ const TvRequestModal = ({
     globalMutate(`/api/v1/tv/${tmdbId}`);
   };
 
+  // A failed request is changed by a request manager and then retried.
+  const isFailed = editRequest?.status === MediaRequestStatus.FAILED;
+
   const updateRequest = async (alsoApproveRequest = false) => {
     if (!editRequest) {
       return;
@@ -238,7 +245,9 @@ const TvRequestModal = ({
           return;
         }
 
-        if (alsoApproveRequest) {
+        if (isFailed) {
+          await axios.post(`/api/v1/request/${editRequest.id}/retry`);
+        } else if (alsoApproveRequest) {
           await axios.post(`/api/v1/request/${editRequest.id}/approve`);
         }
       } else {
@@ -251,9 +260,11 @@ const TvRequestModal = ({
         <span>
           {selectedSeasons.length > 0
             ? intl.formatMessage(
-                alsoApproveRequest
-                  ? messages.requestApproved
-                  : messages.requestedited,
+                isFailed
+                  ? failedMessages.retried
+                  : alsoApproveRequest
+                    ? messages.requestApproved
+                    : messages.requestedited,
                 {
                   title: data?.name,
                   strong: (msg: React.ReactNode) => <strong>{msg}</strong>,
@@ -270,13 +281,29 @@ const TvRequestModal = ({
         }
       );
       if (onComplete) {
-        onComplete(MediaStatus.PENDING);
+        onComplete(
+          isFailed && selectedSeasons.length > 0
+            ? MediaStatus.PROCESSING
+            : MediaStatus.PENDING
+        );
       }
-    } catch {
-      addToast(<span>{intl.formatMessage(messages.errorediting)}</span>, {
-        appearance: 'error',
-        autoDismiss: true,
-      });
+    } catch (e) {
+      addToast(
+        <span>
+          {isFailed
+            ? retryErrorMessage(
+                e,
+                intl,
+                is4k,
+                intl.formatMessage(messages.errorediting)
+              )
+            : intl.formatMessage(messages.errorediting)}
+        </span>,
+        {
+          appearance: 'error',
+          autoDismiss: true,
+        }
+      );
     } finally {
       if (onUpdating) {
         onUpdating(false);
@@ -614,16 +641,20 @@ const TvRequestModal = ({
       onCancel={tvdbId ? () => setSearchModal({ show: true }) : onCancel}
       onOk={() =>
         editRequest
-          ? hasPermission(Permission.MANAGE_REQUESTS)
+          ? hasPermission(Permission.MANAGE_REQUESTS) && !isFailed
             ? updateRequest(true)
             : updateRequest()
           : sendRequest()
       }
       title={intl.formatMessage(
         editRequest
-          ? is4k
-            ? messages.pending4krequest
-            : messages.pendingrequest
+          ? isFailed
+            ? is4k
+              ? failedMessages.title4k
+              : failedMessages.title
+            : is4k
+              ? messages.pending4krequest
+              : messages.pendingrequest
           : is4k
             ? messages.requestseries4ktitle
             : messages.requestseriestitle
@@ -633,9 +664,11 @@ const TvRequestModal = ({
         editRequest
           ? selectedSeasons.length === 0
             ? intl.formatMessage(messages.cancel)
-            : hasPermission(Permission.MANAGE_REQUESTS)
-              ? intl.formatMessage(messages.approve)
-              : intl.formatMessage(messages.edit)
+            : isFailed
+              ? intl.formatMessage(failedMessages.saveAndRetry)
+              : hasPermission(Permission.MANAGE_REQUESTS)
+                ? intl.formatMessage(messages.approve)
+                : intl.formatMessage(messages.edit)
           : unrequestedSeasons.length === 0
             ? intl.formatMessage(messages.alreadyrequested)
             : !settings.currentSettings.partialRequestsEnabled
@@ -687,7 +720,7 @@ const TvRequestModal = ({
           ? settings.currentSettings.partialRequestsEnabled &&
             selectedSeasons.length === 0
             ? 'danger'
-            : hasPermission(Permission.MANAGE_REQUESTS)
+            : hasPermission(Permission.MANAGE_REQUESTS) && !isFailed
               ? 'success'
               : 'primary'
           : 'primary'
@@ -701,13 +734,17 @@ const TvRequestModal = ({
       }
       backdrop={`https://image.tmdb.org/t/p/w1920_and_h800_multi_faces/${data?.backdropPath}`}
     >
-      {editRequest
-        ? isOwner
-          ? intl.formatMessage(messages.pendingapproval)
-          : intl.formatMessage(messages.requestfrom, {
-              username: editRequest?.requestedBy.displayName,
-            })
-        : null}
+      {editRequest ? (
+        isFailed ? (
+          <FailedRequestAlert request={editRequest} />
+        ) : isOwner ? (
+          intl.formatMessage(messages.pendingapproval)
+        ) : (
+          intl.formatMessage(messages.requestfrom, {
+            username: editRequest?.requestedBy.displayName,
+          })
+        )
+      ) : null}
       {hasPermission(
         [
           Permission.MANAGE_REQUESTS,
@@ -1060,8 +1097,10 @@ const TvRequestModal = ({
           onChange={(overrides) => setRequestOverrides(overrides)}
           requestUser={editRequest?.requestedBy}
           requestId={editRequest?.id}
+          // Its server was removed: it starts from the default server and
+          // that server's own settings, as a new request would.
           defaultOverrides={
-            editRequest
+            editRequest && !editRequest.serverIssue
               ? {
                   folder: editRequest.rootFolder,
                   profile: editRequest.profileId,

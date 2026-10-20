@@ -625,11 +625,13 @@ describe('when a music request is approved', () => {
     );
   });
 
-  it('fails at once when there is no Lidarr to send it to', async () => {
-    getSettings().lidarr = [];
+  it('fails at once when its Lidarr was removed and there is no default', async () => {
+    // With no Lidarr at all it stays approved instead, as music fulfilled by
+    // hand would (routes/requestRecover.test.ts).
+    getSettings().lidarr = [lidarr.settings({ id: 3, isDefault: false })];
     const request = await approvedRequest(
       [{ mbId: OK_COMPUTER, title: 'OK Computer' }],
-      { status: MediaRequestStatus.PENDING }
+      { status: MediaRequestStatus.PENDING, serverId: 9 }
     );
 
     request.status = MediaRequestStatus.APPROVED;

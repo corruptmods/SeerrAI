@@ -102,7 +102,7 @@ const messages = defineMessages(
     customHeadersValue: 'Header Value',
     customHeadersIncomplete: 'All headers must have both name and value',
     customHeadersAuthConflict:
-      'Cannot use both Authorization Header and custom Authorization header. Please remove one.',
+      'Use either Authorization Header or a custom Authorization header, not both.',
     validationJsonPayloadRequired: 'You must provide a valid JSON payload',
     webhooksettingssaved: 'Webhook notification settings saved successfully!',
     webhooksettingsfailed: 'Webhook notification settings failed to save.',
@@ -424,14 +424,19 @@ const NotificationsWebhook = () => {
               </div>
             </div>
             <div className="form-row">
-              <label htmlFor="customHeaders" className="text-label">
+              {/* Names the group of headers below: there may be none yet. */}
+              <label id="customHeadersLabel" className="text-label">
                 {intl.formatMessage(messages.customHeaders)}
                 <span className="label-tip">
                   {intl.formatMessage(messages.customHeadersTip)}
                 </span>
               </label>
               <div className="form-input-area">
-                <div className="space-y-2">
+                <div
+                  role="group"
+                  aria-labelledby="customHeadersLabel"
+                  className="space-y-2"
+                >
                   {values.customHeaders.map(
                     (header: { key: string; value: string }, index: number) => (
                       <div key={index} className="flex gap-2">
@@ -443,6 +448,9 @@ const NotificationsWebhook = () => {
                               placeholder={intl.formatMessage(
                                 messages.customHeadersKey
                               )}
+                              aria-label={intl.formatMessage(
+                                messages.customHeadersKey
+                              )}
                             />
                           </div>
                         </div>
@@ -452,6 +460,9 @@ const NotificationsWebhook = () => {
                               name={`customHeaders.${index}.value`}
                               type="text"
                               placeholder={intl.formatMessage(
+                                messages.customHeadersValue
+                              )}
+                              aria-label={intl.formatMessage(
                                 messages.customHeadersValue
                               )}
                             />
@@ -504,7 +515,7 @@ const NotificationsWebhook = () => {
               </div>
             </div>
             <div className="form-row">
-              <label htmlFor="webhook-json-payload" className="text-label">
+              <label htmlFor="jsonPayload" className="text-label">
                 {intl.formatMessage(messages.customJson)}
                 <span className="label-required">*</span>
               </label>
@@ -512,6 +523,8 @@ const NotificationsWebhook = () => {
                 <div className="form-input-field">
                   <JSONEditor
                     name="webhook-json-payload"
+                    inputId="jsonPayload"
+                    label={intl.formatMessage(messages.customJson)}
                     onUpdate={(value) => setFieldValue('jsonPayload', value)}
                     value={values.jsonPayload}
                     onBlur={() => setFieldTouched('jsonPayload')}

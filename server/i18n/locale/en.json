@@ -91,6 +91,7 @@
   "notifications.events.musicRequestAvailable": "Music Request Now Available",
   "notifications.events.requestAvailable": "{kind, select, movie {Movie Request Now Available} movie4k {4K Movie Request Now Available} tv4k {4K Series Request Now Available} other {Series Request Now Available}}",
   "notifications.events.seriesReadyToWatch": "Series Ready to Watch",
+  "notifications.events.wrongMatch": "Wrong match",
   "notifications.test.message": "Check check, 1, 2, 3. Are we coming in clear?",
   "notifications.test.subject": "Test Notification"
 }

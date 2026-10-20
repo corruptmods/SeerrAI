@@ -26,6 +26,7 @@ const messages = defineMessages(
     validationUrlTrailingSlash: 'URL must not end in a trailing slash',
     validationTokenRequired: 'You must provide an application token',
     validationPriorityRequired: 'You must set a priority number',
+    validationPriority: 'The priority must be a whole number from 0 to 10',
     gotifysettingssaved: 'Gotify notification settings saved successfully!',
     gotifysettingsfailed: 'Gotify notification settings failed to save.',
     toastGotifyTestSending: 'Sending Gotify test notification…',
@@ -73,16 +74,21 @@ const NotificationsGotify = () => {
           .required(intl.formatMessage(messages.validationTokenRequired)),
       otherwise: (schema) => schema.nullable(),
     }),
-    priority: Yup.string().when('enabled', {
-      is: true,
-      then: (schema) =>
-        schema
-          .nullable()
-          .min(0)
-          .max(9)
-          .required(intl.formatMessage(messages.validationPriorityRequired)),
-      otherwise: (schema) => schema.nullable(),
-    }),
+    // Gotify's apps read 0 to 10 (see the guide); anything else would be
+    // saved as nothing.
+    priority: Yup.string()
+      .when('enabled', {
+        is: true,
+        then: (schema) =>
+          schema
+            .nullable()
+            .required(intl.formatMessage(messages.validationPriorityRequired)),
+        otherwise: (schema) => schema.nullable(),
+      })
+      .matches(/^(?:\d|10)$/, {
+        message: intl.formatMessage(messages.validationPriority),
+        excludeEmptyString: true,
+      }),
   });
 
   if (!data && !error) {

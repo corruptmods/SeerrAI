@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Zahtjev za glazbu odbijen",
   "notifications.events.musicFailed": "Zahtjev za glazbu nije uspio",
   "notifications.events.musicPending": "Novi zahtjev za glazbu",
-  "notifications.events.musicRequestAvailable": "Zatražena glazba je sada dostupna"
+  "notifications.events.musicRequestAvailable": "Zatražena glazba je sada dostupna",
+  "notifications.events.wrongMatch": "Pogrešno podudaranje"
 }

@@ -13,6 +13,7 @@ import { User } from '@server/entity/User';
 import type { MediaServerRemovalImpact } from '@server/interfaces/api/mediaServerInterfaces';
 import { refreshMediaServerJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
+import matchWatch from '@server/lib/matchWatch';
 import {
   connectedServers,
   linkedServers,
@@ -220,6 +221,7 @@ export const removeServer = async (kind: MediaServerKind): Promise<void> => {
   );
 
   await plexMatchCheck.dropServer(serverName(kind) as MediaServerName);
+  await matchWatch.dropServer(serverName(kind) as MediaServerName);
 
   // A sync already under way checked some titles with this server still
   // there; it runs once more when it finishes.

@@ -12,11 +12,9 @@ import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
 const messages = defineMessages('components.Ai.PickForRoom', {
-  intro:
-    'Choose who is watching, and three titles you would all enjoy are picked from what each of you has been watching.',
+  intro: 'Choose who’s watching to get three titles you’d all enjoy.',
   who: 'Who is watching',
-  whoNote:
-    'People you share a watch list with can be included, unless they have turned this off.',
+  whoNote: 'Only people you share a watch list with, unless they’ve opted out.',
   you: 'You',
   kind: 'Looking for',
   any: 'Anything',

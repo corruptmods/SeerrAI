@@ -4,7 +4,7 @@ import {
   MediaStatus,
   MediaType,
 } from '@server/constants/media';
-import { getRepository } from '@server/datasource';
+import dataSource, { getRepository } from '@server/datasource';
 import EpisodeRequest from '@server/entity/EpisodeRequest';
 import Media from '@server/entity/Media';
 import MediaEvent from '@server/entity/MediaEvent';
@@ -368,5 +368,31 @@ describe('reading it', () => {
       })
     );
     assert.equal(await getRepository(MediaEvent).countBy({ tmdbId: 1 }), 0);
+  });
+
+  // On Postgres a refused write aborts the transaction it is in, so the save
+  // it was recorded for, and everything after it, would be lost with it.
+  it('never undoes the save it is written in when a write fails', async () => {
+    await dataSource.transaction(async (em) => {
+      await recordMediaEvent(
+        { tmdbId: 1, mediaType: MediaType.MOVIE, type: MediaEventType.ADDED },
+        em
+      );
+      await recordMediaEvent(
+        { tmdbId: 2, mediaType: null as never, type: MediaEventType.ADDED },
+        em
+      );
+      await recordMediaEvent(
+        { tmdbId: 3, mediaType: MediaType.MOVIE, type: MediaEventType.ADDED },
+        em
+      );
+    });
+
+    assert.deepEqual(
+      (await getRepository(MediaEvent).find({ order: { tmdbId: 'ASC' } })).map(
+        (event) => event.tmdbId
+      ),
+      [1, 3]
+    );
   });
 });

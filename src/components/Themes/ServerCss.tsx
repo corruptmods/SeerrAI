@@ -16,14 +16,14 @@ import useSWR, { useSWRConfig } from 'swr';
 const messages = defineMessages('components.Themes.ServerCss', {
   serverCss: 'Server CSS',
   description:
-    'Your own styles for everyone on this server, the sign-in page included. You can bring in a stylesheet from elsewhere with @import, such as a theme.park theme.',
+    'Styles for everyone, sign-in page included. @import works, such as for a theme.park theme.',
   placeholder:
     '@import url("https://theme-park.dev/css/base/overseerr/nord.css");\n\n/* Rounder buttons for everyone */\n[data-seerr="button"] {\n  border-radius: 999px;\n}',
   hooksTitle: 'Styles that survive updates',
   hooks:
-    'Style the names in the <link>list of style hooks</link>, such as <code>data-seerr="title-card"</code>. Those names stay the same between versions. Anything else may change.',
+    'Style the names in the <link>list of style hooks</link>, such as <code>data-seerr="title-card"</code>; anything else may change between versions.',
   safeTitle: 'If a style breaks things',
-  safe: 'Add <code>?safe</code> to any address, or use the link on the sign-in page, to open Seerr AI without custom CSS and fix it here. <link>Open this page that way</link>.',
+  safe: 'Add <code>?safe</code> to any address to open Seerr AI without custom CSS. <link>Open this page that way</link>.',
   saveCss: 'Save CSS',
   personalCss: 'Let people add their own CSS',
   personalCssHint:

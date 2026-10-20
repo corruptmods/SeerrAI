@@ -14,7 +14,7 @@ import useSWR from 'swr';
 const messages = defineMessages('components.MediaLists.WatchSuggestions', {
   title: 'Finished watching?',
   description:
-    'Everyone on these lists has watched the titles below. Remove the ones you are done with.',
+    'Everyone on these lists has watched these. Remove the ones you’re done with.',
   remove: 'Remove selected',
   keep: 'Keep all',
   onlist: 'on {list}',

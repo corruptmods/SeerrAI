@@ -113,6 +113,8 @@ interface DiscoverMovieOptions {
   sortBy?: MovieSortOptions;
   watchRegion?: string;
   watchProviders?: string;
+  /** Leave out titles on these services ("8|9"), in watchRegion. */
+  excludeWatchProviders?: string;
   certification?: string;
   certificationGte?: string;
   certificationLte?: string;
@@ -145,6 +147,8 @@ interface DiscoverTvOptions {
   sortBy?: TvSortOptions;
   watchRegion?: string;
   watchProviders?: string;
+  /** Leave out titles on these services ("8|9"), in watchRegion. */
+  excludeWatchProviders?: string;
   withStatus?: string; // Returning Series: 0 Planned: 1 In Production: 2 Ended: 3 Cancelled: 4 Pilot: 5
   certification?: string;
   certificationGte?: string;
@@ -733,6 +737,7 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
     voteCountGte,
     voteCountLte,
     watchProviders,
+    excludeWatchProviders,
     watchRegion,
     certification,
     certificationGte,
@@ -787,6 +792,7 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
           'vote_count.lte': voteCountLte,
           watch_region: watchRegion,
           with_watch_providers: watchProviders,
+          without_watch_providers: excludeWatchProviders,
           certification: certification,
           'certification.gte': certificationGte,
           'certification.lte': certificationLte,
@@ -824,6 +830,7 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
     voteCountGte,
     voteCountLte,
     watchProviders,
+    excludeWatchProviders,
     watchRegion,
     withStatus,
     certification,
@@ -879,6 +886,7 @@ class TheMovieDb extends ExternalAPI implements TvShowProvider {
           'vote_count.gte': voteCountGte,
           'vote_count.lte': voteCountLte,
           with_watch_providers: watchProviders,
+          without_watch_providers: excludeWatchProviders,
           watch_region: watchRegion,
           with_status: withStatus,
           certification: certification,

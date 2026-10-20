@@ -14,6 +14,7 @@ import {
   useMusicRequest,
 } from '@app/components/Music/MusicRequest/shared';
 import RequestModal from '@app/components/RequestModal';
+import RequestServerIssue from '@app/components/RequestServerIssue';
 import useNearScreen, { NearScreen, bothRefs } from '@app/hooks/useNearScreen';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -160,21 +161,38 @@ const MusicRequestCard = ({
                 className="mt-1"
               />
             )}
+          <RequestServerIssue request={requestData} compact className="mt-1" />
           <div className="flex flex-1 items-end space-x-2">
             {requestData.status === MediaRequestStatus.FAILED && manages && (
-              <Tooltip content={intl.formatMessage(globalMessages.retry)}>
-                <Button
-                  buttonType="primary"
-                  buttonSize="sm"
-                  disabled={isRetrying}
-                  onClick={() => retry()}
-                >
-                  <ArrowPathIcon
-                    className={isRetrying ? 'animate-spin' : ''}
-                    style={{ marginRight: '0', animationDirection: 'reverse' }}
-                  />
-                </Button>
-              </Tooltip>
+              <>
+                <Tooltip content={intl.formatMessage(globalMessages.retry)}>
+                  <Button
+                    buttonType="primary"
+                    buttonSize="sm"
+                    disabled={isRetrying}
+                    onClick={() => retry()}
+                  >
+                    <ArrowPathIcon
+                      className={isRetrying ? 'animate-spin' : ''}
+                      style={{
+                        marginRight: '0',
+                        animationDirection: 'reverse',
+                      }}
+                    />
+                  </Button>
+                </Tooltip>
+                {/* Another Lidarr, profile or folder, before retrying. */}
+                <Tooltip content={intl.formatMessage(messages.editrequest)}>
+                  <Button
+                    buttonType="default"
+                    buttonSize="sm"
+                    disabled={isRetrying}
+                    onClick={() => setShowEditModal(true)}
+                  >
+                    <PencilIcon />
+                  </Button>
+                </Tooltip>
+              </>
             )}
             {pending && manages && (
               <>

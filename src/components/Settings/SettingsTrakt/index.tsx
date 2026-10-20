@@ -15,17 +15,17 @@ import useSWR, { mutate as globalMutate } from 'swr';
 const messages = defineMessages('components.Settings.SettingsTrakt', {
   title: 'Trakt',
   description:
-    'Lets people import public Trakt lists into their lists, and have what is on their public Trakt watchlist requested for them. Nobody signs in to Trakt: Seerr AI only reads what is public.',
+    'Lets people import public Trakt lists and have their public watchlist requested. Nobody signs in to Trakt.',
   clientId: 'Client ID',
   clientIdTip:
-    'Make a Trakt app at <TraktAppsLink>developer.trakt.tv/apps</TraktAppsLink> (Trakt asks for a verified GitHub account), then paste its Client ID here. Trakt deletes apps that go unused for 30 days.',
+    'Make an app at <TraktAppsLink>developer.trakt.tv/apps</TraktAppsLink> and paste its Client ID. Unused apps are deleted after 30 days.',
   savedTip: 'A Client ID is saved. Enter a new one to replace it.',
   connected: 'Connected to Trakt.',
   removed: 'Trakt removed.',
   remove: 'Remove',
   removeTitle: 'Remove Trakt',
   removeConfirm:
-    'Remove Trakt? People can no longer import Trakt lists, and nothing more is requested from their Trakt watchlists, until a Client ID is saved again.',
+    'Remove Trakt? Trakt imports and watchlist requests stop until a Client ID is saved again.',
   removeFailed: 'Could not remove Trakt.',
   saveFailed: 'Could not save: {reason}',
   badKey:

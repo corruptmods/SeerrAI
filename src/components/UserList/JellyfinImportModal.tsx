@@ -36,17 +36,17 @@ const messages = defineMessages('components.UserList', {
   importfromJellyfinsynced:
     '{mediaServerName} users synced successfully. Existing users were refreshed.',
   jellyfinsyncnotice:
-    'Everyone on {mediaServerName} has been imported. You can still click Sync to refresh them, such as a changed name or picture.',
+    'Everyone on {mediaServerName} is imported. Sync refreshes names and pictures.',
   importedfromJellyfin:
-    '<strong>{userCount}</strong> {mediaServerName} {userCount, plural, one {user} other {users}} imported successfully!',
+    '<strong>{userCount}</strong> {mediaServerName} {userCount, plural, one {user} other {users}} imported.',
   importedUsersNoPassword:
-    'Imported users do not have a {applicationTitle} password set. If you disable {mediaServerName} sign-in, they will need to set a password from their profile or via a password reset link.',
+    'Imported users have no {applicationTitle} password. Without {mediaServerName} sign-in, they’ll need to set one.',
   user: 'User',
   noJellyfinuserstoimport: 'There are no {mediaServerName} users to import.',
   jellyfinImportSkipped:
-    'Not imported, as another account already has their name as its email: {names}. They can sign in with that account and link {mediaServerName} from their profile.',
+    'Not imported, as another account already uses their name as its email: {names}. They can sign in with it and link {mediaServerName}.',
   newJellyfinsigninenabled:
-    'The <strong>Enable New {mediaServerName} Sign-In</strong> setting is currently enabled. {mediaServerName} users with library access do not need to be imported in order to sign in.',
+    '<strong>Enable New {mediaServerName} Sign-In</strong> is on, so {mediaServerName} users with library access can sign in without being imported.',
 });
 
 const JellyfinImportModal: React.FC<JellyfinImportProps> = ({

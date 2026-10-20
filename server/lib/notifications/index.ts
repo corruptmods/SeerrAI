@@ -35,6 +35,11 @@ export enum Notification {
    * paused, a disk filling up. Admins only; opens the Health page.
    */
   HEALTH = 65536,
+  /**
+   * A media server matched a title just requested and imported to another
+   * title, or not at all (lib/matchWatch). Admins only; told once.
+   */
+  WRONG_MATCH = 131072,
 }
 
 export const hasNotificationType = (

@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Заявката за музика е отхвърлена",
   "notifications.events.musicFailed": "Неуспешна заявка за музика",
   "notifications.events.musicPending": "Нова заявка за музика",
-  "notifications.events.musicRequestAvailable": "Заявената музика вече е налична"
+  "notifications.events.musicRequestAvailable": "Заявената музика вече е налична",
+  "notifications.events.wrongMatch": "Грешно съвпадение"
 }

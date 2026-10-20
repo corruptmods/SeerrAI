@@ -275,6 +275,24 @@ class PlexAPI extends ExternalAPI {
     return response.MediaContainer.Metadata[0];
   }
 
+  /**
+   * One movie or show as a library listing gives it: the ids it is matched
+   * to, a movie's files and a show's folders. Undefined once it is gone.
+   */
+  public async getMatchItem(
+    ratingKey: string
+  ): Promise<PlexLibraryItem | undefined> {
+    try {
+      const response = await this.get<PlexLibraryResponse>(
+        `/library/metadata/${ratingKey}?includeGuids=1`
+      );
+      return response.MediaContainer.Metadata?.[0];
+    } catch (e) {
+      if (e.response?.status === 404) return undefined;
+      throw e;
+    }
+  }
+
   public async getChildrenMetadata(key: string): Promise<PlexMetadata[]> {
     const response = await this.get<PlexMetadataResponse>(
       `/library/metadata/${key}/children`

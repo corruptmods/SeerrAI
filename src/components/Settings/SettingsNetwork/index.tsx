@@ -27,23 +27,24 @@ const messages = defineMessages('components.Settings.SettingsNetwork', {
   networksettingsDescription:
     'Configure network settings for your Seerr AI instance.',
   csrfProtection: 'Enable CSRF Protection',
-  csrfProtectionTip: 'Set external API access to read-only (requires HTTPS)',
+  csrfProtectionTip:
+    'Stops other sites making changes through a signed-in browser. Needs HTTPS.',
   csrfProtectionHoverTip:
-    'Do NOT enable this setting unless you understand what you are doing!',
+    'Over plain HTTP, saving anything in the browser fails. API key requests aren’t affected.',
   trustProxy: 'Enable Proxy Support',
   trustProxyLocalTip:
-    'Take people’s addresses from a reverse proxy on this machine, your local network or Tailscale (such as Nginx, Caddy or Traefik in Docker). Proxies on public addresses are trusted only when you choose them below.',
+    'Trust a reverse proxy on this machine, your local network or Tailscale for people’s addresses.',
   trustCloudflare: 'Trust Cloudflare',
   trustCloudflareTip:
-    'Turn on if Cloudflare’s proxy (the orange cloud) sits in front of your reverse proxy, so Seerr AI sees visitors’ real addresses.',
+    'Turn on if Cloudflare’s proxy (orange cloud) is in front of your reverse proxy.',
   trustedProxies: 'Also Trust These Proxies',
   trustedProxiesTip:
-    'Addresses or ranges of other proxies in front of Seerr AI, such as a reverse proxy on a rented server. Proxies on this machine, your local network and Tailscale are always trusted.',
+    'Other proxies in front of Seerr AI, such as one on a rented server. Local ones are always trusted.',
   validationTrustedProxy:
     '{entry} is not an address or range, such as 203.0.113.5 or 203.0.113.0/24.',
   proxyEnabled: 'HTTP(S) Proxy',
   proxyEnabledTip:
-    'Send ALL outgoing HTTP/HTTPS requests through a proxy server (host/port). Does NOT enable HTTPS, SSL, or certificate configuration.',
+    'Send all outgoing requests through a proxy. This doesn’t set up HTTPS.',
   proxyHostname: 'Proxy Hostname',
   proxyPort: 'Proxy Port',
   proxySsl: 'Use SSL For Proxy',
@@ -57,21 +58,19 @@ const messages = defineMessages('components.Settings.SettingsNetwork', {
   validationDnsCacheMaxTtl: 'You must provide a valid maximum TTL',
   validationProxyPort: 'You must provide a valid port',
   networkDisclaimer:
-    'Network parameters from your container/system should be used instead of these settings. See the {docs} for more information.',
+    'Prefer your container or system’s network settings over these. See the {docs}.',
   docs: 'documentation',
   forceIpv4First: 'Force IPv4 Resolution First',
   forceIpv4FirstTip:
     'Force Seerr AI to resolve IPv4 addresses first instead of IPv6',
   dnsCache: 'DNS Cache',
-  dnsCacheTip:
-    'Enable caching of DNS lookups to optimize performance and avoid making unnecessary API calls',
-  dnsCacheHoverTip:
-    'Do NOT enable this if you are experiencing issues with DNS lookups',
+  dnsCacheTip: 'Cache DNS lookups to save time and calls',
+  dnsCacheHoverTip: 'Leave off if you have DNS lookup problems',
   dnsCacheForceMinTtl: 'DNS Cache Minimum TTL',
   dnsCacheForceMaxTtl: 'DNS Cache Maximum TTL',
   apiRequestTimeout: 'API Request Timeout',
   apiRequestTimeoutTip:
-    'Maximum time (in seconds) to wait for responses from external services like Radarr/Sonarr. Set to 0 for no timeout.',
+    'Seconds to wait for services like Radarr and Sonarr. 0 for no limit.',
   validationApiRequestTimeout: 'You must provide a valid timeout value',
 });
 

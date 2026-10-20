@@ -1,7 +1,7 @@
 /*
  * Seasonal themes: for a few days a year Seerr AI dresses up for a season
- * (Halloween, the December holidays, New Year, and a few an admin can turn
- * on), on top of each person's own look, and goes back to it by itself when
+ * (Halloween, the December holidays, New Year, and Lunar New Year if an
+ * admin turns it on), on top of each person's own look, and goes back to it by itself when
  * the dates pass.
  *
  * An admin chooses which seasons run and when (Settings → Appearance); each
@@ -13,20 +13,24 @@
  * Nothing here touches the server or the database, so pages use it too.
  */
 
+/*
+ * Diwali and Pride Month were seasons once. What was saved for them is
+ * cleared when the server starts (settings migration 0013, and the
+ * ClearRetiredSeasonNotes database migration), and anything else naming
+ * them reads as a season that doesn't exist.
+ */
 export const SEASON_IDS = [
   'halloween',
   'holidays',
   'newyear',
   'lunarnewyear',
-  'diwali',
-  'pride',
 ] as const;
 export type SeasonId = (typeof SEASON_IDS)[number];
 
 /**
  * One season as an admin set it. Days of the year are 'MM-DD'. A season
- * whose dates move (Lunar New Year, Diwali) may leave them out, to have
- * them worked out each year.
+ * whose dates move (Lunar New Year) may leave them out, to have them
+ * worked out each year.
  */
 export interface SeasonSetting {
   enabled: boolean;
@@ -41,8 +45,6 @@ export const SEASON_DEFAULTS: SeasonsSettings = {
   holidays: { enabled: true, start: '12-01', end: '12-28' },
   newyear: { enabled: true, start: '12-29', end: '01-02' },
   lunarnewyear: { enabled: false },
-  diwali: { enabled: false },
-  pride: { enabled: false, start: '06-01', end: '06-30' },
 };
 
 /** A season whose day moves from year to year, and the days around it. */
@@ -56,7 +58,7 @@ interface MovingSeason {
   source: string;
 }
 
-export const MOVING_SEASONS: Record<'lunarnewyear' | 'diwali', MovingSeason> = {
+export const MOVING_SEASONS: Record<'lunarnewyear', MovingSeason> = {
   // The first day of the first lunar month, as China (and Hong Kong)
   // keep it. Countries a time zone away can differ by a day in some
   // years (Vietnam's Tết in 2030 is 2 February). The season runs from
@@ -86,32 +88,6 @@ export const MOVING_SEASONS: Record<'lunarnewyear' | 'diwali', MovingSeason> = {
       'Hong Kong Observatory Gregorian–Lunar calendar conversion table (2027); ' +
       'timeanddate.com (2025–2030); Wikipedia, Chinese New Year (2026–2037); ' +
       'herongyang.com (2031–2040). Checked October 2026; they agree.',
-  },
-  // Lakshmi Puja, the main day, as India keeps it. Places far from India
-  // can keep it a day earlier. The season runs the festival's five days,
-  // Dhanteras to Bhai Dooj.
-  diwali: {
-    days: {
-      2025: '10-20',
-      2026: '11-08',
-      2027: '10-29',
-      2028: '10-17',
-      2029: '11-05',
-      2030: '10-26',
-      2031: '11-14',
-      2032: '11-02',
-      2033: '10-22',
-      2034: '11-10',
-      2035: '10-30',
-      2036: '10-18',
-    },
-    before: 2,
-    after: 2,
-    source:
-      'timeanddate.com, Diwali in India (2025–2030); qppstudio.net, ' +
-      'Northern Deepavali (2026–2036); Royal Mint (2025); Wikipedia, ' +
-      'Diwali (2026); Drik Panchang (2028–2036, worked out for Houston, ' +
-      'so a day earlier in 2030 and 2031). Checked October 2026.',
   },
 };
 
@@ -287,8 +263,8 @@ const timesAround = (season: SeasonCalendarEntry, year: number) =>
 
 /**
  * The season running on a day ('YYYY-MM-DD'). When two meet, the one that
- * started most recently shows (Diwali in the middle of Halloween, New Year
- * at the end of a long Holidays); on the same day, the first in order.
+ * started most recently shows (New Year at the end of a long Holidays); on
+ * the same day, the first in order.
  */
 export const activeSeason = (
   calendar: SeasonCalendar,

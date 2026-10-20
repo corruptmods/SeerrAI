@@ -9,8 +9,7 @@ const messages = defineMessages('components.Settings', {
     'Incorrectly configuring this setting may result in broken functionality',
   experimentalTooltip:
     'Enabling this setting may result in unexpected application behavior',
-  restartrequiredTooltip:
-    'Seerr AI must be restarted for changes to this setting to take effect',
+  restartrequiredTooltip: 'Restart Seerr AI for this to take effect',
 });
 
 const SettingsBadge = ({

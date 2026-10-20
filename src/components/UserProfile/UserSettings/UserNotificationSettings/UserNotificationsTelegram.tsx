@@ -23,8 +23,7 @@ const messages = defineMessages(
     telegramChatIdTipLong:
       '<TelegramBotLink>Start a chat</TelegramBotLink>, add <GetIdBotLink>@get_id_bot</GetIdBotLink>, and issue the <code>/my_id</code> command',
     telegramMessageThreadId: 'Thread/Topic ID',
-    telegramMessageThreadIdTip:
-      "If your group-chat has topics enabled, you can specify a thread/topic's ID here",
+    telegramMessageThreadIdTip: 'For a group chat with topics: the topic’s ID',
     sendSilently: 'Send Silently',
     sendSilentlyDescription: 'Send notifications with no sound',
     validationTelegramChatId: 'You must provide a valid chat ID',

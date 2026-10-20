@@ -22,9 +22,9 @@ div(style='display: block; background-color: #111827; padding: 2.5rem 0;')
         if logoUrl
           if applicationUrl
             a(href=applicationUrl style='margin: 0 1rem;')
-              img(src=logoUrl style='width: 26rem; image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast;')
+              img(src=logoUrl alt=applicationTitle width='416' style='width: 26rem; height: auto;')
           else
-            img(src=logoUrl style='margin: 0 1rem; width: 26rem; image-rendering: crisp-edges; image-rendering: -webkit-optimize-contrast;')
+            img(src=logoUrl alt=applicationTitle width='416' style='margin: 0 1rem; width: 26rem; height: auto;')
         else
           div(style='margin: 0 1rem 2.5rem; font-size: 3em; font-weight: 700;')
             | #{applicationTitle}
@@ -43,7 +43,7 @@ div(style='display: block; background-color: #111827; padding: 2.5rem 0;')
           img(src=imageUrl alt='' style='margin: 1.25rem auto 0; width: 8rem; border-radius: 8px;')
     tr
       td(style='text-align: center;')
-        div(style='margin: 1rem 0 0; font-size: 1.1em; line-height: 1.5; color: #d1d5db; word-break: break-word;')
+        div(style='margin: 1rem 0 0; font-size: 1.1em; line-height: 1.5; color: #d1d5db; word-break: break-word; white-space: pre-line;')
           | #{body}
     if actionUrl
       tr

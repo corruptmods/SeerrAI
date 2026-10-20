@@ -268,6 +268,7 @@ const SettingsLogs = () => {
             </span>
             <input
               type="text"
+              aria-label={intl.formatMessage(globalMessages.search)}
               className="rounded-r-only"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value as string)}

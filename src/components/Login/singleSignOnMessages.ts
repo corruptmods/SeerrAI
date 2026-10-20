@@ -10,18 +10,18 @@ const messages = defineMessages('components.Login.SingleSignOn', {
   signInWith: 'Sign in with {provider}',
   unavailable: 'Signing in with {provider} is not available.',
   provider:
-    'Something went wrong with {provider}. Try again in a moment, and if it keeps happening, tell an admin.',
+    'Something went wrong with {provider}. Try again, or tell an admin if it keeps happening.',
   denied: '{provider} did not sign you in.',
   expired: 'That took too long, or was started in another window. Try again.',
   noAccount:
-    'No account here is linked to this {provider} account. Sign in another way and link {provider} in your profile, or ask an admin for an account.',
+    'No account is linked to this {provider} account. Sign in another way and link it, or ask an admin.',
   existingAccount:
-    'Another account here already has the email of this {provider} account. Sign in with your existing account, then link {provider} in your profile.',
+    'An account here already uses this email. Sign in with it, then link {provider} in your profile.',
   taken: 'This {provider} account is already linked to someone else here.',
   alreadyLinked:
     'You already have a {provider} account linked. Remove it first to link another.',
   notAllowed:
-    "Your {provider} account isn't allowed to use this server. Ask an admin if you think it should be.",
+    'Your {provider} account isn’t allowed here. Ask an admin if that’s wrong.',
   tooMany: 'Too many attempts. Try again in a few minutes.',
   linked: '{provider} is linked. You can now sign in with it.',
 });

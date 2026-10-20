@@ -25,8 +25,7 @@ const messages = defineMessages('components.Settings', {
   seriesMetadataProvider: 'Series metadata provider',
   animeMetadataProvider: 'Anime metadata provider',
   metadataSettings: 'Settings for metadata provider',
-  clickTest:
-    'Click on the "Test" button to check connectivity with metadata providers',
+  clickTest: 'Use Test to check the metadata providers respond',
   notTested: 'Not Tested',
   failed: 'Does not work',
   operational: 'Operational',
@@ -34,9 +33,9 @@ const messages = defineMessages('components.Settings', {
   chooseProvider: 'Choose metadata providers for different content types',
   metadataProviderSelection: 'Metadata Provider Selection',
   tmdbProviderDoesnotWork:
-    'TMDB provider does not work, please select another metadata provider',
+    'TMDB isn’t working. Choose another metadata provider.',
   tvdbProviderDoesnotWork:
-    'TVDB provider does not work, please select another metadata provider',
+    'TVDB isn’t working. Choose another metadata provider.',
   allChosenProvidersAreOperational:
     'All chosen metadata providers are operational',
   connectionTestFailed: 'Connection test failed',
@@ -363,6 +362,7 @@ const SettingsMetadata = () => {
                   <div className="form-input-area">
                     <MetadataSelector
                       testId="tv-metadata-provider-selector"
+                      inputId="tv-metadata-provider"
                       value={values.metadata.tv}
                       onChange={(value) => setFieldValue('metadata.tv', value)}
                       isDisabled={isSubmitting}
@@ -382,6 +382,7 @@ const SettingsMetadata = () => {
                   <div className="form-input-area">
                     <MetadataSelector
                       testId="anime-metadata-provider-selector"
+                      inputId="anime-metadata-provider"
                       value={values.metadata.anime}
                       onChange={(value) =>
                         setFieldValue('metadata.anime', value)

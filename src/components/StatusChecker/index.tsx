@@ -12,12 +12,10 @@ import useSWR from 'swr';
 
 const messages = defineMessages('components.StatusChecker', {
   appUpdated: '{applicationTitle} Updated',
-  appUpdatedDescription:
-    'Please click the button below to reload the application.',
+  appUpdatedDescription: 'Reload to use the new version.',
   reloadApp: 'Reload {applicationTitle}',
   restartRequired: 'Server Restart Required',
-  restartRequiredDescription:
-    'Please restart the server to apply the updated settings.',
+  restartRequiredDescription: 'Restart the server to apply the new settings.',
 });
 
 const StatusChecker = () => {

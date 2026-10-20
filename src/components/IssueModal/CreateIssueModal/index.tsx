@@ -22,8 +22,7 @@ import * as Yup from 'yup';
 const messages = defineMessages('components.IssueModal.CreateIssueModal', {
   validationMessageRequired: 'You must provide a description',
   whatswrong: "What's wrong?",
-  providedetail:
-    'Please provide a detailed explanation of the issue you encountered.',
+  providedetail: 'Describe the problem in detail.',
   extras: 'Extras',
   season: 'Season {seasonNumber}',
   episode: 'Episode {episodeNumber}',

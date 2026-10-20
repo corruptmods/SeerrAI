@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Žiadosť o hudbu zamietnutá",
   "notifications.events.musicFailed": "Žiadosť o hudbu zlyhala",
   "notifications.events.musicPending": "Nová žiadosť o hudbu",
-  "notifications.events.musicRequestAvailable": "Vyžiadaná hudba je teraz dostupná"
+  "notifications.events.musicRequestAvailable": "Vyžiadaná hudba je teraz dostupná",
+  "notifications.events.wrongMatch": "Chybná zhoda"
 }

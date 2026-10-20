@@ -29,7 +29,7 @@ export const SeasonIcon = ({
     style={{ color: colour ?? 'rgb(var(--season-mark))' }}
   >
     {SEASON_LOOKS[season].icon.map((line) => (
-      <path key={line.d} d={line.d} stroke={line.colour ?? 'currentColor'} />
+      <path key={line.d} d={line.d} stroke="currentColor" />
     ))}
   </svg>
 );

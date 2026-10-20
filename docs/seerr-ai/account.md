@@ -2,48 +2,72 @@
 
 [← Seerr AI guide](./README.md)
 
+Everything here is in **Profile → Settings** (your picture, top right → **Settings**).
+
 ## Passkeys
 
-Sign in with your device's fingerprint, face or PIN instead of a password: **Sign in with a passkey** on the sign-in page. Add, rename or remove passkeys in **Profile → Settings → Passkeys**. If you sign in without one on a device that can make one, a banner offers to add it; **Not now** puts it off for two weeks (switch: `passkeyPrompt`).
+Sign in with Face ID, Touch ID, Windows Hello or a security key instead of a password.
 
-Passkeys belong to the server's address (Settings → General → Application URL). One made there can't be used from another address.
+1. Open **Profile → Settings → Passkeys**.
+2. Press **Add a Passkey** and follow your device.
+3. Next time, press **Passkey** (or **Sign in with a passkey**) on the sign-in page.
 
-Admins who manage users can remove someone's passkeys, for a lost device, but can't add or rename them.
+Add one on each device you use; a passkey saved in a password manager works on your other devices too. **Rename** or delete them on the same page. If you sign in without one on a device that could make one, a banner offers it; **Not now** puts it off for two weeks.
 
-## Single sign-on
+Passkeys belong to the server's address (Settings → General → Application URL): one made there doesn't work from another address. Admins who manage users can remove someone's passkey (for a lost device) but can't add one.
 
-If your admin has set up single sign-on, the sign-in page has a **Sign in with …** button for each provider, such as Authentik or Google. To use one with the account you already have here, sign in as usual first, then link it in **Profile → Settings → Linked Accounts → Link Account**. Signing out of Seerr AI doesn't sign you out of the provider. See [Single sign-on](./single-sign-on.md).
+## Linked accounts
 
-## Turning features off for yourself
+**Profile → Settings → Linked Accounts** lists your accounts on Plex, Jellyfin and Emby, and any single sign-on providers. **Link Account** adds one, so you can sign in with it. See [several media servers](./media-servers.md#linking-your-other-accounts) and [single sign-on](./single-sign-on.md#linking-a-provider-to-your-account).
 
-**Profile → Settings → Features** lists every optional feature. Turning one off there hides it for you, everywhere. A feature an admin turned off for everyone stays off. See the [list of switches](./configuration.md#feature-switches).
+## API keys
 
-## How it looks
+Let an app or script, such as Home Assistant or a phone app, use Seerr AI as you. The **API Keys** page appears once an admin turns keys on.
 
-Light or dark, your accent colour and more, in **Profile → Settings → Appearance**. See [Themes](./themes.md).
+1. Open **Profile → Settings → API Keys** and press **Make an API Key**.
+2. Give it a **Name** (what it's for) and choose when it **Expires**: 30 days, 90 days, a year, or **Never**.
+3. Press **Make Key**, then **Copy**. Put it straight into the app: nobody can see it again, not even an admin.
 
-## Your home page
+The app sends it in the `X-Api-Key` header. A key can do exactly what you can, nothing more, so keep it like a password.
 
-Use the pencil button on Discover. See [Discover and lists](./discover-and-lists.md#your-own-home-page).
+The list shows when each key was made, last used and expires. **Revoke** stops one at once; revoke a key when you stop using its app. You can have 10. An expired key stays listed as **Expired**, so you can see which app stopped; it's cleared once it has been expired a month and you make another.
+
+Keys also stop working while an admin has keys turned off, and when you can no longer sign in (for example, no longer shared on Plex). Deleting your account deletes them.
 
 ## Notifications
 
-- **Several at once become one**: when eight titles arrive together, you get "8 titles are ready to watch", not eight notifications. Approvals, declines and watchlist requests are gathered the same way. Admins and channels like Discord still get each one.
-- **Nothing is missed**: a notification that didn't go out (the server restarted, say) is sent later, once.
-- **A series that is still airing**: you're told once everything that had aired when you asked for it is here.
-- **On your phone** (web push): when a title is available or failed, list activity, a Plex sign-in that expired, and for admins, Backfill and Health.
-- **When it should arrive**: approval notifications say when the title is expected.
+**Profile → Settings → Notifications** sets what reaches you and where: **Email**, **Web Push** (your phone or browser) and **Telegram** when an admin has set them up, and **Discord**, **Pushbullet** or **Pushover** with your own details. Tick the kinds you want on each.
+
+What Seerr AI adds:
+
+- **Bursts become one**: eight titles arriving together send "8 titles are ready to watch". Approvals, declines and watchlist requests are gathered the same way.
+- **Nothing missed**: a notification that didn't go out (a restart, say) is sent later, once.
+- **Series still airing**: you're told once everything that had aired when you asked is here.
+- **When it should arrive**: approval notifications say when.
+- **List Activity**: changes on a watch list shared with you.
+- **Declined with a reason**: the reason is in the notification.
+- Admins also get **Backfill**, **Health** and **Wrong Match**.
+
+Admins set up the services themselves in Settings → Notifications; see [Notifications](../using-seerr/notifications/).
+
+## Turning features off for yourself
+
+**Profile → Settings → Features** lists every optional feature, music included. Turning one off hides it for you everywhere. One an admin turned off for everyone stays off. See the [list](./configuration.md#feature-switches).
+
+## How it looks
+
+**Profile → Settings → Appearance**: light or dark, accent colour and more. See [Themes](./themes.md).
+
+## Your home page and menu
+
+The pencil button on Discover. See [Discover and lists](./discover-and-lists.md#your-own-home-page).
 
 ## Trakt watchlist
 
-Once an admin has set up Trakt, anyone allowed to auto-request can enter their Trakt username in **Profile → Settings → General**. What they add to their public Trakt watchlist is then requested for them, every few minutes, with **Auto-Request Movies** and **Auto-Request Series**, the same way a Plex watchlist is. It works on Plex, Jellyfin and Emby. Only the 20 most recently added titles are looked at, so turning it on doesn't request a whole long-kept watchlist at once. Taking a title off the watchlist and adding it back requests it again; something you deleted isn't requested again just because it is still on the watchlist.
-
-## Accounts on several media servers
-
-When Seerr AI is connected to more than one of Plex, Jellyfin and Emby, link your accounts on the others in **Profile → Settings → Linked Accounts**, and sign in with whichever you like. Title pages then put Play on your own servers first. See [Plex, Jellyfin and Emby together](./media-servers.md#linking-accounts).
+Once an admin has set up Trakt, anyone allowed to auto-request can enter their Trakt username in **Profile → Settings → General**. Titles added to your public Trakt watchlist are then requested for you every few minutes, with **Auto-Request Movies** and **Auto-Request Series**, on any media server. Only the 20 most recently added are looked at. Removing a title and adding it back requests it again; something deleted isn't requested again just because it's still listed.
 
 ## Plex sign-in
 
-If Plex stops accepting your sign-in, your Plex watchlist stops syncing. You get one notification and a banner saying so; signing out and back in with Plex fixes it.
+If Plex stops accepting your sign-in, your Plex watchlist stops syncing. You get a notification and a banner; signing out and back in with Plex fixes it.
 
-Admins can have everyone the Plex server is shared with get an account automatically (**Settings → Users → Auto-Import Plex Users**, hourly). Someone an admin deletes isn't imported again.
+Admins can give everyone the Plex server is shared with an account automatically (**Settings → Users → Auto-Import Plex Users**, hourly). Someone an admin deletes isn't imported again.

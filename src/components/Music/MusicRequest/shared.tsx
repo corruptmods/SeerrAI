@@ -7,6 +7,7 @@ import {
   musicRequestStatus,
 } from '@app/components/Music/musicHelpers';
 import useRequestAction from '@app/hooks/useRequestAction';
+import useRetryRequest from '@app/hooks/useRetryRequest';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -165,7 +166,6 @@ export const useMusicRequest = (request: Request, inView: boolean) => {
   const intl = useIntl();
   const { addToast } = useToasts();
   const [isApproving, setIsApproving] = useState(false);
-  const [isRetrying, setIsRetrying] = useState(false);
   const { data: requestData, mutate: revalidate } = useSWR<Request>(
     `/api/v1/request/${request.id}`,
     {
@@ -192,22 +192,11 @@ export const useMusicRequest = (request: Request, inView: boolean) => {
     }
   };
 
-  const retry = async () => {
-    setIsRetrying(true);
-    try {
-      const result = await axios.post<Request>(
-        `/api/v1/request/${request.id}/retry`
-      );
-      revalidate(result.data);
-    } catch {
-      addToast(intl.formatMessage(messages.failedretry), {
-        autoDismiss: true,
-        appearance: 'error',
-      });
-    } finally {
-      setIsRetrying(false);
-    }
-  };
+  const { retry, isRetrying } = useRetryRequest(
+    request,
+    revalidate,
+    messages.failedretry
+  );
 
   const { run } = useRequestAction();
   const remove = () =>

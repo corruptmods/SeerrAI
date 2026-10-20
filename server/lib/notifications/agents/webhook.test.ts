@@ -3,8 +3,8 @@ import type { MediaRequest } from '@server/entity/MediaRequest';
 import { Notification } from '@server/lib/notifications';
 import type { NotificationPayload } from '@server/lib/notifications/agents/agent';
 import WebhookAgent, { KeyMap } from '@server/lib/notifications/agents/webhook';
+import notificationHttp from '@server/lib/notifications/http';
 import type { NotificationAgentWebhook } from '@server/lib/settings';
-import axios from 'axios';
 import assert from 'node:assert/strict';
 import type { TestContext } from 'node:test';
 import { describe, it } from 'node:test';
@@ -95,10 +95,14 @@ describe('webhook templates', () => {
     }
   ) => {
     const posted: { url: string; body: unknown }[] = [];
-    t.mock.method(axios, 'post', async (postedUrl: string, body: unknown) => {
-      posted.push({ url: postedUrl, body });
-      return { data: {} };
-    });
+    t.mock.method(
+      notificationHttp,
+      'post',
+      async (postedUrl: string, body: unknown) => {
+        posted.push({ url: postedUrl, body });
+        return { data: {} };
+      }
+    );
     const agent = new WebhookAgent({
       enabled: true,
       types: Notification.MEDIA_AVAILABLE | Notification.TEST_NOTIFICATION,

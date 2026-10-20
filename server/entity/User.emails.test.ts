@@ -46,7 +46,7 @@ describe('password emails', () => {
     assert.equal(sent.length, 1);
     assert.equal(
       sent[0].locals.logoUrl,
-      'https://seerr.example.com/logo_ai_dark.svg'
+      'https://seerr.example.com/logo_ai_dark.png'
     );
   });
 
@@ -55,7 +55,7 @@ describe('password emails', () => {
     assert.equal(sent.length, 1);
     assert.equal(
       sent[0].locals.logoUrl,
-      'https://seerr.example.com/logo_ai_dark.svg'
+      'https://seerr.example.com/logo_ai_dark.png'
     );
   });
 

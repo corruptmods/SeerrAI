@@ -37,9 +37,9 @@ const messages = defineMessages(
   {
     connectTitle: 'Connect {server}',
     plexOwnerOnly:
-      'Only the owner of this Seerr AI can connect Plex: Seerr AI reaches Plex through their Plex account.',
+      'Only the owner can connect Plex, as Seerr AI reaches Plex through their account.',
     plexSignInDescription:
-      'Sign in with the Plex account that owns the server. It is linked to your account here, and Seerr AI reaches Plex with it. Your email address here stays as it is.',
+      'Sign in with the Plex account that owns the server. It’s linked to your account here; your email stays as is.',
     plexSignIn: 'Sign In with Plex',
     plexSigningIn: 'Signing In…',
     plexContinueAs: 'Continue as {name}',
@@ -79,7 +79,7 @@ const messages = defineMessages(
     connect: 'Connect',
     connecting: 'Connecting…',
     librariesDescription:
-      'Choose the libraries Seerr AI scans for titles. They can be changed later from Edit.',
+      'The libraries Seerr AI scans. You can change them later under Edit.',
     filmsAndSeries: 'Films and Series',
     music: 'Music',
     noneFound: 'None were found.',
@@ -89,7 +89,7 @@ const messages = defineMessages(
     retry: 'Try Again',
     done: 'Done',
     doneTip:
-      'The libraries you turn on are scanned now, and then every night and as titles are added.',
+      'The libraries you turned on are scanned now, then nightly and as titles arrive.',
     errorUnreachable:
       'Could not reach the server. Check the address, and that it is running.',
     errorCredentials: 'The username or password is wrong.',

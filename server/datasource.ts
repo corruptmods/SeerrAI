@@ -12,6 +12,7 @@ import EpisodeRequest from '@server/entity/EpisodeRequest';
 import FutureSeasonSubscription from '@server/entity/FutureSeasonSubscription';
 import Issue from '@server/entity/Issue';
 import IssueComment from '@server/entity/IssueComment';
+import { MatchProblem, MatchWatch } from '@server/entity/MatchWatch';
 import Media from '@server/entity/Media';
 import MediaDeletion from '@server/entity/MediaDeletion';
 import MediaEvent from '@server/entity/MediaEvent';
@@ -33,6 +34,7 @@ import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { Session } from '@server/entity/Session';
 import { User } from '@server/entity/User';
+import UserApiKey from '@server/entity/UserApiKey';
 import UserPasskey from '@server/entity/UserPasskey';
 import { UserPushSubscription } from '@server/entity/UserPushSubscription';
 import { UserSettings } from '@server/entity/UserSettings';
@@ -66,6 +68,8 @@ const entities = [
   Episode,
   EpisodeRequest,
   FutureSeasonSubscription,
+  MatchProblem,
+  MatchWatch,
   Media,
   MediaDeletion,
   MediaEvent,
@@ -85,6 +89,7 @@ const entities = [
   SeasonRequest,
   Session,
   User,
+  UserApiKey,
   UserPasskey,
   UserPushSubscription,
   UserSettings,

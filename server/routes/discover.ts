@@ -9,6 +9,7 @@ import {
 } from '@server/api/themoviedb/constants';
 import type { TmdbKeyword } from '@server/api/themoviedb/interfaces';
 import { MediaType } from '@server/constants/media';
+import { leftOutServices } from '@server/constants/streamingServices';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { User } from '@server/entity/User';
@@ -96,6 +97,7 @@ const QueryFilterOptions = z.object({
   voteCountLte: z.coerce.string().optional(),
   network: z.coerce.string().optional(),
   watchProviders: z.coerce.string().optional(),
+  excludeWatchProviders: z.coerce.string().optional(),
   watchRegion: z.coerce.string().optional(),
   status: z.coerce.string().optional(),
   certification: z.coerce.string().optional(),
@@ -106,6 +108,19 @@ const QueryFilterOptions = z.object({
 });
 
 export type FilterOptions = z.infer<typeof QueryFilterOptions>;
+
+/**
+ * The streaming services to leave out, as TMDB takes them ("8|9"), or
+ * nothing. One also chosen to be shown stays shown.
+ */
+const excludedServices = (query: FilterOptions): string | undefined => {
+  const ids = leftOutServices(
+    query.watchProviders,
+    query.excludeWatchProviders
+  );
+  return ids.length ? ids.join('|') : undefined;
+};
+
 const MovieApiQuerySchema = QueryFilterOptions.omit({
   certificationMode: true,
 }).extend({
@@ -147,6 +162,7 @@ discoverRoutes.get('/movies', async (req, res, next) => {
       voteCountGte: query.voteCountGte,
       voteCountLte: query.voteCountLte,
       watchProviders: query.watchProviders,
+      excludeWatchProviders: excludedServices(query),
       watchRegion: query.watchRegion,
       certification: query.certification,
       certificationGte: query.certificationGte,
@@ -459,6 +475,7 @@ discoverRoutes.get('/tv', async (req, res, next) => {
       voteCountGte: query.voteCountGte,
       voteCountLte: query.voteCountLte,
       watchProviders: query.watchProviders,
+      excludeWatchProviders: excludedServices(query),
       watchRegion: query.watchRegion,
       withStatus: query.status,
       certification: query.certification,

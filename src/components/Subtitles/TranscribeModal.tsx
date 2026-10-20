@@ -15,7 +15,7 @@ import { useIntl } from 'react-intl';
 const messages = defineMessages('components.Subtitles.TranscribeModal', {
   title: 'Transcribe Episodes',
   intro:
-    'Whisper listens to each episode and writes its subtitles. It runs one episode at a time and can take several minutes each. Episodes it has already done are left out.',
+    'Whisper writes subtitles from each episode’s audio, one at a time, several minutes each. Episodes already done are skipped.',
   missing: 'Episodes with no subtitles',
   season: 'One season',
   everything: 'Every episode not transcribed yet',

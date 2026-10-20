@@ -101,7 +101,7 @@ const messages = defineMessages('components.Subtitles.SubtitlesCard', {
   searching:
     'Bazarr is searching for the missing subtitles. They show here as they arrive.',
   searchingThenTranscribe:
-    'Bazarr is searching for the missing subtitles. They show here as they arrive, and whatever no provider has is then transcribed from the audio.',
+    'Bazarr is searching for the missing subtitles; any it can’t find are then transcribed.',
   defaultSet: 'Plex will start this with that subtitle for you.',
   defaultSetSeries:
     'Setting it on {count, plural, one {# episode} other {# episodes}} in Plex.',

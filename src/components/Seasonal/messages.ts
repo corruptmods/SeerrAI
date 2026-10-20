@@ -8,8 +8,6 @@ export const seasonMessages = defineMessages('components.Seasonal', {
   holidays: 'Holidays',
   newyear: 'New Year',
   lunarnewyear: 'Lunar New Year',
-  diwali: 'Diwali',
-  pride: 'Pride Month',
   dates: '{start} to {end}',
 });
 

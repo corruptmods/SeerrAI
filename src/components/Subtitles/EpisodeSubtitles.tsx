@@ -60,7 +60,7 @@ const messages = defineMessages('components.Subtitles.EpisodeSubtitles', {
   searchingMissing:
     'Bazarr is searching for the missing subtitles. They show here as they arrive.',
   searchingThenTranscribe:
-    'Bazarr is searching for the missing subtitles. They show here as they arrive, and whatever no provider has is then transcribed from the audio.',
+    'Bazarr is searching for the missing subtitles; any it can’t find are then transcribed.',
   transcribeStarted:
     'Transcribing. It shows here when Whisper is done, which can take a while.',
   couldNot: 'That did not work: {reason}',

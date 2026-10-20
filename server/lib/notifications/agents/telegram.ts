@@ -6,12 +6,12 @@ import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
 import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
+import notificationHttp from '@server/lib/notifications/http';
 import { mediaPagePath } from '@server/lib/notifications/mediaPage';
 import type { NotificationAgentTelegram } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import type { AvailableLocale } from '@server/types/languages';
-import axios from 'axios';
 import {
   Notification,
   hasNotificationType,
@@ -240,7 +240,7 @@ class TelegramAgent
       try {
         const notificationPayload = this.getNotificationPayload(type, payload);
 
-        await axios.post(endpoint(notificationPayload), {
+        await notificationHttp.post(endpoint(notificationPayload), {
           ...notificationPayload,
           chat_id: settings.options.chatId,
           message_thread_id: settings.options.messageThreadId,
@@ -284,7 +284,7 @@ class TelegramAgent
             payload.notifyUser.settings?.locale as AvailableLocale
           );
 
-          await axios.post(endpoint(notificationPayload), {
+          await notificationHttp.post(endpoint(notificationPayload), {
             ...notificationPayload,
             chat_id: payload.notifyUser.settings.telegramChatId,
             message_thread_id:
@@ -339,7 +339,7 @@ class TelegramAgent
                   user.settings?.locale as AvailableLocale
                 );
 
-                await axios.post(endpoint(notificationPayload), {
+                await notificationHttp.post(endpoint(notificationPayload), {
                   ...notificationPayload,
                   chat_id: user.settings.telegramChatId,
                   message_thread_id: user.settings.telegramMessageThreadId,

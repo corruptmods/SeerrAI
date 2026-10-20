@@ -31,7 +31,7 @@ import useSWR, { useSWRConfig } from 'swr';
 const messages = defineMessages('components.Seasonal.SettingsSeasons', {
   seasons: 'Seasonal themes',
   description:
-    'Choose which seasons run on this server and when. They sit on top of everyone’s own look and end by themselves. Anyone can still turn them off for themselves.',
+    'Choose which seasonal themes run, and when. Anyone can turn them off for themselves.',
   onByDefault: 'On by default',
   offByDefault: 'Off by default',
   movingDates: 'Dates worked out each year',
@@ -214,8 +214,8 @@ const SeasonRow = ({
 
 /**
  * Settings → Appearance → Seasonal themes: which seasons this server runs,
- * and when. Lunar New Year and Diwali move from year to year; their days
- * come from a table (server/lib/seasons) unless set by hand.
+ * and when. Lunar New Year moves from year to year; its days come from a
+ * table (server/lib/seasons) unless set by hand.
  */
 const SettingsSeasons = () => {
   const intl = useIntl();

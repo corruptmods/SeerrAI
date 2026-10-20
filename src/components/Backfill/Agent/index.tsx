@@ -27,7 +27,7 @@ const pageMessages = defineMessages('components.Backfill.Agent.List', {
   confirmClear: 'Delete them?',
   clearFailed: 'Could not clear finished conversations.',
   clearTip:
-    'Finished conversations are cleared out on their own after the days set in Settings. Ones whose downloads are still going stay until those import or fail, and clearing never touches what they downloaded.',
+    'Cleared automatically after the days set in Settings. Ones still downloading stay; downloads are never touched.',
 });
 
 const PAGE = 25;

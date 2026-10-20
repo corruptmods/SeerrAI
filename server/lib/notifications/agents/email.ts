@@ -96,10 +96,10 @@ class EmailAgent
     locale?: AvailableLocale
   ): EmailOptions | undefined {
     const intl = getIntl(locale);
-    const settings = getSettings();
-    const { applicationUrl, applicationTitle } = settings.main;
-    const { embedPoster } = settings.notifications.agents.email;
-    const logoUrl = emailLogoUrl();
+    const { applicationUrl, applicationTitle } = getSettings().main;
+    // The settings being tested, which may not be saved yet, or the saved ones.
+    const { embedPoster, options } = this.getSettings();
+    const logoUrl = emailLogoUrl(options);
 
     if (type === Notification.TEST_NOTIFICATION) {
       return {
@@ -123,6 +123,7 @@ class EmailAgent
     if (
       type === Notification.BACKFILL ||
       type === Notification.HEALTH ||
+      type === Notification.WRONG_MATCH ||
       payload.digest
     ) {
       return {

@@ -15,6 +15,7 @@ import RequestEta, {
   expectedLabel,
 } from '@app/components/RequestEta';
 import RequestModal from '@app/components/RequestModal';
+import RequestServerIssue from '@app/components/RequestServerIssue';
 import StatusBadge from '@app/components/StatusBadge';
 import useNearScreen, {
   bothRefs,
@@ -23,6 +24,7 @@ import useNearScreen, {
 import usePlayLinks from '@app/hooks/usePlayLinks';
 import useRequestAction from '@app/hooks/useRequestAction';
 import type { RequestEta as RequestEtaData } from '@app/hooks/useRequestEtas';
+import useRetryRequest from '@app/hooks/useRetryRequest';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -360,7 +362,6 @@ const RequestItem = ({
       : 0,
   });
 
-  const [isRetrying, setRetrying] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
 
@@ -409,21 +410,11 @@ const RequestItem = ({
     }
   };
 
-  const retryRequest = async () => {
-    setRetrying(true);
-
-    try {
-      const result = await axios.post(`/api/v1/request/${request.id}/retry`);
-      revalidate(result.data);
-    } catch {
-      addToast(intl.formatMessage(messages.failedretry), {
-        autoDismiss: true,
-        appearance: 'error',
-      });
-    } finally {
-      setRetrying(false);
-    }
-  };
+  const { retry: retryRequest, isRetrying } = useRetryRequest(
+    request,
+    revalidate,
+    messages.failedretry
+  );
 
   const { playLink, playLink4k } = usePlayLinks(requestData?.media);
 
@@ -460,9 +451,11 @@ const RequestItem = ({
         // The requests listed here are for films and series.
         type={request.type as VideoMediaType}
         is4k={request.is4k}
-        editRequest={request}
+        // As it is now: it may have failed since the list was loaded.
+        editRequest={requestData}
         onCancel={() => setShowEditModal(false)}
         onComplete={() => {
+          revalidate();
           revalidateList();
           setShowEditModal(false);
         }}
@@ -623,6 +616,7 @@ const RequestItem = ({
                   className="py-0.5 sm:py-1 xl:hidden"
                 />
               )}
+            <RequestServerIssue request={requestData} className="py-0.5" />
             {backfill && <BackfillRequestChip backfill={backfill} />}
             {backfillStatus && <BackfillStatusLine status={backfillStatus} />}
             {describeEta(intl, eta) && (
@@ -755,24 +749,43 @@ const RequestItem = ({
           </div>
         </div>
         <div className="z-10 mt-4 flex w-full flex-col justify-center space-y-2 pl-4 pr-4 xl:mt-0 xl:w-96 xl:items-end xl:pl-0">
+          {/* Retry, or first send it to another server, profile or
+              folder. Side by side, as Approve and Decline are. */}
           {requestData.status === MediaRequestStatus.FAILED &&
             hasPermission(Permission.MANAGE_REQUESTS) && (
-              <Button
-                className="w-full"
-                buttonType="primary"
-                disabled={isRetrying}
-                onClick={() => retryRequest()}
-              >
-                <ArrowPathIcon
-                  className={isRetrying ? 'animate-spin' : ''}
-                  style={{ animationDirection: 'reverse' }}
-                />
-                <span>
-                  {intl.formatMessage(
-                    isRetrying ? globalMessages.retrying : globalMessages.retry
-                  )}
+              <div className="flex w-full flex-row space-x-2">
+                <span className="w-full">
+                  <Button
+                    className="w-full"
+                    buttonType="primary"
+                    disabled={isRetrying}
+                    onClick={() => retryRequest()}
+                  >
+                    <ArrowPathIcon
+                      className={isRetrying ? 'animate-spin' : ''}
+                      style={{ animationDirection: 'reverse' }}
+                    />
+                    <span>
+                      {intl.formatMessage(
+                        isRetrying
+                          ? globalMessages.retrying
+                          : globalMessages.retry
+                      )}
+                    </span>
+                  </Button>
                 </span>
-              </Button>
+                <span className="w-full">
+                  <Button
+                    className="w-full"
+                    buttonType="default"
+                    onClick={() => setShowEditModal(true)}
+                    disabled={isRetrying}
+                  >
+                    <PencilIcon />
+                    <span>{intl.formatMessage(globalMessages.edit)}</span>
+                  </Button>
+                </span>
+              </div>
             )}
           {requestData.status !== MediaRequestStatus.PENDING &&
             hasPermission(Permission.MANAGE_REQUESTS) && (

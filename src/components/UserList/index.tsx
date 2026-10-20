@@ -68,15 +68,13 @@ const messages = defineMessages('components.UserList', {
   userdeleted: 'User deleted successfully!',
   userdeleteerror: 'Something went wrong while deleting the user.',
   deleteconfirm:
-    'Are you sure you want to delete this user? All of their request data will be permanently removed.',
+    'Delete this user? All their request data is permanently removed.',
   createlocaluser: 'Create Local User',
   creating: 'Creating…',
   create: 'Create',
-  validationpasswordminchars:
-    'Password is too short; should be a minimum of 8 characters',
+  validationpasswordminchars: 'Use at least 8 characters',
   usercreatedfailed: 'Something went wrong while creating the user.',
-  usercreatedfailedexisting:
-    'The provided email address is already in use by another user.',
+  usercreatedfailedexisting: 'That email is already used by another user.',
   usercreatedsuccess: 'User created successfully!',
   username: 'Username',
   email: 'Email Address',

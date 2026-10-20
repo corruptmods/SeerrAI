@@ -53,17 +53,15 @@ export const appearanceMessages = defineMessages(
   {
     appearance: 'Appearance',
     description:
-      'How Seerr AI looks for you. It’s saved to your account, so it follows you to every device. Nobody else’s screen changes.',
+      'How Seerr AI looks for you, on every device. Nobody else’s screen changes.',
     mode: 'Mode',
     modeLight: 'Light',
     modeDark: 'Dark',
     modeAuto: 'Match my device',
     modeNoteLight: 'Light all the time.',
     modeNoteDark: 'Dark all the time.',
-    modeNoteAutoDark:
-      'Your device is dark right now, so Seerr AI is too. It switches when your device does.',
-    modeNoteAutoLight:
-      'Your device is light right now, so Seerr AI is too. It switches when your device does.',
+    modeNoteAutoDark: 'Following your device, which is dark right now.',
+    modeNoteAutoLight: 'Following your device, which is light right now.',
     accent: 'Accent colour',
     accentDescription: 'Buttons, links, switches and highlights.',
     accentIndigo: 'Indigo',

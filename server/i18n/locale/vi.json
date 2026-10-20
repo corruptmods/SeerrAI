@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Yêu cầu nhạc đã bị từ chối",
   "notifications.events.musicFailed": "Yêu cầu nhạc thất bại",
   "notifications.events.musicPending": "Yêu cầu nhạc mới",
-  "notifications.events.musicRequestAvailable": "Nhạc đã yêu cầu nay đã có sẵn"
+  "notifications.events.musicRequestAvailable": "Nhạc đã yêu cầu nay đã có sẵn",
+  "notifications.events.wrongMatch": "Ghép sai"
 }

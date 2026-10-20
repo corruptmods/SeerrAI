@@ -46,7 +46,7 @@ import useSWR from 'swr';
 const messages = defineMessages('components.Backfill.Dashboard', {
   backfill: 'Backfill',
   description:
-    'Finds what Sonarr and Radarr can’t, checks every file against your quality profile, and imports only what you approve.',
+    'Finds what Sonarr and Radarr can’t, and imports only what you approve.',
   scan: 'Scan now',
   scanning: 'Scanning…',
   startSearch: 'Start search…',
@@ -80,13 +80,12 @@ const messages = defineMessages('components.Backfill.Dashboard', {
   neverSearched: '{app} has not searched',
   searchNow: 'Search now',
   searching: 'Searching…',
-  emptyActive:
-    'Nothing is stuck. The scan runs every few hours; Scan now runs it straight away.',
+  emptyActive: 'Nothing is stuck. Scans run every few hours, or use Scan now.',
   emptyOther: 'Nothing here.',
   searchTitles: 'Search titles',
   clearSearch: 'Clear the search',
   noMatch:
-    'Nothing on this tab matches “{query}”. The counts on the tabs show where it is.',
+    'Nothing on this tab matches “{query}”. Tab counts show where it is.',
   left: '{size} left · {speed}/s',
   eta: '{time} left',
   searchFailed: 'The search could not be started.',

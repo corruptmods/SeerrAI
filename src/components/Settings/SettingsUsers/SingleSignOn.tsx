@@ -29,9 +29,9 @@ const messages = defineMessages(
   {
     title: 'Single Sign-On',
     description:
-      'Let people sign in with an identity provider such as Authentik, Authelia, Keycloak, Pocket ID or Google. Each provider gets a "Sign in with" button on the sign-in page, and people can link it to the account they already have in Profile → Linked Accounts. Signing out of Seerr AI does not sign them out of the provider.',
+      'Let people sign in with a provider such as Authentik, Keycloak or Google, and link it in Profile → Linked Accounts.',
     needsApplicationUrl:
-      'Set the Application URL in Settings → General first. Providers send people back to Seerr AI at that address, so it must be the address people use.',
+      'Set the Application URL in Settings → General first. Providers send people back to that address.',
     openGeneral: 'Open Settings → General',
     addProvider: 'Add Provider',
     enabled: 'Enabled',
@@ -43,7 +43,7 @@ const messages = defineMessages(
     redirectUrlCopied: 'Redirect URL copied.',
     deleteProvider: 'Delete Provider',
     deleteProviderConfirm:
-      'People can no longer sign in with {name}. Their links to it are kept but unused, and a provider added later is never matched to them.',
+      'People can no longer sign in with {name}. Their links are kept but unused.',
     deleteFailed: 'Could not delete the provider.',
     couldNotOpen:
       'That could not be opened. Check your connection and try again.',

@@ -32,7 +32,7 @@ const messages = defineMessages('components.Settings', {
   plex: 'Plex',
   plexsettings: 'Plex Settings',
   plexsettingsDescription:
-    'Configure the settings for your Plex server. Seerr AI scans your Plex libraries to determine content availability.',
+    'Seerr AI scans your Plex libraries to see what’s available.',
   serverpreset: 'Server',
   serverLocal: 'local',
   serverRemote: 'remote',
@@ -50,19 +50,19 @@ const messages = defineMessages('components.Settings', {
   toastPlexConnectingSuccess: 'Plex connection established successfully!',
   toastPlexConnectingFailure: 'Failed to connect to Plex.',
   settingUpPlexDescription:
-    'To set up Plex, you can either enter the details manually or select a server retrieved from <RegisterPlexTVLink>plex.tv</RegisterPlexTVLink>. Press the button to the right of the dropdown to fetch the list of available servers.',
+    'Enter the details by hand, or pick a server from <RegisterPlexTVLink>plex.tv</RegisterPlexTVLink> with the button beside the list.',
   hostname: 'Hostname or IP Address',
   port: 'Port',
   enablessl: 'Use SSL',
   plexlibraries: 'Plex Libraries',
   plexlibrariesDescription:
-    'The libraries Seerr AI scans for titles. Set up and save your Plex connection settings, then click the button below if no libraries are listed.',
+    'The libraries Seerr AI scans. Save your Plex settings, then use the button below if none are listed.',
   scanning: 'Syncing…',
   refreshServers: 'Refresh Server List',
   scan: 'Sync Libraries',
   manualscan: 'Manual Library Scan',
   manualscanDescription:
-    "Normally, this will only be run once every 24 hours. Seerr AI will check your Plex server's recently added more aggressively. If this is your first time configuring Plex, a one-time full manual library scan is recommended!",
+    'Runs once a day; recently added items are checked more often. Do a full scan after first setup.',
   notrunning: 'Not Running',
   currentlibrary: 'Current Library: {name}',
   librariesRemaining: 'Libraries Remaining: {count}',
@@ -72,7 +72,7 @@ const messages = defineMessages('components.Settings', {
   validationPortRequired: 'You must provide a valid port number',
   webAppUrl: '<WebAppLink>Web App</WebAppLink> URL',
   webAppUrlTip:
-    'Optionally direct users to the web app on your server instead of https://app.plex.tv/desktop',
+    'Optional: send people to your server’s web app instead of https://app.plex.tv/desktop',
   urlBase: 'URL Base',
   externalUrl: 'External URL',
   validationApiKey: 'You must provide an API key',
@@ -502,7 +502,7 @@ const SettingsPlex = ({ isSetupSettings }: SettingsPlexProps) => {
                 </div>
               </div>
               <div className="form-row">
-                <label htmlFor="ssl" className="checkbox-label">
+                <label htmlFor="useSsl" className="checkbox-label">
                   {intl.formatMessage(messages.enablessl)}
                 </label>
                 <div className="form-input-area">

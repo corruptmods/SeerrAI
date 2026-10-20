@@ -136,7 +136,13 @@ export class MediaSubscriber implements EntitySubscriberInterface<Media> {
         }
       }
 
-      await requestRepository.save(completedRequests);
+      // One at a time: saving them together runs every request's afterUpdate
+      // at once on this transaction's connection, and on Postgres their
+      // savepoints then undo each other, aborting the scan's whole save and
+      // losing the "available" notifications.
+      for (const request of completedRequests) {
+        await requestRepository.save(request);
+      }
     }
   }
 

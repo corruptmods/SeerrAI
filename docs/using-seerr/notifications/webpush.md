@@ -25,3 +25,9 @@ For Web Push notifications to work on mobile you need to add Seerr to your home 
 :::info[iOS Users]
 On iOS you may need to enable the Safari notifications feature flag by going to **Settings → Safari → Advanced → Feature Flags** and enabling "Notifications".
 :::
+
+## Configuration
+
+### Embed Poster
+
+Notifications about a film, series or album show its poster (or the album's cover) as the notification's picture, in place of Seerr AI's icon. It's on unless you turn it off. Safari, on iPhone, iPad and Mac, always shows Seerr AI's icon instead.

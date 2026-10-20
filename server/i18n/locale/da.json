@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Musikanmodning afvist",
   "notifications.events.musicFailed": "Musikanmodning mislykkedes",
   "notifications.events.musicPending": "Ny musikanmodning",
-  "notifications.events.musicRequestAvailable": "Anmodet musik nu tilgængelig"
+  "notifications.events.musicRequestAvailable": "Anmodet musik nu tilgængelig",
+  "notifications.events.wrongMatch": "Forkert match"
 }

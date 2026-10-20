@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Запрос музыки отклонён",
   "notifications.events.musicFailed": "Запрос музыки не выполнен",
   "notifications.events.musicPending": "Новый запрос музыки",
-  "notifications.events.musicRequestAvailable": "Запрошенная музыка теперь доступна"
+  "notifications.events.musicRequestAvailable": "Запрошенная музыка теперь доступна",
+  "notifications.events.wrongMatch": "Неверное соответствие"
 }

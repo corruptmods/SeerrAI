@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Odrzucono prośbę o muzykę",
   "notifications.events.musicFailed": "Prośba o muzykę nie powiodła się",
   "notifications.events.musicPending": "Nowa prośba o muzykę",
-  "notifications.events.musicRequestAvailable": "Muzyka, o którą proszono, jest już dostępna"
+  "notifications.events.musicRequestAvailable": "Muzyka, o którą proszono, jest już dostępna",
+  "notifications.events.wrongMatch": "Błędne dopasowanie"
 }

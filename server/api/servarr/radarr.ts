@@ -25,6 +25,8 @@ export interface RadarrMovie {
   digitalRelease?: string;
   physicalRelease?: string;
   year?: number;
+  /** The film's running time on TMDB, in minutes. */
+  runtime?: number;
   images?: { coverType: string; remoteUrl?: string; url?: string }[];
   monitored: boolean;
   tmdbId: number;

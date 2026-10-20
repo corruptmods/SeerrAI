@@ -14,7 +14,7 @@ import * as Yup from 'yup';
 const messages = defineMessages('components.Login', {
   title: 'Add Email',
   description:
-    'Add a valid email address to complete your profile. This will be used for notifications and local sign-in.',
+    'Add your email to finish your profile. It’s used for notifications and local sign-in.',
   email: 'Email address',
   emailAlreadyTaken: 'This email is already in use.',
   validationEmailRequired: 'You must provide an email',

@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Muusika taotlus tagasi lükatud",
   "notifications.events.musicFailed": "Muusika taotlus ebaõnnestus",
   "notifications.events.musicPending": "Uus muusika taotlus",
-  "notifications.events.musicRequestAvailable": "Taotletud muusika on nüüd saadaval"
+  "notifications.events.musicRequestAvailable": "Taotletud muusika on nüüd saadaval",
+  "notifications.events.wrongMatch": "Vale vaste"
 }

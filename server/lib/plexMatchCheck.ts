@@ -1,6 +1,7 @@
 import type { JellyfinUserItem } from '@server/api/jellyfin';
 import type { PlexLibraryItem } from '@server/api/plexapi';
 import PlexAPI from '@server/api/plexapi';
+import type { RadarrMovie } from '@server/api/servarr/radarr';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
 import type { JellyfinFamilyKind } from '@server/constants/server';
@@ -14,6 +15,8 @@ import {
 } from '@server/lib/mediaServers';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import type { MatchKind } from '@server/utils/plexMatch';
+import { runtimeMinutes } from '@server/utils/plexMatch';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
@@ -35,10 +38,11 @@ import path from 'node:path';
 export type MediaServerName = 'Plex' | 'Jellyfin' | 'Emby';
 
 export interface PlexMatchProblem {
-  kind: 'movie' | 'series';
+  /** Music only from the check of new requests (lib/matchWatch). */
+  kind: MatchKind;
   /** The folder both sides point at. */
   folder: string;
-  /** What Sonarr or Radarr has in that folder. */
+  /** What Sonarr, Radarr or Lidarr has in that folder. */
   expected: {
     title: string;
     year?: number;
@@ -46,6 +50,16 @@ export interface PlexMatchProblem {
     tvdbId?: number;
     imdbId?: string;
     server: string;
+    /** Radarr's film, in minutes. */
+    runtime?: number;
+    /** The file's own length, in minutes (Radarr's reading, else the server's). */
+    fileRuntime?: number;
+    /** The file's name in the folder, as Radarr has it. */
+    file?: string;
+    /** Music: the album's MusicBrainz release group, and its artist. */
+    mbid?: string;
+    artist?: string;
+    artistMbid?: string;
   };
   /** The media server it was checked on. */
   mediaServer: MediaServerName;
@@ -57,6 +71,11 @@ export interface PlexMatchProblem {
     tmdbId?: number;
     tvdbId?: number;
     imdbId?: string;
+    /** How long the server says it runs, in minutes. */
+    duration?: number;
+    /** Music: the server's MusicBrainz id for the album, and its artist. */
+    mbid?: string;
+    artist?: string;
   };
   /**
    * - other: matched to another title (whatever its name: two films can
@@ -169,10 +188,13 @@ const anyIdAgrees = (expected: Ids, plex: Ids): boolean =>
     (key) => expected[key] && plex[key] && expected[key] === plex[key]
   );
 
-interface Expected extends Ids {
+export interface Expected extends Ids {
   title: string;
   year?: number;
   server: string;
+  runtime?: number;
+  fileRuntime?: number;
+  file?: string;
 }
 
 /** One item on the media server, as the check needs it. */
@@ -184,7 +206,13 @@ export interface MatchItem {
   /** The folders it is in: a series' own, a movie's file's. */
   folders: string[];
   ids: Ids;
+  /** How long it runs, in minutes, when the server says. */
+  duration?: number;
 }
+
+/** Minutes from milliseconds. */
+const msToMinutes = (ms?: number): number | undefined =>
+  ms && ms > 0 ? Math.round(ms / 60_000) : undefined;
 
 /** A Plex item, for the check. */
 export const plexMatchItem = (
@@ -201,6 +229,8 @@ export const plexMatchItem = (
           (m.Part ?? []).flatMap((p) => (p.file ? [parentFolder(p.file)] : []))
         ),
   ids: plexIds(item),
+  duration:
+    kind === 'movie' ? msToMinutes(item.Media?.[0]?.duration) : undefined,
 });
 
 /** A Jellyfin or Emby item, for the check. */
@@ -215,6 +245,23 @@ export const jellyfinMatchItem = (
     ? [kind === 'series' ? folderName(item.Path) : parentFolder(item.Path)]
     : [],
   ids: jellyfinIds(item),
+  // Ticks are a ten-millionth of a second.
+  duration:
+    kind === 'movie' && item.RunTimeTicks
+      ? msToMinutes(item.RunTimeTicks / 10_000)
+      : undefined,
+});
+
+/**
+ * What Radarr knows that tells whose mistake a wrong match is: the film's
+ * length, the file's own, and the file's name.
+ */
+export const radarrFileFacts = (
+  movie: Pick<RadarrMovie, 'runtime' | 'movieFile'>
+): Pick<Expected, 'runtime' | 'fileRuntime' | 'file'> => ({
+  runtime: movie.runtime || undefined,
+  fileRuntime: runtimeMinutes(movie.movieFile?.mediaInfo?.runTime),
+  file: movie.movieFile?.relativePath || undefined,
 });
 
 /** Compares one Plex item with what Sonarr or Radarr has in its folders. */
@@ -238,7 +285,14 @@ export const compareMatch = (
     year: item.year,
     key: item.key,
     ...ids,
+    ...(item.duration ? { duration: item.duration } : {}),
   };
+  // The server measured the same file: its length stands in for Radarr's
+  // reading of it when Radarr has none.
+  const withFile = (e: Expected): Expected =>
+    kind === 'movie' && !e.fileRuntime && item.duration
+      ? { ...e, fileRuntime: item.duration }
+      : e;
   let checked = false;
   for (const folder of new Set(folders.filter(Boolean))) {
     const candidates = byFolder.get(key(folder));
@@ -250,7 +304,7 @@ export const compareMatch = (
         problem: {
           kind,
           folder,
-          expected: candidates[0],
+          expected: withFile(candidates[0]),
           mediaServer,
           matched,
           reason: 'unmatched',
@@ -266,7 +320,7 @@ export const compareMatch = (
         problem: {
           kind,
           folder,
-          expected: sameFilm ?? candidates[0],
+          expected: withFile(sameFilm ?? candidates[0]),
           mediaServer,
           matched,
           reason: sameFilm ? 'differentId' : 'other',
@@ -282,6 +336,24 @@ class PlexMatchCheck {
   private running = false;
   private cancelled = false;
   private report: PlexMatchReport | null = null;
+  private onFinished?: (
+    report: PlexMatchReport,
+    unread: MediaServerName[]
+  ) => Promise<void> | void;
+
+  /**
+   * What to do when a full run is kept: the check of new requests clears
+   * what it found that this run found right. `unread` names the servers
+   * that could not be read this run.
+   */
+  public whenFinished(
+    run: (
+      report: PlexMatchReport,
+      unread: MediaServerName[]
+    ) => Promise<void> | void
+  ) {
+    this.onFinished = run;
+  }
 
   public status() {
     return { running: this.running };
@@ -336,7 +408,7 @@ class PlexMatchCheck {
    * problem on the other server.
    */
   public async problemFor(
-    kind: 'movie' | 'series',
+    kind: MatchKind,
     ids: {
       tmdbId?: number;
       tvdbId?: number;
@@ -418,6 +490,7 @@ class PlexMatchCheck {
           tmdbId: m.tmdbId || undefined,
           imdbId: m.imdbId || undefined,
           server: server.name,
+          ...radarrFileFacts(m),
         });
       }
     }
@@ -515,6 +588,11 @@ class PlexMatchCheck {
       notChecked: 0,
       problems: [],
     };
+    // Servers whose findings this run can't speak for: not read, or not
+    // reached at all.
+    let unread: MediaServerName[] = connectedServers().map(
+      (server) => serverName(server) as MediaServerName
+    );
     try {
       const servers = connectedServers();
       if (!servers.length) {
@@ -552,6 +630,7 @@ class PlexMatchCheck {
       const stillFailed = failed.filter((f) =>
         stillConnected.includes(f.server)
       );
+      unread = failed.map((f) => f.server);
       report.problems.sort((a, b) =>
         a.expected.title.localeCompare(b.expected.title)
       );
@@ -592,6 +671,14 @@ class PlexMatchCheck {
             errorMessage: e.message,
           })
         );
+        try {
+          await this.onFinished?.(report, unread);
+        } catch (e) {
+          logger.warn('Could not compare the report with new requests', {
+            label: 'Match Check',
+            errorMessage: e instanceof Error ? e.message : String(e),
+          });
+        }
       }
     }
   }

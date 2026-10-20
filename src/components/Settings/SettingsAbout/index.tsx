@@ -39,7 +39,7 @@ const messages = defineMessages('components.Settings.SettingsAbout', {
   uptodate: 'Up to Date',
   versionCheckDisabled: 'Version Check Disabled',
   runningDevelop:
-    'You are running the <code>develop</code> branch of Seerr AI, which is only recommended for those contributing to development or assisting with bleeding-edge testing.',
+    'You’re on the <code>develop</code> branch, meant only for development and testing.',
 });
 
 const SettingsAbout = () => {

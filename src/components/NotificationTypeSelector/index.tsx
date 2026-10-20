@@ -10,73 +10,61 @@ import { useIntl } from 'react-intl';
 const messages = defineMessages('components.NotificationTypeSelector', {
   notificationTypes: 'Notification Types',
   mediarequested: 'Request Pending Approval',
-  mediarequestedDescription:
-    'Send notifications when users submit new media requests which require approval.',
-  usermediarequestedDescription:
-    'Get notified when other users submit new media requests which require approval.',
+  mediarequestedDescription: 'When requests need approval.',
+  usermediarequestedDescription: 'When other users’ requests need approval.',
   mediaapproved: 'Request Approved',
-  mediaapprovedDescription:
-    'Send notifications when media requests are manually approved.',
-  usermediaapprovedDescription:
-    'Get notified when your media requests are approved.',
+  mediaapprovedDescription: 'When requests are approved by hand.',
+  usermediaapprovedDescription: 'When your requests are approved.',
   mediaAutoApproved: 'Request Automatically Approved',
-  mediaAutoApprovedDescription:
-    'Send notifications when users submit new media requests which are automatically approved.',
+  mediaAutoApprovedDescription: 'When requests are approved automatically.',
   usermediaAutoApprovedDescription:
-    'Get notified when other users submit new media requests which are automatically approved.',
+    'When other users’ requests are approved automatically.',
   listactivity: 'List Activity',
   listactivityDescription:
-    'Get notified when someone adds to or removes from a list shared with you.',
+    'When someone adds to or removes from a list shared with you.',
   mediaavailable: 'Request Available',
-  mediaavailableDescription:
-    'Send notifications when media requests become available.',
-  usermediaavailableDescription:
-    'Get notified when your media requests become available.',
+  mediaavailableDescription: 'When requests become available.',
+  usermediaavailableDescription: 'When your requests become available.',
   mediafailed: 'Request Processing Failed',
-  mediafailedDescription:
-    'Send notifications when media requests fail to be added to Radarr or Sonarr.',
+  mediafailedDescription: 'When requests can’t be added to Radarr or Sonarr.',
   usermediafailedDescription:
-    'Get notified when media requests fail to be added to Radarr or Sonarr.',
+    'When requests can’t be added to Radarr or Sonarr.',
   mediadeclined: 'Request Declined',
-  mediadeclinedDescription:
-    'Send notifications when media requests are declined.',
-  usermediadeclinedDescription:
-    'Get notified when your media requests are declined.',
+  mediadeclinedDescription: 'When requests are declined.',
+  usermediadeclinedDescription: 'When your requests are declined.',
   issuecreated: 'Issue Reported',
-  issuecreatedDescription: 'Send notifications when issues are reported.',
-  userissuecreatedDescription: 'Get notified when other users report issues.',
+  issuecreatedDescription: 'When issues are reported.',
+  userissuecreatedDescription: 'When other users report issues.',
   issuecomment: 'Issue Comment',
-  issuecommentDescription:
-    'Send notifications when issues receive new comments.',
-  userissuecommentDescription:
-    'Get notified when issues you reported receive new comments.',
-  adminissuecommentDescription:
-    'Get notified when other users comment on issues.',
+  issuecommentDescription: 'When issues get new comments.',
+  userissuecommentDescription: 'When issues you reported get new comments.',
+  adminissuecommentDescription: 'When other users comment on issues.',
   issueresolved: 'Issue Resolved',
-  issueresolvedDescription: 'Send notifications when issues are resolved.',
-  userissueresolvedDescription:
-    'Get notified when issues you reported are resolved.',
-  adminissueresolvedDescription:
-    'Get notified when issues are resolved by other users.',
+  issueresolvedDescription: 'When issues are resolved.',
+  userissueresolvedDescription: 'When issues you reported are resolved.',
+  adminissueresolvedDescription: 'When other users resolve issues.',
   issuereopened: 'Issue Reopened',
-  issuereopenedDescription: 'Send notifications when issues are reopened.',
-  userissuereopenedDescription:
-    'Get notified when issues you reported are reopened.',
-  adminissuereopenedDescription:
-    'Get notified when issues are reopened by other users.',
+  issuereopenedDescription: 'When issues are reopened.',
+  userissuereopenedDescription: 'When issues you reported are reopened.',
+  adminissuereopenedDescription: 'When other users reopen issues.',
   mediaautorequested: 'Request Automatically Submitted',
   mediaautorequestedDescription:
-    'Get notified when new media requests are automatically submitted for items on Your Watchlist.',
+    'When titles on your watchlist are requested automatically.',
   backfill: 'Backfill',
   backfillDescription:
-    'Send notifications when Backfill finds a pack waiting for approval, and when a backfill finishes or fails.',
+    'When Backfill has a pack to approve, or a backfill finishes or fails.',
   userbackfillDescription:
-    'Get notified when Backfill finds a pack waiting for your approval, and when a backfill finishes or fails. Tap it to approve or skip.',
+    'When Backfill has a pack for you to approve, or a backfill finishes or fails.',
   health: 'Health',
   healthDescription:
-    'Send notifications when a connected service newly has a problem: down, an indexer or subtitle provider paused, a disk filling up.',
+    'When a connected service has a new problem, like being down or a full disk.',
   userhealthDescription:
-    'Get notified when a connected service newly has a problem: down, an indexer or subtitle provider paused, a disk filling up. Tap it to open the Health page.',
+    'When a connected service has a new problem, like being down or a full disk.',
+  wrongMatch: 'Wrong Match',
+  wrongMatchDescription:
+    'When a media server matches a new import to the wrong title.',
+  userwrongMatchDescription:
+    'When a media server matches a new import to the wrong title.',
 });
 
 export const hasNotificationType = (
@@ -123,6 +111,7 @@ export enum Notification {
   PLEX_REAUTH = 16384,
   BACKFILL = 32768,
   HEALTH = 65536,
+  WRONG_MATCH = 131072,
 }
 
 export const ALL_NOTIFICATIONS = Object.values(Notification)
@@ -286,6 +275,9 @@ const NotificationTypeSelector = ({
         description: intl.formatMessage(messages.listactivityDescription),
         value: Notification.LIST_ACTIVITY,
         hasNotifyUser: true,
+        // Only ever sent to the people a list is shared with, through their
+        // own settings: a channel never gets it.
+        hidden: !user,
       },
       {
         id: 'media-available',
@@ -396,6 +388,18 @@ const NotificationTypeSelector = ({
           user ? messages.userhealthDescription : messages.healthDescription
         ),
         value: Notification.HEALTH,
+        hidden: user && !hasPermission(Permission.ADMIN),
+        hasNotifyUser: false,
+      },
+      {
+        id: 'wrong-match',
+        name: intl.formatMessage(messages.wrongMatch),
+        description: intl.formatMessage(
+          user
+            ? messages.userwrongMatchDescription
+            : messages.wrongMatchDescription
+        ),
+        value: Notification.WRONG_MATCH,
         hidden: user && !hasPermission(Permission.ADMIN),
         hasNotifyUser: false,
       },

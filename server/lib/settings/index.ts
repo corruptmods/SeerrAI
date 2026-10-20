@@ -1,3 +1,4 @@
+import type { PersonalApiKeyAccess } from '@server/constants/apiKeys';
 import type { AiFeature } from '@server/constants/features';
 import { DEFAULT_IMAGE_CACHE_MAX_MB } from '@server/constants/images';
 import type { OidcClaimRule } from '@server/constants/oidc';
@@ -623,6 +624,12 @@ export interface MainSettings {
   localLogin: boolean;
   mediaServerLogin: boolean;
   newPlexLogin: boolean;
+  /**
+   * Who may make their own API keys (lib/personalApiKeys): nobody,
+   * admins and people who manage users, or everyone. Off unless an admin
+   * turns it on.
+   */
+  personalApiKeys: PersonalApiKeyAccess;
   discoverRegion: string;
   streamingRegion: string;
   originalLanguage: string;
@@ -636,6 +643,11 @@ export interface MainSettings {
   locale: string;
   youtubeUrl: string;
   versionCheck: boolean;
+  /**
+   * Look for a wrong match on each media server a few minutes after a
+   * requested title is imported (lib/matchWatch), as well as nightly.
+   */
+  matchCheckOnImport: boolean;
 }
 
 export interface ProxySettings {
@@ -701,6 +713,8 @@ interface FullPublicSettings extends PublicSettings {
   hideRequested: boolean;
   localLogin: boolean;
   mediaServerLogin: boolean;
+  /** Who may make their own API keys, for the profile's API Keys tab. */
+  personalApiKeys: PersonalApiKeyAccess;
   /** The connected media servers, the primary one first. */
   mediaServers: PublicMediaServer[];
   /**
@@ -833,6 +847,9 @@ export interface NotificationAgentWebhook extends NotificationAgentConfig {
     supportVariables?: boolean;
   };
 }
+
+/** A new Gotify setup's priority: a notification with a sound. */
+export const GOTIFY_DEFAULT_PRIORITY = 5;
 
 export interface NotificationAgentGotify extends NotificationAgentConfig {
   options: {
@@ -1004,6 +1021,7 @@ class Settings {
         localLogin: true,
         mediaServerLogin: true,
         newPlexLogin: true,
+        personalApiKeys: 'off',
         discoverRegion: '',
         streamingRegion: '',
         originalLanguage: '',
@@ -1017,6 +1035,7 @@ class Settings {
         locale: 'en',
         youtubeUrl: '',
         versionCheck: true,
+        matchCheckOnImport: true,
       },
       plex: {
         name: '',
@@ -1161,7 +1180,8 @@ class Settings {
             options: {
               url: '',
               token: '',
-              priority: 0,
+              // 5 makes a sound in Gotify's Android app; 0 shows nothing.
+              priority: GOTIFY_DEFAULT_PRIORITY,
               locale: 'en',
             },
           },
@@ -1306,8 +1326,9 @@ class Settings {
       },
       // A new install starts with each server's connection set up the way
       // migration 0010 would leave it, so it is not run on it later (where
-      // it would disconnect a server connected since setup).
-      migrations: ['0010_media_servers'],
+      // it would disconnect a server connected since setup). Its channels
+      // are chosen knowing of Wrong Match, so 0014 is not run on them.
+      migrations: ['0010_media_servers', '0014_wrong_match_notifications'],
     };
     if (initialSettings) {
       this.data = mergeSettings(this.data, initialSettings);
@@ -1533,6 +1554,7 @@ class Settings {
       hideRequested: this.data.main.hideRequested,
       localLogin: this.data.main.localLogin,
       mediaServerLogin: this.data.main.mediaServerLogin,
+      personalApiKeys: this.data.main.personalApiKeys ?? 'off',
       mediaServers: connectedKindsOf(this.data).map((kind, index) => ({
         kind,
         name: this.data[kind]?.name ?? '',

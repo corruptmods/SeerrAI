@@ -107,6 +107,9 @@ describe('the answer to a season’s note', () => {
       { season: 'halloween-2026' },
       { season: 'halloween-2026', choice: 'maybe' },
       { season: 'easter-2026', choice: 'off' },
+      // Seasons there are no longer.
+      { season: 'diwali-2026', choice: 'off' },
+      { season: 'pride-2026', choice: 'keep' },
       { season: 'halloween', choice: 'off' },
       { season: 'halloween-2026:off', choice: 'off' },
       { season: 'halloween-2026', choice: 'off', extra: 1 },

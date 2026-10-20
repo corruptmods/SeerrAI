@@ -14,7 +14,7 @@ import { useIntl } from 'react-intl';
 const messages = defineMessages('components.Backfill.SearchAll', {
   searchAll: 'Search all stuck',
   explain:
-    'Searches every stuck title one at a time, with a pause between, instead of a few each scan: titles someone requested first. Titles Sonarr or Radarr searched for today are included; ones Backfill searched in the last day are not. Packs that pass auto-approve start downloading as they are found. Each title is a query to every indexer, so this takes a while.',
+    'Searches every stuck title one by one, requested first. Uses many indexer queries, so it takes a while.',
   start: 'Search All Stuck',
   cancel: 'Cancel',
   starting: 'Starting…',

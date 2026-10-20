@@ -3,6 +3,7 @@ import { getRepository } from '@server/datasource';
 import MediaEvent, { MediaEventType } from '@server/entity/MediaEvent';
 import { User } from '@server/entity/User';
 import logger from '@server/logger';
+import { withNestedTransaction } from '@server/utils/nestedTransaction';
 import type { EntityManager, FindOptionsWhere } from 'typeorm';
 import { In } from 'typeorm';
 
@@ -34,8 +35,8 @@ export const recordMediaEvent = async (
   input: MediaEventInput,
   manager?: EntityManager
 ): Promise<void> => {
-  try {
-    await (manager ?? getRepository(MediaEvent).manager).insert(MediaEvent, {
+  const insert = (into: EntityManager) =>
+    into.insert(MediaEvent, {
       tmdbId: input.tmdbId,
       foreignId: input.foreignId ?? null,
       mediaType: input.mediaType,
@@ -44,6 +45,14 @@ export const recordMediaEvent = async (
       userId: input.userId ?? null,
       detail: input.detail ?? null,
     });
+
+  try {
+    // Inside a transaction, in a nested one of its own: on Postgres a write
+    // that fails aborts the transaction it is in, which would lose the save
+    // being recorded and everything after it.
+    await (manager?.queryRunner?.isTransactionActive
+      ? withNestedTransaction(manager, insert)
+      : insert(manager ?? getRepository(MediaEvent).manager));
   } catch (e) {
     logger.warn('Could not record a history event', {
       label: 'Media History',

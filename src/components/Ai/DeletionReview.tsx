@@ -13,7 +13,7 @@ const messages = defineMessages('components.Ai.DeletionReview', {
   review: 'Review with AI',
   title: 'Review Deletions',
   intro:
-    'Titles that may be deleted by mistake: someone part-way through, rewatched often, recently requested or on a watch list.',
+    'Titles someone may still want: mid-watch, often rewatched, recently requested or on a watch list.',
   none: 'Nothing looks like a mistake.',
   deletes: 'Deletes {date}',
 });

@@ -21,7 +21,7 @@ const messages = defineMessages('components.Settings.Notifications', {
   embedPoster: 'Embed Poster',
   usePublicLogo: 'Use public Seerr AI logo instead of instance logo',
   usePublicLogoTip:
-    'If your Seerr AI instance is not publicly accessible, enable this option so email clients outside your network can display the image. The image will be pulled from the public GitHub repository.',
+    'Turn on if Seerr AI isn’t public, so emails can show the logo. It’s loaded from GitHub.',
   userEmailRequired: 'Require user email',
   emailsender: 'Sender Address',
   smtpHost: 'SMTP Host',

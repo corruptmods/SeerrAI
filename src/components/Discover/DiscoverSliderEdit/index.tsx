@@ -7,6 +7,7 @@ import CreateSlider from '@app/components/Discover/CreateSlider';
 import { sliderTitles } from '@app/components/Discover/constants';
 import GenreTag from '@app/components/GenreTag';
 import KeywordTag from '@app/components/KeywordTag';
+import { WatchProviderTags } from '@app/components/Selector';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -273,6 +274,17 @@ const DiscoverSliderEdit = ({
           )}
           {slider.type === DiscoverSliderType.TMDB_SEARCH && (
             <Tag iconSvg={<MagnifyingGlassIcon />}>{slider.data}</Tag>
+          )}
+          {(slider.type === DiscoverSliderType.TMDB_MOVIE_STREAMING_SERVICES ||
+            slider.type === DiscoverSliderType.TMDB_TV_STREAMING_SERVICES) && (
+            <WatchProviderTags
+              type={
+                slider.type === DiscoverSliderType.TMDB_MOVIE_STREAMING_SERVICES
+                  ? 'movie'
+                  : 'tv'
+              }
+              data={slider.data}
+            />
           )}
         </div>
         {personalOnly ? (

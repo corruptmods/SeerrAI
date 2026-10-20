@@ -15,8 +15,7 @@ import { useIntl } from 'react-intl';
 const messages = defineMessages('components.Discover.Suggested', {
   suggested: 'Suggested for You',
   subtitle: 'Like what you have been watching lately. Updated once a day.',
-  nothing:
-    'Nothing to suggest yet. Suggestions come from what you have finished watching.',
+  nothing: 'Nothing yet. Suggestions come from what you’ve finished watching.',
 });
 
 type MediaType = 'all' | 'movie' | 'tv';

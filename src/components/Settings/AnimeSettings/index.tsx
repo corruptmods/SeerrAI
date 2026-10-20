@@ -19,10 +19,10 @@ import useSWR, { mutate as globalMutate } from 'swr';
 const messages = defineMessages('components.Settings.AnimeSettings', {
   anime: 'Anime',
   description:
-    'What Seerr AI counts as anime decides which root folder, quality profile and series type a request gets in Sonarr and Radarr, what the Anime page on Discover lists, and what the Anime Check reports.',
+    'What counts as anime decides where requests go in Sonarr and Radarr, and what the Anime page lists.',
   leaveOut: 'Leave out anime made in',
   leaveOutTip:
-    'Seerr AI counts a title as anime when TMDB tags it as anime, wherever it was made, and counts animation made in Japanese too. Add a country here to keep its anime-styled shows and films with your regular ones: with United States listed, Avatar: The Last Airbender and Castlevania are not anime, while anything made in Japanese still is. Leave it empty to count anime from everywhere.',
+    'Anime-style titles from these countries count as regular. Japanese-language animation is always anime.',
   noCountries: 'No country: anime from everywhere counts',
   saved: 'Anime settings saved.',
   saveFailed: 'Could not save the anime settings.',

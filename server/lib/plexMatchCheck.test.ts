@@ -10,6 +10,7 @@ import plexMatchCheck, {
   compareItem,
   folderName,
   plexIds,
+  radarrFileFacts,
 } from '@server/lib/plexMatchCheck';
 import type { SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
@@ -240,6 +241,139 @@ describe('Plex Match Check, two titles with one name', () => {
       plexMatchText(problem as PlexMatchProblem).title,
       'Plex matched "Civil War (2024)" to Guerra Civil (2024)'
     );
+  });
+});
+
+describe('Plex Match Check, saying whose mistake it is', () => {
+  // From the owner's 29 reports: Plex matched features to shorts of the
+  // same name, often by IMDb id alone; one folder held the short itself.
+  const radarr = (over: Record<string, unknown>) => ({
+    title: 'Blood',
+    year: 2023,
+    tmdbId: 1000,
+    imdbId: 'tt13280054',
+    server: 'Radarr',
+    ...over,
+  });
+  const check = (
+    expected: Record<string, unknown>,
+    plex: { title: string; year?: number; guids: string[]; folder: string }
+  ) =>
+    plexMatchText(
+      compareItem(
+        'movie',
+        {
+          ...movie('9', plex.title, `/m/${plex.folder}/a.mkv`, plex.guids),
+          year: plex.year,
+        },
+        new Map([[plex.folder.toLowerCase(), [radarr(expected)]]])
+      ).problem as PlexMatchProblem
+    );
+
+  it('shows the ids that disagreed, and the IMDb id to search too', () => {
+    const text = check(
+      {},
+      { title: 'Blood', guids: ['imdb://tt26758432'], folder: 'Blood (2023)' }
+    );
+    assert.match(text.detail, /Radarr: IMDb tt13280054, Plex: IMDb tt26758432/);
+    assert.match(
+      text.detail,
+      /Fix Match in Plex, searching tmdb-1000 or imdb-tt13280054/
+    );
+  });
+
+  it('takes a missing year as unknown, not different', () => {
+    const text = check(
+      {},
+      { title: 'Blood', guids: ['imdb://tt26758432'], folder: 'Blood (2023)' }
+    );
+    assert.equal(
+      text.title,
+      'Plex matched "Blood (2023)" to a different film named Blood'
+    );
+  });
+
+  it('says when the file, not the match, is likely wrong', () => {
+    const text = check(
+      {
+        title: 'Gone in the Night',
+        year: 2022,
+        tmdbId: 874355,
+        imdbId: undefined,
+        runtime: 90,
+        fileRuntime: 21,
+      },
+      {
+        title: 'Nest',
+        year: 2022,
+        guids: ['tmdb://928747'],
+        folder: 'Gone in the Night (2022)',
+      }
+    );
+    assert.equal(
+      text.title,
+      'Radarr\'s file in "Gone in the Night (2022)" may not be Gone in the Night (2022)'
+    );
+    assert.match(text.detail, /file 21 min, film 90 min/);
+    assert.match(text.detail, /Replace it in Radarr/);
+    assert.doesNotMatch(text.detail, /Fix Match/);
+  });
+
+  it('suggests renaming a file not named after the film', () => {
+    const civilWar = {
+      title: 'Civil War',
+      year: 2024,
+      tmdbId: 929590,
+      imdbId: undefined,
+      runtime: 109,
+      fileRuntime: 109,
+    };
+    const plex = {
+      title: 'Guerra Civil',
+      year: 2024,
+      guids: ['tmdb://1310753'],
+      folder: 'Civil War (2024)',
+    };
+    const text = check(
+      { ...civilWar, file: 'Guerra.Civil.2024.1080p.WEB-DL.mkv' },
+      plex
+    );
+    assert.match(text.detail, /file 109 min, film 109 min/);
+    assert.match(text.detail, /rename the file in Radarr/);
+    assert.doesNotMatch(
+      check({ ...civilWar, file: 'Civil War (2024) WEBDL-1080p.mkv' }, plex)
+        .detail,
+      /rename/
+    );
+  });
+
+  it('reads the file facts Radarr keeps, and the server’s length when it has none', () => {
+    assert.deepEqual(
+      radarrFileFacts({
+        runtime: 90,
+        movieFile: {
+          relativePath: 'Nest.2022.1080p.BluRay.x264-BiPOLAR.mkv',
+          mediaInfo: { runTime: '21:27' },
+        } as never,
+      }),
+      {
+        runtime: 90,
+        fileRuntime: 21,
+        file: 'Nest.2022.1080p.BluRay.x264-BiPOLAR.mkv',
+      }
+    );
+    const { problem } = compareItem(
+      'movie',
+      {
+        ...movie('9', 'Nest', '/m/Gone (2022)/a.mkv', ['tmdb://928747']),
+        Media: [
+          { duration: 21 * 60_000, Part: [{ file: '/m/Gone (2022)/a.mkv' }] },
+        ],
+      } as unknown as PlexLibraryItem,
+      new Map([['gone (2022)', [radarr({ tmdbId: 874355, runtime: 90 })]]])
+    );
+    assert.equal(problem?.expected.fileRuntime, 21);
+    assert.equal(problem?.matched.duration, 21);
   });
 });
 

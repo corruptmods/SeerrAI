@@ -20,7 +20,7 @@ const messages = defineMessages('components.Login', {
   validationemailrequired: 'You must provide a valid email address',
   validationpasswordrequired: 'You must provide a password',
   jellyfinLocalLoginHint:
-    "If you haven't set an email address in your profile, use your {mediaServerName} username instead.",
+    'No email in your profile? Use your {mediaServerName} username.',
   loginerror: 'Something went wrong while trying to sign in.',
   toomanyattempts: 'Too many sign-in attempts. Try again in a few minutes.',
   credentialerror: 'The email address or password is incorrect.',

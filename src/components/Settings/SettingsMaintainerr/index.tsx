@@ -18,7 +18,7 @@ import useSWR, { useSWRConfig } from 'swr';
 const messages = defineMessages('components.Settings.SettingsMaintainerr', {
   maintainerrSettings: 'Maintainerr Settings',
   maintainerrSettingsDescription:
-    'Connect Maintainerr to warn people before titles are deleted and let them keep what they are still watching. Each server has its own features.',
+    'Warns people before titles are deleted, and lets them keep what they’re watching.',
   addmaintainerr: 'Add Maintainerr Server',
   features: 'Features',
   badges: 'Badges',

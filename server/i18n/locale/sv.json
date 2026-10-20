@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Musikförfrågan avslagen",
   "notifications.events.musicFailed": "Musikförfrågan misslyckades",
   "notifications.events.musicPending": "Ny musikförfrågan",
-  "notifications.events.musicRequestAvailable": "Begärd musik nu tillgänglig"
+  "notifications.events.musicRequestAvailable": "Begärd musik nu tillgänglig",
+  "notifications.events.wrongMatch": "Fel matchning"
 }

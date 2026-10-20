@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Zenei kérés elutasítva",
   "notifications.events.musicFailed": "Sikertelen zenei kérés",
   "notifications.events.musicPending": "Új zenei kérés",
-  "notifications.events.musicRequestAvailable": "A kért zene már elérhető"
+  "notifications.events.musicRequestAvailable": "A kért zene már elérhető",
+  "notifications.events.wrongMatch": "Hibás egyezés"
 }

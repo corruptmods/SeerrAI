@@ -1,5 +1,7 @@
 import PlexAPI from '@server/api/plexapi';
 import PlexTvAPI from '@server/api/plextv';
+import type { PersonalApiKeyAccess } from '@server/constants/apiKeys';
+import { PERSONAL_API_KEY_ACCESS } from '@server/constants/apiKeys';
 import { ApiErrorCode } from '@server/constants/error';
 import { MIN_IMAGE_CACHE_MAX_MB } from '@server/constants/images';
 import { MediaType } from '@server/constants/media';
@@ -26,6 +28,7 @@ import {
   searchableStuckTitles,
 } from '@server/lib/health';
 import ImageProxy, { imageConversionAvailable } from '@server/lib/imageproxy';
+import matchWatch from '@server/lib/matchWatch';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
 import { applyMediaServerLogin } from '@server/lib/mediaServerAdmin';
 import {
@@ -142,6 +145,18 @@ settingsRoutes.post('/main', async (req, res, next) => {
   }
   const limitBefore = ImageProxy.sizeLimit();
 
+  const keysAsked = (req.body as { personalApiKeys?: unknown }).personalApiKeys;
+  if (
+    keysAsked !== undefined &&
+    !PERSONAL_API_KEY_ACCESS.includes(keysAsked as PersonalApiKeyAccess)
+  ) {
+    return next({
+      status: 400,
+      message: `Personal API keys must be one of: ${PERSONAL_API_KEY_ACCESS.join(', ')}.`,
+    });
+  }
+  const keysBefore = settings.main.personalApiKeys ?? 'off';
+
   // The primary media server is changed under Settings → Media Servers.
   const update = omit(req.body, 'mediaServerType');
   settings.main = merge(settings.main, update);
@@ -149,6 +164,15 @@ settingsRoutes.post('/main', async (req, res, next) => {
   // connected server's own.
   applyMediaServerLogin(update.mediaServerLogin);
   await settings.save();
+
+  if (keysAsked !== undefined && keysAsked !== keysBefore) {
+    logger.info('Who may make personal API keys changed', {
+      label: 'API Key',
+      from: keysBefore,
+      to: keysAsked,
+      changedBy: req.user?.id,
+    });
+  }
 
   // A lower limit takes effect now, not at the next cleanup.
   if (ImageProxy.sizeLimit() < limitBefore) {
@@ -875,6 +899,18 @@ settingsRoutes.get<
       keys,
     }
   );
+  // What the check of new requests found since, shown at once: one problem
+  // a server, the newer finding first.
+  if (media) {
+    const recent = await matchWatch.openProblems(media.id);
+    const servers = new Set(recent.map((p) => p.mediaServer ?? 'Plex'));
+    problems.splice(
+      0,
+      problems.length,
+      ...recent,
+      ...problems.filter((p) => !servers.has(p.mediaServer ?? 'Plex'))
+    );
+  }
   // `problem` is the first, for pages that show one.
   return res.status(200).json({ problem: problems[0] ?? null, problems });
 });

@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Musiikkipyyntö hylätty",
   "notifications.events.musicFailed": "Musiikkipyyntö epäonnistui",
   "notifications.events.musicPending": "Uusi musiikkipyyntö",
-  "notifications.events.musicRequestAvailable": "Pyydetty musiikki nyt saatavilla"
+  "notifications.events.musicRequestAvailable": "Pyydetty musiikki nyt saatavilla",
+  "notifications.events.wrongMatch": "Väärä vastaavuus"
 }

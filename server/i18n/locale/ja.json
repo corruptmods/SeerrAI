@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "音楽のリクエスト却下",
   "notifications.events.musicFailed": "音楽のリクエスト失敗",
   "notifications.events.musicPending": "新しい音楽のリクエスト",
-  "notifications.events.musicRequestAvailable": "リクエストした音楽が視聴可能になりました"
+  "notifications.events.musicRequestAvailable": "リクエストした音楽が視聴可能になりました",
+  "notifications.events.wrongMatch": "照合の誤り"
 }

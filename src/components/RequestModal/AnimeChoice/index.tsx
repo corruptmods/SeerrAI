@@ -7,7 +7,7 @@ import { useIntl } from 'react-intl';
 const messages = defineMessages('components.RequestModal.AnimeChoice', {
   title: 'Anime',
   label: 'Request as anime',
-  hint: 'Ticked for you when this looks like anime from Japan or elsewhere abroad. If that is wrong, change it: anime goes to the anime library, everything else to the regular one.',
+  hint: 'Ticked when it looks like anime. Anime goes to the anime library.',
 });
 
 /**

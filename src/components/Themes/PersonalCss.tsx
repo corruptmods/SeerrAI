@@ -17,7 +17,7 @@ const messages = defineMessages('components.Themes.PersonalCss', {
   personalCss: 'Personal CSS',
   advanced: 'Advanced',
   description:
-    'Your own styles, on your screens only. Pictures and fonts can only come from this server, so a pasted style can’t send anything elsewhere.',
+    'Your own styles, on your screens only. Pictures and fonts must come from this server.',
   placeholder:
     '/* Squarer posters, just for me */\n[data-seerr="title-card"] {\n  border-radius: 4px;\n}',
   saveCss: 'Save CSS',
@@ -27,7 +27,7 @@ const messages = defineMessages('components.Themes.PersonalCss', {
   notText: 'This isn’t CSS.',
   import:
     '@import can’t be used here: styles can’t be brought in from elsewhere.',
-  url: 'Pictures and fonts can only come from this server, so {address} can’t be used. Use a path such as /my-picture.png.',
+  url: 'Pictures and fonts must come from this server, so {address} can’t be used. Use a path like /my-picture.png.',
   script: '{what} can’t be used: it runs code.',
 });
 

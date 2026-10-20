@@ -10,6 +10,7 @@ import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import { User } from '@server/entity/User';
+import { rollBackOnRelease } from '@server/utils/nestedTransaction';
 import gravatarUrl from 'gravatar-url';
 
 export interface SeedDbOptions {
@@ -94,6 +95,7 @@ export async function seedTestDb(options: SeedDbOptions = {}): Promise<void> {
   const dbConnection = dataSource.isInitialized
     ? dataSource
     : await dataSource.initialize();
+  rollBackOnRelease(dbConnection);
 
   if (!options.preserveDb) {
     await dbConnection.dropDatabase();

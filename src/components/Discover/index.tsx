@@ -45,6 +45,10 @@ import {
   isDefaultNavOrder,
   sameNavLayout,
 } from '@server/constants/navigation';
+import {
+  readStreamingRow,
+  streamingServiceQuery,
+} from '@server/constants/streamingServices';
 import type DiscoverSlider from '@server/entity/DiscoverSlider';
 import axios from 'axios';
 import { useEffect, useState } from 'react';
@@ -70,10 +74,9 @@ const messages = defineMessages('components.Discover', {
   couldnotedit:
     'The editor could not be opened. Check your connection and try again.',
   emptywatchlist:
-    'Media added to your <PlexWatchlistSupportLink>Plex Watchlist</PlexWatchlistSupportLink> will appear here.',
+    'Titles on your <PlexWatchlistSupportLink>Plex Watchlist</PlexWatchlistSupportLink> show here.',
   resettodefault: 'Reset to Default',
-  resetwarning:
-    'Reset all sliders to default. This will also delete any custom sliders!',
+  resetwarning: 'Resets all sliders to default and deletes custom ones.',
   updatesuccess: 'Updated discover customization settings.',
   updatefailed:
     'Something went wrong updating the discover customization settings.',
@@ -613,12 +616,12 @@ const Discover = () => {
                 sliderKey={`custom-slider-${slider.id}`}
                 title={slider.title ?? ''}
                 url="/api/v1/discover/movies"
-                extraParams={`watchRegion=${
-                  slider.data?.split(',')[0]
-                }&watchProviders=${slider.data?.split(',')[1]}`}
-                linkUrl={`/discover/movies?watchRegion=${
-                  slider.data?.split(',')[0]
-                }&watchProviders=${slider.data?.split(',')[1]}`}
+                extraParams={streamingServiceQuery(
+                  readStreamingRow(slider.data)
+                )}
+                linkUrl={`/discover/movies?${streamingServiceQuery(
+                  readStreamingRow(slider.data)
+                )}`}
               />
             );
             break;
@@ -628,12 +631,12 @@ const Discover = () => {
                 sliderKey={`custom-slider-${slider.id}`}
                 title={slider.title ?? ''}
                 url="/api/v1/discover/tv"
-                extraParams={`watchRegion=${
-                  slider.data?.split(',')[0]
-                }&watchProviders=${slider.data?.split(',')[1]}`}
-                linkUrl={`/discover/tv?watchRegion=${
-                  slider.data?.split(',')[0]
-                }&watchProviders=${slider.data?.split(',')[1]}`}
+                extraParams={streamingServiceQuery(
+                  readStreamingRow(slider.data)
+                )}
+                linkUrl={`/discover/tv?${streamingServiceQuery(
+                  readStreamingRow(slider.data)
+                )}`}
               />
             );
             break;

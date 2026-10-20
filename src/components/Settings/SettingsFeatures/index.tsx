@@ -19,7 +19,7 @@ import useSWR, { useSWRConfig } from 'swr';
 const messages = defineMessages('components.Settings.SettingsFeatures', {
   features: 'Features',
   description:
-    'Optional features of this build. Turning one off here turns it off for everyone. Each person can also turn any of them off for themselves in their own settings.',
+    'Off here is off for everyone. People can also turn features off for themselves.',
   saved: 'Saved.',
   failed: 'Something went wrong while saving.',
   musicOwnPage: 'Music has its own page',

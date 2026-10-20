@@ -4,7 +4,7 @@ import type { Permission } from '@server/lib/permissions';
 import { hasPermission } from '@server/lib/permissions';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Common.SettingsTabs', {
@@ -85,6 +85,9 @@ const SettingsTabs = ({
   const intl = useIntl();
   const router = useRouter();
   const { user: currentUser } = useUser();
+  // A page can have two sets of tabs (Settings, then a section's own), and
+  // each dropdown's label must find its own.
+  const selectId = useId();
 
   /*
    * Load the other sections' code in the background once this one has
@@ -142,11 +145,11 @@ const SettingsTabs = ({
   return (
     <>
       <div className="sm:hidden">
-        <label htmlFor="tabs" className="sr-only">
+        <label htmlFor={selectId} className="sr-only">
           {intl.formatMessage(messages.selectTab)}
         </label>
         <select
-          id="tabs"
+          id={selectId}
           onChange={(e) => {
             router.push(e.target.value);
           }}

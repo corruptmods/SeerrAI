@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Müzik Talebi Reddedildi",
   "notifications.events.musicFailed": "Müzik Talebi Başarısız",
   "notifications.events.musicPending": "Yeni Müzik Talebi",
-  "notifications.events.musicRequestAvailable": "Talep Edilen Müzik Artık Mevcut"
+  "notifications.events.musicRequestAvailable": "Talep Edilen Müzik Artık Mevcut",
+  "notifications.events.wrongMatch": "Yanlış eşleşme"
 }

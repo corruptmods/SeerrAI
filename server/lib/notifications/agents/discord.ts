@@ -12,12 +12,12 @@ import {
   escapeMarkdown,
 } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
+import notificationHttp from '@server/lib/notifications/http';
 import { mediaPagePath } from '@server/lib/notifications/mediaPage';
 import type { NotificationAgentDiscord } from '@server/lib/settings';
 import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import type { AvailableLocale } from '@server/types/languages';
-import axios from 'axios';
 import {
   Notification,
   hasNotificationType,
@@ -216,6 +216,9 @@ class DiscordAgent
     if (type === Notification.HEALTH) {
       color = EmbedColors.RED;
     }
+    if (type === Notification.WRONG_MATCH) {
+      color = EmbedColors.ORANGE;
+    }
 
     const url = applicationUrl
       ? payload.actionUrl
@@ -346,7 +349,7 @@ class DiscordAgent
         );
       }
 
-      await axios.post(webhookUrl.toString(), {
+      await notificationHttp.post(webhookUrl.toString(), {
         username: settings.options.botUsername
           ? settings.options.botUsername
           : getSettings().main.applicationTitle,

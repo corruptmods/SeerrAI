@@ -18,7 +18,7 @@ const messages = defineMessages('components.DeclineRequestModal', {
   reason: 'Reason',
   reasonPlaceholder: 'Reason (optional), such as “Already on Netflix”',
   reasonHint:
-    '{requestCount, plural, one {Whoever asked sees it} other {Everyone who asked sees it}} with their request and in the notification saying it was declined.',
+    '{requestCount, plural, one {Whoever asked sees it} other {Everyone who asked sees it}}, on the request and in the notification.',
   declining: 'Declining…',
   failed:
     '{requestCount, plural, one {The request could not be declined.} other {Not every request could be declined.}} Try again.',

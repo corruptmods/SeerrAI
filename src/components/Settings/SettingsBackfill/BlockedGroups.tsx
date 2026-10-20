@@ -11,7 +11,7 @@ const messages = defineMessages(
   {
     title: 'Blocked release groups',
     description:
-      'Releases from these groups are never taken: Backfill and the admin agent pass over them, and Radarr and Sonarr get a custom format, "Seerr AI: blocked release groups", that every quality profile scores too low to accept. A file already there from one of them is replaced by the next good release, once that has imported. Changes apply straight away.',
+      'Releases from these groups are never taken, by Backfill, the agent, Radarr or Sonarr. Existing files from them are replaced.',
     none: 'No groups are blocked.',
     group: 'Release group',
     placeholder: 'As in release names, like rothebehap',

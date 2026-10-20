@@ -116,6 +116,33 @@
 }
 
 /*
+ * The blur behind the top bar once the page is scrolled, and behind the
+ * phone's tab bar. It only shows through a see-through bar; behind a solid
+ * one it changes nothing on screen, yet is redrawn on every frame of
+ * scrolling. So it is left off where the bar is solid: the top bar in light
+ * mode and with "Reduce see-through panels" (--panel-opacity is 1), the tab
+ * bar with "Reduce see-through panels" (--bar-opacity is 1). See
+ * themeVariables in src/utils/theme. Kept outside @layer so it is never
+ * left out of the built stylesheet.
+ */
+.top-bar-blur {
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+.tab-bar-blur {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+:root[data-mode='light'] .top-bar-blur,
+:root[data-solid='on'] .top-bar-blur,
+:root[data-solid='on'] .tab-bar-blur {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/*
  * Pictures and the fades over them. A title page's backdrop fades into the
  * page itself: in dark the page's colour covers half the picture at the
  * top, as it always has; in light it covers more of it, so the dark text

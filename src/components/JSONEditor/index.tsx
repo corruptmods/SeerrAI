@@ -7,9 +7,20 @@ interface JSONEditorProps extends HTMLAttributes<HTMLDivElement> {
   name: string;
   value: string;
   onUpdate: (value: string) => void;
+  /** The id of the editor's text box, for a label to point at. */
+  inputId?: string;
+  /** What a screen reader calls the editor. */
+  label?: string;
 }
 
-const JSONEditor = ({ name, value, onUpdate, onBlur }: JSONEditorProps) => {
+const JSONEditor = ({
+  name,
+  value,
+  onUpdate,
+  onBlur,
+  inputId,
+  label,
+}: JSONEditorProps) => {
   return (
     <div className="w-full overflow-hidden rounded-md">
       <AceEditor
@@ -18,6 +29,14 @@ const JSONEditor = ({ name, value, onUpdate, onBlur }: JSONEditorProps) => {
         onChange={onUpdate}
         name={name}
         editorProps={{ $blockScrolling: true }}
+        // Ace types into a hidden text box of its own, which names itself
+        // after the cursor's row unless it is given a name.
+        setOptions={label ? { textInputAriaLabel: label } : undefined}
+        onLoad={(editor) => {
+          if (inputId) {
+            editor.textInput.getElement().id = inputId;
+          }
+        }}
         value={value}
         onBlur={onBlur}
         height="300px"

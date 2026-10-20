@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Demande de musique refusée",
   "notifications.events.musicFailed": "Échec de la demande de musique",
   "notifications.events.musicPending": "Nouvelle demande de musique",
-  "notifications.events.musicRequestAvailable": "Musique demandée désormais disponible"
+  "notifications.events.musicRequestAvailable": "Musique demandée désormais disponible",
+  "notifications.events.wrongMatch": "Mauvaise correspondance"
 }

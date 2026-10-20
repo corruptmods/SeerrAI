@@ -22,6 +22,7 @@ const messages = defineMessages('components.UserProfile.UserSettings', {
   menuChangePass: 'Password',
   menuLinkedAccounts: 'Linked Accounts',
   menuPasskeys: 'Passkeys',
+  menuApiKeys: 'API Keys',
   menuNotifications: 'Notifications',
   menuPermissions: 'Permissions',
   unauthorizedDescription:
@@ -97,6 +98,29 @@ const UserSettings = ({ children }: UserSettingsProps) => {
           (currentUser?.id !== 1 &&
             (user.id === 1 ||
               hasPermission(Permission.ADMIN, user.permissions ?? 0)))),
+    },
+    {
+      text: intl.formatMessage(messages.menuApiKeys),
+      route: '/settings/api-keys',
+      regex: /\/settings\/api-keys/,
+      // Your own, once an admin lets you make them. Someone who manages
+      // users sees another person's while keys are on, except the owner's
+      // or another admin's.
+      hidden:
+        settings.currentSettings.personalApiKeys === 'off' ||
+        (currentUser?.id === user.id
+          ? settings.currentSettings.personalApiKeys === 'managers' &&
+            !hasPermission(
+              Permission.MANAGE_USERS,
+              currentUser?.permissions ?? 0
+            )
+          : !hasPermission(
+              Permission.MANAGE_USERS,
+              currentUser?.permissions ?? 0
+            ) ||
+            (currentUser?.id !== 1 &&
+              (user.id === 1 ||
+                hasPermission(Permission.ADMIN, user.permissions ?? 0)))),
     },
     {
       text: intl.formatMessage(messages.menuNotifications),

@@ -184,7 +184,15 @@ export interface JellyfinUserItem extends JellyfinLibraryItem {
   UserData?: JellyfinUserData;
   ProviderIds?: JellyfinLibraryItemExtended['ProviderIds'];
   Path?: string;
+  /** How long it runs, in ticks of a ten-millionth of a second. */
+  RunTimeTicks?: number;
 }
+
+/** A movie, series, episode or album, as the check of a match reads it. */
+export type JellyfinMatchItem = JellyfinUserItem &
+  Pick<JellyfinMusicItem, 'AlbumArtist' | 'AlbumArtists'> & {
+    Type: string;
+  };
 
 export interface JellyfinUserItemsResponse {
   Items: JellyfinUserItem[];
@@ -728,6 +736,42 @@ class JellyfinAPI extends ExternalAPI {
       Items: response?.Items ?? [],
       TotalRecordCount: response?.TotalRecordCount ?? 0,
     };
+  }
+
+  /**
+   * Items to compare with Sonarr, Radarr or Lidarr: the newest of a
+   * library's (by when the server added them), or those with these ids,
+   * with their paths and the ids the server matched them to.
+   */
+  public async getMatchItems(
+    query:
+      | {
+          libraryId: string;
+          type: 'Movie' | 'Episode' | 'MusicAlbum';
+          newest: number;
+        }
+      | { ids: string[] },
+    timeout: number
+  ): Promise<JellyfinMatchItem[]> {
+    const params =
+      'ids' in query
+        ? { Ids: query.ids.join(',') }
+        : {
+            ParentId: query.libraryId,
+            Recursive: true,
+            IncludeItemTypes: query.type,
+            SortBy: 'DateCreated',
+            SortOrder: 'Descending',
+            Limit: query.newest,
+          };
+    const response = await this.get<{ Items?: JellyfinMatchItem[] }>('/Items', {
+      params: {
+        ...params,
+        Fields: 'Path,ProviderIds,ProductionYear,DateCreated',
+      },
+      timeout,
+    });
+    return response?.Items ?? [];
   }
 
   /**

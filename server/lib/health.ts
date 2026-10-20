@@ -23,6 +23,7 @@ import dataSource, { getRepository } from '@server/datasource';
 import AlbumRequest from '@server/entity/AlbumRequest';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
+import { MatchProblem } from '@server/entity/MatchWatch';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
@@ -43,7 +44,15 @@ import type { PlexMatchProblem } from '@server/lib/plexMatchCheck';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import type { DownloadClientSettings } from '@server/lib/settings';
 import { aiReady, getSettings } from '@server/lib/settings';
-import { mainId, sameName } from '@server/utils/plexMatch';
+import type { ShownId } from '@server/utils/plexMatch';
+import {
+  comparedIds,
+  fileLooksWrong,
+  fileMisnamed,
+  fixSearch,
+  idLabel,
+  sameName,
+} from '@server/utils/plexMatch';
 import { In, IsNull, LessThan, MoreThanOrEqual, Not } from 'typeorm';
 
 /*
@@ -63,6 +72,8 @@ export interface HealthItem {
   href?: string;
   /** A title Radarr or Sonarr has, that can be searched for from here. */
   searchable?: { mediaId: number; is4k: boolean; mediaType: MediaType };
+  /** When it was found, for a list that says. */
+  at?: string;
 }
 
 export interface HealthCheck {
@@ -79,6 +90,13 @@ export interface HealthCheck {
   count: number;
   detail?: string;
   items: HealthItem[];
+  /**
+   * Match Check: what the check of new requests found and is not yet put
+   * right, newest first, shown above the nightly list.
+   */
+  recent?: HealthItem[];
+  /** Of those, how many the nightly list does not have too. */
+  recentCount?: number;
   /**
    * A service that answered, but some of what it reports (its own health
    * list, its disks) could not be read this time. What that would have
@@ -1349,57 +1367,126 @@ const titled = (t: { title: string; year?: number }) =>
 
 /**
  * How to fix a match on this server: Plex's "Fix Match" finds a title by
- * its id typed as "tmdb-123"; Jellyfin's and Emby's "Identify" has a box
- * for each id.
+ * its id typed as "tmdb-123" (or "imdb-tt123"); Jellyfin's and Emby's
+ * "Identify" has a box for each id. `also` is a second id to try.
  */
 export const fixMatchText = (
   server: string,
-  want?: { name: 'tmdb' | 'tvdb'; id: number }
-): string =>
-  server === 'Plex'
-    ? want
-      ? `Fix Match in Plex, searching ${want.name}-${want.id}`
-      : 'Fix Match in Plex'
-    : want
-      ? `Identify in ${server}, entering ${want.name.toUpperCase()} id ${want.id}`
-      : `Identify in ${server}`;
+  want?: ShownId,
+  also?: ShownId
+): string => {
+  const typed = (id: ShownId) => `${id.name}-${id.id}`;
+  const entered = (id: ShownId) =>
+    `${id.name === 'imdb' ? 'IMDb' : id.name.toUpperCase()} id ${id.id}`;
+  if (server === 'Plex') {
+    return want
+      ? `Fix Match in Plex, searching ${typed(want)}${also ? ` or ${typed(also)}` : ''}`
+      : 'Fix Match in Plex';
+  }
+  return want
+    ? `Identify in ${server}, entering ${entered(want)}${also ? ` or ${entered(also)}` : ''}`
+    : `Identify in ${server}`;
+};
+
+/** An album and who it is by. */
+const albumBy = (t: { title: string; year?: number; artist?: string }) =>
+  `${titled(t)}${t.artist ? ` by ${t.artist}` : ''}`;
+
+/** A music problem in words: albums go by MusicBrainz ids, not TMDB's. */
+const musicMatchText = (
+  p: PlexMatchProblem
+): { title: string; detail: string } => {
+  const server = p.mediaServer ?? 'Plex';
+  const { mbid } = p.expected;
+  const fix =
+    server === 'Plex'
+      ? `Fix Match in Plex and pick ${albumBy(p.expected)}`
+      : mbid
+        ? `Identify in ${server}, entering MusicBrainz release group ${mbid}`
+        : `Identify in ${server}`;
+  return {
+    title: `${server} matched the album "${p.folder}" to ${albumBy(p.matched)}`,
+    detail: `${p.expected.server} has ${albumBy(p.expected)} there${mbid ? ` (MusicBrainz ${mbid})` : ''} · ${fix}`,
+  };
+};
 
 /**
  * One Match Check problem in words. The ids are shown because names can't
- * tell two films apart: two can share a name and a year.
+ * tell two films apart: two can share a name and a year. They are the ids
+ * the two sides were compared by, so a server with only an IMDb id shows
+ * it. For a film, the file's length against the film's says whose mistake
+ * it is: a file far off the film is likely another film, which fixing the
+ * match would only hide.
  */
 export const plexMatchText = (
   p: PlexMatchProblem
 ): { title: string; detail: string } => {
+  if (p.kind === 'music') return musicMatchText(p);
   const server = p.mediaServer ?? 'Plex';
-  const want = mainId(p.kind, p.expected);
-  const got = mainId(p.kind, p.matched);
-  const label = (m: { name: string; id: number }) =>
-    `${m.name.toUpperCase()} ${m.id}`;
-  const fix = fixMatchText(server, want);
+  const arr = p.expected.server;
+  const { want, got } = comparedIds(p.kind, p.expected, p.matched);
+  const search = fixSearch(p.kind, p.expected);
+  const fix = fixMatchText(
+    server,
+    search.want,
+    want?.name === 'imdb' ? search.also : undefined
+  );
   const ids = [
-    want && `${p.expected.server}: ${label(want)}`,
-    got && `${server}: ${label(got)}`,
+    want && `${arr}: ${idLabel(want)}`,
+    got && `${server}: ${idLabel(got)}`,
   ]
     .filter(Boolean)
     .join(', ');
+  const film = p.kind === 'movie' && p.reason !== 'differentId';
+  const lengths =
+    p.kind === 'movie' && p.expected.fileRuntime && p.expected.runtime
+      ? `file ${p.expected.fileRuntime} min, film ${p.expected.runtime} min`
+      : '';
+  const rename =
+    film && fileMisnamed(p.expected)
+      ? `rename the file in ${arr} (it is named "${p.expected.file}") so ${server} does not match it wrongly again`
+      : '';
+  const join = (...parts: string[]) => parts.filter(Boolean).join(' · ');
+
+  if (film && fileLooksWrong(p.expected)) {
+    return {
+      title: `${arr}'s file in "${p.folder}" may not be ${titled(p.expected)}`,
+      detail: join(
+        p.reason === 'unmatched'
+          ? `${server} has not matched it`
+          : `${server} matched it to ${titled(p.matched)}${ids ? ` (${ids})` : ''}`,
+        lengths,
+        `Replace it in ${arr} (search for a correct release) rather than fixing the match`
+      ),
+    };
+  }
   if (p.reason === 'unmatched') {
     return {
       title: `${server} has not matched "${p.folder}"`,
-      detail: `${p.expected.server} has ${titled(p.expected)} there · ${fix}`,
+      detail: join(
+        `${arr} has ${titled(p.expected)} there`,
+        lengths,
+        fix,
+        rename
+      ),
     };
   }
   if (p.reason === 'differentId') {
     return {
-      title: `${server} and ${p.expected.server} use different entries for ${titled(p.expected)}`,
-      detail: `The same title by ${p.matched.imdbId && p.matched.imdbId === p.expected.imdbId ? `IMDb (${p.matched.imdbId})` : 'another id'}, but ${ids}, so Seerr's ${server} scan marks ${server}'s entry as in the library rather than the one requested · ${fix}; if ${server} finds nothing, ${p.expected.server}'s entry may be the outdated one`,
+      title: `${server} and ${arr} use different entries for ${titled(p.expected)}`,
+      detail: `The same title by ${p.matched.imdbId && p.matched.imdbId === p.expected.imdbId ? `IMDb (${p.matched.imdbId})` : 'another id'}, but ${ids}, so Seerr's ${server} scan marks ${server}'s entry as in the library rather than the one requested · ${fix}; if ${server} finds nothing, ${arr}'s entry may be the outdated one`,
     };
   }
   return {
     title: sameName(p.matched, p.expected)
       ? `${server} matched "${p.folder}" to a different ${p.kind === 'movie' ? 'film' : 'series'} named ${titled(p.matched)}`
       : `${server} matched "${p.folder}" to ${titled(p.matched)}`,
-    detail: `${p.expected.server} has ${titled(p.expected)} there${ids ? ` (${ids})` : ''} · ${fix}`,
+    detail: join(
+      `${arr} has ${titled(p.expected)} there${ids ? ` (${ids})` : ''}`,
+      lengths,
+      fix,
+      rename
+    ),
   };
 };
 
@@ -1411,6 +1498,30 @@ export const plexMatchText = (
 const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
   const report = await plexMatchCheck.lastReport();
   const items = report.problems.slice(page.skip, page.skip + page.take);
+  const recent = await getRepository(MatchProblem).find({
+    where: { resolvedAt: IsNull() },
+    order: { foundAt: 'DESC' },
+  });
+  const recentMedia = new Map(
+    (
+      await getRepository(Media).find({
+        select: { id: true, tmdbId: true, mediaType: true, foreignId: true },
+        where: {
+          id: In(recent.flatMap((r) => (r.mediaId ? [r.mediaId] : []))),
+        },
+      })
+    ).map((m) => [m.id, m])
+  );
+  // The nightly list may have the same problem: counted once.
+  const nightly = new Set(
+    report.problems.map(
+      (p) => `${p.mediaServer ?? 'Plex'}|${p.folder.toLowerCase()}`
+    )
+  );
+  const newOnes = recent.filter((row) => {
+    const p = JSON.parse(row.problem) as PlexMatchProblem;
+    return !nightly.has(`${row.mediaServer}|${p.folder.toLowerCase()}`);
+  }).length;
   // Sonarr may not know a series' TMDB id; Seerr's own row for it does.
   const byTvdb = new Map(
     (
@@ -1432,10 +1543,27 @@ const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
     group: 'media',
     status: report.error
       ? 'warning'
-      : report.problems.length
+      : report.problems.length || recent.length
         ? 'warning'
         : 'ok',
     count: report.problems.length,
+    recentCount: newOnes,
+    recent: recent.slice(0, ITEM_LIMIT).map((row) => {
+      const p = JSON.parse(row.problem) as PlexMatchProblem;
+      const media = row.mediaId ? recentMedia.get(row.mediaId) : undefined;
+      return {
+        ...plexMatchText(p),
+        at: row.foundAt.toISOString(),
+        href:
+          p.kind === 'music'
+            ? p.expected.mbid
+              ? `/music/album/${p.expected.mbid}`
+              : undefined
+            : media
+              ? `/${media.mediaType}/${media.tmdbId}`
+              : undefined,
+      };
+    }),
     detail: report.error
       ? `The last check could not finish: ${report.error}`
       : report.finishedAt

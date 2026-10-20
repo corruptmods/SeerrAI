@@ -430,3 +430,83 @@ describe('the Anime pages', () => {
     assert.equal(searched.length, 0);
   });
 });
+
+describe('leaving out streaming services', () => {
+  const services = () =>
+    searched.map(
+      ({ kind, watchRegion, watchProviders, excludeWatchProviders }) => ({
+        kind,
+        watchRegion,
+        watchProviders,
+        excludeWatchProviders,
+      })
+    );
+
+  it('asks for films and series not on the services left out', async () => {
+    for (const kind of ['movies', 'tv']) {
+      const res = await get(
+        `/${kind}?watchRegion=US&watchProviders=8&excludeWatchProviders=337|350`
+      );
+      assert.equal(res.status, 200);
+    }
+    assert.deepEqual(services(), [
+      {
+        kind: 'movie',
+        watchRegion: 'US',
+        watchProviders: '8',
+        excludeWatchProviders: '337|350',
+      },
+      {
+        kind: 'tv',
+        watchRegion: 'US',
+        watchProviders: '8',
+        excludeWatchProviders: '337|350',
+      },
+    ]);
+  });
+
+  it('can leave out services without choosing any to show', async () => {
+    // A comma has to be written %2C in an address.
+    const res = await get('/movies?watchRegion=GB&excludeWatchProviders=8%2C9');
+    assert.equal(res.status, 200);
+    assert.deepEqual(services(), [
+      {
+        kind: 'movie',
+        watchRegion: 'GB',
+        watchProviders: undefined,
+        excludeWatchProviders: '8|9',
+      },
+    ]);
+  });
+
+  it('keeps a service that is both shown and left out shown', async () => {
+    await get(
+      '/tv?watchRegion=US&watchProviders=8|9&excludeWatchProviders=9|8'
+    );
+    assert.equal(services()[0].excludeWatchProviders, undefined);
+    await get('/tv?watchRegion=US&watchProviders=8&excludeWatchProviders=8|9');
+    assert.equal(services()[1].excludeWatchProviders, '9');
+  });
+
+  it('leaves nothing out when not asked, as before', async () => {
+    await get('/movies?watchRegion=US&watchProviders=8|9');
+    assert.deepEqual(services(), [
+      {
+        kind: 'movie',
+        watchRegion: 'US',
+        watchProviders: '8|9',
+        excludeWatchProviders: undefined,
+      },
+    ]);
+  });
+
+  it('refuses services that are not TMDB ids', async () => {
+    for (const bad of ['netflix', '8|', '8;9', '-8', '']) {
+      const res = await get(
+        `/movies?watchRegion=US&excludeWatchProviders=${encodeURIComponent(bad)}`
+      );
+      assert.equal(res.status, 400, bad);
+    }
+    assert.equal(searched.length, 0);
+  });
+});

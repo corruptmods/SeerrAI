@@ -17,22 +17,22 @@ const messages = defineMessages('components.RequestModal.QuotaDisplay', {
   allowedRequestsUser:
     'This user is allowed to request <strong>{limit}</strong> {type}{days, plural, =0 {} one { every day} other { every <strong>{days}</strong> days}}.',
   quotaLink:
-    'You can view a summary of your request limits on your <ProfileLink>profile page</ProfileLink>.',
+    'See your request limits on your <ProfileLink>profile page</ProfileLink>.',
   quotaLinkUser:
-    "You can view a summary of this user's request limits on their <ProfileLink>profile page</ProfileLink>.",
+    'See this user’s request limits on their <ProfileLink>profile page</ProfileLink>.',
   movie: 'movie',
   season: 'season',
   album: 'album',
   notenoughseasonrequests: 'Not enough season requests remaining',
   notenoughalbumrequests: 'Not enough album requests remaining',
   requiredquota:
-    'You need to have at least <strong>{seasons}</strong> {seasons, plural, one {season request} other {season requests}} remaining in order to submit a request for this series.',
+    'You need at least <strong>{seasons}</strong> {seasons, plural, one {season request} other {season requests}} left to request this series.',
   requiredquotaUser:
-    'This user needs to have at least <strong>{seasons}</strong> {seasons, plural, one {season request} other {season requests}} remaining in order to submit a request for this series.',
+    'This user needs at least <strong>{seasons}</strong> {seasons, plural, one {season request} other {season requests}} left to request this series.',
   requiredquotaAlbums:
-    'You need to have at least <strong>{albums}</strong> {albums, plural, one {album request} other {album requests}} remaining in order to submit this request.',
+    'You need at least <strong>{albums}</strong> {albums, plural, one {album request} other {album requests}} left for this request.',
   requiredquotaAlbumsUser:
-    'This user needs to have at least <strong>{albums}</strong> {albums, plural, one {album request} other {album requests}} remaining in order to submit this request.',
+    'This user needs at least <strong>{albums}</strong> {albums, plural, one {album request} other {album requests}} left for this request.',
 });
 
 interface QuotaDisplayProps {

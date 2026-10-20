@@ -13,8 +13,7 @@ import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
 const messages = defineMessages('components.Discover.RecentRequestsSlider', {
-  unableToConnect:
-    'Unable to connect to {services}. Some information may be unavailable.',
+  unableToConnect: 'Can’t reach {services}, so some details may be missing.',
 });
 
 const RecentRequestsSlider = () => {

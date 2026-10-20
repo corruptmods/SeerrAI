@@ -18,7 +18,7 @@ import {
   MagnifyingGlassIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
-import type { HealthCheck, HealthStatus } from '@server/lib/health';
+import type { HealthCheck, HealthItem, HealthStatus } from '@server/lib/health';
 import axios from 'axios';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -28,7 +28,7 @@ import useSWR from 'swr';
 const messages = defineMessages('components.Settings.SettingsHealth', {
   health: 'Health',
   healthDescription:
-    'Whether connected services answer, and what has quietly gone wrong with requests, titles and users.',
+    'Whether connected services answer, and what has quietly gone wrong.',
   checkAgain: 'Check Again',
   checking: 'Checking…',
   checkedAt: 'Checked {time}',
@@ -64,7 +64,7 @@ const messages = defineMessages('components.Settings.SettingsHealth', {
   searchAll: 'Search all',
   searchAllConfirm: 'Search all now',
   searchAllExplain:
-    'Searches for every stuck title here that Radarr or Sonarr can act on, not only the ones shown. Each search is a query to your indexers, and many cap how many you can make a day. A season missing entirely is searched as one.',
+    'Searches every stuck title Radarr or Sonarr can act on, not just those shown. Many indexers cap daily searches.',
   searchAllStarted:
     'Searching for {titles, plural, one {# title} other {# titles}} ({episodes, plural, one {# episode or film} other {# episodes and films}}).',
   searchAllStartedWithFailures:
@@ -76,6 +76,13 @@ const messages = defineMessages('components.Settings.SettingsHealth', {
   missingTvdb: 'Requested series with no TVDB id',
   collectionGaps: 'Collections partly in your library',
   plexMatches: 'Folders matched to another title',
+  recentRequests: 'Recent requests',
+  nightlyCheck: 'Nightly check',
+  foundAt: 'Found {time}',
+  checkOnImport: 'Check new requests as they’re imported',
+  checkOnImportTip:
+    'Looks a few minutes after each import and tells admins once (Wrong Match notification).',
+  settingFailed: 'Could not save the setting.',
   plexSignIn: 'Expired Plex sign-ins',
   backfill: 'Backfill',
   backfillSearchErrors: 'Titles Backfill could not search',
@@ -278,6 +285,79 @@ const SearchAll = ({ onDone }: { onDone: () => void }) => {
   );
 };
 
+/**
+ * Match Check's one setting: whether titles just requested and imported
+ * are looked at as they arrive, as well as nightly.
+ */
+const MatchOnImport = () => {
+  const intl = useIntl();
+  const { addToast } = useToasts();
+  const { data, mutate } = useSWR<{ matchCheckOnImport?: boolean }>(
+    '/api/v1/settings/main',
+    { revalidateOnFocus: false }
+  );
+  const [saving, setSaving] = useState(false);
+  const on = data?.matchCheckOnImport !== false;
+
+  return (
+    <div className="flex items-start gap-3 border-b border-gray-700 py-2">
+      <input
+        type="checkbox"
+        id="matchCheckOnImport"
+        className="mt-0.5 flex-none"
+        checked={on}
+        disabled={!data || saving}
+        onChange={async (e) => {
+          const matchCheckOnImport = e.target.checked;
+          setSaving(true);
+          try {
+            await axios.post('/api/v1/settings/main', { matchCheckOnImport });
+            await mutate({ ...data, matchCheckOnImport }, false);
+          } catch {
+            addToast(intl.formatMessage(messages.settingFailed), {
+              appearance: 'error',
+              autoDismiss: true,
+            });
+          } finally {
+            setSaving(false);
+          }
+        }}
+      />
+      <label htmlFor="matchCheckOnImport" className="min-w-0 text-sm">
+        <span className="text-gray-100">
+          {intl.formatMessage(messages.checkOnImport)}
+        </span>
+        <span className="block text-xs text-gray-400">
+          {intl.formatMessage(messages.checkOnImportTip)}
+        </span>
+      </label>
+    </div>
+  );
+};
+
+/** One finding: its title (a link when it has a page) and its detail. */
+const ItemText = ({ item }: { item: HealthItem }) => (
+  <>
+    {item.href ? (
+      <Link
+        href={item.href}
+        className="line-clamp-2 break-words text-gray-100 hover:text-strong hover:underline"
+      >
+        {item.title}
+      </Link>
+    ) : (
+      <span className="line-clamp-3 break-words text-gray-100">
+        {item.title}
+      </span>
+    )}
+    {item.detail && (
+      <span className="mt-0.5 block break-words text-xs text-gray-400">
+        {item.detail}
+      </span>
+    )}
+  </>
+);
+
 const CheckRow = ({
   check,
   checkedAt,
@@ -341,11 +421,16 @@ const CheckRow = ({
         : check.reachable
           ? intl.formatMessage(messages.issues, { count: check.count })
           : intl.formatMessage(messages.unreachable)
-      : check.count > 0
-        ? String(check.count)
+      : check.count + (check.recentCount ?? 0) > 0
+        ? String(check.count + (check.recentCount ?? 0))
         : intl.formatMessage(messages.none);
+  const matchCheck = check.id === 'plexMatches';
+  const recent = check.recent ?? [];
+  // Match Check always opens: its setting is inside.
   const expandable =
-    check.items.length > 0 || (check.status !== 'ok' && !!check.detail);
+    matchCheck ||
+    check.items.length > 0 ||
+    (check.status !== 'ok' && !!check.detail);
 
   const row = (open?: boolean) => (
     <div className="flex w-full items-center space-x-3 px-4 py-3 text-left">
@@ -385,18 +470,52 @@ const CheckRow = ({
               {row(open)}
             </DisclosureButton>
             <DisclosurePanel className="border-t border-gray-700 bg-gray-900/40 px-4 py-2">
-              {(check.group === 'services' || check.id === 'plexMatches') &&
-                check.detail && (
-                  <p
-                    className={`py-1 text-sm ${
-                      check.reachable || check.group !== 'services'
-                        ? 'text-gray-400'
-                        : 'text-red-300'
-                    }`}
-                  >
-                    {check.detail}
-                  </p>
-                )}
+              {matchCheck && <MatchOnImport />}
+              {recent.length > 0 && (
+                <div className="border-b border-gray-700 py-2">
+                  <h5 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    {intl.formatMessage(messages.recentRequests)}
+                  </h5>
+                  <ul>
+                    {recent.map((item, index) => (
+                      <li
+                        key={`${item.at}-${index}`}
+                        className="py-1.5 text-sm"
+                      >
+                        <ItemText item={item} />
+                        {item.at && (
+                          <span className="mt-0.5 block text-xs text-gray-500">
+                            {intl.formatMessage(messages.foundAt, {
+                              time: intl.formatDate(item.at, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              }),
+                            })}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {matchCheck && recent.length > 0 && (
+                <h5 className="pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  {intl.formatMessage(messages.nightlyCheck)}
+                </h5>
+              )}
+              {(check.group === 'services' || matchCheck) && check.detail && (
+                <p
+                  className={`py-1 text-sm ${
+                    check.reachable || check.group !== 'services'
+                      ? 'text-gray-400'
+                      : 'text-red-300'
+                  }`}
+                >
+                  {check.detail}
+                </p>
+              )}
               <ul className={pageLoading ? 'opacity-60' : undefined}>
                 {items.map((item, index) => (
                   <li
@@ -406,23 +525,7 @@ const CheckRow = ({
                     // title to a couple of letters on a phone.
                     className="py-1.5 text-sm"
                   >
-                    {item.href ? (
-                      <Link
-                        href={item.href}
-                        className="line-clamp-2 break-words text-gray-100 hover:text-strong hover:underline"
-                      >
-                        {item.title}
-                      </Link>
-                    ) : (
-                      <span className="line-clamp-3 break-words text-gray-100">
-                        {item.title}
-                      </span>
-                    )}
-                    {item.detail && (
-                      <span className="mt-0.5 block break-words text-xs text-gray-400">
-                        {item.detail}
-                      </span>
-                    )}
+                    <ItemText item={item} />
                     {item.searchable && (
                       <SearchButton
                         mediaId={item.searchable.mediaId}

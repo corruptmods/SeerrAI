@@ -1,10 +1,10 @@
 import { IssueStatus, IssueType } from '@server/constants/issue';
 import { MediaStatus, MediaType } from '@server/constants/media';
 import { declineReasonOf } from '@server/lib/notifications/declineReason';
+import notificationHttp from '@server/lib/notifications/http';
 import type { NotificationAgentWebhook } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
-import axios from 'axios';
 import { get } from 'lodash';
 import { Notification, hasNotificationType } from '..';
 import type { NotificationAgent, NotificationPayload } from './agent';
@@ -278,7 +278,7 @@ class WebhookAgent
         });
       }
 
-      await axios.post(
+      await notificationHttp.post(
         webhookUrl,
         this.buildPayload(type, payload),
         Object.keys(headers).length > 0 ? { headers } : undefined

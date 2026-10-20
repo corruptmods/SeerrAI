@@ -29,7 +29,7 @@ import useSWR, { useSWRConfig } from 'swr';
 const messages = defineMessages('components.Settings.SettingsAi', {
   ai: 'AI',
   description:
-    'A model for the AI features. Each feature sends the model only what it needs, with a small limit on the answer, and repeated questions are answered from memory at no cost. Turn features on or off, for everyone, in Features.',
+    'The model behind the AI features. Each feature sends only what it needs. Turn features on or off in Features.',
   enabled: 'Enable AI Features',
   provider: 'Provider',
   anthropic: 'Claude (Anthropic)',
@@ -37,7 +37,7 @@ const messages = defineMessages('components.Settings.SettingsAi', {
   apiKey: 'API Key',
   apiKeyTip: 'Never shown again once saved.',
   apiKeyAgain:
-    'Enter the key for this provider. A saved key is only used with the provider and address it was saved for.',
+    'Enter this provider’s key. A saved key only works with the provider it was saved for.',
   apiKeyOptional: 'Optional for a server at home.',
   keySaved: 'Key saved',
   keyRemoving: 'Will be removed when you save',
@@ -48,10 +48,10 @@ const messages = defineMessages('components.Settings.SettingsAi', {
   pasteKey: 'Paste the API key',
   baseUrl: 'Server Address',
   baseUrlTip:
-    'Leave empty for OpenAI. For another service or a server at home (Ollama, LM Studio), its OpenAI-compatible address, such as http://your-server:11434/v1. A home server keeps everything in your network.',
+    'Empty for OpenAI. Otherwise an OpenAI-compatible address, such as http://your-server:11434/v1 for Ollama.',
   model: 'Model',
   modelTip:
-    'Used by every feature without its own model below. Smaller models are cheaper and faster, and are enough for most features.',
+    'Used by every feature without its own model. Smaller is cheaper and enough for most.',
   loadModels: 'Reload the Model List',
   chooseModel: 'Choose a model',
   typeModel: 'Type a model name, or add a key to list them',
@@ -59,11 +59,11 @@ const messages = defineMessages('components.Settings.SettingsAi', {
   modelsFailed: 'The model list could not be loaded: {reason}',
   featureModels: 'Model for Each Feature',
   featureModelsTip:
-    'Optional. A cheaper model for simple features, or a stronger one where it matters. Empty uses the model above.',
+    'Optional: a cheaper or stronger model per feature. Empty uses the model above.',
   sameAsAbove: 'Same as above',
   dailyLimit: 'Daily Limit per Person',
   dailyLimitTip:
-    'AI answers each person gets per day. 0 is no limit. Admins are not limited, and answers from memory do not count.',
+    'AI answers per person per day; 0 for no limit. Admins aren’t limited.',
   test: 'Test',
   testOk: '{model} answered.',
   saved: 'AI settings saved.',
@@ -78,7 +78,7 @@ const messages = defineMessages('components.Settings.SettingsAi', {
   aiBackfill: 'Backfill Second Opinion',
   aiAgent: 'Admin Agent',
   privacy:
-    'Titles people have watched are sent to the provider for AI Search, suggestions and picks, but never account names or emails. Issue comments are sent as written. Choose a server at home to keep everything in your network.',
+    'Watched titles and issue comments are sent to the provider; names and emails never are. A home server keeps it all local.',
 });
 
 interface AiSettingsForm {

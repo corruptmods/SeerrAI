@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Musekufro ofgeleent",
   "notifications.events.musicFailed": "Musekufro feelgeschloen",
   "notifications.events.musicPending": "Nei Musekufro",
-  "notifications.events.musicRequestAvailable": "Ugefrot Musek elo disponibel"
+  "notifications.events.musicRequestAvailable": "Ugefrot Musek elo disponibel",
+  "notifications.events.wrongMatch": "Falsch Zouuerdnung"
 }

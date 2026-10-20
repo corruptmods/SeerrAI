@@ -27,11 +27,11 @@ const messages = defineMessages('components.Subtitles.SubtitleSearchModal', {
   asking: 'Asking Bazarr’s providers. This can take up to a minute.',
   none: 'No provider has a subtitle for this.',
   noneTranscribing:
-    'No provider had the missing subtitle, so Whisper is transcribing it from the audio. It shows on the page when it is done.',
+    'No provider had it, so Whisper is transcribing it from the audio.',
   noneQueued:
     'No provider had the missing subtitle. It is already queued to be transcribed from the audio.',
   noneNotMissing:
-    'No provider has another subtitle for this. Nothing was transcribed, since that would replace the one you have. Tap Transcribe to do it anyway.',
+    'No provider has another subtitle. Nothing was transcribed, as it would replace yours; tap Transcribe to do it anyway.',
   noneNotMissingPlain: 'No provider has another subtitle for this.',
   noneUnavailable:
     'No provider has the missing subtitle, and Bazarr has no Whisper to transcribe one.',

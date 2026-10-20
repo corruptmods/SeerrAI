@@ -21,7 +21,7 @@ const messages = defineMessages('components.ResetPassword', {
   validationemailrequired: 'You must provide a valid email address',
   gobacklogin: 'Return to Sign-In Page',
   requestresetlinksuccessmessage:
-    'A password reset link will be sent to the provided email address if it is associated with a valid user.',
+    'If that email belongs to an account, a reset link is on its way.',
 });
 
 const ResetPassword = () => {

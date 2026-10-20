@@ -6,11 +6,11 @@ import {
   escapeMarkdown,
 } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
+import notificationHttp from '@server/lib/notifications/http';
 import { mediaPagePath } from '@server/lib/notifications/mediaPage';
 import type { NotificationAgentGotify } from '@server/lib/settings';
-import { getSettings } from '@server/lib/settings';
+import { GOTIFY_DEFAULT_PRIORITY, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
-import axios from 'axios';
 import { Notification, hasNotificationType } from '..';
 import type { NotificationAgent, NotificationPayload } from './agent';
 import { BaseAgent } from './agent';
@@ -59,7 +59,8 @@ class GotifyAgent
     const intl = getIntl(settings.options.locale);
     const { applicationUrl, applicationTitle } = getSettings().main;
     const embedPoster = settings.embedPoster;
-    const priority = settings.options.priority ?? 1;
+    // The old settings page could save text here, which was kept as nothing.
+    const priority = settings.options.priority ?? GOTIFY_DEFAULT_PRIORITY;
 
     const event = eventText(payload, intl);
     const title = event ? `${event} - ${payload.subject}` : payload.subject;
@@ -167,7 +168,7 @@ class GotifyAgent
       const endpoint = `${settings.options.url}/message?token=${settings.options.token}`;
       const notificationPayload = this.getNotificationPayload(type, payload);
 
-      await axios.post(endpoint, notificationPayload);
+      await notificationHttp.post(endpoint, notificationPayload);
 
       return true;
     } catch (e) {

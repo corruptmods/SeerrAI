@@ -9,8 +9,7 @@ import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Settings.AdvancedSection', {
   advanced: 'Advanced',
-  explain:
-    'Limits and tuning. The defaults suit most servers; change these only for a reason.',
+  explain: 'The defaults suit most servers. Change these only for a reason.',
 });
 
 /**
@@ -24,7 +23,8 @@ const AdvancedSection = ({ children }: { children: React.ReactNode }) => {
       {({ open }) => (
         <>
           <DisclosureButton className="flex w-full items-center justify-between gap-3 rounded-md px-4 py-3 text-left hover:bg-gray-700/40 focus:outline-none focus-visible:bg-gray-700/40">
-            <span>
+            {/* Wraps on a phone rather than pushing the page sideways. */}
+            <span className="min-w-0 whitespace-normal">
               <span className="block text-lg font-semibold text-gray-200">
                 {intl.formatMessage(messages.advanced)}
               </span>

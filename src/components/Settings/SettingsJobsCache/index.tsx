@@ -40,7 +40,7 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     jobsandcache: 'Jobs & Cache',
     jobs: 'Jobs',
     jobsDescription:
-      'Seerr AI performs certain maintenance tasks as regularly-scheduled jobs, but they can also be manually triggered below. Manually running a job will not alter its schedule.',
+      'Scheduled maintenance jobs. Running one now doesn’t change its schedule.',
     jobname: 'Job Name',
     jobtype: 'Type',
     nextexecution: 'Next Execution',
@@ -54,7 +54,7 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     command: 'Command',
     cache: 'Cache',
     cacheDescription:
-      'Seerr AI caches requests to external API endpoints to optimize performance and avoid making unnecessary API calls.',
+      'Answers from outside services, kept to save time and calls.',
     cacheflushed: '{cachename} cache flushed.',
     cacheFlushFailed: '{cachename} cache could not be flushed.',
     cachename: 'Cache Name',
@@ -65,8 +65,7 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     cachevsize: 'Value Size',
     flushcache: 'Flush Cache',
     dnsCache: 'DNS Cache',
-    dnsCacheDescription:
-      'Seerr AI caches DNS lookups to optimize performance and avoid making unnecessary API calls.',
+    dnsCacheDescription: 'DNS lookups, kept to save time and calls.',
     dnscacheflushed: '{hostname} dns cache flushed.',
     dnscachename: 'Hostname',
     dnscacheactiveaddress: 'Active Address',
@@ -75,8 +74,7 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     dnscacheage: 'Age',
     flushdnscache: 'Flush DNS Cache',
     dnsCacheGlobalStats: 'Global DNS Cache Stats',
-    dnsCacheGlobalStatsDescription:
-      'These stats are aggregated across all DNS cache entries.',
+    dnsCacheGlobalStatsDescription: 'Totals across all DNS cache entries.',
     dnsNoCacheEntries: 'No DNS lookups have been cached yet.',
     size: 'Size',
     hits: 'Hits',
@@ -127,7 +125,7 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
       'Every {jobScheduleSeconds, plural, one {second} other {{jobScheduleSeconds} seconds}}',
     imagecache: 'Image Cache',
     imagecacheDescription:
-      'When enabled in settings, Seerr AI will proxy and cache images from pre-configured external sources. Cached images are saved into your config folder. You can find the files in <code>{appDataPath}/cache/images</code>.',
+      'When on, outside images are cached in <code>{appDataPath}/cache/images</code>.',
     imagecachecount: 'Images Cached',
     imagecachesize: 'Total Cache Size',
     imagecachetotal: 'All images',
@@ -415,6 +413,7 @@ const SettingsJobs = () => {
                 <div className="form-input-area">
                   {jobModalState.job?.interval === 'seconds' ? (
                     <select
+                      id="jobSchedule"
                       name="jobScheduleSeconds"
                       className="inline"
                       value={jobModalState.scheduleSeconds}
@@ -438,6 +437,7 @@ const SettingsJobs = () => {
                     </select>
                   ) : jobModalState.job?.interval === 'minutes' ? (
                     <select
+                      id="jobSchedule"
                       name="jobScheduleMinutes"
                       className="inline"
                       value={jobModalState.scheduleMinutes}
@@ -461,6 +461,7 @@ const SettingsJobs = () => {
                     </select>
                   ) : jobModalState.job?.interval === 'days' ? (
                     <select
+                      id="jobSchedule"
                       name="jobScheduleDays"
                       className="inline"
                       value={jobModalState.scheduleDays}
@@ -484,6 +485,7 @@ const SettingsJobs = () => {
                     </select>
                   ) : (
                     <select
+                      id="jobSchedule"
                       name="jobScheduleHours"
                       className="inline"
                       value={jobModalState.scheduleHours}

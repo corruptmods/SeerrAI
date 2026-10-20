@@ -58,8 +58,7 @@ const messages = defineMessages('components.Settings.SonarrModal', {
   animerootfolder: 'Anime Root Folder',
   seasonfolders: 'Season Folders',
   server4k: '4K Server',
-  server4kHelp:
-    'Only if you have a separate 4K instance. Leave unchecked for a single server.',
+  server4kHelp: 'Only for a separate 4K instance.',
   selectQualityProfile: 'Select quality profile',
   selectRootFolder: 'Select root folder',
   selectLanguageProfile: 'Select language profile',
@@ -75,8 +74,7 @@ const messages = defineMessages('components.Settings.SonarrModal', {
   externalUrl: 'External URL',
   enableSearch: 'Enable Automatic Search',
   tagRequests: 'Tag Requests',
-  tagRequestsInfo:
-    "Automatically add an additional tag with the requester's user ID & display name",
+  tagRequestsInfo: 'Tag each title with the requester’s user ID and name',
   validationApplicationUrl: 'You must provide a valid URL',
   validationApplicationUrlTrailingSlash: 'URL must not end in a trailing slash',
   validationBaseUrlLeadingSlash: 'Base URL must have a leading slash',
@@ -87,16 +85,15 @@ const messages = defineMessages('components.Settings.SonarrModal', {
   selecttags: 'Select tags',
   monitorNewItems: 'Monitor New Seasons',
   monitorNewItemsHelp:
-    'Whether Sonarr should monitor (All) or not (None) new seasons when a series is added.',
+    'Whether Sonarr monitors new seasons (All) or not (None).',
   apiKeyHelp: 'Find it in Sonarr: Settings > General > Security > API Key',
   baseUrlHelp:
-    'If you set a URL Base in Sonarr (Settings > General > Host), enter it here (e.g. /sonarr). Leave blank otherwise.',
+    'Only if Sonarr has a URL Base (Settings > General > Host), such as /sonarr.',
   externalUrlHelp:
-    'For clickable links on media pages when the hostname is not reachable from outside your network.',
+    'For links on title pages, if the address above isn’t reachable from outside.',
   syncEnabledHelp:
-    'Scan Sonarr for existing media and request status so users cannot request content already available.',
-  enableSearchHelp:
-    'Automatically trigger a search in Sonarr when a request is approved.',
+    'Mark what Sonarr already has as available, so it isn’t requested again.',
+  enableSearchHelp: 'Search in Sonarr as soon as a request is approved.',
 });
 
 interface SonarrModalProps {
@@ -734,6 +731,7 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
                   </label>
                   <div className="form-input-area">
                     <Select<OptionType, true>
+                      inputId="tags"
                       options={
                         isValidated
                           ? testResponse.tags.map((tag) => ({
@@ -950,11 +948,12 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
                   </div>
                 )}
                 <div className="form-row">
-                  <label htmlFor="tags" className="text-label">
+                  <label htmlFor="animeTags" className="text-label">
                     {intl.formatMessage(messages.animeTags)}
                   </label>
                   <div className="form-input-area">
                     <Select<OptionType, true>
+                      inputId="animeTags"
                       options={
                         isValidated
                           ? testResponse.tags.map((tag) => ({

@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "음악 요청 거절됨",
   "notifications.events.musicFailed": "음악 요청 실패",
   "notifications.events.musicPending": "새 음악 요청",
-  "notifications.events.musicRequestAvailable": "요청한 음악 이제 이용 가능"
+  "notifications.events.musicRequestAvailable": "요청한 음악 이제 이용 가능",
+  "notifications.events.wrongMatch": "잘못된 일치"
 }

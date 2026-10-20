@@ -12,7 +12,7 @@ import { useIntl } from 'react-intl';
 const messages = defineMessages('components.Backfill.Agent.ProposalCard', {
   proposalTitle: 'Waiting for your approval',
   proposalIntro:
-    'Nothing below has been done. Approve to have it done now, each checked again first; decline and nothing changes.',
+    'Nothing below has been done yet. Approve to do it now, or decline to change nothing.',
   approve: 'Approve',
   approveDelete: 'Approve and delete',
   confirmApprove: 'Delete for good?',

@@ -3,11 +3,11 @@ import { getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
 import { declineReasonOf } from '@server/lib/notifications/declineReason';
 import { eventText } from '@server/lib/notifications/eventTitles';
+import notificationHttp from '@server/lib/notifications/http';
 import { mediaPagePath } from '@server/lib/notifications/mediaPage';
 import type { NotificationAgentSlack } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
-import axios from 'axios';
 import { Notification, hasNotificationType } from '..';
 import type { NotificationAgent, NotificationPayload } from './agent';
 import { BaseAgent } from './agent';
@@ -271,7 +271,7 @@ class SlackAgent
       subject: payload.subject,
     });
     try {
-      await axios.post(
+      await notificationHttp.post(
         settings.options.webhookUrl,
         this.buildEmbed(type, payload)
       );

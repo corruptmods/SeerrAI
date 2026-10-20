@@ -6,6 +6,7 @@ import { UserPushSubscription } from '@server/entity/UserPushSubscription';
 import { defineMessages, getIntl } from '@server/i18n';
 import globalMessages from '@server/i18n/globalMessages';
 import { declineReasonOf } from '@server/lib/notifications/declineReason';
+import { NOTIFICATION_TIMEOUT_MS } from '@server/lib/notifications/http';
 import { mediaPagePath } from '@server/lib/notifications/mediaPage';
 import { isPushServiceEndpoint } from '@server/lib/pushEndpoint';
 import type { NotificationAgentConfig } from '@server/lib/settings';
@@ -123,6 +124,7 @@ const WEB_PUSH_NOTIFICATION_TYPES: number[] = [
   Notification.PLEX_REAUTH,
   Notification.BACKFILL,
   Notification.HEALTH,
+  Notification.WRONG_MATCH,
   Notification.TEST_NOTIFICATION,
 ];
 
@@ -193,6 +195,7 @@ class WebPushAgent
       // Backfill supplies its own sentence and the page to open.
       case Notification.BACKFILL:
       case Notification.HEALTH:
+      case Notification.WRONG_MATCH:
         message = payload.message;
         break;
       case Notification.MEDIA_AUTO_REQUESTED:
@@ -420,7 +423,9 @@ class WebPushAgent
               p256dh: pushSub.p256dh,
             },
           },
-          notificationPayload
+          notificationPayload,
+          // Gives up on a push service that stops answering.
+          { timeout: NOTIFICATION_TIMEOUT_MS }
         );
       } catch (e) {
         const webPushError = e as WebPushError;

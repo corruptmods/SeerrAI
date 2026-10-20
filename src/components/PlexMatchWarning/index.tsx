@@ -1,40 +1,53 @@
 import defineMessages from '@app/utils/defineMessages';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import type { PlexMatchProblem } from '@server/lib/plexMatchCheck';
-import { mainId, sameName } from '@server/utils/plexMatch';
+import {
+  comparedIds,
+  fileLooksWrong,
+  fileMisnamed,
+  fixSearch,
+  idLabel,
+  sameName,
+} from '@server/utils/plexMatch';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
 const messages = defineMessages('components.PlexMatchWarning', {
   title: '{mediaServer}’s match needs fixing',
+  fileTitle: '{server}’s file may be the wrong film',
   other:
-    '{mediaServer} matched the folder “{folder}”, where {server} has {expected}, to {plex}. Until the match is fixed, Seerr AI can show the wrong title as available, and episodes and subtitles can be wrong.',
+    '{mediaServer} matched “{folder}” to {plex}, but {server} has {expected} there. Until fixed, the wrong title may show as available.',
   otherSameName:
-    '{mediaServer} matched the folder “{folder}”, where {server} has {expected}, to a different title with the same name ({ids}). Until the match is fixed, Seerr AI can show the wrong title as available, and episodes and subtitles can be wrong.',
+    '{mediaServer} matched “{folder}” to a different title with the same name ({ids}), but {server} has {expected} there. Until fixed, the wrong title may show as available.',
   differentId:
-    '{mediaServer} and {server} have the same title in the folder “{folder}”, but use different entries for it ({ids}), so Seerr AI marks {mediaServer}’s entry as in the library rather than this one.',
+    '{mediaServer} and {server} use different entries for “{folder}” ({ids}), so {mediaServer}’s shows as available, not this one.',
   unmatched:
-    '{mediaServer} has not matched the folder “{folder}”, where {server} has {expected}, to any title, so Seerr AI cannot see it in the library.',
+    '{mediaServer} hasn’t matched “{folder}”, where {server} has {expected}, so it isn’t seen as in the library.',
   thisOne:
-    '{mediaServer} matched the folder “{folder}” to this title, but {server} has {expected} there. This title may show as available when it is not.',
-  fix: 'In Plex, open it, choose Fix Match and pick {expected}. The nightly Match Check clears this once it agrees.',
+    '{mediaServer} matched “{folder}” to this title, but {server} has {expected} there, so it may wrongly show as available.',
+  fix: 'In Plex, choose Fix Match and pick {expected}. This clears after the next Match Check.',
   fixById:
-    'In Plex, open it, choose Fix Match and search for {search} to find exactly this title. The nightly Match Check clears this once it agrees.',
+    'In Plex, choose Fix Match and search for {search}. This clears after the next Match Check.',
   fixDifferentId:
-    'In Plex, open it, choose Fix Match and search for {search}. If Plex finds nothing, {server}’s entry may be the outdated one. The nightly Match Check clears this once they agree.',
+    'In Plex, choose Fix Match and search for {search}. If nothing’s found, {server}’s entry may be outdated.',
   identify:
-    'In {mediaServer}, open it, choose Identify and pick {expected}. The nightly Match Check clears this once it agrees.',
+    'In {mediaServer}, choose Identify and pick {expected}. This clears after the next Match Check.',
   identifyById:
-    'In {mediaServer}, open it, choose Identify and enter {idName} id {id} to find exactly this title. The nightly Match Check clears this once it agrees.',
+    'In {mediaServer}, choose Identify and enter {idName} id {id}. This clears after the next Match Check.',
   identifyDifferentId:
-    'In {mediaServer}, open it, choose Identify and enter {idName} id {id}. If {mediaServer} finds nothing, {server}’s entry may be the outdated one. The nightly Match Check clears this once they agree.',
+    'In {mediaServer}, choose Identify and enter {idName} id {id}. If nothing’s found, {server}’s entry may be outdated.',
+  fixByIdAlt:
+    'In Plex, choose Fix Match and search for {search} or {alt}. This clears after the next Match Check.',
+  identifyByIdAlt:
+    'In {mediaServer}, choose Identify and enter {idName} id {id} or IMDb id {alt}. This clears after the next Match Check.',
+  fileWrong:
+    '{server}’s file may not be {expected}: it runs {file} min, the movie {film} min. Replace the file in {server}; don’t fix the match.',
+  rename:
+    'Also rename “{name}” in {server}, or {mediaServer} may mismatch it again.',
 });
 
 const named = (t: { title: string; year?: number }) =>
   t.year ? `${t.title} (${t.year})` : t.title;
-
-const label = (m?: { name: string; id: number }) =>
-  m ? `${m.name.toUpperCase()} ${m.id}` : undefined;
 
 /** One server's problem with this title, as a warning. */
 const MatchProblem = ({
@@ -54,24 +67,44 @@ const MatchProblem = ({
   const isServerSide =
     problem.expected.tmdbId !== tmdbId &&
     (!tvdbId || problem.expected.tvdbId !== tvdbId);
-  const want = mainId(problem.kind, problem.expected);
-  const got = mainId(problem.kind, problem.matched);
+  // The ids the two sides were told apart by, so a server with only an
+  // IMDb id shows it; the IMDb id is offered as a second search then.
+  const { want: shown, got } = comparedIds(
+    problem.kind,
+    problem.expected,
+    problem.matched
+  );
+  const { want, also } = fixSearch(problem.kind, problem.expected);
+  const alt = shown?.name === 'imdb' ? also : undefined;
   const values = {
     folder: problem.folder,
     server: problem.expected.server,
     expected: named(problem.expected),
     plex: named(problem.matched),
     mediaServer,
-    idName: want?.name.toUpperCase() ?? '',
+    idName: want
+      ? want.name === 'imdb'
+        ? 'IMDb'
+        : want.name.toUpperCase()
+      : '',
     id: want?.id ?? '',
     ids: [
-      want && `${problem.expected.server}: ${label(want)}`,
-      got && `${mediaServer}: ${label(got)}`,
+      shown && `${problem.expected.server}: ${idLabel(shown)}`,
+      got && `${mediaServer}: ${idLabel(got)}`,
     ]
       .filter(Boolean)
       .join(', '),
     search: want ? `${want.name}-${want.id}` : '',
+    alt: alt ? (mediaServer === 'Plex' ? `${alt.name}-${alt.id}` : alt.id) : '',
+    file: problem.expected.fileRuntime ?? '',
+    film: problem.expected.runtime ?? '',
+    name: problem.expected.file ?? '',
   };
+  // A film whose file is far off its length: likely another film, which
+  // fixing the match would only hide.
+  const film = problem.kind === 'movie' && problem.reason !== 'differentId';
+  const wrongFile = film && !isServerSide && fileLooksWrong(problem.expected);
+  const misnamed = film && !wrongFile && fileMisnamed(problem.expected);
   const text = isServerSide
     ? messages.thisOne
     : problem.reason === 'unmatched'
@@ -82,23 +115,31 @@ const MatchProblem = ({
           ? messages.otherSameName
           : messages.other;
   const plex = mediaServer === 'Plex';
-  const fix = !want
-    ? plex
-      ? messages.fix
-      : messages.identify
-    : problem.reason === 'differentId'
+  const fix = wrongFile
+    ? messages.fileWrong
+    : !want
       ? plex
-        ? messages.fixDifferentId
-        : messages.identifyDifferentId
-      : plex
-        ? messages.fixById
-        : messages.identifyById;
+        ? messages.fix
+        : messages.identify
+      : problem.reason === 'differentId'
+        ? plex
+          ? messages.fixDifferentId
+          : messages.identifyDifferentId
+        : alt
+          ? plex
+            ? messages.fixByIdAlt
+            : messages.identifyByIdAlt
+          : plex
+            ? messages.fixById
+            : messages.identifyById;
 
   return (
     <section className="mb-6 rounded-lg bg-yellow-900/30 p-4 ring-1 ring-yellow-600/60 light:bg-warning-soft/20 light:ring-warning">
       <h3 className="flex items-center gap-2 font-semibold text-yellow-200 light:text-warning-text">
         <ExclamationTriangleIcon className="h-5 w-5 flex-none" />
-        {intl.formatMessage(messages.title, { mediaServer })}
+        {wrongFile
+          ? intl.formatMessage(messages.fileTitle, values)
+          : intl.formatMessage(messages.title, { mediaServer })}
       </h3>
       <p className="mt-2 text-sm text-yellow-100/90 light:text-warning-text">
         {intl.formatMessage(text, values)}
@@ -106,6 +147,11 @@ const MatchProblem = ({
       <p className="mt-2 text-sm text-yellow-100/70 light:text-default">
         {intl.formatMessage(fix, values)}
       </p>
+      {misnamed && (
+        <p className="mt-2 text-sm text-yellow-100/70 light:text-default">
+          {intl.formatMessage(messages.rename, values)}
+        </p>
+      )}
     </section>
   );
 };

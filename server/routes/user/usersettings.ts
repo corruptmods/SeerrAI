@@ -1,6 +1,17 @@
 import type { JellyfinLoginResponse } from '@server/api/jellyfin';
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
+import type {
+  ApiKeyCreatedResponse,
+  ApiKeyLifetime,
+  ApiKeyListResponse,
+} from '@server/constants/apiKeys';
+import {
+  API_KEY_LIFETIMES,
+  DEFAULT_API_KEY_LIFETIME,
+  MAX_API_KEYS_PER_PERSON,
+  MAX_API_KEY_NAME_LENGTH,
+} from '@server/constants/apiKeys';
 import { ApiErrorCode } from '@server/constants/error';
 import {
   cleanNavHidden,
@@ -13,6 +24,7 @@ import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
 import OidcLink from '@server/entity/OidcLink';
 import { User } from '@server/entity/User';
+import UserApiKey from '@server/entity/UserApiKey';
 import UserPasskey from '@server/entity/UserPasskey';
 import { UserSettings } from '@server/entity/UserSettings';
 import type {
@@ -42,9 +54,16 @@ import {
   primaryServer,
   serverName,
 } from '@server/lib/mediaServers';
+import { Notification } from '@server/lib/notifications';
 import { linkUsable, usableProviderLinks } from '@server/lib/oidc';
 import { passkeySummary } from '@server/lib/passkeys';
 import { Permission } from '@server/lib/permissions';
+import {
+  apiKeyStatus,
+  expiresAtFor,
+  keySummary,
+  makeKey,
+} from '@server/lib/personalApiKeys';
 import { cleanSeasonNote, seasonNoteValue } from '@server/lib/seasons';
 import { getSettings } from '@server/lib/settings';
 import { endSessions } from '@server/lib/signIn';
@@ -60,7 +79,7 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import gravatarUrl from 'gravatar-url';
 import net from 'net';
-import { Not } from 'typeorm';
+import { IsNull, LessThan, MoreThan, Not } from 'typeorm';
 import { canMakePermissionsChange } from '.';
 import personalCssRoutes from './customCss';
 
@@ -906,9 +925,11 @@ userSettingsRoutes.get<{ id: string }, UserSettingsNotificationsResponse>(
         pgpKey: user.settings?.pgpKey,
         discordEnabled:
           settings?.discord.enabled && settings.discord.options.enableMentions,
+        // Discord only posts to the channel, mentioning people there, and
+        // list activity never goes to a channel: it can't reach anyone here.
         discordEnabledTypes:
           settings?.discord.enabled && settings.discord.options.enableMentions
-            ? settings.discord.types
+            ? (settings.discord.types ?? 0) & ~Notification.LIST_ACTIVITY
             : 0,
         discordIds: user.settings?.discordIds ?? [],
         pushbulletAccessToken: user.settings?.pushbulletAccessToken,
@@ -1509,6 +1530,186 @@ userSettingsRoutes.delete<{ id: string; passkeyId: string }>(
         userId: user.id,
         passkeyId: Number(req.params.passkeyId),
         removedBy: req.user?.id,
+      });
+      return res.status(204).send();
+    } catch (e) {
+      return next({ status: 500, message: e.message });
+    }
+  }
+);
+
+/*
+ * Personal API keys (lib/personalApiKeys). Each person makes and revokes
+ * their own, once an admin lets them (Settings → Users). Someone who
+ * manages users can see another person's keys and revoke them, but never
+ * see a key itself, which nobody can after it is made; as with passkeys,
+ * only the owner touches the owner's, or another admin's.
+ */
+const apiKeyOwner = async (
+  req: Request<{ id: string }>
+): Promise<User | { status: number; message: string }> => {
+  const user = await getRepository(User).findOne({
+    where: { id: Number(req.params.id) },
+  });
+  if (!user) {
+    return { status: 404, message: 'User not found.' };
+  }
+  if (
+    req.user?.id !== user.id &&
+    !(
+      req.user?.hasPermission(Permission.MANAGE_USERS) &&
+      mayManageUser(req.user, user)
+    )
+  ) {
+    return {
+      status: 403,
+      message: "You do not have permission to manage this user's API keys.",
+    };
+  }
+  return user;
+};
+
+userSettingsRoutes.get<{ id: string }, ApiKeyListResponse>(
+  '/api-keys',
+  async (req, res, next) => {
+    try {
+      const user = await apiKeyOwner(req);
+      if (!(user instanceof User)) {
+        return next(user);
+      }
+      const keys = await getRepository(UserApiKey).find({
+        where: { userId: user.id },
+        order: { createdAt: 'ASC', id: 'ASC' },
+      });
+      return res.status(200).json({
+        keys: keys.map(keySummary),
+        status: apiKeyStatus(user),
+        limit: MAX_API_KEYS_PER_PERSON,
+      });
+    } catch (e) {
+      return next({ status: 500, message: e.message });
+    }
+  }
+);
+
+userSettingsRoutes.post<
+  { id: string },
+  ApiKeyCreatedResponse,
+  { name?: unknown; expiresInDays?: unknown }
+>('/api-keys', isOwnProfile(), async (req, res, next) => {
+  const user = req.user as User;
+  // Made by the person, signed in: a key, which might have leaked, can't
+  // make itself a successor, and nor can the server's key acting for them.
+  if (req.authMethod !== 'session') {
+    return next({
+      status: 403,
+      message: 'API keys can only be made while signed in, not with a key.',
+    });
+  }
+  const status = apiKeyStatus(user);
+  if (status !== 'on') {
+    return next({
+      status: 403,
+      message:
+        status === 'off'
+          ? 'Personal API keys are turned off on this server.'
+          : 'Only admins and people who manage users may make API keys.',
+    });
+  }
+
+  const name =
+    typeof req.body.name === 'string' ? req.body.name.trim() : undefined;
+  if (!name || name.length > MAX_API_KEY_NAME_LENGTH) {
+    return next({
+      status: 400,
+      message: `Give the key a name of up to ${MAX_API_KEY_NAME_LENGTH} characters.`,
+    });
+  }
+  const lifetime =
+    req.body.expiresInDays === undefined
+      ? DEFAULT_API_KEY_LIFETIME
+      : req.body.expiresInDays;
+  if (!API_KEY_LIFETIMES.includes(lifetime as ApiKeyLifetime)) {
+    return next({
+      status: 400,
+      message: 'A key lasts 30 days, 90 days, a year, or never expires.',
+    });
+  }
+
+  try {
+    const repository = getRepository(UserApiKey);
+    const now = new Date();
+    // Keys that expired a month ago or more are cleared away, so expired
+    // ones don't pile up in the list.
+    await repository.delete({
+      userId: user.id,
+      expiresAt: LessThan(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)),
+    });
+    const live = await repository.count({
+      where: [
+        { userId: user.id, expiresAt: IsNull() },
+        { userId: user.id, expiresAt: MoreThan(now) },
+      ],
+    });
+    if (live >= MAX_API_KEYS_PER_PERSON) {
+      return next({
+        status: 400,
+        message: `You can have up to ${MAX_API_KEYS_PER_PERSON} API keys. Revoke one you no longer use first.`,
+      });
+    }
+
+    let made = makeKey();
+    // The visible id is random; on the rare clash, roll again.
+    while (await repository.exists({ where: { publicId: made.publicId } })) {
+      made = makeKey();
+    }
+    const saved = await repository.save(
+      new UserApiKey({
+        userId: user.id,
+        publicId: made.publicId,
+        secretHash: made.secretHash,
+        name,
+        createdAt: now,
+        expiresAt: expiresAtFor(lifetime as ApiKeyLifetime, now),
+      })
+    );
+    logger.info('Personal API key created', {
+      label: 'API Key',
+      userId: user.id,
+      keyId: saved.id,
+      publicId: saved.publicId,
+      name,
+      expiresAt: saved.expiresAt?.toISOString() ?? 'never',
+    });
+    return res.status(201).json({ key: keySummary(saved), secret: made.key });
+  } catch (e) {
+    return next({ status: 500, message: e.message });
+  }
+});
+
+userSettingsRoutes.delete<{ id: string; keyId: string }>(
+  '/api-keys/:keyId',
+  async (req, res, next) => {
+    try {
+      const user = await apiKeyOwner(req);
+      if (!(user instanceof User)) {
+        return next(user);
+      }
+      const repository = getRepository(UserApiKey);
+      const key = await repository.findOne({
+        where: { id: Number(req.params.keyId), userId: user.id },
+      });
+      if (!key) {
+        return next({ status: 404, message: 'API key not found.' });
+      }
+      await repository.delete(key.id);
+      logger.info('Personal API key revoked', {
+        label: 'API Key',
+        userId: user.id,
+        keyId: key.id,
+        publicId: key.publicId,
+        name: key.name,
+        revokedBy: req.user?.id,
       });
       return res.status(204).send();
     } catch (e) {

@@ -18,7 +18,7 @@ const messages = defineMessages('components.Settings.Notifications', {
   embedPoster: 'Embed Poster',
   botUsername: 'Bot Username',
   botUsernameTip:
-    'Allow users to also start a chat with your bot and configure their own notifications',
+    'Lets people chat with your bot to set up their own notifications',
   botAPI: 'Bot Authorization Token',
   botApiTip:
     '<CreateBotLink>Create a bot</CreateBotLink> for use with Seerr AI',
@@ -26,8 +26,7 @@ const messages = defineMessages('components.Settings.Notifications', {
   chatIdTip:
     'Start a chat with your bot, add <GetIdBotLink>@get_id_bot</GetIdBotLink>, and issue the <code>/my_id</code> command',
   messageThreadId: 'Thread/Topic ID',
-  messageThreadIdTip:
-    "If your group-chat has topics enabled, you can specify a thread/topic's ID here",
+  messageThreadIdTip: 'For a group chat with topics: the topic’s ID',
   validationBotAPIRequired: 'You must provide a bot authorization token',
   validationChatIdRequired: 'You must provide a valid chat ID',
   validationMessageThreadId:

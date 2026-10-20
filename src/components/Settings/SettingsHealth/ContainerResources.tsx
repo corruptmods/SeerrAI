@@ -27,7 +27,7 @@ const messages = defineMessages(
     lastHour: 'Last hour',
     lastDay: 'Last 24 hours',
     notContainer:
-      'Seerr AI is not running in a container here, so only its own process is shown.',
+      'Not running in a container, so only Seerr AI’s own process is shown.',
     cpuChart: 'CPU use over time',
     memoryChart: 'Memory use over time',
     limit: 'limit',

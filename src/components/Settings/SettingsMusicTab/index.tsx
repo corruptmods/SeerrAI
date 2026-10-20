@@ -31,20 +31,18 @@ import * as Yup from 'yup';
 
 const messages = defineMessages('components.Settings.SettingsMusicTab', {
   music: 'Music',
-  description:
-    'Music in one place: whether it is on, how people search for it, where it comes from, and where the rest of its settings are.',
+  description: 'Everything about music in one place.',
   addLidarr: 'Add Lidarr under Services to start.',
   addLidarrTip:
     'Music appears for everyone once a Lidarr server is added and made the default.',
   openServices: 'Open Services',
   search: 'Search',
   searchDescription:
-    'While music is on, search results have Music beside All, Movies and Series, and the Music page has its own search box. Anyone who turned music off for themselves sees none of it.',
+    'Search gets a Music tab, and the Music page its own search box. Hidden for anyone who turned music off.',
   inAll: 'Include Music in All Search Results',
   inAllTip:
-    'A row of artists and a row of albums below the films, series, collections and people, loaded after them so they never slow them down',
-  offForEveryone:
-    'Music is off for everyone. Turn it on to choose how it is searched and where it comes from.',
+    'Artist and album rows below the other results, loaded last so they never slow them down',
+  offForEveryone: 'Music is off for everyone. Turn it on to set it up.',
   metadata: 'Where Music Comes From',
   whereItLives: 'Where It Lives',
   whereItLivesDescription:
@@ -63,8 +61,7 @@ const messages = defineMessages('components.Settings.SettingsMusicTab', {
     'How many albums each person may request, like seasons for series.',
   discoverRows: 'Music on Discover',
   discoverRowsWhere: 'Discover → Customize Discover',
-  discoverRowsTip:
-    'The Recently Added Music, New Music, Popular Albums and Popular Artists rows, moved or hidden like any row.',
+  discoverRowsTip: 'The music rows on Discover, moved or hidden like any row.',
   loadFailed: 'Music settings could not be loaded.',
 });
 

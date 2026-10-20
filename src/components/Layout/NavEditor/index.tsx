@@ -23,9 +23,9 @@ import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Layout.NavEditor', {
   arrange: 'Arrange your menu',
-  tip: 'Drag an item, or use its arrows, to move it. Hide the ones you don’t use.',
+  tip: 'Drag or use the arrows to reorder; hide what you don’t use.',
   phoneTip:
-    'Drag an item, or use its arrows, to move it. Hide the ones you don’t use. The first {count} shown go on the bar at the bottom of the screen.',
+    'Drag or use the arrows to reorder; hide what you don’t use. The first {count} go in the bottom bar.',
   onBar: 'On the bar',
   inMenu: 'In the menu',
   moveUp: 'Move {item} up',

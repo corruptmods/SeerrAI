@@ -26,22 +26,20 @@ import useSWR from 'swr';
 export const messages = defineMessages('components.Backfill.Agent', {
   agent: 'Admin agent',
   description:
-    'An AI that works like you would: it reads why releases were turned down, tries other searches, opens packs to check their files, and downloads only what is missing.',
+    'An AI that digs deeper: it tries other searches, checks pack contents and downloads only what’s missing.',
   placeholder: 'Ask it to find something: “Get the missing Casper episodes”',
   placeholderShort: 'Ask it to find something',
   ask: 'Ask',
   asking: 'Starting…',
   askFailed: 'The agent could not start.',
   autoOn:
-    'It also steps in on its own when Backfill finds nothing for a requested title, or for a title reported missing.',
+    'It also steps in when Backfill finds nothing for a requested or reported title.',
   autoOff: 'It only works when asked; running on its own is off in Settings.',
   settings: 'Settings',
   allRuns: 'All runs',
-  noRuns:
-    'Nothing yet. Ask it something, or it starts on its own when Backfill comes up empty.',
+  noRuns: 'Nothing yet. Ask it something to get started.',
   held: 'Waiting on the search',
-  heldNote:
-    "It looks once Sonarr's or Radarr's search and Backfill's are over, if they found nothing.",
+  heldNote: 'It starts if Sonarr, Radarr and Backfill find nothing.',
   reportedBy: 'Reported by {name}',
   queued: 'Waiting',
   running: 'Working',
@@ -58,9 +56,9 @@ export const messages = defineMessages('components.Backfill.Agent', {
   working: 'Working on it…',
   forTitle: 'Ask the admin agent',
   autoRan:
-    'It looked for this on its own on {date}. It does that only once per title; from now on it looks only when an admin asks. Sonarr, Radarr and Backfill’s own search keep going without it.',
+    'It looked for this on its own on {date}, which it does once per title. Now it looks only when asked.',
   forTitleTip:
-    'It looks further than Sonarr and Radarr: other searches, packs and collections, checking each file and the language. Left empty, it gets whatever is missing.',
+    'It looks further than Sonarr and Radarr. Left empty, it gets whatever is missing.',
   titlePlaceholder: 'What to do (optional)',
   earlier: 'Earlier conversations',
   allConversations: 'All conversations',

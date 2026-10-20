@@ -1,3 +1,4 @@
+import { NOTIFICATION_TIMEOUT_MS } from '@server/lib/notifications/http';
 import ExternalAPI from './externalapi';
 
 interface PushoverSoundsResponse {
@@ -34,6 +35,7 @@ class PushoverAPI extends ExternalAPI {
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
+        timeout: NOTIFICATION_TIMEOUT_MS,
       }
     );
   }

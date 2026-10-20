@@ -7,8 +7,7 @@ import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Common.FeatureSwitches', {
   suggestedForYou: 'Suggested for You',
-  suggestedForYouTip:
-    'A row and page on Discover of titles picked from what you have watched',
+  suggestedForYouTip: 'A Discover row and page picked from what you’ve watched',
   deletingSoon: 'Deleting Soon',
   deletingSoonTip:
     'The row, poster badges and Keep button for titles Maintainerr is about to remove',
@@ -21,7 +20,7 @@ const messages = defineMessages('components.Common.FeatureSwitches', {
   whoWatchedTip: 'Who has watched a title, on its page (admins only)',
   newSeasons: 'Get New Seasons',
   newSeasonsTip:
-    'The series page button that requests each new season as it premieres. Off pauses any series already followed',
+    'A series page button that requests each new season as it premieres. Off pauses followed series',
   watchSuggestions: 'Finished Watching?',
   watchSuggestionsTip:
     'Offers to remove titles from a watch list once everyone on it has watched them',
@@ -29,46 +28,45 @@ const messages = defineMessages('components.Common.FeatureSwitches', {
   passkeyPromptTip:
     'The banner asking to add a passkey. Signing in with passkeys is unaffected',
   subtitles: 'Subtitles',
-  subtitlesTip:
-    'The Subtitles panel on title pages and the subtitle tag on each episode, read from Bazarr',
+  subtitlesTip: 'Subtitles on title pages and episodes, from Bazarr',
   autoFix: 'Fix Reported Problems',
   autoFixTip:
-    'Acts on a reported issue or an AI Search request at once: finds or transcribes subtitles, searches for missing episodes, replaces a broken or wrong file with another release, and comments on the issue with what it did',
+    'Fixes reported issues right away: subtitles, missing episodes, broken or wrong files. Comments with what it did',
   music: 'Music',
   musicTip:
     'Music in search, Discover and its own pages, and requesting albums through Lidarr',
   offForEveryone: 'Turned off for everyone by an admin',
   ai: 'AI',
   aiDescription:
-    'Features that use the AI model set up in Settings → AI. Each sends the model only what that answer needs.',
+    'Use the AI model from Settings → AI. Each sends only what it needs.',
   aiNotSetUp: 'Set up a model in Settings → AI to use these.',
   aiChat: 'AI Search',
   aiChatTip:
-    'The AI button beside the search box: describe a title, or ask for something, and get matches to open or request. Sends your message and titles you recently watched',
+    'The AI button by the search box: describe what you want. Sends your message and recently watched titles',
   aiReasons: 'Why These Suggestions',
   aiReasonsTip:
-    'Explains each title on the Suggested for You page. Sends titles you recently watched and the suggested titles',
+    'Says why each title is on Suggested for You. Sends your recent watches and the suggestions',
   aiPicker: 'Pick for the Room',
   aiPickerTip:
-    'Picks three titles a group would enjoy together. Only people you share a watch list with can include you, and off leaves you out. Sends titles each person recently watched, never names',
+    'Picks three titles for a group. Off leaves you out of others’ picks. Sends recent watches, never names',
   aiRecap: 'Catch Me Up',
   aiRecapTip:
-    'A spoiler-free recap on series pages, up to where you are. Sends the series’ episode summaries up to that point',
+    'A spoiler-free recap on series pages, up to where you are. Sends episode summaries',
   aiDeletionReview: 'Review Deletions',
   aiDeletionReviewTip:
-    'Flags titles Maintainerr is about to delete that may be a mistake (request managers). Sends titles and viewing counts, never names',
+    'Flags Maintainerr deletions that may be a mistake (request managers). Sends titles and view counts, never names',
   aiIssueTriage: 'Suggest Issue Fixes',
   aiIssueTriageTip:
-    'A likely cause and fix on each reported issue (issue managers). Sends the issue and its comments',
+    'Likely cause and fix on each issue (issue managers). Sends the issue and comments',
   aiLogs: 'Explain Logs',
   aiLogsTip:
     'Explains log entries in plain English (admins). Keys, tokens and emails are removed first',
   aiBackfill: 'Backfill Second Opinion',
   aiBackfillTip:
-    'Matches pack files whose names do not say which episode they are, for an admin to check before approving. Sends the series, its episode titles and the file names',
+    'Places pack files with unclear names, for an admin to check. Sends the series, episode titles and file names',
   aiAgent: 'Admin Agent',
   aiAgentTip:
-    'Looks further when Backfill finds nothing for a requested title, and finds things when an admin asks, starting downloads within its limits. Sends titles, episode lists and release names',
+    'Finds what Backfill can’t, on its own or when an admin asks. Sends titles, episode lists and release names',
 });
 
 interface FeatureSwitchesProps {

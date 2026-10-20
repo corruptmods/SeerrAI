@@ -57,31 +57,28 @@ describe('the seasons a server runs', () => {
       .send({
         seasons: {
           halloween: { enabled: false, start: '10-24', end: '11-01' },
-          diwali: { enabled: true },
-          pride: { enabled: true, start: '06-01', end: '06-30' },
+          lunarnewyear: { enabled: true },
         },
       });
     assert.equal(res.status, 200);
     const saved = {
       ...SEASON_DEFAULTS,
       halloween: { enabled: false, start: '10-24', end: '11-01' },
-      diwali: { enabled: true },
-      pride: { enabled: true, start: '06-01', end: '06-30' },
+      lunarnewyear: { enabled: true },
     };
     assert.deepEqual(res.body, { seasons: saved });
     assert.deepEqual(getSettings().appearance.seasons, saved);
     assert.deepEqual(getSettings().fullPublicSettings.seasons, [
       { id: 'holidays', start: '12-01', end: '12-28' },
       { id: 'newyear', start: '12-29', end: '01-02' },
-      { id: 'diwali' },
-      { id: 'pride', start: '06-01', end: '06-30' },
+      { id: 'lunarnewyear' },
     ]);
   });
 
   it('keep the seasons a save leaves out as they were', async () => {
     getSettings().appearance.seasons = {
       ...SEASON_DEFAULTS,
-      pride: { enabled: true, start: '06-01', end: '06-30' },
+      lunarnewyear: { enabled: true, start: '02-01', end: '02-07' },
     };
     const res = await request(app)
       .post('/api/v1/settings/appearance/seasons')
@@ -94,7 +91,7 @@ describe('the seasons a server runs', () => {
         seasons: { holidays: { enabled: false, start: '12-01', end: '12-28' } },
       });
     assert.equal(ok.status, 200);
-    assert.equal(ok.body.seasons.pride.enabled, true);
+    assert.equal(ok.body.seasons.lunarnewyear.enabled, true);
     assert.equal(ok.body.seasons.holidays.enabled, false);
   });
 
@@ -103,6 +100,16 @@ describe('the seasons a server runs', () => {
       {},
       { seasons: null },
       { seasons: { easter: { enabled: true } } },
+      // Diwali and Pride Month are seasons no longer, so they are unknown
+      // like any other.
+      { seasons: { diwali: { enabled: true } } },
+      { seasons: { pride: { enabled: false, start: '06-01', end: '06-30' } } },
+      {
+        seasons: {
+          halloween: { enabled: true, start: '10-24', end: '11-01' },
+          diwali: { enabled: false },
+        },
+      },
       {
         seasons: {
           halloween: { enabled: true, start: '10-24', end: '11-31' },
@@ -121,13 +128,43 @@ describe('the seasons a server runs', () => {
   it('fall back to the defaults if settings.json was edited into nonsense', () => {
     (getSettings().appearance as { seasons: unknown }).seasons = {
       halloween: 'always',
-      pride: { enabled: true, start: '06-01', end: '06-30' },
+      lunarnewyear: { enabled: true, start: '02-01', end: '02-07' },
     };
     assert.deepEqual(getSettings().fullPublicSettings.seasons, [
       { id: 'halloween', start: '10-24', end: '11-01' },
       { id: 'holidays', start: '12-01', end: '12-28' },
       { id: 'newyear', start: '12-29', end: '01-02' },
-      { id: 'pride', start: '06-01', end: '06-30' },
+      { id: 'lunarnewyear', start: '02-01', end: '02-07' },
     ]);
+  });
+
+  it('leave out Diwali and Pride Month if an older version saved them', async () => {
+    (getSettings().appearance as { seasons: unknown }).seasons = {
+      ...SEASON_DEFAULTS,
+      lunarnewyear: { enabled: true },
+      diwali: { enabled: true },
+      pride: { enabled: true, start: '06-01', end: '06-30' },
+    };
+    const kept = { ...SEASON_DEFAULTS, lunarnewyear: { enabled: true } };
+    assert.deepEqual(getSettings().fullPublicSettings.seasons, [
+      { id: 'halloween', start: '10-24', end: '11-01' },
+      { id: 'holidays', start: '12-01', end: '12-28' },
+      { id: 'newyear', start: '12-29', end: '01-02' },
+      { id: 'lunarnewyear' },
+    ]);
+    const res = await request(app).get('/api/v1/settings/appearance/seasons');
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body, { seasons: kept });
+
+    // The next save keeps only the seasons there are.
+    const saved = await request(app)
+      .post('/api/v1/settings/appearance/seasons')
+      .send({
+        seasons: { holidays: { enabled: false, start: '12-01', end: '12-28' } },
+      });
+    assert.equal(saved.status, 200);
+    const after = { ...kept, holidays: { ...kept.holidays, enabled: false } };
+    assert.deepEqual(saved.body, { seasons: after });
+    assert.deepEqual(getSettings().appearance.seasons, after);
   });
 });

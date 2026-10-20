@@ -11,12 +11,12 @@ const messages = defineMessages('utils.aiErrorMessage', {
     'You have used all {limit} of today’s AI answers. More are available tomorrow.',
   empty: 'The model gave an empty answer. Try again.',
   unreadable:
-    'The model did not answer in a form Seerr could read. Try again, or choose a stronger model.',
+    'The model’s answer couldn’t be read. Try again, or choose a stronger model.',
   picture: 'That picture could not be read.',
   pictureTooBig: 'That picture is too big.',
   askSomething: 'Ask something, or send a picture.',
   noPictures:
-    'The AI model in use cannot read pictures. An admin can choose one that can in the AI settings.',
+    'This AI model can’t read pictures. An admin can choose one that can in AI settings.',
   outOfCredit:
     'The AI account is out of credit. AI features work again once more is added.',
   busy: 'The AI service is busy right now. Try again shortly.',

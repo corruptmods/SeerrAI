@@ -5,12 +5,15 @@ import Tooltip from '@app/components/Common/Tooltip';
 import DeclineReason from '@app/components/DeclineReason';
 import DeclineRequestModal from '@app/components/DeclineRequestModal';
 import RequestModal from '@app/components/RequestModal';
+import RequestServerIssue from '@app/components/RequestServerIssue';
 import useRequestAction from '@app/hooks/useRequestAction';
 import useRequestOverride from '@app/hooks/useRequestOverride';
-import { useUser } from '@app/hooks/useUser';
+import useRetryRequest from '@app/hooks/useRetryRequest';
+import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import {
+  ArrowPathIcon,
   CalendarIcon,
   CheckIcon,
   EyeIcon,
@@ -51,9 +54,20 @@ interface RequestBlockProps {
 }
 
 const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
-  const { user } = useUser();
+  const { user, hasPermission } = useUser();
   const intl = useIntl();
   const { run, isBusy: isUpdating } = useRequestAction();
+  const { retry, isRetrying } = useRetryRequest(
+    request,
+    () => {
+      onUpdate?.();
+      mutate('/api/v1/request/count');
+    },
+    globalMessages.error
+  );
+  const failedForManager =
+    request.status === MediaRequestStatus.FAILED &&
+    hasPermission(Permission.MANAGE_REQUESTS);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const { profile, rootFolder, server, languageProfile } =
@@ -214,12 +228,40 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
                 </Tooltip>
               </>
             )}
+            {failedForManager && (
+              <>
+                <Tooltip content={intl.formatMessage(globalMessages.retry)}>
+                  <Button
+                    buttonType="primary"
+                    className="mr-1"
+                    onClick={() => retry()}
+                    disabled={isUpdating || isRetrying}
+                  >
+                    <ArrowPathIcon
+                      className={`icon-sm ${isRetrying ? 'animate-spin' : ''}`}
+                      style={{ animationDirection: 'reverse' }}
+                    />
+                  </Button>
+                </Tooltip>
+                {/* Another server, profile or folder, before retrying. */}
+                <Tooltip content={intl.formatMessage(messages.edit)}>
+                  <Button
+                    buttonType="warning"
+                    className="mr-1"
+                    onClick={() => setShowEditModal(true)}
+                    disabled={isUpdating || isRetrying}
+                  >
+                    <PencilIcon className="icon-sm" />
+                  </Button>
+                </Tooltip>
+              </>
+            )}
             {request.status !== MediaRequestStatus.PENDING && (
               <Tooltip content={intl.formatMessage(messages.delete)}>
                 <Button
                   buttonType="danger"
                   onClick={() => deleteRequest()}
-                  disabled={isUpdating}
+                  disabled={isUpdating || isRetrying}
                 >
                   <TrashIcon className="icon-sm" />
                 </Button>
@@ -294,6 +336,7 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
               className="mt-2"
             />
           )}
+        <RequestServerIssue request={request} className="mt-2" />
         {(request.seasons ?? []).length > 0 && (
           <div className="mt-2 flex flex-col text-sm">
             <div className="mb-1 font-medium">

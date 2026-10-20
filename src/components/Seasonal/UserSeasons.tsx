@@ -21,7 +21,7 @@ const messages = defineMessages('components.Seasonal.UserSeasons', {
   seasonal: 'Seasonal themes',
   seasonalSwitch: 'Show seasonal themes',
   description:
-    'For a few days a year Seerr AI dresses up. It sits on top of your own theme and switches off by itself when the dates pass, so you’re back to yours.',
+    'A few days a year, Seerr AI dresses up over your theme, then switches back by itself.',
   none: 'This server has no seasonal themes switched on.',
   showingNow: 'On now, until {date}',
   preview: 'Preview',

@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Muzikos rezervacija atmesta",
   "notifications.events.musicFailed": "Muzikos rezervacija nepavyko",
   "notifications.events.musicPending": "Nauja muzikos rezervacija",
-  "notifications.events.musicRequestAvailable": "Rezervuota muzika jau pasiekiama"
+  "notifications.events.musicRequestAvailable": "Rezervuota muzika jau pasiekiama",
+  "notifications.events.wrongMatch": "Netinkamas atitikmuo"
 }

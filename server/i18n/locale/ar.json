@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "تم رفض طلب الموسيقى",
   "notifications.events.musicFailed": "فشل طلب الموسيقى",
   "notifications.events.musicPending": "طلب موسيقى جديد",
-  "notifications.events.musicRequestAvailable": "طلب الموسيقى متوفر الآن"
+  "notifications.events.musicRequestAvailable": "طلب الموسيقى متوفر الآن",
+  "notifications.events.wrongMatch": "مطابقة خاطئة"
 }

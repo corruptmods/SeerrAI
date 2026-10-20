@@ -28,8 +28,7 @@ const messages = defineMessages(
     notagoptions: 'No tags.',
     requestas: 'Request As',
     ignoreQuotaTitle: 'Bypass User Quota',
-    ignoreQuotaDescription:
-      "This request will not count against the user's quota limits. Use with caution.",
+    ignoreQuotaDescription: 'Won’t count against the user’s quota.',
     artistKept:
       'Lidarr already has this artist, so their folder and profiles stay as they are.',
   }

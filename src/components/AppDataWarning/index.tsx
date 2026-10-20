@@ -5,7 +5,7 @@ import useSWR from 'swr';
 
 const messages = defineMessages('components.AppDataWarning', {
   dockerVolumeMissingDescription:
-    'The <code>{appDataPath}</code> volume mount was not configured properly. All data will be cleared when the container is stopped or restarted.',
+    '<code>{appDataPath}</code> isn’t a mounted volume, so all data is lost when the container restarts.',
 });
 
 const AppDataWarning = () => {

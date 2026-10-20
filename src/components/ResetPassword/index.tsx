@@ -21,8 +21,7 @@ const messages = defineMessages('components.ResetPassword', {
   confirmpassword: 'Confirm Password',
   validationpasswordrequired: 'You must provide a password',
   validationpasswordmatch: 'Passwords must match',
-  validationpasswordminchars:
-    'Password is too short; should be a minimum of 8 characters',
+  validationpasswordminchars: 'Use at least 8 characters',
   gobacklogin: 'Return to Sign-In Page',
   resetpasswordsuccessmessage: 'Password reset successfully!',
 });

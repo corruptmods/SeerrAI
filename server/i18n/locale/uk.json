@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "Запит на музику відхилено",
   "notifications.events.musicFailed": "Запит на музику не виконано",
   "notifications.events.musicPending": "Новий запит на музику",
-  "notifications.events.musicRequestAvailable": "Запитана музика тепер доступна"
+  "notifications.events.musicRequestAvailable": "Запитана музика тепер доступна",
+  "notifications.events.wrongMatch": "Хибний збіг"
 }

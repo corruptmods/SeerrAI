@@ -8,6 +8,10 @@ sidebar_position: 6
 
 ## Configuration
 
+### Embed Poster
+
+Notifications about a film, series or album come with its poster (or the album's cover) attached as a picture, which the ntfy app loads from TMDB (or the Cover Art Archive for music). It's on unless you turn it off.
+
 ### Server Root URL
 
 Set this to the URL of your ntfy.sh server.

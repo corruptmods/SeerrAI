@@ -7,13 +7,13 @@ import * as Yup from 'yup';
 
 export const messages = defineMessages('components.Settings.SettingsMusic', {
   musicDescription:
-    'Where artists, albums and covers come from. MusicBrainz answers one request a second for each server, so busy servers can point Seerr AI at a mirror of their own.',
+    'Where artists, albums and covers come from. MusicBrainz allows one request a second, so busy servers can use their own mirror.',
   musicbrainzUrl: 'MusicBrainz Address',
   musicbrainzUrlTip:
     'Leave blank for the public MusicBrainz. A mirror you run has no limit on requests.',
   contactEmail: 'Contact Email',
   contactEmailTip:
-    'Sent to MusicBrainz with each request, so it can reach you rather than slow every Seerr AI down. Optional.',
+    'Optional. Sent with each MusicBrainz request so they can contact you.',
   listenBrainz: 'New and Popular Music',
   listenBrainzTip:
     'The New Music, Popular Albums and Popular Artists rows on Discover, from ListenBrainz.',
@@ -24,7 +24,7 @@ export const messages = defineMessages('components.Settings.SettingsMusic', {
   removeKey: 'Remove the saved key',
   maxAlbumsPerRequest: 'Most Albums in One Request',
   maxAlbumsPerRequestTip:
-    'Asking for an artist’s whole discography asks for at most this many albums.',
+    'The most albums a whole-discography request asks for.',
   validationUrl: 'You must provide a valid URL',
   validationEmail: 'You must provide a valid email address',
   validationMaxAlbums: 'A number from 1 to 1000',

@@ -70,11 +70,11 @@ const messages = defineMessages('components.Backfill.SeriesReview', {
   movieBelowCutoff: 'below the profile’s cutoff',
   why: 'Why {app} missed this',
   whyTitle:
-    'The best pack’s title has no episode numbers Sonarr can read, so Sonarr’s own searches never saw it. Backfill matched it by the {count} file names inside.',
+    'Sonarr can’t read this pack’s title, so it missed it. Backfill matched the {count} files inside.',
   whyMovieTitle:
-    'Radarr does not match the best release’s title to this movie, so its own searches passed it over. Backfill matched it by the file inside.',
+    'Radarr didn’t match the release’s title to this movie. Backfill matched it by the file inside.',
   whyNone:
-    'Nothing on your indexers mentions this title under the names searched: {names}. Add the name release groups use and search again.',
+    'Your indexers have nothing under {names}. Add the name release groups use and search again.',
   titleBadge: 'Title',
   whyRejected: '{count} {count, plural, one {pack} other {packs}}: {reason}',
   whyNotSearched: 'Backfill hasn’t searched for this yet.',
@@ -109,17 +109,17 @@ const messages = defineMessages('components.Backfill.SeriesReview', {
   episodesCount: '{count, plural, one {# episode} other {# episodes}}',
   filesCount: '{count, plural, one {# file} other {# files}}',
   willDelete:
-    '{count} existing {count, plural, one {file} other {files}} will be permanently deleted when their replacements import.',
+    '{count} existing {count, plural, one {file is} other {files are}} deleted for good when replacements import.',
   approve: 'Approve & download…',
   skipPack: 'Skip this pack',
   aiMatched:
-    '{count} {count, plural, one {file was} other {files were}} placed by the AI second opinion, not by its name. Check {count, plural, one {it} other {them}} under Show files before approving.',
+    '{count, plural, one {# file was} other {# files were}} placed by the AI, not by name. Check under Show files before approving.',
   aiBadge: 'AI',
   aiWhy: 'AI: {why}',
   matchedHow:
-    'Files are matched by the episode number in their names and judged by Sonarr, so the pack’s own season split doesn’t matter.',
+    'Files are matched by episode number and checked by Sonarr, whatever the pack’s season split.',
   movieMatchedHow:
-    'Files are matched by the movie’s name and year and judged by Radarr; from a collection, only this movie is downloaded.',
+    'Matched by name and year and checked by Radarr. From a collection, only this movie is downloaded.',
   movieLabel: 'Movie',
   history: 'Backfills',
   noHistory: 'None yet.',

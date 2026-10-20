@@ -32,11 +32,10 @@ const messages = defineMessages('components.ManageSlideOver.AnimeSetting', {
   belongsIn: 'Moves to {folder}',
   belongsOn: 'Goes on {profile}',
   belongsTyped: 'Typed {seriesType}',
-  notInArr:
-    'Not in {arr} yet. The Anime tick in its request dialog starts from what is set here.',
+  notInArr: 'Not in {arr} yet. This sets the Anime tick when it’s requested.',
   serverError: '{server} could not be read: {error}',
   saveHint:
-    'Saving puts it where the setting says in {arr}: the anime or regular root folder (files are moved, which takes a while for a big title), quality profile and, for a series, series type. Anime or not chosen on its requests that says otherwise is replaced.',
+    'Saving moves it in {arr} to match, replacing what its requests chose. Big titles take a while to move.',
   save: 'Save',
   saveAndMove: 'Save and Move',
   saving: 'Saving…',

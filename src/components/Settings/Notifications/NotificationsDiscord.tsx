@@ -23,11 +23,9 @@ const messages = defineMessages('components.Settings.Notifications', {
   webhookUrlTip:
     'Create a <DiscordWebhookLink>webhook integration</DiscordWebhookLink> in your server',
   webhookRoleId: 'Notification Role ID',
-  webhookRoleIdTip:
-    'The role ID to mention in the webhook message. Leave empty to disable mentions',
+  webhookRoleIdTip: 'Role to mention in each message. Empty for no mentions',
   webhookThreadId: 'Thread ID',
-  webhookThreadIdTip:
-    'The ID of the thread channel to post notifications in. Leave empty to post in the webhook channel',
+  webhookThreadIdTip: 'Thread to post in. Empty posts in the webhook’s channel',
   useUserLocale: 'Use Notification Recipient Locale',
   discordsettingssaved: 'Discord notification settings saved successfully!',
   discordsettingsfailed: 'Discord notification settings failed to save.',
@@ -212,7 +210,7 @@ const NotificationsDiscord = () => {
               </div>
             </div>
             <div className="form-row">
-              <label htmlFor="name" className="text-label">
+              <label htmlFor="webhookUrl" className="text-label">
                 {intl.formatMessage(messages.webhookUrl)}
                 <span className="label-required">*</span>
                 <span className="label-tip">

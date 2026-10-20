@@ -27,14 +27,14 @@ const messages = defineMessages('components.MediaLists.ImportListModal', {
   searchplaceholder: 'Search for the right title',
   alsorequest: 'Also request anything not already in the library',
   notrequested:
-    'Added to the list. {count, plural, one {# title was} other {# titles were}} not requested, as one import requests up to 20; request them from the list.',
+    'Added to the list. {count, plural, one {# title wasn’t} other {# titles weren’t}} requested (20 at most per import); request them from the list.',
   matching: 'Matching titles…',
   collection:
     ' — Collection, {count} {count, plural, one {film} other {films}}',
   series: ' — Series',
   movie: ' — Movie',
   instructionsTrakt:
-    'Paste your list below, one title per line (bullets, numbering and years are fine), or a link to a public Trakt list or watchlist.',
+    'Paste titles, one per line, or a link to a public Trakt list or watchlist.',
   readingTrakt: 'Reading the Trakt list…',
   truncatedTrakt: 'Only the first 500 titles were read.',
   traktNotSetUp:
@@ -47,8 +47,7 @@ const messages = defineMessages('components.MediaLists.ImportListModal', {
   traktLimited:
     'Trakt is limiting requests just now. Try again in a few minutes.',
   traktUnreachable: 'Could not reach Trakt. Try again in a while.',
-  notTrakt:
-    'That is not a link to a Trakt list or watchlist. Use the link to a public list, or to someone’s watchlist.',
+  notTrakt: 'That isn’t a link to a Trakt list or watchlist.',
 });
 
 /** Whether the pasted text is a link to Trakt, rather than a written list. */

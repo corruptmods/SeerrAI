@@ -7,6 +7,7 @@ import DeclineReason from '@app/components/DeclineReason';
 import DeclineRequestModal from '@app/components/DeclineRequestModal';
 import MusicRequestCard from '@app/components/Music/MusicRequest/MusicRequestCard';
 import RequestModal from '@app/components/RequestModal';
+import RequestServerIssue from '@app/components/RequestServerIssue';
 import StatusBadge from '@app/components/StatusBadge';
 import useNearScreen, {
   bothRefs,
@@ -14,6 +15,7 @@ import useNearScreen, {
 } from '@app/hooks/useNearScreen';
 import usePlayLinks from '@app/hooks/usePlayLinks';
 import useRequestAction from '@app/hooks/useRequestAction';
+import useRetryRequest from '@app/hooks/useRetryRequest';
 import useToasts from '@app/hooks/useToasts';
 import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -187,6 +189,11 @@ const RequestCardError = ({ requestData }: RequestCardErrorProps) => {
                     />
                   )}
                 </div>
+                <RequestServerIssue
+                  request={requestData}
+                  compact
+                  className="mt-1"
+                />
               </>
             )}
             <div className="flex flex-1 items-end space-x-2">
@@ -238,7 +245,6 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
   const intl = useIntl();
   const { user, hasPermission } = useUser();
   const { addToast } = useToasts();
-  const [isRetrying, setRetrying] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeclineModal, setShowDeclineModal] = useState(false);
@@ -294,24 +300,11 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
       mutate('/api/v1/request/count');
     }, messages.failedmodify);
 
-  const retryRequest = async () => {
-    setRetrying(true);
-
-    try {
-      const response = await axios.post(`/api/v1/request/${request.id}/retry`);
-
-      if (response) {
-        revalidate();
-      }
-    } catch {
-      addToast(intl.formatMessage(messages.failedretry), {
-        autoDismiss: true,
-        appearance: 'error',
-      });
-    } finally {
-      setRetrying(false);
-    }
-  };
+  const { retry: retryRequest, isRetrying } = useRetryRequest(
+    request,
+    revalidate,
+    messages.failedretry
+  );
 
   useEffect(() => {
     if (title && onTitleData) {
@@ -350,7 +343,8 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
         // The requests listed here are for films and series.
         type={request.type as VideoMediaType}
         is4k={request.is4k}
-        editRequest={request}
+        // As it is now: it may have failed since the list was loaded.
+        editRequest={requestData}
         onCancel={() => setShowEditModal(false)}
         onComplete={() => {
           revalidate();
@@ -510,23 +504,48 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                 className="mt-1"
               />
             )}
+          <RequestServerIssue request={requestData} compact className="mt-1" />
           <div className="flex flex-1 items-end space-x-2">
             {requestData.status === MediaRequestStatus.FAILED &&
               hasPermission(Permission.MANAGE_REQUESTS) && (
-                <Button
-                  buttonType="primary"
-                  buttonSize="sm"
-                  disabled={isRetrying}
-                  onClick={() => retryRequest()}
-                >
-                  <ArrowPathIcon
-                    className={isRetrying ? 'animate-spin' : ''}
-                    style={{ marginRight: '0', animationDirection: 'reverse' }}
-                  />
-                  <span className="ml-1.5 hidden sm:block">
-                    {intl.formatMessage(globalMessages.retry)}
-                  </span>
-                </Button>
+                <>
+                  <Tooltip content={intl.formatMessage(globalMessages.retry)}>
+                    <Button
+                      buttonType="primary"
+                      buttonSize="sm"
+                      disabled={isRetrying}
+                      onClick={() => retryRequest()}
+                      // Its label is hidden on a phone.
+                      aria-label={intl.formatMessage(globalMessages.retry)}
+                    >
+                      <ArrowPathIcon
+                        className={isRetrying ? 'animate-spin' : ''}
+                        style={{
+                          marginRight: '0',
+                          animationDirection: 'reverse',
+                        }}
+                      />
+                      <span className="ml-1.5 hidden sm:block">
+                        {intl.formatMessage(globalMessages.retry)}
+                      </span>
+                    </Button>
+                  </Tooltip>
+                  {/* Another server, profile or folder, before retrying. */}
+                  <Tooltip content={intl.formatMessage(messages.editrequest)}>
+                    <Button
+                      buttonType="default"
+                      buttonSize="sm"
+                      disabled={isRetrying}
+                      onClick={() => setShowEditModal(true)}
+                      aria-label={intl.formatMessage(messages.editrequest)}
+                    >
+                      <PencilIcon style={{ marginRight: '0' }} />
+                      <span className="ml-1.5 hidden sm:block">
+                        {intl.formatMessage(globalMessages.edit)}
+                      </span>
+                    </Button>
+                  </Tooltip>
+                </>
               )}
             {requestData.status === MediaRequestStatus.PENDING &&
               hasPermission(Permission.MANAGE_REQUESTS) && (

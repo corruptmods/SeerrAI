@@ -14,8 +14,7 @@ import useSWR from 'swr';
 
 const messages = defineMessages('components.Calendar', {
   calendar: 'Calendar',
-  subtitle:
-    'Releases and episodes coming for everything Radarr and Sonarr are watching for.',
+  subtitle: 'Upcoming releases for everything Radarr and Sonarr monitor.',
   all: 'All',
   movies: 'Movies',
   series: 'Series',

@@ -92,5 +92,6 @@
   "notifications.events.musicDeclined": "संगीत अनुरोध अस्वीकार किया गया",
   "notifications.events.musicFailed": "संगीत अनुरोध विफल रहा",
   "notifications.events.musicPending": "नया संगीत अनुरोध",
-  "notifications.events.musicRequestAvailable": "अनुरोधित संगीत अब उपलब्ध है"
+  "notifications.events.musicRequestAvailable": "अनुरोधित संगीत अब उपलब्ध है",
+  "notifications.events.wrongMatch": "गलत मिलान"
 }

@@ -50,9 +50,9 @@ const messages = defineMessages('components.ManageSlideOver', {
   manageModalNoRequests: 'No requests.',
   manageModalClearMedia: 'Clear Data',
   manageModalClearMediaWarning:
-    '* This will irreversibly remove all data for this {mediaType}, including any requests. If this item exists in your {mediaServerName} library, the media information will be recreated during the next scan.',
+    '* Permanently removes all data for this {mediaType}, including requests. If it’s in {mediaServerName}, the next scan adds it back.',
   manageModalRemoveMediaWarning:
-    '* This will irreversibly remove this {mediaType} from {arr}, including all files.',
+    '* Permanently removes this {mediaType} and its files from {arr}.',
   openarr: 'Open in {arr}',
   removearr: 'Remove from {arr}',
   openarr4k: 'Open in 4K {arr}',

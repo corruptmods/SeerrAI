@@ -31,18 +31,17 @@ const messages = defineMessages('components.AiChat.AiChatPanel', {
   title: 'AI',
   remaining: '{count, plural, one {# answer} other {# answers}} left today',
   intro:
-    'Describe what you are looking for, ask for something, or have a whole franchise put on a list or requested. Anything it finds can be opened, added to a list or requested.',
+    'Describe what you’re after, even a whole franchise. Open, add to a list or request what it finds.',
   example1: 'the movie where a man relives the same day',
   example2: 'something like the last series I watched, but lighter',
   example3: 'add every Pixar film to a new list',
   example4: 'request all of Christopher Nolan’s films',
   introFix:
-    'You can also report a problem with something on the server, and it is fixed for you: missing or wrong subtitles, missing episodes, a file that won’t play, or the wrong episode.',
+    'Or report a problem, like bad subtitles, missing episodes or a file that won’t play, and it gets fixed.',
   fixExample1: 'get English subtitles for Spirited Away',
   fixExample2: 'season 2 episode 5 of Breaking Bad is the wrong episode',
   fixExample3: 'Interstellar has no sound',
-  introPhoto:
-    'Or send a photo of a poster, a cover, a screen or a message, and it finds what is in it.',
+  introPhoto: 'Or send a photo of a poster or screen to find what’s in it.',
   attachPhoto: 'Send a Photo',
   removePhoto: 'Remove the Photo',
   photoAlt: 'The photo sent',

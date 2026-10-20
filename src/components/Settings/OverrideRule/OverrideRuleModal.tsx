@@ -29,19 +29,18 @@ const messages = defineMessages('components.Settings.OverrideRuleModal', {
   selectService: 'Select service',
   conditions: 'Conditions',
   conditionsDescription:
-    'Specifies conditions before applying parameter changes. Each field must be validated for the rules to be applied (AND operation). A field is considered verified if any of its properties match (OR operation).',
+    'Applies when every field matches; a field matches if any of its values do.',
   settings: 'Settings',
-  settingsDescription:
-    'Specifies which settings will be changed when the above conditions are met.',
+  settingsDescription: 'What changes when the conditions above match.',
   users: 'Users',
   genres: 'Genres',
   languages: 'Languages',
   keywords: 'Keywords',
   certification: 'Age Ratings',
   certificationTip:
-    'Matches titles with any of the age ratings chosen. Ratings come from TMDB for the Discover Region in Settings → General, now {region}. A title not rated there goes by its US rating, and one with no rating at all never matches.',
+    'Matches any chosen rating, for the Discover Region ({region}), else the US rating. Unrated titles never match.',
   certificationTipUs:
-    'Matches titles with any of the age ratings chosen. Ratings come from TMDB for the Discover Region in Settings → General, now {region}. A title with no rating never matches.',
+    'Matches any chosen rating, for the Discover Region ({region}). Unrated titles never match.',
   rootfolder: 'Root Folder',
   selectRootFolder: 'Select root folder',
   qualityprofile: 'Quality Profile',
@@ -49,14 +48,14 @@ const messages = defineMessages('components.Settings.OverrideRuleModal', {
   tags: 'Tags',
   seriesType: 'Series Type',
   seriesTypeTip:
-    'How Sonarr numbers the series. Anime also sends it with the anime folder, profiles and tags for anything this rule leaves unset.',
+    'How Sonarr numbers the series. Anime uses the anime folder, profiles and tags where this rule sets none.',
   seriesTypeUnchanged: 'Leave to anime detection',
   seriesTypeStandard: 'Standard',
   seriesTypeDaily: 'Daily',
   seriesTypeAnime: 'Anime',
   movieAnime: 'Anime',
   movieAnimeTip:
-    'Whether the movie goes to Radarr as anime. Anime also sends it with the anime folder, profile and tags for anything this rule leaves unset.',
+    'Whether the movie goes to Radarr as anime. Anime uses the anime folder, profile and tags where this rule sets none.',
   movieAnimeYes: 'Anime',
   movieAnimeNo: 'Not anime',
   notagoptions: 'No tags.',
@@ -375,6 +374,7 @@ const OverrideRuleModal = ({
                   <div className="form-input-area">
                     <div className="form-input-field">
                       <UserSelector
+                        inputId="users"
                         defaultValue={values.users}
                         isDisabled={!isValidated || isTesting}
                         isMulti
@@ -400,6 +400,7 @@ const OverrideRuleModal = ({
                   <div className="form-input-area">
                     <div className="form-input-field">
                       <GenreSelector
+                        inputId="genre"
                         type={
                           values.radarrServiceId != null
                             ? 'movie'
@@ -455,6 +456,7 @@ const OverrideRuleModal = ({
                   <div className="form-input-area">
                     <div className="form-input-field">
                       <KeywordSelector
+                        inputId="keywords"
                         defaultValue={values.keywords}
                         isMulti
                         isDisabled={!isValidated || isTesting}
@@ -652,6 +654,7 @@ const OverrideRuleModal = ({
                   </label>
                   <div className="form-input-area">
                     <Select<OptionType, true>
+                      inputId="tags"
                       options={testResponse.tags.map((tag) => ({
                         label: tag.label,
                         value: tag.id,

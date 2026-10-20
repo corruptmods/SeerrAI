@@ -2,88 +2,74 @@
 
 [← Seerr AI guide](./README.md)
 
-Seerr AI can take requests for music as well as films and series. Music goes through Lidarr the way films go through Radarr, and shows as here once your media server's music library has it.
+Seerr AI takes requests for music too. Music goes through Lidarr, as films go through Radarr, and shows as here once your media server's music library has it.
 
-Nothing about music appears until an admin adds a Lidarr server. After that, everyone who can request films and series can request music too.
-
-## Setting it up (admins)
-
-1. **Add Lidarr** under **Settings → Services → Lidarr**: its address and API key, then the quality profile, metadata profile, root folder and tags new artists get. Mark one Lidarr as the default; music appears for everyone once there is one. **Enable Scan** also brings what Lidarr already has into Seerr AI, so those albums show as here and aren't requested again.
-2. **Switch on your music libraries** under **Settings → Plex**, **Jellyfin** or **Emby**, in the **Music Libraries** section (press **Sync Libraries** first if it's empty). An album counts as here once any connected server's music library lists it.
-3. Optionally, **Settings → Music**: whether music also shows in **All** search results (see [Searching music](#searching-music)), and, under **Where Music Comes From**, a MusicBrainz mirror of your own, a contact address for MusicBrainz, whether the New Music, Popular Albums and Popular Artists rows come from ListenBrainz (**New and Popular Music**), a TheAudioDB key for pictures of artists Lidarr has none of, and the most albums one request may ask for. The same page has the Music switch and links to each of these steps.
-
-Worth turning on in Lidarr: **Settings → Metadata → Write Audio Tags**. Jellyfin and Emby find an album's MusicBrainz ids in its files' tags; without them, albums are matched by folder name, then by title and year, which is usually right but not always.
-
-If no music library is switched on anywhere, Lidarr's files decide instead: an album with all its tracks is here, one with some of them is partly here.
+Music appears once an admin adds Lidarr. Anyone who can request films and series can then request music.
 
 ## Finding music
 
-Search finds artists and albums under **Music**, at the top of the search results; **All** keeps to films, series, collections and people unless an admin adds music below them (see [Searching music](#searching-music)). The Music page has its own search box for artists and albums too. Discover gains four rows: **Recently Added Music**, **New Music**, **Popular Albums** and **Popular Artists**. They can be moved or hidden like any row, and the **Music** item in the sidebar opens all of them.
+- **Music** in the sidebar: new music, popular albums and artists, and a search box for artists and albums.
+- **Search**: pick **Music** above the results for artists and albums. **All** keeps to films, series, collections and people, unless an admin adds music below them.
+- **Discover** gains **Recently Added Music**, **New Music**, **Popular Albums** and **Popular Artists** rows.
 
-An artist's page lists everything they have released, grouped as albums, EPs, singles and the rest (live albums, compilations, soundtracks and remixes, folded away). An album's page has its cover and track list, and **Play** on each server that has it.
+Album and artist tiles say what they are (Album, EP, Single, Artist) and their status; hover or tap for the name, year and **Request**.
 
-Artist and album details come from MusicBrainz, which answers one request a second for each server. A page that would have to wait too long says MusicBrainz is busy and offers to try again; it is rarely needed twice.
+An artist's page lists their releases as albums, EPs and singles, with live albums, compilations and the rest folded away. An album's page has its tracks and a **Play on …** button for each server that has it.
 
-### Searching music
+Details come from MusicBrainz, which answers one request a second for each server. If a page would wait too long, it says MusicBrainz is busy and offers to try again.
 
-While music is on, **Music** is beside All, Movies and Series in search results, and the Music page has its own search box. A search shows up to 8 artists and 12 albums, the ones you most likely mean first: of the albums that match equally well, the one with the most releases (editions, pressings, countries), then albums before EPs and singles; of the artists, those of the albums shown, then the ones with the most tags on MusicBrainz.
-
-**Include Music in All Search Results** (**Settings → Music**, off to start): **All** also shows a row of artists and a row of albums, below the films, series, collections and people. They're asked for once those have loaded, so music never slows the rest down, and they never come above them.
-
-Anyone who turned music off for themselves sees none of it, whatever is chosen here.
-
-### An empty Music page
-
-Until something fills them, the Music page's rows have nothing to show: **Recently Added** fills as albums reach your media server, and **New Music**, **Popular Albums** and **Popular Artists** come from ListenBrainz while **New and Popular Music** is on. With every row empty, the page says so and points to the search box; an admin is also told what would fill it, with a link to Settings → Music when New and Popular Music is off.
+A search shows up to 8 artists and 12 albums, the one you most likely mean first.
 
 ## Requesting music
 
-- **Request** on an artist's page opens a window listing their releases. What starts ticked follows the Lidarr metadata profile: if Lidarr would list only studio albums, only those are ticked. Untick what you don't want, or tick everything for a whole discography.
-- **Request Album** on an album's page, or the small button on an album's card, asks for just that album.
+**A whole artist, or several albums:**
 
-However many albums are ticked, it is **one request**, approved once. Albums already here, or already asked for by someone, are left out. Various Artists compilations can't be requested, because Lidarr can't add Various Artists.
+1. Open the artist and press **Request**.
+2. Tick the releases you want. What starts ticked follows Lidarr's metadata profile; **All albums** (or **All EPs**, **All singles**) ticks a group.
+3. Press **Request N Albums**.
 
-Who can ask, and how much:
+**One album:** press **Request Album** on its page, or **Request** on its tile.
 
-- **Request** covers music, as it covers films and series. For someone who should only ask for music, give them **Request Music** instead (Users → a person → Permissions).
-- **Auto-Approve** covers music too; **Auto-Approve Music** approves only music requests.
-- Albums have their own limit, like seasons for series: **Global Album Request Limit** under **Settings → Users**, and an album limit on each person's settings.
+However many albums you tick, it's **one request**, approved once. Albums already here or already requested are left out. Various Artists compilations can't be requested (Lidarr can't add Various Artists).
 
-## What happens after approval
+While Lidarr downloads, the status shows how far along it is, then **Adding to Plex** (or Jellyfin, or Emby) until your library lists it. When every album in the request is here, you're told once, on your usual notification channels.
 
-The request goes to Lidarr.
+An artist shows **Partially Available** once any album is here, and **Available** once every album asked for (or monitored in Lidarr) is.
 
-- **An artist Lidarr doesn't have yet** is added with only the albums asked for monitored, using the request's profile and folder.
-- **An artist Lidarr already has** keeps its own folder, profiles and new-release setting. The albums asked for are monitored and searched for, any Lidarr is missing are added, and nothing anyone else asked for is ever unmonitored.
+Don't want music? Turn it off for yourself in **Profile → Settings → Features**.
 
-Lidarr's own metadata service sometimes takes days to learn about a new album. Seerr AI keeps trying for a week; after that the request is marked failed with the reason, and can be retried.
+## Setting it up (admins)
 
-While Lidarr downloads, the status pill on the album, the artist and the request shows how far along it is, as it does for films. Once Lidarr has the files and your media server hasn't listed them yet, it says **Adding to Plex** (or Jellyfin, or Emby).
+1. **Settings → Services → Lidarr**: add Lidarr with its address and API key, then the quality profile, metadata profile (which kinds of release Lidarr lists: albums, EPs, singles, live albums), root folder and tags new artists get. Make it the default; you can add more than one Lidarr. **Enable Scan** brings in what Lidarr already has, so those albums show as here.
+2. **Music libraries**: tick them when connecting a server, or later under **Settings → Media Servers → Edit → Music Libraries** (press **Sync Libraries** if the list is empty). An album counts as here once any server's music library lists it. With none switched on anywhere, Lidarr's files decide.
+3. **Settings → Music** (optional): **Include Music in All Search Results**, and under **Where Music Comes From**: a **MusicBrainz Address** (your own mirror has no limit), a **Contact Email** (so MusicBrainz can reach you instead of slowing every Seerr AI down), **New and Popular Music** (the ListenBrainz rows), a **TheAudioDB API Key** for artist pictures, and **Most Albums in One Request** (100 to start). The page links to the rest of music's settings.
 
-## When it arrives
+In Lidarr, turn on **Settings → Metadata → Write Audio Tags**: Jellyfin and Emby match albums by the MusicBrainz ids in the tags; without them, by folder name and then title and year.
 
-**Music Sync** runs every five minutes, and a minute after Lidarr imports something: it reads what each server's music libraries added recently, and follows Lidarr's progress. The **Music Full Scan** reads every music library, and all of Lidarr, each night.
+### Who can ask, and how much
 
-Each album asked for is done once it's here. When every album in a request is here, the request is complete and whoever asked is told, along with anyone watching the request, once, on whichever notification channels they use. An album that is deleted again later is marked deleted, and can be requested again.
+- **Request** covers music. For music only, give someone **Request Music** instead (Users → a person → Permissions).
+- **Auto-Approve** covers music; **Auto-Approve Music** approves only music.
+- Album limits work like season limits: **Global Album Request Limit** in **Settings → Users**, and a limit on each person.
 
-An artist shows as **Partially Available** once any of their albums is here, and **Available** once every album asked for, or monitored in Lidarr, is.
+### What Lidarr is told
 
-## For admins
+- **A new artist** is added with only the requested albums monitored, using the request's profile and folder.
+- **An artist Lidarr has** keeps its own settings. Requested albums are monitored and searched for; nothing anyone else asked for is unmonitored.
 
-**The Manage panel** (the cog on an artist's page, for request managers and admins) shows what Lidarr is downloading of theirs, every request for them (approve, decline, edit or delete each), and their history: who asked for which albums, approvals, and each album arriving or leaving. Admins also get **Open in Lidarr**, **Search Lidarr for Missing Albums**, and **Clear Data**, which removes Seerr AI's own record of the artist and their requests and leaves Lidarr alone.
+Lidarr sometimes takes days to learn about a new album. Seerr AI keeps trying for a week, then marks the request failed with the reason; it can be retried.
 
-**Health** (Settings → Health) checks Lidarr like Radarr and Sonarr, and adds:
+### Keeping track
 
-- **Albums in Lidarr, not on your media server after a day**: usually a music library that's switched off, not scanned, or not looking at Lidarr's folder.
-- **Requested albums with no release found after a week**, each with **Search now**, which asks Lidarr to look again. Albums not released yet aren't listed.
-- **MusicBrainz**: whether it has been answering over the last hour, saying it's over its limit, or turning people away as busy. A mirror of your own (Settings → Music) has no limit.
+- **The Manage panel** (the cog on an artist's page) shows what Lidarr is downloading, every request (approve, decline, edit, delete), and the history. Admins also get **Open in Lidarr**, **Search Lidarr for Missing Albums** and **Clear Data** (removes Seerr AI's own record; Lidarr is left alone).
+- **Health** checks Lidarr, lists albums Lidarr has that no server lists after a day, requested albums with no release after a week (with **Search now**), and whether MusicBrainz is answering.
+- **Music Sync** runs every five minutes and a minute after Lidarr imports; **Music Full Scan** reads every music library and all of Lidarr nightly (03:40).
+- **Webhooks** get `media_type` `music`, the artist's MusicBrainz id as `media_mbid`, the albums as `music_albums`, and `media_tmdbid` 0.
 
-**Webhooks** get `media_type` `music`, the artist's MusicBrainz id as `media_mbid`, and the albums asked for as `music_albums`; `media_tmdbid` is 0. Anything that reads Seerr's webhooks should expect them.
+### Turning it off
 
-## Turning it off
+Switch **Music** off for everyone in **Settings → Music**: the Music page, music in search and on Discover, requests and the music settings go, and the server refuses music.
 
-An admin can switch **Music** off for everyone under **Settings → Music** (Settings → Features points there): the Music item, Music in search, the music rows on Discover, music requests and the music settings all go away, and the server refuses music for everyone. Anyone can also switch it off for themselves under **Profile → Settings → Features**.
+## Not for music yet
 
-## What music doesn't do yet
-
-Backfill and the admin agent, AI Search and picks, watch lists and Roulette, Suggested for You and Who Watched, the blocklist, issues, the calendar, override rules, and following an artist's new releases are for films and series only, for now.
+Backfill and the admin agent, AI Search and picks, watch lists, Suggested for You, Who Watched, the blocklist, issues, the calendar, override rules and following an artist's new releases are for films and series only.

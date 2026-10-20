@@ -42,7 +42,7 @@ const messages = defineMessages('components.UserProfile', {
   plexwatchlist: 'Plex Watchlist',
   localWatchlist: "{username}'s Watchlist",
   emptywatchlist:
-    'Media added to your <PlexWatchlistSupportLink>Plex Watchlist</PlexWatchlistSupportLink> will appear here.',
+    'Titles on your <PlexWatchlistSupportLink>Plex Watchlist</PlexWatchlistSupportLink> show here.',
 });
 
 type MediaTitle = MovieDetails | TvDetails;

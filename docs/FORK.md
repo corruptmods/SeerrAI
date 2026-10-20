@@ -10,18 +10,30 @@ merged back in.
 there, or to cherry-pick a fix worth having. Nothing is expected to merge
 cleanly, and nothing has to.
 
-Upstream `develop` has been read through `8f2eceea` (10 October 2026).
+Upstream `develop` has been read through `31b100dde` (19 October 2026).
 Its two security advisories there are covered: GHSA-xc6j-6p6h-p799 (other
 people's details and issues in a title's media info) by `mediaForViewer`,
 done here before upstream's fix; GHSA-8j73-j6rc-q8xh (notification
 credentials in every embedded user) by `User.toJSON`. Start the next read
 from that commit.
 
+From `8f2eceea` to `31b100dde`, #3630 is taken: when a title arrives,
+the requests it completes are saved one at a time, because saved together
+their save hooks ran at once on one Postgres transaction and their
+savepoints undid each other, failing the whole save. Beyond upstream,
+`withNestedTransaction` makes nested transactions on one connection take
+turns by itself, so no other caller can trip over this again. The rest of
+that range was already here (#3593, #3533, the fork's Radarr fix covering
+all three ways a film is added) or was translations.
+
 Unmerged upstream pull requests taken: #3571 (choosing the networks in the
 Networks row), reworked: each person chooses their own (kept in their user
 settings, saved with the rows they hide) where upstream has one list an
 admin sets; the page carries no validation library; the editor loads only
-while customizing.
+while customizing. #3600 (no blur behind the top bar), reworked: the blur
+is dropped only where the bar is solid (light mode or solid panels, and
+the phone's tab bar with solid panels), where it showed nothing but cost
+scrolling; see-through bars keep it.
 
 ## Building
 
@@ -186,13 +198,18 @@ Each of these came from a bug that reached a running server.
 
 ## What's new
 
-[CHANGELOG.md](../CHANGELOG.md) is written for the people running Seerr AI,
-not for developers. A change they would notice adds a few friendly
-sentences under **Coming next**: what they can now do, where to find it, and
-anything they have to switch on. No code names, file names or jargon.
-Changes nobody would notice (tests, refactors, the build) are left out. A
-release renames **Coming next** to its version and date, and starts a new,
-empty one.
+[CHANGELOG.md](https://github.com/corruptmods/SeerrAI/blob/main/CHANGELOG.md)
+is for the people running Seerr AI, not developers. A change they would
+notice gets one short line under **Coming next**, in plain words, in
+**New**, **Changed** or **Fixed**; details go in the guide (docs/seerr-ai),
+linked once where useful. No code names, file names or jargon. Changes
+nobody would notice (tests, refactors, the build) are left out.
+
+A release renames **Coming next** to its version, `## 1.2.3 (date)`, and
+starts a new, empty one above it; `release.yml` uses that section as the
+release notes. A pre-release does the same with its own version, such as
+`## 2.0.0-beta.1 (unreleased)`, starting with one line saying what it
+previews.
 
 ## Layout of the fork's own code
 
@@ -202,6 +219,7 @@ empty one.
 | `server/lib/list*.ts` | access rules, activity notifications, watch sync |
 | `server/lib/notificationReconciler.ts` | dedup and catch-up delivery |
 | `server/lib/requestDispatch.ts` | marking undispatchable requests failed |
+| `server/lib/requestServers.ts` | which Radarr, Sonarr or Lidarr a request goes to, and why it has none (`serverIssue` on a pending or failed request) |
 | `server/constants/lists.ts`, `src/constants/lists.ts` | tuning knobs |
 | `src/components/MediaLists/` | list UI |
 | `src/hooks/useListDetail.ts`, `useMediaMarkers.ts` | list data and poster badges |
@@ -399,11 +417,21 @@ Do not undo these without reading why first — each was tried the other way.
   userinfo that can't be, lets nobody in. Failed callbacks count toward
   the sign-in limit only with a genuine correlation cookie for that
   provider, so made-up callbacks can't lock out an address.
-- **Trust Proxy trusts only proxies on the local network.** With it on,
-  Express takes `req.ip` through loopback, link-local and private hops
-  (`TRUSTED_PROXIES`), never every hop: with every hop trusted the address
-  is whatever the sender wrote first in X-Forwarded-For, and the sign-in
-  limits count by address.
+- **Enable Proxy Support trusts only known proxies.** With it on, Express
+  takes `req.ip` through loopback, link-local, private and `100.64.0.0/10`
+  (Tailscale) hops (`LOCAL_PROXIES` in `server/utils/trustedProxies.ts`),
+  plus Cloudflare's published ranges with **Trust Cloudflare** and any
+  listed under **Also Trust These Proxies**; never every hop: with every
+  hop trusted the address is whatever the sender wrote first in
+  X-Forwarded-For, and the sign-in limits count by address.
+- **Personal API keys act as their owner, and only through the header.**
+  Keys (`sai_…`, `server/lib/personalApiKeys.ts`) are stored as hashes,
+  checked against the owner's current permissions on every request (and
+  their right to sign in every few minutes), and never take `X-API-User`. A request with an
+  `X-Api-Key` header never uses the session cookie, so a wrong key is a
+  401 even from a signed-in browser, and CSRF protection skips such
+  requests (`server/middleware/csrf.ts`): another site can't make a
+  browser send that header. A key can't make keys.
 - **Admins can remove someone's passkeys, not add or rename them.** For a
   lost device. The owner's and other admins' passkeys are the owner's to
   manage, as with passwords.

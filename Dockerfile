@@ -29,6 +29,16 @@ RUN if [ -d node_modules/.pnpm ]; then \
   -path "*@heroicons/react/16" \
   \) -exec rm -rf {} + || true; \
   fi
+# Build tools that other packages bring along but the running server never
+# loads: Next's compiler (next.config is plain JavaScript), and @swc/core,
+# ts-node and typescript (the server runs compiled from dist/). Source maps
+# go too: nothing reads them.
+RUN rm -rf \
+  node_modules/.pnpm/@next+swc-* \
+  node_modules/.pnpm/@swc+core* \
+  node_modules/.pnpm/ts-node@* \
+  node_modules/.pnpm/typescript@* && \
+  find node_modules/.pnpm -name '*.map' -type f -delete
 
 FROM base AS build
 
@@ -48,7 +58,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store CYPRESS_INSTALL_BINARY=0 pnpm 
 
 RUN pnpm build
 
-RUN rm -rf .next/cache
+RUN rm -rf .next/cache && find .next -name '*.map' -type f -delete
 
 FROM node:22.23.2-alpine3.23@sha256:46825fbbd4e996a78b7a2cdc08d75e38a5a505bdab95dcda55605359bf124bc6
 ARG SOURCE_DATE_EPOCH
@@ -62,7 +72,11 @@ USER node:node
 
 WORKDIR /app
 
-COPY --chown=node:node . .
+# Only what runs: not the source in src/ and server/, which is built into
+# .next/ and dist/.
+COPY --chown=node:node package.json next.config.mjs seerr-api.yml ./
+COPY --chown=node:node public ./public
+COPY --chown=node:node config ./config
 COPY --chown=node:node --from=prod-deps /app/node_modules ./node_modules
 COPY --chown=node:node --from=build /app/.next ./.next
 COPY --chown=node:node --from=build /app/dist ./dist

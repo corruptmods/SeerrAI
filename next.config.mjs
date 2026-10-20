@@ -1,6 +1,7 @@
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
+// Plain JavaScript, so the running server reads it without TypeScript or
+// Next's compiler, which the Docker image leaves out.
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   env: {
     commitTag: process.env.COMMIT_TAG || 'local',
   },

@@ -2,6 +2,12 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
+## Coming next
+
+### Changed
+
+- The Docker image is about 400 MB smaller: build tools and source files it never runs are left out.
+
 ## 2.0.0-beta.1 (20 October 2026)
 
 A preview of Seerr AI 2.0: themes, single sign-on, Plex, Jellyfin and Emby together, music, personal API keys and more. Back up your config folder, and your PostgreSQL database if you use one, before trying it: going back to 1.1.0 afterwards isn't supported.

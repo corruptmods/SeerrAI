@@ -52,7 +52,7 @@ Every extra can be turned off for everyone, or by each person for themselves.
 <p>
   <img src="./docs/seerr-ai/screenshots/phone-discover.jpg" alt="Discover on a phone" height="520">
   &nbsp;
-  <img src="./docs/seerr-ai/screenshots/phone-sign-in.jpg" alt="The sign-in page on a phone, with password, Plex and passkey" height="520">
+  <img src="./docs/seerr-ai/screenshots/phone-sign-in.jpg" alt="The sign-in page on a phone: Jellyfin with Quick Connect, Plex, Emby, Authentik and a Seerr AI password" height="520">
 </p>
 
 ## Install

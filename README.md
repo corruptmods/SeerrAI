@@ -39,12 +39,21 @@ Every extra can be turned off for everyone, or by each person for themselves.
 
 ## Screenshots
 
+![Discover: rows for titles deleting soon and recently added](./docs/seerr-ai/screenshots/discover.jpg)
+
+![A film's page: Play on Plex, Add to List, ratings and who requested it](./docs/seerr-ai/screenshots/title-page.jpg)
+
 | | |
 |---|---|
-| ![Discover in light mode: recent requests, trending films and series](./docs/seerr-ai/screenshots/discover.jpg) **Discover**, in light mode | ![A film's page in dark mode, with Play on Plex and a menu offering Jellyfin and Emby](./docs/seerr-ai/screenshots/title-page.jpg) **A title on three servers**: Play on each |
-| ![The Music page in dark mode with a teal accent: new music and popular albums](./docs/seerr-ai/screenshots/music.jpg) **Music**: new and popular albums | ![Requesting an artist's albums, five ticked, as one request](./docs/seerr-ai/screenshots/music-request.jpg) **Requesting music**: pick albums, one request |
-| ![Settings, Media Servers: Plex, Jellyfin and Emby connected](./docs/seerr-ai/screenshots/media-servers.jpg) **Media Servers**: connect, choose the primary one | ![Profile, Settings, Appearance: mode, accent colour and a preview](./docs/seerr-ai/screenshots/appearance.jpg) **Appearance**: everyone picks their own look |
-| ![Discover on a phone, dark with a true black background](./docs/seerr-ai/screenshots/phone-discover.jpg) **On a phone** | ![The sign-in page on a phone, with Plex, Emby, Authentik, Google, password and passkey](./docs/seerr-ai/screenshots/phone-sign-in.jpg) **Signing in**, single sign-on included |
+| ![The Music page: new music and popular albums](./docs/seerr-ai/screenshots/music.jpg) **Music**: request albums through Lidarr | ![Settings, Media Servers: Plex as the primary server, Jellyfin and Emby ready to connect](./docs/seerr-ai/screenshots/media-servers.jpg) **Media Servers**: Plex, Jellyfin and Emby, in any mix |
+
+![Profile, Settings, Appearance: mode, accent colour, dark background and a preview](./docs/seerr-ai/screenshots/appearance.jpg)
+
+<p>
+  <img src="./docs/seerr-ai/screenshots/phone-discover.jpg" alt="Discover on a phone" height="520">
+  &nbsp;
+  <img src="./docs/seerr-ai/screenshots/phone-sign-in.jpg" alt="The sign-in page on a phone, with password, Plex and passkey" height="520">
+</p>
 
 ## Install
 

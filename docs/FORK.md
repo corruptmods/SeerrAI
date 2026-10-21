@@ -212,7 +212,9 @@ left behind: the changelog lists only what has been released, and **Coming
 next** comes back with the next change. A pre-release does the same with
 its own version, such as `## 2.0.0-beta.2 (date)`, listing what changed
 since the last one; the first starts with one line saying what it
-previews.
+previews. The release after its betas has one section covering
+everything since the last release, in place of the betas' sections, as
+that is what people updating from it read.
 
 ## Layout of the fork's own code
 

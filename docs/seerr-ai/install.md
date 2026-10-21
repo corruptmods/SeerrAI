@@ -67,12 +67,12 @@ cosign verify ghcr.io/corruptmods/seerr-ai:latest \
 
 `verify-attestation --type cyclonedx`, with the same options, checks the SBOM. To accept only releases, end the identity with `@refs/tags/ai-v` instead of `@refs/`.
 
-### Trying the beta
+### Trying a beta
 
-A beta is a preview of the next version, for people happy to try new things. Seerr AI 2.0's first one is `2.0.0-beta.1`:
+A beta is a preview of the next version, for people happy to try new things. When there is one, it's on the [releases page](https://github.com/corruptmods/SeerrAI/releases) as a pre-release, named like `2.1.0-beta.1`:
 
-1. Back up the `config` folder, and your PostgreSQL database if you use one (see [backups](#before-an-update-that-changes-the-database)). A beta changes the database, and going back to an older version can't undo that.
-2. Change the image to `ghcr.io/corruptmods/seerr-ai:2.0.0-beta.1` and recreate the container.
+1. Back up the `config` folder, and your PostgreSQL database if you use one (see [backups](#before-an-update-that-changes-the-database)). A beta can change the database, and going back to an older version can't undo that.
+2. Change the image to `ghcr.io/corruptmods/seerr-ai:` followed by the beta's version, and recreate the container.
 
 `:latest` and `:1` don't move to a beta. A server running a beta is told about the next beta or release. Report problems in the [issues](https://github.com/corruptmods/SeerrAI/issues), saying which beta you run.
 
@@ -173,7 +173,7 @@ git switch dev
 
 The **Seerr AI Release** workflow (`.github/workflows/release.yml`) builds the image for amd64 and arm64, each on its own machine (arm64 on GitHub's arm64 runner), joins them into one image and publishes it to `ghcr.io/<owner>/seerr-ai` (and Docker Hub, below). Every image is then signed and given its SBOM, and both are checked; a release's page is only published once they pass.
 
-- **A release:** `git tag ai-v1.2.3 && git push origin ai-v1.2.3` publishes `:1.2.3`, `:1.2`, `:1` and `:latest`, and creates the GitHub release that **Settings → About** checks for updates against. A version with a hyphen (`ai-v1.3.0-beta.1`) is a pre-release: it gets only `:1.3.0-beta.1`, and leaves `:1.3`, `:1` and `:latest` alone. Only installs already running a pre-release are told about one; everyone else is told only of a newer stable release. The release notes are the CHANGELOG.md section whose heading is the version (`## 1.2.3`, a date in brackets after it is fine, as in `## 2.0.0-beta.1 (20 October 2026)`); a pre-release without one uses **Coming next**.
+- **A release:** `git tag ai-v1.2.3 && git push origin ai-v1.2.3` publishes `:1.2.3`, `:1.2`, `:1` and `:latest`, and creates the GitHub release that **Settings → About** checks for updates against. A version with a hyphen (`ai-v1.3.0-beta.1`) is a pre-release: it gets only `:1.3.0-beta.1`, and leaves `:1.3`, `:1` and `:latest` alone. Only installs already running a pre-release are told about one; everyone else is told only of a newer stable release. The release notes are the CHANGELOG.md section whose heading is the version (`## 1.2.3`, a date in brackets after it is fine, as in `## 2.0.0 (20 October 2026)`); a pre-release without one uses **Coming next**.
 - **Why `ai-v`:** Seerr's own tags (`v1.0.0` to `v3.x`) arrive in a copy that fetches Seerr as `upstream`, so Seerr AI's releases are tagged apart from them. Push one tag at a time; `git push --tags` would send Seerr's too.
 - **`:develop`:** pushing to `dev` publishes nothing. When `dev` is ready to share: Actions → Seerr AI Release → Run workflow, with **Use workflow from** set to `dev`.
 - **A preview:** to let someone try work that isn't on `dev` yet, push a tag `preview-<name>` (`git tag preview-music-fix && git push origin preview-music-fix`) for `:preview-music-fix`, or run the workflow by hand from that branch for `:preview-<branch>` (a `/` in its name becomes `-`). A preview never moves `:latest` or `:develop`, and creates no release. Started by hand from `main`, the workflow stops without publishing: `main` only moves for a release.

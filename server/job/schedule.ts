@@ -3,6 +3,7 @@ import animeCheck from '@server/lib/animeCheck';
 import availabilitySync from '@server/lib/availabilitySync';
 import backfill from '@server/lib/backfill/engine';
 import { maintenanceStatus, runDbMaintenance } from '@server/lib/dbMaintenance';
+import downloadCheck from '@server/lib/downloadCheck';
 import downloadTracker from '@server/lib/downloadtracker';
 import episodeSync from '@server/lib/episodeSync';
 import futureSeasons from '@server/lib/futureSeasons';
@@ -605,6 +606,22 @@ export const startJobs = (): void => {
       })
     ),
     running: () => backfill.monitorStatus().running,
+  });
+
+  // Looks at what Radarr and Sonarr grab, and at imports that get stuck
+  // (lib/downloadCheck). Does nothing until it's turned on in Settings →
+  // Backfill, and needs nothing else of Backfill's.
+  scheduledJobs.push({
+    id: 'download-check',
+    name: 'Download Check',
+    type: 'process',
+    interval: 'seconds',
+    cronSchedule: jobs['download-check'].schedule,
+    job: schedule.scheduleJob(
+      jobs['download-check'].schedule,
+      runJob('Download Check', () => downloadCheck.run())
+    ),
+    running: () => downloadCheck.status().running,
   });
 
   // Report only: folders a media server matched to a different title than

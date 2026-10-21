@@ -197,6 +197,8 @@ export interface DownloadClientSettings {
  * approves. Downloads go to the download clients set up above, under their
  * own category.
  */
+export type DownloadCheckMode = 'off' | 'report' | 'on';
+
 export interface BackfillSettings {
   enabled: boolean;
   prowlarr: {
@@ -254,6 +256,15 @@ export interface BackfillSettings {
    */
   blockedGroups: string[];
   /**
+   * Download Check (lib/downloadCheck): looks at what Radarr and Sonarr
+   * grab, before it downloads and when its import gets stuck. Works without
+   * the rest of Backfill. Changed only through its own route.
+   */
+  downloadCheck: {
+    /** off; report: say what it would do; on: do it. */
+    mode: DownloadCheckMode;
+  };
+  /**
    * The admin agent: an AI that looks further when Backfill finds nothing
    * for a requested title, and that admins can ask to find something.
    */
@@ -305,6 +316,7 @@ export const BACKFILL_DEFAULTS: BackfillSettings = {
   replaceFailed: true,
   historyDays: 90,
   blockedGroups: [],
+  downloadCheck: { mode: 'off' },
   agent: {
     autoRun: true,
     maxAutoRunsPerDay: 12,
@@ -932,6 +944,7 @@ export type JobId =
   | 'anime-check'
   | 'backfill-scan'
   | 'backfill-monitor'
+  | 'download-check'
   | 'health-watch'
   | 'plex-match-check'
   | 'music-sync'
@@ -1276,6 +1289,11 @@ class Settings {
         // once they are in, cleans up after.
         'backfill-monitor': {
           schedule: '30 * * * * *',
+        },
+        // Looks at what Radarr and Sonarr grabbed, twice a minute: off the
+        // minute, where Download Sync reads the same queues.
+        'download-check': {
+          schedule: '15,45 * * * * *',
         },
         // Checks the connected services and tells admins what newly went
         // wrong (Settings → Health).

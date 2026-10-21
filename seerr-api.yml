@@ -241,6 +241,14 @@ components:
           description: Release groups never taken. Changed only through /settings/backfill/blocked-groups; ignored here.
           items:
             type: string
+        downloadCheck:
+          type: object
+          readOnly: true
+          description: Download Check's mode. Changed only through /settings/backfill/download-check; ignored here.
+          properties:
+            mode:
+              type: string
+              enum: ['off', 'report', 'on']
     BackfillAnswer:
       type: object
       additionalProperties: true
@@ -5519,6 +5527,81 @@ paths:
                     type: array
                     items:
                       type: string
+  /settings/backfill/download-check:
+    put:
+      summary: 'Turn Download Check off, to Report only, or on'
+      description: 'Download Check looks at what Radarr and Sonarr grab, before it downloads and when its import gets stuck. With Report only it lists what it would do on the Backfill page and changes nothing. It needs nothing else of Backfill to be set up.'
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - mode
+              properties:
+                mode:
+                  type: string
+                  enum: ['off', 'report', 'on']
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mode:
+                    type: string
+                    enum: ['off', 'report', 'on']
+  /backfill/download-check:
+    get:
+      summary: "Download Check's findings"
+      description: 'The newest findings and everything waiting for an admin, newest first, with the last seven days counted.'
+      tags:
+        - backfill
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackfillAnswer'
+  /backfill/download-check/{id}:
+    post:
+      summary: 'Act on a finding, or leave it'
+      description: 'Rejects, imports, clears or removes the download as chosen, while it is still in the queue; dismiss leaves it alone for good.'
+      tags:
+        - backfill
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - choice
+              properties:
+                choice:
+                  type: string
+                  enum: [reject, import, clear, drop, dismiss]
+      responses:
+        '200':
+          description: The finding as it ends up
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackfillAnswer'
+        '409':
+          description: Dealt with already, or no longer in the queue
   /backfill:
     get:
       summary: "Backfill's overview"

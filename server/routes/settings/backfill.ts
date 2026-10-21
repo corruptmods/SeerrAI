@@ -100,8 +100,9 @@ const keyFor = (prowlarr: ProwlarrBody): string => {
 const withKey = (data: z.infer<typeof body>): BackfillSettings => ({
   ...data,
   prowlarr: { ...data.prowlarr, apiKey: keyFor(data.prowlarr) },
-  // Changed only through /blocked-groups.
+  // Changed only through /blocked-groups and /download-check.
   blockedGroups: getSettings().backfill.blockedGroups,
+  downloadCheck: getSettings().backfill.downloadCheck,
 });
 
 const prowlarrFailed = (e: unknown) => {
@@ -186,6 +187,29 @@ backfillSettingsRoutes.put('/', async (req, res, next) => {
   settings.backfill = next_;
   await settings.save();
   return res.status(200).json(shown(next_));
+});
+
+/**
+ * Turns Download Check off, to Report only, or on. Apart from the form: it
+ * needs nothing else of Backfill's to be set up.
+ */
+backfillSettingsRoutes.put('/download-check', async (req, res, next) => {
+  const parsed = z
+    .object({ mode: z.enum(['off', 'report', 'on']) })
+    .safeParse(req.body);
+  if (!parsed.success) {
+    return next({ status: 400, message: 'Choose Off, Report only or On.' });
+  }
+  const settings = getSettings();
+  settings.backfill = {
+    ...settings.backfill,
+    downloadCheck: { mode: parsed.data.mode },
+  };
+  await settings.save();
+  logger.info(`Download Check is now ${parsed.data.mode}`, {
+    label: 'Download Check',
+  });
+  return res.status(200).json(settings.backfill.downloadCheck);
 });
 
 /**

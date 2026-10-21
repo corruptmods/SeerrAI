@@ -8,6 +8,7 @@ import type { PlanEntry } from '@server/lib/backfill/plan';
 import { selectEntries } from '@server/lib/backfill/plan';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import downloadCheckRoutes from '@server/routes/downloadCheck';
 import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import { In, MoreThanOrEqual, Not, Raw } from 'typeorm';
@@ -18,6 +19,8 @@ import { z } from 'zod';
  * whether or not Backfill is set up; searching and approving need it on.
  */
 const backfillRoutes = Router();
+
+backfillRoutes.use('/download-check', downloadCheckRoutes);
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 

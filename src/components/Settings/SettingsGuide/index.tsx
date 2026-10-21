@@ -63,6 +63,8 @@ const messages = defineMessages('components.Settings.SettingsGuide', {
     'The admin agent, an AI, looks further when Backfill finds nothing. It runs on its own only if that’s on; otherwise ask it from Backfill.',
   stuck3:
     'Health lists titles processing for over a week; Search all asks Radarr and Sonarr to search for them.',
+  stuck4:
+    'Download Check, if it’s on, rejects fakes and wrong titles Radarr and Sonarr grab, and sorts out imports that get stuck. Settings → Backfill turns it on, or to Report only.',
 
   musicTitle: 'Music',
   music1:
@@ -238,6 +240,7 @@ const SettingsGuide = () => {
           <p>{t('stuck1')}</p>
           <p>{t('stuck2')}</p>
           <p>{t('stuck3')}</p>
+          <p>{t('stuck4')}</p>
         </div>
       </Section>
 

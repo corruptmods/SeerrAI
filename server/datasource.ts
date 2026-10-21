@@ -7,6 +7,7 @@ import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
 import { Blocklist } from '@server/entity/Blocklist';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
+import DownloadCheck from '@server/entity/DownloadCheck';
 import Episode from '@server/entity/Episode';
 import EpisodeRequest from '@server/entity/EpisodeRequest';
 import FutureSeasonSubscription from '@server/entity/FutureSeasonSubscription';
@@ -63,6 +64,7 @@ const entities = [
   BackfillSeries,
   Blocklist,
   DiscoverSlider,
+  DownloadCheck,
   Issue,
   IssueComment,
   Episode,

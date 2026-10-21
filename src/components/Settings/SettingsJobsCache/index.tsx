@@ -105,6 +105,7 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     'anime-check': 'Anime Check',
     'backfill-scan': 'Backfill Scan',
     'backfill-monitor': 'Backfill Downloads',
+    'download-check': 'Download Check',
     'health-watch': 'Health Alerts',
     'plex-match-check': 'Match Check',
     'music-sync': 'Music Sync',

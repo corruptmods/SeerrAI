@@ -33,7 +33,7 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | **Settings → Services → Anime** | **Leave out anime made in**: countries whose anime-styled titles don't count as anime unless they're in Japanese. | Empty (United States on servers from before the setting) |
 | **Settings → Services** | **Anime Check** report and **Run Check**. | |
 | **Settings → AI** | Provider, key, model, per-feature models (Advanced), **Daily Limit per Person**, credit. See [AI](./ai.md). | Off; 20 answers a day |
-| **Settings → Backfill** | Prowlarr, download clients, category, when a title is stuck, approval, the admin agent; limits under Advanced. See [Backfill](./backfill-and-agent.md). | Off; see below |
+| **Settings → Backfill** | Prowlarr, download clients, category, when a title is stuck, approval, the admin agent; limits under Advanced. See [Backfill](./backfill-and-agent.md). **Download Check** (Off, Report only or On) is saved on its own and needs nothing else here; see [Download Check](./download-check.md). | Off; see below |
 | **Settings → Notifications** | New types: **Plex Reauth** (always sent), **Backfill**, **Health** and **Wrong Match** (admins), and **List Activity** (each person's own settings, never a channel's). | Web push on; Wrong Match on wherever Health was |
 | **Settings → Health** | Checks, Search all, resources, and **Check new requests as they're imported** (under Titles → Folders matched to another title). See [Keeping it healthy](./health.md). | On |
 | **Settings → How It Works** | The admin overview. | |
@@ -43,6 +43,7 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | Setting | Default |
 |---|---|
 | Enabled | Off |
+| Download Check | Off |
 | Movies too | On |
 | Stuck after (since Sonarr's or Radarr's last search) | 24 hours |
 | Treat files below the cutoff as gaps | Off |
@@ -89,6 +90,7 @@ Seerr AI adds these to **Settings → Jobs & Cache**, where each can be reschedu
 | Plex User Import | hourly | With Auto-Import Plex Users on. Plex only. |
 | Backfill Scan | every 6 hours | Finds stuck titles and searches a few. Only with Backfill on. |
 | Backfill Downloads | every minute | Moves approved Backfill downloads along: picks files, imports, cleans up. |
+| Download Check | every 30 seconds | Checks what Sonarr and Radarr grabbed, and imports that got stuck. Only with Download Check on or on Report only. |
 | Health Alerts | every 10 minutes | Tells admins when a connected service newly has a problem. |
 | Anime Check | daily, 04:15 | Report: series and movies in the wrong anime folder, type or profile. |
 | Match Check | daily, 04:20 | Report: folders a connected media server (Plex, Jellyfin or Emby) matched to another title. |

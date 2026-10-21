@@ -4,6 +4,7 @@ import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import AdvancedSection from '@app/components/Settings/AdvancedSection';
 import BlockedGroups from '@app/components/Settings/SettingsBackfill/BlockedGroups';
+import DownloadCheck from '@app/components/Settings/SettingsBackfill/DownloadCheck';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -719,6 +720,7 @@ const SettingsBackfill = () => {
           );
         }}
       </Formik>
+      <DownloadCheck initial={data.downloadCheck?.mode ?? 'off'} />
       <BlockedGroups initial={data.blockedGroups ?? []} />
     </>
   );

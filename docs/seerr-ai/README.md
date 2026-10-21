@@ -21,6 +21,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 - **[Single sign-on](./single-sign-on.md#setting-it-up-admins)**: adding providers, sign-ups, who can sign in.
 - **[Music](./music.md#setting-it-up-admins)**: Lidarr, music libraries, limits.
 - **[Backfill and the admin agent](./backfill-and-agent.md)**: getting what Sonarr and Radarr can't find.
+- **[Download Check](./download-check.md)**: fakes, wrong titles and stuck imports, sorted out.
 - **[Keeping it healthy](./health.md)**: the Health page, alerts, Match Check, Anime Check.
 - **[Notifications](../using-seerr/notifications/)**: each notification service and its settings.
 - **[Configuration reference](./configuration.md)**: every setting the fork adds, its default, the jobs and the feature switches.

@@ -16,6 +16,7 @@ import animeCheck from '@server/lib/animeCheck';
 import availabilitySync from '@server/lib/availabilitySync';
 import backfill from '@server/lib/backfill/engine';
 import * as dbMaintenance from '@server/lib/dbMaintenance';
+import downloadCheck from '@server/lib/downloadCheck';
 import downloadTracker from '@server/lib/downloadtracker';
 import episodeSync from '@server/lib/episodeSync';
 import futureSeasons from '@server/lib/futureSeasons';
@@ -85,6 +86,7 @@ const stubEveryJob = () => {
     [animeCheck, 'run'],
     [backfill, 'scan'],
     [backfill, 'tick'],
+    [downloadCheck, 'run'],
     [plexMatchCheck, 'run'],
     [healthAlerts, 'run'],
     [dbMaintenance, 'runDbMaintenance'],

@@ -1,6 +1,7 @@
 import dataSource, { getRepository } from '@server/datasource';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
+import DownloadCheck from '@server/entity/DownloadCheck';
 import MusicMetadata from '@server/entity/MusicMetadata';
 import { Session } from '@server/entity/Session';
 import agent from '@server/lib/agent';
@@ -47,6 +48,7 @@ export interface MaintenanceReport {
     backfillPacks: number;
     agentConversations: number;
     musicMetadata: number;
+    downloadChecks: number;
   };
   /** VACUUM (ANALYZE) on Postgres; checkpoint, optimize and maybe VACUUM on SQLite. */
   vacuum: string;
@@ -91,6 +93,20 @@ const pruneBackfill = async (
     ...(inUse.length ? { id: Not(In(inUse)) } : {}),
   });
   return { jobs: jobs.affected ?? 0, packs: packs.affected ?? 0 };
+};
+
+/**
+ * Download Check's findings past Backfill's days kept, except those still
+ * waiting for an admin.
+ */
+const pruneDownloadChecks = async (now: number): Promise<number> => {
+  const days = getSettings().backfill.historyDays;
+  if (!days) return 0;
+  const result = await getRepository(DownloadCheck).delete({
+    createdAt: LessThan(new Date(now - days * DAY)),
+    status: Not('waiting'),
+  });
+  return result.affected ?? 0;
 };
 
 /**
@@ -145,6 +161,7 @@ export const runDbMaintenance = async (
     const backfill = await pruneBackfill(now);
     const agentConversations = await agent.purge(now);
     const musicMetadata = await pruneMusicMetadata(now);
+    const downloadChecks = await pruneDownloadChecks(now);
     let vacuumed: string;
     try {
       vacuumed = await vacuum();
@@ -164,6 +181,7 @@ export const runDbMaintenance = async (
         backfillPacks: backfill.packs,
         agentConversations,
         musicMetadata,
+        downloadChecks,
       },
       vacuum: vacuumed,
       tookMs: Date.now() - started,

@@ -1,4 +1,5 @@
 import { AgentPanel } from '@app/components/Backfill/Agent/parts';
+import DownloadCheckPanel from '@app/components/Backfill/DownloadCheck';
 import SearchAllPanel, {
   SearchAllButton,
 } from '@app/components/Backfill/SearchAll';
@@ -448,6 +449,8 @@ const BackfillDashboard = () => {
           </div>
 
           <AgentPanel />
+
+          <DownloadCheckPanel />
 
           <section className="rounded-lg bg-gray-800 ring-1 ring-gray-700">
             <div className="border-b border-gray-700 p-3">

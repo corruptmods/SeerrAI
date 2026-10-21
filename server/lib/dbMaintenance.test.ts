@@ -3,6 +3,8 @@ import AgentRun from '@server/entity/AgentRun';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
+import type { CheckStatus } from '@server/entity/DownloadCheck';
+import DownloadCheck from '@server/entity/DownloadCheck';
 import MusicMetadata from '@server/entity/MusicMetadata';
 import { Session } from '@server/entity/Session';
 import { runDbMaintenance } from '@server/lib/dbMaintenance';
@@ -146,6 +148,29 @@ describe('database maintenance', () => {
       kept('release-rg:forever', null),
     ]);
 
+    // Download Check's findings: an old one goes, unless it still waits
+    // for an admin.
+    const finding = (key: string, status: CheckStatus, at: number) =>
+      new DownloadCheck({
+        app: 'sonarr',
+        serverId: 0,
+        downloadKey: key,
+        stage: 'grab',
+        title: key,
+        itemId: 1,
+        itemTitle: 'Show',
+        finding: 'early',
+        action: status === 'waiting' ? 'review' : 'reject',
+        status,
+        createdAt: new Date(at),
+        updatedAt: new Date(at),
+      });
+    await getRepository(DownloadCheck).save([
+      finding('old-done', 'done', now - 100 * DAY),
+      finding('old-waiting', 'waiting', now - 100 * DAY),
+      finding('new-done', 'done', now - DAY),
+    ]);
+
     const report = await runDbMaintenance(now);
     assert.ok(report);
     assert.deepEqual(report.removed, {
@@ -154,7 +179,16 @@ describe('database maintenance', () => {
       backfillPacks: 2,
       agentConversations: 1,
       musicMetadata: 1,
+      downloadChecks: 1,
     });
+    assert.deepEqual(
+      (
+        await getRepository(DownloadCheck).find({
+          order: { downloadKey: 'ASC' },
+        })
+      ).map((r) => r.downloadKey),
+      ['new-done', 'old-waiting']
+    );
     assert.deepEqual(
       (await getRepository(MusicMetadata).find({ order: { key: 'ASC' } })).map(
         (m) => m.key

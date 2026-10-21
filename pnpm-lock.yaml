@@ -9,10 +9,12 @@ overrides:
   '@types/express-session': 1.18.2
   '@types/react': 19.2.14
   '@types/react-dom': 19.2.3
-  handlebars: '>=4.7.9'
+  handlebars: '>=4.7.10'
   tar: '>=7.5.19'
   nodemailer: 10.0.13
   ip-address: '>=10.7.3'
+  follow-redirects: '>=1.16.1'
+  source-map-js: '>=1.2.2'
 
 importers:
 
@@ -70,8 +72,8 @@ importers:
         specifier: 2.14.1
         version: 2.14.1
       compression:
-        specifier: 1.8.1
-        version: 1.8.1
+        specifier: 1.8.2
+        version: 1.8.2
       connect-typeorm:
         specifier: 2.0.0
         version: 2.0.0(typeorm@0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(sqlite3@5.1.7)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.23))(@types/node@22.19.0)(typescript@5.4.5)))
@@ -92,7 +94,7 @@ importers:
         version: 0.2.9
       email-templates:
         specifier: 13.0.1
-        version: 13.0.1(@babel/core@7.29.7)(handlebars@4.7.9)(mustache@4.2.0)(pug@3.0.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(underscore@1.13.8)
+        version: 13.0.1(@babel/core@7.29.7)(mustache@4.2.0)(pug@3.0.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(underscore@1.13.8)
       express:
         specifier: 5.2.1
         version: 5.2.1
@@ -1759,7 +1761,7 @@ packages:
       haml-coffee: ^1.14.1
       hamlet: ^0.3.3
       hamljs: ^0.6.2
-      handlebars: '>=4.7.9'
+      handlebars: '>=4.7.10'
       hogan.js: ^3.0.2
       htmling: ^0.0.8
       jazz: ^0.0.18
@@ -3737,8 +3739,8 @@ packages:
     resolution: {integrity: sha512-AF3r7P5dWxL8MxyITRMlORQNaOA2IkAFaTr4k7BUumjPtRpGDTZpl0Pb1XCO6JeDCBdp126Cgs9sMxqSjgYyRg==}
     engines: {node: '>= 0.6'}
 
-  compression@1.8.1:
-    resolution: {integrity: sha512-9mAqGPHLakhCLeNyxPkK4xVo746zQ/czLH1Ky+vkitMnWfWZps8r0qXuwhwizagCRttsL4lfG4pIOvaWLpAP0w==}
+  compression@1.8.2:
+    resolution: {integrity: sha512-o8vI5RE5A6EVVOd9o41jKp41aJom+QTEO/Bx8MYNjexMo/Bv2WOjUfZr+aL0WnYSgymUy6zeguqLTsIhV0gMvQ==}
     engines: {node: '>= 0.8.0'}
 
   computed-style@0.1.4:
@@ -4045,6 +4047,10 @@ packages:
   dequal@2.0.3:
     resolution: {integrity: sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==}
     engines: {node: '>=6'}
+
+  destroy@1.2.0:
+    resolution: {integrity: sha512-2sJGJTaXIIaR1w4iJSNoN0hnMY7Gpc/n8D4qSCJw8QqFWXf7cuAgnEHxBpweaVcPevC2l3KpjYCx3NypQQgaJg==}
+    engines: {node: '>= 0.8', npm: 1.2.8000 || >= 1.4.16}
 
   detect-europe-js@0.1.2:
     resolution: {integrity: sha512-lgdERlL3u0aUdHocoouzT10d9I89VVhk0qNRmll7mXdGfJT1/wqZ2ZLA4oJAjeACPY5fT1wsbq2AT+GkuInsow==}
@@ -4648,8 +4654,8 @@ packages:
   fn.name@1.1.0:
     resolution: {integrity: sha512-GRnmB5gPyJpAhTQdSZTSp9uaPSvl09KoYcMQtsB9rQoOmzs9dH6ffeccH+Z+cv6P68Hu5bC6JjRh4Ah/mHSNRw==}
 
-  follow-redirects@1.16.0:
-    resolution: {integrity: sha512-y5rN/uOsadFT/JfYwhxRS5R7Qce+g3zG97+JrtFZlC9klX/W5hD7iiLzScI4nZqUS7DNUdhPgw4xI8W2LuXlUw==}
+  follow-redirects@1.16.1:
+    resolution: {integrity: sha512-FNvFGzoMLWmE6Yj9spb/zjd7yiNCHiAW9/Tg9CXrQ8wuu32HtlJOwWO11OJafl5FfY3DxTdQ0vj42zU1kvv5jg==}
     engines: {node: '>=4.0'}
     peerDependencies:
       debug: '*'
@@ -4866,8 +4872,8 @@ packages:
     resolution: {integrity: sha512-AiU83cghGg2D8vAUwrMXCByejkkm4RtLwMNGmPU7VhqBYhsxcBCV0SAzRpYNbUCpTci5v46J/KFKPmDYaG2oyA==}
     engines: {node: '>=12'}
 
-  handlebars@4.7.9:
-    resolution: {integrity: sha512-4E71E0rpOaQuJR2A3xDZ+GM1HyWYv1clR58tC8emQNeQe3RH7MAzSbat+V0wG78LQBo6m6bzSG/L4pBuCsgnUQ==}
+  handlebars@4.7.10:
+    resolution: {integrity: sha512-P5VJMVM7qgBn6vjXMw8WG9uVI+ncf2pi72j4de4yz5ZULLj2RGqLYaKOYGsgyrViQ0tePOVlN1tDCCXXtFqXKg==}
     engines: {node: '>=0.4.7'}
     hasBin: true
 
@@ -7263,8 +7269,8 @@ packages:
   sorted-array-functions@1.3.0:
     resolution: {integrity: sha512-2sqgzeFlid6N4Z2fUQ1cvFmTOLRi/sEDzSQ0OKYchqgoPmQBVyM3959qYx3fpS6Esef80KjmpgPeEr028dP3OA==}
 
-  source-map-js@1.2.1:
-    resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
+  source-map-js@1.2.2:
+    resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
     engines: {node: '>=0.10.0'}
 
   source-map-support@0.5.13:
@@ -9897,10 +9903,9 @@ snapshots:
 
   '@jsdevtools/ono@7.1.3': {}
 
-  '@ladjs/consolidate@1.0.4(@babel/core@7.29.7)(handlebars@4.7.9)(lodash@4.18.1)(mustache@4.2.0)(pug@3.0.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(underscore@1.13.8)':
+  '@ladjs/consolidate@1.0.4(@babel/core@7.29.7)(lodash@4.18.1)(mustache@4.2.0)(pug@3.0.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(underscore@1.13.8)':
     optionalDependencies:
       '@babel/core': 7.29.7
-      handlebars: 4.7.9
       lodash: 4.18.1
       mustache: 4.2.0
       pug: 3.0.4
@@ -11460,7 +11465,7 @@ snapshots:
 
   axios@1.20.0:
     dependencies:
-      follow-redirects: 1.16.0
+      follow-redirects: 1.16.1
       form-data: 4.0.6
       https-proxy-agent: 5.0.1
       proxy-from-env: 2.1.0
@@ -11991,11 +11996,12 @@ snapshots:
     dependencies:
       mime-db: 1.54.0
 
-  compression@1.8.1:
+  compression@1.8.2:
     dependencies:
       bytes: 3.1.2
       compressible: 2.0.18
       debug: 2.6.9
+      destroy: 1.2.0
       negotiator: 0.6.4
       on-headers: 1.1.0
       safe-buffer: 5.2.1
@@ -12165,12 +12171,12 @@ snapshots:
   css-tree@2.2.1:
     dependencies:
       mdn-data: 2.0.28
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   css-tree@2.3.1:
     dependencies:
       mdn-data: 2.0.30
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   css-what@6.2.2: {}
 
@@ -12344,6 +12350,8 @@ snapshots:
 
   dequal@2.0.3: {}
 
+  destroy@1.2.0: {}
+
   detect-europe-js@0.1.2: {}
 
   detect-file@1.0.0: {}
@@ -12467,9 +12475,9 @@ snapshots:
 
   electron-to-chromium@1.5.433: {}
 
-  email-templates@13.0.1(@babel/core@7.29.7)(handlebars@4.7.9)(mustache@4.2.0)(pug@3.0.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(underscore@1.13.8):
+  email-templates@13.0.1(@babel/core@7.29.7)(mustache@4.2.0)(pug@3.0.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(underscore@1.13.8):
     dependencies:
-      '@ladjs/consolidate': 1.0.4(@babel/core@7.29.7)(handlebars@4.7.9)(lodash@4.18.1)(mustache@4.2.0)(pug@3.0.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(underscore@1.13.8)
+      '@ladjs/consolidate': 1.0.4(@babel/core@7.29.7)(lodash@4.18.1)(mustache@4.2.0)(pug@3.0.4)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(underscore@1.13.8)
       '@ladjs/i18n': 10.0.0
       get-paths: 0.0.7
       html-to-text: 9.0.5
@@ -13229,7 +13237,7 @@ snapshots:
 
   fn.name@1.1.0: {}
 
-  follow-redirects@1.16.0: {}
+  follow-redirects@1.16.1: {}
 
   for-each@0.3.5:
     dependencies:
@@ -13481,7 +13489,7 @@ snapshots:
       md5-hex: 4.0.0
       type-fest: 1.4.0
 
-  handlebars@4.7.9:
+  handlebars@4.7.10:
     dependencies:
       minimist: 1.2.8
       neo-async: 2.6.2
@@ -15652,13 +15660,13 @@ snapshots:
     dependencies:
       nanoid: 3.3.19
       picocolors: 1.1.1
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   postcss@8.5.28:
     dependencies:
       nanoid: 3.3.19
       picocolors: 1.1.1
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   postgres-array@2.0.0: {}
 
@@ -16514,7 +16522,7 @@ snapshots:
 
   sorted-array-functions@1.3.0: {}
 
-  source-map-js@1.2.1: {}
+  source-map-js@1.2.2: {}
 
   source-map-support@0.5.13:
     dependencies:
@@ -16954,7 +16962,7 @@ snapshots:
     dependencies:
       bs-logger: 0.2.6
       fast-json-stable-stringify: 2.1.0
-      handlebars: 4.7.9
+      handlebars: 4.7.10
       jest: 30.2.0(@types/node@22.19.0)(babel-plugin-macros@3.1.0)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.23))(@types/node@22.19.0)(typescript@5.4.5))
       json5: 2.2.3
       lodash.memoize: 4.1.2

@@ -10,9 +10,18 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ## 2.0.1 (21 October 2026)
 
-### Fixed
+### Security
 
-- Security updates: Node.js 22.23.4, with fixes to TLS, DNS and Brotli handling, and newer versions of the packages used to follow redirects and compress responses.
+- Node.js 22.23.4 ([release notes](https://nodejs.org/en/blog/release/v22.23.4)):
+  - CVE-2026-111497: out-of-bounds write in the Brotli decoder, possible remote code execution
+  - CVE-2026-106069, CVE-2026-106072: TLS hostname checks passed with a non-canonical IP address
+  - CVE-2026-105482: `dns.resolve` cut names off at a NUL byte
+  - CVE-2026-105481: a keep-alive socket could take a response written before its request
+  - CVE-2026-106074, CVE-2026-106073: random values repeated after a snapshot, and a permission model gap; neither is used by Seerr AI
+- [CVE-2026-111756](https://github.com/advisories/GHSA-q3jh-wrc6-jgq8), [CVE-2026-111755](https://github.com/advisories/GHSA-8r9p-f939-6h3c): follow-redirects 1.16.1, so API keys and passwords aren't passed on to another site after a redirect
+- [CVE-2026-87776](https://github.com/advisories/GHSA-vc2v-76pw-4v95): compression 1.8.2, a memory leak when a response is closed early
+- [CVE-2026-106446](https://github.com/advisories/GHSA-8r5x-fm3f-whwj), [CVE-2026-106445](https://github.com/advisories/GHSA-p8wg-vrv2-v86f), [CVE-2026-106444](https://github.com/advisories/GHSA-xw65-4hp5-5hc7): handlebars 4.7.10, template injection; never used, as Seerr AI's emails use Pug, and no longer in the image
+- [CVE-2026-93749](https://github.com/advisories/GHSA-68fv-2mgg-jv7q): source-map-js 1.2.2, slow source maps; build only
 
 ## 2.0.0 (20 October 2026)
 

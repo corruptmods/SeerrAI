@@ -10,12 +10,17 @@ merged back in.
 there, or to cherry-pick a fix worth having. Nothing is expected to merge
 cleanly, and nothing has to.
 
-Upstream `develop` has been read through `31b100dde` (19 October 2026).
+Upstream `develop` has been read through `62ed636b0` (21 October 2026).
 Its two security advisories there are covered: GHSA-xc6j-6p6h-p799 (other
 people's details and issues in a title's media info) by `mediaForViewer`,
 done here before upstream's fix; GHSA-8j73-j6rc-q8xh (notification
 credentials in every embedded user) by `User.toJSON`. Start the next read
 from that commit.
+
+From `31b100dde` to `62ed636b0`: #3639 (Node.js 22.23.4) was done here
+as 2.0.1, with the same image digest; #3425 is taken (the watchlist POST
+body and its 201 answer in the API spec). The rest was CI, the Helm chart
+and contributor docs.
 
 From `8f2eceea` to `31b100dde`, #3630 is taken: when a title arrives,
 the requests it completes are saved one at a time, because saved together
@@ -215,6 +220,35 @@ since the last one; the first starts with one line saying what it
 previews. The release after its betas has one section covering
 everything since the last release, in place of the betas' sections, as
 that is what people updating from it read.
+
+A release that fixes a security problem says so under **Security**, as
+upstream does: each fix with its CVE ID (or GHSA ID when it has no CVE),
+linked to the advisory, and one short line on what it was and whether
+Seerr AI could be reached through it.
+
+## Security pins
+
+`package.json` can't hold comments, so each override that holds a package
+past an advisory is recorded here. Raise a pin when a newer advisory
+covers the version it allows; drop it once nothing in the tree resolves
+below it on its own (`pnpm why <package>`).
+
+| Override | Keeps out | Notes |
+|---|---|---|
+| `handlebars >=4.7.10` | [CVE-2026-106446](https://github.com/advisories/GHSA-8r5x-fm3f-whwj), [CVE-2026-106445](https://github.com/advisories/GHSA-p8wg-vrv2-v86f), [CVE-2026-106444](https://github.com/advisories/GHSA-xw65-4hp5-5hc7), and the 4.7.8 advisories ([GHSA-2w6w-674q-4c4q](https://github.com/advisories/GHSA-2w6w-674q-4c4q) and others) | Only through eslint-plugin-formatjs (ts-jest), a development tool; nothing in the image uses it |
+| `follow-redirects >=1.16.1` | [CVE-2026-111756](https://github.com/advisories/GHSA-q3jh-wrc6-jgq8), [CVE-2026-111755](https://github.com/advisories/GHSA-8r9p-f939-6h3c) | Through axios: credential headers sent on after a cross-origin redirect |
+| `source-map-js >=1.2.2` | [CVE-2026-93749](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) | Through Next's PostCSS; build only |
+| `tar >=7.5.21` | [GHSA-23hp-3jrh-7fpw](https://github.com/advisories/GHSA-23hp-3jrh-7fpw), [GHSA-r292-9mhp-454m](https://github.com/advisories/GHSA-r292-9mhp-454m) | Through sqlite3's build; denial of service on unpacking |
+| `nodemailer 10.0.13` | [GHSA-v53p-9fqp-m79j](https://github.com/advisories/GHSA-v53p-9fqp-m79j), [GHSA-6vj9-mwq6-2f5v](https://github.com/advisories/GHSA-6vj9-mwq6-2f5v), [GHSA-8vvx-rff5-p5rq](https://github.com/advisories/GHSA-8vvx-rff5-p5rq) and the 9.x advisories | Sends every email |
+| `ip-address >=10.7.3` | The ip-address advisories up to 10.7.0 (subnet checks across address families, leading-zero octets) | Only through node-gyp's proxy support, while sqlite3 is built |
+
+`compression` is a direct dependency, held at 1.8.2 for
+[CVE-2026-87776](https://github.com/advisories/GHSA-vc2v-76pw-4v95). Two advisories are knowingly
+left: [CVE-2026-93748](https://github.com/advisories/GHSA-ch52-4w7c-c8xp) (http-cache-semantics, no
+fixed version) and [CVE-2026-3449](https://github.com/advisories/GHSA-vpq2-c234-7xj6)
+(@tootallnate/once), both inside node-gyp, which only runs while sqlite3
+is built. The Node.js version is pinned by digest in the Dockerfiles;
+2.0.1 moved it to 22.23.4 for the October 2026 security release.
 
 ## Layout of the fork's own code
 

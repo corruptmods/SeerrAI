@@ -638,6 +638,24 @@ components:
             Admin only. Also remove the title from Radarr/Sonarr and delete its
             files, adding an import exclusion so the *arr's lists cannot re-add
             it.
+    WatchlistRequest:
+      type: object
+      required:
+        - tmdbId
+        - mediaType
+      properties:
+        tmdbId:
+          type: number
+          example: 1
+        mediaType:
+          type: string
+          enum:
+            - movie
+            - tv
+        ratingKey:
+          type: string
+        title:
+          type: string
     Watchlist:
       type: object
       properties:
@@ -11121,9 +11139,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Watchlist'
+              $ref: '#/components/schemas/WatchlistRequest'
       responses:
-        '200':
+        '201':
           description: Watchlist data returned
           content:
             application/json:

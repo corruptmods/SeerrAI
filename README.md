@@ -41,6 +41,8 @@ Every extra can be turned off for everyone, or by each person for themselves.
 
 | | |
 |---|---|
+| ![The AI panel over Discover, with example requests and problem reports](./docs/seerr-ai/screenshots/ai-search.jpg)<br>**AI Search**: describe a title, request a franchise or report a problem | ![Backfill: stuck titles, missing episodes and the admin agent's recent work](./docs/seerr-ai/screenshots/backfill.jpg)<br>**Backfill**: finds what Sonarr and Radarr can't |
+| ![Health: CPU and memory, every connected service, and what needs attention](./docs/seerr-ai/screenshots/health.jpg)<br>**Health**: every service and what needs attention | ![Calendar: releases and episodes for today, tomorrow and the week ahead](./docs/seerr-ai/screenshots/calendar.jpg)<br>**Calendar**: what's coming |
 | ![Discover: titles deleting soon, recently added and recent requests](./docs/seerr-ai/screenshots/discover.jpg)<br>**Discover** | ![A film's page: poster, overview and crew](./docs/seerr-ai/screenshots/title-page.jpg)<br>**A title page** |
 | ![The Music page: new music and popular albums](./docs/seerr-ai/screenshots/music.jpg)<br>**Music**, requested through Lidarr | ![Settings, Media Servers: Plex as the primary server, Jellyfin and Emby ready to connect](./docs/seerr-ai/screenshots/media-servers.jpg)<br>**Media Servers**: Plex, Jellyfin and Emby, in any mix |
 | ![Profile, Settings, Appearance: mode, accent colour and dark background](./docs/seerr-ai/screenshots/appearance.jpg)<br>**Appearance**: everyone picks their own look | ![On a phone: Discover, and the sign-in page with Jellyfin, Quick Connect, Plex, Emby, Authentik and a Seerr AI password](./docs/seerr-ai/screenshots/phones.jpg)<br>**On a phone**, with every way to sign in |

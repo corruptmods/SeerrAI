@@ -8,6 +8,12 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - **Download Check**: rejects fakes, other titles and copies no better than yours before they download, and sorts out imports that get stuck, importing the right title when it's named another way. Start with Report only, in Settings → Backfill. ([guide](./docs/seerr-ai/download-check.md))
 
+## 2.0.1 (21 October 2026)
+
+### Fixed
+
+- Security updates: Node.js 22.23.4, with fixes to TLS, DNS and Brotli handling, and newer versions of the packages used to follow redirects and compress responses.
+
 ## 2.0.0 (20 October 2026)
 
 Themes, single sign-on, Plex, Jellyfin and Emby together, music, personal API keys and more. Back up your config folder, and your PostgreSQL database if you use one, before updating: 2.0 changes the database, and going back to 1.1.0 isn't supported. `:1` stays on 1.1.0; use `:latest` or `:2` to get 2.0.

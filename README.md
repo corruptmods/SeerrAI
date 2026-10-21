@@ -39,21 +39,11 @@ Every extra can be turned off for everyone, or by each person for themselves.
 
 ## Screenshots
 
-![Discover: rows for titles deleting soon and recently added](./docs/seerr-ai/screenshots/discover.jpg)
-
-![A film's page: Play on Plex, Add to List, ratings and who requested it](./docs/seerr-ai/screenshots/title-page.jpg)
-
 | | |
 |---|---|
-| ![The Music page: new music and popular albums](./docs/seerr-ai/screenshots/music.jpg) **Music**: request albums through Lidarr | ![Settings, Media Servers: Plex as the primary server, Jellyfin and Emby ready to connect](./docs/seerr-ai/screenshots/media-servers.jpg) **Media Servers**: Plex, Jellyfin and Emby, in any mix |
-
-![Profile, Settings, Appearance: mode, accent colour, dark background and a preview](./docs/seerr-ai/screenshots/appearance.jpg)
-
-<p>
-  <img src="./docs/seerr-ai/screenshots/phone-discover.jpg" alt="Discover on a phone" height="520">
-  &nbsp;
-  <img src="./docs/seerr-ai/screenshots/phone-sign-in.jpg" alt="The sign-in page on a phone: Jellyfin with Quick Connect, Plex, Emby, Authentik and a Seerr AI password" height="520">
-</p>
+| ![Discover: titles deleting soon, recently added and recent requests](./docs/seerr-ai/screenshots/discover.jpg)<br>**Discover** | ![A film's page: poster, overview and crew](./docs/seerr-ai/screenshots/title-page.jpg)<br>**A title page** |
+| ![The Music page: new music and popular albums](./docs/seerr-ai/screenshots/music.jpg)<br>**Music**, requested through Lidarr | ![Settings, Media Servers: Plex as the primary server, Jellyfin and Emby ready to connect](./docs/seerr-ai/screenshots/media-servers.jpg)<br>**Media Servers**: Plex, Jellyfin and Emby, in any mix |
+| ![Profile, Settings, Appearance: mode, accent colour and dark background](./docs/seerr-ai/screenshots/appearance.jpg)<br>**Appearance**: everyone picks their own look | ![On a phone: Discover, and the sign-in page with Jellyfin, Quick Connect, Plex, Emby, Authentik and a Seerr AI password](./docs/seerr-ai/screenshots/phones.jpg)<br>**On a phone**, with every way to sign in |
 
 ## Install
 

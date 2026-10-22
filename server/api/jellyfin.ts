@@ -199,7 +199,6 @@ export interface JellyfinUserItemsResponse {
   TotalRecordCount: number;
 }
 
-/** One account on the server, with whether it is switched off. */
 /** One device's session, as /Sessions lists it. */
 export interface JellyfinSession {
   UserId?: string;
@@ -219,6 +218,7 @@ export interface JellyfinSession {
   PlayState?: { IsPaused?: boolean };
 }
 
+/** One account on the server, with whether it is switched off. */
 export interface JellyfinAccount {
   Name: string;
   Id: string;

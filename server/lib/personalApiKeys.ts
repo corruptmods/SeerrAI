@@ -300,7 +300,13 @@ export const authenticateApiKey = async (
 
   // A Siri key reports what is playing, and nothing else. It is for
   // whoever may report with Siri, whether or not they may make keys.
-  if (key.scope === 'siri') {
+  // Any scope but none is limited, and one this version doesn't know
+  // works nowhere: a key never does more than it was made for.
+  if (key.scope) {
+    if (key.scope !== 'siri') {
+      logRefusal(req, 'outsideScope', details);
+      return { status: 403, message: 'This API key cannot be used here.' };
+    }
     if (!SIRI_PATH.test(req.originalUrl.split('?')[0])) {
       logRefusal(req, 'outsideScope', details);
       return {
@@ -314,7 +320,7 @@ export const authenticateApiKey = async (
     }
   }
 
-  const status = key.scope === 'siri' ? 'on' : apiKeyStatus(user);
+  const status = key.scope ? 'on' : apiKeyStatus(user);
   if (status === 'off') {
     logRefusal(req, 'switchedOff', details);
     return {

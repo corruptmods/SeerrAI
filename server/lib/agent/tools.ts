@@ -24,6 +24,12 @@ import {
   describeSeasonReplace,
 } from '@server/lib/agent/changes';
 import {
+  episodeByTitle,
+  indexerReading,
+  nameReading,
+  sceneDiffers,
+} from '@server/lib/agent/numbering';
+import {
   MIN_VIDEO_BYTES,
   UNKNOWN_QUALITY,
   checkMapping,
@@ -56,6 +62,7 @@ import type { RadarrMovieDetail } from '@server/lib/backfill/radarr';
 import { relinkEpisodeFile } from '@server/lib/backfill/relink';
 import type {
   ArrSearchRelease,
+  SonarrEpisode,
   SonarrSeriesDetail,
 } from '@server/lib/backfill/sonarr';
 import { blockedGroupOf } from '@server/lib/blockedGroups';
@@ -573,6 +580,10 @@ const titleStatus: AgentTool = {
           `${episodeLabel(ep.seasonNumber, ep.episodeNumber)}${
             ep.absoluteEpisodeNumber ? ` #${ep.absoluteEpisodeNumber}` : ''
           } "${ep.title ?? ''}" ${ep.airDateUtc?.slice(0, 10) ?? ''}${
+            sceneDiffers(ep)
+              ? ` (scene ${episodeLabel(ep.sceneSeasonNumber!, ep.sceneEpisodeNumber!)})`
+              : ''
+          }${
             queuedIds.has(ep.id)
               ? ' [downloading in Sonarr]'
               : backfilling.has(ep.id)
@@ -589,6 +600,9 @@ const titleStatus: AgentTool = {
           : ''
       }.`,
       ...seasonLines,
+      episodes.some(sceneDiffers)
+        ? "Sonarr numbers this series by the scene's seasons (TheXEM): it searches for an episode by its scene number, shown in brackets, and reads every release name that way, so a release named by the library's numbers can be read as another episode. Search by each episode's title too, and go by titles."
+        : '',
       `Missing, monitored and aired (${missing.length}):`,
       ...missingLines,
       missing.length > MAX_LISTED_MISSING
@@ -666,12 +680,15 @@ const releaseLine = (
     why?: string[];
     /** It failed to download for this title before. */
     failed?: boolean;
+    /** Which library episode it is, by its name. */
+    reading?: string;
   }
 ) => {
   const blocked = blockedGroupOf(known.title);
   return [
     known.ref,
     extra.what,
+    extra.reading,
     sizeOf(known.size),
     known.protocol === 'torrent' ? `${known.seeders ?? 0} seeders` : 'usenet',
     extra.quality,
@@ -766,6 +783,40 @@ const arrSearch = async (
   return { results: search.results ?? [], ageMs: Date.now() - search.doneAt };
 };
 
+/**
+ * A series' episodes and the names releases call it by, to say which
+ * library episode a release is. Empty when the series cannot be read.
+ */
+const libraryOf = async (
+  title: TitleRef
+): Promise<{ episodes: SonarrEpisode[]; names: string[] }> => {
+  try {
+    const sonarr = backfill.sonarrFor(title.serverId);
+    const [series, episodes] = await Promise.all([
+      sonarr.getSeriesDetail(title.arrId),
+      sonarr.getSeriesEpisodes(title.arrId),
+    ]);
+    const names = [
+      series.title,
+      series.title.replace(/\s*\(\d{4}\)$/, ''),
+      ...(series.originalTitle ? [series.originalTitle] : []),
+      ...(series.alternateTitles ?? []).map((alt) => alt.title),
+    ].filter(Boolean);
+    return { episodes, names };
+  } catch {
+    return { episodes: [], names: [] };
+  }
+};
+
+/** What a release is by its name, when it is one of this series' at all. */
+const readingOf = (
+  name: string,
+  library: { episodes: SonarrEpisode[]; names: string[] }
+): string | undefined =>
+  library.episodes.length && mentionsShow(name, library.names)
+    ? indexerReading(name, library.episodes) || undefined
+    : undefined;
+
 const minutes = (ms: number) => Math.max(1, Math.round(ms / 60_000));
 
 const searchReleases: AgentTool = {
@@ -796,6 +847,8 @@ const searchReleases: AgentTool = {
     let key: string;
     let start: () => Promise<ArrSearchRelease[]>;
     let what: string;
+    /** Said when an episode searched by its scene number finds nothing. */
+    let sceneHint = '';
     if (title.kind === 'movie') {
       const radarr = backfill.radarrFor(title.serverId);
       key = titleRef(title);
@@ -817,6 +870,12 @@ const searchReleases: AgentTool = {
         }
         key = `${titleRef(title)}:${season}:${episode}`;
         start = () => sonarr.getReleases({ episodeId: target.id });
+        if (sceneDiffers(target)) {
+          sceneHint = ` Sonarr searched for it by its scene number, ${episodeLabel(
+            target.sceneSeasonNumber!,
+            target.sceneEpisodeNumber!
+          )}: use search_indexers with ${episodeLabel(season, episode)} and with its title, "${target.title ?? ''}".`;
+        }
         what = `Sonarr is still searching for ${episodeLabel(season, episode)}`;
       } else {
         key = `${titleRef(title)}:${season}`;
@@ -862,14 +921,50 @@ const searchReleases: AgentTool = {
         ? ` (from a search ${minutes(found.ageMs)} min ago)`
         : '';
     if (!results.length) {
-      return `No results from any indexer${earlier}${others}.`;
+      return `No results from any indexer${earlier}${others}.${sceneHint}`;
     }
-    const sorted = [...results].sort(
-      (a, b) =>
-        Number(!!b.approved) - Number(!!a.approved) ||
-        (b.seeders ?? 0) - (a.seeders ?? 0)
-    );
     const failed = await failedReleases(title);
+    // The library's episodes, to say which each release is by its title as
+    // well as by Sonarr's mapping.
+    const library =
+      title.kind === 'series'
+        ? await libraryOf(title)
+        : { episodes: [] as SonarrEpisode[], names: [] as string[] };
+    // Accepted first, then what is for a missing episode (by Sonarr's
+    // mapping or the name's title), then anything Sonarr placed, then what
+    // it could not: otherwise a search Sonarr accepted nothing from shows
+    // its first 30 rows of other shows.
+    const missingIds = new Set(
+      library.episodes.filter((ep) => !ep.hasFile).map((ep) => ep.id)
+    );
+    const rankOf = (r: ArrSearchRelease) => {
+      if (r.approved) return 3;
+      const mappedIds = library.episodes
+        .filter(
+          (ep) =>
+            ep.seasonNumber === (r.mappedSeasonNumber ?? season) &&
+            (r.mappedEpisodeNumbers ?? []).includes(ep.episodeNumber)
+        )
+        .map((ep) => ep.id);
+      const titled =
+        library.episodes.length && mentionsShow(r.title, library.names)
+          ? episodeByTitle(r.title, library.episodes)
+          : undefined;
+      if (
+        mappedIds.some((id) => missingIds.has(id)) ||
+        (titled && missingIds.has(titled.id)) ||
+        (r.fullSeason && title.kind === 'series')
+      ) {
+        return 2;
+      }
+      return r.mappedEpisodeNumbers?.length || r.fullSeason ? 1 : 0;
+    };
+    const sorted = [...results]
+      .map((r) => ({ r, rank: rankOf(r) }))
+      .sort(
+        (a, b) => b.rank - a.rank || (b.r.seeders ?? 0) - (a.r.seeders ?? 0)
+      )
+      .map(({ r }) => r);
     const lines: string[] = [];
     for (const result of sorted.slice(0, MAX_LISTED_RELEASES)) {
       const release = asRelease(result);
@@ -893,9 +988,24 @@ const searchReleases: AgentTool = {
                     )
                     .join(',')
                 : 'unmapped';
+      const mapped =
+        title.kind === 'series' &&
+        result.mappedEpisodeNumbers?.length === 1 &&
+        !(result.seasonNumbers && result.seasonNumbers.length > 1) &&
+        !result.fullSeason
+          ? library.episodes.find(
+              (ep) =>
+                ep.seasonNumber ===
+                  (result.mappedSeasonNumber ?? season ?? 0) &&
+                ep.episodeNumber === result.mappedEpisodeNumbers![0]
+            )
+          : undefined;
       lines.push(
         releaseLine(known, {
           what,
+          reading: mapped
+            ? nameReading(result.title, library.episodes, mapped)
+            : readingOf(result.title, library),
           quality: result.quality?.quality.name,
           approved: result.approved,
           why: reasonsOf(result),
@@ -962,13 +1072,20 @@ const searchIndexers: AgentTool = {
     const rank = (r: ProwlarrRelease) =>
       r.protocol === 'usenet' ? 50 : (r.seeders ?? 0);
     // Releases that failed for the title it is working on are marked.
-    const failed = await failedReleases(boundTitle(state.run));
+    const bound = boundTitle(state.run);
+    const failed = await failedReleases(bound);
+    // Which episode of the series it works on each one is, by its name.
+    const library =
+      kind === 'series' && bound?.kind === 'series'
+        ? await libraryOf(bound)
+        : { episodes: [] as SonarrEpisode[], names: [] as string[] };
     const lines = [...results]
       .sort((a, b) => rank(b) - rank(a))
       .slice(0, MAX_LISTED_RELEASES)
       .map((release) =>
         releaseLine(remember(state, release, 'prowlarr'), {
           failed: failed(release),
+          reading: readingOf(release.title, library),
         })
       );
     return `${results.length} results${
@@ -1185,10 +1302,12 @@ interface PreparedGrab {
 
 /**
  * A Usenet post packed in archives or with scrambled names, taken whole:
- * what is inside is only known once the Usenet client has it, so its name has to be
- * the proof. Sonarr
- * (or Radarr) must read the name as exactly this one missing episode (or
- * this movie), in a language that is wanted; its one video is imported.
+ * what is inside is only known once the Usenet client has it, so its name
+ * has to be the proof. Sonarr (or Radarr) must read the name as exactly
+ * this one missing episode (or this movie), in a language that is wanted;
+ * its one video is imported as that episode. For a series Sonarr numbers by
+ * scene numbering, a name numbered the library's way counts too, when it
+ * carries the episode's own title.
  */
 const prepareWhole = async (
   state: AgentState,
@@ -1280,18 +1399,45 @@ const prepareWhole = async (
         }. Only a release that is exactly one episode can be taken unopened; for more, choose a release that can be opened.`
       );
     }
-    const episode = read[0];
-    if (
-      wanted.season !== episode.seasonNumber ||
-      wanted.episode !== episode.episodeNumber
-    ) {
+    // The episode it is: Sonarr's reading, unless Sonarr reads the name by
+    // scene numbering and the name, numbered the library's way, carries the
+    // wanted episode's title. The title must not say another episode.
+    const mapped = read[0];
+    const wantedEp = seriesCtx.episodes.find(
+      (ep) =>
+        ep.seasonNumber === wanted.season && ep.episodeNumber === wanted.episode
+    );
+    const byTitle = episodeByTitle(known.title, seriesCtx.episodes);
+    const sameAsWanted =
+      wanted.season === mapped.seasonNumber &&
+      wanted.episode === mapped.episodeNumber;
+    const namedAsWanted =
+      !!wantedEp &&
+      info?.seasonNumber === wanted.season &&
+      info?.episodeNumbers?.length === 1 &&
+      info.episodeNumbers[0] === wanted.episode &&
+      byTitle?.id === wantedEp.id;
+    if (!sameAsWanted && !namedAsWanted) {
       throw new ToolError(
         `Sonarr reads "${known.title}" as ${episodeLabel(
-          episode.seasonNumber,
-          episode.episodeNumber
-        )}, not ${episodeLabel(wanted.season ?? 0, wanted.episode ?? 0)}. Nothing was started.`
+          mapped.seasonNumber,
+          mapped.episodeNumber
+        )}, not ${episodeLabel(wanted.season ?? 0, wanted.episode ?? 0)}${
+          byTitle
+            ? `, and its title is ${episodeLabel(byTitle.seasonNumber, byTitle.episodeNumber)} "${byTitle.title ?? ''}"`
+            : ''
+        }. Nothing was started.`
       );
     }
+    if (sameAsWanted && byTitle && byTitle.id !== mapped.id) {
+      throw new ToolError(
+        `Sonarr reads "${known.title}" as ${episodeLabel(
+          mapped.seasonNumber,
+          mapped.episodeNumber
+        )}, but its title is ${episodeLabel(byTitle.seasonNumber, byTitle.episodeNumber)} "${byTitle.title ?? ''}". Nothing was started.`
+      );
+    }
+    const episode = sameAsWanted ? mapped : wantedEp!;
     const queued = new Set(
       await seriesCtx.sonarr
         .getSeriesQueueEpisodes(series.id)
@@ -1547,6 +1693,22 @@ const prepareGrab = async (
         );
         throw new ToolError(
           `Nothing was started. File #${file.index} "${fileName}" is ${rangeLabel(season, holds)} by its name, but it was given ${label}. Give it every episode it holds: episodes: [${holds.join(', ')}].`
+        );
+      }
+      // A name carrying another episode's title is that episode, whatever
+      // its number says: releases number seasons their own way (a special
+      // counted as episode 1, scene seasons), and the title does not lie.
+      const titled = episodeByTitle(fileName, ctx.episodes);
+      if (titled && !episodes.some((e) => e.id === titled.id)) {
+        throw new ToolError(
+          `Nothing was started. File #${file.index} "${fileName}" is ${episodeLabel(
+            titled.seasonNumber,
+            titled.episodeNumber
+          )} "${titled.title ?? ''}" by its title${
+            titled.hasFile ? ', which is on disk' : ''
+          }, not ${label} ${full
+            .map((e) => `"${e?.title ?? ''}"`)
+            .join(' + ')}. Map each file by its title, not its number.`
         );
       }
       const named =
@@ -2330,6 +2492,123 @@ const elsewhere = (
   return titleRef(asked) === own
     ? null
     : `This conversation is only about ${run.title ?? 'its title'} (${own}). No admin is in it, so no other title is looked at or changed.`;
+};
+
+/** A tool call as the run made it, to tell what it has looked for. */
+export interface MadeCall {
+  name: string;
+  input: Record<string, unknown>;
+}
+
+/** What one search's words name: episodes, whole seasons, numbers, text. */
+interface SearchWords {
+  episodes: Set<string>;
+  seasons: Set<number>;
+  /** Numbers standing alone ("Show 152", "[152]"), for anime. */
+  numbers: Set<number>;
+  text: string;
+}
+
+const readSearch = (query: string): SearchWords => {
+  const episodes = new Set<string>();
+  const seasons = new Set<number>();
+  const numbers = new Set<number>();
+  for (const m of query.matchAll(
+    /(?:^|[^a-z0-9])s(\d{1,3})(?:[ ._-]?e(\d{1,4}))?(?=[^0-9]|$)|(?:^|[^0-9])(\d{1,2})x(\d{1,3})(?=[^0-9]|$)|\bseason (\d{1,3})\b/gi
+  )) {
+    if (m[1] !== undefined && m[2] !== undefined) {
+      episodes.add(`${Number(m[1])}:${Number(m[2])}`);
+    } else if (m[1] !== undefined) {
+      seasons.add(Number(m[1]));
+    } else if (m[3] !== undefined) {
+      episodes.add(`${Number(m[3])}:${Number(m[4])}`);
+    } else if (m[5] !== undefined) {
+      seasons.add(Number(m[5]));
+    }
+  }
+  // Standing alone: the 04 of S03E04 is not episode 4 overall.
+  for (const m of query.matchAll(/(?:^|[\s#[(-])(\d{1,4})(?=[\s\])-]|$)/g)) {
+    numbers.add(Number(m[1]));
+  }
+  return { episodes, seasons, numbers, text: normalize(query) };
+};
+
+/** Whether a search's words name this episode: its number, or its title. */
+const searchNames = (
+  words: SearchWords,
+  ep: SonarrEpisode,
+  anime: boolean
+): boolean => {
+  const title = normalize(ep.title ?? '');
+  return (
+    words.episodes.has(`${ep.seasonNumber}:${ep.episodeNumber}`) ||
+    (ep.sceneSeasonNumber != null &&
+      ep.sceneEpisodeNumber != null &&
+      words.episodes.has(`${ep.sceneSeasonNumber}:${ep.sceneEpisodeNumber}`)) ||
+    words.seasons.has(ep.seasonNumber) ||
+    (anime &&
+      ep.absoluteEpisodeNumber != null &&
+      words.numbers.has(ep.absoluteEpisodeNumber)) ||
+    (title.length >= 4 && ` ${words.text} `.includes(` ${title} `))
+  );
+};
+
+/**
+ * The missing episodes of the title a run works on that it has not looked
+ * for at all: no search named them (by number or title, one by one or by
+ * their season), nothing was started for them, and nothing is downloading
+ * them. Empty for a movie, or when it cannot be told.
+ */
+export const notLookedFor = async (
+  run: AgentRun,
+  calls: MadeCall[]
+): Promise<SonarrEpisode[]> => {
+  const title = boundTitle(run);
+  if (!title || title.kind !== 'series') return [];
+  const sonarr = backfill.sonarrFor(title.serverId);
+  const [series, episodes, queued, { jobs }] = await Promise.all([
+    sonarr.getSeriesDetail(title.arrId),
+    sonarr.getSeriesEpisodes(title.arrId),
+    sonarr.getSeriesQueueEpisodes(title.arrId).catch(() => [] as number[]),
+    backfillOf(title),
+  ]);
+  const busy = new Set<number>([
+    ...queued,
+    ...jobs.flatMap((job) => job.files.flatMap((f) => f.episodeIds)),
+    ...run.actions.flatMap((a) => a.episodeIds ?? []),
+  ]);
+  // Each search read once, however many episodes there are.
+  const anime = series.seriesType === 'anime';
+  const seasonsSearched = new Set<number>();
+  const episodesSearched = new Set<string>();
+  const words: SearchWords[] = [];
+  for (const call of calls) {
+    if (call.name === 'search_releases') {
+      const season = Number(call.input.season);
+      if (call.input.episode === undefined) seasonsSearched.add(season);
+      else episodesSearched.add(`${season}:${Number(call.input.episode)}`);
+    } else if (call.name === 'search_indexers') {
+      words.push(readSearch(String(call.input.query ?? '')));
+    }
+  }
+  const looked = (ep: SonarrEpisode) =>
+    seasonsSearched.has(ep.seasonNumber) ||
+    episodesSearched.has(`${ep.seasonNumber}:${ep.episodeNumber}`) ||
+    words.some((w) => searchNames(w, ep, anime));
+  const now = Date.now();
+  return episodes
+    .filter(
+      (ep) =>
+        !ep.hasFile &&
+        ep.monitored &&
+        (!ep.airDateUtc || new Date(ep.airDateUtc).getTime() <= now) &&
+        !busy.has(ep.id)
+    )
+    .filter((ep) => !looked(ep))
+    .sort(
+      (a, b) =>
+        a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber
+    );
 };
 
 /** Runs one tool for the model: its answer, or why it could not. */

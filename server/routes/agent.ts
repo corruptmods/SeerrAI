@@ -6,7 +6,7 @@ import type {
   AgentRunDetail,
   AgentRunSummary,
 } from '@server/interfaces/api/agentInterfaces';
-import agent, { proposalOf } from '@server/lib/agent';
+import agent, { NoSuchRun, proposalOf } from '@server/lib/agent';
 import backfill from '@server/lib/backfill/engine';
 import { getSettings } from '@server/lib/settings';
 import type { NextFunction, Request, Response } from 'express';
@@ -178,8 +178,22 @@ agentRoutes.post<{ id: string }>('/:id/reply', async (req, res, next) => {
     return res.status(202).json(summaryOf(run));
   } catch (e) {
     return next({
-      status: 409,
+      status: e instanceof NoSuchRun ? 404 : 409,
       message: e instanceof Error ? e.message : 'It cannot answer now.',
+    });
+  }
+});
+
+/** Stops a run before its next step; what it started carries on. */
+agentRoutes.post<{ id: string }>('/:id/stop', async (req, res, next) => {
+  if (!req.user) return next({ status: 403, message: 'Sign in first.' });
+  try {
+    const run = await agent.stop(Number(req.params.id) || 0, req.user);
+    return res.status(202).json(summaryOf(run));
+  } catch (e) {
+    return next({
+      status: e instanceof NoSuchRun ? 404 : 409,
+      message: e instanceof Error ? e.message : 'It cannot be stopped now.',
     });
   }
 });

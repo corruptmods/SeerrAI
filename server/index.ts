@@ -320,7 +320,7 @@ app
     server.use(
       (
         err: { status: number; message: string; errors: string[] },
-        _req: Request,
+        req: Request,
         res: Response,
         next: NextFunction
       ) => {
@@ -331,6 +331,16 @@ app
         res.status(err.status || 500).json({
           message: err.message,
           errors: err.errors,
+          // Siri's shortcut says `say` aloud, so a request it got wrong
+          // (turned down by the API spec) is heard too.
+          ...(req.originalUrl.startsWith('/api/v1/now-playing')
+            ? {
+                say:
+                  (err.status || 500) < 500
+                    ? 'The shortcut sent something Seerr could not read. Add it again from your Siri page.'
+                    : 'Something went wrong. Try again in a moment.',
+              }
+            : {}),
         });
       }
     );

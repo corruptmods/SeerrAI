@@ -10,15 +10,17 @@ import { MediaEventType } from '@server/entity/MediaEvent';
 import { User } from '@server/entity/User';
 import type { Proposal, ProposedChange } from '@server/lib/agent/changes';
 import { applyChange, applySeasonChange } from '@server/lib/agent/changes';
-import { rangeLabel } from '@server/lib/agent/rules';
+import { episodeLabel, rangeLabel } from '@server/lib/agent/rules';
 import type {
   AgentState,
   KnownRelease,
+  MadeCall,
   TitleRef,
 } from '@server/lib/agent/tools';
 import {
   TOOLS,
   adminPresent,
+  notLookedFor,
   runTool,
   startApprovedGrab,
   titleRef,
@@ -240,7 +242,7 @@ const SYSTEM = `You are the admin agent of a home media server run with Seerr, S
 
 How to work:
 1. Find the title (find_title) and read what it lacks (title_status).
-2. Search two ways. search_releases is Sonarr's or Radarr's own search; the reasons they turned results down show problems you can work around: a wrong year or odd name, the collection's own episode numbering, a size limit, a quality the profile does not want. search_indexers searches Prowlarr directly with any words: try other names, the year, "complete", "collection", a season, the original title. Searches take a while, so ask for the ones you want together in one turn: they run at the same time. For anime, Sonarr's search is slow and goes episode by episode; search_indexers with the English and the original (romaji) names is usually quicker, and fansub releases often number episodes across all seasons.
+2. Search two ways. search_releases is Sonarr's or Radarr's own search; the reasons they turned results down show problems you can work around: a wrong year or odd name, the collection's own episode numbering, a size limit, a quality the profile does not want. search_indexers searches Prowlarr directly with any words: try other names, the year, "complete", "collection", a season, the original title. Searches take a while, so ask for the ones you want together in one turn: they run at the same time. For anime, Sonarr's search is slow and goes episode by episode; search_indexers with the English and the original (romaji) names is usually quicker, and fansub releases often number episodes across all seasons. Search one episode a search, by its number and its title ("Show S03E04 Title"), and by the title alone when that finds nothing; a search naming several episodes finds nothing. Releases often number episodes their own way (a special counted as episode 1, the scene's seasons): the results say which library episode each is by its title, and when its number and its title disagree, the title is right. A season pack is opened with release_files and each file mapped by its title, never grabbed blind.
 3. Steps are limited, so do not spend them on what you already know. A release whose name plainly says it is one missing episode, with no other language in its name, needs neither release_files nor check_language: grab it. Grab several in the same turn. When the admin tells you to start what you found, grab it at once, without checking again what you checked earlier in this conversation. Before you grab a release with several files, or one whose name does not plainly say which episode it is, open it with release_files. Map each file to an episode by its number AND its title. Collections often number files in their own order (shorts or specials first, or one numbering across seasons): compare each file's title with the episode titles from title_status, and never trust the numbers alone.
 4. Be certain before you grab. Check the language with check_language when there is any question. Grab only files for missing episodes. One file per episode is preferred: take a release whose files each hold several episodes (S06E01-02, "Title A + Title B") only when no release has those episodes one per file, and then give each such file every episode it holds (episodes: [1, 2]), so Sonarr names it S06E01-E02. Weigh it in this order: the right content; English or the title's original language; covering as much as possible; quality; size. When nothing meets the quality profile, a lower quality is fine as a stopgap, since Sonarr and Radarr keep looking for upgrades. Prefer a well-seeded torrent or usenet.
 5. Turn down dubs in other languages (TRUEFRENCH, iTALiAN, GERMAN and so on, unless that is the original language), fakes (sizes far too small, torrents of archives or executables only), samples, and other shows. A Usenet post packed in archives, or with scrambled file names (only its PAR2 repair files named), is normal but cannot be opened: when its name is exactly one missing episode, or the movie, grab it whole (whole: true); a season pack like that cannot be used.
@@ -339,9 +341,30 @@ const sameTitle = (row: BackfillSeries) => ({
   arrId: row.arrId,
 });
 
+/** A conversation that isn't there (deleted, or never was). */
+export class NoSuchRun extends Error {}
+
+/** What an admin said or did to a run while it works. */
+interface Live {
+  /** Who stopped it; it stops before its next step. */
+  stopBy?: string;
+  /** What admins said, read before its next step. */
+  notes: { by: string; text: string }[];
+}
+
+/** The most that can wait to be read at once. */
+const MAX_NOTES = 10;
+
+/** A run asked to get everything missing, not one particular thing. */
+const BROAD_ASK =
+  /\b(missing|whatever|everything|all of it|the rest|complete)\b/i;
+
 class Agent {
   private queue: number[] = [];
   private running = false;
+  private live = new Map<number, Live>();
+  /** The run being worked on. */
+  private current?: number;
   private started = false;
   private purgeTimer?: NodeJS.Timeout;
   private holdTimer?: NodeJS.Timeout;
@@ -879,12 +902,30 @@ class Agent {
     const problem = this.problem(user);
     if (problem) throw new Error(problem);
     const runs = getRepository(AgentRun);
-    const run = await runs.findOne({ where: { id } });
-    if (!run) throw new Error('There is no such conversation.');
-    if (run.status === 'queued' || run.status === 'running') {
-      throw new Error('It is still working; reply once it has answered.');
-    }
+    let run = await runs.findOne({ where: { id } });
+    if (!run) throw new NoSuchRun('There is no such conversation.');
     const said = text.trim().slice(0, MAX_ASK);
+    // Working on it, or waiting its turn: read before its next step. Told
+    // apart by what is in hand now, not by the status read above, which a
+    // run finishing meanwhile leaves out of date.
+    if (this.current === id || this.queue.includes(id)) {
+      const live = this.live.get(id) ?? { notes: [] };
+      if (live.stopBy) throw new Error('It is stopping.');
+      if (live.notes.length >= MAX_NOTES) {
+        throw new Error('It has not read what was said yet; wait a moment.');
+      }
+      live.notes.push({ by: user.displayName, text: said });
+      this.live.set(id, live);
+      return run;
+    }
+    if (run.status === 'queued' || run.status === 'running') {
+      // It finished between the read above and now: read it again.
+      run = await runs.findOne({ where: { id } });
+      if (!run) throw new NoSuchRun('There is no such conversation.');
+      if (run.status === 'queued' || run.status === 'running') {
+        throw new Error('It is busy; try again in a moment.');
+      }
+    }
     run.steps.push({
       at: new Date().toISOString(),
       kind: 'reply',
@@ -939,6 +980,90 @@ class Agent {
   }
 
   /**
+   * Stops a run that is waiting its turn or working, before its next step.
+   * What it already started carries on, and it can be replied to later to
+   * pick up where it was.
+   */
+  public async stop(id: number, user: User): Promise<AgentRun> {
+    const runs = getRepository(AgentRun);
+    const found = await runs.findOne({ where: { id } });
+    if (!found) throw new NoSuchRun('There is no such conversation.');
+    if (this.current === id) {
+      const live = this.live.get(id) ?? { notes: [] };
+      live.stopBy = user.displayName;
+      this.live.set(id, live);
+      return found;
+    }
+    if (!this.queue.includes(id)) {
+      throw new Error('It is not working on this one.');
+    }
+    // Out of the queue first, so it cannot start; then read afresh, as
+    // nothing else writes it now.
+    this.queue = this.queue.filter((queued) => queued !== id);
+    this.live.delete(id);
+    const run = await runs.findOneOrFail({ where: { id } });
+    const { decision: undone, ...memory } = (run.memory ?? {}) as {
+      decision?: Decision;
+    };
+    run.memory = memory;
+    run.status = 'done';
+    run.summary = `Stopped by ${user.displayName} before it started.${
+      undone
+        ? ` What ${undone.by} approved was not done: ${undone.changes
+            .map((c) => c.headline)
+            .join('; ')}. Reply to have it proposed again.`
+        : ''
+    }`;
+    run.finishedAt = new Date();
+    run.steps.push({
+      at: new Date().toISOString(),
+      kind: 'say',
+      text: run.summary,
+    });
+    await runs.save(run);
+    return run;
+  }
+
+  /**
+   * What admins said as a run finished, too late for it to read: added to
+   * the conversation, each in its sayer's words. A run that finished goes
+   * on with it, unless it was stopped; one waiting on an admin keeps its
+   * question or proposal, and reads it when it goes on.
+   */
+  private async deliverLate(
+    id: number,
+    notes: { by: string; text: string }[],
+    resume: boolean
+  ): Promise<void> {
+    const runs = getRepository(AgentRun);
+    const run = await runs.findOne({ where: { id } });
+    if (!run) return;
+    const at = new Date().toISOString();
+    for (const note of notes) {
+      run.steps.push({ at, kind: 'reply', text: `${note.by}: ${note.text}` });
+    }
+    const opening = run.conversation.length
+      ? ''
+      : `${this.firstMessage(run)}\n\n`;
+    run.conversation = [
+      ...run.conversation,
+      {
+        role: 'user',
+        text: `${opening}${notes
+          .map((note) => `${note.by} (admin) says: ${note.text}`)
+          .join('\n')}`,
+      },
+    ];
+    if (resume && run.status !== 'waiting') {
+      run.status = 'queued';
+      run.error = null;
+      if (run.purpose === 'retry') run.purpose = 'work';
+    }
+    await runs.save(run);
+    if (run.status === 'queued') this.queue.push(id);
+  }
+
+  /**
    * An admin approves what a run proposed: it goes on, carrying the changes
    * out first, each checked again against how things are now. Only the
    * proposal shown to them, and only once.
@@ -982,7 +1107,7 @@ class Agent {
     try {
       const runs = getRepository(AgentRun);
       const run = await runs.findOne({ where: { id } });
-      if (!run) throw new Error('There is no such conversation.');
+      if (!run) throw new NoSuchRun('There is no such conversation.');
       const proposal = proposalOf(run);
       if (run.status !== 'waiting' || !proposal || proposal.id !== proposalId) {
         throw new Error(
@@ -1192,6 +1317,7 @@ class Agent {
     const id = this.queue.shift();
     if (id === undefined) return;
     this.running = true;
+    this.current = id;
     try {
       await this.execute(id);
     } catch (e) {
@@ -1201,6 +1327,23 @@ class Agent {
         errorMessage: e instanceof Error ? e.message : String(e),
       });
     } finally {
+      // Said as it finished, too late to be read: added for it to go on
+      // with. Still its run while this is done, so anything said meanwhile
+      // waits here too; then let go of at once, nothing in between.
+      for (;;) {
+        const live = this.live.get(id);
+        if (!live?.notes.length) break;
+        const notes = live.notes.splice(0);
+        await this.deliverLate(id, notes, !live.stopBy).catch((e) =>
+          logger.warn('Could not pass on what an admin said', {
+            label: LABEL,
+            runId: id,
+            errorMessage: e instanceof Error ? e.message : String(e),
+          })
+        );
+      }
+      this.live.delete(id);
+      this.current = undefined;
       this.running = false;
       void this.pump();
     }
@@ -1393,8 +1536,43 @@ class Agent {
       let actionsAtGo = run.actions.length;
       let used = 0;
       let warned = false;
+      // Who stopped it, if an admin did.
+      let stoppedBy: string | undefined;
+      // Its searches over the whole conversation, to tell what it never
+      // looked for; and whether it was told so this time.
+      const searched: MadeCall[] = [
+        ...((run.memory as { searched?: MadeCall[] }).searched ?? []),
+      ];
+      let toldWhatsLeft = false;
+      const broad =
+        run.trigger === 'auto' ||
+        (run.trigger === 'report' && !reportOf(run).replace) ||
+        BROAD_ASK.test(run.ask ?? '');
 
       for (; !direct; ) {
+        // An admin may stop it or tell it something while it works: read
+        // before every step.
+        const live = this.live.get(run.id);
+        if (live?.stopBy) {
+          stoppedBy = live.stopBy;
+          break;
+        }
+        if (live?.notes.length) {
+          const notes = live.notes.splice(0);
+          for (const note of notes) step('reply', `${note.by}: ${note.text}`);
+          const said = notes
+            .map(
+              (note) => `${note.by} (admin) says, while you work: ${note.text}`
+            )
+            .join('\n');
+          const last = messages[messages.length - 1];
+          if (last?.role === 'user') {
+            last.text = `${last.text}\n\n${said}`;
+          } else {
+            messages.push({ role: 'user', text: said });
+          }
+          await runs.save(run);
+        }
         const turn = await converse(ai, {
           model,
           system,
@@ -1412,6 +1590,39 @@ class Agent {
           calls: turn.calls,
           raw: turn.raw,
         });
+        // Done, by its own account, after searching: first, any missing
+        // episode its searches never named is put to it, once, when it was
+        // asked for everything.
+        if (
+          !turn.calls.length &&
+          !warned &&
+          broad &&
+          searched.length &&
+          !toldWhatsLeft
+        ) {
+          toldWhatsLeft = true;
+          const left = await notLookedFor(run, searched).catch(() => []);
+          if (left.length) {
+            const listed = left
+              .slice(0, 40)
+              .map(
+                (ep) =>
+                  `${episodeLabel(ep.seasonNumber, ep.episodeNumber)} "${ep.title ?? ''}"`
+              )
+              .join(', ');
+            step(
+              'say',
+              `${left.length} missing episode${left.length === 1 ? ' was' : 's were'} never looked for; looking now.`
+            );
+            messages.push({
+              role: 'user',
+              text: `Not yet: ${left.length} missing episode${left.length === 1 ? ' was' : 's were'} never searched for: ${listed}${
+                left.length > 40 ? ` and ${left.length - 40} more` : ''
+              }. Search for each, one episode a search, by its number and by its title (releases may number them differently), and open any season pack with release_files. Then say where things stand.`,
+            });
+            continue;
+          }
+        }
         if (!turn.calls.length || warned) {
           // Told to stop, it may still ask for tools: none is run, and
           // each is answered so, or the conversation could not go on.
@@ -1444,7 +1655,27 @@ class Agent {
             batches.push([call]);
           }
         }
-        for (const batch of batches) {
+        for (const [at, batch] of batches.entries()) {
+          const stopping = this.live.get(run.id)?.stopBy;
+          if (stopping) {
+            for (const call of batches.slice(at).flat()) {
+              results.push({
+                id: call.id,
+                content: `Not run: ${stopping} stopped it.`,
+                isError: true,
+              });
+            }
+            break;
+          }
+          for (const call of batch) {
+            if (
+              call.name === 'search_releases' ||
+              call.name === 'search_indexers'
+            ) {
+              searched.push({ name: call.name, input: call.input });
+            }
+          }
+          run.memory = { ...run.memory, searched: searched.slice(-500) };
           const calls = batch.map((call) => {
             step('tool', `${call.name}(${describe(call.input)})`, call.name);
             return { call, at: run.steps[run.steps.length - 1] };
@@ -1542,6 +1773,15 @@ class Agent {
         run.status = 'waiting';
         run.question = asked;
         step('ask', asked);
+      } else if (stoppedBy) {
+        const started = run.actions.length - actionsBefore;
+        run.summary = `Stopped by ${stoppedBy}.${
+          started
+            ? ` It had started ${started} download${started === 1 ? '' : 's'}, which carry on.`
+            : ''
+        } Reply to have it carry on from here.`;
+        step('say', run.summary);
+        run.status = 'done';
       } else {
         run.summary = answer || 'Done.';
         if (warned) {

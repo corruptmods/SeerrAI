@@ -8,7 +8,14 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - **Download Check**: rejects fakes, other titles and copies no better than yours before they download, and sorts out imports that get stuck, importing the right title when it's named another way. Start with Report only, in Settings → Backfill. ([guide](./docs/seerr-ai/download-check.md))
 - **Fix this show with Siri**: say "Fix this show" or "Fix this movie" while something is playing, and say what's wrong. It's reported and fixed like an issue; anything that replaces files is asked about first. Set it up in Profile → Settings → Siri. ([guide](./docs/seerr-ai/siri.md))
+- **Admin agent: Stop, and corrections while it works.** Tell it something mid-run and it reads it before its next step; Stop ends it there, leaving what it started downloading.
 - **Understand Reports**: when a report's words don't say what to fix, the AI model works it out, if AI is set up. On issues, fixes that replace files are left for an admin.
+
+### Fixed
+
+- The admin agent found more missing episodes each time it was asked. It now searches each missing episode by number and title, opens season packs instead of grabbing them blind, and is told about any it never looked for before it stops.
+- The admin agent trusted episode numbers over titles. A release numbered its own way (a special counted as episode 1, or the scene's seasons Sonarr goes by) could be imported as the wrong episode, or passed over: a file whose title is another episode is now refused, and one named by the library's numbers is taken when its title agrees.
+- The admin agent could take a release's sample file for the episode.
 
 ## 2.0.1 (21 October 2026)
 

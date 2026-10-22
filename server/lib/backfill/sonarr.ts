@@ -29,6 +29,13 @@ export interface SonarrEpisode {
   monitored: boolean;
   episodeFileId: number;
   lastSearchTime?: string;
+  /**
+   * The scene's numbering (TheXEM), when it differs from the library's.
+   * A series with scene numbering on is searched for, and has release
+   * names read, by it.
+   */
+  sceneSeasonNumber?: number;
+  sceneEpisodeNumber?: number;
 }
 
 export interface SonarrEpisodeFile {

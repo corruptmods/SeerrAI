@@ -5899,9 +5899,33 @@ paths:
                 properties:
                   deleted:
                     type: number
+  /agent/{id}/stop:
+    post:
+      summary: Stop the admin agent
+      description: It stops before its next step. Downloads it already started carry on, and replying later picks up where it was.
+      tags:
+        - backfill
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: number
+      responses:
+        '202':
+          description: It stops
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: There is no such conversation
+        '409':
+          description: It is not working on this one
   /agent/{id}/reply:
     post:
       summary: 'Answer, correct or follow up a conversation with the admin agent'
+      description: While it is working, what is said is read before its next step.
       tags:
         - backfill
       parameters:

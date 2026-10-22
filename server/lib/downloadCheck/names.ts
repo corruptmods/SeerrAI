@@ -216,8 +216,8 @@ const STOP = new Set(['the', 'a', 'an', 'of', 'and', 'in', 'on', 'to', 'for']);
 const meaningful = (words: string): string[] =>
   words.split(' ').filter((w) => w && !STOP.has(w));
 
-/** Titles Sonarr gives episodes nobody has named yet. */
-const GENERIC_EPISODE =
+/** Titles Sonarr gives episodes nobody has named yet (test normalized). */
+export const GENERIC_EPISODE =
   /^((episode|chapter|part|ep|folge|episodio|episode n|capitulo|capitolo)\s*\d+|tba|tbd|pilot|special|untitled)$/;
 
 /**

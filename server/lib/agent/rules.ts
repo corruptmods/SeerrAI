@@ -11,6 +11,9 @@ import type { SonarrQuality } from '@server/lib/backfill/sonarr';
 /** Below this a video is a sample or an extra, not an episode or a film. */
 export const MIN_VIDEO_BYTES = 20 * 1024 * 1024;
 
+/** A sample's name: "x-sample.mkv", "sample-x.mkv", "x.sample.mkv". */
+const SAMPLE = /(^|[\s._\-[(])sample([\s._\-\])]|$)/i;
+
 /** What a file's quality is when Sonarr or Radarr cannot read one. */
 export const UNKNOWN_QUALITY: SonarrQuality = {
   quality: { id: 0, name: 'Unknown' },
@@ -146,6 +149,15 @@ export const checkMapping = (
     const season = entry.season;
     if (!options.isVideo(file.path) || file.size < MIN_VIDEO_BYTES) {
       problems.push(`File #${entry.index} is not a video of any length.`);
+      continue;
+    }
+    // A sample can be long enough to pass for an episode (DHD's are 40 MB).
+    // Only the file's own name is read: a show called Trailer Park Boys,
+    // or an episode called The Menu, is not an extra.
+    if (SAMPLE.test(file.path.split(/[\\/]/).pop() ?? '')) {
+      problems.push(
+        `File #${entry.index} is a sample, not the episode. If it is the only video, the episode is packed in archives: take the release whole, or another one.`
+      );
       continue;
     }
     if (

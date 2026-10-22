@@ -20,7 +20,7 @@ import Media from '@server/entity/Media';
 import { MediaEvent, MediaEventType } from '@server/entity/MediaEvent';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
-import agent, { compact } from '@server/lib/agent';
+import agent, { NoSuchRun, compact } from '@server/lib/agent';
 import {
   MIN_VIDEO_BYTES,
   checkMapping,
@@ -3922,5 +3922,489 @@ describe('when a download the admin agent started fails', () => {
       reporter: member,
     });
     assert.ok(beside, 'not held up by a go looking again');
+  });
+});
+
+describe('the admin agent and episode numbering', () => {
+  /** A Usenet post, packed in archives: only its name says what it is. */
+  const post = (name: string) => ({
+    ...COLLECTION,
+    guid: `https://usenet/${name}`,
+    title: name,
+    protocol: 'usenet' as const,
+    size: 350 * MB,
+    seeders: undefined,
+  });
+  const archived = (name: string) =>
+    `<?xml version="1.0"?><nzb xmlns="http://www.newzbin.com/DTD/2003/nzb"><file poster="p" date="1" subject="[1/1] - &quot;${name}.rar&quot; yEnc (1/1)"><segments><segment bytes="100000" number="1">a@x</segment></segments></file></nzb>`;
+  const useUsenet = () => {
+    getSettings().backfill = { ...getSettings().backfill, usenetClientId: 2 };
+    getSettings().downloadClients = [
+      ...getSettings().downloadClients,
+      {
+        id: 2,
+        name: 'SABnzbd',
+        type: 'sabnzbd',
+        hostname: 'sabnzbd',
+        port: 8080,
+        useSsl: false,
+        urlBase: '',
+        apiKey: 'k',
+        username: '',
+        password: '',
+      },
+    ];
+    mock.method(SabnzbdAPI.prototype, 'addNzb', async () => 'SABnzbd_nzo_1');
+    mock.method(SabnzbdAPI.prototype, 'getJob', async () => ({
+      place: 'queue',
+      status: 'Downloading',
+      percentage: 0,
+      size: 350 * MB,
+      sizeLeft: 350 * MB,
+    }));
+    mock.method(
+      ProwlarrAPI.prototype,
+      'fetchRelease',
+      async (release: ProwlarrRelease) => ({
+        kind: 'nzb',
+        data: archived(release.title),
+      })
+    );
+  };
+  /**
+   * Sonarr numbering the series by the scene's seasons: every name's
+   * S01E02 is read as the library's S01E03 "Boo Hoo Baby".
+   */
+  /** Asked from the title's own page, so it knows the series from the start. */
+  const ABOUT = {
+    title: { kind: 'series' as const, serverId: 0, arrId: SERIES_ID },
+    name: 'Casper the Friendly Ghost',
+  };
+  const sceneParse = (title: string): SonarrParseResult => {
+    const match = /S(\d+)E(\d+)/.exec(title);
+    const number = match ? Number(match[2]) : 0;
+    const mapped = EPISODES.find((e) => e.episodeNumber === number + 1);
+    return {
+      ...parse(title),
+      parsedEpisodeInfo: {
+        quality: {
+          quality: { id: 2, name: 'DVD' },
+          revision: { version: 1, real: 0 },
+        },
+        seasonNumber: match ? Number(match[1]) : undefined,
+        episodeNumbers: match ? [number] : [],
+      },
+      episodes: mapped ? [mapped] : [],
+    };
+  };
+
+  it('takes a post named the library’s way when its title agrees, though Sonarr reads it by the scene', async () => {
+    useUsenet();
+    const titled = post(
+      'Casper.the.Friendly.Ghost.S01E02.Once.Upon.a.Rhyme.DVDRip.x264-GRP'
+    );
+    const bare = post('Casper.the.Friendly.Ghost.S01E02.DVDRip.x264-OTHER');
+    mock.method(ProwlarrAPI.prototype, 'search', async () => [titled, bare]);
+    mock.method(BackfillSonarr.prototype, 'parse', async (title: string) =>
+      sceneParse(title)
+    );
+    script = [
+      () =>
+        toolUse('search_indexers', {
+          query: 'Casper the Friendly Ghost S01E02',
+          kind: 'series',
+        }),
+      (body) => {
+        const listed = lastResult(body).content;
+        // Which episode each is, by its title, or by both numberings.
+        assert.match(
+          listed,
+          /r1 \| is S01E02 "Once Upon a Rhyme" \(missing\) \|/
+        );
+        return toolUse('grab', {
+          title: 'series:0:1283',
+          release: 'r2',
+          files: [{ index: 0, season: 1, episode: 2 }],
+          reason: 'its name is the episode',
+          whole: true,
+        });
+      },
+      (body) => {
+        const refused = lastResult(body);
+        assert.equal(refused.is_error, true);
+        assert.match(refused.content, /as S01E03, not S01E02\. Nothing/);
+        return toolUse('grab', {
+          title: 'series:0:1283',
+          release: 'r1',
+          files: [{ index: 0, season: 1, episode: 2 }],
+          reason: 'its name and title are the episode',
+          whole: true,
+        });
+      },
+      (body) => {
+        const started = lastResult(body);
+        assert.equal(started.is_error, undefined, started.content);
+        assert.match(started.content, /^Started Backfill job #\d+/);
+        return say('Downloading S01E02.');
+      },
+    ];
+    const run = await agent.ask('Get Casper S01E02', await admin(), ABOUT);
+    const done = await waitForRun(run.id);
+    assert.equal(done.status, 'done', done.error ?? '');
+    const job = await getRepository(BackfillJob).findOneOrFail({
+      where: { id: done.actions[0].jobId },
+    });
+    assert.deepEqual(
+      job.files.map((f) => [f.whole, f.episodeIds]),
+      [[true, [502]]]
+    );
+  });
+
+  it('never takes a post whose title is another episode, whatever Sonarr reads', async () => {
+    useUsenet();
+    // Named and read as S01E02, but it is "Boo Hoo Baby".
+    const wrong = post(
+      'Casper.the.Friendly.Ghost.S01E02.Boo.Hoo.Baby.DVDRip.x264-GRP'
+    );
+    mock.method(ProwlarrAPI.prototype, 'search', async () => [wrong]);
+    script = [
+      () =>
+        toolUse('search_indexers', {
+          query: 'Casper the Friendly Ghost S01E02',
+          kind: 'series',
+        }),
+      (body) => {
+        assert.match(
+          lastResult(body).content,
+          /by its number S01E02 "Once Upon a Rhyme" \(missing\), but its title is S01E03 "Boo Hoo Baby" \(on disk\): go by its title/
+        );
+        return toolUse('grab', {
+          title: 'series:0:1283',
+          release: 'r1',
+          files: [{ index: 0, season: 1, episode: 2 }],
+          reason: 'its name is S01E02',
+          whole: true,
+        });
+      },
+      (body) => {
+        const refused = lastResult(body);
+        assert.equal(refused.is_error, true);
+        assert.match(
+          refused.content,
+          /but its title is S01E03 "Boo Hoo Baby"\. Nothing was started\./
+        );
+        return say('That post is another episode.');
+      },
+    ];
+    const run = await agent.ask('Get Casper S01E02', await admin(), ABOUT);
+    const done = await waitForRun(run.id);
+    assert.equal(done.status, 'done', done.error ?? '');
+    assert.equal(done.actions.length, 0);
+  });
+
+  it('never maps a file whose title is another episode, or a sample', async () => {
+    const info = {
+      name: 'Casper S01',
+      'piece length': 1048576,
+      pieces: Buffer.alloc(20),
+      files: [
+        // A special counted as episode 1, so every number is one off.
+        { length: 150 * MB, path: ['Casper.S01E02.Boo.Hoo.Baby.mkv'] },
+        {
+          length: 40 * MB,
+          path: ['Casper.S01E02.Once.Upon.a.Rhyme-sample.mkv'],
+        },
+      ],
+    };
+    mock.method(ProwlarrAPI.prototype, 'fetchRelease', async () => ({
+      kind: 'torrent',
+      data: ben({ announce: 'udp://tracker', info }),
+    }));
+    script = [
+      () =>
+        toolUse('search_indexers', {
+          query: 'Casper the Friendly Ghost',
+          kind: 'series',
+        }),
+      () => toolUse('release_files', { release: 'r1' }),
+      () =>
+        toolUse('grab', {
+          title: 'series:0:1283',
+          release: 'r1',
+          files: [{ index: 0, season: 1, episode: 2 }],
+          reason: 'its number is the episode',
+        }),
+      (body) => {
+        const refused = lastResult(body);
+        assert.equal(refused.is_error, true);
+        assert.match(
+          refused.content,
+          /File #0 "Casper\.S01E02\.Boo\.Hoo\.Baby" is S01E03 "Boo Hoo Baby" by its title, which is on disk, not S01E02 "Once Upon a Rhyme"\. Map each file by its title/
+        );
+        return toolUse('grab', {
+          title: 'series:0:1283',
+          release: 'r1',
+          files: [{ index: 1, season: 1, episode: 2 }],
+          reason: 'its title is the episode',
+        });
+      },
+      (body) => {
+        const refused = lastResult(body);
+        assert.equal(refused.is_error, true);
+        assert.match(refused.content, /File #1 is a sample, not the episode/);
+        return say('Only a sample of it.');
+      },
+    ];
+    const run = await agent.ask('Get Casper S01E02', await admin(), ABOUT);
+    const done = await waitForRun(run.id);
+    assert.equal(done.status, 'done', done.error ?? '');
+    assert.equal(done.actions.length, 0);
+  });
+
+  it('shows the scene number of a missing episode, and says why Sonarr found nothing', async () => {
+    mock.method(BackfillSonarr.prototype, 'getSeriesEpisodes', async () =>
+      EPISODES.map((e) =>
+        e.id === 502 ? { ...e, sceneSeasonNumber: 2, sceneEpisodeNumber: 7 } : e
+      )
+    );
+    mock.method(BackfillSonarr.prototype, 'getReleases', async () => []);
+    script = [
+      () => toolUse('title_status', { title: 'series:0:1283' }),
+      (body) => {
+        const status = lastResult(body).content;
+        assert.match(
+          status,
+          /Sonarr numbers this series by the scene's seasons/
+        );
+        assert.match(
+          status,
+          /S01E02 "Once Upon a Rhyme" 1951-01-01 \(scene S02E07\)/
+        );
+        return toolUse('search_releases', {
+          title: 'series:0:1283',
+          season: 1,
+          episode: 2,
+        });
+      },
+      (body) => {
+        assert.match(
+          lastResult(body).content,
+          /No results from any indexer\. Sonarr searched for it by its scene number, S02E07: use search_indexers with S01E02 and with its title, "Once Upon a Rhyme"\./
+        );
+        return say('Nothing yet.');
+      },
+    ];
+    const run = await agent.ask('Get Casper S01E02', await admin(), ABOUT);
+    const done = await waitForRun(run.id);
+    assert.equal(done.status, 'done', done.error ?? '');
+  });
+
+  it('is told of missing episodes it never searched for, once, when asked for everything', async () => {
+    mock.method(ProwlarrAPI.prototype, 'search', async () => []);
+    const lastText = (body: Record<string, unknown>) => {
+      const messages = body.messages as { content: unknown }[];
+      return JSON.stringify(messages[messages.length - 1].content);
+    };
+    script = [
+      () =>
+        toolUse('search_indexers', {
+          query: "Casper S01E01 Casper's Spree Under The Sea",
+          kind: 'series',
+        }),
+      () => say('Nothing for S01E01; that is all.'),
+      (body) => {
+        const told = lastText(body);
+        assert.match(
+          told,
+          /1 missing episode was never searched for: S01E02 \\"Once Upon a Rhyme\\"/
+        );
+        assert.doesNotMatch(told, /S01E01/);
+        return toolUse('search_indexers', {
+          query: 'Casper Once Upon a Rhyme',
+          kind: 'series',
+        });
+      },
+      () => say('Nothing for either.'),
+    ];
+    const run = await agent.ask(
+      'Get whatever is missing.',
+      await admin(),
+      ABOUT
+    );
+    const done = await waitForRun(run.id);
+    assert.equal(done.status, 'done', done.error ?? '');
+    assert.equal(done.summary, 'Nothing for either.');
+    assert.ok(
+      done.steps.some(
+        (s) =>
+          s.kind === 'say' &&
+          /1 missing episode was never looked for/.test(s.text)
+      )
+    );
+  });
+});
+
+describe('stopping and correcting the admin agent while it works', () => {
+  it('stops before its next step, keeping the conversation to carry on', async () => {
+    const user = await admin();
+    let runId = 0;
+    mock.method(ProwlarrAPI.prototype, 'search', async () => {
+      // An admin presses Stop while the search runs.
+      await agent.stop(runId, user);
+      return [];
+    });
+    script = [
+      () =>
+        toolUses(
+          ['search_indexers', { query: 'Casper S01E01', kind: 'series' }],
+          // Not read-only, so it runs after the search, on its own.
+          [
+            'grab',
+            {
+              title: 'series:0:1283',
+              release: 'r1',
+              files: [{ index: 0, season: 1, episode: 1 }],
+              reason: 'x',
+            },
+          ]
+        ),
+    ];
+    const run = await agent.ask('Get whatever is missing.', user);
+    runId = run.id;
+    const done = await waitForRun(run.id);
+    assert.equal(done.status, 'done', done.error ?? '');
+    assert.equal(
+      done.summary,
+      `Stopped by ${user.displayName}. Reply to have it carry on from here.`
+    );
+    assert.equal(bodies.length, 1, 'the model was not asked again');
+    // The call after the stop was not run, and is answered so.
+    const tools = done.steps.filter((s) => s.kind === 'tool');
+    assert.deepEqual(
+      tools.map((s) => s.tool),
+      ['search_indexers']
+    );
+    assert.match(
+      JSON.stringify(done.conversation),
+      new RegExp(`Not run: ${user.displayName} stopped it\\.`)
+    );
+
+    // Replying carries on from there.
+    script = [() => say('Carrying on.')];
+    await agent.reply(run.id, 'Go on', user);
+    const again = await waitForRun(run.id);
+    assert.equal(again.summary, 'Carrying on.');
+  });
+
+  it('stops a conversation still waiting its turn without starting it', async () => {
+    const user = await admin();
+    // The first one keeps the agent busy until let go.
+    let letGo = () => undefined as void;
+    const held = new Promise<void>((resolve) => {
+      letGo = resolve;
+    });
+    mock.method(ProwlarrAPI.prototype, 'search', async () => {
+      await held;
+      return [];
+    });
+    script = [
+      () => toolUse('search_indexers', { query: 'Casper', kind: 'series' }),
+      () => say('Nothing found.'),
+    ];
+    const first = await agent.ask('Get Casper', user);
+    const second = await agent.ask('Get Casper too', user);
+    const stopped = await agent.stop(second.id, user);
+    assert.equal(stopped.status, 'done');
+    assert.equal(
+      stopped.summary,
+      `Stopped by ${user.displayName} before it started.`
+    );
+    await assert.rejects(
+      agent.stop(second.id, user),
+      /not working on this one/
+    );
+    await assert.rejects(agent.stop(999999, user), NoSuchRun);
+    letGo();
+    const done = await waitForRun(first.id);
+    assert.equal(done.summary, 'Nothing found.');
+    const after = await getRepository(AgentRun).findOneOrFail({
+      where: { id: second.id },
+    });
+    assert.equal(after.status, 'done', 'never started');
+    assert.equal(bodies.length, 2, 'only the first one asked the model');
+  });
+
+  it('reads what an admin says while it works before its next step', async () => {
+    const user = await admin();
+    let runId = 0;
+    mock.method(ProwlarrAPI.prototype, 'search', async () => {
+      await agent.reply(runId, 'Skip the specials', user);
+      return [];
+    });
+    const lastText = (body: Record<string, unknown>) => {
+      const messages = body.messages as { content: unknown }[];
+      return JSON.stringify(messages[messages.length - 1].content);
+    };
+    script = [
+      () =>
+        toolUse('search_indexers', { query: 'Casper S01E01', kind: 'series' }),
+      (body) => {
+        assert.match(
+          lastText(body),
+          new RegExp(
+            `${user.displayName} \\(admin\\) says, while you work: Skip the specials`
+          )
+        );
+        return say('Skipping the specials.');
+      },
+    ];
+    const run = await agent.ask('Get Casper', user);
+    runId = run.id;
+    const done = await waitForRun(run.id);
+    assert.equal(done.status, 'done', done.error ?? '');
+    assert.ok(
+      done.steps.some(
+        (s) =>
+          s.kind === 'reply' &&
+          s.text === `${user.displayName}: Skip the specials`
+      )
+    );
+  });
+
+  it('goes on with what was said as it finished, rather than losing it', async () => {
+    const user = await admin();
+    let runId = 0;
+    let said = false;
+    script = [
+      () => {
+        // Said during its last answer: too late for this go.
+        void agent.reply(runId, 'Check the specials too', user).then(() => {
+          said = true;
+        });
+        return say('Done.');
+      },
+      (body) => {
+        const messages = body.messages as { content: unknown }[];
+        assert.match(
+          JSON.stringify(messages[messages.length - 1].content),
+          /Check the specials too/
+        );
+        return say('Checked the specials.');
+      },
+    ];
+    const run = await agent.ask('Get Casper', user);
+    runId = run.id;
+    for (let i = 0; i < 200; i++) {
+      const now = await getRepository(AgentRun).findOneOrFail({
+        where: { id: run.id },
+      });
+      if (now.summary === 'Checked the specials.' && !agent.isBusy()) break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.ok(said);
+    const done = await getRepository(AgentRun).findOneOrFail({
+      where: { id: run.id },
+    });
+    assert.equal(done.summary, 'Checked the specials.');
   });
 });

@@ -66,6 +66,11 @@ const runMessages = defineMessages('components.Backfill.Agent.Run', {
   started: 'Backfill came up empty for {title}, so it looked further.',
   question: 'It needs your answer',
   replyPlaceholder: 'Correct it or ask for more…',
+  workingPlaceholder: 'Correct it while it works…',
+  waitingToRead: 'It reads this before its next step.',
+  stop: 'Stop',
+  stopping: 'Stopping…',
+  stopFailed: 'It could not be stopped.',
   answerPlaceholder: 'Answer its question…',
   send: 'Send',
   sending: 'Sending…',
@@ -380,6 +385,9 @@ const RunDetail = () => {
   }, [text]);
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState<string>();
+  // Said while it works, until it reads it (a reply step shows up).
+  const [pending, setPending] = useState<string[]>([]);
+  const [stopping, setStopping] = useState(false);
   // The conversation scrolls inside its own box. It follows the newest
   // message while the admin is at the bottom, and stays put once they
   // scroll up to read, offering a way back down instead.
@@ -410,6 +418,13 @@ const RunDetail = () => {
       setUnseen(true);
     }
   }, [count, status]);
+  // Once it is no longer working, Stop and anything said to it are done with.
+  useEffect(() => {
+    if (status !== 'running' && status !== 'queued') {
+      setStopping(false);
+      setPending([]);
+    }
+  }, [status]);
   const onScroll = () => {
     const box = log.current;
     if (!box) return;
@@ -422,16 +437,22 @@ const RunDetail = () => {
   if (!data) return <LoadingSpinner />;
   const working = data.status === 'running' || data.status === 'queued';
   const entries = conversationOf(data);
+  const read = new Set(
+    data.steps
+      .filter((step) => step.kind === 'reply')
+      .map((step) => step.text.slice(step.text.indexOf(': ') + 2))
+  );
+  const unread = working ? pending.filter((note) => !read.has(note)) : [];
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim() || sending || working) return;
+    if (!text.trim() || sending || stopping) return;
     setSending(true);
     setFailed(undefined);
+    const said = text.trim();
     try {
-      await axios.post(`/api/v1/agent/${data.id}/reply`, {
-        text: text.trim(),
-      });
+      await axios.post(`/api/v1/agent/${data.id}/reply`, { text: said });
+      if (working) setPending((before) => [...before, said]);
       setText('');
       pinned.current = true;
       await mutate();
@@ -444,6 +465,24 @@ const RunDetail = () => {
     } finally {
       setSending(false);
     }
+  };
+
+  const stop = async () => {
+    if (stopping) return;
+    setStopping(true);
+    setFailed(undefined);
+    try {
+      await axios.post(`/api/v1/agent/${data.id}/stop`);
+      setPending([]);
+    } catch (err) {
+      setStopping(false);
+      setFailed(
+        axios.isAxiosError(err) && err.response?.data?.message
+          ? String(err.response.data.message)
+          : intl.formatMessage(runMessages.stopFailed)
+      );
+    }
+    await mutate();
   };
 
   const decide = async (approve: boolean) => {
@@ -530,6 +569,21 @@ const RunDetail = () => {
               </Button>
             </Link>
           )}
+          {working && (
+            <Button
+              buttonType="danger"
+              onClick={() => void stop()}
+              disabled={stopping}
+              className="flex-1 sm:flex-none"
+            >
+              <StopCircleIcon />
+              <span>
+                {intl.formatMessage(
+                  stopping ? runMessages.stopping : runMessages.stop
+                )}
+              </span>
+            </Button>
+          )}
           {!working && (
             <ConfirmButton
               onClick={remove}
@@ -611,6 +665,16 @@ const RunDetail = () => {
             {entries.map((entry, i) => (
               <EntryView key={`${entry.at}-${i}`} entry={entry} />
             ))}
+            {unread.map((note, i) => (
+              <div key={`pending-${i}`} className="flex justify-end">
+                <div className="max-w-[85%] rounded-2xl bg-accent/70 px-4 py-2 text-sm text-on-accent">
+                  <p className="whitespace-pre-wrap break-words">{note}</p>
+                  <p className="mt-1 text-[11px] opacity-80">
+                    {intl.formatMessage(runMessages.waitingToRead)}
+                  </p>
+                </div>
+              </div>
+            ))}
             {working && (
               <div className="flex items-center gap-2 text-sm text-indigo-200 light:text-accent-text">
                 <SparklesIcon className="h-4 w-4 animate-pulse" />
@@ -644,7 +708,7 @@ const RunDetail = () => {
               rows={1}
               value={text}
               maxLength={1000}
-              disabled={working || sending}
+              disabled={sending || stopping}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -657,7 +721,9 @@ const RunDetail = () => {
                   ? runMessages.proposalPlaceholder
                   : data.status === 'waiting'
                     ? runMessages.answerPlaceholder
-                    : runMessages.replyPlaceholder
+                    : working
+                      ? runMessages.workingPlaceholder
+                      : runMessages.replyPlaceholder
               )}
               className="block max-h-40 min-h-[44px] min-w-0 flex-1 resize-none rounded-md border border-field-border bg-field px-3 py-[11px] text-sm leading-5 text-strong placeholder:truncate placeholder:text-gray-400 disabled:opacity-60"
             />
@@ -665,7 +731,7 @@ const RunDetail = () => {
             <Button
               buttonType="primary"
               type="submit"
-              disabled={working || sending || !text.trim()}
+              disabled={sending || stopping || !text.trim()}
               className="h-11 flex-none"
               aria-label={intl.formatMessage(
                 sending ? runMessages.sending : runMessages.send

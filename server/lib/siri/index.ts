@@ -15,6 +15,7 @@ import nowPlaying from '@server/lib/nowPlaying';
 import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
 import { randomBytes } from 'node:crypto';
+import { In } from 'typeorm';
 
 /*
  * "Fix this show" from Siri. The shortcut asks what is playing, asks the
@@ -185,9 +186,13 @@ class SiriReports {
   }> {
     if (item) {
       const parsed = parseItem(item);
+      // Films and series only: what can be playing.
       const media = parsed
         ? await getRepository(Media).findOne({
-            where: { id: parsed.mediaId },
+            where: {
+              id: parsed.mediaId,
+              mediaType: In([MediaType.MOVIE, MediaType.TV]),
+            },
           })
         : null;
       if (!parsed || !media) {
@@ -327,11 +332,22 @@ class SiriReports {
       );
     }
     this.asked.delete(token);
+    // Checked again: permissions and reports can change in five minutes.
+    if (!mayReport(user)) {
+      throw new SiriError('You don’t have permission to report problems.', 403);
+    }
     const media = await getRepository(Media).findOne({
       where: { id: asked.mediaId },
     });
     if (!media) {
       throw new SiriError('That title isn’t on the server any more.', 404);
+    }
+    const open = await reportedToday(user, media, asked.season, asked.episode);
+    if (open) {
+      return {
+        say: 'You reported that already today. What happens is written on the issue.',
+        issueId: open.id,
+      };
     }
     const issue = await this.file(user, media, {
       kind: asked.kind,
@@ -361,6 +377,10 @@ class SiriReports {
 
   private ask(asked: Asked): string {
     this.forgetOld();
+    // One question waits per person: a new report replaces the last.
+    for (const [token, waiting] of this.asked) {
+      if (waiting.userId === asked.userId) this.asked.delete(token);
+    }
     const token = randomBytes(12).toString('base64url');
     this.asked.set(token, asked);
     return token;

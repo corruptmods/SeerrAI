@@ -338,6 +338,26 @@ describe('Siri: a report', () => {
     assert.deepEqual(started, []);
   });
 
+  it('keeps one question waiting a person: a new one replaces the last', async () => {
+    const first = await call('POST', '/now-playing/report', {
+      problem: 'it keeps freezing',
+    });
+    const second = await call('POST', '/now-playing/report', {
+      problem: 'this is the wrong episode',
+    });
+    const old = await call('POST', '/now-playing/answer', {
+      confirm: first.body.confirm,
+      answer: 'yes',
+    });
+    assert.equal(old.status, 410);
+    const yes = await call('POST', '/now-playing/answer', {
+      confirm: second.body.confirm,
+      answer: 'yes',
+    });
+    assert.equal(yes.status, 200);
+    assert.equal((await issues()).length, 1);
+  });
+
   it('keeps someone else’s question to them', async () => {
     const asked = await call('POST', '/now-playing/report', {
       problem: 'it keeps freezing',

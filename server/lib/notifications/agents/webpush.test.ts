@@ -108,20 +108,20 @@ describe('web push payload', () => {
     const appName = getSettings().main.applicationTitle;
 
     assert.deepEqual(
-      payloadFor(Notification.MEDIA_PENDING, 'Dune').actionLabels,
+      payloadFor(Notification.MEDIA_PENDING, 'Zelvara').actionLabels,
       {
         approve: 'Approve',
         decline: 'Decline',
         approveFailed: 'Could not approve',
         declineFailed: 'Could not decline',
-        failedBody: `Dune — open ${appName} to try again.`,
+        failedBody: `Zelvara — open ${appName} to try again.`,
       }
     );
   });
 
   it('carries none where there is nothing to approve', () => {
     assert.equal(
-      payloadFor(Notification.MEDIA_AVAILABLE, 'Dune').actionLabels,
+      payloadFor(Notification.MEDIA_AVAILABLE, 'Zelvara').actionLabels,
       undefined
     );
   });

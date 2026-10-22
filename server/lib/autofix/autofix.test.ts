@@ -145,8 +145,8 @@ describe('Auto-fix: reading a report', () => {
 
 describe('Auto-fix: choosing another release', () => {
   const current = {
-    title: '[Erai-raws] Naruto - 002 [480p]',
-    group: 'Erai-raws',
+    title: '[Kaze-raws] Kitsuraga - 002 [480p]',
+    group: 'Kaze-raws',
   };
 
   it('takes one Sonarr only turns down for the file already there, from another group', () => {
@@ -154,22 +154,22 @@ describe('Auto-fix: choosing another release', () => {
       [
         release({
           guid: 'same',
-          title: '[Erai-raws] Naruto - 002 [480p]',
-          releaseGroup: 'Erai-raws',
+          title: '[Kaze-raws] Kitsuraga - 002 [480p]',
+          releaseGroup: 'Kaze-raws',
           rejected: true,
           rejections: [EXISTING],
           qualityWeight: 900,
         }),
         release({
           guid: 'pack',
-          title: '[Judas] Naruto S01',
+          title: '[Tengu] Kitsuraga S01',
           fullSeason: true,
           rejected: true,
           rejections: ['Full season pack'],
         }),
         release({
           guid: 'low-score',
-          title: '[X] Naruto 002',
+          title: '[X] Kitsuraga 002',
           rejected: true,
           rejections: [
             'Custom Formats Original Language , Required Size have score 0 below Series profile minimum 100',
@@ -177,13 +177,13 @@ describe('Auto-fix: choosing another release', () => {
         }),
         release({
           guid: 'other-episode',
-          title: '[Judas] Naruto - 003',
+          title: '[Tengu] Kitsuraga - 003',
           mappedEpisodeInfo: [{ id: 3 }],
         }),
         release({
           guid: 'good',
-          title: '[Judas] Naruto - 002 [BD 1080p]',
-          releaseGroup: 'Judas',
+          title: '[Tengu] Kitsuraga - 002 [BD 1080p]',
+          releaseGroup: 'Tengu',
           rejected: true,
           rejections: [EXISTING],
           mappedEpisodeInfo: [{ id: 2 }],
@@ -201,7 +201,7 @@ describe('Auto-fix: choosing another release', () => {
       pickReplacement(
         [
           release({
-            title: '[Erai-raws] Naruto - 002 [480p].mkv',
+            title: '[Kaze-raws] Kitsuraga - 002 [480p].mkv',
             episodeRequested: true,
           }),
         ],
@@ -273,7 +273,7 @@ let markedFailed: number[] = [];
 let monitored: number[][] = [];
 /** Everything done to Sonarr, in order. */
 let done: string[] = [];
-let slowHorses: Media;
+let quietRavens: Media;
 
 const call = async (method: string, url: string, body?: unknown) => {
   const res = await fetch(`http://127.0.0.1:${port}${url}`, {
@@ -359,7 +359,7 @@ beforeEach(async () => {
   }));
   mock.method(FixSonarr.prototype, 'episodeFile', async (id: number) => ({
     id,
-    releaseGroup: 'Erai-raws',
+    releaseGroup: 'Kaze-raws',
     mediaInfo: {
       runTime:
         episodes.find((e) => e.episodeFileId === id)?.runtime === 45
@@ -400,7 +400,7 @@ beforeEach(async () => {
   );
   mock.method(FixSonarr.prototype, 'seasonHistory', async () => seasonHistory);
   mock.method(FixSonarr.prototype, 'seriesFacts', async () => ({
-    title: 'Slow Horses',
+    title: 'Quiet Ravens',
     originalLanguage: 'English',
   }));
   mock.method(FixSonarr.prototype, 'monitorEpisodes', async (ids: number[]) => {
@@ -422,11 +422,11 @@ beforeEach(async () => {
   });
   mock.method(FixRadarr.prototype, 'movieDetail', async () => ({
     id: 9,
-    title: 'Groundhog Day',
+    title: 'Hedgehog Morning',
     hasFile: true,
     movieFile: {
       id: 900,
-      sceneName: 'Groundhog.Day.1993.1080p.BluRay.x264-OLD',
+      sceneName: 'Hedgehog.Morning.1993.1080p.BluRay.x264-OLD',
       releaseGroup: 'OLD',
     },
   }));
@@ -441,7 +441,7 @@ beforeEach(async () => {
 
   mock.method(BazarrAPI.prototype, 'getMovie', async () => ({
     radarrId: 9,
-    title: 'Groundhog Day',
+    title: 'Hedgehog Morning',
     profileId: 1,
     subtitles: [
       {
@@ -533,7 +533,7 @@ beforeEach(async () => {
       results: [
         {
           id: 137,
-          title: 'Groundhog Day',
+          title: 'Hedgehog Morning',
           release_date: '1993-02-11',
           media_type: 'movie',
           genre_ids: [],
@@ -543,7 +543,7 @@ beforeEach(async () => {
           vote_count: 1,
           adult: false,
           original_language: 'en',
-          original_title: 'Groundhog Day',
+          original_title: 'Hedgehog Morning',
           video: false,
         },
       ],
@@ -572,18 +572,18 @@ beforeEach(async () => {
   actingAs = member;
   series = await getRepository(Media).save(
     new Media({
-      tmdbId: 46260,
-      tvdbId: 78857,
+      tmdbId: 58371,
+      tvdbId: 63914,
       mediaType: MediaType.TV,
       status: MediaStatus.AVAILABLE,
       serviceId: 0,
       externalServiceId: 77,
     })
   );
-  slowHorses = await getRepository(Media).save(
+  quietRavens = await getRepository(Media).save(
     new Media({
-      tmdbId: 95480,
-      tvdbId: 410998,
+      tmdbId: 87316,
+      tvdbId: 521387,
       mediaType: MediaType.TV,
       status: MediaStatus.AVAILABLE,
       serviceId: 0,
@@ -599,8 +599,8 @@ beforeEach(async () => {
       total_results: 1,
       results: [
         {
-          id: 95480,
-          name: 'Slow Horses',
+          id: 87316,
+          name: 'Quiet Ravens',
           first_air_date: '2022-04-01',
           media_type: 'tv',
           genre_ids: [],
@@ -610,7 +610,7 @@ beforeEach(async () => {
           vote_count: 1,
           origin_country: ['GB'],
           original_language: 'en',
-          original_name: 'Slow Horses',
+          original_name: 'Quiet Ravens',
         },
       ],
     }),
@@ -671,9 +671,9 @@ describe('Auto-fix: reported issues', () => {
   it('replaces a broken episode only once another release is found, and says so on the issue', async () => {
     releases = [
       release({
-        guid: 'judas-2',
-        title: '[Judas] Show - S01E02 [BD 1080p]',
-        releaseGroup: 'Judas',
+        guid: 'tengu-2',
+        title: '[Tengu] Show - S01E02 [BD 1080p]',
+        releaseGroup: 'Tengu',
         rejected: true,
         rejections: [EXISTING],
         mappedEpisodeInfo: [{ id: 102 }],
@@ -692,10 +692,10 @@ describe('Auto-fix: reported issues', () => {
     assert.match(comment, /^Automatic fix: Replacing S01E02/);
     assert.match(
       comment,
-      /grabbed \[Judas\] Show - S01E02 \[BD 1080p\] from Nyaa/
+      /grabbed \[Tengu\] Show - S01E02 \[BD 1080p\] from Nyaa/
     );
     assert.deepEqual(deleted, [502]);
-    assert.deepEqual(grabbed, ['judas-2']);
+    assert.deepEqual(grabbed, ['tengu-2']);
   });
 
   it('leaves the file alone when there is nothing else to get', async () => {
@@ -985,14 +985,14 @@ describe('Auto-fix: reported issues', () => {
 describe('Auto-fix: from AI Search', () => {
   it('fetches subtitles at once when asked in plain words', async () => {
     modelAnswer = JSON.stringify({
-      r: 'Getting Spanish subtitles for Groundhog Day.',
-      titles: [{ t: 'Groundhog Day', y: 1993, k: 'movie' }],
+      r: 'Getting Spanish subtitles for Hedgehog Morning.',
+      titles: [{ t: 'Hedgehog Morning', y: 1993, k: 'movie' }],
       do: 'fix',
       fx: 'subtitles',
       lang: 'es',
     });
     const res = await call('POST', '/api/v1/ai/chat', {
-      message: 'get spanish subtitles for groundhog day',
+      message: 'get spanish subtitles for hedgehog morning',
     });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.match(res.body.reply, /Downloaded es subtitles from subdl/);
@@ -1004,18 +1004,18 @@ describe('Auto-fix: from AI Search', () => {
     releases = [
       release({
         guid: 'new',
-        title: 'Groundhog.Day.1993.1080p.BluRay.x264-NEW',
+        title: 'Hedgehog.Morning.1993.1080p.BluRay.x264-NEW',
         releaseGroup: 'NEW',
       }),
     ];
     modelAnswer = JSON.stringify({
       r: 'Replacing it.',
-      titles: [{ t: 'Groundhog Day', y: 1993, k: 'movie' }],
+      titles: [{ t: 'Hedgehog Morning', y: 1993, k: 'movie' }],
       do: 'fix',
       fx: 'broken',
     });
     const asked = await call('POST', '/api/v1/ai/chat', {
-      message: 'groundhog day has no sound',
+      message: 'hedgehog morning has no sound',
     });
     assert.equal(asked.status, 200, JSON.stringify(asked.body));
     // Nothing is touched until they confirm, with the title it would act
@@ -1029,7 +1029,7 @@ describe('Auto-fix: from AI Search', () => {
     assert.deepEqual(asked.body.confirm, {
       kind: 'broken',
       mediaId: movie.id,
-      message: 'groundhog day has no sound',
+      message: 'hedgehog morning has no sound',
     });
 
     const res = await call('POST', '/api/v1/ai/fix', asked.body.confirm);
@@ -1044,7 +1044,7 @@ describe('Auto-fix: from AI Search', () => {
     const comment = await commentOn(issueId);
     assert.match(
       comment,
-      /Replacing it: removed Groundhog\.Day\.1993\.1080p\.BluRay\.x264-OLD/
+      /Replacing it: removed Hedgehog\.Morning\.1993\.1080p\.BluRay\.x264-OLD/
     );
     assert.deepEqual(deleted, [900]);
     assert.deepEqual(grabbed, ['new']);
@@ -1056,12 +1056,12 @@ describe('Auto-fix: from AI Search', () => {
     );
     modelAnswer = JSON.stringify({
       r: '',
-      titles: [{ t: 'Groundhog Day', y: 1993, k: 'movie' }],
+      titles: [{ t: 'Hedgehog Morning', y: 1993, k: 'movie' }],
       do: 'fix',
       fx: 'broken',
     });
     const res = await call('POST', '/api/v1/ai/chat', {
-      message: 'groundhog day is broken',
+      message: 'hedgehog morning is broken',
     });
     assert.match(res.body.reply, /needs permission to report problems/);
     assert.equal(res.body.confirm, undefined);
@@ -1069,7 +1069,7 @@ describe('Auto-fix: from AI Search', () => {
     const direct = await call('POST', '/api/v1/ai/fix', {
       kind: 'broken',
       mediaId: movie.id,
-      message: 'groundhog day is broken',
+      message: 'hedgehog morning is broken',
     });
     assert.match(direct.body.reply, /needs permission to report problems/);
     assert.equal(await getRepository(Issue).count(), 0);
@@ -1079,7 +1079,7 @@ describe('Auto-fix: from AI Search', () => {
   it('acts on the title in the library, not the first TMDB has by that name', async () => {
     const found = (id: number, date: string) => ({
       id,
-      title: 'Groundhog Day',
+      title: 'Hedgehog Morning',
       release_date: date,
       media_type: 'movie',
       genre_ids: [],
@@ -1089,7 +1089,7 @@ describe('Auto-fix: from AI Search', () => {
       vote_count: 1,
       adult: false,
       original_language: 'en',
-      original_title: 'Groundhog Day',
+      original_title: 'Hedgehog Morning',
       video: false,
     });
     // A newer film by the same name comes first, and is not on the server.
@@ -1105,13 +1105,13 @@ describe('Auto-fix: from AI Search', () => {
     });
     modelAnswer = JSON.stringify({
       r: '',
-      titles: [{ t: 'Groundhog Day', k: 'movie' }],
+      titles: [{ t: 'Hedgehog Morning', k: 'movie' }],
       do: 'fix',
       fx: 'subtitles',
       lang: 'es',
     });
     const res = await call('POST', '/api/v1/ai/chat', {
-      message: 'spanish subtitles for groundhog day',
+      message: 'spanish subtitles for hedgehog morning',
     });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.match(res.body.reply, /Downloaded es subtitles/);
@@ -1124,17 +1124,17 @@ describe('Auto-fix: from AI Search', () => {
   it('points at the open report when the same problem is asked about again', async () => {
     modelAnswer = JSON.stringify({
       r: '',
-      titles: [{ t: 'Groundhog Day', y: 1993, k: 'movie' }],
+      titles: [{ t: 'Hedgehog Morning', y: 1993, k: 'movie' }],
       do: 'fix',
       fx: 'broken',
     });
     const asked = await call('POST', '/api/v1/ai/chat', {
-      message: 'groundhog day has no sound',
+      message: 'hedgehog morning has no sound',
     });
     const first = await call('POST', '/api/v1/ai/fix', asked.body.confirm);
     await commentOn(Number(first.body.fix.link.split('/').pop()));
     const again = await call('POST', '/api/v1/ai/chat', {
-      message: 'groundhog day still has no sound',
+      message: 'hedgehog morning still has no sound',
     });
     assert.match(again.body.reply, /reported this already today/);
     assert.equal(again.body.fix.link, first.body.fix.link);
@@ -1145,12 +1145,12 @@ describe('Auto-fix: from AI Search', () => {
     await getRepository(Media).delete({ id: movie.id });
     modelAnswer = JSON.stringify({
       r: '',
-      titles: [{ t: 'Groundhog Day', y: 1993, k: 'movie' }],
+      titles: [{ t: 'Hedgehog Morning', y: 1993, k: 'movie' }],
       do: 'fix',
       fx: 'subtitles',
     });
     const res = await call('POST', '/api/v1/ai/chat', {
-      message: 'subtitles for groundhog day',
+      message: 'subtitles for hedgehog morning',
     });
     assert.match(res.body.reply, /not on the server yet/);
   });
@@ -1158,11 +1158,11 @@ describe('Auto-fix: from AI Search', () => {
 
 // ---- a whole season --------------------------------------------------------------
 
-/** The release Slow Horses' season 6 came from, on the fake Sonarr. */
-const OLD_PACK = 'Slow.Horses.S06.1080p.ATVP.WEB-DL.DDP5.1.H.264-OLDGRP';
+/** The release Quiet Ravens' season 6 came from, on the fake Sonarr. */
+const OLD_PACK = 'Quiet.Ravens.S06.1080p.ATVP.WEB-DL.DDP5.1.H.264-OLDGRP';
 
 /**
- * Season 6 of Slow Horses: five episodes, every file from one season pack,
+ * Season 6 of Quiet Ravens: five episodes, every file from one season pack,
  * as Sonarr's history has it.
  */
 const season6 = () => {
@@ -1184,7 +1184,7 @@ const season6 = () => {
       episodeId: ep.id,
       data: {
         fileId: String(ep.episodeFileId),
-        droppedPath: `/downloads/${OLD_PACK}/Slow.Horses.S06E0${ep.episodeNumber}.mkv`,
+        droppedPath: `/downloads/${OLD_PACK}/Quiet.Ravens.S06E0${ep.episodeNumber}.mkv`,
       },
     })),
     {
@@ -1216,7 +1216,7 @@ const pack = (guid: string, title: string, over: Partial<ArrRelease> = {}) =>
 const single = (n: number, over: Partial<ArrRelease> = {}) =>
   release({
     guid: `single-${n}`,
-    title: `Slow.Horses.S06E0${n}.1080p.WEB.H.264-EPGRP`,
+    title: `Quiet.Ravens.S06E0${n}.1080p.WEB.H.264-EPGRP`,
     rejected: true,
     rejections: [EXISTING],
     mappedEpisodeInfo: [{ id: 600 + n }],
@@ -1224,7 +1224,7 @@ const single = (n: number, over: Partial<ArrRelease> = {}) =>
     ...over,
   });
 
-const NEW_PACK = 'Slow.Horses.S06.1080p.WEB-DL-NEWGRP';
+const NEW_PACK = 'Quiet.Ravens.S06.1080p.WEB-DL-NEWGRP';
 
 /** The admin agent, able to ask admins: what it sends them. */
 const agentReady = () => {
@@ -1271,14 +1271,14 @@ const filesBack = () =>
 
 describe('Auto-fix: reading which season and episode', () => {
   it('reads the season and episode however they are said', () => {
-    assert.deepEqual(seasonEpisodeIn('Fix season 6 of slow horses'), {
+    assert.deepEqual(seasonEpisodeIn('Fix season 6 of quiet ravens'), {
       season: 6,
     });
     assert.deepEqual(
-      seasonEpisodeIn('Whole season 6 is messed up of slow horses'),
+      seasonEpisodeIn('Whole season 6 is messed up of quiet ravens'),
       { season: 6 }
     );
-    assert.deepEqual(seasonEpisodeIn('s6 of slow horses is broken'), {
+    assert.deepEqual(seasonEpisodeIn('s6 of quiet ravens is broken'), {
       season: 6,
     });
     assert.deepEqual(seasonEpisodeIn('S06E03 has no sound'), {
@@ -1295,13 +1295,13 @@ describe('Auto-fix: reading which season and episode', () => {
     });
     assert.deepEqual(seasonEpisodeIn('6x03 skips'), { season: 6, episode: 3 });
     assert.deepEqual(seasonEpisodeIn('episode 4 is wrong'), { episode: 4 });
-    assert.deepEqual(seasonEpisodeIn('Interstellar has no sound'), {});
-    assert.deepEqual(seasonEpisodeIn('Blade Runner 2049 is broken'), {});
+    assert.deepEqual(seasonEpisodeIn('Starwake has no sound'), {});
+    assert.deepEqual(seasonEpisodeIn('Chrome Courier 2049 is broken'), {});
   });
 
   it('tells a whole season to replace from mixed-up episodes', () => {
     assert.equal(
-      classify('Whole season 6 is messed up of slow horses')?.kind,
+      classify('Whole season 6 is messed up of quiet ravens')?.kind,
       'replaceSeason'
     );
     assert.equal(classify('replace all of season 2')?.kind, 'replaceSeason');
@@ -1322,7 +1322,7 @@ describe('Auto-fix: reading which season and episode', () => {
       classify('replace the subtitles for season 2')?.kind,
       'subtitles'
     );
-    assert.equal(classify('Fix season 6 of slow horses'), undefined);
+    assert.equal(classify('Fix season 6 of quiet ravens'), undefined);
   });
 });
 
@@ -1335,23 +1335,23 @@ describe('Auto-fix: replacing a whole season', () => {
       // The release the files came from, of the best quality: never again.
       pack('old-again', OLD_PACK, { qualityWeight: 900 }),
       // Dubbed into a language the series is not in.
-      pack('german', 'Slow.Horses.S06.GERMAN.1080p.WEB.x264-GERGRP', {
+      pack('german', 'Quiet.Ravens.S06.GERMAN.1080p.WEB.x264-GERGRP', {
         qualityWeight: 800,
         languages: [{ id: 4, name: 'German' }],
       }),
       // A quality the profile does not want.
-      pack('unwanted', 'Slow.Horses.S06.480p.WEB.x264-LOW', {
+      pack('unwanted', 'Quiet.Ravens.S06.480p.WEB.x264-LOW', {
         rejections: ['WEBDL-480p is not wanted in profile'],
       }),
       // One episode, better than any pack: a pack is still preferred.
       single(1, { qualityWeight: 950 }),
-      pack('good', 'Slow.Horses.S06.1080p.ATVP.WEB-DL.DDP5.1.H.264-NEWGRP', {
+      pack('good', 'Quiet.Ravens.S06.1080p.ATVP.WEB-DL.DDP5.1.H.264-NEWGRP', {
         qualityWeight: 700,
       }),
     ];
     const result = await autofix.run({
       kind: 'replaceSeason',
-      media: slowHorses,
+      media: quietRavens,
       seasonNumber: 6,
       user: admin,
     });
@@ -1371,7 +1371,7 @@ describe('Auto-fix: replacing a whole season', () => {
     assert.deepEqual(monitored, [[602]]);
     assert.match(
       result.message,
-      /grabbed the season pack Slow\.Horses\.S06\.1080p\.ATVP\.WEB-DL\.DDP5\.1\.H\.264-NEWGRP from Torznab/
+      /grabbed the season pack Quiet\.Ravens\.S06\.1080p\.ATVP\.WEB-DL\.DDP5\.1\.H\.264-NEWGRP from Torznab/
     );
     assert.match(result.message, /the 5 old files were removed/);
     assert.match(result.message, /marked failed in Sonarr/);
@@ -1386,7 +1386,7 @@ describe('Auto-fix: replacing a whole season', () => {
     );
     const result = await autofix.run({
       kind: 'replaceSeason',
-      media: slowHorses,
+      media: quietRavens,
       seasonNumber: 6,
       user: admin,
     });
@@ -1413,7 +1413,7 @@ describe('Auto-fix: replacing a whole season', () => {
     season6();
     seasonReleases = [
       pack('old-again', OLD_PACK),
-      pack('unwanted', 'Slow.Horses.S06.480p.WEB.x264-LOW', {
+      pack('unwanted', 'Quiet.Ravens.S06.480p.WEB.x264-LOW', {
         rejections: ['WEBDL-480p is not wanted in profile'],
       }),
     ];
@@ -1427,7 +1427,7 @@ describe('Auto-fix: replacing a whole season', () => {
           kind,
           serverId,
           arrId,
-          title: 'Slow Horses',
+          title: 'Quiet Ravens',
           status: 'stuck',
         }) as unknown as BackfillSeries
     );
@@ -1442,7 +1442,7 @@ describe('Auto-fix: replacing a whole season', () => {
     );
     const result = await autofix.run({
       kind: 'replaceSeason',
-      media: slowHorses,
+      media: quietRavens,
       seasonNumber: 6,
       user: admin,
       issueId: 7,
@@ -1470,7 +1470,7 @@ describe('Auto-fix: replacing a whole season', () => {
     });
     const result = await autofix.run({
       kind: 'replaceSeason',
-      media: slowHorses,
+      media: quietRavens,
       seasonNumber: 6,
       user: admin,
     });
@@ -1490,7 +1490,7 @@ describe('Auto-fix: replacing a whole season', () => {
     const replace = (user: User) =>
       autofix.run({
         kind: 'replaceSeason',
-        media: slowHorses,
+        media: quietRavens,
         seasonNumber: 6,
         user,
       });
@@ -1517,7 +1517,7 @@ describe('Auto-fix: replacing a whole season', () => {
     const res = await call('POST', '/api/v1/issue', {
       issueType: IssueType.OTHER,
       message: 'The whole season is messed up, please replace it',
-      mediaId: slowHorses.id,
+      mediaId: quietRavens.id,
       problemSeason: 6,
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));
@@ -1533,7 +1533,7 @@ describe('Auto-fix: replacing a whole season', () => {
     });
     assert.equal(
       run.question,
-      `Waiting for approval: Replace season 6 of Slow Horses: download ${NEW_PACK} and then remove the 5 current files.`
+      `Waiting for approval: Replace season 6 of Quiet Ravens: download ${NEW_PACK} and then remove the 5 current files.`
     );
     assert.equal(run.trigger, 'report');
     assert.equal(run.requestedByName, member.displayName);
@@ -1565,7 +1565,7 @@ describe('Auto-fix: replacing a whole season', () => {
     const back = await commentsOn(issueId, 4);
     assert.equal(
       back[3],
-      'Automatic fix: Season 6 of Slow Horses is back: all 5 new files have been imported.'
+      'Automatic fix: Season 6 of Quiet Ravens is back: all 5 new files have been imported.'
     );
     assert.equal(
       (
@@ -1585,7 +1585,7 @@ describe('Auto-fix: replacing a whole season', () => {
     const res = await call('POST', '/api/v1/issue', {
       issueType: IssueType.OTHER,
       message: 'Whole season 6 needs redownloading',
-      mediaId: slowHorses.id,
+      mediaId: quietRavens.id,
       problemSeason: 6,
     });
     await commentOn(res.body.id);
@@ -1610,7 +1610,7 @@ describe('Auto-fix: replacing a whole season', () => {
     seasonReleases = [pack('good', NEW_PACK)];
     const result = await autofix.run({
       kind: 'replaceSeason',
-      media: slowHorses,
+      media: quietRavens,
       seasonNumber: 6,
       user: member,
     });
@@ -1627,7 +1627,7 @@ describe('Auto-fix: replacing a whole season', () => {
     const res = await call('POST', '/api/v1/issue', {
       issueType: IssueType.OTHER,
       message: 'Replace all of season 6',
-      mediaId: slowHorses.id,
+      mediaId: quietRavens.id,
       problemSeason: 6,
     });
     assert.match(await commentOn(res.body.id), /grabbed the season pack/);
@@ -1649,24 +1649,24 @@ describe('Auto-fix: replacing a whole season', () => {
     await agent.checkHeld();
     assert.match(
       (await commentsOn(res.body.id, 3))[2],
-      /^Automatic fix: Season 6 of Slow Horses is back/
+      /^Automatic fix: Season 6 of Quiet Ravens is back/
     );
   });
 });
 
 describe('Auto-fix: a season from AI Search and issues', () => {
-  it('“Fix season 6 of slow horses” with nothing missing asks what is wrong, and replacing it then works', async () => {
+  it('“Fix season 6 of quiet ravens” with nothing missing asks what is wrong, and replacing it then works', async () => {
     season6();
     actingAs = admin;
     // As the model answered on the owner's server: missing episodes.
     modelAnswer = JSON.stringify({
       r: 'Looking for what is missing in season 6.',
-      titles: [{ t: 'Slow Horses', y: 2022, k: 'tv' }],
+      titles: [{ t: 'Quiet Ravens', y: 2022, k: 'tv' }],
       do: 'fix',
       fx: 'missing',
       se: 6,
     });
-    const ask = 'Fix season 6 of slow horses';
+    const ask = 'Fix season 6 of quiet ravens';
     const res = await call('POST', '/api/v1/ai/chat', { message: ask });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.match(
@@ -1684,7 +1684,7 @@ describe('Auto-fix: a season from AI Search and issues', () => {
     // season; it comes from the conversation.
     modelAnswer = JSON.stringify({
       r: 'Replacing season 6.',
-      titles: [{ t: 'Slow Horses', y: 2022, k: 'tv' }],
+      titles: [{ t: 'Quiet Ravens', y: 2022, k: 'tv' }],
       do: 'fix',
       fx: 'replaceSeason',
     });
@@ -1695,11 +1695,11 @@ describe('Auto-fix: a season from AI Search and issues', () => {
     assert.equal(chosen.status, 200, JSON.stringify(chosen.body));
     assert.deepEqual(chosen.body.confirm, {
       kind: 'replaceSeason',
-      mediaId: slowHorses.id,
+      mediaId: quietRavens.id,
       seasonNumber: 6,
       message: 'Replace the whole season',
     });
-    assert.match(chosen.body.reply, /all of season 6 of Slow Horses/);
+    assert.match(chosen.body.reply, /all of season 6 of Quiet Ravens/);
 
     seasonReleases = [pack('good', NEW_PACK)];
     const fixed = await call('POST', '/api/v1/ai/fix', chosen.body.confirm);
@@ -1717,7 +1717,7 @@ describe('Auto-fix: a season from AI Search and issues', () => {
     assert.deepEqual(grabbed, ['good']);
   });
 
-  it('“Whole season 6 is messed up of slow horses” is filed on season 6, not All Seasons, and replaced for an admin', async () => {
+  it('“Whole season 6 is messed up of quiet ravens” is filed on season 6, not All Seasons, and replaced for an admin', async () => {
     season6();
     seasonReleases = [pack('good', NEW_PACK)];
     actingAs = admin;
@@ -1725,16 +1725,16 @@ describe('Auto-fix: a season from AI Search and issues', () => {
     // no season.
     modelAnswer = JSON.stringify({
       r: 'Checking season 6.',
-      titles: [{ t: 'Slow Horses', y: 2022, k: 'tv' }],
+      titles: [{ t: 'Quiet Ravens', y: 2022, k: 'tv' }],
       do: 'fix',
       fx: 'wrongEpisode',
     });
-    const message = 'Whole season 6 is messed up of slow horses';
+    const message = 'Whole season 6 is messed up of quiet ravens';
     const asked = await call('POST', '/api/v1/ai/chat', { message });
     assert.equal(asked.status, 200, JSON.stringify(asked.body));
     assert.deepEqual(asked.body.confirm, {
       kind: 'replaceSeason',
-      mediaId: slowHorses.id,
+      mediaId: quietRavens.id,
       seasonNumber: 6,
       message,
     });
@@ -1756,17 +1756,17 @@ describe('Auto-fix: a season from AI Search and issues', () => {
     assert.equal(deleted.length, 5);
   });
 
-  it('“Whole season 6 is messed up of slow horses” from anyone else waits for an admin', async () => {
+  it('“Whole season 6 is messed up of quiet ravens” from anyone else waits for an admin', async () => {
     season6();
     seasonReleases = [pack('good', NEW_PACK)];
     agentReady();
     modelAnswer = JSON.stringify({
       r: 'Checking season 6.',
-      titles: [{ t: 'Slow Horses', y: 2022, k: 'tv' }],
+      titles: [{ t: 'Quiet Ravens', y: 2022, k: 'tv' }],
       do: 'fix',
       fx: 'wrongEpisode',
     });
-    const message = 'Whole season 6 is messed up of slow horses';
+    const message = 'Whole season 6 is messed up of quiet ravens';
     const asked = await call('POST', '/api/v1/ai/chat', { message });
     assert.equal(asked.body.confirm.seasonNumber, 6);
     assert.match(asked.body.reply, /An admin approves it first/);
@@ -1786,13 +1786,13 @@ describe('Auto-fix: a season from AI Search and issues', () => {
     season6();
     modelAnswer = JSON.stringify({
       r: '',
-      titles: [{ t: 'Slow Horses', y: 2022, k: 'tv' }],
+      titles: [{ t: 'Quiet Ravens', y: 2022, k: 'tv' }],
       do: 'fix',
       fx: 'wrongEpisode',
       se: 1,
     });
     const asked = await call('POST', '/api/v1/ai/chat', {
-      message: 'S06E03 of slow horses is the wrong episode',
+      message: 'S06E03 of quiet ravens is the wrong episode',
     });
     assert.equal(asked.body.confirm.seasonNumber, 6);
     assert.equal(asked.body.confirm.episodeNumber, 3);
@@ -1811,7 +1811,7 @@ describe('Auto-fix: a season from AI Search and issues', () => {
     const res = await call('POST', '/api/v1/issue', {
       issueType: IssueType.OTHER,
       message: 'The whole season 6 is messed up',
-      mediaId: slowHorses.id,
+      mediaId: quietRavens.id,
       problemSeason: 0,
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));

@@ -105,7 +105,7 @@ describe('user request counts', () => {
       new Media({
         tmdbId: 0,
         mediaType: MediaType.MUSIC,
-        foreignId: 'a74b1b7f-71a5-4011-9441-d0b5e4122711',
+        foreignId: '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844',
         status: MediaStatus.PENDING,
       }),
       { listeners: false }
@@ -117,7 +117,7 @@ describe('user request counts', () => {
         type: MediaType.MUSIC,
         status: MediaRequestStatus.PENDING,
         is4k: false,
-        albums: ['OK Computer', 'Kid A'].map(
+        albums: ['Static Garden', 'Fog B'].map(
           (title, i) => new AlbumRequest({ albumMbid: `album-${i}`, title })
         ),
       }),

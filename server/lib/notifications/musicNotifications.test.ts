@@ -34,9 +34,9 @@ import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
 
 setupTestDb();
 
-const ARTIST = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
-const OK_COMPUTER = '1b022e01-4da6-387b-8658-8678046e4cef';
-const KID_A = 'b1392450-e666-3926-a536-22c65f834433';
+const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
+const STATIC_GARDEN = '4f6a2d93-c1e8-3a57-9b02-6d3e8f1c7a40';
+const FOG_B = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
 
 const sent: { type: Notification; payload: NotificationPayload }[] = [];
 
@@ -50,7 +50,7 @@ const musicRequest = async (
       mediaType: MediaType.MUSIC,
       tmdbId: 0,
       foreignId: ARTIST,
-      foreignTitle: 'Radiohead',
+      foreignTitle: 'Glasswing',
       status: MediaStatus.PENDING,
     }),
     { listeners: false }
@@ -105,7 +105,7 @@ afterEach(() => {
 describe('a music request’s notification', () => {
   it('names one album, its artist and year, with its cover and page', async () => {
     const { media, request } = await musicRequest([
-      { mbId: OK_COMPUTER, title: 'OK Computer', date: '1997-05-21' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden', date: '1997-05-21' },
     ]);
 
     const ok = await MediaRequest.sendNotification(
@@ -116,24 +116,24 @@ describe('a music request’s notification', () => {
 
     assert.equal(ok, true);
     const { payload } = sent[0];
-    assert.equal(payload.subject, 'OK Computer — Radiohead (1997)');
-    assert.equal(payload.message, 'OK Computer');
+    assert.equal(payload.subject, 'Static Garden — Glasswing (1997)');
+    assert.equal(payload.message, 'Static Garden');
     assert.equal(
       payload.image,
-      `https://coverartarchive.org/release-group/${OK_COMPUTER}/front-500`
+      `https://coverartarchive.org/release-group/${STATIC_GARDEN}/front-500`
     );
     assert.deepEqual(payload.extra, [{ name: 'Requested Albums', value: '1' }]);
     assert.equal(payload.event, 'Music Request Approved');
     assert.equal(
       mediaPagePath(payload.media!, payload.request),
-      `/music/album/${OK_COMPUTER}`
+      `/music/album/${STATIC_GARDEN}`
     );
   });
 
   it('counts several albums and links to the artist', async () => {
     const { media, request } = await musicRequest([
-      { mbId: OK_COMPUTER, title: 'OK Computer', date: '1997' },
-      { mbId: KID_A, title: 'Kid A', date: '2000' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden', date: '1997' },
+      { mbId: FOG_B, title: 'Fog B', date: '2000' },
     ]);
 
     await MediaRequest.sendNotification(
@@ -143,8 +143,8 @@ describe('a music request’s notification', () => {
     );
 
     const { payload } = sent[0];
-    assert.equal(payload.subject, 'Radiohead — 2 albums');
-    assert.equal(payload.message, 'OK Computer, Kid A');
+    assert.equal(payload.subject, 'Glasswing — 2 albums');
+    assert.equal(payload.message, 'Static Garden, Fog B');
     assert.equal(payload.event, 'New Music Request');
     assert.equal(
       mediaPagePath(payload.media!, payload.request),
@@ -154,7 +154,7 @@ describe('a music request’s notification', () => {
 
   it('carries the decline reason like any other', async () => {
     const { media, request } = await musicRequest([
-      { mbId: OK_COMPUTER, title: 'OK Computer', date: '1997' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden', date: '1997' },
     ]);
     request.status = MediaRequestStatus.DECLINED;
     request.declineReason = 'Already in the library as FLAC';
@@ -208,7 +208,7 @@ describe('music event lines', () => {
 describe('music in each channel', () => {
   const payloadOf = async (type: Notification) => {
     const { media, request } = await musicRequest([
-      { mbId: OK_COMPUTER, title: 'OK Computer', date: '1997' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden', date: '1997' },
     ]);
     await MediaRequest.sendNotification(request, media, type);
     return sent[0].payload;
@@ -223,7 +223,10 @@ describe('music in each channel', () => {
       payload
     );
 
-    assert.equal(embed.url, `https://seerr.example/music/album/${OK_COMPUTER}`);
+    assert.equal(
+      embed.url,
+      `https://seerr.example/music/album/${STATIC_GARDEN}`
+    );
     getSettings().main.applicationUrl = '';
   });
 
@@ -243,7 +246,7 @@ describe('music in each channel', () => {
     );
     assert.equal(
       message?.locals?.actionUrl,
-      `https://seerr.example/music/album/${OK_COMPUTER}`
+      `https://seerr.example/music/album/${STATIC_GARDEN}`
     );
     getSettings().main.applicationUrl = '';
   });
@@ -255,7 +258,7 @@ describe('music in each channel', () => {
       payload
     );
     assert.equal(approved.message, 'Your music request has been approved.');
-    assert.equal(approved.actionUrl, `/music/album/${OK_COMPUTER}`);
+    assert.equal(approved.actionUrl, `/music/album/${STATIC_GARDEN}`);
 
     const failed = new WebPushAgent()['getNotificationPayload'](
       Notification.MEDIA_FAILED,
@@ -274,7 +277,7 @@ describe('music in each channel', () => {
     };
 
     assert.equal(value('media_mbid'), ARTIST);
-    assert.equal(value('music_albums'), 'OK Computer');
+    assert.equal(value('music_albums'), 'Static Garden');
     assert.equal(payload.media?.mediaType, 'music');
     assert.equal(payload.media?.tmdbId, 0);
 

@@ -81,41 +81,41 @@ afterEach(() => mock.restoreAll());
 
 describe('blocked release groups', () => {
   it('catches a group by what was read, or as a word of the title, nothing else', () => {
-    const blocked = ['rothebehap', 'turkseed', 'Flux.X'];
+    const blocked = ['quillowsap', 'lynxseed', 'Gleam.X'];
     const of = (title: string, group?: string) =>
       blockedGroupOf(title, group, blocked);
     assert.equal(
-      of('The.Odyssey.2026.720p.WEB-DL.AAC.x264-rothebehap'),
-      'rothebehap'
+      of('The.Driftwood.2026.720p.WEB-DL.AAC.x264-quillowsap'),
+      'quillowsap'
     );
     assert.equal(
-      of('The Odyssey (2026) 1080p WEBDL H264 [EN TR SUB] AAC #turkseed'),
-      'turkseed'
+      of('The Driftwood (2026) 1080p WEBDL H264 [EN TR SUB] AAC #lynxseed'),
+      'lynxseed'
     );
-    assert.equal(of('Movie 2026 x264 ROTHEBEHAP mp4'), 'rothebehap');
-    assert.equal(of('Some.Movie.2026.1080p', 'RoTheBeHap'), 'rothebehap');
+    assert.equal(of('Movie 2026 x264 QUILLOWSAP mp4'), 'quillowsap');
+    assert.equal(of('Some.Movie.2026.1080p', 'QuIlLoWsAp'), 'quillowsap');
     // A dot in a name is a dot, not any character.
-    assert.equal(of('Movie.2026.1080p-Flux.X'), 'Flux.X');
-    assert.equal(of('Movie.2026.1080p-FluxyX'), undefined);
+    assert.equal(of('Movie.2026.1080p-Gleam.X'), 'Gleam.X');
+    assert.equal(of('Movie.2026.1080p-GleamyX'), undefined);
     // Part of a longer word is not the group.
-    assert.equal(of('Movie.2026.1080p-rothebehapper'), undefined);
-    assert.equal(of('Movie.2026.1080p-NTb'), undefined);
+    assert.equal(of('Movie.2026.1080p-quillowsapper'), undefined);
+    assert.equal(of('Movie.2026.1080p-KRb'), undefined);
   });
 
   it('gives Radarr and Sonarr a format matching the groups by group and by title', () => {
-    const format = blockFormat(['rothebehap', 'Flux.X']);
+    const format = blockFormat(['quillowsap', 'Gleam.X']);
     assert.equal(format.name, BLOCK_FORMAT_NAME);
     const [group, title] = format.specifications;
     assert.equal(group.implementation, 'ReleaseGroupSpecification');
     assert.equal(title.implementation, 'ReleaseTitleSpecification');
     const groupRe = new RegExp(String(group.fields[0].value), 'i');
     const titleRe = new RegExp(String(title.fields[0].value), 'i');
-    assert.ok(groupRe.test('ROTHEBEHAP'));
-    assert.ok(groupRe.test('flux.x'));
-    assert.ok(!groupRe.test('fluxyx'));
-    assert.ok(!groupRe.test('rothebehap2'));
-    assert.ok(titleRe.test('Movie 2026 x264 rothebehap mp4'));
-    assert.ok(!titleRe.test('Movie 2026 x264 rothebehapper'));
+    assert.ok(groupRe.test('QUILLOWSAP'));
+    assert.ok(groupRe.test('gleam.x'));
+    assert.ok(!groupRe.test('gleamyx'));
+    assert.ok(!groupRe.test('quillowsap2'));
+    assert.ok(titleRe.test('Movie 2026 x264 quillowsap mp4'));
+    assert.ok(!titleRe.test('Movie 2026 x264 quillowsapper'));
   });
 
   it('scores the format below the minimum whatever else a release scores', () => {
@@ -152,10 +152,10 @@ describe('blocked release groups', () => {
     mock.getter(FixRadarr.prototype, 'extras', () => radarr.api);
     mock.getter(FixSonarr.prototype, 'extras', () => sonarr.api);
 
-    const { groups, problems } = await setGroupBlocked('rothebehap', true);
-    assert.deepEqual(groups, ['rothebehap']);
+    const { groups, problems } = await setGroupBlocked('quillowsap', true);
+    assert.deepEqual(groups, ['quillowsap']);
     assert.deepEqual(problems, []);
-    assert.deepEqual(getSettings().backfill.blockedGroups, ['rothebehap']);
+    assert.deepEqual(getSettings().backfill.blockedGroups, ['quillowsap']);
 
     const made = radarr.formats.find((f) => f.name === BLOCK_FORMAT_NAME);
     assert.ok(made?.id);
@@ -180,22 +180,22 @@ describe('blocked release groups', () => {
     // A second group updates the same format; scores already right are
     // not saved again.
     radarr.calls.length = 0;
-    await setGroupBlocked('turkseed', true);
+    await setGroupBlocked('lynxseed', true);
     assert.deepEqual(radarr.calls, [`put ${made.id}`]);
     assert.deepEqual(getSettings().backfill.blockedGroups, [
-      'rothebehap',
-      'turkseed',
+      'quillowsap',
+      'lynxseed',
     ]);
     // The same group again, in other case, is one entry.
-    await setGroupBlocked('TURKSEED', true);
+    await setGroupBlocked('LYNXSEED', true);
     assert.deepEqual(getSettings().backfill.blockedGroups, [
-      'rothebehap',
-      'TURKSEED',
+      'quillowsap',
+      'LYNXSEED',
     ]);
 
     // Nothing left blocked: the format goes, with its scores.
-    await setGroupBlocked('rothebehap', false);
-    await setGroupBlocked('turkseed', false);
+    await setGroupBlocked('quillowsap', false);
+    await setGroupBlocked('lynxseed', false);
     assert.deepEqual(getSettings().backfill.blockedGroups, []);
     assert.ok(!radarr.formats.some((f) => f.name === BLOCK_FORMAT_NAME));
     assert.deepEqual(
@@ -210,8 +210,8 @@ describe('blocked release groups', () => {
     const sonarr = standIn([]);
     mock.getter(FixRadarr.prototype, 'extras', () => radarr.api);
     mock.getter(FixSonarr.prototype, 'extras', () => sonarr.api);
-    const { groups, problems } = await setGroupBlocked('rothebehap', true);
-    assert.deepEqual(groups, ['rothebehap']);
+    const { groups, problems } = await setGroupBlocked('quillowsap', true);
+    assert.deepEqual(groups, ['quillowsap']);
     assert.equal(problems.length, 1);
     assert.match(
       problems[0],

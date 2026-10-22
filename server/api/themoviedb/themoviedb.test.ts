@@ -39,7 +39,7 @@ describe('a TMDB search TMDB does not answer', () => {
     'searchTvShows',
   ] as const) {
     it(`${search} says so in the log, and finds nothing`, async () => {
-      const result = await failing()[search]({ query: 'Alien' });
+      const result = await failing()[search]({ query: 'Aurelin' });
       assert.deepEqual(result.results, []);
       assert.equal(warned.length, 1);
       assert.match(JSON.stringify(warned[0]), /status code 503/);

@@ -62,8 +62,8 @@ export const normalize = (value: string): string =>
     .replace(/[^\p{L}\p{N}]+/gu, '');
 
 /**
- * A normalized name without a trailing year ("perfectworld2021"), unless
- * the year is all there is to it ("1917", "2012").
+ * A normalized name without a trailing year ("ninefoldsky2021"), unless
+ * the year is all there is to it ("1863", "2034").
  */
 const withoutYear = (normalized: string): string => {
   const bare = normalized.replace(/(19|20)\d{2}$/, '');

@@ -59,12 +59,12 @@ const lidarr = http.createServer((req, res) => {
         ? [
             {
               id: 42,
-              artistName: 'Radiohead',
+              artistName: 'Glasswing',
               foreignArtistId: ARTIST,
               monitored: false,
               qualityProfileId: 1,
               metadataProfileId: 3,
-              path: '/music/Radiohead',
+              path: '/music/Glasswing',
               rootFolderPath: '/music',
               tags: [7],
             },
@@ -439,7 +439,7 @@ describe('the request window’s Lidarr', () => {
     ]);
     assert.deepEqual(details.artist, {
       id: 42,
-      path: '/music/Radiohead',
+      path: '/music/Glasswing',
       rootFolderPath: '/music',
       qualityProfileId: 1,
       metadataProfileId: 3,

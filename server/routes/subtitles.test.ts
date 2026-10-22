@@ -48,9 +48,9 @@ const SONARR_ID = 844;
 
 const movie = {
   radarrId: RADARR_ID,
-  title: '10 Cloverfield Lane',
+  title: '10 Juniper Lane',
   profileId: 2,
-  sceneName: '10.Cloverfield.Lane.2016.1080p.BDRip.DDP7.1.Atmos.x265-Vialle',
+  sceneName: '10.Juniper.Lane.2016.1080p.BDRip.DDP7.1.Atmos.x265-Brindle',
   subtitles: [
     {
       name: 'English',
@@ -67,7 +67,7 @@ const movie = {
       name: 'English',
       code2: 'en',
       code3: 'eng',
-      path: '/movies/10 Cloverfield Lane (2016)/10 Cloverfield Lane (2016) Bluray-1080p.eng.srt',
+      path: '/movies/10 Juniper Lane (2016)/10 Juniper Lane (2016) Bluray-1080p.eng.srt',
       forced: false,
       hi: false,
       file_size: 54358,
@@ -78,7 +78,7 @@ const movie = {
   missing_subtitles: [],
 };
 
-const SEASON_4 = '/tv/LEGO Ninjago - Dragons Rising/Season 4/';
+const SEASON_4 = '/tv/BRIXO Shurikan - Wyverns Waking/Season 4/';
 const episode = (n: number, subtitles: unknown[], missing = false) => ({
   sonarrSeriesId: SONARR_ID,
   sonarrEpisodeId: 139840 + n,
@@ -150,7 +150,7 @@ const searchResults = [
     hearing_impaired: 'False',
     forced: 'False',
     original_format: 'False',
-    release_info: ['10 Cloverfield Lane (2016) Bluray-1080p tt1179933'],
+    release_info: ['10 Juniper Lane (2016) Bluray-1080p tt1288044'],
     matches: ['hearing_impaired', 'resolution', 'year', 'source', 'title'],
     dont_matches: ['audio_codec', 'hash', 'video_codec', 'release_group'],
     uploader: 'someone',
@@ -307,7 +307,7 @@ before(async () => {
               ? [
                   {
                     sonarrSeriesId: SONARR_ID,
-                    title: 'LEGO Ninjago: Dragons Rising',
+                    title: 'BRIXO Shurikan: Wyverns Waking',
                     profileId: 2,
                   },
                 ]
@@ -519,7 +519,7 @@ beforeEach(async () => {
 
   await getRepository(Media).save([
     new Media({
-      tmdbId: 333371,
+      tmdbId: 471906,
       mediaType: MediaType.MOVIE,
       status: MediaStatus.AVAILABLE,
       serviceId: 0,
@@ -527,7 +527,7 @@ beforeEach(async () => {
       ratingKey: '121141',
     }),
     new Media({
-      tmdbId: 212989,
+      tmdbId: 318472,
       mediaType: MediaType.TV,
       status: MediaStatus.AVAILABLE,
       serviceId: 0,
@@ -597,19 +597,14 @@ const waitFor = async (check: () => boolean) => {
 
 describe('reading a title’s subtitles', () => {
   it('lists a movie’s subtitles, without the folders on the server', async () => {
-    const { status, body } = await call<MovieSubtitles>('GET', '/movie/333371');
+    const { status, body } = await call<MovieSubtitles>('GET', '/movie/471906');
     assert.equal(status, 200);
     assert.deepEqual([body.profile, body.wanted], ['English', ['en']]);
     assert.deepEqual(
       body.tracks.map((t) => [t.id, t.kind, t.fileName, t.ai]),
       [
         [102498, 'embedded', undefined, false],
-        [
-          103755,
-          'file',
-          '10 Cloverfield Lane (2016) Bluray-1080p.eng.srt',
-          false,
-        ],
+        [103755, 'file', '10 Juniper Lane (2016) Bluray-1080p.eng.srt', false],
       ]
     );
     assert.ok(!JSON.stringify(body).includes('/movies/'));
@@ -622,7 +617,7 @@ describe('reading a title’s subtitles', () => {
   });
 
   it('marks the episodes whose subtitle Whisper made, by its latest download', async () => {
-    const { status, body } = await call<SeriesSubtitles>('GET', '/tv/212989');
+    const { status, body } = await call<SeriesSubtitles>('GET', '/tv/318472');
     assert.equal(status, 200);
     const byNumber = new Map(body.episodes.map((e) => [e.episodeNumber, e]));
     assert.equal(byNumber.get(18)?.tracks[0].ai, true, 'synced afterwards');
@@ -641,10 +636,10 @@ describe('reading a title’s subtitles', () => {
 
   it('is not found when Bazarr is not set up, or the switch is off', async () => {
     getSettings().bazarr = { ...getSettings().bazarr, apiKey: '' };
-    assert.equal((await call('GET', '/movie/333371')).status, 404);
+    assert.equal((await call('GET', '/movie/471906')).status, 404);
     getSettings().bazarr = { ...getSettings().bazarr, apiKey: KEY };
     getSettings().main.disabledFeatures = ['subtitles'];
-    assert.equal((await call('GET', '/movie/333371')).status, 404);
+    assert.equal((await call('GET', '/movie/471906')).status, 404);
   });
 
   it('leaves alone a title on a Radarr or Sonarr Bazarr does not follow', async () => {
@@ -677,11 +672,11 @@ describe('reading a title’s subtitles', () => {
 
 describe('searching, downloading and deleting', () => {
   it('leaves searching to people who manage requests', async () => {
-    assert.equal((await call('GET', '/movie/333371/search')).status, 403);
+    assert.equal((await call('GET', '/movie/471906/search')).status, 403);
     actingAs = manager;
     const { status, body: answer } = await call<SubtitleSearchResponse>(
       'GET',
-      '/movie/333371/search'
+      '/movie/471906/search'
     );
     const body = answer.results;
     assert.equal(status, 200);
@@ -704,7 +699,7 @@ describe('searching, downloading and deleting', () => {
     actingAs = manager;
     const { status } = await call(
       'POST',
-      '/tv/212989/season/4/episode/11/download',
+      '/tv/318472/season/4/episode/11/download',
       {
         provider: 'opensubtitlescom',
         subtitle: 'abc',
@@ -734,17 +729,17 @@ describe('searching, downloading and deleting', () => {
   it('deletes only files, and only for admins', async () => {
     actingAs = manager;
     assert.equal(
-      (await call('DELETE', '/movie/333371/subtitle/103755')).status,
+      (await call('DELETE', '/movie/471906/subtitle/103755')).status,
       403
     );
     actingAs = admin;
     assert.equal(
-      (await call('DELETE', '/movie/333371/subtitle/102498')).status,
+      (await call('DELETE', '/movie/471906/subtitle/102498')).status,
       404,
       'a track inside the video'
     );
     assert.equal(
-      (await call('DELETE', '/movie/333371/subtitle/103755')).status,
+      (await call('DELETE', '/movie/471906/subtitle/103755')).status,
       204
     );
     assert.deepEqual(writes[0], {
@@ -766,7 +761,7 @@ describe('searching, downloading and deleting', () => {
     searchGate = new Promise<void>((resolve) => (release = resolve));
     const started = await call<
       TranscriptionStatus & { transcribeAfter: boolean }
-    >('POST', '/tv/212989/search-missing');
+    >('POST', '/tv/318472/search-missing');
     assert.equal(started.status, 202);
     assert.deepEqual(
       [started.body.searching, started.body.transcribeAfter],
@@ -780,7 +775,7 @@ describe('searching, downloading and deleting', () => {
     });
     const during = await call<TranscriptionStatus>(
       'GET',
-      '/tv/212989/transcription'
+      '/tv/318472/transcription'
     );
     assert.equal(during.body.searching, true, 'followed while it searches');
 
@@ -791,8 +786,8 @@ describe('searching, downloading and deleting', () => {
       [writes[1].path, writes[1].fields.episodeid, writes[1].fields.provider],
       ['/providers/episodes', '139851', 'whisperai']
     );
-    await waitFor(() => !transcriber.status('tv:212989').running);
-    const after = transcriber.status('tv:212989');
+    await waitFor(() => !transcriber.status('tv:318472').running);
+    const after = transcriber.status('tv:318472');
     assert.deepEqual(
       [after.searching, after.queued, after.auto],
       [false, 0, 0]
@@ -804,10 +799,10 @@ describe('searching, downloading and deleting', () => {
     providersOn = ['opensubtitlescom'];
     const started = await call<{ transcribeAfter: boolean }>(
       'POST',
-      '/tv/212989/search-missing'
+      '/tv/318472/search-missing'
     );
     assert.equal(started.body.transcribeAfter, false);
-    await waitFor(() => !transcriber.status('tv:212989').searching);
+    await waitFor(() => !transcriber.status('tv:318472').searching);
     await new Promise((resolve) => setTimeout(resolve, 50));
     assert.deepEqual(
       writes.map((w) => w.path),
@@ -831,7 +826,7 @@ describe('a search that finds nothing', () => {
     resultsNow = [searchResults[1]];
     const { status, body } = await call<SubtitleSearchResponse>(
       'GET',
-      '/movie/333371/search?transcribeIfNone=true'
+      '/movie/471906/search?transcribeIfNone=true'
     );
     assert.equal(status, 200);
     assert.equal(body.noneFound, 'started');
@@ -852,7 +847,7 @@ describe('a search that finds nothing', () => {
         subtitle: '869461e4',
       },
     });
-    await waitFor(() => !transcriber.status('movie:333371').running);
+    await waitFor(() => !transcriber.status('movie:471906').running);
   });
 
   it('only when asked to', async () => {
@@ -861,7 +856,7 @@ describe('a search that finds nothing', () => {
     resultsNow = [searchResults[1]];
     const { body } = await call<SubtitleSearchResponse>(
       'GET',
-      '/movie/333371/search'
+      '/movie/471906/search'
     );
     assert.equal(body.noneFound, undefined);
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -873,7 +868,7 @@ describe('a search that finds nothing', () => {
     resultsNow = [searchResults[1]];
     const { body } = await call<SubtitleSearchResponse>(
       'GET',
-      '/movie/333371/search?transcribeIfNone=true'
+      '/movie/471906/search?transcribeIfNone=true'
     );
     assert.equal(body.noneFound, 'notMissing');
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -885,7 +880,7 @@ describe('a search that finds nothing', () => {
     movieNow = noEnglish;
     const { body } = await call<SubtitleSearchResponse>(
       'GET',
-      '/movie/333371/search?transcribeIfNone=true'
+      '/movie/471906/search?transcribeIfNone=true'
     );
     assert.equal(body.noneFound, undefined);
     assert.deepEqual(writes, []);
@@ -897,7 +892,7 @@ describe('a search that finds nothing', () => {
     resultsNow = [];
     const { body } = await call<SubtitleSearchResponse>(
       'GET',
-      '/movie/333371/search?transcribeIfNone=true'
+      '/movie/471906/search?transcribeIfNone=true'
     );
     assert.deepEqual([body.noneFound, body.results], ['unavailable', []]);
   });
@@ -907,7 +902,7 @@ describe('a search that finds nothing', () => {
     resultsNow = [searchResults[1]];
     const missing = await call<SubtitleSearchResponse>(
       'GET',
-      '/tv/212989/season/4/episode/11/search?transcribeIfNone=true'
+      '/tv/318472/season/4/episode/11/search?transcribeIfNone=true'
     );
     assert.equal(missing.body.noneFound, 'started');
     await waitFor(() => writes.length === 1);
@@ -915,23 +910,23 @@ describe('a search that finds nothing', () => {
       [writes[0].path, writes[0].fields.episodeid, writes[0].fields.subtitle],
       ['/providers/episodes', '139851', '869461e4']
     );
-    await waitFor(() => !transcriber.status('tv:212989').running);
+    await waitFor(() => !transcriber.status('tv:318472').running);
     const covered = await call<SubtitleSearchResponse>(
       'GET',
-      '/tv/212989/season/4/episode/19/search?transcribeIfNone=true'
+      '/tv/318472/season/4/episode/19/search?transcribeIfNone=true'
     );
     assert.equal(covered.body.noneFound, 'notMissing');
   });
 
   it('skips a transcription whose gap was filled while it waited', async () => {
     // Queued when English was missing; by its turn, Bazarr has found one.
-    queueMovieTranscription('movie:333371', RADARR_ID, {
+    queueMovieTranscription('movie:471906', RADARR_ID, {
       auto: true,
       known: searchResults[1],
     });
     await waitFor(() => !transcriber.isQueued(`movie:${RADARR_ID}`));
     assert.deepEqual(writes, []);
-    const { done, failed } = transcriber.status('movie:333371');
+    const { done, failed } = transcriber.status('movie:471906');
     assert.deepEqual([done, failed], [1, 0], 'skipped, not failed');
   });
 });
@@ -941,7 +936,7 @@ describe('transcribing', () => {
     actingAs = manager;
     const { status, body } = await call<
       TranscriptionStatus & { added: number }
-    >('POST', '/tv/212989/transcription', { scope: 'notTranscribed' });
+    >('POST', '/tv/318472/transcription', { scope: 'notTranscribed' });
     assert.equal(status, 202);
     // 10, 11 and 19; 18 is Whisper's already.
     assert.equal(body.added, 3);
@@ -958,7 +953,7 @@ describe('transcribing', () => {
     );
     const after = await call<TranscriptionStatus>(
       'GET',
-      '/tv/212989/transcription'
+      '/tv/318472/transcription'
     );
     assert.deepEqual(
       [
@@ -974,7 +969,7 @@ describe('transcribing', () => {
   it('wants a season for a season', async () => {
     actingAs = manager;
     assert.equal(
-      (await call('POST', '/tv/212989/transcription', { scope: 'season' }))
+      (await call('POST', '/tv/318472/transcription', { scope: 'season' }))
         .status,
       400
     );
@@ -982,7 +977,7 @@ describe('transcribing', () => {
 
   it('is for people who manage requests', async () => {
     assert.equal(
-      (await call('POST', '/movie/333371/transcription')).status,
+      (await call('POST', '/movie/471906/transcription')).status,
       403
     );
   });
@@ -997,7 +992,7 @@ describe('transcribing', () => {
       code?: string;
       error?: string;
       retry?: string;
-    }>('POST', '/movie/333371/transcription');
+    }>('POST', '/movie/471906/transcription');
     assert.equal(movie.status, 409);
     assert.equal(
       movie.body.message,
@@ -1008,7 +1003,7 @@ describe('transcribing', () => {
       ['whisperPaused', 'ReadTimeout', 'in 41 minutes'],
       'for the page to say in the viewer’s language'
     );
-    const series = await call('POST', '/tv/212989/transcription', {
+    const series = await call('POST', '/tv/318472/transcription', {
       scope: 'notTranscribed',
     });
     assert.equal(series.status, 409);
@@ -1018,14 +1013,14 @@ describe('transcribing', () => {
   it('keeps why one did not finish, for the title page', async () => {
     actingAs = manager;
     resultsNow = [];
-    const started = await call('POST', '/movie/333371/transcription');
+    const started = await call('POST', '/movie/471906/transcription');
     assert.equal(started.status, 202);
     // Paused between the click and the search: the search offers nothing.
     pausedNow = {
       whisperai: { status: 'ReadTimeout', retry: 'in 41 minutes' },
     };
-    await waitFor(() => !transcriber.status('movie:333371').running);
-    const status = transcriber.status('movie:333371');
+    await waitFor(() => !transcriber.status('movie:471906').running);
+    const status = transcriber.status('movie:471906');
     assert.equal(status.failed, 1);
     assert.deepEqual(status.error, {
       code: 'whisperPaused',
@@ -1056,7 +1051,7 @@ describe('the subtitle your own Plex player starts with', () => {
       available: boolean;
       selected: number;
       options: { id: number }[];
-    }>('GET', '/movie/333371/plex-default');
+    }>('GET', '/movie/471906/plex-default');
     assert.equal(read.status, 200);
     assert.deepEqual(
       [
@@ -1067,7 +1062,7 @@ describe('the subtitle your own Plex player starts with', () => {
       [true, 502, [501, 502, 503]]
     );
     assert.equal(
-      (await call('PUT', '/movie/333371/plex-default', { streamId: 503 }))
+      (await call('PUT', '/movie/471906/plex-default', { streamId: 503 }))
         .status,
       204
     );
@@ -1079,7 +1074,7 @@ describe('the subtitle your own Plex player starts with', () => {
       },
     ]);
     assert.equal(
-      (await call('PUT', '/movie/333371/plex-default', { streamId: 999 }))
+      (await call('PUT', '/movie/471906/plex-default', { streamId: 999 }))
         .status,
       409,
       'not one of its subtitles'
@@ -1090,13 +1085,13 @@ describe('the subtitle your own Plex player starts with', () => {
     const read = await call<{
       selected: string;
       languages: { code: string }[];
-    }>('GET', '/tv/212989/plex-default');
+    }>('GET', '/tv/318472/plex-default');
     assert.deepEqual(
       [read.body.selected, read.body.languages.map((l) => l.code)],
       ['spa', ['eng', 'spa']]
     );
     assert.equal(
-      (await call('PUT', '/tv/212989/plex-default', { language: 'eng' }))
+      (await call('PUT', '/tv/318472/plex-default', { language: 'eng' }))
         .status,
       202
     );
@@ -1115,7 +1110,7 @@ describe('the subtitle your own Plex player starts with', () => {
     plexGate = new Promise<void>((resolve) => (release = resolve));
     for (const language of ['eng', 'spa']) {
       assert.equal(
-        (await call('PUT', '/tv/212989/plex-default', { language })).status,
+        (await call('PUT', '/tv/318472/plex-default', { language })).status,
         202
       );
     }
@@ -1137,7 +1132,7 @@ describe('the subtitle your own Plex player starts with', () => {
     actingAs = admin;
     const { body } = await call<{ available: boolean }>(
       'GET',
-      '/movie/333371/plex-default'
+      '/movie/471906/plex-default'
     );
     assert.equal(body.available, false);
   });

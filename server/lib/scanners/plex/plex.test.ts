@@ -492,7 +492,7 @@ describe('Plex Scanner', () => {
           // Never matched (the "none" agent): no id at all.
           item('901', 'Home Video', 'local://901', 2020),
           // The new agent before it has matched: no Guid list yet.
-          item('902', 'Blood', 'plex://movie/5d776'),
+          item('902', 'Brine', 'plex://movie/5d776'),
           // Matched, but TMDB can't be asked: a real failure.
           item('903', 'Gone Film', 'imdb://tt0000003', 1999),
           { ...fakePlexMovieItem('904', 6210, ['1080']), title: 'Fine' },
@@ -500,7 +500,7 @@ describe('Plex Scanner', () => {
       });
       getMetadataImpl = async (key) =>
         key === '902'
-          ? ({ ...item('902', 'Blood', 'plex://movie/5d776') } as never)
+          ? ({ ...item('902', 'Brine', 'plex://movie/5d776') } as never)
           : undefined;
 
       await runWithMockTimers(() => plexFullScanner.run());
@@ -525,7 +525,7 @@ describe('Plex Scanner', () => {
         "Plex: 2 films aren't matched by Plex yet, so they were skipped. They'll be picked up once Plex has matched them (in Plex: refresh the library's metadata, or use Match on a title)."
       );
       assert.deepEqual([...(summaries[0].meta.examples as string[])].sort(), [
-        'Blood',
+        'Brine',
         'Home Video (2020)',
       ]);
       const skipped = lines.filter((l) => l.message.startsWith('Skipped '));
@@ -540,7 +540,7 @@ describe('Plex Scanner', () => {
           ),
         [
           { name: 'Home Video', year: 2020, type: 'movie', id: '901' },
-          { name: 'Blood', type: 'movie', id: '902' },
+          { name: 'Brine', type: 'movie', id: '902' },
         ]
       );
 

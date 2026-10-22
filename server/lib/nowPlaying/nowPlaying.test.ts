@@ -99,7 +99,7 @@ beforeEach(async () => {
   const media = getRepository(Media);
   bear = await media.save(
     new Media({
-      tmdbId: 136315,
+      tmdbId: 247426,
       mediaType: MediaType.TV,
       status: MediaStatus.AVAILABLE,
       ratingKey: '9001',
@@ -126,8 +126,8 @@ const plexEpisode = (userId: string, state = 'playing') => ({
   type: 'episode',
   ratingKey: '9123',
   grandparentRatingKey: '9001',
-  grandparentTitle: 'The Bear',
-  title: 'Sundae',
+  grandparentTitle: 'The Otterkin',
+  title: 'Gelato Hour',
   parentIndex: 2,
   index: 3,
   User: { id: userId, title: 'someone' },
@@ -140,7 +140,7 @@ describe('Now playing', () => {
     const found = await nowPlaying.playingFor(viewer);
     assert.equal(found.length, 1);
     assert.equal(found[0].media.id, bear.id);
-    assert.equal(found[0].title, 'The Bear');
+    assert.equal(found[0].title, 'The Otterkin');
     assert.equal(found[0].season, 2);
     assert.equal(found[0].episode, 3);
     assert.equal(found[0].seen, 'now');
@@ -152,7 +152,7 @@ describe('Now playing', () => {
       {
         type: 'movie',
         ratingKey: '778',
-        title: 'Groundhog Day',
+        title: 'Hedgehog Morning',
         User: { id: '1', title: 'owner' },
         Player: { state: 'paused' },
       },
@@ -175,7 +175,7 @@ describe('Now playing', () => {
           Type: 'Episode',
           Id: 'ep1',
           SeriesId: 'B3A4C5D6E7F8091A2B3C4D5E6F708192',
-          SeriesName: 'The Bear',
+          SeriesName: 'The Otterkin',
           ParentIndexNumber: 1,
           IndexNumber: 7,
         },
@@ -195,7 +195,7 @@ describe('Now playing', () => {
       {
         type: 'movie',
         ratingKey: '777',
-        title: 'Groundhog Day',
+        title: 'Hedgehog Morning',
         User: { id: '555' },
         Player: { state: 'paused' },
       },
@@ -215,7 +215,7 @@ describe('Now playing', () => {
       {
         type: 'movie',
         ratingKey: '777',
-        title: 'Groundhog Day',
+        title: 'Hedgehog Morning',
         User: { id: '555' },
         Player: { state: 'paused' },
       },
@@ -264,7 +264,7 @@ describe('Now playing', () => {
         kind: 'episode',
         itemId: 'e',
         titleId: '9001',
-        title: 'The Bear',
+        title: 'The Otterkin',
         season: 2,
         episode: 4,
         finished: false,
@@ -277,7 +277,7 @@ describe('Now playing', () => {
         kind: 'movie',
         itemId: '777',
         titleId: '777',
-        title: 'Groundhog Day',
+        title: 'Hedgehog Morning',
         finished: true,
         percent: 100,
         viewerId: '555',

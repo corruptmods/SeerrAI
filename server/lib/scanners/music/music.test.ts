@@ -57,12 +57,12 @@ const mbid = (n: number) =>
 
 const ARTIST = mbid(1);
 const OTHER_ARTIST = mbid(2);
-const HAIL = mbid(101);
-const HAIL_RELEASE = mbid(201);
-const KID_A = mbid(102);
-const AMNESIAC = mbid(103);
-const OK_COMPUTER = mbid(104);
-const IN_RAINBOWS = mbid(105);
+const SING = mbid(101);
+const SING_RELEASE = mbid(201);
+const FOG_B = mbid(102);
+const SOMNOLENT = mbid(103);
+const STATIC_GARDEN = mbid(104);
+const IN_LANTERNS = mbid(105);
 
 interface State {
   plex: {
@@ -242,7 +242,7 @@ const mbStandIn = (req: IncomingMessage, res: ServerResponse) => {
       ? send(res, {
           id: group[1],
           title: 'Found by MusicBrainz',
-          'artist-credit': [{ name: 'Radiohead', artist: { id: artist } }],
+          'artist-credit': [{ name: 'Glasswing', artist: { id: artist } }],
         })
       : send(res, { error: 'Not Found' }, 404);
   }
@@ -347,20 +347,20 @@ beforeEach(() => {
 
 const lidarrArtist = (over: Partial<LidarrArtist> = {}): LidarrArtist => ({
   id: 7,
-  artistName: 'Radiohead',
+  artistName: 'Glasswing',
   foreignArtistId: ARTIST,
   monitored: true,
   qualityProfileId: 1,
   metadataProfileId: 1,
   tags: [],
-  path: '/music/Radiohead',
+  path: '/music/Glasswing',
   ...over,
 });
 
 const lidarrAlbum = (over: Partial<LidarrAlbum> = {}): LidarrAlbum => ({
   id: 70,
-  title: 'Hail to the Thief',
-  foreignAlbumId: HAIL,
+  title: 'Sing to the Ferryman',
+  foreignAlbumId: SING,
   artistId: 7,
   monitored: false,
   albumType: 'Album',
@@ -370,8 +370,8 @@ const lidarrAlbum = (over: Partial<LidarrAlbum> = {}): LidarrAlbum => ({
     {
       id: 1,
       albumId: 70,
-      foreignReleaseId: HAIL_RELEASE,
-      title: 'Hail to the Thief',
+      foreignReleaseId: SING_RELEASE,
+      title: 'Sing to the Ferryman',
       monitored: true,
     },
   ],
@@ -401,7 +401,7 @@ const plexAlbum = (
   title: string,
   {
     artist = '500',
-    artistName = 'Radiohead',
+    artistName = 'Glasswing',
     guid,
     year,
     addedAt = 1_700_000_000,
@@ -431,7 +431,7 @@ const jellyfinAlbum = (
   Id: id,
   Name: name,
   Type: 'MusicAlbum',
-  AlbumArtists: [{ Name: 'Radiohead', Id: `${id}-artist` }],
+  AlbumArtists: [{ Name: 'Glasswing', Id: `${id}-artist` }],
   DateCreated: '2026-10-01T00:00:00Z',
   ...over,
 });
@@ -516,7 +516,7 @@ const seedRequest = async (
 describe('music scans', () => {
   it('does nothing until music is set up', async () => {
     getSettings().lidarr = [];
-    state.plex.albums = [plexAlbum('600', 'Hail to the Thief')];
+    state.plex.albums = [plexAlbum('600', 'Sing to the Ferryman')];
 
     await musicFullScan.run();
 
@@ -528,15 +528,15 @@ describe('music scans', () => {
     it('places an album whose id is a release Lidarr lists, asking MusicBrainz nothing', async () => {
       state.lidarr.artists = [lidarrArtist()];
       state.lidarr.albums = [lidarrAlbum({ monitored: true })];
-      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
-      state.plex.albums = [plexAlbum('600', 'Hail', { guid: HAIL_RELEASE })];
+      state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
+      state.plex.albums = [plexAlbum('600', 'Sing', { guid: SING_RELEASE })];
 
       await musicFullScan.run();
 
-      const album = await albumOf(HAIL);
+      const album = await albumOf(SING);
       assert.equal(album.status, MediaStatus.AVAILABLE);
       assert.equal(album.ratingKey, '600');
-      assert.equal(album.title, 'Hail to the Thief');
+      assert.equal(album.title, 'Sing to the Ferryman');
       assert.equal(album.lidarrAlbumId, 70);
       const artist = await artistOf(ARTIST);
       assert.equal(artist.ratingKey, '500');
@@ -548,12 +548,12 @@ describe('music scans', () => {
     it('places an album whose id is the album’s own', async () => {
       state.lidarr.artists = [lidarrArtist()];
       state.lidarr.albums = [lidarrAlbum()];
-      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
-      state.plex.albums = [plexAlbum('600', 'Hail', { guid: HAIL })];
+      state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
+      state.plex.albums = [plexAlbum('600', 'Sing', { guid: SING })];
 
       await musicFullScan.run();
 
-      assert.equal((await albumOf(HAIL)).status, MediaStatus.AVAILABLE);
+      assert.equal((await albumOf(SING)).status, MediaStatus.AVAILABLE);
       // Not monitored nor asked for: the artist is only partly here.
       assert.equal(
         (await artistOf(ARTIST)).status,
@@ -563,18 +563,18 @@ describe('music scans', () => {
     });
 
     it('asks MusicBrainz about an id Lidarr does not know, as a release then as an album', async () => {
-      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
+      state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
       state.plex.albums = [
-        plexAlbum('600', 'Kid A', { guid: mbid(301) }),
-        plexAlbum('601', 'Amnesiac', { guid: AMNESIAC }),
+        plexAlbum('600', 'Fog B', { guid: mbid(301) }),
+        plexAlbum('601', 'Somnolent', { guid: SOMNOLENT }),
       ];
-      state.mb.releases[mbid(301)] = KID_A;
-      state.mb.groups[AMNESIAC] = ARTIST;
+      state.mb.releases[mbid(301)] = FOG_B;
+      state.mb.groups[SOMNOLENT] = ARTIST;
 
       await musicFullScan.run();
 
-      assert.equal((await albumOf(KID_A)).ratingKey, '600');
-      assert.equal((await albumOf(AMNESIAC)).ratingKey, '601');
+      assert.equal((await albumOf(FOG_B)).ratingKey, '600');
+      assert.equal((await albumOf(SOMNOLENT)).ratingKey, '601');
       // One call for the release; two for the album (as a release first).
       assert.equal(state.mb.calls, 3);
 
@@ -591,48 +591,48 @@ describe('music scans', () => {
       state.lidarr.albums = [
         lidarrAlbum({
           id: 71,
-          foreignAlbumId: AMNESIAC,
-          title: 'Amnesiac',
+          foreignAlbumId: SOMNOLENT,
+          title: 'Somnolent',
           releaseDate: '2001-06-04',
           releases: [],
         }),
       ];
-      state.plex.artists = [plexArtist('500', 'Radiohead (tagged badly)')];
-      state.plex.albums = [plexAlbum('600', 'Amnesiac [Deluxe]')];
+      state.plex.artists = [plexArtist('500', 'Glasswing (tagged badly)')];
+      state.plex.albums = [plexAlbum('600', 'Somnolent [Deluxe]')];
       state.plex.tracks['600'] = [
         {
           ratingKey: '6001',
           type: 'track',
-          title: 'Packt Like Sardines',
+          title: 'Stackt Like Herrings',
           Media: [
-            { Part: [{ file: '/music/Radiohead/Amnesiac (2001)/01.flac' }] },
+            { Part: [{ file: '/music/Glasswing/Somnolent (2001)/01.flac' }] },
           ],
         },
       ];
 
       await musicFullScan.run();
 
-      const album = await albumOf(AMNESIAC);
+      const album = await albumOf(SOMNOLENT);
       assert.equal(album.status, MediaStatus.AVAILABLE);
-      assert.equal(album.folder, 'Amnesiac (2001)');
+      assert.equal(album.folder, 'Somnolent (2001)');
       assert.equal((await artistOf(ARTIST)).ratingKey, '500');
     });
 
     it('reads only what was added since the last scan', async () => {
       state.lidarr.artists = [lidarrArtist()];
       state.lidarr.albums = [lidarrAlbum()];
-      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
+      state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
       const now = Math.floor(Date.now() / 1000);
       state.plex.albums = [
-        plexAlbum('600', 'Hail', { guid: HAIL, addedAt: now }),
-        plexAlbum('601', 'Old', { guid: KID_A, addedAt: now - 86400 * 30 }),
+        plexAlbum('600', 'Sing', { guid: SING, addedAt: now }),
+        plexAlbum('601', 'Old', { guid: FOG_B, addedAt: now - 86400 * 30 }),
       ];
-      state.mb.groups[KID_A] = ARTIST;
+      state.mb.groups[FOG_B] = ARTIST;
 
       await musicSync.run();
 
       assert.equal((await albums()).length, 1);
-      assert.equal((await albumOf(HAIL)).ratingKey, '600');
+      assert.equal((await albumOf(SING)).ratingKey, '600');
       assert.ok(state.plex.asked.some((url) => url.includes('addedAt')));
       // The artist was read on its own, not the whole library.
       assert.ok(
@@ -645,8 +645,8 @@ describe('music scans', () => {
   it('runs one music scan at a time', async () => {
     state.lidarr.artists = [lidarrArtist()];
     state.lidarr.albums = [lidarrAlbum()];
-    state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
-    state.plex.albums = [plexAlbum('600', 'Hail', { guid: HAIL })];
+    state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
+    state.plex.albums = [plexAlbum('600', 'Sing', { guid: SING })];
 
     await Promise.all([musicFullScan.run(), musicSync.run()]);
 
@@ -663,30 +663,30 @@ describe('music scans', () => {
       state.lidarr.artists = [lidarrArtist()];
       state.lidarr.albums = [lidarrAlbum()];
       state.jellyfin.items = [
-        jellyfinAlbum('jf-hail', 'Hail to the Thief', {
+        jellyfinAlbum('jf-sing', 'Sing to the Ferryman', {
           ProviderIds: {
-            MusicBrainzReleaseGroup: HAIL,
+            MusicBrainzReleaseGroup: SING,
             MusicBrainzAlbumArtist: ARTIST,
           },
         }),
       ];
       state.emby.items = [
         // A release Lidarr lists, and the artist only by name.
-        jellyfinAlbum('emby-hail', 'Hail to the Thief', {
-          ProviderIds: { MusicBrainzAlbum: HAIL_RELEASE },
+        jellyfinAlbum('emby-sing', 'Sing to the Ferryman', {
+          ProviderIds: { MusicBrainzAlbum: SING_RELEASE },
         }),
       ];
 
       await musicFullScan.run();
 
-      const album = await albumOf(HAIL);
+      const album = await albumOf(SING);
       assert.equal(album.status, MediaStatus.AVAILABLE);
-      assert.equal(album.jellyfinItemId, 'jf-hail');
-      assert.equal(album.embyItemId, 'emby-hail');
+      assert.equal(album.jellyfinItemId, 'jf-sing');
+      assert.equal(album.embyItemId, 'emby-sing');
       assert.equal(album.ratingKey, null);
       const artist = await artistOf(ARTIST);
-      assert.equal(artist.jellyfinMediaId, 'jf-hail-artist');
-      assert.equal(artist.embyMediaId, 'emby-hail-artist');
+      assert.equal(artist.jellyfinMediaId, 'jf-sing-artist');
+      assert.equal(artist.embyMediaId, 'emby-sing-artist');
       assert.equal((await albums()).length, 1);
       assert.equal(state.mb.calls, 0);
 
@@ -696,11 +696,11 @@ describe('music scans', () => {
         [
           [
             'jellyfin',
-            'https://jellyfin.example.com/web/index.html#!/details?id=jf-hail&context=home&serverId=jellyfin-server',
+            'https://jellyfin.example.com/web/index.html#!/details?id=jf-sing&context=home&serverId=jellyfin-server',
           ],
           [
             'emby',
-            'https://emby.example.com/web/index.html#!/item?id=emby-hail&context=home&serverId=emby-server',
+            'https://emby.example.com/web/index.html#!/item?id=emby-sing&context=home&serverId=emby-server',
           ],
         ]
       );
@@ -713,22 +713,22 @@ describe('music scans', () => {
         lidarrAlbum({ releases: [] }),
         lidarrAlbum({
           id: 72,
-          foreignAlbumId: KID_A,
-          title: 'Kid A',
+          foreignAlbumId: FOG_B,
+          title: 'Fog B',
           releaseDate: '2000-10-02',
           releases: [],
         }),
       ];
       state.jellyfin.items = [
-        jellyfinAlbum('jf-1', 'Hail To The Thief (Special Edition)', {
-          Path: '/music/Radiohead/Hail to the Thief (2003)',
+        jellyfinAlbum('jf-1', 'Sing To The Ferryman (Special Edition)', {
+          Path: '/music/Glasswing/Sing to the Ferryman (2003)',
         }),
-        jellyfinAlbum('jf-2', 'Kid A', {
-          Path: '/music/Radiohead/kida-rip',
+        jellyfinAlbum('jf-2', 'Fog B', {
+          Path: '/music/Glasswing/fogb-rip',
           ProductionYear: 2000,
         }),
-        jellyfinAlbum('jf-3', 'Live at the Astoria', {
-          Path: '/music/Radiohead/Live at the Astoria',
+        jellyfinAlbum('jf-3', 'Live at the Larkfield', {
+          Path: '/music/Glasswing/Live at the Larkfield',
           ProductionYear: 1994,
         }),
         // No ids, and a folder Lidarr does not know: skipped.
@@ -740,11 +740,11 @@ describe('music scans', () => {
 
       await musicFullScan.run();
 
-      assert.equal((await albumOf(HAIL)).jellyfinItemId, 'jf-1');
-      assert.equal((await albumOf(KID_A)).jellyfinItemId, 'jf-2');
+      assert.equal((await albumOf(SING)).jellyfinItemId, 'jf-1');
+      assert.equal((await albumOf(FOG_B)).jellyfinItemId, 'jf-2');
       const rows = await albums();
       const unplaced = rows.find((row) => !row.mbId);
-      assert.equal(unplaced?.title, 'Live at the Astoria');
+      assert.equal(unplaced?.title, 'Live at the Larkfield');
       assert.equal(unplaced?.status, MediaStatus.AVAILABLE);
       assert.equal(unplaced?.releaseDate, '1994');
       assert.equal(rows.length, 3);
@@ -756,17 +756,17 @@ describe('music scans', () => {
         '2026-10-10T00:00:00Z'
       );
       state.jellyfin.items = [
-        jellyfinAlbum('jf-new', 'Hail to the Thief', {
+        jellyfinAlbum('jf-new', 'Sing to the Ferryman', {
           DateCreated: '2026-10-11T00:00:00Z',
           ProviderIds: {
-            MusicBrainzReleaseGroup: HAIL,
+            MusicBrainzReleaseGroup: SING,
             MusicBrainzAlbumArtist: ARTIST,
           },
         }),
-        jellyfinAlbum('jf-old', 'Kid A', {
+        jellyfinAlbum('jf-old', 'Fog B', {
           DateCreated: '2026-01-01T00:00:00Z',
           ProviderIds: {
-            MusicBrainzReleaseGroup: KID_A,
+            MusicBrainzReleaseGroup: FOG_B,
             MusicBrainzAlbumArtist: ARTIST,
           },
         }),
@@ -776,7 +776,7 @@ describe('music scans', () => {
 
       assert.deepEqual(
         (await albums()).map((row) => row.mbId),
-        [HAIL]
+        [SING]
       );
       assert.ok(state.jellyfin.asked[0].includes('SortOrder=Descending'));
     });
@@ -787,10 +787,10 @@ describe('music scans', () => {
       const media = await seedArtist(
         [
           {
-            mbId: HAIL,
+            mbId: SING,
             status: MediaStatus.AVAILABLE,
             ratingKey: '600',
-            jellyfinItemId: 'jf-hail',
+            jellyfinItemId: 'jf-sing',
           },
         ],
         {
@@ -807,12 +807,12 @@ describe('music scans', () => {
 
     it('keeps an album any server still has, and drops the others’ ids', async () => {
       await onBoth();
-      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
-      state.plex.albums = [plexAlbum('600', 'Hail', { guid: HAIL })];
+      state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
+      state.plex.albums = [plexAlbum('600', 'Sing', { guid: SING })];
 
       await musicFullScan.run();
 
-      const album = await albumOf(HAIL);
+      const album = await albumOf(SING);
       assert.equal(album.status, MediaStatus.AVAILABLE);
       assert.equal(album.ratingKey, '600');
       assert.equal(album.jellyfinItemId, null);
@@ -826,8 +826,8 @@ describe('music scans', () => {
       await getRepository(MusicAlbum).insert(
         new MusicAlbum({
           mediaId: media.id,
-          mbId: KID_A,
-          title: 'Kid A',
+          mbId: FOG_B,
+          title: 'Fog B',
           secondaryTypes: [],
           status: MediaStatus.AVAILABLE,
           ratingKey: '601',
@@ -835,17 +835,17 @@ describe('music scans', () => {
       );
       await seedRequest(
         media,
-        [{ mbid: HAIL, title: 'Hail to the Thief' }],
+        [{ mbid: SING, title: 'Sing to the Ferryman' }],
         MediaRequestStatus.COMPLETED
       );
 
       await musicFullScan.run();
 
-      const hail = await albumOf(HAIL);
-      assert.equal(hail.status, MediaStatus.DELETED);
-      assert.equal(hail.ratingKey, null);
-      assert.equal(hail.jellyfinItemId, null);
-      assert.equal((await albumOf(KID_A)).status, MediaStatus.UNKNOWN);
+      const sing = await albumOf(SING);
+      assert.equal(sing.status, MediaStatus.DELETED);
+      assert.equal(sing.ratingKey, null);
+      assert.equal(sing.jellyfinItemId, null);
+      assert.equal((await albumOf(FOG_B)).status, MediaStatus.UNKNOWN);
       const artist = await artistOf(ARTIST);
       assert.equal(artist.status, MediaStatus.DELETED);
       assert.equal(artist.ratingKey, null);
@@ -867,7 +867,7 @@ describe('music scans', () => {
 
       await musicFullScan.run();
 
-      assert.equal((await albumOf(HAIL)).status, MediaStatus.AVAILABLE);
+      assert.equal((await albumOf(SING)).status, MediaStatus.AVAILABLE);
     });
 
     for (const silent of ['plex', 'jellyfin', 'lidarr'] as const) {
@@ -877,10 +877,10 @@ describe('music scans', () => {
 
         await musicFullScan.run();
 
-        const album = await albumOf(HAIL);
+        const album = await albumOf(SING);
         assert.equal(album.status, MediaStatus.AVAILABLE);
         assert.equal(album.ratingKey, '600');
-        assert.equal(album.jellyfinItemId, 'jf-hail');
+        assert.equal(album.jellyfinItemId, 'jf-sing');
       });
     }
 
@@ -889,7 +889,7 @@ describe('music scans', () => {
 
       await musicSync.run();
 
-      const album = await albumOf(HAIL);
+      const album = await albumOf(SING);
       assert.equal(album.status, MediaStatus.AVAILABLE);
       assert.equal(album.ratingKey, '600');
     });
@@ -897,7 +897,7 @@ describe('music scans', () => {
     it('keeps an album a server still lists when MusicBrainz cannot be asked', async () => {
       const group = mbid(301);
       state.mb.groups[group] = ARTIST;
-      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
+      state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
       state.plex.albums = [plexAlbum('600', 'Some Album', { guid: group })];
 
       await musicFullScan.run();
@@ -919,19 +919,21 @@ describe('music scans', () => {
 
     it('keeps an album a server still lists whose artist it cannot tell this time', async () => {
       await seedArtist(
-        [{ mbId: HAIL, status: MediaStatus.AVAILABLE, ratingKey: '600' }],
+        [{ mbId: SING, status: MediaStatus.AVAILABLE, ratingKey: '600' }],
         { status: MediaStatus.AVAILABLE, ratingKey: '500' }
       );
       // Plex lists the same album, but with no ids and under a name
       // Lidarr does not know.
       state.plex.artists = [plexArtist('500', 'Someone Else')];
       state.plex.albums = [
-        plexAlbum('600', 'Hail to the Thief', { artistName: 'Someone Else' }),
+        plexAlbum('600', 'Sing to the Ferryman', {
+          artistName: 'Someone Else',
+        }),
       ];
 
       await musicFullScan.run();
 
-      const album = await albumOf(HAIL);
+      const album = await albumOf(SING);
       assert.equal(album.status, MediaStatus.AVAILABLE);
       assert.equal(album.ratingKey, '600');
       assert.equal((await artistOf(ARTIST)).ratingKey, '500');
@@ -939,20 +941,20 @@ describe('music scans', () => {
 
     it('marks nothing gone while an album waits for MusicBrainz', async () => {
       await seedArtist(
-        [{ mbId: HAIL, status: MediaStatus.AVAILABLE, ratingKey: '600' }],
+        [{ mbId: SING, status: MediaStatus.AVAILABLE, ratingKey: '600' }],
         { status: MediaStatus.AVAILABLE, ratingKey: '500' }
       );
       // The server lists the album under a new id, which only MusicBrainz
       // could place, and MusicBrainz does not answer.
       getSettings().music.musicbrainzUrl = 'http://127.0.0.1:1';
-      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
+      state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
       state.plex.albums = [
-        plexAlbum('700', 'Hail to the Thief', { guid: HAIL_RELEASE }),
+        plexAlbum('700', 'Sing to the Ferryman', { guid: SING_RELEASE }),
       ];
 
       await musicFullScan.run();
 
-      const album = await albumOf(HAIL);
+      const album = await albumOf(SING);
       assert.equal(album.status, MediaStatus.AVAILABLE);
       assert.equal(album.ratingKey, '600');
     });
@@ -975,20 +977,20 @@ describe('music scans', () => {
 
     it('lets Lidarr’s files decide while no music library is on', async () => {
       const media = await seedArtist([
-        { mbId: HAIL, title: 'Hail to the Thief' },
-        { mbId: KID_A, title: 'Kid A' },
+        { mbId: SING, title: 'Sing to the Ferryman' },
+        { mbId: FOG_B, title: 'Fog B' },
       ]);
       await seedRequest(media, [
-        { mbid: HAIL, title: 'Hail to the Thief' },
-        { mbid: KID_A, title: 'Kid A' },
+        { mbid: SING, title: 'Sing to the Ferryman' },
+        { mbid: FOG_B, title: 'Fog B' },
       ]);
       state.lidarr.artists = [lidarrArtist()];
       state.lidarr.albums = [
         lidarrAlbum({ monitored: true, statistics: stats(10) }),
         lidarrAlbum({
           id: 72,
-          foreignAlbumId: KID_A,
-          title: 'Kid A',
+          foreignAlbumId: FOG_B,
+          title: 'Fog B',
           monitored: true,
           releases: [],
           statistics: stats(4),
@@ -998,11 +1000,11 @@ describe('music scans', () => {
       await musicSync.run();
 
       assert.deepEqual(state.plex.asked, []);
-      const hail = await albumOf(HAIL);
-      assert.equal(hail.status, MediaStatus.AVAILABLE);
-      assert.equal(hail.trackFileCount, 10);
+      const sing = await albumOf(SING);
+      assert.equal(sing.status, MediaStatus.AVAILABLE);
+      assert.equal(sing.trackFileCount, 10);
       assert.equal(
-        (await albumOf(KID_A)).status,
+        (await albumOf(FOG_B)).status,
         MediaStatus.PARTIALLY_AVAILABLE
       );
       assert.equal(
@@ -1013,13 +1015,13 @@ describe('music scans', () => {
       // Lidarr loses the files: the full scan takes the album down.
       state.lidarr.albums[0].statistics = stats(0);
       await musicFullScan.run();
-      assert.equal((await albumOf(HAIL)).status, MediaStatus.DELETED);
+      assert.equal((await albumOf(SING)).status, MediaStatus.DELETED);
     });
 
     it('leaves an album Lidarr has files for processing while a server has music on', async () => {
       getSettings().plex.musicLibraries[0].enabled = true;
-      const media = await seedArtist([{ mbId: HAIL }]);
-      await seedRequest(media, [{ mbid: HAIL, title: 'Hail to the Thief' }]);
+      const media = await seedArtist([{ mbId: SING }]);
+      await seedRequest(media, [{ mbid: SING, title: 'Sing to the Ferryman' }]);
       state.lidarr.artists = [lidarrArtist()];
       state.lidarr.albums = [
         lidarrAlbum({ monitored: true, statistics: stats(10) }),
@@ -1027,15 +1029,15 @@ describe('music scans', () => {
 
       await musicSync.run();
 
-      const hail = await albumOf(HAIL);
-      assert.equal(hail.status, MediaStatus.PROCESSING);
-      assert.equal(hail.trackFileCount, 10);
+      const sing = await albumOf(SING);
+      assert.equal(sing.status, MediaStatus.PROCESSING);
+      assert.equal(sing.trackFileCount, 10);
     });
   });
 
   it(`asks MusicBrainz at most ${MB_CALL_CAP} times a run, and leaves the rest for the next`, async () => {
     const extra = 5;
-    state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
+    state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
     for (let i = 0; i < MB_CALL_CAP + extra; i++) {
       const release = mbid(10_000 + i);
       state.mb.releases[release] = mbid(20_000 + i);
@@ -1065,34 +1067,34 @@ describe('music scans', () => {
   describe('Lidarr’s work on requests', () => {
     it('monitors and adds requested albums Lidarr did not take', async () => {
       const media = await seedArtist([
-        { mbId: HAIL },
-        { mbId: KID_A },
-        { mbId: OK_COMPUTER },
+        { mbId: SING },
+        { mbId: FOG_B },
+        { mbId: STATIC_GARDEN },
       ]);
       await seedRequest(media, [
-        { mbid: HAIL, title: 'Hail to the Thief' },
-        { mbid: KID_A, title: 'Kid A' },
-        { mbid: OK_COMPUTER, title: 'OK Computer' },
+        { mbid: SING, title: 'Sing to the Ferryman' },
+        { mbid: FOG_B, title: 'Fog B' },
+        { mbid: STATIC_GARDEN, title: 'Static Garden' },
       ]);
       // Someone else asked for two of them too: each is sent once.
       await seedRequest(media, [
-        { mbid: HAIL, title: 'Hail to the Thief' },
-        { mbid: KID_A, title: 'Kid A' },
+        { mbid: SING, title: 'Sing to the Ferryman' },
+        { mbid: FOG_B, title: 'Fog B' },
       ]);
       state.lidarr.artists = [lidarrArtist()];
       state.lidarr.albums = [
         lidarrAlbum({ monitored: false }),
         lidarrAlbum({
           id: 74,
-          foreignAlbumId: OK_COMPUTER,
+          foreignAlbumId: STATIC_GARDEN,
           monitored: true,
           releases: [],
         }),
       ];
-      state.lidarr.lookups[KID_A] = lidarrAlbum({
+      state.lidarr.lookups[FOG_B] = lidarrAlbum({
         id: 0,
-        foreignAlbumId: KID_A,
-        title: 'Kid A',
+        foreignAlbumId: FOG_B,
+        title: 'Fog B',
         releases: [],
       });
 
@@ -1105,21 +1107,21 @@ describe('music scans', () => {
       assert.equal(state.lidarr.added.length, 1);
       assert.equal(
         (state.lidarr.added[0] as { foreignAlbumId: string }).foreignAlbumId,
-        KID_A
+        FOG_B
       );
       assert.deepEqual(state.lidarr.added[0].artist, { id: 7 });
       assert.deepEqual(state.lidarr.added[0].addOptions, {
         searchForNewAlbum: true,
       });
       // Lidarr's ids are kept on the albums.
-      assert.equal((await albumOf(HAIL)).lidarrAlbumId, 70);
-      assert.equal((await albumOf(KID_A)).lidarrAlbumId, 901);
+      assert.equal((await albumOf(SING)).lidarrAlbumId, 70);
+      assert.equal((await albumOf(FOG_B)).lidarrAlbumId, 901);
     });
 
     it('fails a request after a week of Lidarr not knowing an album', async () => {
-      const media = await seedArtist([{ mbId: IN_RAINBOWS }]);
+      const media = await seedArtist([{ mbId: IN_LANTERNS }]);
       const recent = await seedRequest(media, [
-        { mbid: IN_RAINBOWS, title: 'In Rainbows' },
+        { mbid: IN_LANTERNS, title: 'In Lanterns' },
       ]);
       state.lidarr.artists = [lidarrArtist()];
 
@@ -1132,7 +1134,7 @@ describe('music scans', () => {
 
       const old = await seedRequest(
         media,
-        [{ mbid: IN_RAINBOWS, title: 'In Rainbows' }],
+        [{ mbid: IN_LANTERNS, title: 'In Lanterns' }],
         MediaRequestStatus.APPROVED,
         new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
       );
@@ -1157,14 +1159,14 @@ describe('music scans', () => {
       lidarrAlbum({ monitored: true }),
       lidarrAlbum({
         id: 72,
-        foreignAlbumId: KID_A,
-        title: 'Kid A',
+        foreignAlbumId: FOG_B,
+        title: 'Fog B',
         releases: [],
       }),
       lidarrAlbum({
         id: 80,
         artistId: 8,
-        foreignAlbumId: OK_COMPUTER,
+        foreignAlbumId: STATIC_GARDEN,
         releases: [],
       }),
     ];
@@ -1174,11 +1176,11 @@ describe('music scans', () => {
     // Only what Lidarr monitors or has files for.
     assert.deepEqual(
       (await albums()).map((row) => [row.mbId, row.status]),
-      [[HAIL, MediaStatus.PROCESSING]]
+      [[SING, MediaStatus.PROCESSING]]
     );
     const artist = await artistOf(ARTIST);
     assert.equal(artist.status, MediaStatus.PROCESSING);
-    assert.equal(artist.foreignTitle, 'Radiohead');
+    assert.equal(artist.foreignTitle, 'Glasswing');
     assert.equal(artist.externalServiceId, 7);
     assert.equal(
       artist.serviceUrl,
@@ -1220,40 +1222,40 @@ describe('music scans', () => {
       ).map((event) => [event.type, event.detail]);
 
     it('keeps the artist’s name: Lidarr’s, or the server’s until Lidarr knows them', async () => {
-      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
+      state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
       state.plex.albums = [
-        plexAlbum('601', 'Amnesiac', {
-          guid: AMNESIAC,
-          artistName: 'Radiohead (tagged)',
+        plexAlbum('601', 'Somnolent', {
+          guid: SOMNOLENT,
+          artistName: 'Glasswing (tagged)',
         }),
       ];
-      state.mb.groups[AMNESIAC] = ARTIST;
+      state.mb.groups[SOMNOLENT] = ARTIST;
 
       await musicFullScan.run();
-      assert.equal((await artistOf(ARTIST)).foreignTitle, 'Radiohead (tagged)');
+      assert.equal((await artistOf(ARTIST)).foreignTitle, 'Glasswing (tagged)');
 
       // A server's name never replaces one known.
       state.plex.albums[0].parentTitle = 'Someone Else';
       await musicFullScan.run();
-      assert.equal((await artistOf(ARTIST)).foreignTitle, 'Radiohead (tagged)');
+      assert.equal((await artistOf(ARTIST)).foreignTitle, 'Glasswing (tagged)');
 
       // Lidarr's, MusicBrainz's own, does.
       state.lidarr.artists = [lidarrArtist()];
       await musicFullScan.run();
-      assert.equal((await artistOf(ARTIST)).foreignTitle, 'Radiohead');
+      assert.equal((await artistOf(ARTIST)).foreignTitle, 'Glasswing');
     });
 
     it('completes a request once its albums are here, says so once, and writes it down', async () => {
       const media = await seedArtist([
-        { mbId: HAIL, title: 'Hail to the Thief' },
+        { mbId: SING, title: 'Sing to the Ferryman' },
       ]);
       const request = await seedRequest(media, [
-        { mbid: HAIL, title: 'Hail to the Thief' },
+        { mbid: SING, title: 'Sing to the Ferryman' },
       ]);
       state.lidarr.artists = [lidarrArtist()];
       state.lidarr.albums = [lidarrAlbum({ monitored: true })];
-      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
-      state.plex.albums = [plexAlbum('600', 'Hail', { guid: HAIL_RELEASE })];
+      state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
+      state.plex.albums = [plexAlbum('600', 'Sing', { guid: SING_RELEASE })];
 
       await musicFullScan.run();
       await musicSync.run();
@@ -1271,17 +1273,19 @@ describe('music scans', () => {
       // The artist's name, kept from Lidarr by the scan.
       assert.equal(
         available[0].payload.subject,
-        'Hail to the Thief — Radiohead'
+        'Sing to the Ferryman — Glasswing'
       );
-      assert.deepEqual(await history(), [['available', 'Hail to the Thief']]);
+      assert.deepEqual(await history(), [
+        ['available', 'Sing to the Ferryman'],
+      ]);
     });
 
     it('writes an album leaving into its artist’s history', async () => {
       await seedArtist(
         [
           {
-            mbId: HAIL,
-            title: 'Hail to the Thief',
+            mbId: SING,
+            title: 'Sing to the Ferryman',
             status: MediaStatus.AVAILABLE,
           },
         ],
@@ -1292,15 +1296,15 @@ describe('music scans', () => {
 
       await musicFullScan.run();
 
-      assert.equal((await albumOf(HAIL)).status, MediaStatus.UNKNOWN);
-      assert.deepEqual(await history(), [['removed', 'Hail to the Thief']]);
+      assert.equal((await albumOf(SING)).status, MediaStatus.UNKNOWN);
+      assert.deepEqual(await history(), [['removed', 'Sing to the Ferryman']]);
     });
 
     it('stops showing an import as being added once the album is here', async () => {
       const media = await seedArtist([
-        { mbId: HAIL, title: 'Hail to the Thief', lidarrAlbumId: 70 },
+        { mbId: SING, title: 'Sing to the Ferryman', lidarrAlbumId: 70 },
       ]);
-      await seedRequest(media, [{ mbid: HAIL, title: 'Hail to the Thief' }]);
+      await seedRequest(media, [{ mbid: SING, title: 'Sing to the Ferryman' }]);
       (
         downloadTracker as unknown as {
           hold: (
@@ -1315,8 +1319,12 @@ describe('music scans', () => {
         0,
         {
           externalId: 7,
-          downloadId: 'hail',
-          album: { id: 70, title: 'Hail to the Thief', foreignAlbumId: HAIL },
+          downloadId: 'sing',
+          album: {
+            id: 70,
+            title: 'Sing to the Ferryman',
+            foreignAlbumId: SING,
+          },
           stage: 'importing',
           size: 1,
           sizeLeft: 0,
@@ -1331,8 +1339,8 @@ describe('music scans', () => {
       await musicSync.run();
       assert.equal(downloadTracker.getMusicProgress(0, 7).length, 1);
 
-      state.plex.artists = [plexArtist('500', 'Radiohead', ARTIST)];
-      state.plex.albums = [plexAlbum('600', 'Hail', { guid: HAIL_RELEASE })];
+      state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
+      state.plex.albums = [plexAlbum('600', 'Sing', { guid: SING_RELEASE })];
       await musicFullScan.run();
       assert.deepEqual(downloadTracker.getMusicProgress(0, 7), []);
     });

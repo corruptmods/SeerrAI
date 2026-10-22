@@ -36,16 +36,16 @@ import {
 
 setupTestDb();
 
-const ARTIST = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
-const OK_COMPUTER = '1b022e01-4da6-387b-8658-8678046e4cef';
-const KID_A = 'b1392450-e666-3926-a536-22c65f834433';
+const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
+const STATIC_GARDEN = '4f6a2d93-c1e8-3a57-9b02-6d3e8f1c7a40';
+const FOG_B = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
 
 const lidarr = createFakeLidarr();
 const subscriber = new MediaRequestSubscriber();
 
 const lookedUpArtist = (): LidarrArtist => ({
   id: 0,
-  artistName: 'Radiohead',
+  artistName: 'Glasswing',
   foreignArtistId: ARTIST,
   monitored: false,
   qualityProfileId: 0,
@@ -74,7 +74,7 @@ const approvedRequest = async (
       mediaType: MediaType.MUSIC,
       tmdbId: 0,
       foreignId: ARTIST,
-      foreignTitle: 'Radiohead',
+      foreignTitle: 'Glasswing',
       status: MediaStatus.PROCESSING,
     }),
     { listeners: false }
@@ -151,9 +151,9 @@ afterEach(() => {
 
 describe('sending a music request to Lidarr', () => {
   it('adds one album of a new artist with nothing else of theirs monitored', async () => {
-    lidarr.lookupAlbums.set(OK_COMPUTER, lookedUpAlbum(OK_COMPUTER, 'OK'));
+    lidarr.lookupAlbums.set(STATIC_GARDEN, lookedUpAlbum(STATIC_GARDEN, 'OK'));
     const request = await approvedRequest(
-      [{ mbId: OK_COMPUTER, title: 'OK Computer' }],
+      [{ mbId: STATIC_GARDEN, title: 'Static Garden' }],
       { profileId: 4, rootFolder: '/flac', metadataProfileId: 9, tags: [3] }
     );
 
@@ -191,7 +191,7 @@ describe('sending a music request to Lidarr', () => {
     assert.equal(media.externalServiceId, added.id);
     assert.equal(media.externalServiceSlug, ARTIST);
     const album = await getRepository(MusicAlbum).findOneByOrFail({
-      mbId: OK_COMPUTER,
+      mbId: STATIC_GARDEN,
     });
     assert.equal(album.lidarrAlbumId, lidarr.albums[0].id);
     assert.equal(await statusOf(request.id), MediaRequestStatus.APPROVED);
@@ -200,8 +200,8 @@ describe('sending a music request to Lidarr', () => {
   it('adds a new artist with exactly the albums asked for to monitor', async () => {
     lidarr.lookupArtists.set(ARTIST, lookedUpArtist());
     const request = await approvedRequest([
-      { mbId: OK_COMPUTER, title: 'OK Computer' },
-      { mbId: KID_A, title: 'Kid A' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
+      { mbId: FOG_B, title: 'Fog B' },
     ]);
 
     await subscriber.dispatchToLidarr(request, lidarr.settings());
@@ -221,7 +221,7 @@ describe('sending a music request to Lidarr', () => {
     assert.equal(body.monitorNewItems, 'none');
     assert.deepEqual(body.addOptions, {
       monitor: 'none',
-      albumsToMonitor: [OK_COMPUTER, KID_A],
+      albumsToMonitor: [STATIC_GARDEN, FOG_B],
       searchForMissingAlbums: true,
     });
     const media = await getRepository(Media).findOneByOrFail({
@@ -234,38 +234,38 @@ describe('sending a music request to Lidarr', () => {
     lidarr.artists = [
       {
         id: 7,
-        artistName: 'Radiohead',
+        artistName: 'Glasswing',
         foreignArtistId: ARTIST,
         monitored: false,
         monitorNewItems: 'all',
         qualityProfileId: 5,
         metadataProfileId: 3,
         rootFolderPath: '/elsewhere',
-        path: '/elsewhere/Radiohead',
+        path: '/elsewhere/Glasswing',
         tags: [8],
       },
     ];
     lidarr.albums = [
       {
         id: 70,
-        title: 'OK Computer',
-        foreignAlbumId: OK_COMPUTER,
+        title: 'Static Garden',
+        foreignAlbumId: STATIC_GARDEN,
         artistId: 7,
         monitored: false,
       },
       {
         id: 71,
-        title: 'Pablo Honey',
+        title: 'Velvet Clay',
         foreignAlbumId: '9a3b1f2c-0000-4000-8000-000000000001',
         artistId: 7,
         monitored: true,
       },
     ];
-    lidarr.lookupAlbums.set(KID_A, lookedUpAlbum(KID_A, 'Kid A'));
+    lidarr.lookupAlbums.set(FOG_B, lookedUpAlbum(FOG_B, 'Fog B'));
     const request = await approvedRequest(
       [
-        { mbId: OK_COMPUTER, title: 'OK Computer' },
-        { mbId: KID_A, title: 'Kid A' },
+        { mbId: STATIC_GARDEN, title: 'Static Garden' },
+        { mbId: FOG_B, title: 'Fog B' },
       ],
       // Chosen for the request, but an artist Lidarr has keeps its own.
       { profileId: 4, rootFolder: '/flac', metadataProfileId: 9 }
@@ -319,17 +319,17 @@ describe('sending a music request to Lidarr', () => {
       id: request.media.id,
     });
     assert.equal(media.externalServiceId, 7);
-    const okComputer = await getRepository(MusicAlbum).findOneByOrFail({
-      mbId: OK_COMPUTER,
+    const staticGarden = await getRepository(MusicAlbum).findOneByOrFail({
+      mbId: STATIC_GARDEN,
     });
-    assert.equal(okComputer.lidarrAlbumId, 70);
+    assert.equal(staticGarden.lidarrAlbumId, 70);
   });
 
   it('leaves a monitored artist alone when it has the albums already', async () => {
     lidarr.artists = [
       {
         id: 7,
-        artistName: 'Radiohead',
+        artistName: 'Glasswing',
         foreignArtistId: ARTIST,
         monitored: true,
         qualityProfileId: 5,
@@ -340,14 +340,14 @@ describe('sending a music request to Lidarr', () => {
     lidarr.albums = [
       {
         id: 70,
-        title: 'OK Computer',
-        foreignAlbumId: OK_COMPUTER,
+        title: 'Static Garden',
+        foreignAlbumId: STATIC_GARDEN,
         artistId: 7,
         monitored: true,
       },
     ];
     const request = await approvedRequest([
-      { mbId: OK_COMPUTER, title: 'OK Computer' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
     ]);
 
     await subscriber.dispatchToLidarr(request, lidarr.settings());
@@ -363,11 +363,11 @@ describe('sending a music request to Lidarr', () => {
 
   it('never searches when the server is set not to', async () => {
     const quiet = lidarr.settings({ preventSearch: true });
-    lidarr.lookupAlbums.set(OK_COMPUTER, lookedUpAlbum(OK_COMPUTER, 'OK'));
+    lidarr.lookupAlbums.set(STATIC_GARDEN, lookedUpAlbum(STATIC_GARDEN, 'OK'));
     lidarr.lookupArtists.set(ARTIST, lookedUpArtist());
 
     const one = await approvedRequest([
-      { mbId: OK_COMPUTER, title: 'OK Computer' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
     ]);
     await subscriber.dispatchToLidarr(one, quiet);
     assert.deepEqual(
@@ -390,8 +390,8 @@ describe('sending a music request to Lidarr', () => {
   it('asks a new artist for no search of missing albums when set not to', async () => {
     lidarr.lookupArtists.set(ARTIST, lookedUpArtist());
     const request = await approvedRequest([
-      { mbId: OK_COMPUTER, title: 'OK Computer' },
-      { mbId: KID_A, title: 'Kid A' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
+      { mbId: FOG_B, title: 'Fog B' },
     ]);
     await subscriber.dispatchToLidarr(
       request,
@@ -406,9 +406,9 @@ describe('sending a music request to Lidarr', () => {
 
   it('tags the artist with whoever asked, when the server tags requests', async () => {
     const tagging = lidarr.settings({ tagRequests: true, tags: [3] });
-    lidarr.lookupAlbums.set(OK_COMPUTER, lookedUpAlbum(OK_COMPUTER, 'OK'));
+    lidarr.lookupAlbums.set(STATIC_GARDEN, lookedUpAlbum(STATIC_GARDEN, 'OK'));
     const request = await approvedRequest([
-      { mbId: OK_COMPUTER, title: 'OK Computer' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
     ]);
 
     await subscriber.dispatchToLidarr(request, tagging);
@@ -444,7 +444,7 @@ describe('sending a music request to Lidarr', () => {
 
   it('marks the request failed when Lidarr cannot look the album up yet', async () => {
     const request = await approvedRequest([
-      { mbId: OK_COMPUTER, title: 'OK Computer' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
     ]);
 
     await subscriber.dispatchToLidarr(request, lidarr.settings());
@@ -455,8 +455,8 @@ describe('sending a music request to Lidarr', () => {
 
   it('marks the request failed when Lidarr cannot look the artist up yet', async () => {
     const request = await approvedRequest([
-      { mbId: OK_COMPUTER, title: 'OK Computer' },
-      { mbId: KID_A, title: 'Kid A' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
+      { mbId: FOG_B, title: 'Fog B' },
     ]);
 
     await subscriber.dispatchToLidarr(request, lidarr.settings());
@@ -468,7 +468,7 @@ describe('sending a music request to Lidarr', () => {
   it('marks the request failed when Lidarr does not answer', async () => {
     lidarr.down = true;
     const request = await approvedRequest([
-      { mbId: OK_COMPUTER, title: 'OK Computer' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
     ]);
 
     await subscriber.dispatchToLidarr(request, lidarr.settings());
@@ -480,7 +480,7 @@ describe('sending a music request to Lidarr', () => {
     lidarr.artists = [
       {
         id: 7,
-        artistName: 'Radiohead',
+        artistName: 'Glasswing',
         foreignArtistId: ARTIST,
         monitored: true,
         qualityProfileId: 5,
@@ -491,15 +491,15 @@ describe('sending a music request to Lidarr', () => {
     lidarr.albums = [
       {
         id: 70,
-        title: 'OK Computer',
-        foreignAlbumId: OK_COMPUTER,
+        title: 'Static Garden',
+        foreignAlbumId: STATIC_GARDEN,
         artistId: 7,
         monitored: false,
       },
     ];
     const request = await approvedRequest([
-      { mbId: OK_COMPUTER, title: 'OK Computer' },
-      { mbId: KID_A, title: 'Kid A' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
+      { mbId: FOG_B, title: 'Fog B' },
     ]);
 
     await subscriber.dispatchToLidarr(request, lidarr.settings());
@@ -511,9 +511,9 @@ describe('sending a music request to Lidarr', () => {
 
 describe('when a music request is approved', () => {
   it('is sent to Lidarr once, and its albums are on their way', async () => {
-    lidarr.lookupAlbums.set(OK_COMPUTER, lookedUpAlbum(OK_COMPUTER, 'OK'));
+    lidarr.lookupAlbums.set(STATIC_GARDEN, lookedUpAlbum(STATIC_GARDEN, 'OK'));
     const request = await approvedRequest(
-      [{ mbId: OK_COMPUTER, title: 'OK Computer' }],
+      [{ mbId: STATIC_GARDEN, title: 'Static Garden' }],
       { status: MediaRequestStatus.PENDING }
     );
 
@@ -543,10 +543,10 @@ describe('when a music request is approved', () => {
 
   it('is sent again when a failed one is retried', async () => {
     const request = await approvedRequest(
-      [{ mbId: OK_COMPUTER, title: 'OK Computer' }],
+      [{ mbId: STATIC_GARDEN, title: 'Static Garden' }],
       { status: MediaRequestStatus.FAILED }
     );
-    lidarr.lookupAlbums.set(OK_COMPUTER, lookedUpAlbum(OK_COMPUTER, 'OK'));
+    lidarr.lookupAlbums.set(STATIC_GARDEN, lookedUpAlbum(STATIC_GARDEN, 'OK'));
 
     request.status = MediaRequestStatus.APPROVED;
     await getRepository(MediaRequest).save(request);
@@ -576,7 +576,7 @@ describe('when a music request is approved', () => {
         mediaType: MediaType.MUSIC,
         tmdbId: 0,
         foreignId: ARTIST,
-        foreignTitle: 'Radiohead',
+        foreignTitle: 'Glasswing',
         status: MediaStatus.UNKNOWN,
       }),
       { listeners: false }
@@ -584,8 +584,8 @@ describe('when a music request is approved', () => {
     await dataSource.manager.save(
       new MusicAlbum({
         mediaId: media.id,
-        mbId: OK_COMPUTER,
-        title: 'OK Computer',
+        mbId: STATIC_GARDEN,
+        title: 'Static Garden',
         secondaryTypes: [],
         status: MediaStatus.UNKNOWN,
       }),
@@ -602,8 +602,8 @@ describe('when a music request is approved', () => {
         is4k: false,
         albums: [
           new AlbumRequest({
-            albumMbid: OK_COMPUTER,
-            title: 'OK Computer',
+            albumMbid: STATIC_GARDEN,
+            title: 'Static Garden',
             status: MediaRequestStatus.APPROVED,
           }),
         ],
@@ -630,7 +630,7 @@ describe('when a music request is approved', () => {
     // hand would (routes/requestRecover.test.ts).
     getSettings().lidarr = [lidarr.settings({ id: 3, isDefault: false })];
     const request = await approvedRequest(
-      [{ mbId: OK_COMPUTER, title: 'OK Computer' }],
+      [{ mbId: STATIC_GARDEN, title: 'Static Garden' }],
       { status: MediaRequestStatus.PENDING, serverId: 9 }
     );
 

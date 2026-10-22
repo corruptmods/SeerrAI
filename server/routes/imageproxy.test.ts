@@ -321,10 +321,10 @@ describe('GET /imageproxy/tmdb/...', () => {
 });
 
 describe('music’s pictures', () => {
-  const ALBUM = 'b1392450-e666-3926-a536-22c65f834433';
-  const ARTIST = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
+  const ALBUM = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
+  const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
   /** Albums only these tests ask for, so each starts uncached. */
-  const COVER = `${unique.replace(/\D/g, '').padStart(8, '0').slice(-8)}-e666-3926-a536-22c65f834433`;
+  const COVER = `${unique.replace(/\D/g, '').padStart(8, '0').slice(-8)}-5b29-3f6c-b8a4-91d6e2f07a35`;
   const MISSING = `${COVER.slice(0, 8)}-0000-3926-a536-22c65f834433`;
   const music = (path: string, headers: Record<string, string> = {}) =>
     fetch(base.replace(/\/tmdb$/, path), { headers, redirect: 'manual' });
@@ -395,7 +395,7 @@ describe('music’s pictures', () => {
       [`/caa/release-group/${ALBUM}/front-500`, 'https://coverartarchive.org'],
       [`/caa/release/${ALBUM}/front`, 'https://coverartarchive.org'],
       [
-        `/fanart/fanart/music/${ARTIST}/artistthumb/radiohead-5.jpg`,
+        `/fanart/fanart/music/${ARTIST}/artistthumb/glasswing-5.jpg`,
         'https://assets.fanart.tv',
       ],
       ['/tadb/images/media/artist/thumb/abc.jpg', 'https://r2.theaudiodb.com'],
@@ -482,7 +482,7 @@ describe('music’s pictures', () => {
 
   it('keep pictures of artists a year, as posters are', async () => {
     for (const path of [
-      `/fanart/fanart/music/${ARTIST}/artistthumb/radiohead-5.jpg`,
+      `/fanart/fanart/music/${ARTIST}/artistthumb/glasswing-5.jpg`,
       '/tadb/images/media/artist/thumb/abc.jpg',
     ]) {
       const res = await music(path, SIGNED_IN);

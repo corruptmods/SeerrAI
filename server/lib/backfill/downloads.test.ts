@@ -31,7 +31,7 @@ const file = (episodeId: number, episode: number, state = 'waiting') => ({
 const job = (over: Partial<BackfillJob>, series: Partial<BackfillSeries>) =>
   ({
     id: 52,
-    title: 'Casper collection',
+    title: 'Wendle collection',
     status: 'downloading',
     downloadId: 'a6df2f46',
     size: 1200,
@@ -63,7 +63,7 @@ describe('Backfill downloads on title pages', () => {
         ['series', 0, 1283, 2, 400, 200, 'downloading'],
       ]
     );
-    assert.equal(items[0].item.title, 'Backfill: Casper collection');
+    assert.equal(items[0].item.title, 'Backfill: Wendle collection');
     assert.equal(items[0].item.timeLeft, '00:01:30');
     assert.deepEqual(
       items[0].item.estimatedCompletionTime,

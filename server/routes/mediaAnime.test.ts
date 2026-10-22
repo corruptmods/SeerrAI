@@ -25,13 +25,13 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 setupTestDb();
 
 const ANIMATION = { id: 16, name: 'Animation' };
-// TMDB as the scan sees it: Uzumaki is listed as American and English.
-const UZUMAKI = 90001;
+// TMDB as the scan sees it: Yorumaki is listed as American and English.
+const YORUMAKI = 90001;
 const OSHI_NO_KO = 90002;
 const SPIRITED_AWAY = 90003;
 const shows: Record<number, object> = {
-  [UZUMAKI]: {
-    id: UZUMAKI,
+  [YORUMAKI]: {
+    id: YORUMAKI,
     genres: [ANIMATION],
     original_language: 'en',
     origin_country: ['US'],
@@ -224,15 +224,15 @@ beforeEach(async () => {
   series = {
     654: {
       id: 654,
-      folder: 'Uzumaki',
-      path: '/tv/Uzumaki',
+      folder: 'Yorumaki',
+      path: '/tv/Yorumaki',
       qualityProfileId: 1,
       seriesType: 'standard',
     },
     700: {
       id: 700,
-      folder: 'Oshi no Ko',
-      path: '/anime/Oshi no Ko',
+      folder: 'Yume no Tane',
+      path: '/anime/Yume no Tane',
       qualityProfileId: 13,
       seriesType: 'anime',
     },
@@ -240,8 +240,8 @@ beforeEach(async () => {
   radarrMovies = {
     41: {
       id: 41,
-      folder: 'Spirited Away (2001)',
-      path: '/anime-movies/Spirited Away (2001)',
+      folder: 'Lantern Drift (2001)',
+      path: '/anime-movies/Lantern Drift (2001)',
       qualityProfileId: 9,
     },
   };
@@ -290,7 +290,7 @@ const call = async (method: 'GET' | 'PUT', mediaId: number, body?: unknown) => {
 
 describe('GET /media/:id/anime', () => {
   it('says what Seerr decided and what would put the title where it belongs', async () => {
-    const media = await linked(MediaType.TV, UZUMAKI, 654);
+    const media = await linked(MediaType.TV, YORUMAKI, 654);
     const res = await call('GET', media.id);
     assert.equal(res.status, 200);
     assert.deepEqual(
@@ -312,7 +312,7 @@ describe('GET /media/:id/anime', () => {
         sonarr.qualityProfile,
         sonarr.seriesType,
       ],
-      ['Sonarr', '/tv/Uzumaki', 'HD-1080p', 'standard']
+      ['Sonarr', '/tv/Yorumaki', 'HD-1080p', 'standard']
     );
     assert.deepEqual(sonarr.ifNotAnime, {});
     assert.deepEqual(sonarr.ifAnime, {
@@ -333,7 +333,7 @@ describe('GET /media/:id/anime', () => {
   });
 
   it('is for admins only', async () => {
-    const media = await linked(MediaType.TV, UZUMAKI, 654);
+    const media = await linked(MediaType.TV, YORUMAKI, 654);
     actingAs = manager;
     assert.equal((await call('GET', media.id)).status, 403);
     assert.equal(
@@ -349,7 +349,7 @@ describe('GET /media/:id/anime', () => {
 
 describe('PUT /media/:id/anime', () => {
   it('sets a series as anime and moves it in Sonarr to match', async () => {
-    const media = await linked(MediaType.TV, UZUMAKI, 654);
+    const media = await linked(MediaType.TV, YORUMAKI, 654);
     const res = await call('PUT', media.id, { animeSetting: true });
     assert.equal(res.status, 200);
     assert.deepEqual(edits, [
@@ -380,14 +380,14 @@ describe('PUT /media/:id/anime', () => {
       },
     ]);
     // Read again after the move, it is where it belongs.
-    assert.equal(res.body.servers[0].path, '/anime/Uzumaki');
+    assert.equal(res.body.servers[0].path, '/anime/Yorumaki');
     assert.deepEqual(res.body.servers[0].ifAnime, {});
     const saved = await getRepository(Media).findOneByOrFail({ id: media.id });
     assert.equal(saved.animeSetting, true);
   });
 
   it('puts a series back when set to automatic, and leaves alone what is right', async () => {
-    const media = await linked(MediaType.TV, UZUMAKI, 654);
+    const media = await linked(MediaType.TV, YORUMAKI, 654);
     await call('PUT', media.id, { animeSetting: true });
     edits = [];
     const res = await call('PUT', media.id, { animeSetting: null });
@@ -406,8 +406,8 @@ describe('PUT /media/:id/anime', () => {
 
   it('only changes what is wrong, and does not move files it leaves in place', async () => {
     series[654].qualityProfileId = 13;
-    series[654].path = '/anime/Uzumaki';
-    const media = await linked(MediaType.TV, UZUMAKI, 654);
+    series[654].path = '/anime/Yorumaki';
+    const media = await linked(MediaType.TV, YORUMAKI, 654);
     await call('PUT', media.id, { animeSetting: true });
     assert.deepEqual(edits[0].body, {
       seriesIds: [654],
@@ -431,17 +431,17 @@ describe('PUT /media/:id/anime', () => {
         },
       },
     ]);
-    assert.equal(res.body.servers[0].path, '/movies/Spirited Away (2001)');
+    assert.equal(res.body.servers[0].path, '/movies/Lantern Drift (2001)');
   });
 
   it('says when Sonarr could not be changed, and keeps the setting', async () => {
-    const media = await linked(MediaType.TV, UZUMAKI, 654);
+    const media = await linked(MediaType.TV, YORUMAKI, 654);
     failEdits = true;
     const res = await call('PUT', media.id, { animeSetting: true });
     assert.equal(res.status, 200);
     assert.equal(res.body.applied.length, 1);
     assert.match(res.body.applied[0].error, /Failed to edit series/);
-    assert.equal(res.body.servers[0].path, '/tv/Uzumaki');
+    assert.equal(res.body.servers[0].path, '/tv/Yorumaki');
     const saved = await getRepository(Media).findOneByOrFail({ id: media.id });
     assert.equal(saved.animeSetting, true);
   });
@@ -481,7 +481,7 @@ describe('PUT /media/:id/anime', () => {
   });
 
   it('refuses a setting that is not true, false or null', async () => {
-    const media = await linked(MediaType.TV, UZUMAKI, 654);
+    const media = await linked(MediaType.TV, YORUMAKI, 654);
     assert.equal(
       (await call('PUT', media.id, { animeSetting: 'yes' })).status,
       400

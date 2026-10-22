@@ -334,7 +334,7 @@ describe('request ETAs', () => {
   });
 
   it('does not call a film released just because Radarr may search for it', async () => {
-    // The Mongoose: minimum availability "announced", so Radarr counts it
+    // The Pangolin: minimum availability "announced", so Radarr counts it
     // available from announcement, but it opens in cinemas in five weeks.
     radarrMovies = {
       20: {
@@ -689,7 +689,7 @@ describe('release dates as the title page shows them', () => {
   });
 
   it('shows the digital date for a film Radarr has no link for', async () => {
-    // Insidious: Out of the Further — in cinemas already, digital ahead, and
+    // Vesperline: Out of the Hollow — in cinemas already, digital ahead, and
     // Radarr cannot be asked about it.
     tmdbReleases[31] = us([
       [3, -33],
@@ -726,7 +726,7 @@ describe('release dates as the title page shows them', () => {
 
   it('shows the digital date with minimum availability "announced", as on the live server', async () => {
     // The live setup: default Radarr on "announced", a film it has no link
-    // for, in cinemas already, digital ahead — Insidious: Out of the Further.
+    // for, in cinemas already, digital ahead — Vesperline: Out of the Hollow.
     getSettings().radarr = [
       {
         id: 0,
@@ -911,8 +911,8 @@ describe('a title being processed with no request', () => {
     ],
   });
 
-  it('estimates Insidious: in Radarr on "announced", no request, in cinemas, digital ahead', async () => {
-    tmdbReleases[1291595] = us([
+  it('estimates Vesperline: in Radarr on "announced", no request, in cinemas, digital ahead', async () => {
+    tmdbReleases[1382706] = us([
       [3, -33],
       [4, 13],
     ]);
@@ -924,7 +924,7 @@ describe('a title being processed with no request', () => {
     };
     const media = await getRepository(Media).save(
       new Media({
-        tmdbId: 1291595,
+        tmdbId: 1382706,
         mediaType: MediaType.MOVIE,
         status: MediaStatus.PROCESSING,
         serviceId: 0,

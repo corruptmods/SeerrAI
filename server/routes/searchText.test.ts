@@ -40,17 +40,17 @@ stub('getMovie', async ({ movieId }: { movieId: number }) => {
     original_title: 'Le Film',
     credits: {
       cast: [
-        { name: 'Harrison Ford', character: 'Han Solo' },
-        { name: 'Harrison Ford', character: 'Indiana Jones' },
+        { name: 'Garrick Holt', character: 'Tam Vexley' },
+        { name: 'Garrick Holt', character: 'Dakota Reyes' },
       ],
       crew: [
-        { name: 'George Lucas', job: 'Director' },
-        { name: 'Gary Kurtz', job: 'Producer' },
+        { name: 'Morris Thane', job: 'Director' },
+        { name: 'Lyle Brannock', job: 'Producer' },
       ],
     },
     genres: [{ id: 1, name: 'Science Fiction' }],
     keywords: { keywords: [{ id: 1, name: 'space opera' }] },
-    production_companies: [{ id: 1, name: 'Lucasfilm Ltd.' }],
+    production_companies: [{ id: 1, name: 'Thanefilm Ltd.' }],
   };
 });
 stub('getTvShow', async ({ tvId }: { tvId: number }) => {
@@ -60,10 +60,12 @@ stub('getTvShow', async ({ tvId }: { tvId: number }) => {
     name: `Show ${tvId}`,
     original_name: `Show ${tvId}`,
     aggregate_credits: {
-      cast: [{ name: 'Alan Ritchson', roles: [{ character: 'Jack Reacher' }] }],
+      cast: [
+        { name: 'Brock Tallard', roles: [{ character: 'Nils Halvorsen' }] },
+      ],
     },
     credits: { crew: [] },
-    created_by: [{ name: 'Nick Santora' }],
+    created_by: [{ name: 'Dean Ferrow' }],
     genres: [{ id: 2, name: 'Crime' }],
     keywords: { results: [] },
     production_companies: [{ id: 2, name: 'Amazon MGM Studios' }],
@@ -125,22 +127,22 @@ describe('GET /discover/search-text', () => {
     for (const word of [
       'film',
       'le',
-      'harrison',
-      'ford',
-      'han',
-      'solo',
-      'indiana',
-      'lucas',
+      'garrick',
+      'holt',
+      'tam',
+      'vexley',
+      'dakota',
+      'thane',
       'science',
       'space',
       'opera',
-      'lucasfilm',
+      'thanefilm',
     ]) {
       assert.ok(words.includes(` ${word} `), `has "${word}"`);
     }
-    assert.ok(!words.includes(' kurtz '), 'not a producer');
+    assert.ok(!words.includes(' brannock '), 'not a producer');
     assert.equal(
-      words.split(' harrison ').length,
+      words.split(' garrick ').length,
       2,
       'each word once, however many roles'
     );
@@ -149,8 +151,8 @@ describe('GET /discover/search-text', () => {
   it('covers series: cast by role, and who created it', async () => {
     const { text } = await get('tv:22');
 
-    assert.match(text['tv:22'], /\bjack reacher\b/);
-    assert.match(text['tv:22'], /\bsantora\b/);
+    assert.match(text['tv:22'], /\bnils halvorsen\b/);
+    assert.match(text['tv:22'], /\bferrow\b/);
     assert.match(text['tv:22'], /\bcrime\b/);
     assert.match(text['tv:22'], /\bamazon mgm studios\b/);
     assert.match(text['tv:22'], /\bprime video\b/);

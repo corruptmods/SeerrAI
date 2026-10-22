@@ -16,11 +16,11 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 /**
- * The live loop behind "DAHMER - Monster" being auto-approved every three
+ * The live loop behind "HOLLOWAY - Phantom" being auto-approved every three
  * minutes.
  *
- * TVDB folded DAHMER into its Monster anthology entry, which TMDB assigns to
- * the anthology (225634), so the DAHMER entry (113988) has no TVDB id of its
+ * TVDB folded HOLLOWAY into its Phantom anthology entry, which TMDB assigns to
+ * the anthology (336745), so the HOLLOWAY entry (226491) has no TVDB id of its
  * own. When a series request cannot resolve a TVDB id, the Sonarr dispatch
  * deleted both the media row and the request. Nothing survived, so watchlist
  * sync had no record of trying and tried again on every run — notifying each
@@ -43,10 +43,10 @@ describe('a series request whose TVDB id cannot be resolved', () => {
   const requestIt = () =>
     MediaRequest.request(
       {
-        mediaId: 113988,
+        mediaId: 226491,
         mediaType: MediaType.TV,
         seasons: 'all',
-        tvdbId: 389492,
+        tvdbId: 497315,
         is4k: false,
       } as never,
       user,
@@ -58,8 +58,8 @@ describe('a series request whose TVDB id cannot be resolved', () => {
 
   beforeEach(async () => {
     stub(TheMovieDb.prototype, 'getTvShow', {
-      id: 113988,
-      name: 'DAHMER - Monster: The Jeffrey Dahmer Story',
+      id: 226491,
+      name: 'HOLLOWAY - Phantom: The Edgar Holloway Story',
       first_air_date: '2022-09-21',
       // What TMDB returns for this entry: no TVDB id of its own.
       external_ids: { tvdb_id: null },
@@ -105,11 +105,11 @@ describe('a series request whose TVDB id cannot be resolved', () => {
       where: { plexUsername: 'unresolvable' },
     });
 
-    // The anthology, which legitimately holds TVDB 389492.
+    // The anthology, which legitimately holds TVDB 497315.
     await getRepository(Media).save(
       new Media({
-        tmdbId: 225634,
-        tvdbId: 389492,
+        tmdbId: 336745,
+        tvdbId: 497315,
         mediaType: MediaType.TV,
         status: MediaStatus.AVAILABLE,
       })
@@ -121,14 +121,14 @@ describe('a series request whose TVDB id cannot be resolved', () => {
     await settle();
 
     const media = await getRepository(Media).findOne({
-      where: { tmdbId: 113988, mediaType: MediaType.TV },
+      where: { tmdbId: 226491, mediaType: MediaType.TV },
     });
     assert.ok(media, 'the media row must survive a failed dispatch');
 
     const requests = await getRepository(MediaRequest).find({
       relations: { media: true },
     });
-    const forTitle = requests.filter((r) => r.media?.tmdbId === 113988);
+    const forTitle = requests.filter((r) => r.media?.tmdbId === 226491);
 
     assert.equal(forTitle.length, 1, 'the request must survive as a record');
     assert.equal(
@@ -151,7 +151,7 @@ describe('a series request whose TVDB id cannot be resolved', () => {
     const count = await getRepository(MediaRequest)
       .createQueryBuilder('request')
       .leftJoin('request.media', 'media')
-      .where('media.tmdbId = :tmdbId', { tmdbId: 113988 })
+      .where('media.tmdbId = :tmdbId', { tmdbId: 226491 })
       .getCount();
 
     assert.equal(count, 1, 'one record, not one per sync');

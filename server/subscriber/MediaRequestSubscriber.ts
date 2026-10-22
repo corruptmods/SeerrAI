@@ -947,7 +947,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
            * no trace of the attempt, so watchlist sync saw the title as
            * never requested and tried again on every run — each time
            * inserting, notifying, and deleting again. It happened with
-           * "DAHMER - Monster" once TVDB folded it into the Monster
+           * "HOLLOWAY - Phantom" once TVDB folded it into the Phantom
            * anthology, leaving the TMDB entry without a TVDB id of its own.
            *
            * Keep both and mark the request failed instead. The failure is

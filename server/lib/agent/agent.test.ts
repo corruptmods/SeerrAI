@@ -100,16 +100,16 @@ const ben = (value: unknown): Buffer => {
 };
 
 const MB = 1024 * 1024;
-const FOLDER = 'Casper the Friendly Ghost (Complete collection in MP4 format)';
+const FOLDER = 'Wendle the Gentle Lantern (Complete collection in MP4 format)';
 const INFO = {
   name: FOLDER,
   'piece length': 1048576,
   pieces: Buffer.alloc(20),
   files: [
-    'Film - E01 (The Friendly Ghost).mp4',
-    "Film - E02 (Casper's Spree Under the Sea).mp4",
-    'Film - E03 (Once Upon a Rhyme).mp4',
-    'Film - E04 (Boo Hoo Baby).mp4',
+    'Film - E01 (The Gentle Lantern).mp4',
+    "Film - E02 (Wendle's Picnic Below the Pier).mp4",
+    'Film - E03 (Twice Around a Riddle).mp4',
+    'Film - E04 (Hush Hush Puppy).mp4',
   ].map((name) => ({ length: 150 * MB, path: ['Theatrical', name] })),
 };
 const TORRENT = ben({ announce: 'udp://tracker', info: INFO });
@@ -133,15 +133,15 @@ const ep = (
   airDateUtc: '1951-01-01T00:00:00Z',
 });
 const EPISODES = [
-  ep(501, 1, "Casper's Spree Under The Sea", false),
-  ep(502, 2, 'Once Upon a Rhyme', false),
-  ep(503, 3, 'Boo Hoo Baby', true),
+  ep(501, 1, "Wendle's Picnic Below The Pier", false),
+  ep(502, 2, 'Twice Around a Riddle', false),
+  ep(503, 3, 'Hush Hush Puppy', true),
 ];
 
 const COLLECTION: ProwlarrRelease = {
-  guid: 'https://indexer/casper',
+  guid: 'https://indexer/wendle',
   title:
-    'Casper the Friendly Ghost (Complete collection in MP4 format) [Lando18]',
+    'Wendle the Gentle Lantern (Complete collection in MP4 format) [Quill42]',
   size: 600 * MB,
   indexerId: 30,
   indexer: 'LimeTorrents',
@@ -152,7 +152,7 @@ const COLLECTION: ProwlarrRelease = {
 const FRENCH: ProwlarrRelease = {
   ...COLLECTION,
   guid: 'https://indexer/french',
-  title: 'Casper The Friendly Ghost.1950.S01.TRUEFRENCH.DVDRip.x264-FTMVHD',
+  title: 'Wendle The Gentle Lantern.1950.S01.TRUEFRENCH.DVDRip.x264-QRZVHD',
 };
 
 type Reply = (body: Record<string, unknown>) => unknown;
@@ -210,7 +210,7 @@ const parse = (title: string): SonarrParseResult => {
         revision: { version: 1, real: 0 },
       },
     },
-    series: { id: SERIES_ID, title: 'Casper the Friendly Ghost' },
+    series: { id: SERIES_ID, title: 'Wendle the Gentle Lantern' },
     episodes: episode ? [episode] : [],
     languages: /TRUEFRENCH/.test(title)
       ? [{ id: 2, name: 'French' }]
@@ -315,12 +315,12 @@ beforeEach(async () => {
 
   const detail = {
     id: SERIES_ID,
-    title: 'Casper the Friendly Ghost',
+    title: 'Wendle the Gentle Lantern',
     year: 1950,
-    tvdbId: 370935,
+    tvdbId: 482610,
     seriesType: 'standard',
     qualityProfileId: 11,
-    path: '/tv/Casper the Friendly Ghost',
+    path: '/tv/Wendle the Gentle Lantern',
     originalLanguage: { id: 1, name: 'English' },
     statistics: { episodeFileCount: 1, episodeCount: 3 },
   };
@@ -423,20 +423,20 @@ const admin = () => getRepository(User).findOneOrFail({ where: { id: 1 } });
 describe('the admin agent', () => {
   it('maps a collection by episode title and downloads only what is missing', async () => {
     script = [
-      () => toolUse('find_title', { query: 'casper friendly ghost' }),
+      () => toolUse('find_title', { query: 'wendle gentle lantern' }),
       (body) => {
         assert.match(
           lastResult(body).content,
-          /series:0:1283 {2}Casper the Friendly Ghost \(1950\)/
+          /series:0:1283 {2}Wendle the Gentle Lantern \(1950\)/
         );
         return toolUse('title_status', { title: 'series:0:1283' });
       },
       (body) => {
         const status = lastResult(body).content;
         assert.match(status, /Missing, monitored and aired \(2\)/);
-        assert.match(status, /S01E01 "Casper's Spree Under The Sea"/);
+        assert.match(status, /S01E01 "Wendle's Picnic Below The Pier"/);
         return toolUse('search_indexers', {
-          query: 'Casper the Friendly Ghost collection',
+          query: 'Wendle the Gentle Lantern collection',
           kind: 'series',
         });
       },
@@ -451,7 +451,7 @@ describe('the admin agent', () => {
         const files = lastResult(body).content;
         assert.match(
           files,
-          /#1 {2}.*Film - E02 \(Casper's Spree Under the Sea\)\.mp4 {2}\(150 MB\)/
+          /#1 {2}.*Film - E02 \(Wendle's Picnic Below the Pier\)\.mp4 {2}\(150 MB\)/
         );
         // Taken by its number, E04 would be S01E04, which has no such
         // episode; E03 by number is S01E03, which has a file.
@@ -461,7 +461,7 @@ describe('the admin agent', () => {
             title: 'series:0:1283',
             release: 'r1',
             files: [{ index: 3, season: 1, episode: 3 }],
-            reason: 'Boo Hoo Baby is S01E03',
+            reason: 'Hush Hush Puppy is S01E03',
           },
           'g1'
         );
@@ -514,7 +514,7 @@ describe('the admin agent', () => {
     ];
 
     const run = await agent.ask(
-      'Get the missing Casper the Friendly Ghost episodes',
+      'Get the missing Wendle the Gentle Lantern episodes',
       await admin()
     );
     const done = await waitForRun(run.id);
@@ -525,7 +525,7 @@ describe('the admin agent', () => {
     );
     assert.deepEqual(
       [done.kind, done.serverId, done.arrId, done.title],
-      ['series', 0, SERIES_ID, 'Casper the Friendly Ghost']
+      ['series', 0, SERIES_ID, 'Wendle the Gentle Lantern']
     );
     assert.equal(done.actions.length, 1);
     assert.deepEqual(done.actions[0].episodeIds, [501, 502]);
@@ -560,7 +560,7 @@ describe('the admin agent', () => {
     assert.equal(sent[0].actionUrl, `/backfill/agent/${run.id}`);
     assert.match(
       sent[0].subject ?? '',
-      /Casper the Friendly Ghost: change by the admin agent/
+      /Wendle the Gentle Lantern: change by the admin agent/
     );
     assert.equal(sent[0].message, '1 download started');
 
@@ -622,8 +622,8 @@ describe('the admin agent', () => {
         size: 350 * MB,
         seeders: undefined,
       });
-      const EPISODE = post('Casper.the.Friendly.Ghost.S01E02.DVDRip.x264-GRP');
-      const SEASON = post('Casper.the.Friendly.Ghost.S01.DVDRip.x264-GRP');
+      const EPISODE = post('Wendle.the.Gentle.Lantern.S01E02.DVDRip.x264-GRP');
+      const SEASON = post('Wendle.the.Gentle.Lantern.S01.DVDRip.x264-GRP');
       mock.method(ProwlarrAPI.prototype, 'search', async () => [
         EPISODE,
         SEASON,
@@ -702,7 +702,7 @@ describe('the admin agent', () => {
       script = [
         () =>
           toolUse('search_indexers', {
-            query: 'Casper the Friendly Ghost',
+            query: 'Wendle the Gentle Lantern',
             kind: 'series',
           }),
         () => toolUse('release_files', { release: 'r1' }),
@@ -750,7 +750,7 @@ describe('the admin agent', () => {
           return say('Downloading S01E02 whole from Usenet.');
         },
       ];
-      const run = await agent.ask('Get Casper S01E02', await admin());
+      const run = await agent.ask('Get Wendle S01E02', await admin());
       const done = await waitForRun(run.id);
       assert.equal(done.status, 'done', done.error ?? '');
       const job = await getRepository(BackfillJob).findOneOrFail({
@@ -779,7 +779,7 @@ describe('the admin agent', () => {
     script = [
       () =>
         toolUse('search_indexers', {
-          query: 'Casper the Friendly Ghost',
+          query: 'Wendle the Gentle Lantern',
           kind: 'series',
         }),
       () => toolUse('release_files', { release: 'r1' }),
@@ -787,7 +787,7 @@ describe('the admin agent', () => {
         toolUse('grab', {
           title: 'series:0:1283',
           release: 'r1',
-          // "Boo Hoo Baby" is not "Once Upon a Rhyme", and E04 is not E02.
+          // "Hush Hush Puppy" is not "Twice Around a Riddle", and E04 is not E02.
           files: [{ index: 3, season: 1, episode: 2 }],
           reason: 'Fourth short is the second episode',
         }),
@@ -796,7 +796,7 @@ describe('the admin agent', () => {
         assert.equal(held.is_error, true);
         assert.match(
           held.content,
-          /Not started\. Look again: File #3 "Film - E04 \(Boo Hoo Baby\)" names neither S01E02 "Once Upon a Rhyme" nor its number/
+          /Not started\. Look again: File #3 "Film - E04 \(Hush Hush Puppy\)" names neither S01E02 "Twice Around a Riddle" nor its number/
         );
         return toolUse('grab', {
           title: 'series:0:1283',
@@ -811,7 +811,7 @@ describe('the admin agent', () => {
         return say('Started it.');
       },
     ];
-    const run = await agent.ask('Get Casper', await admin());
+    const run = await agent.ask('Get Wendle', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.deepEqual(done.actions[0].episodeIds, [502]);
@@ -874,7 +874,7 @@ describe('the admin agent', () => {
     script = [
       () =>
         toolUse('search_indexers', {
-          query: 'Casper the Friendly Ghost',
+          query: 'Wendle the Gentle Lantern',
           kind: 'series',
         }),
       () => toolUse('release_files', { release: 'r1' }),
@@ -883,7 +883,7 @@ describe('the admin agent', () => {
           title: 'series:0:1283',
           release: 'r1',
           files: [{ index: 2, season: 1, episode: 2 }],
-          reason: 'Once Upon a Rhyme by title',
+          reason: 'Twice Around a Riddle by title',
         }),
       (body) => {
         const refused = lastResult(body);
@@ -896,7 +896,7 @@ describe('the admin agent', () => {
           title: 'series:0:1283',
           release: 'r1',
           files: [{ index: 1, season: 1, episode: 1 }],
-          reason: "Casper's Spree Under the Sea by title",
+          reason: "Wendle's Picnic Below the Pier by title",
         });
       },
       (body) => {
@@ -911,7 +911,7 @@ describe('the admin agent', () => {
         return say('Added S01E01 to the download already running.');
       },
     ];
-    const run = await agent.ask('Get Casper', await admin());
+    const run = await agent.ask('Get Wendle', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.equal(done.actions[0].jobId, running.id);
@@ -1012,7 +1012,7 @@ describe('the admin agent', () => {
     script = [
       () =>
         toolUse('search_indexers', {
-          query: 'Casper the Friendly Ghost',
+          query: 'Wendle the Gentle Lantern',
           kind: 'series',
         }),
       () => toolUse('release_files', { release: 'r1' }),
@@ -1022,7 +1022,7 @@ describe('the admin agent', () => {
         return say('Started it.');
       },
     ];
-    const run = await agent.ask('Get Casper', await admin());
+    const run = await agent.ask('Get Wendle', await admin());
     assert.equal((await waitForRun(run.id)).status, 'done');
 
     // An admin turning it down is final.
@@ -1034,7 +1034,7 @@ describe('the admin agent', () => {
     script = [
       () =>
         toolUse('search_indexers', {
-          query: 'Casper the Friendly Ghost',
+          query: 'Wendle the Gentle Lantern',
           kind: 'series',
         }),
       () => toolUse('release_files', { release: 'r1' }),
@@ -1049,7 +1049,7 @@ describe('the admin agent', () => {
         return say('That release was turned down.');
       },
     ];
-    const again = await agent.ask('Get Casper', await admin());
+    const again = await agent.ask('Get Wendle', await admin());
     assert.equal((await waitForRun(again.id)).status, 'done');
   });
 
@@ -1059,7 +1059,7 @@ describe('the admin agent', () => {
       new BackfillJob({
         seriesId: row.id,
         candidateId: null,
-        title: 'Casper S01E01 WEB',
+        title: 'Wendle S01E01 WEB',
         status: 'downloading',
         mode: 'missing',
         protocol: 'torrent',
@@ -1068,9 +1068,9 @@ describe('the admin agent', () => {
         files: [
           {
             index: 0,
-            path: 'Casper S01E01.mkv',
+            path: 'Wendle S01E01.mkv',
             size: 150 * MB,
-            judgedAs: 'Casper S01E01',
+            judgedAs: 'Wendle S01E01',
             episodeIds: [501],
             season: 1,
             episode: 1,
@@ -1093,12 +1093,12 @@ describe('the admin agent', () => {
         assert.match(
           status,
           new RegExp(
-            `S01E01 "Casper's Spree Under The Sea" 1951-01-01 \\[downloading in Backfill job #${running.id}\\]`
+            `S01E01 "Wendle's Picnic Below The Pier" 1951-01-01 \\[downloading in Backfill job #${running.id}\\]`
           )
         );
         assert.match(status, new RegExp(`job #${running.id} is downloading`));
         return toolUse('search_indexers', {
-          query: 'Casper the Friendly Ghost',
+          query: 'Wendle the Gentle Lantern',
           kind: 'series',
         });
       },
@@ -1126,7 +1126,7 @@ describe('the admin agent', () => {
           title: 'series:0:1283',
           release: 'r1',
           files: [{ index: 2, season: 1, episode: 2 }],
-          reason: 'Once Upon a Rhyme by title',
+          reason: 'Twice Around a Riddle by title',
         });
       },
       (body) => {
@@ -1134,7 +1134,7 @@ describe('the admin agent', () => {
         return say('Started S01E02 beside the download already running.');
       },
     ];
-    const run = await agent.ask('Get Casper', await admin());
+    const run = await agent.ask('Get Wendle', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.deepEqual(done.actions[0].episodeIds, [502]);
@@ -1163,7 +1163,7 @@ describe('the admin agent', () => {
       () =>
         toolUses(
           ['search_releases', { title: 'series:0:1283', season: 1 }],
-          ['search_indexers', { query: 'Casper complete', kind: 'series' }],
+          ['search_indexers', { query: 'Wendle complete', kind: 'series' }],
           ['search_releases', { title: 'series:0:1283', season: 0 }]
         ),
       (body) => {
@@ -1176,14 +1176,14 @@ describe('the admin agent', () => {
           answers.map((a) => [a.tool_use_id, a.content]),
           [
             ['c0', 'No results from any indexer.'],
-            ['c1', 'Nothing for "Casper complete".'],
+            ['c1', 'Nothing for "Wendle complete".'],
             ['c2', 'No results from any indexer.'],
           ]
         );
         return say('Nothing anywhere.');
       },
     ];
-    const run = await agent.ask('Get Casper', await admin());
+    const run = await agent.ask('Get Wendle', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.equal(most, 3, 'all three searched at once');
@@ -1232,7 +1232,7 @@ describe('the admin agent', () => {
         return say('Sonarr found nothing for season 1.');
       },
     ];
-    const run = await agent.ask('Get Casper', await admin());
+    const run = await agent.ask('Get Wendle', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.equal(getReleases.mock.callCount(), 1, 'searched once');
@@ -1240,13 +1240,13 @@ describe('the admin agent', () => {
 
   it('asks when it cannot decide, and goes on from where it was after the answer', async () => {
     script = [
-      () => toolUse('search_indexers', { query: 'Casper', kind: 'series' }),
+      () => toolUse('search_indexers', { query: 'Wendle', kind: 'series' }),
       () =>
         toolUse('ask_admin', {
           question: 'There is an English collection and a French one. Which?',
         }),
     ];
-    const run = await agent.ask('Get Casper', await admin());
+    const run = await agent.ask('Get Wendle', await admin());
     const waiting = await waitForRun(run.id, ['waiting']);
     assert.equal(
       waiting.question,
@@ -1366,21 +1366,21 @@ describe('the admin agent', () => {
     script = [
       ...Array.from(
         { length: 3 },
-        () => () => toolUse('find_title', { query: 'casper' })
+        () => () => toolUse('find_title', { query: 'wendle' })
       ),
       (body) => {
         assert.match(lastText(body), /Carry on with what is left/);
-        return toolUse('find_title', { query: 'casper' });
+        return toolUse('find_title', { query: 'wendle' });
       },
-      () => toolUse('find_title', { query: 'casper' }),
-      () => toolUse('find_title', { query: 'casper' }),
+      () => toolUse('find_title', { query: 'wendle' }),
+      () => toolUse('find_title', { query: 'wendle' }),
       (body) => {
         // That go started nothing: no third.
         assert.match(lastText(body), /limit of 3 steps/);
         return say('Nothing found.');
       },
     ];
-    const run = await agent.ask('Find Casper', await admin());
+    const run = await agent.ask('Find Wendle', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.equal(done.steps.filter((s) => s.kind === 'tool').length, 6);
@@ -1405,7 +1405,7 @@ describe('the admin agent', () => {
     script = [
       ...Array.from(
         { length: 5 },
-        () => () => toolUse('find_title', { query: 'casper' })
+        () => () => toolUse('find_title', { query: 'wendle' })
       ),
       (body) => {
         const messages = body.messages as { content: unknown }[];
@@ -1416,7 +1416,7 @@ describe('the admin agent', () => {
         return say('Ran out of steps.');
       },
     ];
-    const run = await agent.ask('Find Casper', await admin());
+    const run = await agent.ask('Find Wendle', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done');
     assert.equal(
@@ -1437,7 +1437,7 @@ describe('the admin agent', () => {
         ...Array.from(
           { length: 14 },
           (_, i) =>
-            ['search_indexers', { query: `Casper ${i}`, kind: 'series' }] as [
+            ['search_indexers', { query: `Wendle ${i}`, kind: 'series' }] as [
               string,
               Record<string, unknown>,
             ]
@@ -1458,7 +1458,7 @@ describe('the admin agent', () => {
       },
       () => say('Two rounds were enough.'),
     ];
-    const run = await agent.ask('Find Casper', await admin());
+    const run = await agent.ask('Find Wendle', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.equal(done.summary, 'Two rounds were enough.');
@@ -1480,10 +1480,10 @@ describe('the admin agent', () => {
         : {}),
     });
     mock.method(BackfillSonarr.prototype, 'getReleases', async () => [
-      release('Casper S57E01 1080p', 57),
-      release('Casper S56E08 1080p', 56),
-      release('Casper S01E01 DVDRip', 1),
-      release('Casper Complete Collection'),
+      release('Wendle S57E01 1080p', 57),
+      release('Wendle S56E08 1080p', 56),
+      release('Wendle S01E01 DVDRip', 1),
+      release('Wendle Complete Collection'),
     ]);
     script = [
       () => toolUse('search_releases', { title: 'series:0:1283', season: 1 }),
@@ -1493,13 +1493,13 @@ describe('the admin agent', () => {
           found,
           /^2 results \(2 more for other seasons left out\):/
         );
-        assert.match(found, /Casper S01E01 DVDRip/);
-        assert.match(found, /Casper Complete Collection/);
+        assert.match(found, /Wendle S01E01 DVDRip/);
+        assert.match(found, /Wendle Complete Collection/);
         assert.ok(!found.includes('S57E01'));
         return say('Only season 1 and a collection.');
       },
     ];
-    const run = await agent.ask('Find Casper', await admin());
+    const run = await agent.ask('Find Wendle', await admin());
     assert.equal((await waitForRun(run.id)).status, 'done');
   });
 
@@ -1520,9 +1520,9 @@ describe('the admin agent', () => {
       mappedEpisodeNumbers: [1, 2, 3],
     });
     mock.method(BackfillSonarr.prototype, 'getReleases', async () => [
-      pack('Casper S01-S03 1080p', [1, 2, 3]),
-      pack('Casper S04-S05 1080p', [4, 5]),
-      pack('Casper S02 1080p', [2]),
+      pack('Wendle S01-S03 1080p', [1, 2, 3]),
+      pack('Wendle S04-S05 1080p', [4, 5]),
+      pack('Wendle S02 1080p', [2]),
     ]);
     script = [
       () => toolUse('search_releases', { title: 'series:0:1283', season: 2 }),
@@ -1532,14 +1532,14 @@ describe('the admin agent', () => {
           found,
           /^2 results \(1 more for other seasons left out\):/
         );
-        assert.match(found, /Casper S01-S03 1080p/);
+        assert.match(found, /Wendle S01-S03 1080p/);
         assert.match(found, /S01–S03 pack/);
         assert.match(found, /S02 pack/);
         assert.ok(!found.includes('S04-S05'));
         return say('Season 2 is in two packs.');
       },
     ];
-    const run = await agent.ask('Find Casper season 2', await admin());
+    const run = await agent.ask('Find Wendle season 2', await admin());
     assert.equal((await waitForRun(run.id)).status, 'done');
   });
 
@@ -1549,8 +1549,8 @@ describe('the admin agent', () => {
         kind: 'series',
         serverId: 0,
         arrId: SERIES_ID,
-        tmdbId: 260376,
-        title: 'Casper the Friendly Ghost',
+        tmdbId: 371849,
+        title: 'Wendle the Gentle Lantern',
         status: 'none',
         missing: 2,
         searchTerms: [],
@@ -1564,7 +1564,7 @@ describe('the admin agent', () => {
 
     const media = await getRepository(Media).save(
       new Media({
-        tmdbId: 260376,
+        tmdbId: 371849,
         mediaType: MediaType.TV,
         status: MediaStatus.PROCESSING,
       })
@@ -1586,7 +1586,7 @@ describe('the admin agent', () => {
           'never requests on its own'
         );
         const first = (body.messages as { content: string }[])[0].content;
-        assert.match(first, /Casper the Friendly Ghost \(series:0:1283\)/);
+        assert.match(first, /Wendle the Gentle Lantern \(series:0:1283\)/);
         return say('Nothing better than what Backfill saw.');
       },
     ];
@@ -1619,7 +1619,7 @@ describe('the admin agent', () => {
         kind: 'series',
         serverId: 0,
         arrId: SERIES_ID,
-        title: 'Casper the Friendly Ghost',
+        title: 'Wendle the Gentle Lantern',
         reporter,
       });
     assert.equal(await report(member), null, 'nor for someone’s report');
@@ -1630,7 +1630,7 @@ describe('the admin agent', () => {
     await getRepository(AgentRun).delete({ id: asked.id });
     // The title's history says so.
     const events = await getRepository(MediaEvent).find({
-      where: { tmdbId: 260376, type: MediaEventType.AGENT },
+      where: { tmdbId: 371849, type: MediaEventType.AGENT },
     });
     assert.deepEqual(
       events.map((e) => [e.mediaType, e.userId, e.detail]),
@@ -1694,7 +1694,7 @@ describe('the admin agent', () => {
       set() {},
       get() {
         return async () => ({
-          name: 'Casper the Friendly Ghost',
+          name: 'Wendle the Gentle Lantern',
           poster_path: null,
         });
       },
@@ -1706,7 +1706,7 @@ describe('the admin agent', () => {
     const media = await getRepository(Media).save(
       new Media({
         tmdbId: 8888,
-        tvdbId: 370935,
+        tvdbId: 482610,
         mediaType: MediaType.TV,
         status: MediaStatus.PARTIALLY_AVAILABLE,
         serviceId: 0,
@@ -1733,7 +1733,7 @@ describe('the admin agent', () => {
       kind: 'series' as const,
       serverId: 0,
       arrId: SERIES_ID,
-      title: 'Casper the Friendly Ghost',
+      title: 'Wendle the Gentle Lantern',
       reporter,
       issueId: issue.id,
     };
@@ -1753,7 +1753,7 @@ describe('the admin agent', () => {
       (body) => {
         assert.match(
           JSON.stringify((body.messages as unknown[])[0]),
-          /reported that Casper the Friendly Ghost \(series:0:1283\) is missing\. Sonarr searched again and found nothing usable/
+          /reported that Wendle the Gentle Lantern \(series:0:1283\) is missing\. Sonarr searched again and found nothing usable/
         );
         return say('No release of the two missing shorts exists yet.');
       },
@@ -1794,7 +1794,7 @@ describe('the admin agent', () => {
       kind: 'series',
       serverId: 0,
       arrId: SERIES_ID,
-      title: 'Casper the Friendly Ghost',
+      title: 'Wendle the Gentle Lantern',
       reporter: await admin(),
     });
     await agent.checkHeld();
@@ -1812,7 +1812,7 @@ describe('the admin agent', () => {
   it('cannot run without AI set up for it', async () => {
     getSettings().main.disabledFeatures = ['aiAgent'];
     await assert.rejects(
-      agent.ask('Find Casper', await admin()),
+      agent.ask('Find Wendle', await admin()),
       /Admin Agent/
     );
   });
@@ -1932,7 +1932,7 @@ describe('the agent’s limits', () => {
   it('cuts the oldest tool results short in a long conversation, nothing else', () => {
     const big = (n: number) => `line one of ${n}\n${'x'.repeat(50_000)}`;
     const messages = compact([
-      { role: 'user', text: 'Get Casper' },
+      { role: 'user', text: 'Get Wendle' },
       { role: 'assistant', text: '', calls: [], raw: [] },
       { role: 'tool', results: [{ id: 'a', content: big(1) }] },
       { role: 'tool', results: [{ id: 'b', content: big(2) }] },
@@ -1952,46 +1952,49 @@ describe('the agent’s limits', () => {
 
   it('reads a fansub "S5 - 13" as the season’s episode, not the series’', () => {
     assert.deepEqual(
-      fileNumbers('[HorribleSubs] Shokugeki no Soma S5 - 13 [1080p].mkv'),
+      fileNumbers('[DreadfulSubs] Ryouri no Kaze S5 - 13 [1080p].mkv'),
       { season: 5, episode: 13 }
     );
     assert.deepEqual(
-      fileNumbers('[SubsPlease] Food Wars Season 2 - 04v2 (720p).mkv'),
+      fileNumbers('[SubsKindly] Kitchen Clash Season 2 - 04v2 (720p).mkv'),
       { season: 2, episode: 4 }
     );
     assert.deepEqual(
-      fileNumbers('[HorribleSubs] Shokugeki no Soma - 13 [1080p].mkv'),
+      fileNumbers('[DreadfulSubs] Ryouri no Kaze - 13 [1080p].mkv'),
       { absolute: 13 }
     );
-    assert.deepEqual(fileNumbers('Food Wars! S05E13 The Last Dish 1080p.mkv'), {
-      season: 5,
-      episode: 13,
-    });
+    assert.deepEqual(
+      fileNumbers('Kitchen Clash! S05E13 The Last Spoon 1080p.mkv'),
+      {
+        season: 5,
+        episode: 13,
+      }
+    );
   });
 
   it('finds titles by every word, in any order, ignoring "the" and punctuation', () => {
-    assert.ok(titleMatches('casper ghost', 'Casper the Friendly Ghost'));
+    assert.ok(titleMatches('wendle lantern', 'Wendle the Gentle Lantern'));
     assert.ok(
       titleMatches(
-        'Spooktacular Casper',
-        'The Spooktacular New Adventures of Casper'
+        'Glimmering Wendle',
+        'The Glimmering New Adventures of Wendle'
       )
     );
-    assert.ok(!titleMatches('casper school', 'Casper the Friendly Ghost'));
-    assert.ok(titleMatches('Amelie', 'Amélie'));
+    assert.ok(!titleMatches('wendle school', 'Wendle the Gentle Lantern'));
+    assert.ok(titleMatches('Roselie', 'Rosélie'));
   });
 });
 
 describe('the admin agent and files holding several episodes', () => {
   const DOUBLE_INFO = {
-    name: 'Casper the Friendly Ghost S01 1080p',
+    name: 'Wendle the Gentle Lantern S01 1080p',
     'piece length': 1048576,
     pieces: Buffer.alloc(20),
     files: [
       {
         length: 300 * MB,
         path: [
-          "Casper the Friendly Ghost - S01E01-02 - Casper's Spree Under The Sea + Once Upon a Rhyme.mkv",
+          "Wendle the Gentle Lantern - S01E01-02 - Wendle's Picnic Below The Pier + Twice Around a Riddle.mkv",
         ],
       },
     ],
@@ -2002,7 +2005,7 @@ describe('the admin agent and files holding several episodes', () => {
       {
         ...COLLECTION,
         guid: 'https://indexer/doubles',
-        title: 'Casper the Friendly Ghost S01 1080p',
+        title: 'Wendle the Gentle Lantern S01 1080p',
       },
     ]);
     mock.method(ProwlarrAPI.prototype, 'fetchRelease', async () => ({
@@ -2020,7 +2023,7 @@ describe('the admin agent and files holding several episodes', () => {
     script = [
       () =>
         toolUse('search_indexers', {
-          query: 'Casper the Friendly Ghost',
+          query: 'Wendle the Gentle Lantern',
           kind: 'series',
         }),
       () => toolUse('release_files', { release: 'r1' }),
@@ -2054,7 +2057,7 @@ describe('the admin agent and files holding several episodes', () => {
         return say('Started it.');
       },
     ];
-    const run = await agent.ask('Get Casper', await admin());
+    const run = await agent.ask('Get Wendle', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.deepEqual(done.actions[0].episodeIds, [501, 502]);
@@ -2077,7 +2080,7 @@ describe('the admin agent and files holding several episodes', () => {
       {
         id: 900,
         seasonNumber: 1,
-        relativePath: 'Season 1/Casper - S01E01 - Spree.mkv',
+        relativePath: 'Season 1/Wendle - S01E01 - Picnic.mkv',
         size: 300 * MB,
         mediaInfo: { runTime: '13:43' },
         quality: {
@@ -2115,7 +2118,7 @@ describe('the admin agent and files holding several episodes', () => {
       files = [
         {
           ...files[0],
-          relativePath: 'Season 1/Casper - S01E01-E02 - Spree + Rhyme.mkv',
+          relativePath: 'Season 1/Wendle - S01E01-E02 - Picnic + Riddle.mkv',
         },
       ];
       return 2;
@@ -2142,13 +2145,13 @@ describe('the admin agent and files holding several episodes', () => {
       (body) => {
         assert.match(
           lastResult(body).content,
-          /Linked to S01E01-E02 and renamed: "Casper - S01E01 - Spree" is now "Casper - S01E01-E02 - Spree \+ Rhyme"/
+          /Linked to S01E01-E02 and renamed: "Wendle - S01E01 - Picnic" is now "Wendle - S01E01-E02 - Picnic \+ Riddle"/
         );
         return say('Relinked it.');
       },
     ];
     const run = await agent.ask(
-      'Casper S01E01 holds two episodes',
+      'Wendle S01E01 holds two episodes',
       await admin()
     );
     const done = await waitForRun(run.id);
@@ -2157,7 +2160,7 @@ describe('the admin agent and files holding several episodes', () => {
     assert.deepEqual(imported[0][0].episodeIds, [501, 502]);
     assert.equal(
       imported[0][0].path,
-      '/tv/Casper the Friendly Ghost/Season 1/Casper - S01E01 - Spree.mkv'
+      '/tv/Wendle the Gentle Lantern/Season 1/Wendle - S01E01 - Picnic.mkv'
     );
   });
 
@@ -2205,7 +2208,7 @@ describe('relinking a file that holds several episodes', () => {
       renamed: [],
     };
     const sonarr = {
-      getSeriesDetail: async () => ({ id: 7, path: '/tv/Shaun the Sheep' }),
+      getSeriesDetail: async () => ({ id: 7, path: '/tv/Bramwell the Goat' }),
       getSeriesEpisodes: async () => episodes,
       getEpisodeFiles: async () => files,
       manualImport: async (given: ManualImportFile[]) => {
@@ -2226,7 +2229,7 @@ describe('relinking a file that holds several episodes', () => {
         calls.renamed.push(ids);
         const f = files.find((x) => x.id === ids[0])!;
         f.relativePath =
-          'Season 6/Shaun the Sheep - S06E01-E02 - Baa-gherita! + Get Your Goat [HDTV-1080p].mkv';
+          'Season 6/Bramwell the Goat - S06E01-E02 - Bleat-ballad! + Hold Your Hooves [HDTV-1080p].mkv';
         return 2;
       },
       getCommand: async () => ({ id: 1, name: 'x', status: 'completed' }),
@@ -2241,7 +2244,7 @@ describe('relinking a file that holds several episodes', () => {
         id: 172086,
         seasonNumber: 6,
         relativePath:
-          'Season 6/Shaun the Sheep - S06E01 - Baa-gherita! [HDTV-1080p].mkv',
+          'Season 6/Bramwell the Goat - S06E01 - Bleat-ballad! [HDTV-1080p].mkv',
         size: 375 * MB,
         quality,
         releaseGroup: undefined,
@@ -2259,7 +2262,7 @@ describe('relinking a file that holds several episodes', () => {
     assert.deepEqual(calls.imported, [
       [
         {
-          path: '/tv/Shaun the Sheep/Season 6/Shaun the Sheep - S06E01 - Baa-gherita! [HDTV-1080p].mkv',
+          path: '/tv/Bramwell the Goat/Season 6/Bramwell the Goat - S06E01 - Bleat-ballad! [HDTV-1080p].mkv',
           seriesId: 7,
           episodeIds: [145799, 145800],
           quality,
@@ -2311,10 +2314,10 @@ describe('relinking a file that holds several episodes', () => {
 describe('the admin agent and movies', () => {
   const MOVIE: RadarrMovieDetail = {
     id: 3831,
-    title: 'Shaun the Sheep: Little Sheep of Horrors',
+    title: 'Bramwell the Goat: Little Goat of Terrors',
     year: 2025,
-    tmdbId: 1698932,
-    path: '/movies/Shaun the Sheep - Little Sheep of Horrors (2025)',
+    tmdbId: 1587643,
+    path: '/movies/Bramwell the Goat - Little Goat of Terrors (2025)',
     qualityProfileId: 6,
     monitored: true,
     isAvailable: true,
@@ -2323,13 +2326,15 @@ describe('the admin agent and movies', () => {
     originalLanguage: { id: 1, name: 'English' },
   };
   const MOVIE_INFO = {
-    name: 'Shaun.the.Sheep.Little.Sheep.of.Horrors.2025.1080p.WEB-DL',
+    name: 'Bramwell.the.Goat.Little.Goat.of.Terrors.2025.1080p.WEB-DL',
     'piece length': 1048576,
     pieces: Buffer.alloc(20),
     files: [
       {
         length: 900 * MB,
-        path: ['Shaun.the.Sheep.Little.Sheep.of.Horrors.2025.1080p.WEB-DL.mkv'],
+        path: [
+          'Bramwell.the.Goat.Little.Goat.of.Terrors.2025.1080p.WEB-DL.mkv',
+        ],
       },
     ],
   };
@@ -2379,7 +2384,7 @@ describe('the admin agent and movies', () => {
       {
         ...COLLECTION,
         guid: 'https://indexer/horrors',
-        title: 'Shaun.the.Sheep.Little.Sheep.of.Horrors.2025.1080p.WEB-DL',
+        title: 'Bramwell.the.Goat.Little.Goat.of.Terrors.2025.1080p.WEB-DL',
         size: 900 * MB,
       },
     ]);
@@ -2393,7 +2398,7 @@ describe('the admin agent and movies', () => {
     script = [
       () =>
         toolUse('search_indexers', {
-          query: 'Shaun the Sheep Little Sheep of Horrors',
+          query: 'Bramwell the Goat Little Goat of Terrors',
           kind: 'movie',
         }),
       () => toolUse('release_files', { release: 'r1' }),
@@ -2412,7 +2417,7 @@ describe('the admin agent and movies', () => {
         return say('Started it.');
       },
     ];
-    const run = await agent.ask('Get Little Sheep of Horrors', await admin());
+    const run = await agent.ask('Get Little Goat of Terrors', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     const job = await getRepository(BackfillJob).findOneOrFail({
@@ -2433,7 +2438,7 @@ describe('the admin agent and movies', () => {
     script = [
       () =>
         toolUse('search_indexers', {
-          query: 'Shaun the Sheep Little Sheep of Horrors',
+          query: 'Bramwell the Goat Little Goat of Terrors',
           kind: 'movie',
         }),
       () => toolUse('release_files', { release: 'r1' }),
@@ -2451,7 +2456,7 @@ describe('the admin agent and movies', () => {
         return say('It has a file already.');
       },
     ];
-    const run = await agent.ask('Get Little Sheep of Horrors', await admin());
+    const run = await agent.ask('Get Little Goat of Terrors', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.deepEqual(done.actions, []);
@@ -2493,7 +2498,7 @@ describe('the admin agent and movies', () => {
     script = [
       () =>
         toolUse('search_indexers', {
-          query: 'Shaun the Sheep Little Sheep of Horrors',
+          query: 'Bramwell the Goat Little Goat of Terrors',
           kind: 'movie',
         }),
       () => toolUse('release_files', { release: 'r1' }),
@@ -2511,7 +2516,7 @@ describe('the admin agent and movies', () => {
         return say('It is not monitored.');
       },
     ];
-    const run = await agent.ask('Get Little Sheep of Horrors', await admin());
+    const run = await agent.ask('Get Little Goat of Terrors', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.deepEqual(done.actions, []);
@@ -2533,7 +2538,7 @@ describe('changes the admin agent proposes', () => {
 
   it('replaces a file only once an admin approves, and only once', async () => {
     script = [
-      () => toolUse('search_indexers', { query: 'Casper', kind: 'series' }),
+      () => toolUse('search_indexers', { query: 'Wendle', kind: 'series' }),
       () => toolUse('release_files', { release: 'r1' }),
       () =>
         toolUse('grab', {
@@ -2545,7 +2550,7 @@ describe('changes the admin agent proposes', () => {
         }),
     ];
     const run = await agent.ask(
-      'Replace Boo Hoo Baby in Casper with a better copy',
+      'Replace Hush Hush Puppy in Wendle with a better copy',
       await admin()
     );
     const waiting = await waitForRun(run.id, ['waiting']);
@@ -2557,9 +2562,12 @@ describe('changes the admin agent proposes', () => {
     assert.equal(proposal.changes[0].kind, 'replace');
     assert.equal(
       proposal.changes[0].headline,
-      'Replace a file of Casper the Friendly Ghost'
+      'Replace a file of Wendle the Gentle Lantern'
     );
-    assert.match(proposal.changes[0].details.join('\n'), /S01E03 Boo Hoo Baby/);
+    assert.match(
+      proposal.changes[0].details.join('\n'),
+      /S01E03 Hush Hush Puppy/
+    );
     assert.match(
       proposal.changes[0].details.join('\n'),
       /until it has, the old file stays/
@@ -2620,22 +2628,22 @@ describe('changes the admin agent proposes', () => {
       () =>
         toolUse('propose_change', {
           kind: 'blockGroup',
-          group: 'rothebehap',
+          group: 'quillowsap',
           reason: 'Their releases have been fakes.',
         }),
     ];
-    const run = await agent.ask('Block rothebehap', await admin());
+    const run = await agent.ask('Block quillowsap', await admin());
     const waiting = await waitForRun(run.id, ['waiting']);
     const proposal = proposalOf(waiting);
     assert.equal(
       proposal?.changes[0].headline,
-      'Block the release group rothebehap'
+      'Block the release group quillowsap'
     );
     const declined = await agent.decline(run.id, proposal!.id, await admin());
     assert.equal(declined.status, 'done');
     assert.match(
       declined.summary ?? '',
-      /declined: Block the release group rothebehap/
+      /declined: Block the release group quillowsap/
     );
     assert.deepEqual(settings.backfill.blockedGroups ?? [], []);
     await assert.rejects(
@@ -2649,7 +2657,7 @@ describe('changes the admin agent proposes', () => {
       () =>
         toolUse('propose_change', {
           kind: 'blockGroup',
-          group: 'rothebehap',
+          group: 'quillowsap',
           reason: 'Asked again.',
         }),
     ];
@@ -2705,11 +2713,11 @@ describe('changes the admin agent proposes', () => {
       () =>
         toolUse('propose_change', {
           kind: 'blockGroup',
-          group: 'rothebehap',
+          group: 'quillowsap',
           reason: 'Their releases have been fakes.',
         }),
     ];
-    const run = await agent.ask('Block rothebehap everywhere', await admin());
+    const run = await agent.ask('Block quillowsap everywhere', await admin());
     const waiting = await waitForRun(run.id, ['waiting']);
     // Proposing changed nothing.
     assert.deepEqual(settings.backfill.blockedGroups ?? [], []);
@@ -2719,7 +2727,7 @@ describe('changes the admin agent proposes', () => {
         const messages = body.messages as { role: string; content: unknown }[];
         assert.match(
           String(messages[messages.length - 1].content),
-          /Done: Block the release group rothebehap\. Blocked rothebehap\. Radarr and Sonarr are updated\./
+          /Done: Block the release group quillowsap\. Blocked quillowsap\. Radarr and Sonarr are updated\./
         );
         return say('Blocked.');
       },
@@ -2727,7 +2735,7 @@ describe('changes the admin agent proposes', () => {
     await agent.approve(run.id, proposalOf(waiting)!.id, await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
-    assert.deepEqual(settings.backfill.blockedGroups, ['rothebehap']);
+    assert.deepEqual(settings.backfill.blockedGroups, ['quillowsap']);
     assert.equal(formats[0].name, 'Seerr AI: blocked release groups');
     assert.deepEqual(profiles[0].formatItems, [
       { format: 40, name: 'Seerr AI: blocked release groups', score: -1 },
@@ -2740,15 +2748,15 @@ describe('changes the admin agent proposes', () => {
       {
         ...COLLECTION,
         guid: 'https://indexer/blocked',
-        title: 'Casper.S01E01.DVDRip.x264-rothebehap',
+        title: 'Wendle.S01E01.DVDRip.x264-quillowsap',
       },
     ]);
     script = [
-      () => toolUse('search_indexers', { query: 'Casper', kind: 'series' }),
+      () => toolUse('search_indexers', { query: 'Wendle', kind: 'series' }),
       (body) => {
         assert.match(
           lastResult(body).content,
-          /blocked group rothebehap: never take it/
+          /blocked group quillowsap: never take it/
         );
         return toolUse('grab', {
           title: 'series:0:1283',
@@ -2760,7 +2768,7 @@ describe('changes the admin agent proposes', () => {
       (body) => {
         const refused = lastResult(body);
         assert.equal(refused.is_error, true);
-        assert.match(refused.content, /rothebehap is a blocked release group/);
+        assert.match(refused.content, /quillowsap is a blocked release group/);
         return say('Nothing usable.');
       },
     ];
@@ -2834,11 +2842,11 @@ describe('the admin agent keeping its conversations whole', () => {
       agent: { ...settings.backfill.agent, maxSteps: 1, autoContinue: 0 },
     };
     script = [
-      () => toolUse('find_title', { query: 'casper' }, 'a1'),
+      () => toolUse('find_title', { query: 'wendle' }, 'a1'),
       // Told to stop, it asks for another tool all the same.
-      () => toolUse('find_title', { query: 'casper' }, 'a2'),
+      () => toolUse('find_title', { query: 'wendle' }, 'a2'),
     ];
-    const run = await agent.ask('Find Casper', await admin());
+    const run = await agent.ask('Find Wendle', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     const last = done.conversation[done.conversation.length - 1] as {
@@ -2872,8 +2880,8 @@ describe('the admin agent keeping its conversations whole', () => {
       }
       return save(run);
     }) as typeof repo.save);
-    script = [() => toolUse('find_title', { query: 'casper' }, 'e1')];
-    const run = await agent.ask('Find Casper', await admin());
+    script = [() => toolUse('find_title', { query: 'wendle' }, 'e1')];
+    const run = await agent.ask('Find Wendle', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'failed');
     const last = done.conversation[done.conversation.length - 1] as {
@@ -2899,12 +2907,12 @@ describe('the admin agent keeping its conversations whole', () => {
       new AgentRun({
         trigger: 'ask',
         status: 'failed',
-        ask: 'Find Casper',
+        ask: 'Find Wendle',
         requestedById: 1,
         steps: [],
         actions: [],
         conversation: [
-          { role: 'user', text: 'An admin asked: Find Casper' },
+          { role: 'user', text: 'An admin asked: Find Wendle' },
           {
             role: 'assistant',
             text: '',
@@ -2941,7 +2949,7 @@ describe('the admin agent keeping its conversations whole', () => {
         kind: 'series',
         serverId: 0,
         arrId: SERIES_ID,
-        title: 'Casper the Friendly Ghost',
+        title: 'Wendle the Gentle Lantern',
         steps: [],
         actions: [],
       },
@@ -2956,7 +2964,7 @@ describe('the admin agent keeping its conversations whole', () => {
     assert.equal(elsewhere.isError, true);
     assert.match(
       elsewhere.text,
-      /only about Casper the Friendly Ghost \(series:0:1283\)/
+      /only about Wendle the Gentle Lantern \(series:0:1283\)/
     );
     const ownTitle = await runTool(state, 'grab', {
       title: 'series:0:1283',
@@ -2992,7 +3000,7 @@ describe('the admin agent keeping its conversations whole', () => {
       kind: 'series',
       serverId: 0,
       arrId: SERIES_ID,
-      title: 'Casper the Friendly Ghost',
+      title: 'Wendle the Gentle Lantern',
       reporter,
     });
     assert.ok(held);
@@ -3000,7 +3008,7 @@ describe('the admin agent keeping its conversations whole', () => {
       (body) => {
         const said = JSON.stringify(body.messages);
         assert.doesNotMatch(said, /Ignore your rules/);
-        assert.match(said, /Someone reported that Casper the Friendly Ghost/);
+        assert.match(said, /Someone reported that Wendle the Gentle Lantern/);
         return say('Nothing found.');
       },
     ];
@@ -3019,7 +3027,7 @@ describe('the admin agent keeping its conversations whole', () => {
         kind: 'series',
         serverId: 0,
         arrId: SERIES_ID,
-        title: 'Casper the Friendly Ghost',
+        title: 'Wendle the Gentle Lantern',
         reporter: me,
       });
     const runs = getRepository(AgentRun);
@@ -3058,7 +3066,7 @@ describe('the admin agent keeping its conversations whole', () => {
       set() {},
       get() {
         return async () => ({
-          name: 'Casper the Friendly Ghost',
+          name: 'Wendle the Gentle Lantern',
           poster_path: null,
         });
       },
@@ -3074,7 +3082,7 @@ describe('the admin agent keeping its conversations whole', () => {
     const media = await getRepository(Media).save(
       new Media({
         tmdbId: 8888,
-        tvdbId: 370935,
+        tvdbId: 482610,
         mediaType: MediaType.TV,
         status: MediaStatus.PARTIALLY_AVAILABLE,
         serviceId: 0,
@@ -3088,7 +3096,7 @@ describe('the admin agent keeping its conversations whole', () => {
       kind: 'series',
       serverId: 0,
       arrId: SERIES_ID,
-      title: 'Casper the Friendly Ghost',
+      title: 'Wendle the Gentle Lantern',
       reporter: me,
       issueId: issue.id,
     });
@@ -3125,7 +3133,7 @@ describe('the admin agent keeping its conversations whole', () => {
       kind: 'series',
       serverId: 0,
       arrId: SERIES_ID,
-      title: 'Casper the Friendly Ghost',
+      title: 'Wendle the Gentle Lantern',
       reporter: me,
     });
     assert.ok(held);
@@ -3147,7 +3155,7 @@ describe('the admin agent keeping its conversations whole', () => {
         const first = JSON.stringify((body.messages as unknown[])[0]);
         assert.match(
           first,
-          /reported that Casper the Friendly Ghost \(series:0:1283\) is missing/
+          /reported that Wendle the Gentle Lantern \(series:0:1283\) is missing/
         );
         assert.match(first, /says: Only season 1 matters/);
         return say('Looking at season 1.');
@@ -3170,12 +3178,12 @@ describe('the admin agent keeping its conversations whole', () => {
       new AgentRun({
         trigger: 'ask',
         status: 'done',
-        ask: 'Get Casper',
+        ask: 'Get Wendle',
         steps: [],
         actions: [1, 2].map((jobId) => ({
           at: hourAgo,
           type: 'grab' as const,
-          title: 'Casper the Friendly Ghost',
+          title: 'Wendle the Gentle Lantern',
           detail: 'a download',
           jobId,
         })),
@@ -3192,13 +3200,13 @@ describe('the admin agent keeping its conversations whole', () => {
       agent: { ...settings.backfill.agent, maxGrabsPerDay: 2 },
     };
     script = [
-      () => toolUse('search_indexers', { query: 'Casper', kind: 'series' }),
+      () => toolUse('search_indexers', { query: 'Wendle', kind: 'series' }),
       () =>
         toolUse('grab', {
           title: 'series:0:1283',
           release: 'r1',
           files: [{ index: 1, season: 1, episode: 1 }],
-          reason: "Casper's Spree Under the Sea by title",
+          reason: "Wendle's Picnic Below the Pier by title",
         }),
       (body) => {
         const refused = lastResult(body);
@@ -3207,7 +3215,7 @@ describe('the admin agent keeping its conversations whole', () => {
         return say('The day’s downloads are used up.');
       },
     ];
-    const run = await agent.ask('Get Casper', await admin());
+    const run = await agent.ask('Get Wendle', await admin());
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.equal(await getRepository(BackfillJob).count(), 0);
@@ -3218,13 +3226,13 @@ describe('the admin agent keeping its conversations whole', () => {
       () =>
         toolUse('propose_change', {
           kind: 'blockGroup',
-          group: 'rothebehap',
+          group: 'quillowsap',
           reason: 'Their releases have been fakes.',
         }),
     ];
     const settings = getSettings();
     mock.method(settings, 'save', async () => undefined);
-    const run = await agent.ask('Block rothebehap', await admin());
+    const run = await agent.ask('Block quillowsap', await admin());
     const waiting = await waitForRun(run.id, ['waiting']);
     const proposal = (waiting.memory as { proposal?: { id: string } })
       .proposal!;
@@ -3235,7 +3243,7 @@ describe('the admin agent keeping its conversations whole', () => {
     assert.equal(failed.status, 'failed');
     assert.match(
       failed.error ?? '',
-      /not done: Block the release group rothebehap/
+      /not done: Block the release group quillowsap/
     );
     assert.equal((failed.memory as { decision?: unknown }).decision, undefined);
 
@@ -3248,23 +3256,23 @@ describe('the admin agent keeping its conversations whole', () => {
 
   it('tells of downloads started in a go that ends with a question', async () => {
     const row = await backfill.track('series', 0, SERIES_ID);
-    await getRepository(BackfillSeries).update(row.id, { tmdbId: 260376 });
+    await getRepository(BackfillSeries).update(row.id, { tmdbId: 371849 });
     script = [
-      () => toolUse('search_indexers', { query: 'Casper', kind: 'series' }),
+      () => toolUse('search_indexers', { query: 'Wendle', kind: 'series' }),
       () => toolUse('release_files', { release: 'r1' }),
       () =>
         toolUse('grab', {
           title: 'series:0:1283',
           release: 'r1',
           files: [{ index: 1, season: 1, episode: 1 }],
-          reason: "Casper's Spree Under the Sea by title",
+          reason: "Wendle's Picnic Below the Pier by title",
         }),
       () =>
         toolUse('ask_admin', {
           question: 'S01E02 only comes in French. Take it?',
         }),
     ];
-    const run = await agent.ask('Get Casper', await admin());
+    const run = await agent.ask('Get Wendle', await admin());
     const waiting = await waitForRun(run.id, ['waiting']);
     assert.equal(waiting.actions.length, 1);
     assert.equal(sent.length, 1);
@@ -3273,7 +3281,7 @@ describe('the admin agent keeping its conversations whole', () => {
     assert.equal(sent.length, 2);
     assert.equal(sent[1].message, '1 download started');
     const events = await getRepository(MediaEvent).find({
-      where: { tmdbId: 260376, type: MediaEventType.AGENT },
+      where: { tmdbId: 371849, type: MediaEventType.AGENT },
     });
     assert.equal(events.length, 1);
     assert.match(events[0].detail ?? '', /started a download/);
@@ -3281,10 +3289,10 @@ describe('the admin agent keeping its conversations whole', () => {
 });
 
 describe('replacing a whole season through the admin agent', () => {
-  const OLD = 'Casper.S01.DVDRip.x264-OLDGRP';
-  const NEW = 'Casper.the.Friendly.Ghost.S01.1080p.WEB-DL-NEWGRP';
+  const OLD = 'Wendle.S01.DVDRip.x264-OLDGRP';
+  const NEW = 'Wendle.the.Gentle.Lantern.S01.1080p.WEB-DL-NEWGRP';
   let done: string[] = [];
-  /** Season 1 of Casper, every episode with a file from one old pack. */
+  /** Season 1 of Wendle, every episode with a file from one old pack. */
   const season = () =>
     [1, 2, 3].map((n) => ({
       id: 500 + n,
@@ -3305,7 +3313,7 @@ describe('replacing a whole season through the admin agent', () => {
       releaseGroup: 'OLDGRP',
     }));
     mock.method(FixSonarr.prototype, 'seriesFacts', async () => ({
-      title: 'Casper the Friendly Ghost',
+      title: 'Wendle the Gentle Lantern',
       originalLanguage: 'English',
     }));
     mock.method(FixSonarr.prototype, 'seasonHistory', async () => [
@@ -3397,7 +3405,7 @@ describe('replacing a whole season through the admin agent', () => {
       },
     ];
     const run = await agent.ask(
-      'Fix season 1 of Casper. Replace it all',
+      'Fix season 1 of Wendle. Replace it all',
       await admin()
     );
     const waiting = await waitForRun(run.id, ['waiting']);
@@ -3406,11 +3414,11 @@ describe('replacing a whole season through the admin agent', () => {
     assert.equal(proposal?.changes[0].kind, 'replaceSeason');
     assert.equal(
       proposal?.changes[0].headline,
-      `Replace season 1 of Casper the Friendly Ghost: download ${NEW} and then remove the 3 current files`
+      `Replace season 1 of Wendle the Gentle Lantern: download ${NEW} and then remove the 3 current files`
     );
     assert.equal(
       waiting.question,
-      `Waiting for approval: Replace season 1 of Casper the Friendly Ghost: download ${NEW} and then remove the 3 current files.`
+      `Waiting for approval: Replace season 1 of Wendle the Gentle Lantern: download ${NEW} and then remove the 3 current files.`
     );
     assert.match(
       proposal!.changes[0].details.join('\n'),
@@ -3424,7 +3432,7 @@ describe('replacing a whole season through the admin agent', () => {
       (body) => {
         const messages = body.messages as { role: string; content: unknown }[];
         const said = String(messages[messages.length - 1].content);
-        assert.match(said, /Done: Replacing season 1 of Casper/);
+        assert.match(said, /Done: Replacing season 1 of Wendle/);
         return say('Season 1 is being replaced.');
       },
     ];
@@ -3453,7 +3461,7 @@ describe('replacing a whole season through the admin agent', () => {
         }),
     ];
     const run = await agent.ask(
-      'Delete the files of season 1 of Casper',
+      'Delete the files of season 1 of Wendle',
       await admin()
     );
     const waiting = await waitForRun(run.id, ['waiting']);
@@ -3465,7 +3473,7 @@ describe('replacing a whole season through the admin agent', () => {
       (body) => {
         assert.match(
           JSON.stringify((body.messages as unknown[])[0]),
-          /season 1 of Casper the Friendly Ghost \(series:0:1283\) is bad and asked for it to be replaced/
+          /season 1 of Wendle the Gentle Lantern \(series:0:1283\) is bad and asked for it to be replaced/
         );
         return toolUse('replace_season', {
           title: 'series:0:1283',
@@ -3486,7 +3494,7 @@ describe('replacing a whole season through the admin agent', () => {
       kind: 'series',
       serverId: 0,
       arrId: SERIES_ID,
-      title: 'Casper the Friendly Ghost',
+      title: 'Wendle the Gentle Lantern',
       reporter,
       seasonNumber: 1,
       replace: true,
@@ -3531,8 +3539,8 @@ describe('when a download the admin agent started fails', () => {
   });
   // As on the owner's server: a usenet post that SABnzbd could not finish,
   // and another group's post of the same episode that would have worked.
-  const HONE = post('Casper.the.Friendly.Ghost.S01E02.DVDRip.x264-HONE');
-  const MEGUSTA = post('Casper.the.Friendly.Ghost.S01E02.480p.WEB-MeGusta');
+  const KILN = post('Wendle.the.Gentle.Lantern.S01E02.DVDRip.x264-KILN');
+  const LESIGH = post('Wendle.the.Gentle.Lantern.S01E02.480p.WEB-LeSigh');
   /** What SABnzbd says of each download it was given, by its id. */
   let sab: Map<string, 'queue' | 'failed'>;
   let added = 0;
@@ -3556,7 +3564,7 @@ describe('when a download the admin agent started fails', () => {
         password: '',
       },
     ];
-    mock.method(ProwlarrAPI.prototype, 'search', async () => [HONE, MEGUSTA]);
+    mock.method(ProwlarrAPI.prototype, 'search', async () => [KILN, LESIGH]);
     mock.method(
       ProwlarrAPI.prototype,
       'fetchRelease',
@@ -3593,11 +3601,11 @@ describe('when a download the admin agent started fails', () => {
     mock.method(SabnzbdAPI.prototype, 'pauseJob', async () => undefined);
   });
 
-  /** A go that searches and takes HONE's post of S01E02. */
+  /** A go that searches and takes KILN's post of S01E02. */
   const grabHone = (then: Reply) => [
     () =>
       toolUse('search_indexers', {
-        query: 'Casper the Friendly Ghost S01E02',
+        query: 'Wendle the Gentle Lantern S01E02',
         kind: 'series',
       }),
     () =>
@@ -3631,7 +3639,7 @@ describe('when a download the admin agent started fails', () => {
 
   it('looks for another release once the run is over, never the one that failed', async () => {
     script = grabHone(() => say('Downloading S01E02 from Usenet.'));
-    const run = await agent.ask('Get Casper S01E02', await admin());
+    const run = await agent.ask('Get Wendle S01E02', await admin());
     const first = await waitForRun(run.id);
     assert.equal(first.status, 'done', first.error ?? '');
     const asked = bodies.length;
@@ -3642,22 +3650,22 @@ describe('when a download the admin agent started fails', () => {
         assert.match(
           lastSaid(body),
           new RegExp(
-            `Download #${failedId} failed \\(SABnzbd could not finish it: Aborted, cannot be completed\\)\\. Find another release for S01E02; do not pick the same release \\(\\\\"Casper\\.the\\.Friendly\\.Ghost\\.S01E02\\.DVDRip\\.x264-HONE\\\\"\\) or group \\(HONE\\) again\\.`
+            `Download #${failedId} failed \\(SABnzbd could not finish it: Aborted, cannot be completed\\)\\. Find another release for S01E02; do not pick the same release \\(\\\\"Wendle\\.the\\.Gentle\\.Lantern\\.S01E02\\.DVDRip\\.x264-KILN\\\\"\\) or group \\(KILN\\) again\\.`
           )
         );
         return toolUse('search_indexers', {
-          query: 'Casper the Friendly Ghost S01E02',
+          query: 'Wendle the Gentle Lantern S01E02',
           kind: 'series',
         });
       },
       (body) => {
         const found = lastResult(body).content;
-        const [hone, megusta] = found.split('\n').slice(1);
+        const [kiln, lesigh] = found.split('\n').slice(1);
         assert.match(
-          hone,
-          /^r1 .*HONE.*failed to download for this title: never take it again/
+          kiln,
+          /^r1 .*KILN.*failed to download for this title: never take it again/
         );
-        assert.doesNotMatch(megusta, /failed/);
+        assert.doesNotMatch(lesigh, /failed/);
         return toolUse('grab', {
           title: 'series:0:1283',
           release: 'r1',
@@ -3682,7 +3690,7 @@ describe('when a download the admin agent started fails', () => {
       (body) => {
         const started = lastResult(body);
         assert.equal(started.is_error, undefined, started.content);
-        return say('Took the MeGusta post of S01E02 instead.');
+        return say('Took the LeSigh post of S01E02 instead.');
       },
     ];
     const job = await getRepository(BackfillJob).findOneOrFail({
@@ -3694,7 +3702,7 @@ describe('when a download the admin agent started fails', () => {
     const after = await waitForRun(run.id);
     assert.equal(after.status, 'done', after.error ?? '');
     assert.equal(bodies.length, asked + 4, 'one more go of the same run');
-    assert.equal(after.summary, 'Took the MeGusta post of S01E02 instead.');
+    assert.equal(after.summary, 'Took the LeSigh post of S01E02 instead.');
     // Its own kind of go: not a new conversation, and not one counted
     // towards the agent's runs a day.
     assert.equal(await getRepository(AgentRun).count(), 1);
@@ -3715,7 +3723,7 @@ describe('when a download the admin agent started fails', () => {
     assert.equal(failed.status, 'failed');
     assert.equal(failed.followUp, 'replaced');
     assert.equal(failed.replacedById, replacement.id);
-    assert.equal(replacement.title, MEGUSTA.title);
+    assert.equal(replacement.title, LESIGH.title);
     assert.equal(replacement.agentRunId, run.id);
   });
 
@@ -3725,7 +3733,7 @@ describe('when a download the admin agent started fails', () => {
         kind: 'series',
         serverId: 0,
         arrId: SERIES_ID,
-        title: 'Casper the Friendly Ghost',
+        title: 'Wendle the Gentle Lantern',
         status: 'downloading',
         missing: 2,
         searchTerms: [],
@@ -3737,7 +3745,7 @@ describe('when a download the admin agent started fails', () => {
         new BackfillJob({
           seriesId: row.id,
           candidateId: null,
-          title: `Casper.the.Friendly.Ghost.S01E02.Try${n}-GRP${n}`,
+          title: `Wendle.the.Gentle.Lantern.S01E02.Try${n}-GRP${n}`,
           status: 'failed',
           protocol: 'usenet',
           clientId: 2,
@@ -3762,7 +3770,7 @@ describe('when a download the admin agent started fails', () => {
       );
     }
     script = grabHone(() => say('Downloading S01E02 from Usenet.'));
-    const run = await agent.ask('Get Casper S01E02', await admin());
+    const run = await agent.ask('Get Wendle S01E02', await admin());
     const first = await waitForRun(run.id);
     assert.equal(first.status, 'done', first.error ?? '');
     const asked = bodies.length;
@@ -3796,7 +3804,7 @@ describe('when a download the admin agent started fails', () => {
     script = grabHone(() =>
       toolUse('ask_admin', { question: 'Do you want S01E01 in 480p too?' })
     );
-    const run = await agent.ask('Get Casper S01E02', await admin());
+    const run = await agent.ask('Get Wendle S01E02', await admin());
     const waiting = await waitForRun(run.id, ['waiting']);
     const asked = bodies.length;
     const failedId = await failFirst(waiting);
@@ -3853,10 +3861,10 @@ describe('when a download the admin agent started fails', () => {
     );
     const approval = await agent.awaitApproval({
       title,
-      name: 'Casper the Friendly Ghost',
+      name: 'Wendle the Gentle Lantern',
       change: {
         kind: 'replaceSeason',
-        headline: 'Replace season 1 of Casper the Friendly Ghost',
+        headline: 'Replace season 1 of Wendle the Gentle Lantern',
         title,
         details: [],
         params: { season: 1 },
@@ -3866,7 +3874,7 @@ describe('when a download the admin agent started fails', () => {
     });
     const followed = await agent.follow({
       title,
-      name: 'Casper the Friendly Ghost',
+      name: 'Wendle the Gentle Lantern',
       seasonNumber: 1,
       episodeIds: [501],
     });
@@ -3881,7 +3889,7 @@ describe('when a download the admin agent started fails', () => {
     // Neither counts as a run of the day, nor holds a report of the title.
     const report = await agent.afterReport({
       ...title,
-      title: 'Casper the Friendly Ghost',
+      title: 'Wendle the Gentle Lantern',
       reporter: member,
     });
     assert.ok(report, 'the report was looked into');
@@ -3893,7 +3901,7 @@ describe('when a download the admin agent started fails', () => {
         trigger: 'auto',
         status: 'done',
         ...title,
-        title: 'Casper the Friendly Ghost',
+        title: 'Wendle the Gentle Lantern',
         steps: [],
         actions: [],
       })
@@ -3901,7 +3909,7 @@ describe('when a download the admin agent started fails', () => {
     assert.equal(
       await agent.afterReport({
         ...title,
-        title: 'Casper the Friendly Ghost',
+        title: 'Wendle the Gentle Lantern',
         reporter: member,
       }),
       null,
@@ -3918,7 +3926,7 @@ describe('when a download the admin agent started fails', () => {
     };
     const beside = await agent.afterReport({
       ...title,
-      title: 'Casper the Friendly Ghost',
+      title: 'Wendle the Gentle Lantern',
       reporter: member,
     });
     assert.ok(beside, 'not held up by a go looking again');
@@ -3973,12 +3981,12 @@ describe('the admin agent and episode numbering', () => {
   };
   /**
    * Sonarr numbering the series by the scene's seasons: every name's
-   * S01E02 is read as the library's S01E03 "Boo Hoo Baby".
+   * S01E02 is read as the library's S01E03 "Hush Hush Puppy".
    */
   /** Asked from the title's own page, so it knows the series from the start. */
   const ABOUT = {
     title: { kind: 'series' as const, serverId: 0, arrId: SERIES_ID },
-    name: 'Casper the Friendly Ghost',
+    name: 'Wendle the Gentle Lantern',
   };
   const sceneParse = (title: string): SonarrParseResult => {
     const match = /S(\d+)E(\d+)/.exec(title);
@@ -4001,9 +4009,9 @@ describe('the admin agent and episode numbering', () => {
   it('takes a post named the library’s way when its title agrees, though Sonarr reads it by the scene', async () => {
     useUsenet();
     const titled = post(
-      'Casper.the.Friendly.Ghost.S01E02.Once.Upon.a.Rhyme.DVDRip.x264-GRP'
+      'Wendle.the.Gentle.Lantern.S01E02.Twice.Around.a.Riddle.DVDRip.x264-GRP'
     );
-    const bare = post('Casper.the.Friendly.Ghost.S01E02.DVDRip.x264-OTHER');
+    const bare = post('Wendle.the.Gentle.Lantern.S01E02.DVDRip.x264-OTHER');
     mock.method(ProwlarrAPI.prototype, 'search', async () => [titled, bare]);
     mock.method(BackfillSonarr.prototype, 'parse', async (title: string) =>
       sceneParse(title)
@@ -4011,7 +4019,7 @@ describe('the admin agent and episode numbering', () => {
     script = [
       () =>
         toolUse('search_indexers', {
-          query: 'Casper the Friendly Ghost S01E02',
+          query: 'Wendle the Gentle Lantern S01E02',
           kind: 'series',
         }),
       (body) => {
@@ -4019,7 +4027,7 @@ describe('the admin agent and episode numbering', () => {
         // Which episode each is, by its title, or by both numberings.
         assert.match(
           listed,
-          /r1 \| is S01E02 "Once Upon a Rhyme" \(missing\) \|/
+          /r1 \| is S01E02 "Twice Around a Riddle" \(missing\) \|/
         );
         return toolUse('grab', {
           title: 'series:0:1283',
@@ -4048,7 +4056,7 @@ describe('the admin agent and episode numbering', () => {
         return say('Downloading S01E02.');
       },
     ];
-    const run = await agent.ask('Get Casper S01E02', await admin(), ABOUT);
+    const run = await agent.ask('Get Wendle S01E02', await admin(), ABOUT);
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     const job = await getRepository(BackfillJob).findOneOrFail({
@@ -4062,21 +4070,21 @@ describe('the admin agent and episode numbering', () => {
 
   it('never takes a post whose title is another episode, whatever Sonarr reads', async () => {
     useUsenet();
-    // Named and read as S01E02, but it is "Boo Hoo Baby".
+    // Named and read as S01E02, but it is "Hush Hush Puppy".
     const wrong = post(
-      'Casper.the.Friendly.Ghost.S01E02.Boo.Hoo.Baby.DVDRip.x264-GRP'
+      'Wendle.the.Gentle.Lantern.S01E02.Hush.Hush.Puppy.DVDRip.x264-GRP'
     );
     mock.method(ProwlarrAPI.prototype, 'search', async () => [wrong]);
     script = [
       () =>
         toolUse('search_indexers', {
-          query: 'Casper the Friendly Ghost S01E02',
+          query: 'Wendle the Gentle Lantern S01E02',
           kind: 'series',
         }),
       (body) => {
         assert.match(
           lastResult(body).content,
-          /by its number S01E02 "Once Upon a Rhyme" \(missing\), but its title is S01E03 "Boo Hoo Baby" \(on disk\): go by its title/
+          /by its number S01E02 "Twice Around a Riddle" \(missing\), but its title is S01E03 "Hush Hush Puppy" \(on disk\): go by its title/
         );
         return toolUse('grab', {
           title: 'series:0:1283',
@@ -4091,12 +4099,12 @@ describe('the admin agent and episode numbering', () => {
         assert.equal(refused.is_error, true);
         assert.match(
           refused.content,
-          /but its title is S01E03 "Boo Hoo Baby"\. Nothing was started\./
+          /but its title is S01E03 "Hush Hush Puppy"\. Nothing was started\./
         );
         return say('That post is another episode.');
       },
     ];
-    const run = await agent.ask('Get Casper S01E02', await admin(), ABOUT);
+    const run = await agent.ask('Get Wendle S01E02', await admin(), ABOUT);
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.equal(done.actions.length, 0);
@@ -4104,15 +4112,15 @@ describe('the admin agent and episode numbering', () => {
 
   it('never maps a file whose title is another episode, or a sample', async () => {
     const info = {
-      name: 'Casper S01',
+      name: 'Wendle S01',
       'piece length': 1048576,
       pieces: Buffer.alloc(20),
       files: [
         // A special counted as episode 1, so every number is one off.
-        { length: 150 * MB, path: ['Casper.S01E02.Boo.Hoo.Baby.mkv'] },
+        { length: 150 * MB, path: ['Wendle.S01E02.Hush.Hush.Puppy.mkv'] },
         {
           length: 40 * MB,
-          path: ['Casper.S01E02.Once.Upon.a.Rhyme-sample.mkv'],
+          path: ['Wendle.S01E02.Twice.Around.a.Riddle-sample.mkv'],
         },
       ],
     };
@@ -4123,7 +4131,7 @@ describe('the admin agent and episode numbering', () => {
     script = [
       () =>
         toolUse('search_indexers', {
-          query: 'Casper the Friendly Ghost',
+          query: 'Wendle the Gentle Lantern',
           kind: 'series',
         }),
       () => toolUse('release_files', { release: 'r1' }),
@@ -4139,7 +4147,7 @@ describe('the admin agent and episode numbering', () => {
         assert.equal(refused.is_error, true);
         assert.match(
           refused.content,
-          /File #0 "Casper\.S01E02\.Boo\.Hoo\.Baby" is S01E03 "Boo Hoo Baby" by its title, which is on disk, not S01E02 "Once Upon a Rhyme"\. Map each file by its title/
+          /File #0 "Wendle\.S01E02\.Hush\.Hush\.Puppy" is S01E03 "Hush Hush Puppy" by its title, which is on disk, not S01E02 "Twice Around a Riddle"\. Map each file by its title/
         );
         return toolUse('grab', {
           title: 'series:0:1283',
@@ -4155,7 +4163,7 @@ describe('the admin agent and episode numbering', () => {
         return say('Only a sample of it.');
       },
     ];
-    const run = await agent.ask('Get Casper S01E02', await admin(), ABOUT);
+    const run = await agent.ask('Get Wendle S01E02', await admin(), ABOUT);
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
     assert.equal(done.actions.length, 0);
@@ -4178,7 +4186,7 @@ describe('the admin agent and episode numbering', () => {
         );
         assert.match(
           status,
-          /S01E02 "Once Upon a Rhyme" 1951-01-01 \(scene S02E07\)/
+          /S01E02 "Twice Around a Riddle" 1951-01-01 \(scene S02E07\)/
         );
         return toolUse('search_releases', {
           title: 'series:0:1283',
@@ -4189,12 +4197,12 @@ describe('the admin agent and episode numbering', () => {
       (body) => {
         assert.match(
           lastResult(body).content,
-          /No results from any indexer\. Sonarr searched for it by its scene number, S02E07: use search_indexers with S01E02 and with its title, "Once Upon a Rhyme"\./
+          /No results from any indexer\. Sonarr searched for it by its scene number, S02E07: use search_indexers with S01E02 and with its title, "Twice Around a Riddle"\./
         );
         return say('Nothing yet.');
       },
     ];
-    const run = await agent.ask('Get Casper S01E02', await admin(), ABOUT);
+    const run = await agent.ask('Get Wendle S01E02', await admin(), ABOUT);
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
   });
@@ -4208,7 +4216,7 @@ describe('the admin agent and episode numbering', () => {
     script = [
       () =>
         toolUse('search_indexers', {
-          query: "Casper S01E01 Casper's Spree Under The Sea",
+          query: "Wendle S01E01 Wendle's Picnic Below The Pier",
           kind: 'series',
         }),
       () => say('Nothing for S01E01; that is all.'),
@@ -4216,11 +4224,11 @@ describe('the admin agent and episode numbering', () => {
         const told = lastText(body);
         assert.match(
           told,
-          /1 missing episode was never searched for: S01E02 \\"Once Upon a Rhyme\\"/
+          /1 missing episode was never searched for: S01E02 \\"Twice Around a Riddle\\"/
         );
         assert.doesNotMatch(told, /S01E01/);
         return toolUse('search_indexers', {
-          query: 'Casper Once Upon a Rhyme',
+          query: 'Wendle Twice Around a Riddle',
           kind: 'series',
         });
       },
@@ -4256,7 +4264,7 @@ describe('stopping and correcting the admin agent while it works', () => {
     script = [
       () =>
         toolUses(
-          ['search_indexers', { query: 'Casper S01E01', kind: 'series' }],
+          ['search_indexers', { query: 'Wendle S01E01', kind: 'series' }],
           // Not read-only, so it runs after the search, on its own.
           [
             'grab',
@@ -4308,11 +4316,11 @@ describe('stopping and correcting the admin agent while it works', () => {
       return [];
     });
     script = [
-      () => toolUse('search_indexers', { query: 'Casper', kind: 'series' }),
+      () => toolUse('search_indexers', { query: 'Wendle', kind: 'series' }),
       () => say('Nothing found.'),
     ];
-    const first = await agent.ask('Get Casper', user);
-    const second = await agent.ask('Get Casper too', user);
+    const first = await agent.ask('Get Wendle', user);
+    const second = await agent.ask('Get Wendle too', user);
     const stopped = await agent.stop(second.id, user);
     assert.equal(stopped.status, 'done');
     assert.equal(
@@ -4347,7 +4355,7 @@ describe('stopping and correcting the admin agent while it works', () => {
     };
     script = [
       () =>
-        toolUse('search_indexers', { query: 'Casper S01E01', kind: 'series' }),
+        toolUse('search_indexers', { query: 'Wendle S01E01', kind: 'series' }),
       (body) => {
         assert.match(
           lastText(body),
@@ -4358,7 +4366,7 @@ describe('stopping and correcting the admin agent while it works', () => {
         return say('Skipping the specials.');
       },
     ];
-    const run = await agent.ask('Get Casper', user);
+    const run = await agent.ask('Get Wendle', user);
     runId = run.id;
     const done = await waitForRun(run.id);
     assert.equal(done.status, 'done', done.error ?? '');
@@ -4392,7 +4400,7 @@ describe('stopping and correcting the admin agent while it works', () => {
         return say('Checked the specials.');
       },
     ];
-    const run = await agent.ask('Get Casper', user);
+    const run = await agent.ask('Get Wendle', user);
     runId = run.id;
     for (let i = 0; i < 200; i++) {
       const now = await getRepository(AgentRun).findOneOrFail({

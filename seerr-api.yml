@@ -2326,10 +2326,10 @@ components:
           default: 'collection'
         title:
           type: string
-          example: Star Wars Collection
+          example: Nova Rift Collection
         originalTitle:
           type: string
-          example: Star Wars Collection
+          example: Nova Rift Collection
         adult:
           type: boolean
           example: false
@@ -2842,10 +2842,10 @@ components:
         albumMbid:
           type: string
           description: The album's MusicBrainz release-group id.
-          example: b1392450-e666-3926-a536-22c65f834433
+          example: 7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35
         title:
           type: string
-          example: Hail to the Thief
+          example: Sing to the Ferryman
         status:
           type: number
           description: As the request's. 1 = PENDING APPROVAL, 2 = APPROVED, 3 = DECLINED, 4 = FAILED, 5 = COMPLETED
@@ -5584,7 +5584,7 @@ paths:
               properties:
                 group:
                   type: string
-                  example: rothebehap
+                  example: quillowsap
                 blocked:
                   type: boolean
       responses:
@@ -13837,7 +13837,7 @@ paths:
                 artistMbid:
                   type: string
                   description: The artist's MusicBrainz id.
-                  example: a74b1b7f-71a5-4011-9441-d0b5e4122711
+                  example: 3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844
                 albums:
                   type: array
                   description: The albums' MusicBrainz release-group ids.
@@ -14769,7 +14769,7 @@ paths:
                         example: The Boys
                       url:
                         type: string
-                        example: 'https://www.imdb.com/title/tt1190634'
+                        example: 'https://www.imdb.com/title/tt2301745'
                       criticsScore:
                         type: number
                         example: 8.6
@@ -15643,7 +15643,7 @@ paths:
                 properties:
                   say:
                     type: string
-                    example: What’s wrong with The Bear, season 2 episode 3?
+                    example: What’s wrong with The Otterkin, season 2 episode 3?
                   item:
                     type: string
                     example: '42:2:3'

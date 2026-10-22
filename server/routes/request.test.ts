@@ -1976,7 +1976,7 @@ describe('POST /request/missing', () => {
 
 describe('series type and anime', () => {
   const ANIMATION = { id: 16, name: 'Animation' };
-  // Japanese animation without TMDB's anime keyword, like Oshi no Ko.
+  // Japanese animation without TMDB's anime keyword, like Yume no Tane.
   const JAPANESE_ANIMATION = 88100;
   const KOREAN_ANIMATION = 88101;
   showDetails.set(JAPANESE_ANIMATION, {
@@ -2164,7 +2164,7 @@ describe('series type and anime', () => {
 
 describe('anime movies', () => {
   const ANIMATION = { id: 16, name: 'Animation' };
-  // Japanese animation without TMDB's anime keyword, like Spirited Away.
+  // Japanese animation without TMDB's anime keyword, like Lantern Drift.
   const JAPANESE_ANIMATION = 99100;
   const FRENCH_ANIMATION = 99101;
   movieDetails.set(JAPANESE_ANIMATION, {

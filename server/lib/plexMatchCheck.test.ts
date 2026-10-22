@@ -20,7 +20,7 @@ import { promises as fs } from 'node:fs';
 import { describe, it } from 'node:test';
 
 /*
- * Plex matched the folder "Carrie" (Sonarr: Carrie, 2026) to The Carrie
+ * Plex matched the folder "Wrenna" (Sonarr: Wrenna, 2026) to The Wrenna
  * Diaries, and nothing said so. The check finds folders whose Plex match
  * disagrees with what Sonarr or Radarr has in them.
  */
@@ -59,62 +59,62 @@ const movie = (
     Media: [{ Part: [{ file }] }],
   }) as unknown as PlexLibraryItem;
 
-const carrie = {
-  title: 'Carrie',
+const wrenna = {
+  title: 'Wrenna',
   year: 2026,
-  tvdbId: 455755,
-  tmdbId: 288673,
+  tvdbId: 577104,
+  tmdbId: 375182,
   server: 'Sonarr',
 };
 
 describe('Plex Match Check, one item at a time', () => {
   it('reads folder names however the slashes lean', () => {
-    assert.equal(folderName('/tv/Carrie/'), 'Carrie');
-    assert.equal(folderName('D:\\TV\\Carrie'), 'Carrie');
+    assert.equal(folderName('/tv/Wrenna/'), 'Wrenna');
+    assert.equal(folderName('D:\\TV\\Wrenna'), 'Wrenna');
   });
 
   it('reads ids from new agents and legacy ones', () => {
     assert.deepEqual(
       plexIds(
         show('1', 'x', 'x', [
-          'tvdb://257454',
-          'tmdb://46157',
-          'imdb://tt2056366',
+          'tvdb://364817',
+          'tmdb://57284',
+          'imdb://tt2167477',
         ])
       ),
-      { tvdbId: 257454, tmdbId: 46157, imdbId: 'tt2056366' }
+      { tvdbId: 364817, tmdbId: 57284, imdbId: 'tt2167477' }
     );
     assert.deepEqual(
       plexIds(
-        show('1', 'x', 'x', [], 'com.plexapp.agents.thetvdb://455755?lang=en')
+        show('1', 'x', 'x', [], 'com.plexapp.agents.thetvdb://577104?lang=en')
       ),
-      { tvdbId: 455755 }
+      { tvdbId: 577104 }
     );
   });
 
   it('flags a folder Plex matched to another series', () => {
-    const byFolder = new Map([['carrie', [carrie]]]);
+    const byFolder = new Map([['wrenna', [wrenna]]]);
     const { checked, problem } = compareItem(
       'series',
-      show('126741', 'The Carrie Diaries', 'Carrie', [
-        'tvdb://257454',
-        'tmdb://46157',
+      show('126741', 'The Wrenna Diaries', 'Wrenna', [
+        'tvdb://364817',
+        'tmdb://57284',
       ]),
       byFolder
     );
     assert.equal(checked, true);
     assert.equal(problem?.reason, 'other');
-    assert.equal(problem?.folder, 'Carrie');
+    assert.equal(problem?.folder, 'Wrenna');
     assert.equal(problem?.matched.key, '126741');
-    assert.equal(problem?.expected.tvdbId, 455755);
+    assert.equal(problem?.expected.tvdbId, 577104);
   });
 
   it('leaves alone a folder Plex matched rightly, and one Sonarr does not have', () => {
-    const byFolder = new Map([['carrie', [carrie]]]);
+    const byFolder = new Map([['wrenna', [wrenna]]]);
     assert.deepEqual(
       compareItem(
         'series',
-        show('1', 'Carrie', 'Carrie', ['tvdb://455755']),
+        show('1', 'Wrenna', 'Wrenna', ['tvdb://577104']),
         byFolder
       ),
       { checked: true }
@@ -132,8 +132,8 @@ describe('Plex Match Check, one item at a time', () => {
   it('flags a folder Plex has not matched at all', () => {
     const { problem } = compareItem(
       'series',
-      show('3', 'Carrie', 'Carrie', [], 'local://3'),
-      new Map([['carrie', [carrie]]])
+      show('3', 'Wrenna', 'Wrenna', [], 'local://3'),
+      new Map([['wrenna', [wrenna]]])
     );
     assert.equal(problem?.reason, 'unmatched');
   });
@@ -142,7 +142,7 @@ describe('Plex Match Check, one item at a time', () => {
     const byFolder = new Map([
       [
         'adopted (2026)',
-        [{ title: 'Adopted', year: 2026, tmdbId: 1393143, server: 'Radarr' }],
+        [{ title: 'Adopted', year: 2026, tmdbId: 1482754, server: 'Radarr' }],
       ],
     ]);
     const { problem } = compareItem(
@@ -157,7 +157,7 @@ describe('Plex Match Check, one item at a time', () => {
       compareItem(
         'movie',
         movie('9', 'Adopted', '/movies/Adopted (2026)/Adopted.mkv', [
-          'tmdb://1393143',
+          'tmdb://1482754',
         ]),
         byFolder
       ).problem,
@@ -167,32 +167,32 @@ describe('Plex Match Check, one item at a time', () => {
 });
 
 describe('Plex Match Check, two titles with one name', () => {
-  // Folders that read "Plex matched Americana (2025) to Americana (2025)":
+  // Folders that read "Plex matched Quillmore (2025) to Quillmore (2025)":
   // the names agree and the ids don't, so the ids are what must be shown.
-  const americana = {
-    title: 'Americana',
+  const quillmore = {
+    title: 'Quillmore',
     year: 2025,
     tmdbId: 1000,
     imdbId: 'tt1000',
     server: 'radarr',
   };
-  const byFolder = new Map([['americana (2025)', [americana]]]);
-  const plexAmericana = (ids: string[]) => ({
-    ...movie('7', 'Americana', '/m/Americana (2025)/a.mkv', ids),
+  const byFolder = new Map([['quillmore (2025)', [quillmore]]]);
+  const plexQuillmore = (ids: string[]) => ({
+    ...movie('7', 'Quillmore', '/m/Quillmore (2025)/a.mkv', ids),
     year: 2025,
   });
 
   it('calls a same-named film with other ids another film, and shows both ids', () => {
     const { problem } = compareItem(
       'movie',
-      plexAmericana(['tmdb://2000', 'imdb://tt2000']),
+      plexQuillmore(['tmdb://2000', 'imdb://tt2000']),
       byFolder
     );
     assert.equal(problem?.reason, 'other');
     const text = plexMatchText(problem as PlexMatchProblem);
     assert.equal(
       text.title,
-      'Plex matched "Americana (2025)" to a different film named Americana (2025)'
+      'Plex matched "Quillmore (2025)" to a different film named Quillmore (2025)'
     );
     assert.match(text.detail, /radarr: TMDB 1000, Plex: TMDB 2000/);
     assert.match(text.detail, /Fix Match in Plex, searching tmdb-1000/);
@@ -201,14 +201,14 @@ describe('Plex Match Check, two titles with one name', () => {
   it('tells apart the same film under another TMDB entry', () => {
     const { problem } = compareItem(
       'movie',
-      plexAmericana(['tmdb://2000', 'imdb://tt1000']),
+      plexQuillmore(['tmdb://2000', 'imdb://tt1000']),
       byFolder
     );
     assert.equal(problem?.reason, 'differentId');
     const text = plexMatchText(problem as PlexMatchProblem);
     assert.equal(
       text.title,
-      'Plex and radarr use different entries for Americana (2025)'
+      'Plex and radarr use different entries for Quillmore (2025)'
     );
     assert.match(text.detail, /The same title by IMDb \(tt1000\)/);
     assert.match(text.detail, /radarr: TMDB 1000, Plex: TMDB 2000/);
@@ -218,19 +218,19 @@ describe('Plex Match Check, two titles with one name', () => {
     const { problem } = compareItem(
       'movie',
       {
-        ...movie('8', 'Guerra Civil', '/m/Civil War (2024)/c.mkv', [
+        ...movie('8', 'Guerra Fronteriza', '/m/Border Feud (2024)/c.mkv', [
           'tmdb://3',
         ]),
         year: 2024,
       },
       new Map([
         [
-          'civil war (2024)',
+          'border feud (2024)',
           [
             {
-              title: 'Civil War',
+              title: 'Border Feud',
               year: 2024,
-              tmdbId: 929590,
+              tmdbId: 846213,
               server: 'radarr',
             },
           ],
@@ -239,7 +239,7 @@ describe('Plex Match Check, two titles with one name', () => {
     );
     assert.equal(
       plexMatchText(problem as PlexMatchProblem).title,
-      'Plex matched "Civil War (2024)" to Guerra Civil (2024)'
+      'Plex matched "Border Feud (2024)" to Guerra Fronteriza (2024)'
     );
   });
 });
@@ -248,10 +248,10 @@ describe('Plex Match Check, saying whose mistake it is', () => {
   // From the owner's 29 reports: Plex matched features to shorts of the
   // same name, often by IMDb id alone; one folder held the short itself.
   const radarr = (over: Record<string, unknown>) => ({
-    title: 'Blood',
+    title: 'Brine',
     year: 2023,
     tmdbId: 1000,
-    imdbId: 'tt13280054',
+    imdbId: 'tt14391165',
     server: 'Radarr',
     ...over,
   });
@@ -273,46 +273,46 @@ describe('Plex Match Check, saying whose mistake it is', () => {
   it('shows the ids that disagreed, and the IMDb id to search too', () => {
     const text = check(
       {},
-      { title: 'Blood', guids: ['imdb://tt26758432'], folder: 'Blood (2023)' }
+      { title: 'Brine', guids: ['imdb://tt27869543'], folder: 'Brine (2023)' }
     );
-    assert.match(text.detail, /Radarr: IMDb tt13280054, Plex: IMDb tt26758432/);
+    assert.match(text.detail, /Radarr: IMDb tt14391165, Plex: IMDb tt27869543/);
     assert.match(
       text.detail,
-      /Fix Match in Plex, searching tmdb-1000 or imdb-tt13280054/
+      /Fix Match in Plex, searching tmdb-1000 or imdb-tt14391165/
     );
   });
 
   it('takes a missing year as unknown, not different', () => {
     const text = check(
       {},
-      { title: 'Blood', guids: ['imdb://tt26758432'], folder: 'Blood (2023)' }
+      { title: 'Brine', guids: ['imdb://tt27869543'], folder: 'Brine (2023)' }
     );
     assert.equal(
       text.title,
-      'Plex matched "Blood (2023)" to a different film named Blood'
+      'Plex matched "Brine (2023)" to a different film named Brine'
     );
   });
 
   it('says when the file, not the match, is likely wrong', () => {
     const text = check(
       {
-        title: 'Gone in the Night',
+        title: 'Lost on the Ridge',
         year: 2022,
-        tmdbId: 874355,
+        tmdbId: 763842,
         imdbId: undefined,
         runtime: 90,
         fileRuntime: 21,
       },
       {
-        title: 'Nest',
+        title: 'Roostling',
         year: 2022,
-        guids: ['tmdb://928747'],
-        folder: 'Gone in the Night (2022)',
+        guids: ['tmdb://817364'],
+        folder: 'Lost on the Ridge (2022)',
       }
     );
     assert.equal(
       text.title,
-      'Radarr\'s file in "Gone in the Night (2022)" may not be Gone in the Night (2022)'
+      'Radarr\'s file in "Lost on the Ridge (2022)" may not be Lost on the Ridge (2022)'
     );
     assert.match(text.detail, /file 21 min, film 90 min/);
     assert.match(text.detail, /Replace it in Radarr/);
@@ -320,28 +320,28 @@ describe('Plex Match Check, saying whose mistake it is', () => {
   });
 
   it('suggests renaming a file not named after the film', () => {
-    const civilWar = {
-      title: 'Civil War',
+    const borderFeud = {
+      title: 'Border Feud',
       year: 2024,
-      tmdbId: 929590,
+      tmdbId: 846213,
       imdbId: undefined,
       runtime: 109,
       fileRuntime: 109,
     };
     const plex = {
-      title: 'Guerra Civil',
+      title: 'Guerra Fronteriza',
       year: 2024,
-      guids: ['tmdb://1310753'],
-      folder: 'Civil War (2024)',
+      guids: ['tmdb://1427986'],
+      folder: 'Border Feud (2024)',
     };
     const text = check(
-      { ...civilWar, file: 'Guerra.Civil.2024.1080p.WEB-DL.mkv' },
+      { ...borderFeud, file: 'Guerra.Fronteriza.2024.1080p.WEB-DL.mkv' },
       plex
     );
     assert.match(text.detail, /file 109 min, film 109 min/);
     assert.match(text.detail, /rename the file in Radarr/);
     assert.doesNotMatch(
-      check({ ...civilWar, file: 'Civil War (2024) WEBDL-1080p.mkv' }, plex)
+      check({ ...borderFeud, file: 'Border Feud (2024) WEBDL-1080p.mkv' }, plex)
         .detail,
       /rename/
     );
@@ -352,25 +352,30 @@ describe('Plex Match Check, saying whose mistake it is', () => {
       radarrFileFacts({
         runtime: 90,
         movieFile: {
-          relativePath: 'Nest.2022.1080p.BluRay.x264-BiPOLAR.mkv',
+          relativePath: 'Roostling.2022.1080p.BluRay.x264-TriPOLAR.mkv',
           mediaInfo: { runTime: '21:27' },
         } as never,
       }),
       {
         runtime: 90,
         fileRuntime: 21,
-        file: 'Nest.2022.1080p.BluRay.x264-BiPOLAR.mkv',
+        file: 'Roostling.2022.1080p.BluRay.x264-TriPOLAR.mkv',
       }
     );
     const { problem } = compareItem(
       'movie',
       {
-        ...movie('9', 'Nest', '/m/Gone (2022)/a.mkv', ['tmdb://928747']),
+        ...movie('9', 'Roostling', '/m/Departa (2022)/a.mkv', [
+          'tmdb://817364',
+        ]),
         Media: [
-          { duration: 21 * 60_000, Part: [{ file: '/m/Gone (2022)/a.mkv' }] },
+          {
+            duration: 21 * 60_000,
+            Part: [{ file: '/m/Departa (2022)/a.mkv' }],
+          },
         ],
       } as unknown as PlexLibraryItem,
-      new Map([['gone (2022)', [radarr({ tmdbId: 874355, runtime: 90 })]]])
+      new Map([['departa (2022)', [radarr({ tmdbId: 763842, runtime: 90 })]]])
     );
     assert.equal(problem?.expected.fileRuntime, 21);
     assert.equal(problem?.matched.duration, 21);
@@ -392,13 +397,13 @@ describe('Plex Match Check, the whole library', () => {
     ] as unknown as SonarrSettings[];
     settings.radarr = [];
     t.mock.method(SonarrAPI.prototype, 'getSeries', async () => [
-      { ...carrie, path: '/tv/Carrie' },
-      { title: 'Bluey', year: 2018, tvdbId: 353546, path: '/tv/Bluey' },
+      { ...wrenna, path: '/tv/Wrenna' },
+      { title: 'Pipkin', year: 2018, tvdbId: 462781, path: '/tv/Pipkin' },
     ]);
     const shows = [
-      show('126741', 'The Carrie Diaries', 'Carrie', ['tvdb://257454']),
+      show('126741', 'The Wrenna Diaries', 'Wrenna', ['tvdb://364817']),
       ...Array.from({ length: 250 }, (_, i) =>
-        show(`b${i}`, 'Bluey', 'Bluey', ['tvdb://353546'])
+        show(`b${i}`, 'Pipkin', 'Pipkin', ['tvdb://462781'])
       ),
     ];
     const asked: string[] = [];
@@ -422,13 +427,13 @@ describe('Plex Match Check, the whole library', () => {
     assert.equal(report.checked, 251);
     assert.deepEqual(
       report.problems.map((p) => [p.expected.title, p.matched.title]),
-      [['Carrie', 'The Carrie Diaries']]
+      [['Wrenna', 'The Wrenna Diaries']]
     );
     assert.deepEqual(
-      (await plexMatchCheck.problemFor('series', { tvdbId: 455755 })).map(
+      (await plexMatchCheck.problemFor('series', { tvdbId: 577104 })).map(
         (p) => p.folder
       ),
-      ['Carrie']
+      ['Wrenna']
     );
     assert.deepEqual(
       (await plexMatchCheck.problemFor('series', { key: '126741' })).map(
@@ -438,7 +443,7 @@ describe('Plex Match Check, the whole library', () => {
       'found from the side Plex matched it to'
     );
     assert.deepEqual(
-      await plexMatchCheck.problemFor('series', { tvdbId: 353546 }),
+      await plexMatchCheck.problemFor('series', { tvdbId: 462781 }),
       []
     );
   });
@@ -455,14 +460,14 @@ describe('Plex Match Check, the whole library', () => {
     ] as unknown as SonarrSettings[];
     settings.radarr = [];
     t.mock.method(SonarrAPI.prototype, 'getSeries', async () => [
-      { ...carrie, path: '/tv/Carrie' },
-      { title: 'Bluey', year: 2018, tvdbId: 353546, path: '/tv/Bluey' },
+      { ...wrenna, path: '/tv/Wrenna' },
+      { title: 'Pipkin', year: 2018, tvdbId: 462781, path: '/tv/Pipkin' },
     ]);
     const shows = [
       ...Array.from({ length: 250 }, (_, i) =>
-        show(`b${i}`, 'Bluey', 'Bluey', ['tvdb://353546'])
+        show(`b${i}`, 'Pipkin', 'Pipkin', ['tvdb://462781'])
       ),
-      show('126741', 'The Carrie Diaries', 'Carrie', ['tvdb://257454']),
+      show('126741', 'The Wrenna Diaries', 'Wrenna', ['tvdb://364817']),
     ];
     let cancelAfterFirstPage = false;
     t.mock.method(
@@ -484,7 +489,7 @@ describe('Plex Match Check, the whole library', () => {
     assert.equal(full.checked, 251);
     assert.equal(full.problems.length, 1);
 
-    // Stopped after the first page: Carrie, on the second, is never reached.
+    // Stopped after the first page: Wrenna, on the second, is never reached.
     cancelAfterFirstPage = true;
     await plexMatchCheck.run();
 
@@ -530,23 +535,23 @@ describe('Match Check on several servers', () => {
   it('checks every connected server, in one report', async (t) => {
     setUp(t);
     t.mock.method(SonarrAPI.prototype, 'getSeries', async () => [
-      { ...carrie, path: '/tv/Carrie' },
+      { ...wrenna, path: '/tv/Wrenna' },
     ]);
     t.mock.method(PlexAPI.prototype, 'getLibraryContents', async () => ({
       totalSize: 1,
       items: [
-        show('126741', 'The Carrie Diaries', 'Carrie', ['tvdb://257454']),
+        show('126741', 'The Wrenna Diaries', 'Wrenna', ['tvdb://364817']),
       ],
     }));
     t.mock.method(JellyfinAPI.prototype, 'getLibraryPage', async () => ({
       TotalRecordCount: 1,
       Items: [
         {
-          Id: 'jf-carrie',
-          Name: 'The Carrie Diaries',
+          Id: 'jf-wrenna',
+          Name: 'The Wrenna Diaries',
           Type: 'Series',
-          Path: '/data/tv/Carrie',
-          ProviderIds: { Tvdb: '257454' },
+          Path: '/data/tv/Wrenna',
+          ProviderIds: { Tvdb: '364817' },
         },
       ],
     }));
@@ -559,32 +564,32 @@ describe('Match Check on several servers', () => {
     assert.deepEqual(
       report.problems.map((p) => [p.mediaServer, p.matched.key]).sort(),
       [
-        ['Jellyfin', 'jf-carrie'],
+        ['Jellyfin', 'jf-wrenna'],
         ['Plex', '126741'],
       ]
     );
     assert.equal(
-      (await plexMatchCheck.problemFor('series', { tvdbId: 455755 })).length,
+      (await plexMatchCheck.problemFor('series', { tvdbId: 577104 })).length,
       2
     );
     // Found from the title it was wrongly matched to, by that server's id.
     assert.deepEqual(
       (
         await plexMatchCheck.problemFor('series', {
-          keys: [{ mediaServer: 'Jellyfin', key: 'jf-carrie' }],
+          keys: [{ mediaServer: 'Jellyfin', key: 'jf-wrenna' }],
         })
       ).map((p) => p.mediaServer),
       ['Jellyfin']
     );
     assert.deepEqual(
       await plexMatchCheck.problemFor('series', {
-        keys: [{ mediaServer: 'Emby', key: 'jf-carrie' }],
+        keys: [{ mediaServer: 'Emby', key: 'jf-wrenna' }],
       }),
       []
     );
     // An id without its server is taken as Plex's.
     assert.deepEqual(
-      await plexMatchCheck.problemFor('series', { key: 'jf-carrie' }),
+      await plexMatchCheck.problemFor('series', { key: 'jf-wrenna' }),
       []
     );
   });
@@ -592,12 +597,12 @@ describe('Match Check on several servers', () => {
   it('leaves out a server removed while it runs', async (t) => {
     setUp(t);
     t.mock.method(SonarrAPI.prototype, 'getSeries', async () => [
-      { ...carrie, path: '/tv/Carrie' },
+      { ...wrenna, path: '/tv/Wrenna' },
     ]);
     t.mock.method(PlexAPI.prototype, 'getLibraryContents', async () => ({
       totalSize: 1,
       items: [
-        show('126741', 'The Carrie Diaries', 'Carrie', ['tvdb://257454']),
+        show('126741', 'The Wrenna Diaries', 'Wrenna', ['tvdb://364817']),
       ],
     }));
     t.mock.method(JellyfinAPI.prototype, 'getLibraryPage', async () => {
@@ -608,11 +613,11 @@ describe('Match Check on several servers', () => {
         TotalRecordCount: 1,
         Items: [
           {
-            Id: 'jf-carrie',
-            Name: 'The Carrie Diaries',
+            Id: 'jf-wrenna',
+            Name: 'The Wrenna Diaries',
             Type: 'Series',
-            Path: '/data/tv/Carrie',
-            ProviderIds: { Tvdb: '257454' },
+            Path: '/data/tv/Wrenna',
+            ProviderIds: { Tvdb: '364817' },
           },
         ],
       };
@@ -637,12 +642,12 @@ describe('Match Check on several servers', () => {
   it('keeps what one server found when another cannot be read', async (t) => {
     setUp(t);
     t.mock.method(SonarrAPI.prototype, 'getSeries', async () => [
-      { ...carrie, path: '/tv/Carrie' },
+      { ...wrenna, path: '/tv/Wrenna' },
     ]);
     t.mock.method(PlexAPI.prototype, 'getLibraryContents', async () => ({
       totalSize: 1,
       items: [
-        show('126741', 'The Carrie Diaries', 'Carrie', ['tvdb://257454']),
+        show('126741', 'The Wrenna Diaries', 'Wrenna', ['tvdb://364817']),
       ],
     }));
     t.mock.method(JellyfinAPI.prototype, 'getLibraryPage', async () => {

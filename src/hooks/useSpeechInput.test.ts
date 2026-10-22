@@ -9,13 +9,13 @@ describe('speech input', () => {
   it('joins what has been heard, and is final only once all of it is', () => {
     assert.deepEqual(
       transcriptOf(
-        Object.assign([result('star ', true), result('wars', false)])
+        Object.assign([result('nova ', true), result('rift', false)])
       ),
-      { text: 'star wars', final: false }
+      { text: 'nova rift', final: false }
     );
     assert.deepEqual(
-      transcriptOf(Object.assign([result(' the matrix ', true)])),
-      { text: 'the matrix', final: true }
+      transcriptOf(Object.assign([result(' the mazewright ', true)])),
+      { text: 'the mazewright', final: true }
     );
   });
 

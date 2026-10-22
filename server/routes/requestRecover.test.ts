@@ -52,8 +52,8 @@ import type { EntityManager } from 'typeorm';
 
 setupTestDb();
 
-const ARTIST = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
-const OK_COMPUTER = '1b022e01-4da6-387b-8658-8678046e4cef';
+const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
+const STATIC_GARDEN = '4f6a2d93-c1e8-3a57-9b02-6d3e8f1c7a40';
 
 const lidarr = createFakeLidarr();
 
@@ -197,7 +197,7 @@ const musicRequest = async (overrides: Partial<MediaRequest> = {}) => {
       mediaType: MediaType.MUSIC,
       tmdbId: 0,
       foreignId: ARTIST,
-      foreignTitle: 'Radiohead',
+      foreignTitle: 'Glasswing',
       status: MediaStatus.PROCESSING,
     }),
     { listeners: false }
@@ -205,8 +205,8 @@ const musicRequest = async (overrides: Partial<MediaRequest> = {}) => {
   await manager.save(
     new MusicAlbum({
       mediaId: media.id,
-      mbId: OK_COMPUTER,
-      title: 'OK Computer',
+      mbId: STATIC_GARDEN,
+      title: 'Static Garden',
       secondaryTypes: [],
       status: MediaStatus.PROCESSING,
     }),
@@ -221,8 +221,8 @@ const musicRequest = async (overrides: Partial<MediaRequest> = {}) => {
       is4k: false,
       albums: [
         new AlbumRequest({
-          albumMbid: OK_COMPUTER,
-          title: 'OK Computer',
+          albumMbid: STATIC_GARDEN,
+          title: 'Static Garden',
           status: MediaRequestStatus.APPROVED,
         }),
       ],
@@ -235,13 +235,13 @@ const musicRequest = async (overrides: Partial<MediaRequest> = {}) => {
 
 const lookedUpAlbum = (): LidarrAlbum => ({
   id: 0,
-  title: 'OK Computer',
-  foreignAlbumId: OK_COMPUTER,
+  title: 'Static Garden',
+  foreignAlbumId: STATIC_GARDEN,
   artistId: 0,
   monitored: false,
   artist: {
     id: 0,
-    artistName: 'Radiohead',
+    artistName: 'Glasswing',
     foreignArtistId: ARTIST,
     monitored: false,
     qualityProfileId: 0,
@@ -514,7 +514,7 @@ describe('editing a failed request', () => {
     const res = await call('PUT', `/request/${request.id}`, {
       mediaType: 'music',
       serverId: 3,
-      albums: [OK_COMPUTER],
+      albums: [STATIC_GARDEN],
     });
 
     assert.equal(res.status, 200);
@@ -673,7 +673,7 @@ describe('retrying a request whose server is gone', () => {
 
   it('sends music to the default Lidarr server', async () => {
     getSettings().lidarr = [lidarr.settings({ id: 3 })];
-    lidarr.lookupAlbums.set(OK_COMPUTER, lookedUpAlbum());
+    lidarr.lookupAlbums.set(STATIC_GARDEN, lookedUpAlbum());
     const request = await musicRequest({ serverId: 1, metadataProfileId: 9 });
 
     const res = await call('POST', `/request/${request.id}/retry`);

@@ -805,7 +805,7 @@ class BaseScanner<T> {
   /**
    * A media server item belongs to one title. When the media server matches
    * a file to another title than before (Plex first took a new show
-   * "Carrie" for "The Carrie Diaries", then was corrected), the title it
+   * "Wrenna" for "The Wrenna Diaries", then was corrected), the title it
    * left no longer has it: without this, both showed as available, and
    * the wrong one stayed so. A title the item leaves that Sonarr or Radarr
    * never had, and no other media server has either, goes back to unknown;

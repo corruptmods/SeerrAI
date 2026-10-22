@@ -75,7 +75,7 @@ const candidatesFor = async (tmdb: TheMovieDb, line: ParsedLine) => {
       ]
     : candidates;
 
-  // "Pitch Perfect series" probably means the set — but "White Noise
+  // "Harmony Lane series" probably means the set — but "Grey Static
   // series" means a TV show, so a collection is only promoted to the top,
   // never forced. Both readings stay in the list.
   if (line.collectionHint) {

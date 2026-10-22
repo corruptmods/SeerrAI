@@ -35,7 +35,7 @@ setupTestDb();
 
 /*
  * An indexer's download limit, as Tabula Rasa's was reached on a real
- * server: a Usenet pack for two missing MythBusters episodes, whose NZB
+ * server: a Usenet pack for two missing TruthTesters episodes, whose NZB
  * Prowlarr could not hand over ("Request failed with status code 429").
  * Backfill tried again every minute, gave the job up after ten, offered
  * the pack again, and it was approved again: all day. Prowlarr, Sonarr and
@@ -58,9 +58,9 @@ const ep = (id: number, episode: number): SonarrEpisode => ({
 
 const entry = (index: number, episodeId: number): PlanEntry => ({
   index,
-  path: `MythBusters.S2016E0${index + 1}.1080p.AMZN.mkv`,
+  path: `TruthTesters.S2016E0${index + 1}.1080p.AMZN.mkv`,
   size: 2e9,
-  judgedAs: `MythBusters.S2016E0${index + 1}.1080p.AMZN.mkv`,
+  judgedAs: `TruthTesters.S2016E0${index + 1}.1080p.AMZN.mkv`,
   episodeIds: [episodeId],
   season: 2016,
   episode: index + 1,
@@ -71,8 +71,8 @@ const entry = (index: number, episodeId: number): PlanEntry => ({
 const PLAN = [entry(0, 501), entry(1, 502)];
 
 const RELEASE: ProwlarrRelease = {
-  guid: 'https://prowlarr/7/mythbusters',
-  title: 'MythBusters.S2016E01.1080p.AMZN.WEB-DL',
+  guid: 'https://prowlarr/7/truthtesters',
+  title: 'TruthTesters.S2016E01.1080p.AMZN.WEB-DL',
   size: 4e9,
   indexerId: 7,
   indexer: 'Tabula Rasa',
@@ -187,8 +187,8 @@ beforeEach(() => {
   ]);
   mock.method(sonarr, 'getSeriesDetail', async () => ({
     id: 123,
-    title: 'MythBusters',
-    path: '/tv/MythBusters',
+    title: 'TruthTesters',
+    path: '/tv/TruthTesters',
     seriesType: 'standard',
     qualityProfileId: 1,
   }));
@@ -243,7 +243,7 @@ const seed = async (
       kind: 'series',
       serverId: 0,
       arrId,
-      title: arrId === 123 ? 'MythBusters' : `Series ${arrId}`,
+      title: arrId === 123 ? 'TruthTesters' : `Series ${arrId}`,
       seriesType: 'standard',
       status: 'found',
       missing: 2,
@@ -278,9 +278,9 @@ const searchFindsItAgain = () =>
     backfill as unknown as { target: () => Promise<unknown> },
     'target',
     async () => ({
-      title: 'MythBusters',
+      title: 'TruthTesters',
       poster: null,
-      names: ['MythBusters'],
+      names: ['TruthTesters'],
       missing: 2,
       categories: [5000],
       extraTerms: [],
@@ -508,7 +508,7 @@ describe('Backfill and an indexer’s download limit', () => {
     const { candidate: other } = await seed(
       {
         guid: 'https://prowlarr/9/a',
-        title: 'MythBusters.S2016E01.720p.WEB',
+        title: 'TruthTesters.S2016E01.720p.WEB',
         indexer: 'NZBgeek',
         indexerId: 9,
       },
@@ -554,7 +554,7 @@ describe('Backfill and an indexer’s download limit', () => {
     assert.equal(taken.reason, null);
   });
 
-  it('cannot loop as it did for MythBusters', async () => {
+  it('cannot loop as it did for TruthTesters', async () => {
     const { row, candidate } = await seed();
     await backfill.approve(candidate.id, { mode: 'missing', user: gm });
     // Twelve hours of minute ticks and hourly scans, with the pack
@@ -707,7 +707,7 @@ describe('searching while Prowlarr is at its limit', () => {
       return [];
     });
     await assert.rejects(
-      tool.run({} as never, { query: 'MythBusters', kind: 'series' }),
+      tool.run({} as never, { query: 'TruthTesters', kind: 'series' }),
       /Prowlarr has reached its search limit; it can be asked again in about 20 minutes/
     );
     assert.equal(asked, 0);

@@ -15,8 +15,8 @@ export interface ParsedLine {
   /** A four-digit year found in the line, if any. */
   year?: number;
   /**
-   * The line looked like it referred to a whole set — "Pitch Perfect series",
-   * "the Bourne trilogy". Only a hint: "White Noise series" means a TV show,
+   * The line looked like it referred to a whole set — "Harmony Lane series",
+   * "the Kessler trilogy". Only a hint: "Grey Static series" means a TV show,
    * so both readings are offered rather than one being assumed.
    */
   collectionHint?: boolean;
@@ -32,10 +32,10 @@ const BRACKETED_YEAR = /[([]\s*(19\d{2}|20\d{2}|21\d{2})\s*[)\]]/;
 const COLLECTION_HINT =
   /\s+(?:the\s+)?(series|collection|trilogy|quadrilogy|saga|movies|films|franchise)\s*$/i;
 
-/** "all Harry Potter movies" — the leading word is not part of the title. */
+/** "all Milo Thistle movies" — the leading word is not part of the title. */
 const LEADING_ALL = /^all\s+(?:the\s+)?/i;
 
-/** A bare year at the end of a line, e.g. "Heat 1995". */
+/** A bare year at the end of a line, e.g. "Scorch 1995". */
 const TRAILING_YEAR = /\s+(19\d{2}|20\d{2}|21\d{2})\s*$/;
 
 export const parseTitleList = (text: string): ParsedLine[] => {

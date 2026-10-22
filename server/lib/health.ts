@@ -1170,7 +1170,7 @@ const stuckProcessing = async (
  * after it was approved, which a search may fix.
  */
 
-/** "Hail to the Thief — Radiohead", or the album alone. */
+/** "Sing to the Ferryman — Glasswing", or the album alone. */
 const albumTitle = (title: string, artist?: string | null) =>
   artist ? `${title} — ${artist}` : title;
 

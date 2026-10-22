@@ -81,7 +81,7 @@ const ISSUE_TYPE: Record<FixKind, IssueType> = {
   replaceSeason: IssueType.OTHER,
 };
 
-/** "The Bear, season 2 episode 3", as Siri says it. */
+/** "The Otterkin, season 2 episode 3", as Siri says it. */
 export const spokenName = (p: {
   title: string;
   season?: number;
@@ -135,7 +135,7 @@ class SiriReports {
 
   /**
    * What they are watching, and what Siri asks next: "What's wrong with
-   * The Bear, season 2 episode 3?", or that nothing is playing.
+   * The Otterkin, season 2 episode 3?", or that nothing is playing.
    */
   public async playing(
     user: User,

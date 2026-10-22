@@ -22,7 +22,7 @@ const MIN = 60 * 1000;
 const movie = (guid: string, extra: Partial<PlexLibraryItem> = {}) =>
   ({
     ratingKey: '501',
-    title: 'Blood',
+    title: 'Brine',
     guid,
     addedAt: 1_800_000_000,
     updatedAt: 1_800_000_000,
@@ -142,7 +142,7 @@ describe('the recently added scan', () => {
     // Plex has matched it since; the window has moved past it.
     added = [];
     matched = movie('plex://movie/abc', {
-      Guid: [{ id: 'tmdb://84773' }],
+      Guid: [{ id: 'tmdb://73682' }],
     });
     const first = now;
     await scan(first + 3 * 60 * 1000);

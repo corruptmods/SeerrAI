@@ -10,8 +10,8 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 /**
- * Pins the path behind a live loop: TMDB 113988 requested as a movie with
- * TVDB 389492, which media 225634 already holds. Every three minutes it
+ * Pins the path behind a live loop: TMDB 226491 requested as a movie with
+ * TVDB 497315, which media 336745 already holds. Every three minutes it
  * notified and left no row behind.
  *
  * These pass, which is the point — on SQLite the media row persists and the
@@ -34,16 +34,16 @@ describe('repeat auto-requests for a colliding title', () => {
 
   beforeEach(async () => {
     stub('getMovie', {
-      id: 113988,
-      title: 'Monster',
+      id: 226491,
+      title: 'Phantom',
       release_date: '2022-01-01',
-      external_ids: { tvdb_id: 389492 },
+      external_ids: { tvdb_id: 497315 },
     });
     stub('getTvShow', {
-      id: 113988,
-      name: 'DAHMER',
+      id: 226491,
+      name: 'HOLLOWAY',
       first_air_date: '2022-09-21',
-      external_ids: { tvdb_id: 389492 },
+      external_ids: { tvdb_id: 497315 },
       seasons: [{ season_number: 1, episode_count: 10 }],
     });
 
@@ -62,8 +62,8 @@ describe('repeat auto-requests for a colliding title', () => {
     // The anthology row that already owns the TVDB id.
     await getRepository(Media).save(
       new Media({
-        tmdbId: 225634,
-        tvdbId: 389492,
+        tmdbId: 336745,
+        tvdbId: 497315,
         mediaType: MediaType.TV,
         status: MediaStatus.AVAILABLE,
       })
@@ -73,9 +73,9 @@ describe('repeat auto-requests for a colliding title', () => {
   it('persists media when requested as a movie with a colliding TVDB id', async () => {
     await MediaRequest.request(
       {
-        mediaId: 113988,
+        mediaId: 226491,
         mediaType: MediaType.MOVIE,
-        tvdbId: 389492,
+        tvdbId: 497315,
         is4k: false,
       } as never,
       user,
@@ -83,7 +83,7 @@ describe('repeat auto-requests for a colliding title', () => {
     );
 
     const media = await getRepository(Media).findOne({
-      where: { tmdbId: 113988, mediaType: MediaType.MOVIE },
+      where: { tmdbId: 226491, mediaType: MediaType.MOVIE },
     });
 
     assert.ok(media, 'the media row must survive the request');
@@ -96,9 +96,9 @@ describe('repeat auto-requests for a colliding title', () => {
     const attempt = async () =>
       MediaRequest.request(
         {
-          mediaId: 113988,
+          mediaId: 226491,
           mediaType: MediaType.MOVIE,
-          tvdbId: 389492,
+          tvdbId: 497315,
           is4k: false,
         } as never,
         user,

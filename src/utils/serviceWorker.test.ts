@@ -327,7 +327,7 @@ describe('images kept on the device', () => {
   it('are shown once more when out of date, and fetched again for next time', async () => {
     const worker = loadImageWorker();
     const cover =
-      '/imageproxy/caa/release-group/b1392450-e666-3926-a536-22c65f834433/front-500';
+      '/imageproxy/caa/release-group/7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35/front-500';
     worker.answer.cacheControl = 'public, max-age=60';
     worker.answer.sentAt = HOUR_AGO();
     await worker.view(cover);

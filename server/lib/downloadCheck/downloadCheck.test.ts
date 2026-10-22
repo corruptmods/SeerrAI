@@ -67,66 +67,69 @@ describe('reading release names', () => {
   it('finds the title, year, country and episode title', () => {
     assert.deepEqual(
       readEpisodeRelease(
-        'Expedition.Unknown.2018.S02E05.The.Real.Robin.Hood.1080p.DSCP.WEB-DL.DDP2.0.H.264-FUZEER'
+        'Wayfarer.Ledger.2018.S02E05.The.Real.Copper.Fox.1080p.DSCP.WEB-DL.DDP2.0.H.264-FIZZLR'
       ),
       {
-        title: 'expedition unknown',
+        title: 'wayfarer ledger',
         year: 2018,
         country: undefined,
-        episodeTitle: 'the real robin hood',
+        episodeTitle: 'the real copper fox',
         hasEpisode: true,
       }
     );
-    const wall = readEpisodeRelease('The.Wall.AU.S01E01.WEB-DL.x264-MFO');
-    assert.equal(wall.title, 'the wall');
+    const wall = readEpisodeRelease('The.Turnstile.AU.S01E01.WEB-DL.x264-QXO');
+    assert.equal(wall.title, 'the turnstile');
     assert.equal(wall.country, 'au');
     // "Us" is a word here, not the United States.
-    const penn = readEpisodeRelease(
-      'Penn.&amp;.Teller-Fool.Us.S02E04.Knife.of.the.Party.1080p.Netflix.WEB-DL.DD+.2.0.x264-TrollHD'
+    const bramble = readEpisodeRelease(
+      'Bramble.&amp;.Finch-Trick.Us.S02E04.Ladle.of.the.Evening.1080p.Netflix.WEB-DL.DD+.2.0.x264-GoblinHD'
     );
-    assert.equal(penn.title, 'penn and teller fool us');
-    assert.equal(penn.country, undefined);
-    assert.equal(penn.episodeTitle, 'knife of the party');
+    assert.equal(bramble.title, 'bramble and finch trick us');
+    assert.equal(bramble.country, undefined);
+    assert.equal(bramble.episodeTitle, 'ladle of the evening');
     const club = readEpisodeRelease(
-      'The 1 Club (2024) S01E02 (1080p AMZN WEB-DL H265 SDR DDP 5.1 English - HONE)'
+      'The 9 Society (2024) S01E02 (1080p AMZN WEB-DL H265 SDR DDP 5.1 English - KILN)'
     );
-    assert.equal(club.title, 'the 1 club');
+    assert.equal(club.title, 'the 9 society');
     assert.equal(club.year, 2024);
     assert.equal(club.episodeTitle, undefined);
     assert.equal(
-      readEpisodeRelease('[Arid] Food Wars! The Fourth Plate - S04E07 (BDRip)')
-        .title,
-      'food wars the fourth plate'
+      readEpisodeRelease(
+        '[Dusk] Kitchen Clash! The Fourth Course - S04E07 (BDRip)'
+      ).title,
+      'kitchen clash the fourth course'
     );
   });
 
   it('reads a movie title up to its year', () => {
-    const odyssey = readMovieRelease('2001.A.Space.Odyssey.1968.1080p.BluRay');
-    assert.equal(odyssey.title, '2001 a space odyssey');
-    assert.equal(odyssey.year, 1968);
-    assert.equal(readMovieRelease('Heat (1995) 2160p UHD').title, 'heat');
+    const driftwood = readMovieRelease('2087.A.Tidal.Voyage.1968.1080p.BluRay');
+    assert.equal(driftwood.title, '2087 a tidal voyage');
+    assert.equal(driftwood.year, 1968);
+    assert.equal(readMovieRelease('Scorch (1995) 2160p UHD').title, 'scorch');
   });
 });
 
 describe('telling the right title from another', () => {
-  const foodParadise = { title: 'Food Paradise', year: 2007 };
+  const snackKingdom = { title: 'Snack Kingdom', year: 2007 };
 
   it('takes the right show under another name', () => {
     assert.equal(
       judgeName(
         readEpisodeRelease(
-          'Penn.&amp;.Teller-Fool.Us.S02E04.Knife.of.the.Party.1080p.Netflix.WEB-DL-TrollHD'
+          'Bramble.&amp;.Finch-Trick.Us.S02E04.Ladle.of.the.Evening.1080p.Netflix.WEB-DL-GoblinHD'
         ),
-        { title: 'Penn & Teller: Fool Us', year: 2011 },
-        [{ id: 1, title: 'Knife of the Party' }]
+        { title: 'Bramble & Finch: Trick Us', year: 2011 },
+        [{ id: 1, title: 'Ladle of the Evening' }]
       ).verdict,
       'same'
     );
     assert.deepEqual(
       judgeName(
-        readEpisodeRelease('The.Wall.S02E02.Noah.and.Lisa.720p.NBC.WEB-DL-BTN'),
-        { title: 'The Wall (2016)', year: 2016 },
-        [{ id: 1, title: 'Noah and Lisa' }]
+        readEpisodeRelease(
+          'The.Turnstile.S02E02.Theo.and.Mira.720p.NBC.WEB-DL-KXR'
+        ),
+        { title: 'The Turnstile (2016)', year: 2016 },
+        [{ id: 1, title: 'Theo and Mira' }]
       ).verdict,
       'same'
     );
@@ -134,42 +137,42 @@ describe('telling the right title from another', () => {
 
   it('turns down another country’s version, a revival and a spin-off’s numbering', () => {
     const wall = judgeName(
-      readEpisodeRelease('The.Wall.AU.S01E03.1080p.WEB.H264-CBFM'),
+      readEpisodeRelease('The.Turnstile.AU.S01E03.1080p.WEB.H264-PLWK'),
       {
-        title: 'The Wall (2016)',
+        title: 'The Turnstile (2016)',
         year: 2016,
-        alternateTitles: [{ title: 'The Wall US' }],
+        alternateTitles: [{ title: 'The Turnstile US' }],
       },
-      [{ id: 1, title: 'Mike and Shana' }]
+      [{ id: 1, title: 'Gus and Ivy' }]
     );
     assert.deepEqual([wall.verdict, wall.reason], ['different', 'country']);
 
-    const scrubs = judgeName(
-      readEpisodeRelease('Scrubs.2026.S02E04.1080p.HEVC.x265-MeGusta'),
-      { title: 'Scrubs', year: 2001 },
-      [{ id: 1, title: 'My Big Mouth' }]
+    const gurneys = judgeName(
+      readEpisodeRelease('Gurneys.2026.S02E04.1080p.HEVC.x265-LeSigh'),
+      { title: 'Gurneys', year: 2001 },
+      [{ id: 1, title: 'My Loud Pager' }]
     );
-    assert.deepEqual([scrubs.verdict, scrubs.reason], ['different', 'year']);
+    assert.deepEqual([gurneys.verdict, gurneys.reason], ['different', 'year']);
 
     // Another episode altogether, and no other episode has its title.
-    const penn = judgeName(
+    const bramble = judgeName(
       readEpisodeRelease(
-        'Penn.&amp;.Teller-Fool.Us.S01E04.Solid.Goldfish.1080p.Netflix.WEB-DL-TrollHD'
+        'Bramble.&amp;.Finch-Trick.Us.S01E04.Steady.Tadpole.1080p.Netflix.WEB-DL-GoblinHD'
       ),
-      { title: 'Penn & Teller: Fool Us', year: 2011 },
-      [{ id: 1, title: 'Teller Is a Blockhead' }],
+      { title: 'Bramble & Finch: Trick Us', year: 2011 },
+      [{ id: 1, title: 'Finch Is a Featherbrain' }],
       [
         {
           id: 1,
           seasonNumber: 1,
           episodeNumber: 4,
-          title: 'Teller Is a Blockhead',
+          title: 'Finch Is a Featherbrain',
           hasFile: false,
         },
       ]
     );
     assert.deepEqual(
-      [penn.verdict, penn.reason],
+      [bramble.verdict, bramble.reason],
       ['different', 'episodeTitle']
     );
   });
@@ -177,30 +180,30 @@ describe('telling the right title from another', () => {
   it('finds an episode numbered another way by its title', () => {
     const evidence = judgeName(
       readEpisodeRelease(
-        'Food.Paradise.2013.S09E11.Sandwich.Heroes.720p.HMAX.WEB-DL.DDP2.0.H.264-FUZEER'
+        'Snack.Kingdom.2013.S09E11.Pretzel.Champions.720p.HMAX.WEB-DL.DDP2.0.H.264-FIZZLR'
       ),
-      foodParadise,
-      [{ id: 911, title: 'Ice Cream Paradise 2' }],
+      snackKingdom,
+      [{ id: 911, title: 'Waffle Kingdom 2' }],
       [
         {
           id: 911,
           seasonNumber: 9,
           episodeNumber: 11,
-          title: 'Ice Cream Paradise 2',
+          title: 'Waffle Kingdom 2',
           hasFile: false,
         },
         {
           id: 1403,
           seasonNumber: 14,
           episodeNumber: 3,
-          title: 'Sandwich Heroes',
+          title: 'Pretzel Champions',
           hasFile: true,
         },
         {
           id: 1404,
           seasonNumber: 14,
           episodeNumber: 4,
-          title: 'Flavor Fiesta!',
+          title: 'Spice Jamboree!',
           hasFile: true,
         },
       ]
@@ -209,26 +212,26 @@ describe('telling the right title from another', () => {
     assert.equal(evidence.episode?.id, 1403);
   });
 
-  it('keeps numbers apart: Pizza Paradise 2 is not Pizza Paradise 3', () => {
+  it('keeps numbers apart: Taco Kingdom 2 is not Taco Kingdom 3', () => {
     const evidence = judgeName(
       readEpisodeRelease(
-        'Food.Paradise.2013.S01E13.Pizza.Paradise.3.720p.HMAX.WEB-DL-FUZEER'
+        'Snack.Kingdom.2013.S01E13.Taco.Kingdom.3.720p.HMAX.WEB-DL-FIZZLR'
       ),
-      foodParadise,
-      [{ id: 113, title: 'Pizza Paradise 2' }],
+      snackKingdom,
+      [{ id: 113, title: 'Taco Kingdom 2' }],
       [
         {
           id: 113,
           seasonNumber: 1,
           episodeNumber: 13,
-          title: 'Pizza Paradise 2',
+          title: 'Taco Kingdom 2',
           hasFile: true,
         },
         {
           id: 705,
           seasonNumber: 7,
           episodeNumber: 5,
-          title: 'Pizza Paradise 3',
+          title: 'Taco Kingdom 3',
           hasFile: false,
         },
       ]
@@ -241,31 +244,31 @@ describe('telling the right title from another', () => {
     assert.equal(
       judgeName(
         readEpisodeRelease(
-          'The.Traitors.New.Blood.S01E05.720p.WEB.H264-iNSiDiOUS'
+          'The.Schemers.Fresh.Blood.S01E05.720p.WEB.H264-iNTRePiD'
         ),
-        { title: 'The Traitors (US)', year: 2023 },
-        [{ id: 1, title: 'Getting Away With Murder' }]
+        { title: 'The Schemers (US)', year: 2023 },
+        [{ id: 1, title: 'Walking Away With Jewels' }]
       ).verdict,
       'unsure'
     );
     assert.equal(
       judgeName(
-        readEpisodeRelease('Thank.You.Next.S01E05.1080p.WEB.h264-EDITH'),
-        { title: "Thank God You're Here", year: 2006 },
-        [{ id: 1, title: 'Akmal Saleh, Shaun Micallef' }]
+        readEpisodeRelease('Hold.You.Next.S01E05.1080p.WEB.h264-MABEL'),
+        { title: "Hold Tight You're Live", year: 2006 },
+        [{ id: 1, title: 'Dorian Pike, Wendell Marsh' }]
       ).verdict,
       'unsure'
     );
   });
 
   it('judges a movie by its title and year', () => {
-    const movie = { title: 'Heat', year: 1995 };
+    const movie = { title: 'Scorch', year: 1995 };
     assert.equal(
-      judgeName(readMovieRelease('Heat.1995.1080p.BluRay'), movie).verdict,
+      judgeName(readMovieRelease('Scorch.1995.1080p.BluRay'), movie).verdict,
       'same'
     );
     assert.equal(
-      judgeName(readMovieRelease('Heat.2013.1080p.WEB'), movie).verdict,
+      judgeName(readMovieRelease('Scorch.2013.1080p.WEB'), movie).verdict,
       'different'
     );
   });
@@ -381,11 +384,11 @@ describe('the rules', () => {
         'xem',
       ],
       [
-        'Episode 1x2 was not found in the grabbed release: Mythbusters.S01E02',
+        'Episode 1x2 was not found in the grabbed release: Truthtesters.S01E02',
         'badFiles',
       ],
       [
-        'Episode 1x3 was unexpected considering the Mythbusters.S01E02.1080p folder name',
+        'Episode 1x3 was unexpected considering the Truthtesters.S01E02.1080p folder name',
         'badFiles',
       ],
       [
@@ -741,9 +744,9 @@ describe('Download Check', () => {
   });
 
   it('rejects another country’s version before it downloads', async () => {
-    const au = grab({ title: 'The.Wall.AU.S01E01.WEB-DL.x264-MFO' });
+    const au = grab({ title: 'The.Turnstile.AU.S01E01.WEB-DL.x264-QXO' });
     sonarr.itemFacts.set(10, {
-      title: 'The Wall (2016)',
+      title: 'The Turnstile (2016)',
       year: 2016,
       qualityProfileId: 1,
     });
@@ -802,7 +805,7 @@ describe('Download Check', () => {
   it('imports the right show filed by ID, telling Sonarr the episode', async () => {
     const stuck = grab({
       title:
-        'Penn.&amp;.Teller-Fool.Us.S02E04.Knife.of.the.Party.1080p.Netflix.WEB-DL-TrollHD',
+        'Bramble.&amp;.Finch-Trick.Us.S02E04.Ladle.of.the.Evening.1080p.Netflix.WEB-DL-GoblinHD',
       status: 'completed',
       state: 'importblocked',
       trackedStatus: 'warning',
@@ -811,22 +814,22 @@ describe('Download Check', () => {
         'Found matching series via grab history, but release was matched to series by ID. Automatic import is not possible. See the FAQ for details.',
       ],
     });
-    stuck.episodes[0].title = 'Knife of the Party';
+    stuck.episodes[0].title = 'Ladle of the Evening';
     sonarr.itemFacts.set(10, {
-      title: 'Penn & Teller: Fool Us',
+      title: 'Bramble & Finch: Trick Us',
       year: 2011,
       qualityProfileId: 1,
     });
     sonarr.seriesEpisodes.set(10, stuck.episodes);
     sonarr.importable.set('HASH1', [
       {
-        path: '/dl/Penn/a.mkv',
+        path: '/dl/Bramble/a.mkv',
         size: 1200 * MB,
         episodeIds: [],
         quality: WEB1080,
       },
       {
-        path: '/dl/Penn/sample.mkv',
+        path: '/dl/Bramble/sample.mkv',
         size: 20 * MB,
         episodeIds: [],
         quality: WEB1080,
@@ -841,14 +844,13 @@ describe('Download Check', () => {
     assert.equal(sonarr.imported.length, 1);
     assert.deepEqual(
       sonarr.imported[0].map((f) => [f.path, f.episodeIds, f.downloadId]),
-      [['/dl/Penn/a.mkv', [103], 'HASH1']]
+      [['/dl/Bramble/a.mkv', [103], 'HASH1']]
     );
   });
 
   it('imports a renumbered episode as the one it is, when that one is missing', async () => {
     const stuck = grab({
-      title:
-        'Food.Paradise.2013.S01E13.Pizza.Paradise.3.720p.HMAX.WEB-DL-FUZEER',
+      title: 'Snack.Kingdom.2013.S01E13.Taco.Kingdom.3.720p.HMAX.WEB-DL-FIZZLR',
       status: 'completed',
       state: 'importblocked',
       trackedStatus: 'warning',
@@ -862,12 +864,12 @@ describe('Download Check', () => {
         id: 113,
         seasonNumber: 1,
         episodeNumber: 13,
-        title: 'Pizza Paradise 2',
+        title: 'Taco Kingdom 2',
         hasFile: false,
       },
     ];
     sonarr.itemFacts.set(10, {
-      title: 'Food Paradise',
+      title: 'Snack Kingdom',
       year: 2007,
       qualityProfileId: 1,
     });
@@ -877,7 +879,7 @@ describe('Download Check', () => {
         id: 705,
         seasonNumber: 7,
         episodeNumber: 5,
-        title: 'Pizza Paradise 3',
+        title: 'Taco Kingdom 3',
         hasFile: false,
       },
     ]);
@@ -912,7 +914,7 @@ describe('Download Check', () => {
 
   it('leaves an unsure title for an admin, and their choice stands', async () => {
     const stuck = grab({
-      title: 'The.Traitors.New.Blood.S01E05.720p.WEB.H264-iNSiDiOUS',
+      title: 'The.Schemers.Fresh.Blood.S01E05.720p.WEB.H264-iNTRePiD',
       state: 'importblocked',
       trackedStatus: 'warning',
       sizeLeft: 0,
@@ -921,7 +923,7 @@ describe('Download Check', () => {
       ],
     });
     sonarr.itemFacts.set(10, {
-      title: 'The Traitors (US)',
+      title: 'The Schemers (US)',
       year: 2023,
       qualityProfileId: 1,
     });
@@ -985,15 +987,15 @@ describe('Download Check', () => {
 
   it('rejects a movie no better than the one there', async () => {
     radarr.itemFacts.set(20, {
-      title: 'Heat',
+      title: 'Scorch',
       year: 1995,
       qualityProfileId: 1,
       movieFile: { id: 9, quality: WEB1080, customFormatScore: 500 },
     });
-    radarr.parsed.set('Heat.1995.720p.WEB-DL', 20);
+    radarr.parsed.set('Scorch.1995.720p.WEB-DL', 20);
     radarr.queueNow = [
       grab({
-        title: 'Heat.1995.720p.WEB-DL',
+        title: 'Scorch.1995.720p.WEB-DL',
         itemId: 20,
         episodes: [],
         quality: WEB720,

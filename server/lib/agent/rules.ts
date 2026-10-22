@@ -152,7 +152,7 @@ export const checkMapping = (
       continue;
     }
     // A sample can be long enough to pass for an episode (DHD's are 40 MB).
-    // Only the file's own name is read: a show called Trailer Park Boys,
+    // Only the file's own name is read: a show called Caravan Lot Lads,
     // or an episode called The Menu, is not an extra.
     if (SAMPLE.test(file.path.split(/[\\/]/).pop() ?? '')) {
       problems.push(
@@ -319,7 +319,7 @@ const distance = (a: string, b: string): number => {
   return d[a.length][b.length];
 };
 
-/** The same word, allowing a typo in a longer one ("Capser"). */
+/** The same word, allowing a typo in a longer one ("Wendel"). */
 const sameWord = (a: string, b: string) =>
   a === b || (Math.min(a.length, b.length) >= 5 && distance(a, b) <= 1);
 

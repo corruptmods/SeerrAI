@@ -260,18 +260,20 @@ const plexHas = (
   return asked;
 };
 
-const civilWar = {
-  title: 'Civil War',
+const borderFeud = {
+  title: 'Border Feud',
   year: 2024,
-  tmdbId: 929590,
-  imdbId: 'tt17279496',
-  folder: 'Civil War (2024)',
+  tmdbId: 846213,
+  imdbId: 'tt18381507',
+  folder: 'Border Feud (2024)',
   runtime: 109,
-  file: 'Guerra.Civil.2024.1080p.mkv',
+  file: 'Guerra.Fronteriza.2024.1080p.mkv',
   fileRuntime: '1:49:01',
 };
 const guerraCivil = () =>
-  plexMovie('70', 'Guerra Civil', 2024, 'Civil War (2024)', ['tmdb://1310753']);
+  plexMovie('70', 'Guerra Fronteriza', 2024, 'Border Feud (2024)', [
+    'tmdb://1427986',
+  ]);
 
 const pending = () =>
   getRepository(MatchWatch).find({ order: { mediaServer: 'ASC' } });
@@ -287,7 +289,7 @@ describe('looking at new requests as they are imported', () => {
       apiKey: 'jk',
       libraries: [{ id: 'jm', name: 'Films', enabled: true, type: 'movie' }],
     };
-    const film = await requestedMovie(929590, 10);
+    const film = await requestedMovie(846213, 10);
     await dataSource.manager.save(
       new Media({
         mediaType: MediaType.MOVIE,
@@ -302,7 +304,7 @@ describe('looking at new requests as they are imported', () => {
       new Media({
         mediaType: MediaType.TV,
         tmdbId: 1,
-        tvdbId: 455755,
+        tvdbId: 577104,
         status: MediaStatus.PROCESSING,
         serviceId: 0,
         externalServiceId: 20,
@@ -356,8 +358,8 @@ describe('looking at new requests as they are imported', () => {
   });
 
   it('backs off, and gives up quietly on a title the server never lists', async () => {
-    await requestedMovie(929590, 10);
-    radarrHas({ 10: civilWar });
+    await requestedMovie(846213, 10);
+    radarrHas({ 10: borderFeud });
     const asked = plexHas(() => []);
     await matchWatch.noteImports([imported('movie', 10)], T0);
 
@@ -380,8 +382,8 @@ describe('looking at new requests as they are imported', () => {
   });
 
   it('tells a match to another title once, gathered, with the fix and a link', async () => {
-    const film = await requestedMovie(929590, 10);
-    radarrHas({ 10: civilWar });
+    const film = await requestedMovie(846213, 10);
+    radarrHas({ 10: borderFeud });
     plexHas(() => [guerraCivil()]);
     await matchWatch.noteImports([imported('movie', 10)], T0);
 
@@ -401,11 +403,11 @@ describe('looking at new requests as they are imported', () => {
     assert.equal(message.notifyAdmin, true);
     assert.equal(message.notifyUser, undefined, 'never the requester');
     assert.equal(message.event, 'Wrong match');
-    assert.match(message.subject, /^Civil War \(2024\): Plex matched/);
-    assert.match(message.subject, /Guerra Civil \(2024\)/);
+    assert.match(message.subject, /^Border Feud \(2024\): Plex matched/);
+    assert.match(message.subject, /Guerra Fronteriza \(2024\)/);
     assert.match(
       message.message ?? '',
-      /Fix Match in Plex, searching tmdb-929590/
+      /Fix Match in Plex, searching tmdb-846213/
     );
     assert.match(message.message ?? '', /rename the file in Radarr/);
     assert.equal(message.actionUrl, `/movie/${film.tmdbId}`);
@@ -419,10 +421,10 @@ describe('looking at new requests as they are imported', () => {
   });
 
   it('says "not matched" only once the server has had its time', async () => {
-    await requestedMovie(929590, 10);
-    radarrHas({ 10: civilWar });
+    await requestedMovie(846213, 10);
+    radarrHas({ 10: borderFeud });
     plexHas(() => [
-      plexMovie('70', 'Civil War', undefined, 'Civil War (2024)', []),
+      plexMovie('70', 'Border Feud', undefined, 'Border Feud (2024)', []),
     ]);
     await matchWatch.noteImports([imported('movie', 10)], T0);
 
@@ -435,19 +437,27 @@ describe('looking at new requests as they are imported', () => {
     assert.equal(JSON.parse(problem.problem).reason, 'unmatched');
     await matchWatch.run(at(122));
     assert.equal(sent.length, 1);
-    assert.match(sent[0].subject, /Plex has not matched "Civil War \(2024\)"/);
+    assert.match(
+      sent[0].subject,
+      /Plex has not matched "Border Feud \(2024\)"/
+    );
   });
 
   it('puts problems found close together into one message', async () => {
-    await requestedMovie(929590, 10);
+    await requestedMovie(846213, 10);
     await requestedMovie(1000, 12);
     radarrHas({
-      10: civilWar,
-      12: { title: 'Eden', year: 2025, tmdbId: 1000, folder: 'Eden (2025)' },
+      10: borderFeud,
+      12: {
+        title: 'Orvane',
+        year: 2025,
+        tmdbId: 1000,
+        folder: 'Orvane (2025)',
+      },
     });
     plexHas(() => [
       guerraCivil(),
-      plexMovie('71', 'Eden', 2025, 'Eden (2025)', ['tmdb://1455674']),
+      plexMovie('71', 'Orvane', 2025, 'Orvane (2025)', ['tmdb://1566785']),
     ]);
     await matchWatch.noteImports([imported('movie', 10)], T0);
     await matchWatch.noteImports([imported('movie', 12)], at(5));
@@ -460,8 +470,8 @@ describe('looking at new requests as they are imported', () => {
     await matchWatch.run(at(12));
     assert.equal(sent.length, 1);
     assert.equal(sent[0].subject, '2 wrong matches');
-    assert.match(sent[0].message ?? '', /Civil War/);
-    assert.match(sent[0].message ?? '', /Eden/);
+    assert.match(sent[0].message ?? '', /Border Feud/);
+    assert.match(sent[0].message ?? '', /Orvane/);
     assert.match(
       sent[0].message ?? '',
       /https:\/\/seerr\.example\/movie\/1000/,
@@ -511,13 +521,13 @@ describe('looking at new requests as they are imported', () => {
   });
 
   it('clears a problem put right without a word', async () => {
-    await requestedMovie(929590, 10);
-    radarrHas({ 10: civilWar });
+    await requestedMovie(846213, 10);
+    radarrHas({ 10: borderFeud });
     let fixed = false;
     plexHas(() => [
       fixed
-        ? plexMovie('70', 'Civil War', 2024, 'Civil War (2024)', [
-            'tmdb://929590',
+        ? plexMovie('70', 'Border Feud', 2024, 'Border Feud (2024)', [
+            'tmdb://846213',
           ])
         : guerraCivil(),
     ]);
@@ -537,8 +547,8 @@ describe('looking at new requests as they are imported', () => {
   });
 
   it('carries on after a restart from what it kept', async () => {
-    await requestedMovie(929590, 10);
-    radarrHas({ 10: civilWar });
+    await requestedMovie(846213, 10);
+    radarrHas({ 10: borderFeud });
     plexHas(() => [guerraCivil()]);
     await matchWatch.noteImports([imported('movie', 10)], T0);
     await matchWatch.run(at(2));
@@ -561,19 +571,21 @@ describe('looking at new requests as they are imported', () => {
       apiKey: 'jk',
       libraries: [{ id: 'jm', name: 'Films', enabled: true, type: 'movie' }],
     };
-    await requestedMovie(929590, 10);
-    radarrHas({ 10: civilWar });
+    await requestedMovie(846213, 10);
+    radarrHas({ 10: borderFeud });
     plexHas(() => [
-      plexMovie('70', 'Civil War', 2024, 'Civil War (2024)', ['tmdb://929590']),
+      plexMovie('70', 'Border Feud', 2024, 'Border Feud (2024)', [
+        'tmdb://846213',
+      ]),
     ]);
     mock.method(JellyfinAPI.prototype, 'getMatchItems', async () => [
       {
         Id: 'jf-1',
-        Name: 'Guerra Civil',
+        Name: 'Guerra Fronteriza',
         Type: 'Movie',
         ProductionYear: 2024,
-        Path: '/media/films/Civil War (2024)/f.mkv',
-        ProviderIds: { Tmdb: '1310753' },
+        Path: '/media/films/Border Feud (2024)/f.mkv',
+        ProviderIds: { Tmdb: '1427986' },
       },
     ]);
     await matchWatch.noteImports([imported('movie', 10)], T0);
@@ -591,7 +603,7 @@ describe('looking at new requests as they are imported', () => {
     await matchWatch.run(at(12));
     assert.match(
       sent[0].message ?? '',
-      /Identify in Jellyfin, entering TMDB id 929590/
+      /Identify in Jellyfin, entering TMDB id 846213/
     );
   });
 
@@ -599,8 +611,8 @@ describe('looking at new requests as they are imported', () => {
     const show = await dataSource.manager.save(
       new Media({
         mediaType: MediaType.TV,
-        tmdbId: 288673,
-        tvdbId: 455755,
+        tmdbId: 375182,
+        tvdbId: 577104,
         status: MediaStatus.PROCESSING,
         serviceId: 0,
         externalServiceId: 20,
@@ -619,23 +631,23 @@ describe('looking at new requests as they are imported', () => {
     );
     mock.method(SonarrAPI.prototype, 'getSeriesById', async () => ({
       id: 20,
-      title: 'Carrie',
+      title: 'Wrenna',
       year: 2026,
-      tvdbId: 455755,
-      tmdbId: 288673,
-      path: '/tv/Carrie',
+      tvdbId: 577104,
+      tmdbId: 375182,
+      path: '/tv/Wrenna',
     }));
     plexHas(
       () => [],
       [
         {
           ratingKey: '126741',
-          title: 'The Carrie Diaries',
+          title: 'The Wrenna Diaries',
           year: 2013,
           guid: 'plex://show/x',
           type: 'show',
-          Guid: [{ id: 'tvdb://257454' }],
-          Location: [{ path: '/data/tv/Carrie' }],
+          Guid: [{ id: 'tvdb://364817' }],
+          Location: [{ path: '/data/tv/Wrenna' }],
           Media: [],
         } as unknown as PlexLibraryItem,
       ]
@@ -648,20 +660,20 @@ describe('looking at new requests as they are imported', () => {
     await matchWatch.run(at(2));
     await matchWatch.run(at(12));
     assert.equal(sent.length, 1);
-    assert.match(sent[0].subject, /The Carrie Diaries/);
-    assert.match(sent[0].message ?? '', /searching tvdb-455755/);
+    assert.match(sent[0].subject, /The Wrenna Diaries/);
+    assert.match(sent[0].message ?? '', /searching tvdb-577104/);
   });
 
   it('compares albums by their MusicBrainz ids, or clearly different names', async () => {
-    const ARTIST = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
-    const KID_A = 'b8a7c51f-362c-4dcb-a259-bc6e0095f0a6';
-    const OK = '0b6b4ba0-d36f-47bd-b4ea-6a5b91842d29';
+    const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
+    const FOG_B = 'e4d1a87c-5f92-4b03-b6c8-af2d7019e3b5';
+    const OK = '9c2f7e64-a18b-4d35-9e71-5b0c4d8a2f16';
     const media = await dataSource.manager.save(
       new Media({
         mediaType: MediaType.MUSIC,
         tmdbId: 0,
         foreignId: ARTIST,
-        foreignTitle: 'Radiohead',
+        foreignTitle: 'Glasswing',
         status: MediaStatus.PROCESSING,
         serviceId: 0,
         externalServiceId: 30,
@@ -676,8 +688,12 @@ describe('looking at new requests as they are imported', () => {
         requestedBy: await requester(),
         is4k: false,
         albums: [
-          new AlbumRequest({ albumMbid: KID_A, title: 'Kid A', status: 2 }),
-          new AlbumRequest({ albumMbid: OK, title: 'OK Computer', status: 2 }),
+          new AlbumRequest({ albumMbid: FOG_B, title: 'Fog B', status: 2 }),
+          new AlbumRequest({
+            albumMbid: OK,
+            title: 'Static Garden',
+            status: 2,
+          }),
         ],
       }),
       { listeners: false }
@@ -686,8 +702,8 @@ describe('looking at new requests as they are imported', () => {
       number,
       { title: string; mbid: string; date: string }
     > = {
-      40: { title: 'Kid A', mbid: KID_A, date: '2000-10-02' },
-      41: { title: 'OK Computer', mbid: OK, date: '1997-05-21' },
+      40: { title: 'Fog B', mbid: FOG_B, date: '2000-10-02' },
+      41: { title: 'Static Garden', mbid: OK, date: '1997-05-21' },
     };
     stub(LidarrAPI, 'getAlbum', (async (id: number) => ({
       id,
@@ -695,28 +711,28 @@ describe('looking at new requests as they are imported', () => {
       foreignAlbumId: albums[id].mbid,
       releaseDate: albums[id].date,
       releases: [{ foreignReleaseId: `${albums[id].mbid}-r` }],
-      artist: { artistName: 'Radiohead', foreignArtistId: ARTIST },
+      artist: { artistName: 'Glasswing', foreignArtistId: ARTIST },
     })) as never);
     stub(LidarrAPI, 'getTrackFiles', (async (id: number) => [
-      { id: 1, path: `/music/Radiohead/${albums[id].title}/01.flac` },
+      { id: 1, path: `/music/Glasswing/${albums[id].title}/01.flac` },
     ]) as never);
     const plexAlbums: PlexMusicItem[] = [
-      // Kid A's folder, matched to another album entirely.
+      // Fog B's folder, matched to another album entirely.
       {
         ratingKey: 'p40',
         type: 'album',
-        title: 'Pablo Honey',
+        title: 'Velvet Clay',
         year: 1993,
-        parentTitle: 'Radiohead',
+        parentTitle: 'Glasswing',
         Guid: [{ id: 'mbid://11111111-1111-1111-1111-111111111111' }],
       },
-      // OK Computer's, with no MusicBrainz id and its own names: fine.
+      // Static Garden's, with no MusicBrainz id and its own names: fine.
       {
         ratingKey: 'p41',
         type: 'album',
-        title: 'OK Computer (Remastered)',
+        title: 'Static Garden (Remastered)',
         year: 1997,
-        parentTitle: 'Radiohead',
+        parentTitle: 'Glasswing',
       },
     ];
     mock.method(
@@ -730,7 +746,7 @@ describe('looking at new requests as they are imported', () => {
           {
             Part: [
               {
-                file: `/data/music/Radiohead/${key === 'p40' ? 'Kid A' : 'OK Computer'}/01.flac`,
+                file: `/data/music/Glasswing/${key === 'p40' ? 'Fog B' : 'Static Garden'}/01.flac`,
               },
             ],
           },
@@ -752,12 +768,12 @@ describe('looking at new requests as they are imported', () => {
     assert.equal(rows.length, 1);
     const problem = JSON.parse(rows[0].problem);
     assert.equal(problem.kind, 'music');
-    assert.equal(problem.expected.mbid, KID_A);
+    assert.equal(problem.expected.mbid, FOG_B);
     assert.equal(rows[0].arrAlbumId, 40);
     assert.deepEqual(
       (await pending()).map((r) => r.arrItemId),
       [40],
-      'OK Computer is right'
+      'Static Garden is right'
     );
     // The requester's album waits for the server; the other does not.
     assert.deepEqual(
@@ -765,9 +781,9 @@ describe('looking at new requests as they are imported', () => {
       [40]
     );
     await matchWatch.run(at(12));
-    assert.match(sent[0].subject, /Pablo Honey/);
-    assert.match(sent[0].message ?? '', /Fix Match in Plex and pick Kid A/);
-    assert.equal(sent[0].actionUrl, `/music/album/${KID_A}`);
+    assert.match(sent[0].subject, /Velvet Clay/);
+    assert.match(sent[0].message ?? '', /Fix Match in Plex and pick Fog B/);
+    assert.equal(sent[0].actionUrl, `/music/album/${FOG_B}`);
   });
 });
 
@@ -788,11 +804,11 @@ describe('sharing what is found with the nightly Match Check', () => {
     mock.method(SonarrAPI.prototype, 'getSeries', async () => []);
     stub(RadarrAPI, 'getMovies', (async () => [
       {
-        title: civilWar.title,
-        year: civilWar.year,
-        tmdbId: civilWar.tmdbId,
-        imdbId: civilWar.imdbId,
-        path: `/movies/${civilWar.folder}`,
+        title: borderFeud.title,
+        year: borderFeud.year,
+        tmdbId: borderFeud.tmdbId,
+        imdbId: borderFeud.imdbId,
+        path: `/movies/${borderFeud.folder}`,
       },
     ]) as never);
     mock.method(
@@ -808,8 +824,8 @@ describe('sharing what is found with the nightly Match Check', () => {
 
   it('does not tell what the nightly check listed already', async () => {
     await nightlyFinds([guerraCivil()]);
-    await requestedMovie(929590, 10);
-    radarrHas({ 10: civilWar });
+    await requestedMovie(846213, 10);
+    radarrHas({ 10: borderFeud });
     plexHas(() => [guerraCivil()]);
     await matchWatch.noteImports([imported('movie', 10)], T0);
     await matchWatch.run(at(2));
@@ -820,8 +836,8 @@ describe('sharing what is found with the nightly Match Check', () => {
   });
 
   it('is not told again when the nightly check finds it, and is cleared when it finds it right', async () => {
-    await requestedMovie(929590, 10);
-    radarrHas({ 10: civilWar });
+    await requestedMovie(846213, 10);
+    radarrHas({ 10: borderFeud });
     plexHas(() => [guerraCivil()]);
     await matchWatch.noteImports([imported('movie', 10)], T0);
     await matchWatch.run(at(2));
@@ -834,7 +850,9 @@ describe('sharing what is found with the nightly Match Check', () => {
     assert.equal(still.resolvedAt, null);
 
     await nightlyFinds([
-      plexMovie('70', 'Civil War', 2024, 'Civil War (2024)', ['tmdb://929590']),
+      plexMovie('70', 'Border Feud', 2024, 'Border Feud (2024)', [
+        'tmdb://846213',
+      ]),
     ]);
     const [cleared] = await problems();
     assert.ok(cleared.resolvedAt, 'the nightly check found it right');

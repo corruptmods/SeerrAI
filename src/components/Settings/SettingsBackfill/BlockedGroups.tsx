@@ -14,7 +14,7 @@ const messages = defineMessages(
       'Releases from these groups are never taken, by Backfill, the agent, Radarr or Sonarr. Existing files from them are replaced.',
     none: 'No groups are blocked.',
     group: 'Release group',
-    placeholder: 'As in release names, like rothebehap',
+    placeholder: 'As in release names, like quillowsap',
     add: 'Block',
     adding: 'Blocking…',
     remove: 'Unblock {group}',

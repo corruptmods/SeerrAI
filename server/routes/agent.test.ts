@@ -98,8 +98,8 @@ describe('the admin agent’s routes', () => {
       new AgentRun({
         trigger: 'ask',
         status: 'done',
-        ask: 'Find Casper',
-        title: 'Casper the Friendly Ghost',
+        ask: 'Find Wendle',
+        title: 'Wendle the Gentle Lantern',
         summary: 'Grabbed two.',
         steps: [
           { at: '2026-10-07T20:00:00.000Z', kind: 'say', text: 'Looking.' },
@@ -116,7 +116,7 @@ describe('the admin agent’s routes', () => {
         r.steps,
       ]),
       [
-        ['Casper the Friendly Ghost', 1],
+        ['Wendle the Gentle Lantern', 1],
         ['Old', 0],
       ]
     );
@@ -134,7 +134,7 @@ describe('the admin agent’s routes', () => {
       400
     );
     const refused = await call('POST', '/api/v1/agent/ask', {
-      text: 'Find Casper',
+      text: 'Find Wendle',
     });
     assert.equal(refused.status, 409);
     assert.match(refused.body.message, /Admin Agent/);
@@ -153,11 +153,11 @@ describe('the admin agent’s routes', () => {
       );
     });
     const ok = await call('POST', '/api/v1/agent/ask', {
-      text: '  Find Casper  ',
+      text: '  Find Wendle  ',
     });
     assert.equal(ok.status, 202);
     assert.equal(ok.body.status, 'queued');
-    assert.deepEqual(asked, ['Find Casper']);
+    assert.deepEqual(asked, ['Find Wendle']);
   });
 
   it('take a reply to a conversation that is not busy', async () => {
@@ -203,7 +203,7 @@ describe('the admin agent’s routes', () => {
       'getSeriesDetail',
       async (id: number) => {
         if (id !== 1284) throw new Error('Not found');
-        return { id, title: 'Food Wars!' };
+        return { id, title: 'Kitchen Clash!' };
       }
     );
     const asked: [string, unknown][] = [];
@@ -235,7 +235,7 @@ describe('the admin agent’s routes', () => {
         'Get whatever is missing.',
         {
           title: { kind: 'series', serverId: 0, arrId: 1284 },
-          name: 'Food Wars!',
+          name: 'Kitchen Clash!',
         },
       ],
     ]);
@@ -249,7 +249,7 @@ describe('the admin agent’s routes', () => {
       new AgentRun({
         trigger: 'ask',
         status: 'done',
-        ask: 'Find Casper',
+        ask: 'Find Wendle',
         kind: 'series',
         serverId: 0,
         arrId: 1283,
@@ -264,7 +264,7 @@ describe('the admin agent’s routes', () => {
     assert.equal(mine.status, 200);
     assert.deepEqual(
       mine.body.runs.map((r: { title: string }) => r.title),
-      ['Food Wars!']
+      ['Kitchen Clash!']
     );
     assert.equal((await call('GET', '/api/v1/agent')).body.total, 2);
   });
@@ -275,7 +275,7 @@ describe('the admin agent’s routes', () => {
         kind: 'series',
         serverId: 0,
         arrId: 5,
-        title: 'Casper',
+        title: 'Wendle',
         status: 'downloading',
       })
     );
@@ -309,7 +309,7 @@ describe('the admin agent’s routes', () => {
           {
             at: new Date().toISOString(),
             type: 'grab',
-            title: 'Casper',
+            title: 'Wendle',
             detail: 'x',
             jobId,
           },

@@ -17,30 +17,30 @@ import { describe, it } from 'node:test';
 
 describe('names and folders', () => {
   it('are compared without case, accents, “the”, “&” or punctuation', () => {
-    assert.equal(normalizeName('The Beatles'), normalizeName('beatles'));
-    assert.equal(normalizeName('Björk'), 'bjork');
-    assert.equal(normalizeName('Simon & Garfunkel'), 'simonandgarfunkel');
-    assert.equal(normalizeName('OK Computer (1997)'), 'okcomputer1997');
+    assert.equal(normalizeName('The Tin Larks'), normalizeName('tinlarks'));
+    assert.equal(normalizeName('Sölvi'), 'solvi');
+    assert.equal(normalizeName('Hollis & Wren'), 'hollisandwren');
+    assert.equal(normalizeName('Static Garden (1997)'), 'staticgarden1997');
     assert.equal(normalizeName('坂本龍一'), '坂本龍一');
     assert.equal(normalizeName(undefined), '');
   });
 
   it('takes the last folder of a path, either kind of slash', () => {
-    assert.equal(folderName('/music/Radiohead/Kid A/'), 'Kid A');
-    assert.equal(folderName('D:\\Music\\Radiohead\\Kid A'), 'Kid A');
+    assert.equal(folderName('/music/Glasswing/Fog B/'), 'Fog B');
+    assert.equal(folderName('D:\\Music\\Glasswing\\Fog B'), 'Fog B');
     assert.equal(
-      parentPath('/music/Radiohead/Kid A/01.flac'),
-      '/music/Radiohead/Kid A'
+      parentPath('/music/Glasswing/Fog B/01.flac'),
+      '/music/Glasswing/Fog B'
     );
-    assert.equal(parentPath('/music/Radiohead/'), '/music');
+    assert.equal(parentPath('/music/Glasswing/'), '/music');
     assert.equal(folderName(undefined), undefined);
   });
 });
 
 describe('matching an album by folder or title', () => {
   const candidates = [
-    { mbid: 'hail', title: 'Hail to the Thief', releaseDate: '2003-06-09' },
-    { mbid: 'kid-a', title: 'Kid A', releaseDate: '2000-10-02' },
+    { mbid: 'sing', title: 'Sing to the Ferryman', releaseDate: '2003-06-09' },
+    { mbid: 'kid-a', title: 'Fog B', releaseDate: '2000-10-02' },
     { mbid: 'live', title: 'Live', releaseDate: '1994' },
     { mbid: 'live-2', title: 'Live', releaseDate: '2001' },
     { mbid: 'kept', title: 'Bootleg', folder: 'bootleg-1995' },
@@ -49,14 +49,14 @@ describe('matching an album by folder or title', () => {
   it('matches the folder against a title, with or without its year', () => {
     assert.equal(
       matchByFolderOrTitle(
-        { path: '/m/Radiohead/Hail to the Thief (2003)', title: 'x' },
+        { path: '/m/Glasswing/Sing to the Ferryman (2003)', title: 'x' },
         candidates
       ),
-      'hail'
+      'sing'
     );
     assert.equal(
       matchByFolderOrTitle(
-        { path: '/m/Radiohead/Kid A', title: 'x' },
+        { path: '/m/Glasswing/Fog B', title: 'x' },
         candidates
       ),
       'kid-a'
@@ -72,7 +72,7 @@ describe('matching an album by folder or title', () => {
   });
 
   it('then the title and year, and only a single match', () => {
-    assert.equal(matchByFolderOrTitle({ title: 'KID A' }, candidates), 'kid-a');
+    assert.equal(matchByFolderOrTitle({ title: 'FOG B' }, candidates), 'kid-a');
     assert.equal(
       matchByFolderOrTitle({ title: 'Live', year: 2001 }, candidates),
       'live-2'
@@ -83,11 +83,11 @@ describe('matching an album by folder or title', () => {
       undefined
     );
     assert.equal(
-      matchByFolderOrTitle({ title: 'Kid A', year: 2009 }, candidates),
+      matchByFolderOrTitle({ title: 'Fog B', year: 2009 }, candidates),
       undefined
     );
     assert.equal(
-      matchByFolderOrTitle({ title: 'Amnesiac' }, candidates),
+      matchByFolderOrTitle({ title: 'Somnolent' }, candidates),
       undefined
     );
   });

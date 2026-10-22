@@ -26,8 +26,8 @@ const record = (
   artistId: 7,
   albumId: album.id,
   album,
-  artist: { id: 7, artistName: 'Radiohead', foreignArtistId: 'artist' },
-  title: `Radiohead - ${album.title} (FLAC)`,
+  artist: { id: 7, artistName: 'Glasswing', foreignArtistId: 'artist' },
+  title: `Glasswing - ${album.title} (FLAC)`,
   size: 500,
   sizeleft,
   timeleft: '00:01:00',
@@ -38,8 +38,8 @@ const record = (
   protocol: 'torrent',
 });
 
-const HAIL = { id: 70, title: 'Hail to the Thief', foreignAlbumId: 'hail' };
-const KID_A = { id: 71, title: 'Kid A', foreignAlbumId: 'kid-a' };
+const SING = { id: 70, title: 'Sing to the Ferryman', foreignAlbumId: 'sing' };
+const FOG_B = { id: 71, title: 'Fog B', foreignAlbumId: 'kid-a' };
 
 const LIDARR = {
   id: 0,
@@ -92,8 +92,8 @@ afterEach(() => {
 describe('Lidarr’s downloads', () => {
   it('are kept by artist, each saying its album', async () => {
     queue = [
-      record('hail', HAIL, 'downloading', 'downloading', 250),
-      record('kid-a', KID_A, 'queued', 'downloading', 500),
+      record('sing', SING, 'downloading', 'downloading', 250),
+      record('kid-a', FOG_B, 'queued', 'downloading', 500),
     ];
 
     await downloadTracker.updateDownloads();
@@ -102,8 +102,8 @@ describe('Lidarr’s downloads', () => {
     assert.deepEqual(
       all.map((item) => [item.mediaType, item.album?.title, item.stage]),
       [
-        [MediaType.MUSIC, 'Hail to the Thief', 'downloading'],
-        [MediaType.MUSIC, 'Kid A', 'queued'],
+        [MediaType.MUSIC, 'Sing to the Ferryman', 'downloading'],
+        [MediaType.MUSIC, 'Fog B', 'queued'],
       ]
     );
     assert.deepEqual(
@@ -114,7 +114,7 @@ describe('Lidarr’s downloads', () => {
   });
 
   it('show on the artist’s own record', async () => {
-    queue = [record('hail', HAIL, 'downloading', 'downloading', 250)];
+    queue = [record('sing', SING, 'downloading', 'downloading', 250)];
     await downloadTracker.updateDownloads();
 
     const artist = new Media({
@@ -137,7 +137,7 @@ describe('Lidarr’s downloads', () => {
     downloadTracker.whenImported(() => {
       scans++;
     });
-    queue = [record('hail', HAIL, 'completed', 'importing', 0)];
+    queue = [record('sing', SING, 'completed', 'importing', 0)];
     await downloadTracker.updateDownloads();
 
     queue = [];
@@ -161,7 +161,7 @@ describe('Lidarr’s downloads', () => {
 
   it('are not read while music is off', async () => {
     getSettings().main.disabledFeatures = ['music'];
-    queue = [record('hail', HAIL, 'downloading', 'downloading', 250)];
+    queue = [record('sing', SING, 'downloading', 'downloading', 250)];
 
     await downloadTracker.updateDownloads();
 

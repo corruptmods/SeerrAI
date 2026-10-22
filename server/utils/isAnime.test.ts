@@ -11,8 +11,8 @@ const ANIMATION = { id: 16, name: 'Animation' };
 const DRAMA = { id: 18, name: 'Drama' };
 const ANIME_KEYWORD = { id: 210024, name: 'anime' };
 
-// Castlevania: American, in English, with TMDB's anime keyword.
-const castlevania = {
+// Gravespire: American, in English, with TMDB's anime keyword.
+const gravespire = {
   keywords: { results: [ANIME_KEYWORD] },
   genres: [ANIMATION],
   original_language: 'en',
@@ -36,7 +36,7 @@ describe('isAnime', () => {
   });
 
   it('counts anime from every country when none is left out', () => {
-    assert.equal(isAnime(castlevania, []), true);
+    assert.equal(isAnime(gravespire, []), true);
     // Korean, with the keyword.
     assert.equal(
       isAnime(
@@ -53,7 +53,7 @@ describe('isAnime', () => {
   });
 
   it('leaves out a country the admin listed, unless it is in Japanese', () => {
-    assert.equal(isAnime(castlevania, ['US']), false);
+    assert.equal(isAnime(gravespire, ['US']), false);
     // A movie, known only by where it was produced.
     assert.equal(
       isAnime(
@@ -79,7 +79,7 @@ describe('isAnime', () => {
       ),
       false
     );
-    // Uzumaki: an American co-production made in Japanese.
+    // Yorumaki: an American co-production made in Japanese.
     assert.equal(
       isAnime(
         {
@@ -93,7 +93,7 @@ describe('isAnime', () => {
       true
     );
     // Only the countries listed are left out.
-    assert.equal(isAnime(castlevania, ['KR', 'CN']), true);
+    assert.equal(isAnime(gravespire, ['KR', 'CN']), true);
     assert.equal(
       isAnime(
         {
@@ -124,7 +124,7 @@ describe('isAnime', () => {
   });
 
   it('counts Japanese animation without the keyword', () => {
-    // Oshi no Ko: no anime keyword on TMDB at the time.
+    // Yume no Tane: no anime keyword on TMDB at the time.
     assert.equal(
       isAnime(
         {
@@ -189,8 +189,8 @@ describe('isAnime', () => {
 
 describe('leftOutAsAnime', () => {
   it('is true only for a title not in Japanese from a listed country', () => {
-    assert.equal(leftOutAsAnime(castlevania, ['US']), true);
-    assert.equal(leftOutAsAnime(castlevania, []), false);
+    assert.equal(leftOutAsAnime(gravespire, ['US']), true);
+    assert.equal(leftOutAsAnime(gravespire, []), false);
     assert.equal(
       leftOutAsAnime({ original_language: 'ja', origin_country: ['US'] }, [
         'US',

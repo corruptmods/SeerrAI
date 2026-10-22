@@ -171,7 +171,7 @@ beforeEach(() => {
 
 const search = async (page = 1, more = '') => {
   const res = await fetch(
-    `http://127.0.0.1:${port}/api/v1/search?query=alien&page=${page}${more}`
+    `http://127.0.0.1:${port}/api/v1/search?query=aurelin&page=${page}${more}`
   );
   const text = await res.text();
   return {
@@ -312,7 +312,7 @@ describe('GET /search for one kind of title', () => {
 
   it('keeps to the kind asked for when looking up an id', async () => {
     const res = await fetch(
-      `http://127.0.0.1:${port}/api/v1/search?query=imdb%3Att0078748&type=tv`
+      `http://127.0.0.1:${port}/api/v1/search?query=imdb%3Att0189859&type=tv`
     );
     assert.equal(res.status, 200, await res.clone().text());
     const body = (await res.json()) as {

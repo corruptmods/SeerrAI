@@ -8,8 +8,8 @@ import logger from '@server/logger';
  * Which albums and artists a music search shows first.
  *
  * MusicBrainz scores every exact match the same (100) and lists those in no
- * useful order, so a search for "Thriller" can fill the page with obscure
- * albums of that name and leave out Michael Jackson's. The search asks for
+ * useful order, so a search for "Moonlurker" can fill the page with obscure
+ * albums of that name and leave out Marcus Delray's. The search asks for
  * many more than it shows and ranks them here, using only what the search
  * answer already carries: no extra request per result.
  */
@@ -121,8 +121,8 @@ export interface SearchPage<T> {
  * A search's results, looking further while they are still tied.
  *
  * When every result on a page has the top score, the one people mean can
- * be on the next page as easily as this one (a search for "Thriller" has
- * a hundred exact matches before Michael Jackson's). So while a page ends
+ * be on the next page as easily as this one (a search for "Moonlurker" has
+ * a hundred exact matches before Marcus Delray's). So while a page ends
  * on the top score and there are more, the next page is asked for too, up
  * to `maxPages`. Only searches like that cost the extra requests.
  *

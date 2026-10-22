@@ -5,25 +5,25 @@ import { isListSort, sortListItems } from './listSort';
 const items = [
   {
     id: 1,
-    title: 'The Matrix',
+    title: 'The Mazewright',
     releaseDate: '1999-03-31',
     createdAt: '2026-01-02T00:00:00Z',
   },
   {
     id: 2,
-    title: 'alien',
+    title: 'aurelin',
     releaseDate: '1979-05-25',
     createdAt: '2026-03-01T00:00:00Z',
   },
   {
     id: 3,
-    title: 'Mad Max 2',
+    title: 'Mad Moth 2',
     releaseDate: '1981-12-24',
     createdAt: '2026-02-01T00:00:00Z',
   },
   {
     id: 4,
-    title: 'Mad Max 10',
+    title: 'Mad Moth 10',
     releaseDate: '',
     createdAt: '2026-02-15T00:00:00Z',
   },
@@ -40,7 +40,7 @@ describe('sortListItems', () => {
   });
 
   it('sorts titles ignoring case, a leading article, and by number', () => {
-    // alien, Mad Max 2, Mad Max 10, (The) Matrix
+    // aurelin, Mad Moth 2, Mad Moth 10, (The) Mazewright
     assert.deepEqual(ids(sortListItems(items, 'title')), [2, 3, 4, 1]);
   });
 

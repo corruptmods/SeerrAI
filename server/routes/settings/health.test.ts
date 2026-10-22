@@ -1468,8 +1468,8 @@ describe('requests, titles and users', () => {
     await getRepository(Media).save(
       new Media({
         mediaType: MediaType.TV,
-        tmdbId: 288673,
-        tvdbId: 455755,
+        tmdbId: 375182,
+        tvdbId: 577104,
         status: MediaStatus.PARTIALLY_AVAILABLE,
       })
     );
@@ -1481,17 +1481,17 @@ describe('requests, titles and users', () => {
       problems: [
         {
           kind: 'series' as const,
-          folder: 'Carrie',
+          folder: 'Wrenna',
           reason: 'other' as const,
           expected: {
-            title: 'Carrie',
+            title: 'Wrenna',
             year: 2026,
-            tvdbId: 455755,
+            tvdbId: 577104,
             server: 'Sonarr',
           },
           mediaServer: 'Plex',
           matched: {
-            title: 'The Carrie Diaries',
+            title: 'The Wrenna Diaries',
             year: 2013,
             key: '126741',
           },
@@ -1504,9 +1504,9 @@ describe('requests, titles and users', () => {
       check.items.map((i) => [i.title, i.detail, i.href]),
       [
         [
-          'Plex matched "Carrie" to The Carrie Diaries (2013)',
-          'Sonarr has Carrie (2026) there (Sonarr: TVDB 455755) · Fix Match in Plex, searching tvdb-455755',
-          '/tv/288673',
+          'Plex matched "Wrenna" to The Wrenna Diaries (2013)',
+          'Sonarr has Wrenna (2026) there (Sonarr: TVDB 577104) · Fix Match in Plex, searching tvdb-577104',
+          '/tv/375182',
         ],
       ]
     );
@@ -1532,7 +1532,7 @@ describe('requests, titles and users', () => {
 });
 
 describe('music', () => {
-  const ARTIST = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
+  const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
   const album = (n: number) =>
     `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
@@ -1569,7 +1569,7 @@ describe('music', () => {
     settings.plex = { ...settings.plex, musicLibraries: [] };
   };
 
-  /** Radiohead, their albums, and a request for some of them. */
+  /** Glasswing, their albums, and a request for some of them. */
   const seed = async (
     albums: Partial<MusicAlbum>[],
     {
@@ -1582,7 +1582,7 @@ describe('music', () => {
         mediaType: MediaType.MUSIC,
         tmdbId: 0,
         foreignId: ARTIST,
-        foreignTitle: 'Radiohead',
+        foreignTitle: 'Glasswing',
         status: MediaStatus.PROCESSING,
         serviceId: 0,
         externalServiceId: 7,
@@ -1638,12 +1638,12 @@ describe('music', () => {
       await seed([
         {
           mbId: album(1),
-          title: 'Hail to the Thief',
+          title: 'Sing to the Ferryman',
           trackCount: 14,
           trackFileCount: 14,
         },
         // Lidarr has nothing of it yet: not this check's.
-        { mbId: album(2), title: 'Kid A', trackFileCount: 0 },
+        { mbId: album(2), title: 'Fog B', trackFileCount: 0 },
       ]);
       // In Lidarr only an hour: the media server may not have scanned yet.
       const fresh = await getRepository(MusicAlbum).save(
@@ -1654,7 +1654,7 @@ describe('music', () => {
             })
           ).id,
           mbId: album(3),
-          title: 'Amnesiac',
+          title: 'Somnolent',
           secondaryTypes: [],
           status: MediaStatus.PROCESSING,
           trackFileCount: 11,
@@ -1665,7 +1665,7 @@ describe('music', () => {
       const check = byId(await health(), 'musicNotOnServer');
       assert.equal(check.status, 'warning');
       assert.equal(check.count, 1);
-      assert.equal(check.items[0].title, 'Hail to the Thief — Radiohead');
+      assert.equal(check.items[0].title, 'Sing to the Ferryman — Glasswing');
       assert.match(check.items[0].detail!, /^14 of 14 tracks in Lidarr · /);
       assert.equal(check.items[0].href, `/music/album/${album(1)}`);
 
@@ -1681,8 +1681,8 @@ describe('music', () => {
   it('flags requested albums with no release a week after approval, ready to search', async () => {
     try {
       const media = await seed([
-        { mbId: album(1), title: 'Kid A', lidarrAlbumId: 71, trackCount: 10 },
-        { mbId: album(2), title: 'Amnesiac', lidarrAlbumId: 72 },
+        { mbId: album(1), title: 'Fog B', lidarrAlbumId: 71, trackCount: 10 },
+        { mbId: album(2), title: 'Somnolent', lidarrAlbumId: 72 },
         // Not out yet: nothing to find.
         {
           mbId: album(3),
@@ -1691,16 +1691,16 @@ describe('music', () => {
           releaseDate: '2999',
         },
         // Lidarr is getting it.
-        { mbId: album(4), title: 'Pablo Honey', trackFileCount: 4 },
+        { mbId: album(4), title: 'Velvet Clay', trackFileCount: 4 },
       ]);
 
       const check = byId(await health(), 'musicNoRelease');
       assert.equal(check.status, 'warning');
       assert.equal(check.count, 1);
-      assert.equal(check.items[0].title, 'Radiohead — 2 albums');
+      assert.equal(check.items[0].title, 'Glasswing — 2 albums');
       assert.match(
         check.items[0].detail!,
-        /^Kid A, Amnesiac · approved 8 days ago$/
+        /^Fog B, Somnolent · approved 8 days ago$/
       );
       assert.equal(check.items[0].href, `/music/artist/${ARTIST}`);
       assert.deepEqual(
@@ -1753,7 +1753,7 @@ describe('music', () => {
 
   it('leaves alone a request approved this week', async () => {
     try {
-      await seed([{ mbId: album(1), title: 'Kid A', lidarrAlbumId: 71 }], {
+      await seed([{ mbId: album(1), title: 'Fog B', lidarrAlbumId: 71 }], {
         approvedAgo: 2 * DAY,
       });
       assert.equal(byId(await health(), 'musicNoRelease').count, 0);
@@ -1805,7 +1805,7 @@ describe('music', () => {
 
   it('is left off the page while music is off for everyone', async () => {
     try {
-      await seed([{ mbId: album(1), title: 'Kid A', lidarrAlbumId: 71 }]);
+      await seed([{ mbId: album(1), title: 'Fog B', lidarrAlbumId: 71 }]);
       getSettings().main.disabledFeatures = ['music'];
       const ids = (await health()).map((c) => c.id);
       for (const id of ['musicbrainz', 'musicNotOnServer', 'musicNoRelease']) {

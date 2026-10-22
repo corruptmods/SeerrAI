@@ -39,7 +39,7 @@ export type ChangeKind =
 /** One change, as proposed: what it does, in words, and how to do it. */
 export interface ProposedChange {
   kind: ChangeKind;
-  /** One line: "Delete the file of Resident Evil (2026)". */
+  /** One line: "Delete the file of Hollow Signal (2026)". */
   headline: string;
   /** What exactly happens, line by line. */
   details: string[];

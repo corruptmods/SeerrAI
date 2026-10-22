@@ -20,7 +20,7 @@ Every 10 minutes (the **Health Alerts** job) the service checks run, and admins 
 
 ## Match Check: titles matched wrongly
 
-Media servers match files to titles by name; Sonarr, Radarr and Lidarr by id. When they disagree, the wrong title shows as available and the right one shows nothing. A new show called "Carrie" might be matched to "The Carrie Diaries".
+Media servers match files to titles by name; Sonarr, Radarr and Lidarr by id. When they disagree, the wrong title shows as available and the right one shows nothing. A new show called "Wrenna" might be matched to "The Wrenna Diaries".
 
 **Every night** (04:20, the **Match Check** job), Seerr AI reads each library on each connected server, finds each item's folder in Sonarr or Radarr, and compares ids. Problems are listed on Health, and the title's page tells admins what the server matched it to and how to fix it: **Fix Match** in Plex, or **Identify** in Jellyfin and Emby (open the title there), with the id to enter. Until it's fixed, episodes and subtitles can be wrong too. The next check, nightly or after an import, clears it once they agree. **Run now** in Settings → Jobs & Cache runs it straight away.
 
@@ -37,8 +37,8 @@ What a row can say:
 
 | It says | Meaning | Fix |
 |---|---|---|
-| Plex matched "Civil War (2024)" to Guerra Civil (2024) | The server picked another title. | **Fix Match** (Plex) or **Identify** (Jellyfin, Emby) with the id shown, such as `tmdb-929590`. |
-| …to a different film named Americana (2025) | Two titles share a name and year. | The same. |
+| Plex matched "Border Feud (2024)" to Guerra Fronteriza (2024) | The server picked another title. | **Fix Match** (Plex) or **Identify** (Jellyfin, Emby) with the id shown, such as `tmdb-846213`. |
+| …to a different film named Quillmore (2025) | Two titles share a name and year. | The same. |
 | Plex and Radarr use different entries for… | Same title, but different TMDB or TVDB entries, usually because one was replaced. | Fix the match with the id shown; if nothing is found, Radarr's entry may be outdated. |
 | Plex has not matched "…" | No match for the folder. | Fix the match. |
 | A length far off the film's (`file 21 min, film 107 min`) | The file is probably another film. | Replace it in Radarr rather than fixing the match. |

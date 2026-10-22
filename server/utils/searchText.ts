@@ -4,8 +4,8 @@
  */
 
 /**
- * Lower case, accents dropped and punctuation as spaces, so "Amélie" finds
- * "amelie" and "Spider-Man" finds "spider man".
+ * Lower case, accents dropped and punctuation as spaces, so "Rosélie" finds
+ * "roselie" and "Web-Weaver" finds "web weaver".
  */
 export const normalizeSearchText = (text: string): string =>
   text
@@ -20,8 +20,8 @@ export const searchWords = (query: string): string[] =>
   normalizeSearchText(query).split(' ').filter(Boolean);
 
 /**
- * Whether every word matches the start of some word in the text: "tom hanks"
- * finds Tom Hanks, "han" finds Han Solo but not Johansson.
+ * Whether every word matches the start of some word in the text: "ned barlow"
+ * finds Ned Barlow, "tam" finds Tam Vexley but not Rustamson.
  */
 export const matchesSearch = (haystack: string, words: string[]): boolean => {
   const padded = ` ${haystack} `;

@@ -185,7 +185,7 @@ class WebPushAgent
       case Notification.TEST_NOTIFICATION:
         message = payload.message;
         break;
-      // List activity supplies its own sentence, e.g. "Jordan added Dune."
+      // List activity supplies its own sentence, e.g. "Jordan added Zelvara."
       case Notification.LIST_ACTIVITY:
         message = payload.message;
         break;

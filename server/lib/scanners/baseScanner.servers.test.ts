@@ -94,11 +94,11 @@ describe('scans from several media servers', () => {
 
   it("writes Emby's ids to Emby's own columns", async () => {
     const { emby } = scanners();
-    await emby.seeMovie(27205, 'emby', 'e-27205');
+    await emby.seeMovie(38416, 'emby', 'e-38416');
     const movie = await getRepository(Media).findOneOrFail({
-      where: { tmdbId: 27205, mediaType: MediaType.MOVIE },
+      where: { tmdbId: 38416, mediaType: MediaType.MOVIE },
     });
-    assert.equal(movie.embyMediaId, 'e-27205');
+    assert.equal(movie.embyMediaId, 'e-38416');
     assert.equal(movie.jellyfinMediaId, null);
     assert.equal(movie.ratingKey, null);
   });

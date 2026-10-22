@@ -33,13 +33,13 @@ const group = (
   } = {}
 ): MbReleaseGroup => ({
   id,
-  title: 'Thriller',
+  title: 'Moonlurker',
   score,
   count,
   'primary-type': type,
   releases: statuses?.map((status, i) => ({
     id: `${id}-${i}`,
-    title: 'Thriller',
+    title: 'Moonlurker',
     status,
   })),
   'artist-credit': artists.map((artist) => ({

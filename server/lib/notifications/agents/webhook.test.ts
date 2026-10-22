@@ -147,9 +147,9 @@ describe('webhook templates', () => {
   it('fills every copy of a variable', async (t) => {
     const { body } = await send(t, {
       template: { text: '{{subject}} and {{subject}}, {{unknown_key}}' },
-      payload: { subject: 'Dune' },
+      payload: { subject: 'Zelvara' },
     });
-    assert.deepEqual(body, { text: 'Dune and Dune, {{unknown_key}}' });
+    assert.deepEqual(body, { text: 'Zelvara and Zelvara, {{unknown_key}}' });
   });
 
   it("fills the address with a value of 0, and nothing for one it hasn't", async (t) => {

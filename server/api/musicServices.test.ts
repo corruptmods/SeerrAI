@@ -16,8 +16,8 @@ import { afterEach, describe, it, mock } from 'node:test';
  * Archive for covers, and TheAudioDB for artist pictures.
  */
 
-const ALBUM = 'b1392450-e666-3926-a536-22c65f834433';
-const ARTIST = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
+const ALBUM = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
+const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
 
 const getAxios = (client: unknown): AxiosInstance =>
   (client as { axios: AxiosInstance }).axios;
@@ -117,7 +117,7 @@ describe('TheAudioDB', () => {
         artists: [
           {
             idArtist: '1',
-            strArtist: 'Radiohead',
+            strArtist: 'Glasswing',
             strArtistThumb: 'https://r2.theaudiodb.com/thumb.jpg',
             strArtistFanart: 'https://r2.theaudiodb.com/fanart.jpg',
           },

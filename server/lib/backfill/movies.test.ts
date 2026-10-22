@@ -62,10 +62,10 @@ const PROFILE: SonarrQualityProfile = {
 
 const SECRETS: RadarrMovieDetail = {
   id: 55,
-  title: 'Harry Potter and the Chamber of Secrets',
+  title: 'Milo Thistle and the Vault of Echoes',
   year: 2002,
   tmdbId: 672,
-  path: '/movies/Harry Potter and the Chamber of Secrets (2002)',
+  path: '/movies/Milo Thistle and the Vault of Echoes (2002)',
   qualityProfileId: 6,
   monitored: true,
   isAvailable: true,
@@ -77,10 +77,10 @@ const SECRETS: RadarrMovieDetail = {
 /** Radarr's parser: a name with the year, or one it knows as another movie. */
 const parse = (title: string): RadarrParseResult => {
   const quality = /1080p/i.test(title) ? BLURAY_1080 : WEB_720;
-  if (/Prisoner.of.Azkaban/i.test(title)) {
+  if (/Captive.of.Grimholt/i.test(title)) {
     return {
       title,
-      movie: { id: 99, title: 'Harry Potter and the Prisoner of Azkaban' },
+      movie: { id: 99, title: 'Milo Thistle and the Captive of Grimholt' },
       parsedMovieInfo: { quality },
     };
   }
@@ -125,11 +125,11 @@ describe('Backfill for movies: judging a pack', () => {
   it('takes this movie out of a collection and leaves the others', async () => {
     const { plan, summary } = await judgeMoviePack(
       files(
-        'Harry Potter Collection/Harry.Potter.and.the.Philosophers.Stone.mkv',
-        'Harry Potter Collection/Harry.Potter.and.the.Chamber.of.Secrets.mkv',
-        'Harry Potter Collection/Harry.Potter.and.the.Prisoner.of.Azkaban.2004.mkv'
+        'Milo Thistle Collection/Milo.Thistle.and.the.Alchemists.Key.mkv',
+        'Milo Thistle Collection/Milo.Thistle.and.the.Vault.of.Echoes.mkv',
+        'Milo Thistle Collection/Milo.Thistle.and.the.Captive.of.Grimholt.2004.mkv'
       ),
-      'Harry Potter Complete Collection 1080p BluRay x264-GRP',
+      'Milo Thistle Complete Collection 1080p BluRay x264-GRP',
       context()
     );
     assert.equal(summary.fill, 1);
@@ -139,21 +139,21 @@ describe('Backfill for movies: judging a pack', () => {
     assert.equal(used.quality?.quality.name, 'Bluray-1080p');
     assert.equal(
       used.judgedAs,
-      'Harry Potter and the Chamber of Secrets (2002) 1080p BluRay x264-GRP'
+      'Milo Thistle and the Vault of Echoes (2002) 1080p BluRay x264-GRP'
     );
     const reasons = plan
       .filter((e) => e.action === 'reject')
       .map((e) => e.reason);
     assert.deepEqual(reasons.sort(), [
-      'Named as another movie: Harry Potter and the Prisoner of Azkaban',
+      'Named as another movie: Milo Thistle and the Captive of Grimholt',
       'Not this movie',
     ]);
   });
 
   it('takes a lone file with a bare name from a pack named for the movie', async () => {
     const { summary } = await judgeMoviePack(
-      files('Chamber/movie.mkv', 'Chamber/sample.mkv'),
-      'Harry Potter and the Chamber of Secrets 2002 1080p BluRay x264-GRP',
+      files('Vault/movie.mkv', 'Vault/sample.mkv'),
+      'Milo Thistle and the Vault of Echoes 2002 1080p BluRay x264-GRP',
       context()
     );
     assert.equal(summary.fill, 1);
@@ -163,12 +163,12 @@ describe('Backfill for movies: judging a pack', () => {
     const thing: RadarrMovieDetail = {
       ...SECRETS,
       id: 60,
-      title: 'The Thing',
+      title: 'The Frostling',
       year: 2011,
     };
     const { plan } = await judgeMoviePack(
-      files('The.Thing.1982.1080p.BluRay.x264-GRP.mkv'),
-      'The Thing 1982 1080p BluRay x264-GRP',
+      files('The.Frostling.1982.1080p.BluRay.x264-GRP.mkv'),
+      'The Frostling 1982 1080p BluRay x264-GRP',
       context(null, thing)
     );
     assert.equal(plan[0].action, 'reject');
@@ -186,8 +186,8 @@ describe('Backfill for movies: judging a pack', () => {
       quality,
       customFormatScore,
     });
-    const pack = files('Harry.Potter.and.the.Chamber.of.Secrets.mkv');
-    const title = 'Harry Potter and the Chamber of Secrets 1080p BluRay';
+    const pack = files('Milo.Thistle.and.the.Vault.of.Echoes.mkv');
+    const title = 'Milo Thistle and the Vault of Echoes 1080p BluRay';
     const better = await judgeMoviePack(pack, title, {
       ...context(onDisk(WEB_720)),
       movie: { ...SECRETS, hasFile: true, movieFileId: 900 },
@@ -202,40 +202,40 @@ describe('Backfill for movies: judging a pack', () => {
   });
 
   it('never takes a sequel for the movie, from a collection or alone', async () => {
-    const toyStory: RadarrMovieDetail = {
+    const tinParade: RadarrMovieDetail = {
       ...SECRETS,
       id: 70,
-      title: 'Toy Story',
+      title: 'Tin Parade',
       year: 1995,
     };
-    const ctx = context(null, toyStory);
+    const ctx = context(null, tinParade);
     ctx.radarr = {
       parse: async (title: string) =>
-        title.startsWith('Toy Story (1995)')
+        title.startsWith('Tin Parade (1995)')
           ? {
               title,
-              movie: { id: 70, title: 'Toy Story' },
+              movie: { id: 70, title: 'Tin Parade' },
               parsedMovieInfo: { quality: BLURAY_1080 },
             }
           : parse(title),
     } as unknown as BackfillRadarr;
     const { plan } = await judgeMoviePack(
       files(
-        'Toy Story Collection/Toy Story 2.mkv',
-        'Toy Story Collection/Toy Story.mkv',
-        'Toy Story Collection/Toy Story 3.mkv'
+        'Tin Parade Collection/Tin Parade 2.mkv',
+        'Tin Parade Collection/Tin Parade.mkv',
+        'Tin Parade Collection/Tin Parade 3.mkv'
       ),
-      'Toy Story Collection 1080p BluRay x264-GRP',
+      'Tin Parade Collection 1080p BluRay x264-GRP',
       ctx
     );
     const used = plan.filter((e) => e.action === 'fill');
     assert.deepEqual(
       used.map((e) => e.path),
-      ['Toy Story Collection/Toy Story.mkv']
+      ['Tin Parade Collection/Tin Parade.mkv']
     );
     const alone = await judgeMoviePack(
-      files('Toy Story 2/movie.mkv'),
-      'Toy Story 2 1999 1080p BluRay x264-GRP',
+      files('Tin Parade 2/movie.mkv'),
+      'Tin Parade 2 1999 1080p BluRay x264-GRP',
       ctx
     );
     assert.equal(alone.summary.fill, 0);
@@ -245,12 +245,12 @@ describe('Backfill for movies: judging a pack', () => {
     const thing: RadarrMovieDetail = {
       ...SECRETS,
       id: 60,
-      title: 'The Thing',
+      title: 'The Frostling',
       year: 1982,
     };
     const { plan } = await judgeMoviePack(
-      files('sparks-thething-1080p.mkv'),
-      'The Thing 2011 1080p BluRay x264-SPARKS',
+      files('cinders-thefrostling-1080p.mkv'),
+      'The Frostling 2011 1080p BluRay x264-CINDERS',
       context(null, thing)
     );
     assert.equal(plan[0].action, 'reject');
@@ -258,29 +258,29 @@ describe('Backfill for movies: judging a pack', () => {
 
   it('turns down episodes that come up in a movie search', async () => {
     const { plan } = await judgeMoviePack(
-      files('Harry.Potter.and.the.Chamber.of.Secrets.S01E02.mkv'),
-      'Harry Potter and the Chamber of Secrets S01 1080p',
+      files('Milo.Thistle.and.the.Vault.of.Echoes.S01E02.mkv'),
+      'Milo Thistle and the Vault of Echoes S01 1080p',
       context()
     );
     assert.equal(plan[0].reason, 'An episode, not a movie');
   });
 
   it('finds titles that are only a year', () => {
-    assert.equal(mentionsShow('1917 2019 1080p BluRay x264', ['1917']), true);
-    assert.equal(sameShow('2012', ['1917']), false);
-    assert.equal(sameShow('1917', ['1917']), true);
-    assert.equal(sameShow('Perfect World 2021', ['Perfect World']), true);
+    assert.equal(mentionsShow('1863 2019 1080p BluRay x264', ['1863']), true);
+    assert.equal(sameShow('2034', ['1863']), false);
+    assert.equal(sameShow('1863', ['1863']), true);
+    assert.equal(sameShow('Ninefold Sky 2021', ['Ninefold Sky']), true);
   });
 
   it('names a file the way Radarr reads it', () => {
     assert.equal(
       movieName({
         fileName: 'movie',
-        packTitle: 'WWF Hardcore 2001 DVDRip x264-GROUP',
-        title: 'WWF: Hardcore',
+        packTitle: 'XWL Ironclad 2001 DVDRip x264-GROUP',
+        title: 'XWL: Ironclad',
         year: 2001,
       }),
-      'WWF: Hardcore (2001) DVDRip x264-GROUP'
+      'XWL: Ironclad (2001) DVDRip x264-GROUP'
     );
   });
 });
@@ -311,12 +311,12 @@ const ben = (value: unknown): Buffer => {
 };
 
 const INFO = {
-  name: 'Harry Potter Collection',
+  name: 'Milo Thistle Collection',
   'piece length': 4194304,
   pieces: Buffer.alloc(20),
   files: [
-    { length: 2 * GB, path: ['Harry.Potter.and.the.Philosophers.Stone.mkv'] },
-    { length: 2 * GB, path: ['Harry.Potter.and.the.Chamber.of.Secrets.mkv'] },
+    { length: 2 * GB, path: ['Milo.Thistle.and.the.Alchemists.Key.mkv'] },
+    { length: 2 * GB, path: ['Milo.Thistle.and.the.Vault.of.Echoes.mkv'] },
   ],
 };
 const TORRENT = ben({ announce: 'udp://tracker', info: INFO });
@@ -325,7 +325,7 @@ const HASH = createHash('sha1').update(ben(INFO)).digest('hex');
 const RELEASE: ProwlarrRelease = {
   guid: 'https://indexer/hp',
   title:
-    'Harry Potter and the Chamber of Secrets Collection 1080p BluRay x264-GRP',
+    'Milo Thistle and the Vault of Echoes Collection 1080p BluRay x264-GRP',
   size: 4 * GB,
   indexerId: 3,
   indexer: 'Knaben',
@@ -361,7 +361,7 @@ const heldTorrent = (savePath = '/downloads/backfill') => ({
   eta: 60,
   dlspeed: 1000,
   save_path: savePath,
-  content_path: `${savePath}/Harry Potter Collection`,
+  content_path: `${savePath}/Milo Thistle Collection`,
 });
 
 beforeEach(() => {
@@ -526,7 +526,7 @@ describe('Backfill for movies: from Radarr’s wanted list to the library', () =
     assert.deepEqual(imports, [
       [
         {
-          path: '/data/backfill/Harry Potter Collection/Harry.Potter.and.the.Chamber.of.Secrets.mkv',
+          path: '/data/backfill/Milo Thistle Collection/Milo.Thistle.and.the.Vault.of.Echoes.mkv',
           movieId: 55,
         },
       ],
@@ -567,7 +567,7 @@ describe('Backfill for movies: from Radarr’s wanted list to the library', () =
     };
     const OTHER = ben({
       announce: 'udp://tracker',
-      info: { ...INFO, name: 'Harry Potter Collection REPACK' },
+      info: { ...INFO, name: 'Milo Thistle Collection REPACK' },
     });
     mock.method(
       ProwlarrAPI.prototype,
@@ -929,12 +929,12 @@ describe('Backfill: searching for what a series is missing', () => {
     const sonarr = BackfillSonarr.prototype;
     mock.method(sonarr, 'getSeriesDetail', async () => ({
       id: 891,
-      title: 'Expedition Unknown',
+      title: 'Wayfarer Ledger',
       year: 2015,
-      tvdbId: 280316,
+      tvdbId: 391427,
       seriesType: 'standard',
       qualityProfileId: 6,
-      path: '/tv/Expedition Unknown',
+      path: '/tv/Wayfarer Ledger',
     }));
     mock.method(sonarr, 'getSeriesEpisodes', async () => [
       {
@@ -958,14 +958,13 @@ describe('Backfill: searching for what a series is missing', () => {
         {
           ...RELEASE,
           guid: 'old-pack',
-          title: 'Expedition Unknown Season 4 Complete 720p HDTV x264',
+          title: 'Wayfarer Ledger Season 4 Complete 720p HDTV x264',
           seeders: 90,
         },
         {
           ...RELEASE,
           guid: 'the-episode',
-          title:
-            'Expedition.Unknown.2018.S17E07.1080p.WEB-DL.DDP2.0.H.264-FUZEER',
+          title: 'Wayfarer.Ledger.2018.S17E07.1080p.WEB-DL.DDP2.0.H.264-FIZZLR',
           seeders: 2,
         },
       ];
@@ -984,12 +983,12 @@ describe('Backfill: searching for what a series is missing', () => {
         kind: 'series',
         serverId: 0,
         arrId: 891,
-        title: 'Expedition Unknown',
+        title: 'Wayfarer Ledger',
         status: 'stuck',
       })
     );
     await backfill.search(row.id);
-    assert.deepEqual(queries, ['Expedition Unknown', 'Expedition Unknown S17']);
+    assert.deepEqual(queries, ['Wayfarer Ledger', 'Wayfarer Ledger S17']);
     assert.equal(opened[0], 'the-episode');
   });
 });
@@ -1019,7 +1018,7 @@ describe('Backfill when something goes wrong', () => {
   const IMPORTED = [
     [
       {
-        path: '/data/backfill/Harry Potter Collection/Harry.Potter.and.the.Chamber.of.Secrets.mkv',
+        path: '/data/backfill/Milo Thistle Collection/Milo.Thistle.and.the.Vault.of.Echoes.mkv',
         movieId: 55,
       },
     ],
@@ -1302,7 +1301,7 @@ describe('Backfill when something goes wrong', () => {
         kind: 'movie',
         serverId: 0,
         arrId: 56,
-        title: 'Harry Potter and the Goblet of Fire',
+        title: 'Milo Thistle and the Lantern of Ash',
         status: 'found',
         lastSearchedAt: new Date(),
       })
@@ -1317,7 +1316,7 @@ describe('Backfill when something goes wrong', () => {
       ) {
         await repo.update(wanted.id, {
           status: 'downloading',
-          searchTerms: ['Chamber of Secrets'],
+          searchTerms: ['Vault of Echoes'],
         });
         await repo.update(gone.id, { status: 'downloading' });
       }
@@ -1326,7 +1325,7 @@ describe('Backfill when something goes wrong', () => {
     await backfill.scan();
     const kept = await repo.findOneOrFail({ where: { id: wanted.id } });
     assert.equal(kept.status, 'downloading');
-    assert.deepEqual(kept.searchTerms, ['Chamber of Secrets']);
+    assert.deepEqual(kept.searchTerms, ['Vault of Echoes']);
     assert.equal(kept.missing, 1, 'what the scan read is still saved');
     assert.equal(
       (await repo.findOneOrFail({ where: { id: gone.id } })).status,
@@ -1378,7 +1377,7 @@ describe('Backfill when something goes wrong', () => {
         kind: 'movie',
         serverId: 0,
         arrId: 56,
-        title: 'Harry Potter and the Goblet of Fire',
+        title: 'Milo Thistle and the Lantern of Ash',
         status: 'found',
         missing: 1,
         lastSearchedAt: new Date(),

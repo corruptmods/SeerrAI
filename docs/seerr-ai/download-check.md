@@ -18,7 +18,7 @@ Checked as soon as Sonarr or Radarr takes it, and while a delay profile still ho
 |---|---|
 | A program in it (`.exe`, `.scr`, `.lnk`, `.bat` and the like), only archives, no video, or only a sample. Torrents, once the client has their file list | Rejected |
 | Grabbed a day or more before the episode aired | Rejected |
-| Another title: another country's version (The.Wall.AU for The Wall), another year (Scrubs.2026 for the 2001 series), or an episode whose title is another episode's | Rejected |
+| Another title: another country's version (The.Turnstile.AU for The Turnstile), another year (Gurneys.2026 for the 2001 series), or an episode whose title is another episode's | Rejected |
 | No better than the file you have, compared as the import compares: quality, then revision, then custom format score | Rejected, not searched again |
 | A single episode where your file holds two | Rejected, not searched again |
 | A better copy of the same is in the queue | Removed, not blocklisted |
@@ -31,7 +31,7 @@ It gets two minutes to clear by itself, then Sonarr's or Radarr's own reason dec
 
 | Reason | Done |
 |---|---|
-| Matched to the series or movie by ID | The name decides. The right title under another name (Penn.&amp;.Teller-Fool.Us): imported. The right show numbered another way, when the episode it really is is missing (Food.Paradise.2013.S01E13 is S07E05, "Pizza Paradise 3"): imported as that episode. Another title, or an episode you have: rejected. When the name doesn't say: left for you |
+| Matched to the series or movie by ID | The name decides. The right title under another name (Bramble.&amp;.Finch-Trick.Us): imported. The right show numbered another way, when the episode it really is is missing (Snack.Kingdom.2013.S01E13 is S07E05, "Taco Kingdom 3"): imported as that episode. Another title, or an episode you have: rejected. When the name doesn't say: left for you |
 | TheXEM hasn't confirmed the numbering, it couldn't tell if it's a sample, or it couldn't read the file name | Imported, each file as the episode Sonarr reads it as; a single episode's one video is that episode |
 | Nothing in it can be imported: a sample, archives, the wrong episodes, no video | Rejected |
 | Not an upgrade, or your file holds more episodes | Rejected, not searched again |

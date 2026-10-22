@@ -99,7 +99,7 @@ Backfill first takes a good pack it already found for the same episodes. If ther
 When you ask it to, the agent can also change what's already there. It never does any of these by itself: it works out exactly what would happen, shows you, and waits. Nothing changes until you press **Approve** on the conversation's page.
 
 - **Replace a file** with a release it found (a better copy, or the right one). The old file stays, and keeps playing, until the new one has imported.
-- **Replace a whole season** ("season 6 is bad, replace it all"): the card says what it will download and how many files go after, for example "Replace season 6 of Slow Horses: download … and then remove the 5 current files". Approved, the new release is grabbed first; only then are the old releases marked failed in Sonarr and the old files removed so the new ones import. If nothing can be grabbed, nothing is removed. Asked to replace or fix something, the agent never proposes deleting the files first; deleting is only offered when deleting is what you asked for.
+- **Replace a whole season** ("season 6 is bad, replace it all"): the card says what it will download and how many files go after, for example "Replace season 6 of Quiet Ravens: download … and then remove the 5 current files". Approved, the new release is grabbed first; only then are the old releases marked failed in Sonarr and the old files removed so the new ones import. If nothing can be grabbed, nothing is removed. Asked to replace or fix something, the agent never proposes deleting the files first; deleting is only offered when deleting is what you asked for.
 - **Search for a better release**: Radarr or Sonarr searches and takes one only if your quality profile prefers it. (This one just runs; it's what they'd do anyway.)
 - **Block or unblock a release group** (see below).
 - **Mark a download as failed**: it's removed from the download client and blocklisted, and Radarr or Sonarr looks for another.
@@ -108,7 +108,7 @@ When you ask it to, the agent can also change what's already there. It never doe
 
 Each change is checked again when you approve it. If things have moved on (a new file arrived, the download already finished), it's left alone and the agent tells you. You'll get a notification when something is waiting for you. Answering in the chat instead of approving drops the proposal; declining ends the conversation without changing anything.
 
-Admins can ask for all of this from **AI Search** too ("this copy of The Odyssey is a cam, delete it and block the group"). AI Search hands it to the agent and links you to the conversation. Nobody else can, with one exception: anyone who can report issues can ask for a whole season to be replaced (see [Auto-fix](./subtitles-and-autofix.md#auto-fix)), and that waits here for an admin to approve or decline, like any other change. When Auto-fix finds no other release for a season, the agent looks further and can only propose replacing it.
+Admins can ask for all of this from **AI Search** too ("this copy of The Driftwood is a cam, delete it and block the group"). AI Search hands it to the agent and links you to the conversation. Nobody else can, with one exception: anyone who can report issues can ask for a whole season to be replaced (see [Auto-fix](./subtitles-and-autofix.md#auto-fix)), and that waits here for an admin to approve or decline, like any other change. When Auto-fix finds no other release for a season, the agent looks further and can only propose replacing it.
 
 ### Blocked release groups
 

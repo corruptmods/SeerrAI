@@ -26,7 +26,7 @@ interface Sortable {
   createdAt?: string;
 }
 
-/** "The Matrix" files under M, as it does in Plex. */
+/** "The Mazewright" files under M, as it does in Plex. */
 const sortTitle = (title: string | undefined) =>
   (title ?? '').trim().replace(/^(the|a|an)\s+/i, '');
 

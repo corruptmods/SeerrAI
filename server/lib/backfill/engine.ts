@@ -452,7 +452,7 @@ interface Target {
   missing: number;
   categories: number[];
   /**
-   * Searches beyond the names: a season's own ("Expedition Unknown S17"),
+   * Searches beyond the names: a season's own ("Wayfarer Ledger S17"),
    * since a name alone brings back the most popular releases, which are
    * often old season packs.
    */
@@ -1791,8 +1791,8 @@ class Backfill {
       wants: (title) =>
         wanted.filter((rx) => rx.test(title)).length +
         wantedSeasons.filter((rx) => rx.test(title)).length,
-      // A title Sonarr matches to another show it has (Shippuden, for
-      // Naruto) is that show's.
+      // A title Sonarr matches to another show it has (Tsumuden, for
+      // Kitsuraga) is that show's.
       readTitle: async (title) => {
         const parsed = await ctx.sonarr.parse(title).catch(() => null);
         return {
@@ -1844,7 +1844,7 @@ class Backfill {
       const { missing } = target;
 
       // Search under each name, in the app's order, skipping a name another
-      // already covers ("Perfect World" covers "Perfect World (2021)").
+      // already covers ("Ninefold Sky" covers "Ninefold Sky (2021)").
       const terms: string[] = [];
       for (const name of target.names) {
         const n = name.toLowerCase();

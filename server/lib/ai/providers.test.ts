@@ -474,7 +474,7 @@ describe('a conversation with tools', () => {
     const first = await converse(settings(), {
       model: 'claude-x',
       system: 'sys',
-      messages: [{ role: 'user', text: 'find Casper' }],
+      messages: [{ role: 'user', text: 'find Wendle' }],
       tools,
       maxTokens: 800,
     });
@@ -494,7 +494,7 @@ describe('a conversation with tools', () => {
       model: 'claude-x',
       system: 'sys',
       messages: [
-        { role: 'user', text: 'find Casper' },
+        { role: 'user', text: 'find Wendle' },
         {
           role: 'assistant',
           text: first.text,
@@ -511,7 +511,7 @@ describe('a conversation with tools', () => {
     });
     assert.equal(second.text, 'Done.');
     assert.deepEqual(sent[1].body.messages, [
-      { role: 'user', content: 'find Casper' },
+      { role: 'user', content: 'find Wendle' },
       { role: 'assistant', content: turn },
       {
         role: 'user',
@@ -548,7 +548,7 @@ describe('a conversation with tools', () => {
     const first = await converse(ai, {
       model: 'gpt-4o',
       system: 'sys',
-      messages: [{ role: 'user', text: 'find Casper' }],
+      messages: [{ role: 'user', text: 'find Wendle' }],
       tools,
       maxTokens: 800,
     });
@@ -571,7 +571,7 @@ describe('a conversation with tools', () => {
       model: 'gpt-4o',
       system: 'sys',
       messages: [
-        { role: 'user', text: 'find Casper' },
+        { role: 'user', text: 'find Wendle' },
         { role: 'assistant', text: '', calls: first.calls, raw: first.raw },
         {
           role: 'tool',

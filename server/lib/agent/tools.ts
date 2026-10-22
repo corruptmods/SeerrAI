@@ -1292,7 +1292,7 @@ interface PreparedGrab {
   name: string;
   plan: PlanEntry[];
   bytes: number;
-  /** "S01E01 Casper's Spree Under The Sea", per plan entry. */
+  /** "S01E01 Wendle's Picnic Below The Pier", per plan entry. */
   targets: string[];
   /** What could make it wrong, for an admin to judge. */
   doubts: string[];

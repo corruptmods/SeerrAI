@@ -6,8 +6,8 @@
  * their titles. When it doesn't, but the indexer said which title it was
  * (a TVDB, TMDB or IMDb id), they grab it anyway and then refuse to import
  * it ("matched to series by ID"). Most of those are the right title under
- * another name: Food.Paradise.2013, Penn.&amp;.Teller-Fool.Us. Some are
- * not: The.Wall.AU is Australia's version of The Wall, Scrubs.2026 is the
+ * another name: Snack.Kingdom.2013, Bramble.&amp;.Finch-Trick.Us. Some are
+ * not: The.Turnstile.AU is Australia's version of The Turnstile, Gurneys.2026 is the
  * revival, filed under the 2001 series' episodes. The name says which.
  */
 
@@ -37,15 +37,15 @@ export const unescapeName = (value: string): string =>
 
 /**
  * A name as words: lower case, accents and punctuation gone, "&" as "and".
- * "Penn & Teller: Fool Us" and "Penn.&amp;.Teller-Fool.Us" both read
- * "penn and teller fool us".
+ * "Bramble & Finch: Trick Us" and "Bramble.&amp;.Finch-Trick.Us" both read
+ * "bramble and finch trick us".
  */
 export const normalize = (value: string): string =>
   wordsOf(value).join(' ').toLowerCase();
 
 /**
- * A name's words with their case kept, for telling "The.Wall.AU" (a
- * country) from "Fool.Us" (a word).
+ * A name's words with their case kept, for telling "The.Turnstile.AU" (a
+ * country) from "Trick.Us" (a word).
  */
 const wordsOf = (value: string): string[] =>
   unescapeName(value)
@@ -92,7 +92,7 @@ export interface ReleaseName {
   /** The title before the season, year and country, as words. */
   title: string;
   year?: number;
-  /** A country the name marks its version with ("au" in The.Wall.AU). */
+  /** A country the name marks its version with ("au" in The.Turnstile.AU). */
   country?: string;
   /** The episode's own title, as words, when the name carries one. */
   episodeTitle?: string;
@@ -100,20 +100,20 @@ export interface ReleaseName {
   hasEpisode: boolean;
 }
 
-/** Brackets around a group or a hash at the start: "[Believe] ". */
+/** Brackets around a group or a hash at the start: "[Concur] ". */
 const LEADING_TAGS = /^(\s*\[[^\]]*\]\s*)+/;
 
 /** S01E02, S01, 1x02, Season 3: the first one splits title from the rest. */
 const EPISODE_MARK =
   /(^|[\s._-])(s\d{1,4}([\s._-]?e\d{1,4})*([\s._-]?-?e\d{1,4})*|\d{1,2}x\d{2,3}|season[\s._]?\d{1,3})(?=$|[\s._-])/i;
 
-/** A movie's year, which ends its title: "Heat.1995.1080p", "Heat (1995)". */
+/** A movie's year, which ends its title: "Scorch.1995.1080p", "Scorch (1995)". */
 const MOVIE_YEAR = /(^|[\s._([-])((?:19|20)\d{2})(?=$|[\s._)\]-])/g;
 
 /**
  * Takes a year, then a country, off the end of a title (either order). A
  * country is two capitals, as releases and Sonarr's titles write them:
- * "The.Wall.AU", "The Traitors (US)"; "Fool.Us" ends with a word.
+ * "The.Turnstile.AU", "The Schemers (US)"; "Trick.Us" ends with a word.
  */
 const splitTail = (
   raw: string[]
@@ -175,7 +175,7 @@ export const readMovieRelease = (name: string): ReleaseName => {
   const clean = unescapeName(name).replace(LEADING_TAGS, '');
   let found: RegExpExecArray | null = null;
   // The last year-like number that still has a title before it: in
-  // "2001.A.Space.Odyssey.1968" the title is "2001 A Space Odyssey".
+  // "2087.A.Tidal.Voyage.1968" the title is "2087 A Tidal Voyage".
   for (const match of clean.matchAll(MOVIE_YEAR)) {
     if (match.index > 0) found = match as RegExpExecArray;
   }
@@ -203,7 +203,7 @@ interface TitleName {
   country?: string;
 }
 
-/** "The Wall (2016)", "The Traitors (US)", "The Wall US" as their parts. */
+/** "The Turnstile (2016)", "The Schemers (US)", "The Turnstile US" as their parts. */
 const nameOf = (title: string): TitleName => {
   const { words, country } = splitTail(wordsOf(title));
   return { words: words.join(' '), country };
@@ -229,7 +229,7 @@ export const episodeTitleLikeness = (a: string, b: string): number => {
   const y = normalize(b);
   if (!x || !y) return 0;
   if (x === y) return 1;
-  // "Pizza Paradise 2" is not "Pizza Paradise 3", nor "Pizza Paradise".
+  // "Taco Kingdom 2" is not "Taco Kingdom 3", nor "Taco Kingdom".
   const numbers = (s: string) =>
     s
       .split(' ')
@@ -263,8 +263,8 @@ export type Verdict =
   | 'same'
   /**
    * The right show, numbered another way: its episode title is another
-   * episode's (`episode`). Food.Paradise.2013.S09E11.Sandwich.Heroes is
-   * Sonarr's S14E03, "Sandwich Heroes".
+   * episode's (`episode`). Snack.Kingdom.2013.S09E11.Pretzel.Champions is
+   * Sonarr's S14E03, "Pretzel Champions".
    */
   | 'renumbered'
   /** The name is another title or another version of it. */
@@ -337,7 +337,7 @@ export const judgeName = (
     names.map((n) => n.country).filter((c): c is string => !!c)
   );
 
-  // Another country's version: The.Wall.AU for The Wall (2016).
+  // Another country's version: The.Turnstile.AU for The Turnstile (2016).
   if (release.country && !countries.has(release.country)) {
     return { verdict: 'different', reason: 'country', named };
   }

@@ -37,8 +37,8 @@ const server = {
 
 describe('judging one series', () => {
   it('knows a series is in a folder by the whole folder name', () => {
-    assert.equal(inFolder('/anime/Oshi no Ko', '/anime'), true);
-    assert.equal(inFolder('/anime/Oshi no Ko', '/anime/'), true);
+    assert.equal(inFolder('/anime/Yume no Tane', '/anime'), true);
+    assert.equal(inFolder('/anime/Yume no Tane', '/anime/'), true);
     assert.equal(inFolder('/animeX/Show', '/anime'), false);
     assert.equal(inFolder('D:\\anime\\Show', 'D:/anime'), true);
   });
@@ -46,7 +46,7 @@ describe('judging one series', () => {
   it('flags anime typed or filed as standard, and the reverse', () => {
     assert.deepEqual(
       judgeSeries(
-        { path: '/tv/Oshi no Ko', seriesType: 'anime' },
+        { path: '/tv/Yume no Tane', seriesType: 'anime' },
         true,
         server
       ),
@@ -54,20 +54,24 @@ describe('judging one series', () => {
     );
     assert.deepEqual(
       judgeSeries(
-        { path: '/anime/Oshi no Ko', seriesType: 'standard' },
+        { path: '/anime/Yume no Tane', seriesType: 'standard' },
         true,
         server
       ),
       { wrongType: true, wrongFolder: false, expectedFolder: null }
     );
     assert.deepEqual(
-      judgeSeries({ path: '/anime/Bluey', seriesType: 'anime' }, false, server),
+      judgeSeries(
+        { path: '/anime/Pipkin', seriesType: 'anime' },
+        false,
+        server
+      ),
       { wrongType: true, wrongFolder: true, expectedFolder: '/tv' }
     );
     // A daily show is not anime and is fine as it is.
     assert.deepEqual(
       judgeSeries(
-        { path: '/tv/The Daily Show', seriesType: 'daily' },
+        { path: '/tv/The Nightly Desk', seriesType: 'daily' },
         false,
         server
       ),
@@ -77,7 +81,7 @@ describe('judging one series', () => {
 
   it('leaves folders alone until the anime folder is a folder of its own', () => {
     assert.deepEqual(
-      judgeSeries({ path: '/tv/Oshi no Ko', seriesType: 'anime' }, true, {
+      judgeSeries({ path: '/tv/Yume no Tane', seriesType: 'anime' }, true, {
         activeDirectory: '/tv',
         activeAnimeDirectory: '/tv/',
       }),
@@ -99,7 +103,7 @@ describe('judging one movie', () => {
   it('flags anime filed or profiled as a movie, and the reverse', () => {
     assert.deepEqual(
       judgeMovie(
-        { path: '/movies/Spirited Away (2001)', qualityProfileId: 6 },
+        { path: '/movies/Lantern Drift (2001)', qualityProfileId: 6 },
         true,
         movieServer
       ),
@@ -112,7 +116,7 @@ describe('judging one movie', () => {
     );
     assert.deepEqual(
       judgeMovie(
-        { path: '/anime-movies/Heat (1995)', qualityProfileId: 9 },
+        { path: '/anime-movies/Scorch (1995)', qualityProfileId: 9 },
         false,
         movieServer
       ),
@@ -128,7 +132,7 @@ describe('judging one movie', () => {
   it('lets other movies sit on any profile but the anime one', () => {
     assert.deepEqual(
       judgeMovie(
-        { path: '/movies/Dune (2021)', qualityProfileId: 7 },
+        { path: '/movies/Zelvara (2021)', qualityProfileId: 7 },
         false,
         movieServer
       ),
@@ -144,7 +148,7 @@ describe('judging one movie', () => {
   it('checks only what the server has an anime setting of its own for', () => {
     assert.deepEqual(
       judgeMovie(
-        { path: '/movies/Spirited Away (2001)', qualityProfileId: 6 },
+        { path: '/movies/Lantern Drift (2001)', qualityProfileId: 6 },
         true,
         { ...movieServer, activeAnimeDirectory: undefined }
       ),
@@ -157,7 +161,7 @@ describe('judging one movie', () => {
     );
     assert.deepEqual(
       judgeMovie(
-        { path: '/movies/Spirited Away (2001)', qualityProfileId: 6 },
+        { path: '/movies/Lantern Drift (2001)', qualityProfileId: 6 },
         true,
         { ...movieServer, activeAnimeProfileId: 6 }
       ).wrongProfile,
@@ -194,19 +198,19 @@ describe('the Anime Check job', () => {
       // Japanese animation without the keyword, filed as TV.
       {
         id: 1,
-        title: 'Oshi no Ko',
-        tmdbId: 203737,
-        tvdbId: 421069,
-        path: '/tv/Oshi no Ko',
+        title: 'Yume no Tane',
+        tmdbId: 314862,
+        tvdbId: 532178,
+        path: '/tv/Yume no Tane',
         seriesType: 'anime',
       },
       // Correct as it is.
       {
         id: 2,
-        title: 'Frieren',
-        tmdbId: 209867,
-        tvdbId: 424536,
-        path: '/anime/Frieren',
+        title: 'Minamo',
+        tmdbId: 318954,
+        tvdbId: 536127,
+        path: '/anime/Minamo',
         seriesType: 'anime',
       },
       // Korean animation an admin chose to send as anime.
@@ -238,14 +242,14 @@ describe('the Anime Check job', () => {
     t.mock.method(SonarrAPI.prototype, 'getSeries', async () => sonarrSeries);
 
     const shows: Record<number, unknown> = {
-      203737: {
-        id: 203737,
+      314862: {
+        id: 314862,
         genres: [{ id: 16 }],
         original_language: 'ja',
         keywords: { results: [] },
       },
-      209867: {
-        id: 209867,
+      318954: {
+        id: 318954,
         genres: [{ id: 16 }],
         original_language: 'ja',
         keywords: { results: [{ id: 210024 }] },
@@ -332,7 +336,7 @@ describe('the Anime Check job', () => {
     // Set as not anime on its page: its folder is right, its type is not.
     await getRepository(Media).save(
       new Media({
-        tmdbId: 203737,
+        tmdbId: 314862,
         mediaType: MediaType.TV,
         status: MediaStatus.AVAILABLE,
         animeSetting: false,
@@ -355,7 +359,7 @@ describe('the Anime Check job', () => {
       ]),
       [
         ['Korean Show', true, true, '/anime', 'request'],
-        ['Oshi no Ko', true, false, null, 'title'],
+        ['Yume no Tane', true, false, null, 'title'],
       ]
     );
     assert.equal(
@@ -398,25 +402,25 @@ describe('the Anime Check job', () => {
       // Japanese animation without the keyword, filed as a movie.
       {
         id: 1,
-        title: 'Spirited Away',
+        title: 'Lantern Drift',
         tmdbId: 129,
-        path: '/movies/Spirited Away (2001)',
+        path: '/movies/Lantern Drift (2001)',
         qualityProfileId: 6,
       },
       // Correct as it is.
       {
         id: 2,
-        title: 'Your Name.',
-        tmdbId: 372058,
-        path: '/anime-movies/Your Name. (2016)',
+        title: 'Our Tide.',
+        tmdbId: 483619,
+        path: '/anime-movies/Our Tide. (2016)',
         qualityProfileId: 9,
       },
       // An admin chose to send it as anime.
       {
         id: 3,
-        title: 'The Red Turtle',
-        tmdbId: 337703,
-        path: '/movies/The Red Turtle (2016)',
+        title: 'The Amber Tortoise',
+        tmdbId: 449258,
+        path: '/movies/The Amber Tortoise (2016)',
         qualityProfileId: 6,
       },
       // TMDB does not know it.
@@ -446,14 +450,14 @@ describe('the Anime Check job', () => {
         original_language: 'ja',
         keywords: { keywords: [] },
       },
-      372058: {
-        id: 372058,
+      483619: {
+        id: 483619,
         genres: [{ id: 16 }],
         original_language: 'ja',
         keywords: { keywords: [{ id: 210024 }] },
       },
-      337703: {
-        id: 337703,
+      449258: {
+        id: 449258,
         genres: [{ id: 16 }],
         original_language: 'xx',
         keywords: { keywords: [] },
@@ -500,7 +504,7 @@ describe('the Anime Check job', () => {
     );
     const media = await getRepository(Media).save(
       new Media({
-        tmdbId: 337703,
+        tmdbId: 449258,
         mediaType: MediaType.MOVIE,
         status: MediaStatus.AVAILABLE,
       })
@@ -530,8 +534,8 @@ describe('the Anime Check job', () => {
         p.decidedBy,
       ]),
       [
-        ['Spirited Away', true, true, '/anime-movies', 'detection'],
-        ['The Red Turtle', true, true, '/anime-movies', 'request'],
+        ['Lantern Drift', true, true, '/anime-movies', 'detection'],
+        ['The Amber Tortoise', true, true, '/anime-movies', 'request'],
       ]
     );
     assert.deepEqual(

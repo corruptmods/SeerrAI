@@ -818,13 +818,13 @@ describe('Jellyfin Scanner', () => {
       serve(
         {
           movies: [
-            listed('3426', 'Arrival', 'Movie', 2016),
+            listed('3426', 'Brightfall', 'Movie', 2016),
             listed('3427', 'Home Movies', 'Movie'),
             listed('broken', 'Broken Film', 'Movie', 2001),
             listed('known', 'Known Film', 'Movie', 2020),
           ],
           shows: [
-            listed('e44cc', 'Severance', 'Series', 2022),
+            listed('e44cc', 'Lumenward', 'Series', 2022),
             listed('lost', 'Lost Show', 'Series', 2004),
           ],
         },
@@ -879,9 +879,9 @@ describe('Jellyfin Scanner', () => {
         "Emby: 2 films and 1 series aren't identified by Emby yet, so they were skipped. They'll be picked up once Emby has identified them (in Emby: refresh the library's metadata, or use Identify on a title)."
       );
       assert.deepEqual([...(summaries[0].meta.examples as string[])].sort(), [
-        'Arrival (2016)',
+        'Brightfall (2016)',
         'Home Movies',
-        'Severance (2022)',
+        'Lumenward (2022)',
       ]);
 
       // Each one skipped is a debug line naming it, never the whole item.
@@ -889,10 +889,10 @@ describe('Jellyfin Scanner', () => {
       assert.equal(skipped.length, 3);
       assert.ok(skipped.every((l) => l.level === 'debug'));
       assert.deepEqual(
-        skipped.find((l) => l.message.startsWith('Skipped Arrival'))?.meta,
+        skipped.find((l) => l.message.startsWith('Skipped Brightfall'))?.meta,
         {
           label: 'Emby Sync',
-          item: { name: 'Arrival', year: 2016, type: 'Movie', id: '3426' },
+          item: { name: 'Brightfall', year: 2016, type: 'Movie', id: '3426' },
         }
       );
       for (const line of lines) {
@@ -913,7 +913,7 @@ describe('Jellyfin Scanner', () => {
 
     it('says Jellyfin on a Jellyfin server', async () => {
       configureJellyfinWithLibrary([movieLibrary]);
-      serve({ movies: [listed('3426', 'Arrival', 'Movie', 2016)] }, {});
+      serve({ movies: [listed('3426', 'Brightfall', 'Movie', 2016)] }, {});
 
       await runWithMockTimers(() => jellyfinFullScanner.run());
 
@@ -924,7 +924,7 @@ describe('Jellyfin Scanner', () => {
         summary?.message,
         "Jellyfin: 1 film isn't identified by Jellyfin yet, so it was skipped. It'll be picked up once Jellyfin has identified it (in Jellyfin: refresh the library's metadata, or use Identify on a title)."
       );
-      assert.deepEqual(summary?.meta.examples, ['Arrival (2016)']);
+      assert.deepEqual(summary?.meta.examples, ['Brightfall (2016)']);
     });
 
     it('says nothing more when every title is identified', async () => {

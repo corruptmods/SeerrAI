@@ -19,9 +19,9 @@ let settings: SonarrSettings;
 
 const routes: Record<string, unknown> = {
   '/api/v3/parse': {
-    title: '[Group] Frieren - 05 [1080p].mkv',
+    title: '[Group] Minamo - 05 [1080p].mkv',
     parsedEpisodeInfo: {
-      seriesTitle: 'Frieren',
+      seriesTitle: 'Minamo',
       seasonNumber: -1,
       seasonNumbers: [],
       episodeNumbers: [],
@@ -31,37 +31,37 @@ const routes: Record<string, unknown> = {
     },
   },
   '/api/v3/release': [
-    { guid: 'a', title: 'Frieren - 05', indexerId: 1, seasonNumber: -1 },
+    { guid: 'a', title: 'Minamo - 05', indexerId: 1, seasonNumber: -1 },
     {
       guid: 'b',
-      title: 'Frieren S01-S02',
+      title: 'Minamo S01-S02',
       indexerId: 1,
       seasonNumber: 1,
       seasonNumbers: [1, 2],
       fullSeason: true,
     },
-    { guid: 'c', title: 'Frieren S00E01', indexerId: 1, seasonNumber: 0 },
+    { guid: 'c', title: 'Minamo S00E01', indexerId: 1, seasonNumber: 0 },
   ],
   '/api/v3/series/7': {
     id: 7,
-    title: 'Frieren – Nach dem Ende der Reise',
-    originalTitle: 'Sousou no Frieren',
+    title: 'Minamo – Jenseits des Hafens',
+    originalTitle: 'Toudai no Minamo',
     year: 2023,
-    tvdbId: 424536,
+    tvdbId: 536127,
     seriesType: 'anime',
     qualityProfileId: 1,
-    path: '/tv/Frieren',
-    alternateTitles: [{ title: 'Frieren: Beyond Journey’s End' }],
+    path: '/tv/Minamo',
+    alternateTitles: [{ title: 'Minamo: Beyond Harbor’s Edge' }],
   },
   '/api/v3/series/8': {
     id: 8,
-    title: 'Frieren – Nach dem Ende der Reise',
-    originalTitle: '葬送のフリーレン',
+    title: 'Minamo – Jenseits des Hafens',
+    originalTitle: '灯台のミナモ',
     year: 2023,
-    tvdbId: 424536,
+    tvdbId: 536127,
     seriesType: 'anime',
     qualityProfileId: 1,
-    path: '/tv/Frieren',
+    path: '/tv/Minamo',
   },
   '/api/v3/episode': [],
   '/api/v3/episodefile': [],
@@ -105,7 +105,7 @@ describe('Sonarr v5', () => {
 
   it('reads a name with no season as having none, as v4 did', async () => {
     const parsed = await BackfillSonarr.forServer(settings).parse(
-      '[Group] Frieren - 05 [1080p].mkv'
+      '[Group] Minamo - 05 [1080p].mkv'
     );
     assert.equal(parsed.parsedEpisodeInfo?.seasonNumber, undefined);
     assert.deepEqual(parsed.parsedEpisodeInfo?.absoluteEpisodeNumbers, [5]);
@@ -132,8 +132,8 @@ describe('Sonarr v5', () => {
       arrId: 7,
       searchTerms: [],
     } as unknown as BackfillSeries);
-    assert.ok(ctx.names.includes('Sousou no Frieren'));
-    assert.ok(ctx.names.includes('Frieren – Nach dem Ende der Reise'));
+    assert.ok(ctx.names.includes('Toudai no Minamo'));
+    assert.ok(ctx.names.includes('Minamo – Jenseits des Hafens'));
 
     // Not in a script release names use.
     const other = await backfill.context({
@@ -141,6 +141,6 @@ describe('Sonarr v5', () => {
       arrId: 8,
       searchTerms: [],
     } as unknown as BackfillSeries);
-    assert.ok(!other.names.includes('葬送のフリーレン'));
+    assert.ok(!other.names.includes('灯台のミナモ'));
   });
 });

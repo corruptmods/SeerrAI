@@ -150,14 +150,14 @@ beforeEach(async () => {
     { Id: 'g3', Name: 'Guest', Policy: { IsDisabled: false } },
   ];
   items = [
-    { Id: 'm1', Name: '1917 (2019)', Type: 'Movie', ProductionYear: 2019 },
-    { Id: 's1', Name: 'The Apothecary Diaries', Type: 'Series' },
+    { Id: 'm1', Name: '1863 (2019)', Type: 'Movie', ProductionYear: 2019 },
+    { Id: 's1', Name: 'The Herbalist Ledgers', Type: 'Series' },
     ...[1, 2, 3].map((n) => ({
       Id: `e${n}`,
       Name: `Episode ${n}`,
       Type: 'Episode' as const,
       SeriesId: 's1',
-      SeriesName: 'The Apothecary Diaries',
+      SeriesName: 'The Herbalist Ledgers',
       ParentIndexNumber: 1,
       IndexNumber: n,
     })),
@@ -226,10 +226,10 @@ describe('watch history from Jellyfin and Emby', () => {
         p.percent,
       ]),
       [
-        ['episode', 's1', 'The Apothecary Diaries', 1, 3, false, 84],
-        ['episode', 's1', 'The Apothecary Diaries', 1, 2, true, 100],
-        ['episode', 's1', 'The Apothecary Diaries', 1, 1, true, 100],
-        ['movie', 'm1', '1917 (2019)', null, null, true, 100],
+        ['episode', 's1', 'The Herbalist Ledgers', 1, 3, false, 84],
+        ['episode', 's1', 'The Herbalist Ledgers', 1, 2, true, 100],
+        ['episode', 's1', 'The Herbalist Ledgers', 1, 1, true, 100],
+        ['movie', 'm1', '1863 (2019)', null, null, true, 100],
       ],
       'the unplaced episode is left out, and 612% part-watched is not read as finished'
     );
@@ -264,7 +264,7 @@ describe('watch history from Jellyfin and Emby', () => {
     };
     try {
       const film = await saveMedia({
-        tmdbId: 530915,
+        tmdbId: 641826,
         mediaType: MediaType.MOVIE,
         jellyfinMediaId: 'm1',
       });
@@ -278,7 +278,7 @@ describe('watch history from Jellyfin and Emby', () => {
       );
 
       const series = await saveMedia({
-        tmdbId: 220542,
+        tmdbId: 331675,
         mediaType: MediaType.TV,
         jellyfinMediaId: 's1',
       });
@@ -297,7 +297,7 @@ describe('watch history from Jellyfin and Emby', () => {
 
   it('reads plays of one title since a moment, for lists and progress', async () => {
     const series = await saveMedia({
-      tmdbId: 220543,
+      tmdbId: 331676,
       mediaType: MediaType.TV,
       jellyfinMediaId: 's1',
     });
@@ -316,7 +316,7 @@ describe('watch history from Jellyfin and Emby', () => {
     // As seen on a real Emby server: Played, but no LastPlayedDate.
     userData.j2.e2 = { Played: true, PlayCount: 1 };
     const series = await saveMedia({
-      tmdbId: 220544,
+      tmdbId: 331677,
       mediaType: MediaType.TV,
       jellyfinMediaId: 's1',
     });
@@ -396,7 +396,7 @@ describe('watch history from Jellyfin and Emby', () => {
 
   it('maps the server’s ids back to the library, regular and 4K', async () => {
     const film = await saveMedia({
-      tmdbId: 530916,
+      tmdbId: 641827,
       mediaType: MediaType.MOVIE,
       jellyfinMediaId: 'm-reg',
       jellyfinMediaId4k: 'm-4k',
@@ -437,7 +437,7 @@ describe('watch history from Jellyfin and Emby', () => {
     try {
       assert.equal(watchSource()?.label, 'Emby');
       const media = await saveMedia({
-        tmdbId: 220544,
+        tmdbId: 331677,
         mediaType: MediaType.TV,
         embyMediaId: 's1',
       });
@@ -457,8 +457,8 @@ describe('watch history from Jellyfin and Emby', () => {
           })
         );
       }
-      const progress = await getSeriesProgress(alex, [220544]);
-      assert.deepEqual(progress[220544], {
+      const progress = await getSeriesProgress(alex, [331677]);
+      assert.deepEqual(progress[331677], {
         state: 'up_next',
         next: { season: 1, episode: 3 },
         remaining: 1,
@@ -533,9 +533,9 @@ describe('Match Check on Jellyfin and Emby', () => {
   it('reads the ids the server matched, whatever their case', () => {
     assert.deepEqual(
       jellyfinIds({
-        ProviderIds: { Imdb: 'tt26743760', Tmdb: '220542', Tvdb: '431162' },
+        ProviderIds: { Imdb: 'tt27854871', Tmdb: '331675', Tvdb: '542683' },
       } as never),
-      { imdbId: 'tt26743760', tmdbId: 220542, tvdbId: 431162 }
+      { imdbId: 'tt27854871', tmdbId: 331675, tvdbId: 542683 }
     );
     assert.deepEqual(
       jellyfinIds({ ProviderIds: { TMDB: 'x', imdb: 'nope' } } as never),
@@ -546,19 +546,19 @@ describe('Match Check on Jellyfin and Emby', () => {
   it('finds a folder matched to another title, and says how to Identify it', () => {
     const byFolder = new Map([
       [
-        'carrie (2026)',
-        [{ title: 'Carrie', year: 2026, tmdbId: 1, server: 'Radarr' }],
+        'wrenna (2026)',
+        [{ title: 'Wrenna', year: 2026, tmdbId: 1, server: 'Radarr' }],
       ],
     ]);
     const item = jellyfinMatchItem('movie', {
       Id: 'abc',
-      Name: 'The Carrie Diaries',
+      Name: 'The Wrenna Diaries',
       Type: 'Movie',
       ProductionYear: 2013,
-      Path: '/media/movies/Carrie (2026)/Carrie (2026).mkv',
+      Path: '/media/movies/Wrenna (2026)/Wrenna (2026).mkv',
       ProviderIds: { Tmdb: '2' },
     } as never);
-    assert.deepEqual(item.folders, ['Carrie (2026)']);
+    assert.deepEqual(item.folders, ['Wrenna (2026)']);
     const { checked, problem } = compareMatch(
       'movie',
       item,

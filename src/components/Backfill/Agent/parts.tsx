@@ -27,7 +27,7 @@ export const messages = defineMessages('components.Backfill.Agent', {
   agent: 'Admin agent',
   description:
     'An AI that digs deeper: it tries other searches, checks pack contents and downloads only what’s missing.',
-  placeholder: 'Ask it to find something: “Get the missing Casper episodes”',
+  placeholder: 'Ask it to find something: “Get the missing Wendle episodes”',
   placeholderShort: 'Ask it to find something',
   ask: 'Ask',
   asking: 'Starting…',

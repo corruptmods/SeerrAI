@@ -181,7 +181,7 @@ const languagesOf = (intl: IntlShape, tracks: SubtitleTrack[]) => {
 interface SubtitlesCardProps {
   kind: SubtitlesKind;
   tmdbId: number;
-  /** The title as dialogs name it: "10 Cloverfield Lane (2016)". */
+  /** The title as dialogs name it: "10 Juniper Lane (2016)". */
   title: string;
 }
 

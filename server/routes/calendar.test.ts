@@ -153,8 +153,8 @@ const calendar = (query = '') =>
 describe('the release calendar', () => {
   it('lists each release a film has in range, once, even with a 4K server', async () => {
     const film = {
-      tmdbId: 1291595,
-      title: 'Insidious: Out of the Further',
+      tmdbId: 1382706,
+      title: 'Vesperline: Out of the Hollow',
       hasFile: false,
       inCinemas: utcDay(-40),
       digitalRelease: utcDay(12),
@@ -174,14 +174,14 @@ describe('the release calendar', () => {
       body.items.map((i) => [i.title, i.kind, i.at, i.allDay, i.poster]),
       [
         [
-          'Insidious: Out of the Further',
+          'Vesperline: Out of the Hollow',
           'digital',
           utcDay(12),
           true,
           'https://image.tmdb.org/t/p/original/x.jpg',
         ],
         [
-          'Insidious: Out of the Further',
+          'Vesperline: Out of the Hollow',
           'physical',
           utcDay(30),
           true,
@@ -198,9 +198,9 @@ describe('the release calendar', () => {
 
   it('reads episodes airing together as one line, and apart as two', async () => {
     const show = {
-      title: 'Neagley',
+      title: 'Vossberg',
       tvdbId: 400,
-      tmdbId: 250307,
+      tmdbId: 361418,
       images: [
         {
           coverType: 'poster',
@@ -252,8 +252,8 @@ describe('the release calendar', () => {
         i.at,
       ]),
       [
-        ['Neagley', 250307, 1, [1, 2], null, false, at(3, 1)],
-        ['Neagley', 250307, 1, [3], 'Three', false, at(10, 1)],
+        ['Vossberg', 361418, 1, [1, 2], null, false, at(3, 1)],
+        ['Vossberg', 361418, 1, [3], 'Three', false, at(10, 1)],
       ]
     );
   });

@@ -6,7 +6,7 @@ Say **"Fix this show"** or **"Fix this movie"** to Siri while something is playi
 
 ```
 You:   Hey Siri, fix this show.
-Siri:  What's wrong with The Bear, season 2 episode 3?
+Siri:  What's wrong with The Otterkin, season 2 episode 3?
 You:   The subtitles are out of sync.
 Siri:  Reported. I'm looking for subtitles now. You'll be told how it goes.
 ```
@@ -15,7 +15,7 @@ Siri:  Reported. I'm looking for subtitles now. You'll be told how it goes.
 
 Your words are read by the same rules as an issue: subtitles missing or out of sync, "make subtitles", episodes missing, a broken or bad copy, the wrong episode, a whole bad season. When the rules can't tell and an admin has set up AI, the AI model reads them instead (**Understand Reports**, which sends only your words). If neither can tell, it's reported for an admin to look at.
 
-Anything that replaces files (a broken copy, the wrong episode, a whole season) is always asked about first: "That replaces the file of The Bear, season 2 episode 3 with another copy. Should I go ahead?" **No** still reports it, for an admin, and leaves the files alone. The question lasts 5 minutes.
+Anything that replaces files (a broken copy, the wrong episode, a whole season) is always asked about first: "That replaces the file of The Otterkin, season 2 episode 3 with another copy. Should I go ahead?" **No** still reports it, for an admin, and leaves the files alone. The question lasts 5 minutes.
 
 ## What counts as playing
 

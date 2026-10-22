@@ -29,7 +29,7 @@ import type {
  * cannot place because its name has no year (as collections often have
  * it) is renamed with the movie's title and year and the pack's quality
  * tags, then read again, but only when the title it gives is exactly this
- * movie's ("Toy Story 2" is not "Toy Story"), or when it is the only video
+ * movie's ("Tin Parade 2" is not "Tin Parade"), or when it is the only video
  * in a pack that is this movie by name and year. Only files Radarr maps to
  * this movie are used; the rest of a collection is left out of the
  * download.
@@ -59,7 +59,7 @@ export const sameYear = (year: number, movie: RadarrMovieDetail): boolean =>
 
 /**
  * The title a name gives, before its year, tags or brackets, without a
- * collection's running number: "02 - Toy.Story.2.1080p" is "Toy Story 2".
+ * collection's running number: "02 - Tin.Parade.2.1080p" is "Tin Parade 2".
  */
 export const namedTitle = (name: string): string => {
   const words = name

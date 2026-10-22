@@ -34,7 +34,7 @@ const wordOf = (group: string) =>
 /**
  * The blocked group a release belongs to, by the group its indexer or
  * Radarr/Sonarr read, or by the group's name as a word of the title (a
- * torrent can name it with spaces, "x264 rothebehap mp4", and no group is
+ * torrent can name it with spaces, "x264 quillowsap mp4", and no group is
  * read at all). Undefined when it is not blocked.
  */
 export const blockedGroupOf = (

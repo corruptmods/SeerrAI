@@ -58,7 +58,7 @@ const radarr = {
   history: async () => history,
   movieDetail: async () => ({
     id: MOVIE.arrId,
-    title: 'The Odyssey',
+    title: 'The Driftwood',
     monitored: true,
     qualityProfileId: 6,
     hasFile: movieFileId !== null,
@@ -67,7 +67,7 @@ const radarr = {
         ? undefined
         : {
             id: movieFileId,
-            relativePath: 'The Odyssey (2026) [WEBDL-1080p].mkv',
+            relativePath: 'The Driftwood (2026) [WEBDL-1080p].mkv',
             size: 5.1 * GB,
           },
   }),
@@ -158,13 +158,13 @@ describe('deleting files', () => {
     const change = await describeChange({
       kind: 'deleteFiles',
       title: MOVIE,
-      name: 'The Odyssey',
+      name: 'The Driftwood',
       reason: 'It is a fake.',
     });
-    assert.equal(change.headline, 'Delete the file of The Odyssey');
+    assert.equal(change.headline, 'Delete the file of The Driftwood');
     assert.match(
       text(change),
-      /"The Odyssey \(2026\) \[WEBDL-1080p\]\.mkv" \(5\.1 GB\)/
+      /"The Driftwood \(2026\) \[WEBDL-1080p\]\.mkv" \(5\.1 GB\)/
     );
     assert.match(
       text(change),
@@ -184,7 +184,7 @@ describe('deleting files', () => {
     movieFileId = 10894;
     assert.match(
       await applyChange(change),
-      /^Deleted the file of The Odyssey\.$/
+      /^Deleted the file of The Driftwood\.$/
     );
     assert.deepEqual(calls, ['delete movie file 10894']);
   });
@@ -260,7 +260,7 @@ describe('marking a download failed', () => {
     queue = [
       {
         id: 55,
-        title: 'The.Odyssey.2026.Celdra',
+        title: 'The.Driftwood.2026.Vandra',
         downloadClient: 'qBittorrent',
         movieId: MOVIE.arrId,
       },
@@ -269,12 +269,12 @@ describe('marking a download failed', () => {
     const queued = await describeChange({
       kind: 'markFailed',
       title: MOVIE,
-      name: 'The Odyssey',
+      name: 'The Driftwood',
       reason: 'A fake.',
     });
     assert.match(
       text(queued),
-      /Removes "The\.Odyssey\.2026\.Celdra" from qBittorrent/
+      /Removes "The\.Driftwood\.2026\.Vandra" from qBittorrent/
     );
     assert.deepEqual(queued.params.queueIds, [55]);
 
@@ -282,7 +282,7 @@ describe('marking a download failed', () => {
       {
         id: 32776,
         eventType: 'grabbed',
-        sourceTitle: 'The Odyssey #turkseed',
+        sourceTitle: 'The Driftwood #lynxseed',
         date: '2026-10-12T00:13:53Z',
       },
       {
@@ -303,10 +303,10 @@ describe('marking a download failed', () => {
     const grabbed = await describeChange({
       kind: 'markFailed',
       title: MOVIE,
-      name: 'The Odyssey',
+      name: 'The Driftwood',
       reason: 'A fake.',
     });
-    assert.match(text(grabbed), /Blocklists "The Odyssey #turkseed"/);
+    assert.match(text(grabbed), /Blocklists "The Driftwood #lynxseed"/);
     assert.match(text(grabbed), /The file on disk stays/);
     await applyChange(grabbed);
     assert.deepEqual(calls, ['failed 32776']);
@@ -330,12 +330,12 @@ describe('changing the quality profile', () => {
     const change = await describeChange({
       kind: 'changeProfile',
       title: MOVIE,
-      name: 'The Odyssey',
+      name: 'The Driftwood',
       profile: 'ultra-hd',
       search: true,
       reason: 'They want 4K.',
     });
-    assert.equal(change.headline, 'Move The Odyssey to the Ultra-HD profile');
+    assert.equal(change.headline, 'Move The Driftwood to the Ultra-HD profile');
     assert.match(text(change), /from HD-1080p to Ultra-HD/);
     assert.match(
       await applyChange(change),
@@ -374,11 +374,11 @@ describe('changing the quality profile', () => {
       describeChange({
         kind: 'changeProfile',
         title: MOVIE,
-        name: 'The Odyssey',
+        name: 'The Driftwood',
         profile: 'HD-1080p',
         reason: 'x',
       }),
-      /The Odyssey already uses HD-1080p/
+      /The Driftwood already uses HD-1080p/
     );
   });
 });
@@ -387,10 +387,10 @@ describe('release groups', () => {
   it('turns down blocking a group twice, or unblocking one that is not', async () => {
     getSettings().backfill = {
       ...getSettings().backfill,
-      blockedGroups: ['rothebehap'],
+      blockedGroups: ['quillowsap'],
     };
     await assert.rejects(
-      describeChange({ kind: 'blockGroup', group: 'ROTHEBEHAP', reason: 'x' }),
+      describeChange({ kind: 'blockGroup', group: 'QUILLOWSAP', reason: 'x' }),
       /already blocked/
     );
     await assert.rejects(
@@ -403,7 +403,7 @@ describe('release groups', () => {
     );
     const change = await describeChange({
       kind: 'blockGroup',
-      group: 'turkseed',
+      group: 'lynxseed',
       reason: 'Fakes.',
     });
     assert.match(text(change), /Radarr and Sonarr reject them too/);

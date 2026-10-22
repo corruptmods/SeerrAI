@@ -57,7 +57,7 @@ const call = async (method: string, url: string, body?: unknown) => {
 
 const episode = (season = 2, number = 3): NowPlaying => ({
   media: bear,
-  title: 'The Bear',
+  title: 'The Otterkin',
   season,
   episode: number,
   seen: 'now',
@@ -94,7 +94,7 @@ beforeEach(async () => {
   const media = getRepository(Media);
   bear = await media.save(
     new Media({
-      tmdbId: 136315,
+      tmdbId: 247426,
       mediaType: MediaType.TV,
       status: MediaStatus.AVAILABLE,
     })
@@ -214,7 +214,10 @@ describe('Siri: what is playing', () => {
   it('asks about the first title, and says which to send back', async () => {
     const { status, body } = await call('GET', '/now-playing');
     assert.equal(status, 200, body.message);
-    assert.equal(body.say, 'What’s wrong with The Bear, season 2 episode 3?');
+    assert.equal(
+      body.say,
+      'What’s wrong with The Otterkin, season 2 episode 3?'
+    );
     assert.equal(body.item, `${bear.id}:2:3`);
     assert.equal(body.playing[0].mediaType, 'tv');
   });
@@ -235,10 +238,10 @@ describe('Siri: what is playing', () => {
   });
 
   it('names films and episodes as Siri says them', () => {
-    assert.equal(spokenName({ title: 'Groundhog Day' }), 'Groundhog Day');
+    assert.equal(spokenName({ title: 'Hedgehog Morning' }), 'Hedgehog Morning');
     assert.equal(
-      spokenName({ title: 'The Bear', season: 2 }),
-      'The Bear, season 2'
+      spokenName({ title: 'The Otterkin', season: 2 }),
+      'The Otterkin, season 2'
     );
     assert.deepEqual(parseItem('12:2:3'), {
       mediaId: 12,
@@ -284,7 +287,7 @@ describe('Siri: a report', () => {
     Object.defineProperty(TheMovieDb.prototype, 'getTvShow', {
       configurable: true,
       set() {},
-      get: () => async () => ({ name: 'The Bear' }),
+      get: () => async () => ({ name: 'The Otterkin' }),
     });
     const asked = await call('POST', '/now-playing/report', {
       problem: 'it keeps freezing',
@@ -293,7 +296,7 @@ describe('Siri: a report', () => {
     assert.equal(asked.status, 200, asked.body.message);
     assert.equal(
       asked.body.say,
-      'That replaces the file of The Bear, season 2 episode 3 with another copy. Should I go ahead?'
+      'That replaces the file of The Otterkin, season 2 episode 3 with another copy. Should I go ahead?'
     );
     assert.ok(asked.body.confirm);
     assert.equal((await issues()).length, 0, 'nothing filed before the yes');
@@ -327,7 +330,7 @@ describe('Siri: a report', () => {
     const asked = await call('POST', '/now-playing/report', {
       problem: 'this is the wrong episode',
     });
-    assert.match(asked.body.say, /checks The Bear, season 2 episode 3/);
+    assert.match(asked.body.say, /checks The Otterkin, season 2 episode 3/);
     const no = await call('POST', '/now-playing/answer', {
       confirm: asked.body.confirm,
       answer: 'no',
@@ -377,7 +380,7 @@ describe('Siri: a report', () => {
     });
     assert.equal(
       asked.body.say,
-      'That asks an admin to replace all of season 2 of The Bear. Should I ask?'
+      'That asks an admin to replace all of season 2 of The Otterkin. Should I ask?'
     );
     await call('POST', '/now-playing/answer', {
       confirm: asked.body.confirm,
@@ -393,7 +396,7 @@ describe('Siri: a report', () => {
     const asked = await call('POST', '/now-playing/report', {
       problem: 'season 1 is completely messed up, replace it',
     });
-    assert.match(asked.body.say, /all of season 1 of The Bear/);
+    assert.match(asked.body.say, /all of season 1 of The Otterkin/);
   });
 
   it('replaces a film’s one file for "the whole thing"', async () => {
@@ -401,7 +404,7 @@ describe('Siri: a report', () => {
       {
         ...episode(),
         media: film,
-        title: 'Groundhog Day',
+        title: 'Hedgehog Morning',
         season: undefined,
         episode: undefined,
       },
@@ -411,7 +414,7 @@ describe('Siri: a report', () => {
     });
     assert.equal(
       asked.body.say,
-      'That replaces the file of Groundhog Day with another copy. Should I go ahead?'
+      'That replaces the file of Hedgehog Morning with another copy. Should I go ahead?'
     );
   });
 
@@ -438,7 +441,7 @@ describe('Siri: a report', () => {
       modelAsked[0].prompt,
       /the people talk but the words at the bottom are in french/
     );
-    assert.doesNotMatch(modelAsked[0].prompt, /The Bear|siri-viewer/);
+    assert.doesNotMatch(modelAsked[0].prompt, /The Otterkin|siri-viewer/);
     assert.deepEqual(
       started.map((s) => [s.kind, s.language]),
       [['subtitles', 'fr']]

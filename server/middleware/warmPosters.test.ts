@@ -43,8 +43,8 @@ describe('posters warmed from a page of titles', () => {
 describe('covers warmed from a page of music', () => {
   const cover = (id: string, size = '500') =>
     `https://coverartarchive.org/release-group/${id}/front-${size}`;
-  const A = 'b1392450-e666-3926-a536-22c65f834433';
-  const B = '1b022e01-4da6-387b-8658-8678046e4cef';
+  const A = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
+  const B = '4f6a2d93-c1e8-3a57-9b02-6d3e8f1c7a40';
 
   it('takes each album’s cover, from a page of results or search', () => {
     assert.deepEqual(

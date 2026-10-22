@@ -30,9 +30,9 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 
 setupTestDb();
 
-const ARTIST = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
-const OK_COMPUTER = '1b022e01-4da6-387b-8658-8678046e4cef';
-const KID_A = 'b1392450-e666-3926-a536-22c65f834433';
+const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
+const STATIC_GARDEN = '4f6a2d93-c1e8-3a57-9b02-6d3e8f1c7a40';
+const FOG_B = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
 
 const sent: { type: Notification; payload: NotificationPayload }[] = [];
 const ofType = (type: Notification) =>
@@ -48,7 +48,7 @@ const seedArtist = async (
       mediaType: MediaType.MUSIC,
       tmdbId: 0,
       foreignId: ARTIST,
-      foreignTitle: 'Radiohead',
+      foreignTitle: 'Glasswing',
       status,
     }),
     { listeners: false }
@@ -128,34 +128,34 @@ describe('completing music requests', () => {
   it('completes a request once every album asked for is here, and says so once', async () => {
     const media = await seedArtist([
       {
-        mbId: OK_COMPUTER,
-        title: 'OK Computer',
+        mbId: STATIC_GARDEN,
+        title: 'Static Garden',
         status: MediaStatus.AVAILABLE,
       },
-      { mbId: KID_A, title: 'Kid A', status: MediaStatus.PROCESSING },
+      { mbId: FOG_B, title: 'Fog B', status: MediaStatus.PROCESSING },
     ]);
     const request = await seedRequest(media, [
-      { mbId: OK_COMPUTER, title: 'OK Computer' },
-      { mbId: KID_A, title: 'Kid A' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
+      { mbId: FOG_B, title: 'Fog B' },
     ]);
 
     // One of two here: that album is done, the request is not.
     assert.deepEqual(await completeMusicRequests([media.id]), []);
     assert.equal(await statusOf(request.id), MediaRequestStatus.APPROVED);
     assert.deepEqual(await albumStatuses(request.id), {
-      [OK_COMPUTER]: MediaRequestStatus.COMPLETED,
-      [KID_A]: MediaRequestStatus.APPROVED,
+      [STATIC_GARDEN]: MediaRequestStatus.COMPLETED,
+      [FOG_B]: MediaRequestStatus.APPROVED,
     });
     assert.equal(sent.length, 0);
 
-    await setAlbum(KID_A, MediaStatus.AVAILABLE);
+    await setAlbum(FOG_B, MediaStatus.AVAILABLE);
     assert.deepEqual(await completeMusicRequests([media.id]), [request.id]);
     assert.equal(await statusOf(request.id), MediaRequestStatus.COMPLETED);
 
     const available = ofType(Notification.MEDIA_AVAILABLE);
     assert.equal(available.length, 1);
     assert.equal(available[0].event, 'Music Request Now Available');
-    assert.equal(available[0].subject, 'Radiohead — 2 albums');
+    assert.equal(available[0].subject, 'Glasswing — 2 albums');
     assert.equal(available[0].notifyUser?.id, 2);
     assert.equal(available[0].notifySystem, true);
     assert.equal(available[0].notifyAdmin, false);
@@ -173,13 +173,13 @@ describe('completing music requests', () => {
   it('tells each watcher once, apart from the requester', async () => {
     const media = await seedArtist([
       {
-        mbId: OK_COMPUTER,
-        title: 'OK Computer',
+        mbId: STATIC_GARDEN,
+        title: 'Static Garden',
         status: MediaStatus.AVAILABLE,
       },
     ]);
     const request = await seedRequest(media, [
-      { mbId: OK_COMPUTER, title: 'OK Computer' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
     ]);
     await getRepository(MediaRequestWatcher).save(
       new MediaRequestWatcher({ requestId: request.id, userId: 1 })
@@ -193,21 +193,21 @@ describe('completing music requests', () => {
     assert.equal(available.filter((p) => p.notifySystem).length, 1);
     const watcher = available.find((p) => p.notifyUser?.id === 1);
     assert.equal(watcher?.notifySystem, false);
-    assert.equal(watcher?.subject, 'OK Computer — Radiohead');
+    assert.equal(watcher?.subject, 'Static Garden — Glasswing');
   });
 
   it('completes without a word when an album asked for was deleted', async () => {
     const media = await seedArtist([
       {
-        mbId: OK_COMPUTER,
-        title: 'OK Computer',
+        mbId: STATIC_GARDEN,
+        title: 'Static Garden',
         status: MediaStatus.AVAILABLE,
       },
-      { mbId: KID_A, title: 'Kid A', status: MediaStatus.DELETED },
+      { mbId: FOG_B, title: 'Fog B', status: MediaStatus.DELETED },
     ]);
     const request = await seedRequest(media, [
-      { mbId: OK_COMPUTER, title: 'OK Computer' },
-      { mbId: KID_A, title: 'Kid A' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
+      { mbId: FOG_B, title: 'Fog B' },
     ]);
 
     assert.deepEqual(await completeMusicRequests([media.id]), [request.id]);
@@ -220,23 +220,23 @@ describe('completing music requests', () => {
   it('leaves pending and declined requests, and declined albums, alone', async () => {
     const media = await seedArtist([
       {
-        mbId: OK_COMPUTER,
-        title: 'OK Computer',
+        mbId: STATIC_GARDEN,
+        title: 'Static Garden',
         status: MediaStatus.AVAILABLE,
       },
-      { mbId: KID_A, title: 'Kid A', status: MediaStatus.PROCESSING },
+      { mbId: FOG_B, title: 'Fog B', status: MediaStatus.PROCESSING },
     ]);
     const pending = await seedRequest(
       media,
-      [{ mbId: OK_COMPUTER, title: 'OK Computer' }],
+      [{ mbId: STATIC_GARDEN, title: 'Static Garden' }],
       MediaRequestStatus.PENDING
     );
-    // Kid A was taken off: only OK Computer counts.
+    // Fog B was taken off: only Static Garden counts.
     const trimmed = await seedRequest(media, [
-      { mbId: OK_COMPUTER, title: 'OK Computer' },
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
       {
-        mbId: KID_A,
-        title: 'Kid A',
+        mbId: FOG_B,
+        title: 'Fog B',
         status: MediaRequestStatus.DECLINED,
       },
     ]);
@@ -244,7 +244,7 @@ describe('completing music requests', () => {
     assert.deepEqual(await completeMusicRequests([media.id]), [trimmed.id]);
     assert.equal(await statusOf(pending.id), MediaRequestStatus.PENDING);
     assert.equal(
-      (await albumStatuses(trimmed.id))[KID_A],
+      (await albumStatuses(trimmed.id))[FOG_B],
       MediaRequestStatus.DECLINED
     );
     assert.equal(ofType(Notification.MEDIA_AVAILABLE).length, 1);
@@ -253,14 +253,14 @@ describe('completing music requests', () => {
   it('completes a request that failed to send, once its albums came anyway', async () => {
     const media = await seedArtist([
       {
-        mbId: OK_COMPUTER,
-        title: 'OK Computer',
+        mbId: STATIC_GARDEN,
+        title: 'Static Garden',
         status: MediaStatus.AVAILABLE,
       },
     ]);
     const request = await seedRequest(
       media,
-      [{ mbId: OK_COMPUTER, title: 'OK Computer' }],
+      [{ mbId: STATIC_GARDEN, title: 'Static Garden' }],
       MediaRequestStatus.FAILED
     );
 
@@ -272,14 +272,14 @@ describe('catching up on music notifications', () => {
   it('says a music request is here when that was missed, and only once', async () => {
     const media = await seedArtist([
       {
-        mbId: OK_COMPUTER,
-        title: 'OK Computer',
+        mbId: STATIC_GARDEN,
+        title: 'Static Garden',
         status: MediaStatus.AVAILABLE,
       },
     ]);
     await seedRequest(
       media,
-      [{ mbId: OK_COMPUTER, title: 'OK Computer' }],
+      [{ mbId: STATIC_GARDEN, title: 'Static Garden' }],
       MediaRequestStatus.COMPLETED
     );
 
@@ -289,23 +289,23 @@ describe('catching up on music notifications', () => {
     const available = ofType(Notification.MEDIA_AVAILABLE);
     assert.equal(available.length, 1);
     assert.equal(available[0].event, 'Music Now Available');
-    assert.equal(available[0].subject, 'OK Computer — Radiohead');
+    assert.equal(available[0].subject, 'Static Garden — Glasswing');
   });
 
   it('waits while an album asked for is not here', async () => {
     const media = await seedArtist([
       {
-        mbId: OK_COMPUTER,
-        title: 'OK Computer',
+        mbId: STATIC_GARDEN,
+        title: 'Static Garden',
         status: MediaStatus.AVAILABLE,
       },
-      { mbId: KID_A, title: 'Kid A', status: MediaStatus.DELETED },
+      { mbId: FOG_B, title: 'Fog B', status: MediaStatus.DELETED },
     ]);
     await seedRequest(
       media,
       [
-        { mbId: OK_COMPUTER, title: 'OK Computer' },
-        { mbId: KID_A, title: 'Kid A' },
+        { mbId: STATIC_GARDEN, title: 'Static Garden' },
+        { mbId: FOG_B, title: 'Fog B' },
       ],
       MediaRequestStatus.COMPLETED
     );
@@ -318,14 +318,14 @@ describe('catching up on music notifications', () => {
   it('tells the requester a music request failed, once', async () => {
     const media = await seedArtist([
       {
-        mbId: OK_COMPUTER,
-        title: 'OK Computer',
+        mbId: STATIC_GARDEN,
+        title: 'Static Garden',
         status: MediaStatus.PROCESSING,
       },
     ]);
     await seedRequest(
       media,
-      [{ mbId: OK_COMPUTER, title: 'OK Computer' }],
+      [{ mbId: STATIC_GARDEN, title: 'Static Garden' }],
       MediaRequestStatus.FAILED
     );
 
@@ -342,12 +342,12 @@ describe('catching up on music notifications', () => {
 describe('an artist’s own status', () => {
   it('becoming available does not approve a pending music request', async () => {
     const media = await seedArtist(
-      [{ mbId: KID_A, title: 'Kid A', status: MediaStatus.AVAILABLE }],
+      [{ mbId: FOG_B, title: 'Fog B', status: MediaStatus.AVAILABLE }],
       MediaStatus.PENDING
     );
     const request = await seedRequest(
       media,
-      [{ mbId: OK_COMPUTER, title: 'OK Computer' }],
+      [{ mbId: STATIC_GARDEN, title: 'Static Garden' }],
       MediaRequestStatus.PENDING
     );
 
@@ -357,7 +357,7 @@ describe('an artist’s own status', () => {
 
     assert.equal(await statusOf(request.id), MediaRequestStatus.PENDING);
     assert.equal(
-      (await albumStatuses(request.id))[OK_COMPUTER],
+      (await albumStatuses(request.id))[STATIC_GARDEN],
       MediaRequestStatus.PENDING
     );
   });

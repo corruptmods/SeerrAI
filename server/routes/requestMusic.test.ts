@@ -46,11 +46,11 @@ import {
 
 setupTestDb();
 
-const ARTIST = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
-const OTHER_ARTIST = '0383dadf-2a4e-4d10-a46a-e9e041da8eb3';
-const OK_COMPUTER = '1b022e01-4da6-387b-8658-8678046e4cef';
-const KID_A = 'b1392450-e666-3926-a536-22c65f834433';
-const IN_RAINBOWS = '6e335887-60ba-38f0-95af-fae7774336bf';
+const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
+const OTHER_ARTIST = '5c72e1b9-4f3d-4a86-b917-d2a8f60c3e51';
+const STATIC_GARDEN = '4f6a2d93-c1e8-3a57-9b02-6d3e8f1c7a40';
+const FOG_B = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
+const IN_LANTERNS = '1d84b6f2-9e07-3c5a-a4d8-e3f2b7091c6d';
 const SOMEONE_ELSES = '9a3b1f2c-0000-4000-8000-000000000001';
 
 const lidarr = createFakeLidarr();
@@ -76,8 +76,8 @@ const group = (
 });
 
 const DISCOGRAPHY = [
-  group(OK_COMPUTER, 'OK Computer', '1997-05-21'),
-  group(KID_A, 'Kid A', '2000-10-02'),
+  group(STATIC_GARDEN, 'Static Garden', '1997-05-21'),
+  group(FOG_B, 'Fog B', '2000-10-02'),
 ];
 
 const call = async (
@@ -170,7 +170,7 @@ beforeEach(async () => {
   mock.method(
     MusicBrainz.prototype,
     'getArtist',
-    async (id: string) => ({ id, name: 'Radiohead' }) as MbArtist
+    async (id: string) => ({ id, name: 'Glasswing' }) as MbArtist
   );
   mock.method(
     MusicBrainz.prototype,
@@ -178,8 +178,8 @@ beforeEach(async () => {
     async (id: string) => (id === ARTIST ? DISCOGRAPHY : [])
   );
   mock.method(MusicBrainz.prototype, 'getReleaseGroup', async (id: string) =>
-    id === IN_RAINBOWS
-      ? group(IN_RAINBOWS, 'In Rainbows', '2007-10-10')
+    id === IN_LANTERNS
+      ? group(IN_LANTERNS, 'In Lanterns', '2007-10-10')
       : group(id, 'Not Theirs', '1990', OTHER_ARTIST)
   );
 
@@ -196,7 +196,7 @@ afterEach(() => {
 
 describe('POST /request/music', () => {
   it('asks for albums as one request, waiting for approval', async () => {
-    const res = await requestMusic({ albums: [OK_COMPUTER, KID_A] });
+    const res = await requestMusic({ albums: [STATIC_GARDEN, FOG_B] });
 
     assert.equal(res.status, 201);
     const request = await getRepository(MediaRequest).findOneOrFail({
@@ -207,16 +207,16 @@ describe('POST /request/music', () => {
     assert.deepEqual(
       request.albums.map((album) => [album.albumMbid, album.title]).sort(),
       [
-        [OK_COMPUTER, 'OK Computer'],
-        [KID_A, 'Kid A'],
+        [STATIC_GARDEN, 'Static Garden'],
+        [FOG_B, 'Fog B'],
       ]
     );
 
     const media = await artistMedia();
     assert.equal(media.tmdbId, 0);
-    assert.equal(media.foreignTitle, 'Radiohead');
+    assert.equal(media.foreignTitle, 'Glasswing');
     assert.equal(media.status, MediaStatus.PENDING);
-    const ok = await albumRow(OK_COMPUTER);
+    const ok = await albumRow(STATIC_GARDEN);
     assert.equal(ok.status, MediaStatus.PENDING);
     assert.equal(ok.primaryType, 'Album');
     assert.equal(ok.releaseDate, '1997-05-21');
@@ -224,9 +224,9 @@ describe('POST /request/music', () => {
   });
 
   it('looks up an album MusicBrainz has not listed under the artist yet', async () => {
-    const res = await requestMusic({ albums: [IN_RAINBOWS] });
+    const res = await requestMusic({ albums: [IN_LANTERNS] });
     assert.equal(res.status, 201);
-    assert.equal((await albumRow(IN_RAINBOWS)).title, 'In Rainbows');
+    assert.equal((await albumRow(IN_LANTERNS)).title, 'In Lanterns');
   });
 
   it("refuses someone else's album, Various Artists, and too many albums", async () => {
@@ -235,12 +235,12 @@ describe('POST /request/music', () => {
 
     res = await call('POST', '/request/music', {
       artistMbid: VARIOUS_ARTISTS_MBID,
-      albums: [OK_COMPUTER],
+      albums: [STATIC_GARDEN],
     });
     assert.equal(res.status, 400);
 
     getSettings().music.maxAlbumsPerRequest = 1;
-    res = await requestMusic({ albums: [OK_COMPUTER, KID_A] });
+    res = await requestMusic({ albums: [STATIC_GARDEN, FOG_B] });
     assert.equal(res.status, 400);
     assert.equal(
       await getRepository(MediaRequest).count({
@@ -252,23 +252,23 @@ describe('POST /request/music', () => {
 
   it('is allowed by Request, or by Request Music alone, and nothing else', async () => {
     await actAs(Permission.REQUEST_MUSIC);
-    assert.equal((await requestMusic({ albums: [OK_COMPUTER] })).status, 201);
+    assert.equal((await requestMusic({ albums: [STATIC_GARDEN] })).status, 201);
 
     await actAs(Permission.REQUEST_MOVIE + Permission.REQUEST_TV, 'films@x');
-    assert.equal((await requestMusic({ albums: [KID_A] })).status, 403);
+    assert.equal((await requestMusic({ albums: [FOG_B] })).status, 403);
   });
 
   it('is approved at once with Auto-Approve Music, past 32 bits, and sent to Lidarr', async () => {
     await actAs(Permission.REQUEST + Permission.AUTO_APPROVE_MUSIC);
-    lidarr.lookupAlbums.set(OK_COMPUTER, {
+    lidarr.lookupAlbums.set(STATIC_GARDEN, {
       id: 0,
-      title: 'OK Computer',
-      foreignAlbumId: OK_COMPUTER,
+      title: 'Static Garden',
+      foreignAlbumId: STATIC_GARDEN,
       artistId: 0,
       monitored: false,
       artist: {
         id: 0,
-        artistName: 'Radiohead',
+        artistName: 'Glasswing',
         foreignArtistId: ARTIST,
         monitored: false,
         qualityProfileId: 0,
@@ -277,7 +277,7 @@ describe('POST /request/music', () => {
       },
     });
 
-    const res = await requestMusic({ albums: [OK_COMPUTER] });
+    const res = await requestMusic({ albums: [STATIC_GARDEN] });
 
     assert.equal(res.status, 201);
     assert.equal(
@@ -292,14 +292,17 @@ describe('POST /request/music', () => {
       1
     );
     assert.equal((await artistMedia()).status, MediaStatus.PROCESSING);
-    assert.equal((await albumRow(OK_COMPUTER)).status, MediaStatus.PROCESSING);
+    assert.equal(
+      (await albumRow(STATIC_GARDEN)).status,
+      MediaStatus.PROCESSING
+    );
     const [album] = await getRepository(AlbumRequest).find();
     assert.equal(album.status, MediaRequestStatus.APPROVED);
   });
 
   it('waits for approval with only Auto-Approve for another kind', async () => {
     await actAs(Permission.REQUEST + Permission.AUTO_APPROVE_MOVIE);
-    const res = await requestMusic({ albums: [OK_COMPUTER] });
+    const res = await requestMusic({ albums: [STATIC_GARDEN] });
     assert.equal(
       (res.body as { status: number }).status,
       MediaRequestStatus.PENDING
@@ -307,17 +310,17 @@ describe('POST /request/music', () => {
   });
 
   it('leaves out albums already asked for or already here', async () => {
-    assert.equal((await requestMusic({ albums: [OK_COMPUTER] })).status, 201);
+    assert.equal((await requestMusic({ albums: [STATIC_GARDEN] })).status, 201);
 
     await actAs(Permission.REQUEST, 'second@x');
-    assert.equal((await requestMusic({ albums: [OK_COMPUTER] })).status, 409);
+    assert.equal((await requestMusic({ albums: [STATIC_GARDEN] })).status, 409);
 
     const media = await artistMedia();
     await dataSource.manager.save(
       new MusicAlbum({
         mediaId: media.id,
-        mbId: IN_RAINBOWS,
-        title: 'In Rainbows',
+        mbId: IN_LANTERNS,
+        title: 'In Lanterns',
         secondaryTypes: [],
         status: MediaStatus.AVAILABLE,
       }),
@@ -325,7 +328,7 @@ describe('POST /request/music', () => {
     );
 
     const res = await requestMusic({
-      albums: [OK_COMPUTER, KID_A, IN_RAINBOWS],
+      albums: [STATIC_GARDEN, FOG_B, IN_LANTERNS],
     });
     assert.equal(res.status, 201);
     const request = await getRepository(MediaRequest).findOneOrFail({
@@ -333,7 +336,7 @@ describe('POST /request/music', () => {
     });
     assert.deepEqual(
       request.albums.map((album) => album.albumMbid),
-      [KID_A]
+      [FOG_B]
     );
   });
 
@@ -346,7 +349,7 @@ describe('POST /request/music', () => {
     actingAs = await getRepository(User).findOneByOrFail({ id: user.id });
 
     let res = await requestMusic({
-      albums: [OK_COMPUTER, KID_A, IN_RAINBOWS],
+      albums: [STATIC_GARDEN, FOG_B, IN_LANTERNS],
     });
     assert.equal(res.status, 403);
     assert.equal(
@@ -354,7 +357,7 @@ describe('POST /request/music', () => {
       'You can request 2 more albums.'
     );
 
-    res = await requestMusic({ albums: [OK_COMPUTER, KID_A] });
+    res = await requestMusic({ albums: [STATIC_GARDEN, FOG_B] });
     assert.equal(res.status, 201);
 
     const quota = await call('GET', `/user/${user.id}/quota`);
@@ -366,7 +369,7 @@ describe('POST /request/music', () => {
       restricted: true,
     });
 
-    res = await requestMusic({ albums: [IN_RAINBOWS] });
+    res = await requestMusic({ albums: [IN_LANTERNS] });
     assert.equal(res.status, 403);
     assert.equal(
       (res.body as { message: string }).message,
@@ -378,22 +381,22 @@ describe('POST /request/music', () => {
       { type: MediaType.MUSIC },
       { status: MediaRequestStatus.DECLINED }
     );
-    res = await requestMusic({ albums: [IN_RAINBOWS] });
+    res = await requestMusic({ albums: [IN_LANTERNS] });
     assert.equal(res.status, 201);
   });
 
   it('follows the default music quota, which managers may bypass', async () => {
     getSettings().main.defaultQuotas.music = { quotaLimit: 1, quotaDays: 7 };
     const listener = await actAs(Permission.REQUEST);
-    assert.equal((await requestMusic({ albums: [OK_COMPUTER] })).status, 201);
-    assert.equal((await requestMusic({ albums: [KID_A] })).status, 403);
+    assert.equal((await requestMusic({ albums: [STATIC_GARDEN] })).status, 201);
+    assert.equal((await requestMusic({ albums: [FOG_B] })).status, 403);
 
     await actAs(
       Permission.MANAGE_REQUESTS + Permission.MANAGE_USERS,
       'manager@x'
     );
     const res = await requestMusic({
-      albums: [KID_A],
+      albums: [FOG_B],
       userId: listener.id,
       ignoreQuota: true,
     });
@@ -407,7 +410,7 @@ describe('POST /request/music', () => {
 
   it('keeps the advanced options for those allowed them', async () => {
     let res = await requestMusic({
-      albums: [OK_COMPUTER],
+      albums: [STATIC_GARDEN],
       profileId: 9,
       metadataProfileId: 9,
       rootFolder: '/secret',
@@ -421,7 +424,7 @@ describe('POST /request/music', () => {
 
     await actAs(Permission.REQUEST + Permission.REQUEST_ADVANCED, 'adv@x');
     res = await requestMusic({
-      albums: [KID_A],
+      albums: [FOG_B],
       profileId: 9,
       metadataProfileId: 4,
       rootFolder: '/flac',
@@ -436,17 +439,17 @@ describe('POST /request/music', () => {
 
   it('is refused while music is off or not set up', async () => {
     getSettings().main.disabledFeatures = ['music'];
-    assert.equal((await requestMusic({ albums: [OK_COMPUTER] })).status, 403);
+    assert.equal((await requestMusic({ albums: [STATIC_GARDEN] })).status, 403);
 
     getSettings().main.disabledFeatures = [];
     getSettings().lidarr = [];
-    assert.equal((await requestMusic({ albums: [OK_COMPUTER] })).status, 404);
+    assert.equal((await requestMusic({ albums: [STATIC_GARDEN] })).status, 404);
   });
 });
 
 describe('music requests in the lists', () => {
   it('are listed by default for someone with music, with their albums', async () => {
-    const res = await requestMusic({ albums: [OK_COMPUTER] });
+    const res = await requestMusic({ albums: [STATIC_GARDEN] });
     const id = (res.body as { id: number }).id;
 
     await actAs(Permission.MANAGE_REQUESTS, 'manager@x');
@@ -463,7 +466,7 @@ describe('music requests in the lists', () => {
       listed.map((request) => request.id),
       [id]
     );
-    assert.equal(listed[0].albums[0].albumMbid, OK_COMPUTER);
+    assert.equal(listed[0].albums[0].albumMbid, STATIC_GARDEN);
     assert.equal(listed[0].albums[0].albumStatus, MediaStatus.PENDING);
 
     list = await call('GET', '/request?mediaType=movie%2Ctv');
@@ -476,7 +479,7 @@ describe('music requests in the lists', () => {
 
   it("are on someone's own requests page, and the count", async () => {
     const listener = actingAs;
-    await requestMusic({ albums: [OK_COMPUTER] });
+    await requestMusic({ albums: [STATIC_GARDEN] });
 
     let mine = await call('GET', `/user/${listener.id}/requests`);
     const results = (
@@ -486,7 +489,7 @@ describe('music requests in the lists', () => {
     ).results;
     assert.equal(results.length, 1);
     assert.equal(results[0].type, 'music');
-    assert.equal(results[0].albums[0].title, 'OK Computer');
+    assert.equal(results[0].albums[0].title, 'Static Garden');
     let count = await call('GET', '/request/count');
     assert.equal((count.body as { music: number }).music, 1);
 
@@ -499,7 +502,7 @@ describe('music requests in the lists', () => {
   });
 
   it('show one request with its albums', async () => {
-    const res = await requestMusic({ albums: [OK_COMPUTER] });
+    const res = await requestMusic({ albums: [STATIC_GARDEN] });
     const one = await call(
       'GET',
       `/request/${(res.body as { id: number }).id}`
@@ -513,12 +516,12 @@ describe('music requests in the lists', () => {
 
 describe('changing a music request', () => {
   it('takes albums off and puts others on, without sending anything', async () => {
-    const res = await requestMusic({ albums: [OK_COMPUTER, KID_A] });
+    const res = await requestMusic({ albums: [STATIC_GARDEN, FOG_B] });
     const id = (res.body as { id: number }).id;
 
     const edit = await call('PUT', `/request/${id}`, {
       mediaType: 'music',
-      albums: [KID_A, IN_RAINBOWS],
+      albums: [FOG_B, IN_LANTERNS],
     });
 
     assert.equal(edit.status, 200);
@@ -527,11 +530,11 @@ describe('changing a music request', () => {
     });
     assert.deepEqual(
       request.albums.map((album) => album.albumMbid).sort(),
-      [IN_RAINBOWS, KID_A].sort()
+      [IN_LANTERNS, FOG_B].sort()
     );
     assert.equal(request.status, MediaRequestStatus.PENDING);
-    assert.equal((await albumRow(OK_COMPUTER)).status, MediaStatus.UNKNOWN);
-    assert.equal((await albumRow(IN_RAINBOWS)).status, MediaStatus.PENDING);
+    assert.equal((await albumRow(STATIC_GARDEN)).status, MediaStatus.UNKNOWN);
+    assert.equal((await albumRow(IN_LANTERNS)).status, MediaStatus.PENDING);
     assert.equal(
       await getRepository(AlbumRequest).count(),
       2,
@@ -541,7 +544,7 @@ describe('changing a music request', () => {
   });
 
   it('cannot take every album off, or change someone else’s', async () => {
-    const res = await requestMusic({ albums: [OK_COMPUTER] });
+    const res = await requestMusic({ albums: [STATIC_GARDEN] });
     const id = (res.body as { id: number }).id;
 
     let edit = await call('PUT', `/request/${id}`, {
@@ -553,13 +556,13 @@ describe('changing a music request', () => {
     await actAs(Permission.REQUEST, 'other@x');
     edit = await call('PUT', `/request/${id}`, {
       mediaType: 'music',
-      albums: [KID_A],
+      albums: [FOG_B],
     });
     assert.equal(edit.status, 403);
   });
 
   it('when declined, frees its albums and keeps the reason', async () => {
-    const res = await requestMusic({ albums: [OK_COMPUTER] });
+    const res = await requestMusic({ albums: [STATIC_GARDEN] });
     const id = (res.body as { id: number }).id;
 
     await actAs(Permission.MANAGE_REQUESTS, 'manager@x');
@@ -574,35 +577,35 @@ describe('changing a music request', () => {
     assert.equal(request.status, MediaRequestStatus.DECLINED);
     assert.equal(request.declineReason, 'Not on Lidarr’s indexers');
     assert.equal(request.albums[0].status, MediaRequestStatus.DECLINED);
-    assert.equal((await albumRow(OK_COMPUTER)).status, MediaStatus.UNKNOWN);
+    assert.equal((await albumRow(STATIC_GARDEN)).status, MediaStatus.UNKNOWN);
     assert.equal((await artistMedia()).status, MediaStatus.UNKNOWN);
     assert.equal(lidarr.calls.length, 0);
   });
 
   it('when deleted, frees its albums to be asked for again', async () => {
-    const res = await requestMusic({ albums: [OK_COMPUTER] });
+    const res = await requestMusic({ albums: [STATIC_GARDEN] });
     const id = (res.body as { id: number }).id;
 
     const deleted = await call('DELETE', `/request/${id}`);
 
     assert.equal(deleted.status, 204);
-    assert.equal((await albumRow(OK_COMPUTER)).status, MediaStatus.UNKNOWN);
+    assert.equal((await albumRow(STATIC_GARDEN)).status, MediaStatus.UNKNOWN);
     assert.equal((await artistMedia()).status, MediaStatus.UNKNOWN);
     assert.equal(await getRepository(AlbumRequest).count(), 0);
-    assert.equal((await requestMusic({ albums: [OK_COMPUTER] })).status, 201);
+    assert.equal((await requestMusic({ albums: [STATIC_GARDEN] })).status, 201);
   });
 
   it('when approved, is sent to Lidarr', async () => {
     lidarr.lookupArtists.set(ARTIST, {
       id: 0,
-      artistName: 'Radiohead',
+      artistName: 'Glasswing',
       foreignArtistId: ARTIST,
       monitored: false,
       qualityProfileId: 0,
       metadataProfileId: 0,
       tags: [],
     });
-    const res = await requestMusic({ albums: [OK_COMPUTER, KID_A] });
+    const res = await requestMusic({ albums: [STATIC_GARDEN, FOG_B] });
     const id = (res.body as { id: number }).id;
 
     await actAs(Permission.MANAGE_REQUESTS, 'manager@x');
@@ -617,9 +620,9 @@ describe('changing a music request', () => {
     );
     assert.deepEqual(
       (sent?.body?.addOptions as { albumsToMonitor: string[] }).albumsToMonitor,
-      [OK_COMPUTER, KID_A]
+      [STATIC_GARDEN, FOG_B]
     );
-    assert.equal((await albumRow(KID_A)).status, MediaStatus.PROCESSING);
+    assert.equal((await albumRow(FOG_B)).status, MediaStatus.PROCESSING);
     assert.equal((await artistMedia()).status, MediaStatus.PROCESSING);
   });
 });
@@ -641,7 +644,7 @@ describe('a music request’s history', () => {
   beforeEach(() => {
     lidarr.lookupArtists.set(ARTIST, {
       id: 0,
-      artistName: 'Radiohead',
+      artistName: 'Glasswing',
       foreignArtistId: ARTIST,
       monitored: false,
       qualityProfileId: 0,
@@ -652,7 +655,7 @@ describe('a music request’s history', () => {
 
   it('is kept by the artist: asked for, approved, on its way', async () => {
     await actAs(Permission.REQUEST);
-    const res = await requestMusic({ albums: [OK_COMPUTER, KID_A] });
+    const res = await requestMusic({ albums: [STATIC_GARDEN, FOG_B] });
     const id = (res.body as { id: number }).id;
 
     await actAs(Permission.MANAGE_REQUESTS, 'manager@x');
@@ -662,14 +665,14 @@ describe('a music request’s history', () => {
     );
 
     assert.deepEqual(await history(), [
-      ['requested', '2 albums: OK Computer, Kid A', 'listener@test.local'],
+      ['requested', '2 albums: Static Garden, Fog B', 'listener@test.local'],
       ['approved', null, 'manager@x'],
       ['processing', null, null],
     ]);
   });
 
   it('says why Lidarr could not take it', async () => {
-    const res = await requestMusic({ albums: [OK_COMPUTER] });
+    const res = await requestMusic({ albums: [STATIC_GARDEN] });
     const id = (res.body as { id: number }).id;
     lidarr.down = true;
 
@@ -682,7 +685,7 @@ describe('a music request’s history', () => {
   });
 
   it('is for request managers and admins only', async () => {
-    await requestMusic({ albums: [OK_COMPUTER] });
+    await requestMusic({ albums: [STATIC_GARDEN] });
     const res = await call('GET', `/music/artist/${ARTIST}/history`);
     assert.equal(res.status, 403);
   });

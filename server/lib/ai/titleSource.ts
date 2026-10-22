@@ -17,7 +17,7 @@ import logger from '@server/logger';
 export interface TitleSource {
   /** What kind of set it is. */
   k: 'collection' | 'keyword' | 'company' | 'person';
-  /** What to search TMDB for: "Harry Potter", "Marvel Cinematic Universe". */
+  /** What to search TMDB for: "Milo Thistle", "Halcyon Comics Universe". */
   q: string;
   /** For a person: films they directed, or ones they appear in. */
   r?: 'director' | 'cast' | null;

@@ -36,10 +36,10 @@ const album = (
 describe('music pictures', () => {
   it('come through the image proxy when the server caches images', () => {
     const cover =
-      'https://coverartarchive.org/release-group/b1392450-e666-3926-a536-22c65f834433/front-500';
+      'https://coverartarchive.org/release-group/7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35/front-500';
     assert.equal(
       musicImageSrc(cover, true),
-      '/imageproxy/caa/release-group/b1392450-e666-3926-a536-22c65f834433/front-500'
+      '/imageproxy/caa/release-group/7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35/front-500'
     );
     assert.equal(musicImageSrc(cover, false), cover);
     assert.equal(
@@ -49,7 +49,7 @@ describe('music pictures', () => {
   });
 
   it('of an artist come from the image proxy’s own address for them', () => {
-    const ID = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
+    const ID = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
     assert.equal(
       musicImageSrc(artistImageUrl(ID), true),
       `/imageproxy/artist/${ID}`

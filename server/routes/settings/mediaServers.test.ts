@@ -946,7 +946,7 @@ describe('Match Check on a title page', () => {
   it('shows at once what the check of new requests found, one a server', async () => {
     const media = await getRepository(Media).save(
       new Media({
-        tmdbId: 929590,
+        tmdbId: 846213,
         mediaType: MediaType.MOVIE,
         status: MediaStatus.PROCESSING,
       })
@@ -959,22 +959,22 @@ describe('Match Check on a title page', () => {
         kind: 'movie',
         problem: JSON.stringify({
           ...matchedTo('Plex', key),
-          expected: { title: 'Civil War', tmdbId: 929590, server: 'Radarr' },
+          expected: { title: 'Border Feud', tmdbId: 846213, server: 'Radarr' },
           matched: { title, key },
         }),
         foundAt: new Date(),
         resolvedAt,
       });
     await found('old', 'Fixed Since', new Date());
-    await found('new', 'Guerra Civil');
+    await found('new', 'Guerra Fronteriza');
     // The nightly report has an older finding on the same server.
     report([
       {
         ...matchedTo('Plex', 'nightly'),
-        expected: { title: 'Civil War', tmdbId: 929590, server: 'Radarr' },
+        expected: { title: 'Border Feud', tmdbId: 846213, server: 'Radarr' },
       },
     ]);
-    assert.deepEqual(await problemsFor(929590, 'x'), ['Plex new']);
+    assert.deepEqual(await problemsFor(846213, 'x'), ['Plex new']);
   });
 });
 

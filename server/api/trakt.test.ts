@@ -99,12 +99,12 @@ describe('reading Trakt links', () => {
 
   it('turns down anything else', () => {
     for (const text of [
-      'The Matrix (1999)',
+      'The Mazewright (1999)',
       'https://example.com/users/someone/lists/x',
       'https://trakt.tv/users/someone',
       'https://trakt.tv/users/someone/watchlist/extra',
       'https://trakt.tv/lists/not-a-number',
-      'https://trakt.tv/movies/the-matrix-1999',
+      'https://trakt.tv/movies/the-mazewright-1999',
     ]) {
       assert.equal(parseTraktUrl(text), undefined, text);
     }

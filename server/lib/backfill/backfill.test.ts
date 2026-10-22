@@ -36,8 +36,8 @@ import { describe, it } from 'node:test';
 /*
  * The canonical names below are the ones Sonarr was asked about on the live
  * server while this was built: Sonarr maps them to the right episode and
- * scores them as the real release (Judas's Naruto 202 as Bluray-1080p, +700;
- * HuangSubs' Perfect World 131 under its 2021 title, +403).
+ * scores them as the real release (Tengu's Kitsuraga 202 as Bluray-1080p, +700;
+ * LiangSubs' Ninefold Sky 131 under its 2021 title, +403).
  */
 
 /** The fork's "Anime 1080p" profile, as Sonarr returns it, trimmed. */
@@ -83,12 +83,12 @@ const q = (id: number, name: string, version = 1) => ({
   revision: { version, real: 0 },
 });
 
-const JUDAS_PACK =
-  '[Judas] Naruto (Complete Series) [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]';
+const TENGU_PACK =
+  '[Tengu] Kitsuraga (Complete Series) [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]';
 
 describe('Backfill: reading names', () => {
   it('takes the absolute number in brackets after a pack’s own SxxEyy', () => {
-    assert.deepEqual(readNumbers('[Judas] Naruto - S05E17 (202)'), {
+    assert.deepEqual(readNumbers('[Tengu] Kitsuraga - S05E17 (202)'), {
       season: 5,
       episode: 17,
       absolute: 202,
@@ -98,9 +98,9 @@ describe('Backfill: reading names', () => {
   it('reads a file holding several episodes, however the range is written', () => {
     const range = { season: 6, episode: 1, through: 2 };
     for (const name of [
-      'Shaun the Sheep - S06E01-02 - Baa-gherita + Get Your Goat.mkv',
-      'Shaun.the.Sheep.S06E01E02.1080p.mkv',
-      'Shaun.the.Sheep.S06E01-E02.720p.mkv',
+      'Bramwell the Goat - S06E01-02 - Bleat-ballad + Hold Your Hooves.mkv',
+      'Bramwell.the.Goat.S06E01E02.1080p.mkv',
+      'Bramwell.the.Goat.S06E01-E02.720p.mkv',
     ]) {
       assert.deepEqual(readNumbers(name), range, name);
     }
@@ -117,18 +117,18 @@ describe('Backfill: reading names', () => {
 
   it('reads " - 131v3" as episode 131, version 3', () => {
     assert.deepEqual(
-      readNumbers('[HuangSubs] Perfect World - 131v3 (1080P HEVC AAC)'),
+      readNumbers('[LiangSubs] Ninefold Sky - 131v3 (1080P HEVC AAC)'),
       { absolute: 131, version: 3 }
     );
   });
 
   it('keeps a pack’s quality tags and drops what describes the pack', () => {
     assert.equal(
-      releaseTags(JUDAS_PACK),
+      releaseTags(TENGU_PACK),
       '[BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]'
     );
     assert.equal(
-      releaseTags('Baggage.S01-S04.480p.WEB-DL.x264-GRP'),
+      releaseTags('Carryall.S01-S04.480p.WEB-DL.x264-GRP'),
       '480p WEB-DL x264'
     );
   });
@@ -136,22 +136,22 @@ describe('Backfill: reading names', () => {
   it('builds the names Sonarr was shown to judge correctly', () => {
     assert.equal(
       canonicalName({
-        fileName: '[Judas] Naruto - S05E17 (202)',
-        packTitle: JUDAS_PACK,
-        seriesTitle: 'Naruto',
+        fileName: '[Tengu] Kitsuraga - S05E17 (202)',
+        packTitle: TENGU_PACK,
+        seriesTitle: 'Kitsuraga',
         number: { absolute: 202 },
       }),
-      '[Judas] Naruto - 202 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]'
+      '[Tengu] Kitsuraga - 202 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]'
     );
     assert.equal(
       canonicalName({
-        fileName: '[HuangSubs] Perfect World - 131v3 (1080P HEVC AAC)',
-        packTitle: '[HuangSubs] Perfect World (1080p)',
-        seriesTitle: 'Perfect World (2021)',
+        fileName: '[LiangSubs] Ninefold Sky - 131v3 (1080P HEVC AAC)',
+        packTitle: '[LiangSubs] Ninefold Sky (1080p)',
+        seriesTitle: 'Ninefold Sky (2021)',
         number: { absolute: 131 },
         version: 3,
       }),
-      '[HuangSubs] Perfect World 2021 - 131v3 (1080P HEVC AAC)'
+      '[LiangSubs] Ninefold Sky 2021 - 131v3 (1080P HEVC AAC)'
     );
   });
 
@@ -165,20 +165,20 @@ describe('Backfill: reading names', () => {
     assert.equal(
       canonicalName({
         fileName: 'Show.S01E01E02.1080p.WEB-DL-GRP',
-        packTitle: 'Perfect World 2021 S01 1080p WEB-DL-GRP',
-        seriesTitle: 'Perfect World (2021)',
+        packTitle: 'Ninefold Sky 2021 S01 1080p WEB-DL-GRP',
+        seriesTitle: 'Ninefold Sky (2021)',
         number: { season: 1, episode: 1, through: 2 },
       }),
-      'Perfect World 2021 S01E01-E02 1080p WEB-DL-GRP'
+      'Ninefold Sky 2021 S01E01-E02 1080p WEB-DL-GRP'
     );
     assert.equal(
       canonicalName({
-        fileName: '[Judas] Naruto - 01-02.mkv',
-        packTitle: JUDAS_PACK,
-        seriesTitle: 'Naruto',
+        fileName: '[Tengu] Kitsuraga - 01-02.mkv',
+        packTitle: TENGU_PACK,
+        seriesTitle: 'Kitsuraga',
         number: { absolute: 1, through: 2 },
       }),
-      '[Judas] Naruto - 01-02 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]'
+      '[Tengu] Kitsuraga - 01-02 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]'
     );
   });
 
@@ -186,15 +186,15 @@ describe('Backfill: reading names', () => {
     assert.ok(isExtra('Show/Extras/Making of.mkv'));
     assert.ok(isExtra('Show - 01 sample.mkv'));
     assert.ok(isExtra('[Group] Show - NCOP1.mkv'));
-    assert.ok(!isExtra('[Judas] Naruto - S05E17 (202).mkv'));
+    assert.ok(!isExtra('[Tengu] Kitsuraga - S05E17 (202).mkv'));
   });
 
   it('tells this show from one that only starts the same way', () => {
-    const names = ['Naruto', 'Naruto (2002)'];
-    assert.ok(sameShow('Naruto', names));
-    assert.ok(sameShow('Naruto 2002', names));
-    assert.ok(!sameShow('Naruto Shippuuden', names));
-    assert.ok(mentionsShow('[Erai-raws] Naruto Shippuuden - 080', names));
+    const names = ['Kitsuraga', 'Kitsuraga (2002)'];
+    assert.ok(sameShow('Kitsuraga', names));
+    assert.ok(sameShow('Kitsuraga 2002', names));
+    assert.ok(!sameShow('Kitsuraga Tsumuuden', names));
+    assert.ok(mentionsShow('[Kaze-raws] Kitsuraga Tsumuuden - 080', names));
   });
 });
 
@@ -225,17 +225,17 @@ const ben = (value: unknown): Buffer => {
 describe('Backfill: torrents and NZBs', () => {
   it('lists a torrent’s files, folder first, and works out its hash', () => {
     const info = {
-      name: '[Judas] Naruto',
+      name: '[Tengu] Kitsuraga',
       'piece length': 4194304,
       pieces: Buffer.alloc(20),
       files: [
         {
           length: 476_000_000,
-          path: ['S5', '[Judas] Naruto - S05E17 (202).mkv'],
+          path: ['S5', '[Tengu] Kitsuraga - S05E17 (202).mkv'],
         },
         {
           length: 274_000_000,
-          path: ['S1', '[Judas] Naruto - S01E02 (002).mkv'],
+          path: ['S1', '[Tengu] Kitsuraga - S01E02 (002).mkv'],
         },
       ],
     };
@@ -248,12 +248,12 @@ describe('Backfill: torrents and NZBs', () => {
     assert.deepEqual(meta.files, [
       {
         index: 0,
-        path: '[Judas] Naruto/S5/[Judas] Naruto - S05E17 (202).mkv',
+        path: '[Tengu] Kitsuraga/S5/[Tengu] Kitsuraga - S05E17 (202).mkv',
         size: 476_000_000,
       },
       {
         index: 1,
-        path: '[Judas] Naruto/S1/[Judas] Naruto - S01E02 (002).mkv',
+        path: '[Tengu] Kitsuraga/S1/[Tengu] Kitsuraga - S01E02 (002).mkv',
         size: 274_000_000,
       },
     ]);
@@ -301,16 +301,16 @@ describe('Backfill: torrents and NZBs', () => {
 
   it('reads an NZB’s files from their subjects, and spots RAR posts', () => {
     const nzb = `<?xml version="1.0"?><nzb xmlns="http://www.newzbin.com/DTD/2003/nzb">
-      <file poster="p" date="1" subject="[1/3] - &quot;[HuangSubs] Perfect World - 153 (1080p HEVC AAC).mkv&quot; yEnc (1/2)">
+      <file poster="p" date="1" subject="[1/3] - &quot;[LiangSubs] Ninefold Sky - 153 (1080p HEVC AAC).mkv&quot; yEnc (1/2)">
         <segments><segment bytes="700000" number="1">a@b</segment><segment bytes="300000" number="2">c@d</segment></segments>
       </file>
-      <file poster="p" date="1" subject="[2/3] - &quot;Perfect.World.153.par2&quot; yEnc (1/1)">
+      <file poster="p" date="1" subject="[2/3] - &quot;Ninefold.Sky.153.par2&quot; yEnc (1/1)">
         <segments><segment bytes="1000" number="1">e@f</segment></segments>
       </file></nzb>`;
     const files = parseNzb(nzb);
     assert.deepEqual(files[0], {
       index: 0,
-      name: '[HuangSubs] Perfect World - 153 (1080p HEVC AAC).mkv',
+      name: '[LiangSubs] Ninefold Sky - 153 (1080p HEVC AAC).mkv',
       size: 1_000_000,
     });
     assert.equal(packingOf(readNzb(nzb)), undefined);
@@ -628,17 +628,17 @@ describe('Backfill: what Sonarr would take', () => {
 describe('Backfill: judging a pack', () => {
   /** What Sonarr answered on the live server, for these names. */
   const answers: Record<string, SonarrParseResult> = {
-    '[Judas] Naruto - S05E17 (202)': {
-      title: '[Judas] Naruto - S05E17 (202)',
+    '[Tengu] Kitsuraga - S05E17 (202)': {
+      title: '[Tengu] Kitsuraga - S05E17 (202)',
       parsedEpisodeInfo: {
-        seriesTitle: 'Naruto',
+        seriesTitle: 'Kitsuraga',
         quality: q(0, 'Unknown'),
         seasonNumber: 5,
         episodeNumbers: [17],
         absoluteEpisodeNumbers: [],
-        releaseGroup: 'Judas',
+        releaseGroup: 'Tengu',
       },
-      series: { id: 1279, title: 'Naruto' },
+      series: { id: 1279, title: 'Kitsuraga' },
       episodes: [
         {
           id: 145130,
@@ -653,16 +653,16 @@ describe('Backfill: judging a pack', () => {
       ],
       customFormatScore: 0,
     },
-    '[Judas] Naruto - 202 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]':
+    '[Tengu] Kitsuraga - 202 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]':
       {
         title: '',
         parsedEpisodeInfo: {
-          seriesTitle: 'Naruto',
+          seriesTitle: 'Kitsuraga',
           quality: q(7, 'Bluray-1080p'),
           absoluteEpisodeNumbers: [202],
-          releaseGroup: 'Judas',
+          releaseGroup: 'Tengu',
         },
-        series: { id: 1279, title: 'Naruto' },
+        series: { id: 1279, title: 'Kitsuraga' },
         episodes: [
           {
             id: 145136,
@@ -678,10 +678,10 @@ describe('Backfill: judging a pack', () => {
         languages: [{ id: 8, name: 'Japanese' }],
         customFormatScore: 700,
       },
-    '[Erai-raws] Naruto Shippuuden - 080 [1080p]': {
+    '[Kaze-raws] Kitsuraga Tsumuuden - 080 [1080p]': {
       title: '',
       parsedEpisodeInfo: {
-        seriesTitle: 'Naruto Shippuuden',
+        seriesTitle: 'Kitsuraga Tsumuuden',
         absoluteEpisodeNumbers: [80],
       },
       customFormatScore: 0,
@@ -691,12 +691,12 @@ describe('Backfill: judging a pack', () => {
   const ctx = (): SeriesContext => ({
     series: {
       id: 1279,
-      title: 'Naruto',
+      title: 'Kitsuraga',
       year: 2002,
-      tvdbId: 78857,
+      tvdbId: 63914,
       seriesType: 'anime',
       qualityProfileId: 13,
-      path: '/anime/Naruto',
+      path: '/anime/Kitsuraga',
     },
     episodes: [
       {
@@ -722,7 +722,7 @@ describe('Backfill: judging a pack', () => {
     ],
     files: [],
     profile: ANIME_1080P,
-    names: ['Naruto'],
+    names: ['Kitsuraga'],
     sonarr: {
       parse: async (title: string) => {
         const answer = answers[title];
@@ -732,17 +732,17 @@ describe('Backfill: judging a pack', () => {
     } as unknown as SeriesContext['sonarr'],
   });
 
-  it('maps a Judas file by its absolute number, not the pack’s SxxEyy', async () => {
+  it('maps a Tengu file by its absolute number, not the pack’s SxxEyy', async () => {
     const { plan, summary } = await judgePack(
       [
         {
           index: 0,
-          path: '[Judas] Naruto/S5/[Judas] Naruto - S05E17 (202).mkv',
+          path: '[Tengu] Kitsuraga/S5/[Tengu] Kitsuraga - S05E17 (202).mkv',
           size: 476e6,
         },
-        { index: 1, path: '[Judas] Naruto/S5/sample.mkv', size: 30e6 },
+        { index: 1, path: '[Tengu] Kitsuraga/S5/sample.mkv', size: 30e6 },
       ],
-      JUDAS_PACK,
+      TENGU_PACK,
       ctx()
     );
     assert.equal(plan.length, 1, 'the sample is passed over');
@@ -758,20 +758,20 @@ describe('Backfill: judging a pack', () => {
       [
         {
           index: 0,
-          path: '[Erai-raws] Naruto Shippuuden - 080 [1080p].mkv',
+          path: '[Kaze-raws] Kitsuraga Tsumuuden - 080 [1080p].mkv',
           size: 500e6,
         },
       ],
-      '[Erai-raws] Naruto Shippuuden - 080 ~ 500 [1080p]',
+      '[Kaze-raws] Kitsuraga Tsumuuden - 080 ~ 500 [1080p]',
       ctx()
     );
     assert.equal(plan[0].action, 'reject');
-    assert.equal(plan[0].reason, 'Named as another show: Naruto Shippuuden');
+    assert.equal(plan[0].reason, 'Named as another show: Kitsuraga Tsumuuden');
   });
 });
 
 describe('Backfill: a two-part finale the scene numbers as one', () => {
-  // Blue Mountain State S03: the scene's S03E12 is TVDB's E12 and E13, as
+  // Grey Summit State S03: the scene's S03E12 is TVDB's E12 and E13, as
   // Sonarr answered on the live server, but the pack has a file for each.
   const ep = (id: number, episodeNumber: number, hasFile: boolean) => ({
     id,
@@ -788,12 +788,12 @@ describe('Backfill: a two-part finale the scene numbers as one', () => {
   const ctx = (): SeriesContext => ({
     series: {
       id: 1243,
-      title: 'Blue Mountain State',
+      title: 'Grey Summit State',
       year: 2010,
-      tvdbId: 134511,
+      tvdbId: 245622,
       seriesType: 'standard',
       qualityProfileId: 13,
-      path: '/tv/Blue Mountain State',
+      path: '/tv/Grey Summit State',
     },
     episodes: [e12, e13],
     files: [
@@ -806,18 +806,18 @@ describe('Backfill: a two-part finale the scene numbers as one', () => {
       },
     ],
     profile: ANIME_1080P,
-    names: ['Blue Mountain State'],
+    names: ['Grey Summit State'],
     sonarr: {
       parse: async (title: string) => ({
         title,
         parsedEpisodeInfo: {
-          seriesTitle: 'Blue Mountain State (2010)',
+          seriesTitle: 'Grey Summit State (2010)',
           quality: q(3, 'WEBDL-1080p'),
           seasonNumber: 3,
           episodeNumbers: [/S03E12/.test(title) ? 12 : 13],
-          releaseGroup: 'Panda',
+          releaseGroup: 'Koala',
         },
-        series: { id: 1243, title: 'Blue Mountain State' },
+        series: { id: 1243, title: 'Grey Summit State' },
         episodes: /S03E12/.test(title) ? [e13, e12] : [e13],
         customFormatScore: 885000,
       }),
@@ -829,16 +829,16 @@ describe('Backfill: a two-part finale the scene numbers as one', () => {
       [
         {
           index: 11,
-          path: 'Blue Mountain State (2010) - S03E12 - The Corn Field (1) (1080p WEB-DL x265 Panda).mkv',
+          path: 'Grey Summit State (2010) - S03E12 - The Barley Patch (1) (1080p WEB-DL x265 Koala).mkv',
           size: 627e6,
         },
         {
           index: 12,
-          path: 'Blue Mountain State (2010) - S03E13 - The Corn Field (2) (1080p WEB-DL x265 Panda).mkv',
+          path: 'Grey Summit State (2010) - S03E13 - The Barley Patch (2) (1080p WEB-DL x265 Koala).mkv',
           size: 627e6,
         },
       ],
-      'Blue Mountain State (2010) Season 3 S03 (1080p WEB-DL x265 Panda)',
+      'Grey Summit State (2010) Season 3 S03 (1080p WEB-DL x265 Koala)',
       ctx()
     );
     const byIndex = new Map(plan.map((e) => [e.index, e]));
@@ -854,11 +854,11 @@ describe('Backfill: a two-part finale the scene numbers as one', () => {
       [
         {
           index: 0,
-          path: 'Blue Mountain State (2010) - S03E12 - The Corn Field (1080p WEB-DL x265 Panda).mkv',
+          path: 'Grey Summit State (2010) - S03E12 - The Barley Patch (1080p WEB-DL x265 Koala).mkv',
           size: 1.2e9,
         },
       ],
-      'Blue Mountain State (2010) S03E12 (1080p WEB-DL x265 Panda)',
+      'Grey Summit State (2010) S03E12 (1080p WEB-DL x265 Koala)',
       ctx()
     );
     assert.deepEqual([...plan[0].episodeIds].sort(), [142107, 142108]);
@@ -886,7 +886,7 @@ describe('Backfill: the AI second opinion', () => {
     seasonNumber: 5,
     episodeNumber: 23,
     absoluteEpisodeNumber: 202,
-    title: 'The Battle Begins: Naruto vs. Sasuke',
+    title: 'The Battle Begins: Kitsuraga vs. Ryomaru',
     hasFile: false,
     monitored: true,
     episodeFileId: 0,
@@ -894,52 +894,52 @@ describe('Backfill: the AI second opinion', () => {
   const festival = special(
     145157,
     3,
-    'Naruto OVA 3: Hidden Leaf Village Grand Sports Festival'
+    'Kitsuraga OVA 3: Misty Pine Village Grand Sports Festival'
   );
   const clover = special(
     145155,
     1,
-    'Naruto OVA: Find the Crimson Four-Leaf Clover!'
+    'Kitsuraga OVA: Find the Amber Four-Leaf Clover!'
   );
 
   /** Answers Sonarr gave on the live server for these exact names. */
   const sonarrAnswers: Record<string, SonarrParseResult> = {
-    '[Judas] Naruto - Hidden Leaf Village Grand Sports Festival': {
-      title: '[Judas] Naruto - Hidden Leaf Village Grand Sports Festival',
+    '[Tengu] Kitsuraga - Misty Pine Village Grand Sports Festival': {
+      title: '[Tengu] Kitsuraga - Misty Pine Village Grand Sports Festival',
       customFormatScore: 0,
     },
-    '[Judas] Naruto - Crimson Clover': {
-      title: '[Judas] Naruto - Crimson Clover',
+    '[Tengu] Kitsuraga - Amber Clover': {
+      title: '[Tengu] Kitsuraga - Amber Clover',
       customFormatScore: 0,
     },
-    '[Judas] Naruto - S00E03 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]':
+    '[Tengu] Kitsuraga - S00E03 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]':
       {
         title: '',
         parsedEpisodeInfo: {
-          seriesTitle: 'Naruto',
+          seriesTitle: 'Kitsuraga',
           quality: q(7, 'Bluray-1080p'),
           seasonNumber: 0,
           episodeNumbers: [3],
-          releaseGroup: 'Judas',
+          releaseGroup: 'Tengu',
         },
-        series: { id: 1279, title: 'Naruto' },
+        series: { id: 1279, title: 'Kitsuraga' },
         episodes: [{ ...festival }],
         languages: [{ id: 8, name: 'Japanese' }],
         customFormatScore: 700,
       },
     // Sonarr maps the clover file to a different special than the one the
     // model names, so the model's match is turned down.
-    '[Judas] Naruto - S00E01 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]':
+    '[Tengu] Kitsuraga - S00E01 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]':
       {
         title: '',
         parsedEpisodeInfo: {
-          seriesTitle: 'Naruto',
+          seriesTitle: 'Kitsuraga',
           quality: q(7, 'Bluray-1080p'),
           seasonNumber: 0,
           episodeNumbers: [1],
-          releaseGroup: 'Judas',
+          releaseGroup: 'Tengu',
         },
-        series: { id: 1279, title: 'Naruto' },
+        series: { id: 1279, title: 'Kitsuraga' },
         episodes: [{ ...festival }],
         customFormatScore: 700,
       },
@@ -950,17 +950,17 @@ describe('Backfill: the AI second opinion', () => {
   ): SeriesContext => ({
     series: {
       id: 1279,
-      title: 'Naruto',
+      title: 'Kitsuraga',
       year: 2002,
-      tvdbId: 78857,
+      tvdbId: 63914,
       seriesType: 'anime',
       qualityProfileId: 13,
-      path: '/anime/Naruto',
+      path: '/anime/Kitsuraga',
     },
     episodes: [ep202, festival, clover],
     files: [],
     profile: ANIME_1080P,
-    names: ['Naruto'],
+    names: ['Kitsuraga'],
     sonarr: {
       parse: async (title: string) => {
         const answer = sonarrAnswers[title];
@@ -973,7 +973,7 @@ describe('Backfill: the AI second opinion', () => {
 
   const FESTIVAL_FILE = {
     index: 4,
-    path: '[Judas] Naruto/Specials/[Judas] Naruto - Hidden Leaf Village Grand Sports Festival.mkv',
+    path: '[Tengu] Kitsuraga/Specials/[Tengu] Kitsuraga - Misty Pine Village Grand Sports Festival.mkv',
     size: 300e6,
   };
 
@@ -981,7 +981,7 @@ describe('Backfill: the AI second opinion', () => {
     let asked: Parameters<NonNullable<SeriesContext['secondOpinion']>>[0];
     const { plan, summary } = await judgePack(
       [FESTIVAL_FILE],
-      JUDAS_PACK,
+      TENGU_PACK,
       context(async (req) => {
         asked = req;
         return [
@@ -996,7 +996,7 @@ describe('Backfill: the AI second opinion', () => {
     assert.equal(asked!.files.length, 1);
     assert.equal(
       asked!.files[0].name,
-      '[Judas] Naruto - Hidden Leaf Village Grand Sports Festival'
+      '[Tengu] Kitsuraga - Misty Pine Village Grand Sports Festival'
     );
     assert.equal(asked!.files[0].problem, 'No episode number in the name');
     assert.equal(plan[0].action, 'fill');
@@ -1012,11 +1012,11 @@ describe('Backfill: the AI second opinion', () => {
       [
         {
           index: 5,
-          path: '[Judas] Naruto/Specials/[Judas] Naruto - Crimson Clover.mkv',
+          path: '[Tengu] Kitsuraga/Specials/[Tengu] Kitsuraga - Amber Clover.mkv',
           size: 300e6,
         },
       ],
-      JUDAS_PACK,
+      TENGU_PACK,
       context(async () => [
         { index: 5, episodeIds: [145155], why: 'The clover OVA' },
       ])
@@ -1033,7 +1033,7 @@ describe('Backfill: the AI second opinion', () => {
   it('keeps going, and says why, when the model cannot be asked', async () => {
     const { plan, summary } = await judgePack(
       [FESTIVAL_FILE],
-      JUDAS_PACK,
+      TENGU_PACK,
       context(async () => {
         throw new Error('You have used all 20 of today’s AI answers.');
       })
@@ -1047,7 +1047,7 @@ describe('Backfill: the AI second opinion', () => {
     let asked = false;
     await judgePack(
       [],
-      JUDAS_PACK,
+      TENGU_PACK,
       context(async () => {
         asked = true;
         return [];

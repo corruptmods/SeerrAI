@@ -325,7 +325,7 @@ describe('an Emby install after the upgrade', () => {
       async function (this: JellyfinAPI, id: string) {
         libraries.push(`${this.kind}:${id}`);
         return [
-          { Id: 'emby-550', Name: 'Fight Club', Type: 'Movie' },
+          { Id: 'emby-550', Name: 'Brawl Society', Type: 'Movie' },
         ] as JellyfinLibraryItem[];
       }
     );
@@ -334,7 +334,7 @@ describe('an Emby install after the upgrade', () => {
       'getItemData',
       async () => ({
         Id: 'emby-550',
-        Name: 'Fight Club',
+        Name: 'Brawl Society',
         Type: 'Movie',
         ProviderIds: { Tmdb: '550' },
       })

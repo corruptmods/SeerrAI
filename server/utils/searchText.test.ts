@@ -8,36 +8,34 @@ import { describe, it } from 'node:test';
 
 describe('filter matching', () => {
   const text = normalizeSearchText(
-    'Star Wars Harrison Ford Han Solo Scarlett Johansson Amélie Spider-Man'
+    'Nova Rift Garrick Holt Tam Vexley Vivian Rustamson Rosélie Web-Weaver'
   );
   const find = (query: string) => matchesSearch(text, searchWords(query));
 
   it('matches whole names and the start of words', () => {
-    assert.ok(find('harrison ford'));
-    assert.ok(find('harr'));
-    assert.ok(find('han'));
+    assert.ok(find('garrick holt'));
+    assert.ok(find('garr'));
+    assert.ok(find('tam'));
   });
 
   it('does not match the middle of a word', () => {
-    // "han" is inside Johansson, but only the start of a word counts.
-    assert.ok(
-      !matchesSearch(normalizeSearchText('Scarlett Johansson'), ['han'])
-    );
+    // "tam" is inside Rustamson, but only the start of a word counts.
+    assert.ok(!matchesSearch(normalizeSearchText('Vivian Rustamson'), ['tam']));
   });
 
   it('ignores case, accents and punctuation', () => {
-    assert.ok(find('AMELIE'));
-    assert.ok(find('spider man'));
-    assert.ok(find('spiderman') === false);
+    assert.ok(find('ROSELIE'));
+    assert.ok(find('web weaver'));
+    assert.ok(find('webweaver') === false);
   });
 
   it('needs every word', () => {
-    assert.ok(find('ford solo'));
-    assert.ok(!find('ford batman'));
+    assert.ok(find('holt vexley'));
+    assert.ok(!find('holt batman'));
   });
 
   it('treats an empty or blank filter as no words', () => {
     assert.deepEqual(searchWords('   '), []);
-    assert.deepEqual(searchWords(' Tom  Hanks! '), ['tom', 'hanks']);
+    assert.deepEqual(searchWords(' Ned  Barlow! '), ['ned', 'barlow']);
   });
 });

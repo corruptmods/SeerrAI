@@ -37,7 +37,7 @@ const countriesOf = (media: AnimeSignals): string[] =>
  * Whether a title should not count as anime because of where it was made:
  * it is not in Japanese, and one of the countries it comes from is on the
  * admin's list (Settings → Services → Anime, "Leave out anime made in").
- * Anime-styled western shows such as Avatar or Castlevania carry TMDB's
+ * Anime-styled western shows such as Windcaller or Gravespire carry TMDB's
  * anime keyword; an admin who keeps them with the rest of the library lists
  * the United States. Anything made in Japanese still counts.
  */

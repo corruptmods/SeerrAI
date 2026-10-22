@@ -43,33 +43,33 @@ describe('a media server scan', () => {
   it('takes an item away from the title it was wrongly matched to', async () => {
     const scanner = new ProbeScanner();
     scanner.begin();
-    // Plex first took the new "Carrie" for "The Carrie Diaries".
-    await scanner.seeShow(46157, '126741');
+    // Plex first took the new "Wrenna" for "The Wrenna Diaries".
+    await scanner.seeShow(57284, '126741');
     const wrong = await getRepository(Media).findOneOrFail({
-      where: { tmdbId: 46157, mediaType: MediaType.TV },
+      where: { tmdbId: 57284, mediaType: MediaType.TV },
       relations: { seasons: true },
     });
     assert.equal(wrong.status, MediaStatus.PARTIALLY_AVAILABLE);
 
-    // Corrected, the same item is now Carrie (2026), which Sonarr has.
+    // Corrected, the same item is now Wrenna (2026), which Sonarr has.
     await getRepository(Media).save(
       new Media({
-        tmdbId: 288673,
+        tmdbId: 375182,
         mediaType: MediaType.TV,
         status: MediaStatus.PROCESSING,
         serviceId: 0,
         externalServiceId: 1286,
       })
     );
-    await scanner.seeShow(288673, '126741');
+    await scanner.seeShow(375182, '126741');
 
     const right = await getRepository(Media).findOneOrFail({
-      where: { tmdbId: 288673, mediaType: MediaType.TV },
+      where: { tmdbId: 375182, mediaType: MediaType.TV },
     });
     assert.equal(right.ratingKey, '126741');
     assert.equal(right.status, MediaStatus.PARTIALLY_AVAILABLE);
     const left = await getRepository(Media).findOneOrFail({
-      where: { tmdbId: 46157, mediaType: MediaType.TV },
+      where: { tmdbId: 57284, mediaType: MediaType.TV },
       relations: { seasons: true },
     });
     assert.equal(left.ratingKey, null);

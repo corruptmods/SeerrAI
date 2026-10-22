@@ -10,50 +10,61 @@ import { describe, it } from 'node:test';
 describe('parseTitleList', () => {
   it('strips bullets, numbering and checkboxes', () => {
     const parsed = parseTitleList(
-      ['- The Matrix', '• Practical Magic', '1. Heat', '[x] Arrival'].join('\n')
+      [
+        '- The Mazewright',
+        '• Practical Alchemy',
+        '1. Scorch',
+        '[x] Brightfall',
+      ].join('\n')
     );
 
     assert.deepEqual(
       parsed.map((line) => line.title),
-      ['The Matrix', 'Practical Magic', 'Heat', 'Arrival']
+      ['The Mazewright', 'Practical Alchemy', 'Scorch', 'Brightfall']
     );
   });
 
   it('reads a year in brackets or bare, and removes it from the title', () => {
-    const [bracketed, bare] = parseTitleList('The Matrix (1999)\nHeat 1995');
+    const [bracketed, bare] = parseTitleList(
+      'The Mazewright (1999)\nScorch 1995'
+    );
 
-    assert.equal(bracketed.title, 'The Matrix');
+    assert.equal(bracketed.title, 'The Mazewright');
     assert.equal(bracketed.year, 1999);
-    assert.equal(bare.title, 'Heat');
+    assert.equal(bare.title, 'Scorch');
     assert.equal(bare.year, 1995);
   });
 
   it('drops a personal note after a dash', () => {
-    const [line] = parseTitleList('Insidious — want to watch with Jordan');
+    const [line] = parseTitleList('Vesperline — want to watch with Jordan');
 
-    assert.equal(line.title, 'Insidious');
+    assert.equal(line.title, 'Vesperline');
   });
 
   it('keeps a hyphen that is part of the title', () => {
-    const [line] = parseTitleList('Spider-Man: Brand New Day');
+    const [line] = parseTitleList('Web-Weaver: Fresh New Dawn');
 
-    assert.equal(line.title, 'Spider-Man: Brand New Day');
+    assert.equal(line.title, 'Web-Weaver: Fresh New Dawn');
   });
 
   it('ignores section headings and blank lines', () => {
     const parsed = parseTitleList(
-      ['Movies:', '', 'The Matrix', '   ', 'Arrival'].join('\n')
+      ['Movies:', '', 'The Mazewright', '   ', 'Brightfall'].join('\n')
     );
 
     assert.deepEqual(
       parsed.map((line) => line.title),
-      ['The Matrix', 'Arrival']
+      ['The Mazewright', 'Brightfall']
     );
   });
 
   it('removes duplicates, matching on title and year together', () => {
     const parsed = parseTitleList(
-      ['The Matrix (1999)', 'the matrix (1999)', 'The Matrix (2003)'].join('\n')
+      [
+        'The Mazewright (1999)',
+        'the mazewright (1999)',
+        'The Mazewright (2003)',
+      ].join('\n')
     );
 
     // Same title and year is a duplicate; a different year is a different film.
@@ -66,10 +77,10 @@ describe('parseTitleList', () => {
 
   it('flags set wording without swallowing the title', () => {
     const cases: [string, string][] = [
-      ['Pitch Perfect series', 'Pitch Perfect'],
-      ['The Bourne trilogy', 'The Bourne'],
-      ['John Wick collection', 'John Wick'],
-      ['all Harry Potter movies', 'Harry Potter'],
+      ['Harmony Lane series', 'Harmony Lane'],
+      ['The Kessler trilogy', 'The Kessler'],
+      ['Rex Calder collection', 'Rex Calder'],
+      ['all Milo Thistle movies', 'Milo Thistle'],
     ];
 
     for (const [input, expected] of cases) {
@@ -81,16 +92,16 @@ describe('parseTitleList', () => {
   });
 
   it('does not flag a title that merely ends in a similar word', () => {
-    const [line] = parseTitleList('Hereditary');
+    const [line] = parseTitleList('Inheritor');
 
     assert.equal(line.collectionHint, undefined);
   });
 
   it('keeps the original line so the user can see what was matched', () => {
-    const [line] = parseTitleList('  [x] The Matrix (1999)  ');
+    const [line] = parseTitleList('  [x] The Mazewright (1999)  ');
 
-    assert.equal(line.raw, '[x] The Matrix (1999)');
-    assert.equal(line.title, 'The Matrix');
+    assert.equal(line.raw, '[x] The Mazewright (1999)');
+    assert.equal(line.title, 'The Mazewright');
   });
 
   it('returns nothing for text with no titles in it', () => {

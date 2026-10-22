@@ -342,13 +342,13 @@ describe('the Anime pages', () => {
   it('include anime from every country when none is left out', async () => {
     answer(
       page([
-        series(1, 'Castlevania', { language: 'en', country: 'US' }),
+        series(1, 'Gravespire', { language: 'en', country: 'US' }),
         series(2, 'Korean', { language: 'ko', country: 'KR' }),
       ]),
       page([series(3, 'Japanese')])
     );
     assert.deepEqual((await names('/anime?show=popular')).sort(), [
-      'Castlevania',
+      'Gravespire',
       'Japanese',
       'Korean',
     ]);
@@ -358,15 +358,15 @@ describe('the Anime pages', () => {
     getSettings().main.animeExcludedCountries = ['US'];
     answer(
       page([
-        series(1, 'Castlevania', { language: 'en', country: 'US' }),
-        series(2, 'Uzumaki', { language: 'ja', country: 'US' }),
+        series(1, 'Gravespire', { language: 'en', country: 'US' }),
+        series(2, 'Yorumaki', { language: 'ja', country: 'US' }),
         series(3, 'Korean', { language: 'ko', country: 'KR' }),
       ]),
       page([])
     );
     assert.deepEqual((await names('/anime?show=popular')).sort(), [
       'Korean',
-      'Uzumaki',
+      'Yorumaki',
     ]);
   });
 

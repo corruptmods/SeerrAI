@@ -26,7 +26,7 @@ describe('marking what earlier admin agent runs were for', () => {
         kind: 'series',
         serverId: 0,
         arrId: 1,
-        title: 'Slow Horses',
+        title: 'Quiet Ravens',
         status: 'none',
         missing: 1,
         searchTerms: [],
@@ -44,7 +44,7 @@ describe('marking what earlier admin agent runs were for', () => {
       await run('report', { report: { issueId: 3 } });
       await run('auto', {});
       await runner.query(
-        `INSERT INTO "backfill_job" ("seriesId", "title", "status", "protocol", "clientId") VALUES (${series.id}, 'Slow.Horses.S06E03-HONE', 'failed', 'usenet', 2)`
+        `INSERT INTO "backfill_job" ("seriesId", "title", "status", "protocol", "clientId") VALUES (${series.id}, 'Quiet.Ravens.S06E03-KILN', 'failed', 'usenet', 2)`
       );
       await migration.up(runner);
     } finally {

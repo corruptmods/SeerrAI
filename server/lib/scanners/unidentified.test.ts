@@ -99,12 +99,12 @@ describe('titles the server has not identified yet', () => {
 
   it('keeps the message the scan always gave', () => {
     const error = new NotIdentifiedError('film', {
-      name: 'Blood',
+      name: 'Brine',
       type: 'movie',
       id: '501',
     });
     assert.equal(error.message, 'Unable to find TMDB ID');
     assert.ok(error instanceof Error);
-    assert.equal(nameOf(error.item), 'Blood');
+    assert.equal(nameOf(error.item), 'Brine');
   });
 });

@@ -61,13 +61,13 @@ const ben = (value: unknown): Buffer => {
 };
 
 const INFO = {
-  name: '[Judas] Naruto',
+  name: '[Tengu] Kitsuraga',
   'piece length': 4194304,
   pieces: Buffer.alloc(20),
   files: [
-    { length: 400, path: ['S3', '[Judas] Naruto - S03E06 (101).mkv'] },
-    { length: 300, path: ['S3', '[Judas] Naruto - S03E07 (102).mkv'] },
-    { length: 200, path: ['S1', '[Judas] Naruto - S01E01 (001).mkv'] },
+    { length: 400, path: ['S3', '[Tengu] Kitsuraga - S03E06 (101).mkv'] },
+    { length: 300, path: ['S3', '[Tengu] Kitsuraga - S03E07 (102).mkv'] },
+    { length: 200, path: ['S1', '[Tengu] Kitsuraga - S01E01 (001).mkv'] },
   ],
 };
 const TORRENT = ben({ announce: 'udp://tracker', info: INFO });
@@ -85,24 +85,24 @@ const entry = (
   replaces: number
 ): PlanEntry => ({
   index,
-  path: `[Judas] Naruto/S3/${file}`,
+  path: `[Tengu] Kitsuraga/S3/${file}`,
   size: index === 0 ? 400 : 300,
   judgedAs: file,
   episodeIds: [episodeId],
   absolute: episodeId,
   quality,
   languages: [{ id: 8, name: 'Japanese' }],
-  releaseGroup: 'Judas',
+  releaseGroup: 'Tengu',
   score: 700,
   action,
   replaces,
 });
 const PLAN: PlanEntry[] = [
-  entry(0, '[Judas] Naruto - S03E06 (101).mkv', 101, 'fill', 0),
-  entry(1, '[Judas] Naruto - S03E07 (102).mkv', 102, 'upgrade', 1),
+  entry(0, '[Tengu] Kitsuraga - S03E06 (101).mkv', 101, 'fill', 0),
+  entry(1, '[Tengu] Kitsuraga - S03E07 (102).mkv', 102, 'upgrade', 1),
   {
-    ...entry(2, '[Judas] Naruto - S01E01 (001).mkv', 1, 'skip', 0),
-    path: '[Judas] Naruto/S1/[Judas] Naruto - S01E01 (001).mkv',
+    ...entry(2, '[Tengu] Kitsuraga - S01E01 (001).mkv', 1, 'skip', 0),
+    path: '[Tengu] Kitsuraga/S1/[Tengu] Kitsuraga - S01E01 (001).mkv',
   },
 ];
 
@@ -222,12 +222,12 @@ beforeEach(async () => {
   }));
   mock.method(BackfillSonarr.prototype, 'getSeriesDetail', async () => ({
     id: 1279,
-    title: 'Naruto',
+    title: 'Kitsuraga',
     year: 2002,
-    tvdbId: 78857,
+    tvdbId: 63914,
     seriesType: 'anime',
     qualityProfileId: 13,
-    path: '/anime/Naruto',
+    path: '/anime/Kitsuraga',
   }));
   mock.method(BackfillSonarr.prototype, 'getRootFoldersNow', async () => [
     { path: '/anime', freeSpace: 10 * 1024 ** 4 },
@@ -300,7 +300,7 @@ beforeEach(async () => {
     eta: 60,
     dlspeed: 1000,
     save_path: '/downloads/backfill',
-    content_path: '/downloads/backfill/[Judas] Naruto',
+    content_path: '/downloads/backfill/[Tengu] Kitsuraga',
   });
   mock.method(
     QBittorrentAPI.prototype,
@@ -376,9 +376,9 @@ const seed = async () => {
     new BackfillSeries({
       serverId: 0,
       arrId: 1279,
-      tmdbId: 46260,
-      tvdbId: 78857,
-      title: 'Naruto',
+      tmdbId: 58371,
+      tvdbId: 63914,
+      title: 'Kitsuraga',
       year: 2002,
       seriesType: 'anime',
       status: 'found',
@@ -390,7 +390,7 @@ const seed = async () => {
     new BackfillCandidate({
       seriesId: series.id,
       guid: 'https://indexer/1',
-      title: '[Judas] Naruto (Complete Series) [BD 1080p]',
+      title: '[Tengu] Kitsuraga (Complete Series) [BD 1080p]',
       indexer: 'Uindex',
       indexerId: 45,
       protocol: 'torrent',
@@ -430,7 +430,7 @@ describe('Backfill routes', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.readiness.ready, true);
     assert.equal(res.body.stats.awaiting, 1);
-    assert.equal(res.body.awaiting[0].series.title, 'Naruto');
+    assert.equal(res.body.awaiting[0].series.title, 'Kitsuraga');
     assert.ok(!JSON.stringify(res.body).includes('apikey'));
   });
 
@@ -479,7 +479,7 @@ describe('Backfill routes', () => {
     const res = await call(
       'POST',
       `/api/v1/backfill/candidates/${candidate.id}/approve`,
-      { mode: 'all', confirm: 'naruto' }
+      { mode: 'all', confirm: 'kitsuraga' }
     );
     assert.equal(res.status, 200);
     const jobs = getRepository(BackfillJob);
@@ -520,11 +520,11 @@ describe('Backfill routes', () => {
     assert.equal(job.status, 'importing');
     assert.deepEqual(imports[0], [
       {
-        path: '/data/torrents/backfill/[Judas] Naruto/S3/[Judas] Naruto - S03E06 (101).mkv',
+        path: '/data/torrents/backfill/[Tengu] Kitsuraga/S3/[Tengu] Kitsuraga - S03E06 (101).mkv',
         episodeIds: [101],
       },
       {
-        path: '/data/torrents/backfill/[Judas] Naruto/S3/[Judas] Naruto - S03E07 (102).mkv',
+        path: '/data/torrents/backfill/[Tengu] Kitsuraga/S3/[Tengu] Kitsuraga - S03E07 (102).mkv',
         episodeIds: [102],
       },
     ]);
@@ -558,7 +558,7 @@ describe('Backfill routes', () => {
       new BackfillCandidate({
         seriesId: series.id,
         guid: 'https://indexer/other',
-        title: '[Other] Naruto 101 [1080p]',
+        title: '[Other] Kitsuraga 101 [1080p]',
         indexer: 'Nyaa',
         indexerId: 2,
         protocol: 'torrent',
@@ -573,7 +573,7 @@ describe('Backfill routes', () => {
     assert.equal(before.body.awaiting.length, 1);
     await call('POST', `/api/v1/backfill/candidates/${candidate.id}/approve`, {
       mode: 'all',
-      confirm: 'naruto',
+      confirm: 'kitsuraga',
     });
     const after = await call('GET', '/api/v1/backfill');
     assert.deepEqual(after.body.awaiting, []);
@@ -603,7 +603,7 @@ describe('Backfill routes', () => {
     const res = await call(
       'POST',
       `/api/v1/backfill/candidates/${candidate.id}/approve`,
-      { mode: 'all', confirm: 'naruto' }
+      { mode: 'all', confirm: 'kitsuraga' }
     );
     torrentDone = true;
     await backfill.tick();
@@ -649,7 +649,7 @@ describe('Backfill routes', () => {
     const approved = await call(
       'POST',
       `/api/v1/backfill/candidates/${candidate.id}/approve`,
-      { mode: 'all', confirm: 'naruto' }
+      { mode: 'all', confirm: 'kitsuraga' }
     );
     const id = approved.body.id;
     const saved = await getRepository(BackfillJob).findOneOrFail({
@@ -678,7 +678,7 @@ describe('Backfill routes', () => {
     assert.equal(detail.body.stage, 'Downloading');
     const overview = await call('GET', '/api/v1/backfill');
     assert.equal(overview.body.jobs[0].progress, expected);
-    const lookup = await call('GET', '/api/v1/backfill/lookup?tmdbIds=46260');
+    const lookup = await call('GET', '/api/v1/backfill/lookup?tmdbIds=58371');
     assert.equal(lookup.body[0].job.progress, expected);
     assert.deepEqual(
       lookup.body[0].jobs.map((j: { id: number }) => j.id),
@@ -715,7 +715,7 @@ describe('Backfill routes', () => {
 
   it('report what Backfill has for a title, for its page and the requests list', async () => {
     const { series } = await seed();
-    const res = await call('GET', '/api/v1/backfill/lookup?tmdbIds=46260,1');
+    const res = await call('GET', '/api/v1/backfill/lookup?tmdbIds=58371,1');
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.equal(res.body.length, 1);
     assert.equal(res.body[0].id, series.id);
@@ -727,11 +727,11 @@ describe('Backfill routes', () => {
   it('link a complete title from its page only when asked to', async () => {
     const { series } = await seed();
     await getRepository(BackfillSeries).update(series.id, { status: 'done' });
-    const plain = await call('GET', '/api/v1/backfill/lookup?tmdbIds=46260');
+    const plain = await call('GET', '/api/v1/backfill/lookup?tmdbIds=58371');
     assert.deepEqual(plain.body, []);
     const all = await call(
       'GET',
-      '/api/v1/backfill/lookup?tmdbIds=46260&all=true'
+      '/api/v1/backfill/lookup?tmdbIds=58371&all=true'
     );
     assert.equal(all.body.length, 1);
     assert.equal(all.body[0].status, 'done');
@@ -749,16 +749,16 @@ describe('Backfill routes', () => {
         searchTerms: [],
       });
     await getRepository(BackfillSeries).save([
-      more('Naruto Shippuden', 2, 'stuck'),
-      more('Boruto: Naruto Next Generations', 3, 'done'),
-      more('Bleach', 4, 'stuck'),
-      more('100% Wolf', 5, 'ignored'),
+      more('Kitsuraga Tsumuden', 2, 'stuck'),
+      more('Sorato: Kitsuraga Next Lanterns', 3, 'done'),
+      more('Inkwash', 4, 'stuck'),
+      more('100% Wombat', 5, 'ignored'),
     ]);
-    const stuck = await call('GET', '/api/v1/backfill?q=NARUTO');
+    const stuck = await call('GET', '/api/v1/backfill?q=KITSURAGA');
     assert.equal(stuck.status, 200, JSON.stringify(stuck.body));
     assert.deepEqual(
       stuck.body.series.map((s: { title: string }) => s.title).sort(),
-      ['Naruto', 'Naruto Shippuden']
+      ['Kitsuraga', 'Kitsuraga Tsumuden']
     );
     assert.deepEqual(stuck.body.counts, {
       all: 2,
@@ -769,10 +769,10 @@ describe('Backfill routes', () => {
     // What the page shows above the list stays the whole picture.
     assert.equal(stuck.body.stats.stuck, 3);
 
-    const done = await call('GET', '/api/v1/backfill?filter=done&q=naruto');
+    const done = await call('GET', '/api/v1/backfill?filter=done&q=kitsuraga');
     assert.deepEqual(
       done.body.series.map((s: { title: string }) => s.title),
-      ['Boruto: Naruto Next Generations']
+      ['Sorato: Kitsuraga Next Lanterns']
     );
     // A % is a percent sign, not "anything".
     const percent = await call(
@@ -781,7 +781,7 @@ describe('Backfill routes', () => {
     );
     assert.deepEqual(
       percent.body.series.map((s: { title: string }) => s.title),
-      ['100% Wolf']
+      ['100% Wombat']
     );
     const wild = await call(
       'GET',
@@ -805,7 +805,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       new BackfillCandidate({
         seriesId: series.id,
         guid: 'https://indexer/2',
-        title: '[Other] Naruto 101-102 [1080p]',
+        title: '[Other] Kitsuraga 101-102 [1080p]',
         indexer: 'Nyaa',
         indexerId: 3,
         protocol: 'torrent',
@@ -869,7 +869,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       (s) => s.payload.actionUrl === `/backfill/series/${series.id}`
     );
     assert.equal(offered.length, 1);
-    assert.match(offered[0].payload.message ?? '', /\[Other\] Naruto/);
+    assert.match(offered[0].payload.message ?? '', /\[Other\] Kitsuraga/);
     assert.equal(
       (
         await getRepository(BackfillCandidate).findOneOrFail({
@@ -944,7 +944,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       new BackfillCandidate({
         seriesId: series.id,
         guid: 'https://indexer/2',
-        title: '[Other] Naruto 101-102 [1080p]',
+        title: '[Other] Kitsuraga 101-102 [1080p]',
         indexer: 'Nyaa',
         indexerId: 3,
         protocol: 'torrent',
@@ -987,7 +987,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
     });
     assert.match(
       failed.log.at(-1)?.message ?? '',
-      new RegExp(`^Replaced by #${replacement.id}: \\[Other\\] Naruto`)
+      new RegExp(`^Replaced by #${replacement.id}: \\[Other\\] Kitsuraga`)
     );
     assert.equal(replacement.status, 'downloading');
     assert.equal(
@@ -1099,7 +1099,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       new BackfillJob({
         seriesId: series.id,
         candidateId: null,
-        title: 'Naruto.S03E06.x264-HONE',
+        title: 'Kitsuraga.S03E06.x264-KILN',
         status: 'failed',
         protocol: 'usenet',
         clientId: 2,
@@ -1156,7 +1156,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
     const res = await call(
       'POST',
       `/api/v1/backfill/candidates/${candidate.id}/approve`,
-      { mode: 'all', confirm: 'naruto' }
+      { mode: 'all', confirm: 'kitsuraga' }
     );
     assert.equal(res.status, 200, res.body.message);
     const job = await getRepository(BackfillJob).findOneOrFail({
@@ -1236,39 +1236,39 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
 
   it('asks the model about the file named only by its title, and never auto-approves it', async () => {
     const SPECIAL_INFO = {
-      name: '[Judas] Naruto (Complete Series)',
+      name: '[Tengu] Kitsuraga (Complete Series)',
       'piece length': 4194304,
       pieces: Buffer.alloc(20),
       files: [
         {
           length: 476_000_000,
-          path: ['S5', '[Judas] Naruto - S05E17 (202).mkv'],
+          path: ['S5', '[Tengu] Kitsuraga - S05E17 (202).mkv'],
         },
         {
           length: 300_000_000,
           path: [
             'Specials',
-            '[Judas] Naruto - Hidden Leaf Village Grand Sports Festival.mkv',
+            '[Tengu] Kitsuraga - Misty Pine Village Grand Sports Festival.mkv',
           ],
         },
       ],
     };
     torrentData = ben({ announce: 'udp://tracker', info: SPECIAL_INFO });
     const PACK =
-      '[Judas] Naruto (Complete Series) [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]';
+      '[Tengu] Kitsuraga (Complete Series) [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]';
     const ep202 = {
       ...ep(145136, false),
       seasonNumber: 5,
       episodeNumber: 23,
       absoluteEpisodeNumber: 202,
-      title: 'The Battle Begins: Naruto vs. Sasuke',
+      title: 'The Battle Begins: Kitsuraga vs. Ryomaru',
     };
     const festival = {
       ...ep(145157, false),
       seasonNumber: 0,
       episodeNumber: 3,
       absoluteEpisodeNumber: undefined,
-      title: 'Naruto OVA 3: Hidden Leaf Village Grand Sports Festival',
+      title: 'Kitsuraga OVA 3: Misty Pine Village Grand Sports Festival',
     };
     episodes = [ep202, festival];
     const bd = {
@@ -1277,40 +1277,40 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
     };
     // What Sonarr answered on the live server for these names.
     const parsed: Record<string, unknown> = {
-      '[Judas] Naruto - S05E17 (202)': {
+      '[Tengu] Kitsuraga - S05E17 (202)': {
         title: '',
         parsedEpisodeInfo: {
-          seriesTitle: 'Naruto',
+          seriesTitle: 'Kitsuraga',
           seasonNumber: 5,
           episodeNumbers: [17],
         },
-        series: { id: 1279, title: 'Naruto' },
+        series: { id: 1279, title: 'Kitsuraga' },
         episodes: [],
       },
-      [`[Judas] Naruto - 202 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]`]:
+      [`[Tengu] Kitsuraga - 202 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]`]:
         {
           title: '',
           parsedEpisodeInfo: {
-            seriesTitle: 'Naruto',
+            seriesTitle: 'Kitsuraga',
             quality: bd,
             absoluteEpisodeNumbers: [202],
-            releaseGroup: 'Judas',
+            releaseGroup: 'Tengu',
           },
-          series: { id: 1279, title: 'Naruto' },
+          series: { id: 1279, title: 'Kitsuraga' },
           episodes: [ep202],
           customFormatScore: 700,
         },
-      [`[Judas] Naruto - S00E03 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]`]:
+      [`[Tengu] Kitsuraga - S00E03 [BD 1080p][HEVC x265 10bit][Multi-Audio][Multi-Subs]`]:
         {
           title: '',
           parsedEpisodeInfo: {
-            seriesTitle: 'Naruto',
+            seriesTitle: 'Kitsuraga',
             quality: bd,
             seasonNumber: 0,
             episodeNumbers: [3],
-            releaseGroup: 'Judas',
+            releaseGroup: 'Tengu',
           },
-          series: { id: 1279, title: 'Naruto' },
+          series: { id: 1279, title: 'Kitsuraga' },
           episodes: [festival],
           customFormatScore: 700,
         },
@@ -1333,7 +1333,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
     }));
     mock.method(ProwlarrAPI.prototype, 'search', async () => [
       {
-        guid: 'https://nyaa/judas',
+        guid: 'https://nyaa/tengu',
         title: PACK,
         size: 776_000_000,
         indexerId: 1,
@@ -1388,7 +1388,7 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       new BackfillSeries({
         serverId: 0,
         arrId: 1279,
-        title: 'Naruto',
+        title: 'Kitsuraga',
         seriesType: 'anime',
         status: 'stuck',
         missing: 1,
@@ -1398,8 +1398,8 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
     await backfill.search(series.id, admin, { ai: true });
 
     assert.equal(prompts.length, 1, 'one question, about one pack');
-    assert.match(prompts[0], /Hidden Leaf Village Grand Sports Festival/);
-    assert.match(prompts[0], /^1\. \[Judas\] Naruto - Hidden Leaf/m);
+    assert.match(prompts[0], /Misty Pine Village Grand Sports Festival/);
+    assert.match(prompts[0], /^1\. \[Tengu\] Kitsuraga - Misty Pine/m);
     assert.ok(
       !prompts[0].includes('apikey'),
       'Prowlarr links never reach the model'

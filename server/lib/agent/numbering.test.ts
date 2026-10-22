@@ -35,23 +35,23 @@ const ep = (
 });
 
 const LIBRARY: NumberedEpisode[] = [
-  ep(863, 0, 1, 'Behind the Map', false),
-  ep(873, 1, 3, 'Thin Air', true),
-  ep(893, 3, 1, 'Red Canyon', true),
-  ep(895, 3, 3, 'Into the Furnace', false),
-  ep(904, 4, 1, 'Long Road (1)', true),
-  ep(905, 4, 2, 'Long Road (2)', false),
-  ep(941, 8, 1, 'Island Exile', false, [6, 15]),
-  ep(945, 8, 5, 'Thin Air', true, [7, 5]),
-  ep(948, 9, 1, 'River Delta', true, [8, 1]),
-  ep(953, 9, 6, 'Lion Country', false, [8, 6]),
+  ep(863, 0, 1, 'Beyond the Map', false),
+  ep(873, 1, 3, 'Thin Ice', true),
+  ep(893, 3, 1, 'Ochre Canyon', true),
+  ep(895, 3, 3, 'Into the Kiln', false),
+  ep(904, 4, 1, 'Long Trail (1)', true),
+  ep(905, 4, 2, 'Long Trail (2)', false),
+  ep(941, 8, 1, 'Atoll Exile', false, [6, 15]),
+  ep(945, 8, 5, 'Thin Ice', true, [7, 5]),
+  ep(948, 9, 1, 'River Bend', true, [8, 1]),
+  ep(953, 9, 6, 'Jackal Country', false, [8, 6]),
   ep(990, 9, 9, 'Episode 9', false),
 ];
 const byId = (id: number) => LIBRARY.find((e) => e.id === id)!;
 
 describe('Release numbering', () => {
   it('reads the first season and episode a name gives', () => {
-    assert.deepEqual(numbersInName('Far.Afield.S08E01.Island.Exile'), {
+    assert.deepEqual(numbersInName('Remote.Reach.S08E01.Atoll.Exile'), {
       season: 8,
       episode: 1,
     });
@@ -63,14 +63,14 @@ describe('Release numbering', () => {
       season: 3,
       episode: 4,
     });
-    assert.equal(numbersInName('Far Afield Season 3 Complete'), undefined);
+    assert.equal(numbersInName('Remote Reach Season 3 Complete'), undefined);
     assert.equal(numbersInName('Show.2019.1080p.x264'), undefined);
   });
 
   it('finds the episode a name’s title is, whatever its number', () => {
     assert.equal(
       episodeByTitle(
-        'Far.Afield.S08E01.Island.Exile.720p.HDTV.x264-GRP',
+        'Remote.Reach.S08E01.Atoll.Exile.720p.HDTV.x264-GRP',
         LIBRARY
       )?.id,
       941
@@ -78,39 +78,41 @@ describe('Release numbering', () => {
     // Some groups count the special as S03E01.
     assert.equal(
       episodeByTitle(
-        'Far.Afield.S03E01.Behind.the.Map.1080p.AMZN.WEB-DL',
+        'Remote.Reach.S03E01.Beyond.the.Map.1080p.AMZN.WEB-DL',
         LIBRARY
       )?.id,
       863
     );
     assert.equal(
-      episodeByTitle('Far.Afield.S03E04.Into.the.Furnace.1080p', LIBRARY)?.id,
+      episodeByTitle('Remote.Reach.S03E04.Into.the.Kiln.1080p', LIBRARY)?.id,
       895
     );
   });
 
   it('tells parts apart by their numbers', () => {
     assert.equal(
-      episodeByTitle('Far.Afield.S04E02.Long.Road.Part.2.1080p', LIBRARY)?.id,
+      episodeByTitle('Remote.Reach.S04E02.Long.Trail.Part.2.1080p', LIBRARY)
+        ?.id,
       905
     );
     assert.equal(
-      episodeByTitle('Far.Afield.S04E01.Long.Road.Part.1.1080p', LIBRARY)?.id,
+      episodeByTitle('Remote.Reach.S04E01.Long.Trail.Part.1.1080p', LIBRARY)
+        ?.id,
       904
     );
   });
 
   it('says nothing when two episodes share the title, or it is generic', () => {
     assert.equal(
-      episodeByTitle('Far.Afield.S08E05.Thin.Air.720p', LIBRARY),
+      episodeByTitle('Remote.Reach.S08E05.Thin.Ice.720p', LIBRARY),
       undefined
     );
     assert.equal(
-      episodeByTitle('Far.Afield.S09E09.Episode.9.720p', LIBRARY),
+      episodeByTitle('Remote.Reach.S09E09.Episode.9.720p', LIBRARY),
       undefined
     );
     assert.equal(
-      episodeByTitle('Far.Afield.S09E01.720p.HDTV', LIBRARY),
+      episodeByTitle('Remote.Reach.S09E01.720p.HDTV', LIBRARY),
       undefined
     );
   });
@@ -121,39 +123,39 @@ describe('Release numbering', () => {
   });
 
   it('says when Sonarr’s mapping and the title disagree', () => {
-    const name = 'Far.Afield.S08E01.Island.Exile.720p.HDTV.x264-GRP';
+    const name = 'Remote.Reach.S08E01.Atoll.Exile.720p.HDTV.x264-GRP';
     assert.equal(
       nameReading(name, LIBRARY, byId(948)),
-      'Sonarr maps it to S09E01 "River Delta" (on disk), but its title is library S08E01 "Island Exile" (missing): go by its title'
+      'Sonarr maps it to S09E01 "River Bend" (on disk), but its title is library S08E01 "Atoll Exile" (missing): go by its title'
     );
     assert.equal(
       nameReading(
-        'Far.Afield.S08E06.Lion.Country.HDTV.x264-GRP',
+        'Remote.Reach.S08E06.Jackal.Country.HDTV.x264-GRP',
         LIBRARY,
         byId(953)
       ),
-      'is S09E06 "Lion Country" (missing)'
+      'is S09E06 "Jackal Country" (missing)'
     );
     assert.equal(
-      nameReading('Far.Afield.S08E01.720p', LIBRARY, byId(948)),
-      'Sonarr maps it to S09E01 "River Delta" (on disk)'
+      nameReading('Remote.Reach.S08E01.720p', LIBRARY, byId(948)),
+      'Sonarr maps it to S09E01 "River Bend" (on disk)'
     );
   });
 
   it('reads indexer results by number, scene number and title', () => {
     assert.equal(
-      indexerReading('Far.Afield.S08E01.Island.Exile.720p.HDTV', LIBRARY),
-      'is S08E01 "Island Exile" (missing)'
+      indexerReading('Remote.Reach.S08E01.Atoll.Exile.720p.HDTV', LIBRARY),
+      'is S08E01 "Atoll Exile" (missing)'
     );
     assert.equal(
-      indexerReading('Far.Afield.S03E01.Behind.the.Map.1080p', LIBRARY),
-      'by its number S03E01 "Red Canyon" (on disk), but its title is S00E01 "Behind the Map" (missing): go by its title'
+      indexerReading('Remote.Reach.S03E01.Beyond.the.Map.1080p', LIBRARY),
+      'by its number S03E01 "Ochre Canyon" (on disk), but its title is S00E01 "Beyond the Map" (missing): go by its title'
     );
     // No title: either numbering could be meant.
     assert.equal(
-      indexerReading('Far.Afield.S08E01.720p.HDTV', LIBRARY),
-      'S08E01 "Island Exile" (missing), or by the scene\'s numbering S09E01 "River Delta" (on disk): check the files\' titles'
+      indexerReading('Remote.Reach.S08E01.720p.HDTV', LIBRARY),
+      'S08E01 "Atoll Exile" (missing), or by the scene\'s numbering S09E01 "River Bend" (on disk): check the files\' titles'
     );
-    assert.equal(indexerReading('Far.Afield.Complete.1080p', LIBRARY), '');
+    assert.equal(indexerReading('Remote.Reach.Complete.1080p', LIBRARY), '');
   });
 });

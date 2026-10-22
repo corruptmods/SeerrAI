@@ -55,7 +55,7 @@ beforeEach(() => {
 
 describe('notifications sent close together', () => {
   it('tells the person once about a burst, and admins and channels at once', async () => {
-    for (const title of ['Dune (2021)', 'Up (2009)', 'Heat (1995)']) {
+    for (const title of ['Zelvara (2021)', 'Yonder (2009)', 'Scorch (1995)']) {
       notificationManager.sendNotification(
         Notification.MEDIA_AVAILABLE,
         available(title)
@@ -81,11 +81,11 @@ describe('notifications sent close together', () => {
       },
       {
         subject: '3 titles are ready to watch',
-        message: 'Dune (2021), Up (2009), Heat (1995).',
+        message: 'Zelvara (2021), Yonder (2009), Scorch (1995).',
         digest: true,
         system: false,
         admin: false,
-        image: 'https://img/Dune (2021).jpg',
+        image: 'https://img/Zelvara (2021).jpg',
         actionUrl: '/requests',
       }
     );
@@ -94,12 +94,12 @@ describe('notifications sent close together', () => {
   it('sends one on its own as it was, only a moment later', async () => {
     notificationManager.sendNotification(
       Notification.MEDIA_AVAILABLE,
-      available('Dune (2021)')
+      available('Zelvara (2021)')
     );
     await wait(120);
     const [own] = toUser();
     assert.equal(toUser().length, 1);
-    assert.equal(own.payload.subject, 'Dune (2021)');
+    assert.equal(own.payload.subject, 'Zelvara (2021)');
     assert.equal(own.payload.digest, undefined);
     assert.equal(own.payload.notifyAdmin, false, 'admins were told already');
   });
@@ -156,10 +156,10 @@ describe('notifications sent close together', () => {
 
   it('tells about the same title once, however often it came up', async () => {
     for (const title of [
-      'Dune (2021)',
-      'Dune (2021)',
-      'Up (2009)',
-      'Up (2009)',
+      'Zelvara (2021)',
+      'Zelvara (2021)',
+      'Yonder (2009)',
+      'Yonder (2009)',
     ]) {
       notificationManager.sendNotification(
         Notification.MEDIA_AVAILABLE,
@@ -172,15 +172,15 @@ describe('notifications sent close together', () => {
     sent = [];
     notificationManager.sendNotification(
       Notification.MEDIA_AVAILABLE,
-      available('Heat (1995)')
+      available('Scorch (1995)')
     );
     notificationManager.sendNotification(
       Notification.MEDIA_AVAILABLE,
-      available('Heat (1995)')
+      available('Scorch (1995)')
     );
     await wait(120);
     assert.equal(toUser().length, 1);
-    assert.equal(toUser()[0].payload.subject, 'Heat (1995)');
+    assert.equal(toUser()[0].payload.subject, 'Scorch (1995)');
   });
 
   it('names a few and counts the rest', async () => {
@@ -212,7 +212,7 @@ describe('notifications sent close together', () => {
     notificationManager.gathering = { quietMs: 60_000, longestMs: 60_000 };
     notificationManager.sendNotification(
       Notification.MEDIA_AVAILABLE,
-      available('Dune (2021)')
+      available('Zelvara (2021)')
     );
     notificationManager.flush();
     assert.equal(toUser().length, 1);
@@ -243,10 +243,10 @@ describe('notifications sent close together', () => {
         request: { id, is4k: false, declineReason } as MediaRequest,
       });
 
-    decline(1, 'Dune (2021)', 'Already on Netflix');
-    decline(2, 'Up (2009)', 'We have it on disc');
-    decline(3, 'Heat (1995)');
-    decline(4, 'Alien (1979)');
+    decline(1, 'Zelvara (2021)', 'Already on Netflix');
+    decline(2, 'Yonder (2009)', 'We have it on disc');
+    decline(3, 'Scorch (1995)');
+    decline(4, 'Aurelin (1979)');
 
     const reasons = () =>
       toUser().map(

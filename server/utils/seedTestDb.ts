@@ -125,12 +125,12 @@ export async function resetTestDb(): Promise<void> {
 /** MusicBrainz ids the music fixtures use. */
 export const MUSIC_FIXTURE_IDS = {
   /** An artist with albums in the library and a request in each status. */
-  artist: 'a74b1b7f-71a5-4011-9441-d0b5e4122711',
-  album: 'b1392450-e666-3926-a536-22c65f834433',
-  otherAlbum: '1b022e01-4da6-387b-8658-8678046e4cef',
+  artist: '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844',
+  album: '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35',
+  otherAlbum: '4f6a2d93-c1e8-3a57-9b02-6d3e8f1c7a40',
   /** An artist whose albums Lidarr is still getting. */
-  processingArtist: '8bfac288-ccc5-448d-9573-c33ea2aa5c30',
-  processingAlbum: '6e335887-60ba-38f0-95af-fae7774336bf',
+  processingArtist: 'd2b7c4e9-6a13-4f58-8e06-c39f71a5b204',
+  processingAlbum: '1d84b6f2-9e07-3c5a-a4d8-e3f2b7091c6d',
 } as const;
 
 export interface MusicFixtures {
@@ -187,7 +187,7 @@ export async function seedMusicFixtures(): Promise<MusicFixtures> {
       new MusicAlbum({
         mediaId: artist.id,
         mbId: ids.album,
-        title: 'Hail to the Thief',
+        title: 'Sing to the Ferryman',
         primaryType: 'Album',
         secondaryTypes: [],
         releaseDate: '2003-06-09',
@@ -198,13 +198,13 @@ export async function seedMusicFixtures(): Promise<MusicFixtures> {
         ratingKey: '9002',
         jellyfinItemId: 'jellyfin-album',
         embyItemId: 'emby-album',
-        folder: 'Hail to the Thief (2003)',
+        folder: 'Sing to the Ferryman (2003)',
         mediaAddedAt: longAgo,
       }),
       new MusicAlbum({
         mediaId: artist.id,
         mbId: ids.otherAlbum,
-        title: 'OK Computer',
+        title: 'Static Garden',
         primaryType: 'Album',
         secondaryTypes: [],
         releaseDate: '1997-05-21',
@@ -224,7 +224,7 @@ export async function seedMusicFixtures(): Promise<MusicFixtures> {
       new MusicAlbum({
         mediaId: processingArtist.id,
         mbId: ids.processingAlbum,
-        title: 'In Rainbows',
+        title: 'In Lanterns',
         primaryType: 'Album',
         secondaryTypes: [],
         releaseDate: '2007-10-10',
@@ -259,7 +259,7 @@ export async function seedMusicFixtures(): Promise<MusicFixtures> {
         albums: [
           new AlbumRequest({
             albumMbid: ids.otherAlbum,
-            title: 'OK Computer',
+            title: 'Static Garden',
             status,
           }),
         ],

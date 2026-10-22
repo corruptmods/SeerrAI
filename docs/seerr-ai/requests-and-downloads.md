@@ -74,7 +74,7 @@ If there's no default server, Retry says so: add one in **Settings → Services*
 
 Seerr AI decides what counts as anime the same way everywhere (requests, scans, title pages, the Anime page and the Anime Check): anything TMDB tags as anime, from any country, and animation in Japanese.
 
-- **Leave out anime made in** (**Settings → Services → Anime**): countries whose anime-styled titles don't count unless in Japanese. List the United States to keep Avatar: The Last Airbender and Castlevania with your regular series; leave it empty to count anime from everywhere. Servers from before this setting start with the United States listed.
+- **Leave out anime made in** (**Settings → Services → Anime**): countries whose anime-styled titles don't count unless in Japanese. List the United States to keep Avatar: The Last Airbender and Gravespire with your regular series; leave it empty to count anime from everywhere. Servers from before this setting start with the United States listed.
 - **When requesting:** **Request as anime** is ticked for anime, from Japan or anywhere else. Untick it when it's wrong, and the request goes to the regular folder, profile and tags.
 - **On a title:** admins set **Anime** in the Manage panel to Automatic, Anime or Not anime. **Save and Move** sets the matching root folder (the files move), quality profile and, for a series, series type.
 - **Movies:** each Radarr can have its own anime root folder, quality profile and tags (Settings → Services).

@@ -75,7 +75,7 @@ describe('sourcesFor', () => {
 
 describe('music’s pictures', () => {
   const COVER =
-    '/imageproxy/caa/release-group/b1392450-e666-3926-a536-22c65f834433';
+    '/imageproxy/caa/release-group/7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
 
   it('offer a cover as AVIF and WebP, though its address has no file name', () => {
     assert.deepEqual(
@@ -97,21 +97,21 @@ describe('music’s pictures', () => {
   });
 
   it('offer an artist’s backdrop in widths for each screen', () => {
-    const [avif] = sourcesFor('/imageproxy/artist/a74b1b7f/backdrop');
+    const [avif] = sourcesFor('/imageproxy/artist/3c9e5f21/backdrop');
     assert.equal(avif.responsive, true);
     assert.match(avif.srcSet, /backdrop\?f=avif&w=480 480w/);
   });
 
   it('offer a picture of an artist smaller too, for the tiles it fills', () => {
     // fanart.tv's are 1000 square; a tile is a few hundred pixels wide.
-    const [photo] = sourcesFor('/imageproxy/artist/a74b1b7f');
+    const [photo] = sourcesFor('/imageproxy/artist/3c9e5f21');
     assert.equal(photo.responsive, true);
     assert.equal(
       photo.srcSet,
       [
-        '/imageproxy/artist/a74b1b7f?f=avif&w=480 480w',
-        '/imageproxy/artist/a74b1b7f?f=avif&w=780 780w',
-        '/imageproxy/artist/a74b1b7f?f=avif 1000w',
+        '/imageproxy/artist/3c9e5f21?f=avif&w=480 480w',
+        '/imageproxy/artist/3c9e5f21?f=avif&w=780 780w',
+        '/imageproxy/artist/3c9e5f21?f=avif 1000w',
       ].join(', ')
     );
   });
@@ -122,10 +122,10 @@ describe('convertible', () => {
     for (const url of [
       '/imageproxy/tmdb/t/p/w300_and_h450_face/a.jpg',
       '/imageproxy/tvdb/banners/a.png',
-      '/imageproxy/caa/release-group/b1392450-e666-3926-a536-22c65f834433/front-500',
+      '/imageproxy/caa/release-group/7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35/front-500',
       '/imageproxy/fanart/fanart/music/x/artistthumb/a.jpg',
-      '/imageproxy/artist/a74b1b7f-71a5-4011-9441-d0b5e4122711',
-      '/imageproxy/artist/a74b1b7f-71a5-4011-9441-d0b5e4122711/backdrop',
+      '/imageproxy/artist/3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844',
+      '/imageproxy/artist/3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844/backdrop',
     ]) {
       assert.equal(convertible(url), true, url);
     }

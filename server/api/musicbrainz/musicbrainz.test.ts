@@ -27,9 +27,9 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
  * in the database.
  */
 
-const ARTIST = '5b11f4ce-a62d-471e-81fc-a69a8278c7da';
-const ALBUM = '1b022e01-4da6-387b-8658-8678046e4cef';
-const RELEASE = 'b84ee12a-09ef-421b-82de-0441a926375b';
+const ARTIST = '7f3e9a20-b51c-4d86-92ad-c4e1d08b6f73';
+const ALBUM = '4f6a2d93-c1e8-3a57-9b02-6d3e8f1c7a40';
+const RELEASE = '3a96f0c4-e27d-4b51-8c39-0d5b2e8a714f';
 const OTHER_RELEASE = '2d5e5c7c-3b9a-4b6f-8a50-6bd25a3b2a33';
 
 /** A clock the queue sleeps on: sleeping moves it forward. */
@@ -314,11 +314,11 @@ describe('the MusicBrainz client', () => {
 
   it('asks once, then answers from memory and from the database', async () => {
     const { client, get } = stubbed({
-      [`/ws/2/artist/${ARTIST}`]: { id: ARTIST, name: 'Radiohead' },
+      [`/ws/2/artist/${ARTIST}`]: { id: ARTIST, name: 'Glasswing' },
     });
 
-    assert.equal((await client.getArtist(ARTIST)).name, 'Radiohead');
-    assert.equal((await client.getArtist(ARTIST)).name, 'Radiohead');
+    assert.equal((await client.getArtist(ARTIST)).name, 'Glasswing');
+    assert.equal((await client.getArtist(ARTIST)).name, 'Glasswing');
     assert.equal(get.mock.callCount(), 1);
     const [, config] = get.mock.calls[0].arguments as [
       string,
@@ -330,13 +330,13 @@ describe('the MusicBrainz client', () => {
     const row = await getRepository(MusicMetadata).findOneOrFail({
       where: { key: `artist:${ARTIST}` },
     });
-    assert.equal(JSON.parse(row.data).name, 'Radiohead');
+    assert.equal(JSON.parse(row.data).name, 'Glasswing');
     const lifetime = new Date(row.expiresAt!).getTime() - Date.now();
     assert.ok(lifetime > MB_LIFETIMES.artist - 60_000);
 
     // After a restart: memory is empty, the database still has it.
     cacheManager.getCache('musicbrainz').flush();
-    assert.equal((await client.getArtist(ARTIST)).name, 'Radiohead');
+    assert.equal((await client.getArtist(ARTIST)).name, 'Glasswing');
     assert.equal(get.mock.callCount(), 1);
   });
 
@@ -367,8 +367,8 @@ describe('the MusicBrainz client', () => {
     const { client } = stubbed({
       [`/ws/2/release/${RELEASE}`]: {
         id: RELEASE,
-        title: 'OK Computer',
-        'release-group': { id: ALBUM, title: 'OK Computer' },
+        title: 'Static Garden',
+        'release-group': { id: ALBUM, title: 'Static Garden' },
       },
     });
     assert.equal(await client.getReleaseGroupOfRelease(RELEASE), ALBUM);
@@ -382,18 +382,18 @@ describe('the MusicBrainz client', () => {
     const { client, get } = stubbed({
       [`/ws/2/release-group/${ALBUM}`]: {
         id: ALBUM,
-        title: 'OK Computer',
+        title: 'Static Garden',
         releases: [
-          { id: OTHER_RELEASE, title: 'OK Computer', status: 'Bootleg' },
+          { id: OTHER_RELEASE, title: 'Static Garden', status: 'Bootleg' },
           {
             id: 'c0f7b5c4-1111-4b6f-8a50-6bd25a3b2a33',
-            title: 'OK Computer',
+            title: 'Static Garden',
             status: 'Official',
             date: '2009-08-31',
           },
           {
             id: RELEASE,
-            title: 'OK Computer',
+            title: 'Static Garden',
             status: 'Official',
             date: '1997-05-21',
           },
@@ -401,17 +401,17 @@ describe('the MusicBrainz client', () => {
       },
       [`/ws/2/release/${RELEASE}`]: {
         id: RELEASE,
-        title: 'OK Computer',
+        title: 'Static Garden',
         media: [
           {
             position: 1,
-            tracks: [{ id: 't1', position: 1, title: 'Airbag' }],
+            tracks: [{ id: 't1', position: 1, title: 'Lifebuoy' }],
           },
         ],
       },
     });
     const media = await client.getTracks(ALBUM);
-    assert.equal(media[0].tracks?.[0].title, 'Airbag');
+    assert.equal(media[0].tracks?.[0].title, 'Lifebuoy');
     assert.deepEqual(
       get.mock.calls.map((c) => c.arguments[0]),
       [`/ws/2/release-group/${ALBUM}`, `/ws/2/release/${RELEASE}`]
@@ -449,8 +449,8 @@ describe('the MusicBrainz client', () => {
     const { client, get } = stubbed({
       '/ws/2/artist': { count: 1, offset: 0, artists: [{ id: ARTIST }] },
     });
-    await client.searchArtists('Radiohead');
-    await client.searchArtists(' radiohead ');
+    await client.searchArtists('Glasswing');
+    await client.searchArtists(' glasswing ');
     assert.equal(get.mock.callCount(), 1);
     assert.equal(await getRepository(MusicMetadata).count(), 0);
   });
@@ -465,8 +465,8 @@ describe('the MusicBrainz client', () => {
 
   it('turns the Wikipedia extract into plain text', async () => {
     assert.equal(
-      plainText('<p>Radiohead are an <b>English</b> rock band &amp; more.</p>'),
-      'Radiohead are an English rock band & more.'
+      plainText('<p>Glasswing are an <b>English</b> rock band &amp; more.</p>'),
+      'Glasswing are an English rock band & more.'
     );
     const { client } = stubbed({
       [`/artist/${ARTIST}/wikipedia-extract`]: {

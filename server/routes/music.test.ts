@@ -61,9 +61,9 @@ import sharp from 'sharp';
 setupTestDb();
 
 const IDS = MUSIC_FIXTURE_IDS;
-const UNKNOWN_ARTIST = '0383dadf-2a4e-4d10-a46a-e9e041da8eb3';
-const FANART = `https://assets.fanart.tv/fanart/music/${IDS.artist}/artistthumb/radiohead-5.jpg`;
-const BACKDROP = `https://assets.fanart.tv/fanart/music/${IDS.artist}/artistbackground/radiohead-6.jpg`;
+const UNKNOWN_ARTIST = '5c72e1b9-4f3d-4a86-b917-d2a8f60c3e51';
+const FANART = `https://assets.fanart.tv/fanart/music/${IDS.artist}/artistthumb/glasswing-5.jpg`;
+const BACKDROP = `https://assets.fanart.tv/fanart/music/${IDS.artist}/artistbackground/glasswing-6.jpg`;
 
 // The fake Lidarr: its artist lookup, and how often it was asked.
 let lookups: string[] = [];
@@ -84,7 +84,7 @@ const lidarr = http.createServer((req, res) => {
       JSON.stringify([
         {
           id: 0,
-          artistName: 'Radiohead',
+          artistName: 'Glasswing',
           foreignArtistId: mbid,
           images: lookupImages,
         },
@@ -150,8 +150,8 @@ const get = async (pathname: string) => {
 
 const artist: MbArtist = {
   id: IDS.artist,
-  name: 'Radiohead',
-  'sort-name': 'Radiohead',
+  name: 'Glasswing',
+  'sort-name': 'Glasswing',
   type: 'Group',
   country: 'GB',
   area: { id: 'x', name: 'United Kingdom' },
@@ -163,7 +163,7 @@ const artist: MbArtist = {
   relations: [
     {
       type: 'official homepage',
-      url: { resource: 'https://www.radiohead.com/' },
+      url: { resource: 'https://www.glasswing.com/' },
     },
     { type: 'lyrics', url: { resource: 'https://lyrics.example/rh' } },
     { type: 'wikipedia', url: { resource: 'http://insecure.example/' } },
@@ -178,15 +178,15 @@ const album = (id: string, title: string, date: string): MbReleaseGroup => ({
   'first-release-date': date,
   'artist-credit': [
     {
-      name: 'Radiohead',
+      name: 'Glasswing',
       joinphrase: '',
-      artist: { id: IDS.artist, name: 'Radiohead' },
+      artist: { id: IDS.artist, name: 'Glasswing' },
     },
   ],
 });
 
 /*
- * A search for "Thriller", shaped like a real MusicBrainz answer observed
+ * A search for "Moonlurker", shaped like a real MusicBrainz answer observed
  * on 2026-10-19 (release-group search, limit 100): 338 results in all, the
  * first 98 of them exact titles that all score 100, in no useful order,
  * then weaker matches scoring 85. The first five, and the four albums
@@ -195,19 +195,19 @@ const album = (id: string, title: string, date: string): MbReleaseGroup => ({
  * small acts' albums and singles it listed (their ids are made up, their
  * release counts 1 or 2 as theirs were). The artists are made up.
  */
-const THRILLER = {
-  /** Michael Jackson's album: 98th, with 85 releases. */
-  album: 'f32fab67-77dd-3937-addc-9062e28e4c37',
+const MOONLURKER = {
+  /** Marcus Delray's album: 98th, with 85 releases. */
+  album: '9d2c7e15-3b84-3f0a-a6d1-2e8b5c4f9037',
   /** His single: about 82nd, with 7. */
-  single: '3a7817b5-22cb-32c3-a31b-2c8309fbf92e',
-  /** Augustus Pablo's album: about 56th, with 7. */
-  pablo: 'ac52cdf1-81a9-405f-974b-987fea6d3995',
-  /** Killer's album: about 69th, with 4. */
-  killer: '7c943020-eede-4e54-8841-000d670b8d11',
+  single: '6b18d4e2-7f05-3c91-b2e7-8a4c1d6f30b9',
+  /** Octavius Ruiz's album: about 56th, with 7. */
+  ruiz: '2e7d9a41-c63b-4f18-8d25-b1a0f9e3c742',
+  /** Wrecker's album: about 69th, with 4. */
+  wrecker: '8a1f6c37-d290-4b5e-9c73-000e4a2b6f18',
 };
-const THRILLER_TOTAL = 338;
+const MOONLURKER_TOTAL = 338;
 
-const thrillerBand = (n: number) =>
+const moonlurkerBand = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const madeUp = (n: number) =>
   `00000000-0000-4000-9000-${String(n).padStart(12, '0')}`;
@@ -245,38 +245,38 @@ const releaseGroup = (
 
 /** One of the small acts' exact matches, numbered from 0. */
 const smallMatch = (n: number, score = 100) =>
-  releaseGroup(madeUp(n), 'Thriller', `Small act ${n}`, {
+  releaseGroup(madeUp(n), 'Moonlurker', `Small act ${n}`, {
     score,
     count: 1 + (n % 2),
     type: ['Album', 'Single', 'EP'][n % 3],
   });
 
 /** The first page of the real answer, as above. */
-const thrillerAlbums = () => {
+const moonlurkerAlbums = () => {
   const named: Record<number, MbReleaseGroup> = {
-    1: releaseGroup(madeUp(9001), 'Thriller!', 'Cold Blood'),
-    2: releaseGroup(madeUp(9002), 'Thriller', 'Swoop'),
-    3: releaseGroup(madeUp(9003), 'Thriller', 'Eddie and the Hot Rods', {
+    1: releaseGroup(madeUp(9001), 'Moonlurker!', 'Warm Ashes'),
+    2: releaseGroup(madeUp(9002), 'Moonlurker', 'Plummet'),
+    3: releaseGroup(madeUp(9003), 'Moonlurker', 'Ronnie and the Fast Kites', {
       count: 2,
     }),
-    4: releaseGroup(madeUp(9004), 'Thriller', 'Part Chimp', { count: 2 }),
-    5: releaseGroup(madeUp(9005), 'Thriller', 'Brown Betty'),
-    56: releaseGroup(THRILLER.pablo, 'Thriller', 'Augustus Pablo', {
+    4: releaseGroup(madeUp(9004), 'Moonlurker', 'Half Lemur', { count: 2 }),
+    5: releaseGroup(madeUp(9005), 'Moonlurker', 'Rust Matilda'),
+    56: releaseGroup(MOONLURKER.ruiz, 'Moonlurker', 'Octavius Ruiz', {
       count: 7,
     }),
-    69: releaseGroup(THRILLER.killer, 'Thriller', 'Killer', { count: 4 }),
-    82: releaseGroup(THRILLER.single, 'Thriller', 'Michael Jackson', {
+    69: releaseGroup(MOONLURKER.wrecker, 'Moonlurker', 'Wrecker', { count: 4 }),
+    82: releaseGroup(MOONLURKER.single, 'Moonlurker', 'Marcus Delray', {
       count: 7,
       type: 'Single',
     }),
-    98: releaseGroup(THRILLER.album, 'Thriller', 'Michael Jackson', {
+    98: releaseGroup(MOONLURKER.album, 'Moonlurker', 'Marcus Delray', {
       count: 85,
       date: '1982-11-30',
     }),
-    99: releaseGroup(madeUp(9099), 'Bad Thriller', 'Small act 99', {
+    99: releaseGroup(madeUp(9099), 'Bad Moonlurker', 'Small act 99', {
       score: 85,
     }),
-    100: releaseGroup(madeUp(9100), 'Gold Thriller', 'Small act 100', {
+    100: releaseGroup(madeUp(9100), 'Gold Moonlurker', 'Small act 100', {
       score: 85,
     }),
   };
@@ -284,35 +284,35 @@ const thrillerAlbums = () => {
     { length: 100 },
     (_, i) => named[i + 1] ?? smallMatch(i)
   );
-  return { count: THRILLER_TOTAL, offset: 0, 'release-groups': groups };
+  return { count: MOONLURKER_TOTAL, offset: 0, 'release-groups': groups };
 };
 
 /**
  * The same search had there been more exact matches: the first page all
- * ties without Michael Jackson's album, which is 20th on the second page,
+ * ties without Marcus Delray's album, which is 20th on the second page,
  * and that page ends on weaker matches.
  */
-const thrillerAlbumsAt = (offset: number) => {
+const moonlurkerAlbumsAt = (offset: number) => {
   const groups =
     offset === 0
       ? Array.from({ length: 100 }, (_, i) => smallMatch(i))
       : Array.from({ length: 100 }, (_, i) =>
           i === 19
-            ? releaseGroup(THRILLER.album, 'Thriller', 'Michael Jackson', {
+            ? releaseGroup(MOONLURKER.album, 'Moonlurker', 'Marcus Delray', {
                 count: 85,
                 date: '1982-11-30',
               })
             : smallMatch(offset + i, i < 60 ? 100 : 85)
         );
-  return { count: THRILLER_TOTAL, offset, 'release-groups': groups };
+  return { count: MOONLURKER_TOTAL, offset, 'release-groups': groups };
 };
 
-const thrillerArtists = () => ({
+const moonlurkerArtists = () => ({
   count: 25,
   offset: 0,
   artists: Array.from({ length: 25 }, (_, n) => ({
-    id: thrillerBand(n),
-    name: 'Thriller',
+    id: moonlurkerBand(n),
+    name: 'Moonlurker',
     score: 100,
     tags: n === 7 ? [{ name: 'hard rock', count: 2 }] : [],
   })),
@@ -324,7 +324,7 @@ const thrillerArtists = () => ({
  */
 const mirrorAnswering = (
   albumsAt: (offset: number) => unknown,
-  artists: () => unknown = thrillerArtists
+  artists: () => unknown = moonlurkerArtists
 ) => {
   getSettings().music = {
     ...musicDefaults(),
@@ -450,7 +450,7 @@ afterEach(() => {
 describe('when music is there', () => {
   it('is not, before a default Lidarr is set up', async () => {
     getSettings().lidarr = [{ ...lidarrServer(), isDefault: false }];
-    const { status, body } = await get('/music/search?query=radiohead');
+    const { status, body } = await get('/music/search?query=glasswing');
     assert.equal(status, 404);
     assert.match((body as { message: string }).message, /not set up/);
   });
@@ -492,10 +492,12 @@ describe('search', () => {
     mock.method(MusicBrainz.prototype, 'searchReleaseGroups', async () => ({
       count: 1,
       offset: 0,
-      'release-groups': [album(IDS.album, 'Hail to the Thief', '2003-06-09')],
+      'release-groups': [
+        album(IDS.album, 'Sing to the Ferryman', '2003-06-09'),
+      ],
     }));
 
-    const { status, body } = await get('/music/search?query=radiohead');
+    const { status, body } = await get('/music/search?query=glasswing');
     assert.equal(status, 200);
     const { artists, albums } = body as {
       artists: { id: string; status?: number; mediaType: string }[];
@@ -514,13 +516,13 @@ describe('search', () => {
       ]
     );
     assert.equal(albums[0].status, MediaStatus.AVAILABLE);
-    assert.equal(albums[0].artistName, 'Radiohead');
+    assert.equal(albums[0].artistName, 'Glasswing');
     assert.equal(
       albums[0].coverUrl,
       `https://coverartarchive.org/release-group/${IDS.album}/front-500`
     );
     assert.deepEqual(searchArtists.mock.calls[0].arguments.slice(0, 2), [
-      'radiohead',
+      'glasswing',
       { limit: 25, offset: 0 },
     ]);
   });
@@ -545,7 +547,7 @@ describe('search', () => {
       'searchReleaseGroups',
       async () => ({ count: 0, offset: 0, 'release-groups': [] })
     );
-    assert.equal((await get('/music/search?query=radiohead')).status, 200);
+    assert.equal((await get('/music/search?query=glasswing')).status, 200);
     // More are asked for than shown, so the best can be picked from them.
     assert.deepEqual(searchArtists.mock.calls[0].arguments[1], {
       limit: 25,
@@ -558,24 +560,24 @@ describe('search', () => {
   });
 
   it('shows the album you most likely mean first, from many more asked for', async () => {
-    const { requests } = mirrorAnswering(thrillerAlbums);
-    const { status, body } = await get('/music/search?query=Thriller');
+    const { requests } = mirrorAnswering(moonlurkerAlbums);
+    const { status, body } = await get('/music/search?query=Moonlurker');
     assert.equal(status, 200);
     const { artists, albums } = body as {
       artists: { id: string }[];
       albums: { id: string; artistName: string; primaryType: string }[];
     };
     assert.equal(albums.length, 12);
-    // As ranked from the real answer: Michael Jackson's album (85
-    // releases), Augustus Pablo's and his single (7 each, the album
-    // first), then Killer's (4).
+    // As ranked from the real answer: Marcus Delray's album (85
+    // releases), Octavius Ruiz's and his single (7 each, the album
+    // first), then Wrecker's (4).
     assert.deepEqual(
       albums.slice(0, 4).map((a) => [a.id, a.artistName, a.primaryType]),
       [
-        [THRILLER.album, 'Michael Jackson', 'Album'],
-        [THRILLER.pablo, 'Augustus Pablo', 'Album'],
-        [THRILLER.single, 'Michael Jackson', 'Single'],
-        [THRILLER.killer, 'Killer', 'Album'],
+        [MOONLURKER.album, 'Marcus Delray', 'Album'],
+        [MOONLURKER.ruiz, 'Octavius Ruiz', 'Album'],
+        [MOONLURKER.single, 'Marcus Delray', 'Single'],
+        [MOONLURKER.wrecker, 'Wrecker', 'Album'],
       ]
     );
     // The weaker matches come after every exact one.
@@ -589,17 +591,17 @@ describe('search', () => {
     // The band with the most tags first, then MusicBrainz's order.
     assert.deepEqual(
       artists.slice(0, 3).map((a) => a.id),
-      [thrillerBand(7), thrillerBand(0), thrillerBand(1)]
+      [moonlurkerBand(7), moonlurkerBand(0), moonlurkerBand(1)]
     );
   });
 
   it('looks on the next page while the results are still tied', async () => {
-    const { requests } = mirrorAnswering(thrillerAlbumsAt);
-    const { status, body } = await get('/music/search?query=Thriller');
+    const { requests } = mirrorAnswering(moonlurkerAlbumsAt);
+    const { status, body } = await get('/music/search?query=Moonlurker');
     assert.equal(status, 200);
     assert.equal(
       (body as { albums: { id: string }[] }).albums[0].id,
-      THRILLER.album
+      MOONLURKER.album
     );
     // The second page ends below the top score, so there is no third,
     // though MusicBrainz has more.
@@ -610,15 +612,15 @@ describe('search', () => {
   });
 
   it('asks MusicBrainz once for a search made twice', async () => {
-    const { requests } = mirrorAnswering(thrillerAlbumsAt);
-    for (const query of ['Thriller', ' thriller ']) {
+    const { requests } = mirrorAnswering(moonlurkerAlbumsAt);
+    for (const query of ['Moonlurker', ' moonlurker ']) {
       const { status, body } = await get(
         `/music/search?query=${encodeURIComponent(query)}`
       );
       assert.equal(status, 200);
       assert.equal(
         (body as { albums: { id: string }[] }).albums[0].id,
-        THRILLER.album
+        MOONLURKER.album
       );
     }
     assert.deepEqual(requests().sort(), [
@@ -643,7 +645,7 @@ describe('search', () => {
     for (const inAll of [false, true]) {
       getSettings().music.search = { inAll };
       assert.equal(
-        (await get('/music/search?query=radiohead')).status,
+        (await get('/music/search?query=glasswing')).status,
         200,
         String(inAll)
       );
@@ -655,7 +657,7 @@ describe('search', () => {
     actingAs = Object.assign(new User(), friend, {
       settings: { disabledFeatures: ['music'] },
     });
-    assert.equal((await get('/music/search?query=radiohead')).status, 403);
+    assert.equal((await get('/music/search?query=glasswing')).status, 403);
   });
 
   it('says MusicBrainz is busy rather than keep someone waiting', async () => {
@@ -667,7 +669,7 @@ describe('search', () => {
       offset: 0,
       'release-groups': [],
     }));
-    const { status, body } = await get('/music/search?query=radiohead');
+    const { status, body } = await get('/music/search?query=glasswing');
     assert.equal(status, 503);
     assert.match((body as { message: string }).message, /busy/);
   });
@@ -686,7 +688,7 @@ describe('an artist', () => {
     mock.method(
       MusicBrainz.prototype,
       'getWikipediaExtract',
-      async () => 'Radiohead are an English rock band.'
+      async () => 'Glasswing are an English rock band.'
     );
   });
 
@@ -694,12 +696,12 @@ describe('an artist', () => {
     const { status, body } = await get(`/music/artist/${IDS.artist}`);
     assert.equal(status, 200);
     const details = body as Record<string, unknown>;
-    assert.equal(details.name, 'Radiohead');
-    assert.equal(details.biography, 'Radiohead are an English rock band.');
+    assert.equal(details.name, 'Glasswing');
+    assert.equal(details.biography, 'Glasswing are an English rock band.');
     assert.deepEqual(details.genres, ['alternative rock', 'rock']);
     // Only https links of the kinds people follow.
     assert.deepEqual(details.links, [
-      { kind: 'official homepage', url: 'https://www.radiohead.com/' },
+      { kind: 'official homepage', url: 'https://www.glasswing.com/' },
     ]);
     assert.equal(details.area, 'United Kingdom');
     assert.equal(details.mediaInfo, undefined);
@@ -762,8 +764,8 @@ describe('an artist', () => {
         'release-group-count': 150,
         'release-group-offset': 100,
         'release-groups': [
-          album(IDS.album, 'Hail to the Thief', '2003-06-09'),
-          album(IDS.otherAlbum, 'OK Computer', '1997-05-21'),
+          album(IDS.album, 'Sing to the Ferryman', '2003-06-09'),
+          album(IDS.otherAlbum, 'Static Garden', '1997-05-21'),
         ],
       })
     );
@@ -797,14 +799,14 @@ describe('an artist’s picture', () => {
     assert.equal(first.status, 302);
     assert.equal(
       first.res.headers.get('location'),
-      `/imageproxy/fanart/fanart/music/${IDS.artist}/artistthumb/radiohead-5.jpg`
+      `/imageproxy/fanart/fanart/music/${IDS.artist}/artistthumb/glasswing-5.jpg`
     );
     const backdrop = await get(
       `/music/artist/${IDS.artist}/image?kind=backdrop`
     );
     assert.equal(
       backdrop.res.headers.get('location'),
-      `/imageproxy/fanart/fanart/music/${IDS.artist}/artistbackground/radiohead-6.jpg`
+      `/imageproxy/fanart/fanart/music/${IDS.artist}/artistbackground/glasswing-6.jpg`
     );
     assert.deepEqual(lookups, [`lidarr:${IDS.artist}`], 'asked Lidarr once');
   });
@@ -840,8 +842,8 @@ describe('an artist’s picture', () => {
           'release-group-count': 2,
           'release-group-offset': 0,
           'release-groups': [
-            album(IDS.otherAlbum, 'OK Computer', '1997-05-21'),
-            album(IDS.album, 'Hail to the Thief', '2003-06-09'),
+            album(IDS.otherAlbum, 'Static Garden', '1997-05-21'),
+            album(IDS.album, 'Sing to the Ferryman', '2003-06-09'),
           ],
         }),
         fetchedAt: new Date(),
@@ -899,8 +901,8 @@ describe('an artist’s picture, from the image proxy', () => {
     );
     assert.equal(again.status, 304);
     assert.deepEqual(fetchedPictures, [
-      `/fanart/music/${IDS.artist}/artistthumb/radiohead-5.jpg`,
-      `/fanart/music/${IDS.artist}/artistbackground/radiohead-6.jpg`,
+      `/fanart/music/${IDS.artist}/artistthumb/glasswing-5.jpg`,
+      `/fanart/music/${IDS.artist}/artistbackground/glasswing-6.jpg`,
     ]);
     assert.deepEqual(lookups, [`lidarr:${IDS.artist}`], 'asked Lidarr once');
   });
@@ -924,7 +926,7 @@ describe('an artist’s picture, from the image proxy', () => {
 
   it('is only a MusicBrainz id, with or without the backdrop', async () => {
     for (const address of [
-      'radiohead',
+      'glasswing',
       `${IDS.artist}/photo`,
       `${IDS.artist}/backdrop/x`,
       `${IDS.artist}?w=480`,
@@ -939,7 +941,7 @@ describe('an album', () => {
   it('is shown with its status and its artist’s record here', async () => {
     await seedMusicFixtures();
     mock.method(MusicBrainz.prototype, 'getReleaseGroup', async () => ({
-      ...album(IDS.otherAlbum, 'OK Computer', '1997-05-21'),
+      ...album(IDS.otherAlbum, 'Static Garden', '1997-05-21'),
       genres: [{ name: 'art rock', count: 4 }],
     }));
     const { status, body } = await get(`/music/album/${IDS.otherAlbum}`);
@@ -952,7 +954,7 @@ describe('an album', () => {
       genres: string[];
       mediaInfo: { id: number; requests: unknown[] };
     };
-    assert.equal(details.title, 'OK Computer');
+    assert.equal(details.title, 'Static Garden');
     assert.equal(details.status, MediaStatus.PROCESSING);
     assert.equal(details.artistId, IDS.artist);
     assert.deepEqual(details.genres, ['art rock']);
@@ -984,7 +986,7 @@ describe('an album', () => {
     ];
     try {
       mock.method(MusicBrainz.prototype, 'getReleaseGroup', async () =>
-        album(IDS.album, 'Hail to the Thief', '2003-06-09')
+        album(IDS.album, 'Sing to the Ferryman', '2003-06-09')
       );
       const { status, body } = await get(`/music/album/${IDS.album}`);
       assert.equal(status, 200);
@@ -1021,7 +1023,7 @@ describe('an album', () => {
   it('is being added to the library while Lidarr has files no server lists', async () => {
     await seedMusicFixtures();
     mock.method(MusicBrainz.prototype, 'getReleaseGroup', async () =>
-      album(IDS.otherAlbum, 'OK Computer', '1997-05-21')
+      album(IDS.otherAlbum, 'Static Garden', '1997-05-21')
     );
     const settings = getSettings();
     const saved = {
@@ -1063,14 +1065,14 @@ describe('an album', () => {
             id: 't1',
             position: 1,
             number: '1',
-            title: '2 + 2 = 5',
+            title: '3 + 3 = 7',
             length: 199000,
           },
           {
             id: 't2',
             position: 2,
             number: '2',
-            title: 'Sit Down. Stand Up.',
+            title: 'Lie Down. Get Up.',
             recording: { id: 'r', title: 'x', length: 259000 },
           },
         ],
@@ -1079,12 +1081,12 @@ describe('an album', () => {
     const { status, body } = await get(`/music/album/${IDS.album}/tracks`);
     assert.equal(status, 200);
     assert.deepEqual((body as { tracks: unknown[] }).tracks, [
-      { disc: 1, position: 1, number: '1', title: '2 + 2 = 5', length: 199000 },
+      { disc: 1, position: 1, number: '1', title: '3 + 3 = 7', length: 199000 },
       {
         disc: 1,
         position: 2,
         number: '2',
-        title: 'Sit Down. Stand Up.',
+        title: 'Lie Down. Get Up.',
         length: 259000,
       },
     ]);
@@ -1141,10 +1143,10 @@ describe('Discover’s music rows', () => {
         release_groups: [
           {
             artist_mbids: [IDS.artist],
-            artist_name: 'Radiohead',
+            artist_name: 'Glasswing',
             listen_count: 10,
             release_group_mbid: IDS.album,
-            release_group_name: 'Hail to the Thief',
+            release_group_name: 'Sing to the Ferryman',
           },
           {
             artist_mbids: [],
@@ -1165,7 +1167,7 @@ describe('Discover’s music rows', () => {
         artists: [
           {
             artist_mbid: IDS.artist,
-            artist_name: 'Radiohead',
+            artist_name: 'Glasswing',
             listen_count: 9,
           },
         ],
@@ -1185,7 +1187,7 @@ describe('Discover’s music rows', () => {
       {
         mediaType: 'artist',
         id: IDS.artist,
-        name: 'Radiohead',
+        name: 'Glasswing',
         status: MediaStatus.PARTIALLY_AVAILABLE,
       },
     ]);
@@ -1203,7 +1205,7 @@ describe('Discover’s music rows', () => {
   it('show what the media servers added most recently', async () => {
     const { artist } = await seedMusicFixtures();
     // The artist's name, as the music scans keep it.
-    await getRepository(Media).update(artist.id, { foreignTitle: 'Radiohead' });
+    await getRepository(Media).update(artist.id, { foreignTitle: 'Glasswing' });
     const { status, body } = await get('/discover/music/recently-added');
     assert.equal(status, 200);
     // Only albums that are here and known to MusicBrainz.
@@ -1218,7 +1220,7 @@ describe('Discover’s music rows', () => {
           }[];
         }
       ).results.map((a) => [a.id, a.artistId, a.artistName, a.title]),
-      [[IDS.album, IDS.artist, 'Radiohead', 'Hail to the Thief']]
+      [[IDS.album, IDS.artist, 'Glasswing', 'Sing to the Ferryman']]
     );
   });
 

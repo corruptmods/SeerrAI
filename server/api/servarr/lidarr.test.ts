@@ -10,8 +10,8 @@ import { afterEach, describe, it, mock } from 'node:test';
  * to monitor exactly what was asked for.
  */
 
-const ARTIST_MBID = 'a74b1b7f-71a5-4011-9441-d0b5e4122711';
-const ALBUM_MBID = 'b1392450-e666-3926-a536-22c65f834433';
+const ARTIST_MBID = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
+const ALBUM_MBID = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
 
 const buildLidarr = () =>
   new LidarrAPI({ url: 'http://localhost:8686/api/v1', apiKey: 'test' });
@@ -21,7 +21,7 @@ const getAxios = (lidarr: LidarrAPI): AxiosInstance =>
 
 const artist: LidarrArtist = {
   id: 0,
-  artistName: 'Radiohead',
+  artistName: 'Glasswing',
   foreignArtistId: ARTIST_MBID,
   monitored: false,
   qualityProfileId: 0,
@@ -31,7 +31,7 @@ const artist: LidarrArtist = {
 
 const album: LidarrAlbum = {
   id: 0,
-  title: 'OK Computer',
+  title: 'Static Garden',
   foreignAlbumId: ALBUM_MBID,
   artistId: 0,
   monitored: false,
@@ -63,9 +63,12 @@ describe('LidarrAPI', () => {
 
     assert.equal(
       (await lidarr.lookupArtist(ARTIST_MBID))?.artistName,
-      'Radiohead'
+      'Glasswing'
     );
-    assert.equal((await lidarr.lookupAlbum(ALBUM_MBID))?.title, 'OK Computer');
+    assert.equal(
+      (await lidarr.lookupAlbum(ALBUM_MBID))?.title,
+      'Static Garden'
+    );
     assert.deepEqual(get.mock.calls[0].arguments, [
       '/artist/lookup',
       { params: { term: `lidarr:${ARTIST_MBID}` } },

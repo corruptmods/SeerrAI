@@ -602,8 +602,8 @@ describe('watch lists', () => {
 
       it('reads the titles on a pasted Trakt list', async () => {
         traktTitles = [
-          { type: 'movie', title: 'The Matrix', year: 1999, tmdbId: 603 },
-          { type: 'show', title: 'Severance', year: 2022, tmdbId: 95396 },
+          { type: 'movie', title: 'The Mazewright', year: 1999, tmdbId: 603 },
+          { type: 'show', title: 'Lumenward', year: 2022, tmdbId: 86247 },
           { type: 'movie', title: 'Unmatched', year: 2001 },
         ];
         const { status, body } = await call<{
@@ -619,8 +619,8 @@ describe('watch lists', () => {
         assert.deepEqual(
           body.titles.map((t) => [t.mediaType, t.tmdbId ?? null, t.title]),
           [
-            ['movie', 603, 'The Matrix'],
-            ['tv', 95396, 'Severance'],
+            ['movie', 603, 'The Mazewright'],
+            ['tv', 86247, 'Lumenward'],
             ['movie', null, 'Unmatched'],
           ]
         );
@@ -685,10 +685,10 @@ describe('watch lists', () => {
             {
               tmdbId: 603,
               mediaType: 'movie',
-              title: 'The Matrix',
+              title: 'The Mazewright',
               year: 1999,
             },
-            { tmdbId: 95396, mediaType: 'tv', title: 'Severance' },
+            { tmdbId: 86247, mediaType: 'tv', title: 'Lumenward' },
             { mediaType: 'movie', title: 'Unmatched', year: 2001 },
           ],
         });
@@ -700,10 +700,10 @@ describe('watch lists', () => {
           ]),
           [[603, 'movie', '/m603.jpg']]
         );
-        assert.equal(body.results[0].raw, 'The Matrix (1999)');
+        assert.equal(body.results[0].raw, 'The Mazewright (1999)');
         assert.deepEqual(
           body.results[1].candidates.map((c) => [c.tmdbId, c.mediaType]),
-          [[95396, 'tv']]
+          [[86247, 'tv']]
         );
         // No id: searched by name, as a written line is.
         assert.equal(body.results[2].candidates[0].tmdbId, 7001);
@@ -733,11 +733,11 @@ describe('watch lists', () => {
         {
           text: [
             'Movies:',
-            '- The Matrix (1999)',
-            '• Practical Magic',
-            '[x] Person of Interest',
-            'Insidious — with Jordan',
-            '- The Matrix (1999)',
+            '- The Mazewright (1999)',
+            '• Practical Alchemy',
+            '[x] Matter of Record',
+            'Vesperline — with Jordan',
+            '- The Mazewright (1999)',
           ].join('\n'),
         }
       );
@@ -752,7 +752,7 @@ describe('watch lists', () => {
           candidates: { mediaType: string; partCount?: number }[];
         }[];
       }>('POST', '/api/v1/list/import/search', {
-        text: 'Pitch Perfect series',
+        text: 'Harmony Lane series',
       });
 
       const line = body.results[0];

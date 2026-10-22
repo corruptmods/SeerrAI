@@ -36,7 +36,7 @@ const record = (
     episodeNumber: episode,
     absoluteEpisodeNumber: 0,
   },
-  title: `Carrie.S01E0${episode}.1080p.HEVC.x265-MeGusta`,
+  title: `Wrenna.S01E0${episode}.1080p.HEVC.x265-LeSigh`,
   size: 500,
   sizeleft,
   timeleft: '00:00:00',

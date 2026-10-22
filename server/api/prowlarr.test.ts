@@ -51,7 +51,7 @@ after(() => {
 
 const release = (over: Partial<ProwlarrRelease>): ProwlarrRelease => ({
   guid: 'https://indexer/1',
-  title: 'Expedition Unknown Season 5 Complete 720p WEB x264 [i_c]',
+  title: 'Wayfarer Ledger Season 5 Complete 720p WEB x264 [q_z]',
   size: 1,
   indexerId: 46,
   indexer: 'ExtraTorrent.st',
@@ -88,7 +88,7 @@ describe('Fetching a result through Prowlarr', () => {
     assert.equal(fetched.kind, 'magnet');
     assert.match(
       (fetched as { uri: string }).uri,
-      /^magnet:\?xt=urn:btih:7ea162cd6756dd883e69ce57085648ecd035dae3&dn=Expedition/
+      /^magnet:\?xt=urn:btih:7ea162cd6756dd883e69ce57085648ecd035dae3&dn=Wayfarer/
     );
   });
 

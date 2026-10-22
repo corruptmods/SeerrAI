@@ -27,8 +27,8 @@ import path from 'node:path';
  * problem says which server it is on.
  *
  * The media server matches by folder and file names, Sonarr and Radarr by
- * their own ids, and when the two disagree nothing says so: "Carrie" (2026)
- * matched to "The Carrie Diaries" made the wrong title available in Seerr,
+ * their own ids, and when the two disagree nothing says so: "Wrenna" (2026)
+ * matched to "The Wrenna Diaries" made the wrong title available in Seerr,
  * left the right one without check marks, and showed the other show's
  * subtitles. Each item's folder is looked up in Sonarr or Radarr by its
  * name, and their ids compared. Report only: nothing is changed; the fix

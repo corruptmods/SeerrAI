@@ -97,11 +97,11 @@ stub('searchMovies', async ({ query }: { query: string }) => ({
   total_pages: 1,
   total_results: 1,
   results:
-    query === 'Groundhog Day'
+    query === 'Hedgehog Morning'
       ? [
           {
             id: 137,
-            title: 'Groundhog Day',
+            title: 'Hedgehog Morning',
             release_date: '1993-02-11',
             media_type: 'movie',
             genre_ids: [],
@@ -111,7 +111,7 @@ stub('searchMovies', async ({ query }: { query: string }) => ({
             vote_count: 1,
             adult: false,
             original_language: 'en',
-            original_title: 'Groundhog Day',
+            original_title: 'Hedgehog Morning',
             video: false,
           },
         ]
@@ -435,7 +435,7 @@ describe('who gets the AI features', () => {
 describe('the AI chat', () => {
   it('turns a description into real titles with their status', async () => {
     answers = [
-      '```json\n{"r":"Sounds like this one.","titles":[{"t":"Groundhog Day","y":1993,"k":"movie"},{"t":"Made Up Film","y":2001,"k":"movie"}]}\n```',
+      '```json\n{"r":"Sounds like this one.","titles":[{"t":"Hedgehog Morning","y":1993,"k":"movie"},{"t":"Made Up Film","y":2001,"k":"movie"}]}\n```',
     ];
     const { status, body } = await call<{
       reply: string;
@@ -469,7 +469,7 @@ describe('the AI chat', () => {
 
     it('finds the titles in a picture sent on its own', async () => {
       answers = [
-        '{"r":"That poster is Groundhog Day.","titles":[{"t":"Groundhog Day","y":1993,"k":"movie"}]}',
+        '{"r":"That poster is Hedgehog Morning.","titles":[{"t":"Hedgehog Morning","y":1993,"k":"movie"}]}',
       ];
       const { status, body } = await call<{
         reply: string;
@@ -529,7 +529,7 @@ describe('the AI chat', () => {
 
   it('answers the same question again from memory, at no cost', async () => {
     getSettings().ai.dailyLimit = 1;
-    answers = ['{"r":"","titles":[{"t":"Groundhog Day","k":"movie"}]}'];
+    answers = ['{"r":"","titles":[{"t":"Hedgehog Morning","k":"movie"}]}'];
     const first = await call('POST', '/api/v1/ai/chat', {
       message: 'same day',
     });
@@ -542,7 +542,7 @@ describe('the AI chat', () => {
   });
 
   it('asks once more when the answer is not readable, then gives up', async () => {
-    answers = ['I think Groundhog Day', '{"r":"ok","titles":[]}'];
+    answers = ['I think Hedgehog Morning', '{"r":"ok","titles":[]}'];
     const ok = await call('POST', '/api/v1/ai/chat', { message: 'one' });
     assert.equal(ok.status, 200);
     assert.equal(calls.length, 2);
@@ -557,7 +557,7 @@ describe('the AI chat', () => {
 
   it('knows what it said, and never shows an offered title again', async () => {
     answers = [
-      '{"r":"More like that:","titles":[{"t":"Groundhog Day","y":1993,"k":"movie"}]}',
+      '{"r":"More like that:","titles":[{"t":"Hedgehog Morning","y":1993,"k":"movie"}]}',
     ];
     const { status, body } = await call<{
       reply: string;
@@ -568,13 +568,13 @@ describe('the AI chat', () => {
         {
           ask: 'a film about a repeating day',
           reply: 'Want more like these?',
-          offered: ['Groundhog Day (1993)'],
+          offered: ['Hedgehog Morning (1993)'],
         },
       ],
     });
     assert.equal(status, 200);
     assert.match(calls[0].prompt, /You: Want more like these\?/);
-    assert.match(calls[0].prompt, /Already offered: Groundhog Day \(1993\)/);
+    assert.match(calls[0].prompt, /Already offered: Hedgehog Morning \(1993\)/);
     // The model repeated itself; the person does not see it, or a "more
     // like that" with nothing under it.
     assert.deepEqual(body.results, []);
@@ -608,7 +608,7 @@ describe('the AI chat', () => {
       action?: { do: string; earlier: boolean };
     }>('POST', '/api/v1/ai/chat', {
       message: 'request all of those',
-      turns: [{ ask: 'films', offered: ['Groundhog Day (1993)'] }],
+      turns: [{ ask: 'films', offered: ['Hedgehog Morning (1993)'] }],
     });
     assert.equal(status, 200);
     assert.deepEqual(body.action, { do: 'request', earlier: true });
@@ -617,14 +617,14 @@ describe('the AI chat', () => {
 
   it('names a new list, and may list a title it offered before', async () => {
     answers = [
-      '{"r":"Here is a list.","titles":[{"t":"Groundhog Day","y":1993,"k":"movie"}],"do":"list","n":"Time loops"}',
+      '{"r":"Here is a list.","titles":[{"t":"Hedgehog Morning","y":1993,"k":"movie"}],"do":"list","n":"Time loops"}',
     ];
     const { body } = await call<{
       results: { id: number }[];
       action?: { do: string; name?: string; earlier: boolean };
     }>('POST', '/api/v1/ai/chat', {
       message: 'make me a list of time loop films',
-      turns: [{ ask: 'films', offered: ['Groundhog Day (1993)'] }],
+      turns: [{ ask: 'films', offered: ['Hedgehog Morning (1993)'] }],
     });
     assert.deepEqual(body.action, {
       do: 'list',
@@ -645,7 +645,7 @@ describe('the AI chat', () => {
     });
     actingAs = admin;
     answers = [
-      '{"r":"The admin agent is on it; nothing changes until you approve.","titles":[{"t":"Groundhog Day","y":1993,"k":"movie"}],"do":"admin"}',
+      '{"r":"The admin agent is on it; nothing changes until you approve.","titles":[{"t":"Hedgehog Morning","y":1993,"k":"movie"}],"do":"admin"}',
     ];
     const { status, body } = await call<{
       reply: string;
@@ -663,7 +663,7 @@ describe('the AI chat', () => {
     });
     assert.deepEqual(body.results, []);
     assert.deepEqual(asked, [
-      'the copy of this one is bad, delete it and block the group (The title: Groundhog Day (1993), a movie.)',
+      'the copy of this one is bad, delete it and block the group (The title: Hedgehog Morning (1993), a movie.)',
     ]);
     ask.mock.restore();
   });
@@ -671,7 +671,7 @@ describe('the AI chat', () => {
   it('never offers the admin agent to someone who is not an admin', async () => {
     const ask = mock.method(agent, 'ask', async () => ({ id: 1 }) as AgentRun);
     answers = [
-      '{"r":"Sure.","titles":[{"t":"Groundhog Day","y":1993,"k":"movie"}],"do":"admin"}',
+      '{"r":"Sure.","titles":[{"t":"Hedgehog Morning","y":1993,"k":"movie"}],"do":"admin"}',
     ];
     const { status, body } = await call<{ fix?: unknown }>(
       'POST',
@@ -719,8 +719,8 @@ describe('the AI chat', () => {
         total_pages: 1,
         total_results: 2,
         results: [
-          { id: 9, name: 'marvel comics' },
-          { id: 180547, name: 'marvel cinematic universe' },
+          { id: 9, name: 'halcyon comics' },
+          { id: 291658, name: 'halcyon comics universe' },
         ],
       }));
       const asked: { keywords?: string; page?: number }[] = [];
@@ -744,14 +744,14 @@ describe('the AI chat', () => {
         }
       );
       answers = [
-        '{"r":"Every Marvel Cinematic Universe film.","titles":[],"do":"list","src":{"k":"keyword","q":"Marvel Cinematic Universe"},"m":"movie"}',
+        '{"r":"Every Halcyon Comics Universe film.","titles":[],"do":"list","src":{"k":"keyword","q":"Halcyon Comics Universe"},"m":"movie"}',
       ];
       const { status, body } = await call<{
         results: { id: number }[];
         source: { name: string; more: boolean };
         action: { do: string; name: string };
       }>('POST', '/api/v1/ai/chat', {
-        message: 'add all marvel movies to a list',
+        message: 'add all halcyon movies to a list',
       });
 
       assert.equal(status, 200);
@@ -759,8 +759,8 @@ describe('the AI chat', () => {
       assert.deepEqual(
         asked.map((a) => [a.keywords, a.page]),
         [
-          ['180547', 1],
-          ['180547', 2],
+          ['291658', 1],
+          ['291658', 2],
         ]
       );
       assert.deepEqual(
@@ -768,12 +768,12 @@ describe('the AI chat', () => {
         [1, 2, 3]
       );
       assert.deepEqual(body.source, {
-        name: 'Marvel Cinematic Universe',
+        name: 'Halcyon Comics Universe',
         more: false,
       });
       assert.deepEqual(body.action, {
         do: 'list',
-        name: 'Marvel Cinematic Universe',
+        name: 'Halcyon Comics Universe',
         earlier: false,
       });
     });
@@ -815,7 +815,7 @@ describe('the AI chat', () => {
         results: [
           {
             id: 525,
-            name: 'Christopher Nolan',
+            name: 'Adrian Vell',
             popularity: 10,
             known_for_department: 'Directing',
           },
@@ -828,21 +828,21 @@ describe('the AI chat', () => {
           { ...movie(51, '2016-01-01'), character: 'A cameo' },
         ],
         crew: [
-          { ...movie(27205, '2010-07-15'), job: 'Director' },
-          { ...movie(157336, '2014-11-05'), job: 'Director' },
+          { ...movie(38416, '2010-07-15'), job: 'Director' },
+          { ...movie(268447, '2014-11-05'), job: 'Director' },
           { ...movie(60, '2013-01-01'), job: 'Producer' },
         ],
       }));
       answers = [
-        '{"r":"Nolan\'s films.","titles":[],"do":"request","src":{"k":"person","q":"Christopher Nolan","r":"director"},"m":"movie"}',
+        '{"r":"Vell\'s films.","titles":[],"do":"request","src":{"k":"person","q":"Adrian Vell","r":"director"},"m":"movie"}',
       ];
       const { body } = await call<{
         results: { id: number }[];
         action: { do: string };
-      }>('POST', '/api/v1/ai/chat', { message: 'request all nolan films' });
+      }>('POST', '/api/v1/ai/chat', { message: 'request all vell films' });
       assert.deepEqual(
         body.results.map((r) => r.id),
-        [27205, 157336]
+        [38416, 268447]
       );
       assert.equal(body.action.do, 'request');
     });
@@ -855,7 +855,7 @@ describe('the AI chat', () => {
         results: [
           {
             id: 525,
-            name: 'Christopher Nolan',
+            name: 'Adrian Vell',
             popularity: 10,
             known_for_department: 'Directing',
           },
@@ -864,25 +864,25 @@ describe('the AI chat', () => {
       stub('getPersonCombinedCredits', async () => ({
         id: 525,
         cast: [{ ...movie(51, '2016-01-01'), character: 'A cameo' }],
-        crew: [{ ...movie(27205, '2010-07-15'), job: 'Director' }],
+        crew: [{ ...movie(38416, '2010-07-15'), job: 'Director' }],
       }));
       for (const reply of [
         // Flat, as the instructions show.
-        '{"r":"Nolan.","titles":[],"do":"request","set":"director","of":"Christopher Nolan","m":"movie"}',
+        '{"r":"Vell.","titles":[],"do":"request","set":"director","of":"Adrian Vell","m":"movie"}',
         // Nested, with its own words for the fields.
-        '{"r":"Nolan.","titles":[],"do":"request","src":{"kind":"filmography","name":"Christopher Nolan","role":"directed"}}',
+        '{"r":"Vell.","titles":[],"do":"request","src":{"kind":"filmography","name":"Adrian Vell","role":"directed"}}',
         // The older shape.
-        '{"r":"Nolan.","titles":[],"do":"request","src":{"k":"person","q":"Christopher Nolan","r":"director"}}',
+        '{"r":"Vell.","titles":[],"do":"request","src":{"k":"person","q":"Adrian Vell","r":"director"}}',
       ]) {
         clearAiCache();
         answers = [reply];
         const { body } = await call<{
           results: { id: number }[];
           action?: { do: string };
-        }>('POST', '/api/v1/ai/chat', { message: 'request all nolan films' });
+        }>('POST', '/api/v1/ai/chat', { message: 'request all vell films' });
         assert.deepEqual(
           body.results.map((r) => r.id),
-          [27205],
+          [38416],
           reply
         );
         assert.equal(body.action?.do, 'request', reply);
@@ -986,7 +986,7 @@ describe('the AI chat', () => {
           // watching.
           play({
             media_type: 'episode',
-            grandparent_title: 'Survivor',
+            grandparent_title: 'Outlastia',
             date: now - 600,
             percent_complete: 40,
           }),
@@ -999,13 +999,13 @@ describe('the AI chat', () => {
           }),
           play({
             media_type: 'movie',
-            title: 'Groundhog Day',
+            title: 'Hedgehog Morning',
             year: 1993,
             date: now - 3 * day,
           }),
           play({
             media_type: 'episode',
-            grandparent_title: 'Survivor',
+            grandparent_title: 'Outlastia',
             date: now - 5 * day,
           }),
         ],
@@ -1022,20 +1022,20 @@ describe('the AI chat', () => {
     });
 
     it('sends it newest first, with when, so "just watched" means something', async () => {
-      answers = ['{"r":"You last watched Survivor, today.","titles":[]}'];
+      answers = ['{"r":"You last watched Outlastia, today.","titles":[]}'];
       await call('POST', '/api/v1/ai/chat', {
         message: 'what did I just watch?',
       });
       assert.match(
         calls[0].prompt,
-        /Watch history, newest first: Survivor \(series, today\); Groundhog Day \(1993, 3 days ago\)/
+        /Watch history, newest first: Outlastia \(series, today\); Hedgehog Morning \(1993, 3 days ago\)/
       );
       assert.doesNotMatch(calls[0].prompt, /Glanced At/);
     });
 
     it('still finds a title they watched when they describe it', async () => {
       answers = [
-        '{"r":"That is this one.","titles":[{"t":"Groundhog Day","y":1993,"k":"movie"}]}',
+        '{"r":"That is this one.","titles":[{"t":"Hedgehog Morning","y":1993,"k":"movie"}]}',
       ];
       const found = await call<{ results: { id: number }[] }>(
         'POST',

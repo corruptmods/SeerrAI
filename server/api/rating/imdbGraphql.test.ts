@@ -5,18 +5,18 @@ import { describe, it } from 'node:test';
 describe('IMDb ratings', () => {
   it('reads a series rating and its votes', () => {
     assert.deepEqual(
-      ratingFromResponse('tt9288030', {
+      ratingFromResponse('tt8399141', {
         data: {
           title: {
-            id: 'tt9288030',
-            titleText: { text: 'Reacher' },
+            id: 'tt8399141',
+            titleText: { text: 'Halvorsen' },
             ratingsSummary: { aggregateRating: 8, voteCount: 318451 },
           },
         },
       }),
       {
-        title: 'Reacher',
-        url: 'https://www.imdb.com/title/tt9288030',
+        title: 'Halvorsen',
+        url: 'https://www.imdb.com/title/tt8399141',
         criticsScore: 8,
         criticsScoreCount: 318451,
       }

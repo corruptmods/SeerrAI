@@ -7005,7 +7005,7 @@ paths:
                           type: string
                         group:
                           type: string
-                          enum: [services, requests, media, users]
+                          enum: [services, backfill, requests, media, users]
                         name:
                           type: string
                         status:
@@ -7044,6 +7044,40 @@ paths:
                         recentCount:
                           type: number
                           description: Match Check only. How many of `recent` the nightly list does not have too.
+                  activity:
+                    type: object
+                    description: What Download Check and the admin agent did in the last week, while Backfill is on. Each part is left out while it is off.
+                    properties:
+                      downloadCheck:
+                        type: object
+                        properties:
+                          mode:
+                            type: string
+                            enum: ['off', report, 'on']
+                          rejected:
+                            type: number
+                          imported:
+                            type: number
+                          cleared:
+                            type: number
+                          wouldHave:
+                            type: number
+                            description: What it would have done, in Report only
+                          failed:
+                            type: number
+                      agent:
+                        type: object
+                        properties:
+                          conversations:
+                            type: number
+                          downloads:
+                            type: number
+                          imported:
+                            type: number
+                          failed:
+                            type: number
+                          changes:
+                            type: number
   /settings/health/resources:
     get:
       summary: What Seerr's own container is using

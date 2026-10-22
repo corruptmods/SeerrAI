@@ -10,6 +10,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - **Fix this show with Siri**: say "Fix this show" or "Fix this movie" while something is playing, and say what's wrong. It's reported and fixed like an issue; anything that replaces files is asked about first. Set it up in Profile → Settings → Siri. ([guide](./docs/seerr-ai/siri.md))
 - **Admin agent: Stop, and corrections while it works.** Tell it something mid-run and it reads it before its next step; Stop ends it there, leaving what it started downloading.
 - **Understand Reports**: when a report's words don't say what to fix, the AI model works it out, if AI is set up. On issues, fixes that replace files are left for an admin.
+- **Backfill goes by episode titles.** A file named S08E01 whose title is another episode is taken as that episode, and specials named only by their title are placed by it. Missing specials and episodes the scene numbers another way are searched for by title.
+- **Download Check catches the wrong episode**: a single episode whose title is another episode's is rejected before it goes in under the wrong number, and Backfill looks for the one it really is.
+- **The admin agent remembers each title**: what it searched, started, and what failed or was turned down, so the next conversation doesn't repeat it.
+- **Health shows Download Check and the agent**: findings and conversations waiting for you, and what both did this week.
 
 ### Fixed
 

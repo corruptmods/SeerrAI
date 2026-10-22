@@ -1,6 +1,7 @@
 import type { TorrentClient } from '@server/api/downloadclients';
 import { isTorrentClient, torrentClientFor } from '@server/api/downloadclients';
 import { getRepository } from '@server/datasource';
+import BackfillSeries from '@server/entity/BackfillSeries';
 import type {
   CheckAction,
   CheckFinding,
@@ -8,6 +9,8 @@ import type {
   CheckStatus,
 } from '@server/entity/DownloadCheck';
 import DownloadCheck from '@server/entity/DownloadCheck';
+import { episodeTitled, titleFits } from '@server/lib/agent/numbering';
+import backfill from '@server/lib/backfill/engine';
 import type {
   CheckServer,
   Grab,
@@ -20,7 +23,9 @@ import type {
 import { CheckRadarr, CheckSonarr } from '@server/lib/downloadCheck/arr';
 import type { Evidence } from '@server/lib/downloadCheck/names';
 import {
+  GENERIC_EPISODE,
   judgeName,
+  normalize,
   readEpisodeRelease,
   readMovieRelease,
 } from '@server/lib/downloadCheck/names';
@@ -74,6 +79,11 @@ export const BLOCKED_FOR_MS = 2 * 60_000;
 /** How long an import is followed before it's taken as started, not done. */
 const IMPORT_WAIT_MS = 90_000;
 const IMPORT_POLL_MS = 3_000;
+/**
+ * How long after a Backfill search of a title a grab numbered another way
+ * doesn't start another: one that recent has looked already.
+ */
+const LOOK_AGAIN_MS = 6 * 60 * 60 * 1000;
 
 /** States a download is in before it's down. */
 const DOWNLOADING = [
@@ -454,6 +464,30 @@ class DownloadCheckEngine {
       }
     }
 
+    // Read as this series, but its episode title is another episode's:
+    // Sonarr reads names by the scene's numbers (TheXEM), or the group
+    // numbered it its own way. Left alone it goes in as the wrong episode.
+    if (parsed === grab.itemId && server.app === 'sonarr') {
+      const other = await this.titledAs(pass, grab);
+      if (other) {
+        return {
+          finding: 'renumbered',
+          action: 'reject',
+          params: {
+            reason: 'episodeTitle',
+            episodeTitle: readEpisodeRelease(grab.title).episodeTitle,
+            expected: grab.episodes[0].title,
+            episode: {
+              id: other.id,
+              label: episodesLabel([other]),
+              title: other.title,
+              hasFile: other.hasFile,
+            },
+          },
+        };
+      }
+    }
+
     // No better than what's there: the import would refuse it.
     const facts = await pass.facts(grab.itemId);
     const quality = grab.quality;
@@ -539,6 +573,30 @@ class DownloadCheckEngine {
       }
     }
     return undefined;
+  }
+
+  /**
+   * The other library episode a single-episode grab's title is, exactly,
+   * when the name has one that isn't the episode it was filed as. Nothing
+   * while that episode has no title yet ("TBA", as at air time), as the
+   * name can't then be told from it.
+   */
+  private async titledAs(
+    pass: Pass,
+    grab: Grab
+  ): Promise<QueueEpisode | undefined> {
+    if (grab.episodes.length !== 1) return undefined;
+    const filed = grab.episodes[0];
+    if (
+      !filed.title ||
+      GENERIC_EPISODE.test(normalize(filed.title)) ||
+      !readEpisodeRelease(grab.title).episodeTitle ||
+      titleFits(grab.title, filed)
+    ) {
+      return undefined;
+    }
+    const other = episodeTitled(grab.title, await pass.episodes(grab.itemId));
+    return other && other.id !== filed.id ? other : undefined;
   }
 
   private async judge(pass: Pass, grab: Grab): Promise<Evidence> {
@@ -804,6 +862,13 @@ class DownloadCheckEngine {
           // was no better than the file there needs no replacement.
           skipRedownload: !(await this.anyMissing(pass, grab)),
         });
+        // The reject is done whatever becomes of this.
+        await this.lookByTitle(row).catch((e: unknown) =>
+          logger.warn('Could not start a Backfill search', {
+            label: LABEL,
+            errorMessage: errorText(e),
+          })
+        );
       } else if (action === 'drop') {
         await server.remove(grab.queueIds, {
           removeFromClient: true,
@@ -866,6 +931,34 @@ class DownloadCheckEngine {
     }
     row.updatedAt = new Date();
     return repo.save(row);
+  }
+
+  /**
+   * A release turned down for being another episode, one still missing:
+   * Backfill looks for it, as it reads names by their episode titles where
+   * Sonarr can't.
+   */
+  private async lookByTitle(row: DownloadCheck): Promise<void> {
+    if (row.app !== 'sonarr' || row.finding !== 'renumbered') return;
+    if (!getSettings().backfill.enabled) return;
+    const params = JSON.parse(row.params || '{}') as {
+      episode?: { hasFile?: boolean };
+    };
+    if (!params.episode || params.episode.hasFile) return;
+    const title = await getRepository(BackfillSeries).findOne({
+      select: { id: true, status: true, lastSearchedAt: true },
+      where: { kind: 'series', serverId: row.serverId, arrId: row.itemId },
+    });
+    // Once in a while, however many such grabs a title gets.
+    if (
+      !title ||
+      title.status === 'ignored' ||
+      (title.lastSearchedAt &&
+        Date.now() - title.lastSearchedAt.getTime() < LOOK_AGAIN_MS)
+    ) {
+      return;
+    }
+    backfill.startSearch(title.id);
   }
 
   private async follow(server: CheckServer, id: number) {

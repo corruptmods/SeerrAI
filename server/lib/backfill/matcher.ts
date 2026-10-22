@@ -1,5 +1,12 @@
 import type { ProwlarrRelease } from '@server/api/prowlarr';
 import {
+  episodeNamedIn,
+  episodeTitled,
+  sceneDiffers,
+  titleFits,
+} from '@server/lib/agent/numbering';
+import { episodeLabel } from '@server/lib/agent/rules';
+import {
   baseName,
   canonicalName,
   isExtra,
@@ -168,7 +175,15 @@ export const judgeFile = async (
           ? { absolute }
           : undefined;
   if (!number) {
-    return { ...base, problem: 'No episode number in the name' };
+    // Named by its title alone, as specials often are.
+    // Only for a missing episode: an extra that happens to carry a title
+    // must not be planned over the file there.
+    const named = episodeNamedIn(name, ctx.episodes, ctx.names);
+    const titled = named && !named.hasFile ? named : undefined;
+    const unnumbered = { ...base, problem: 'No episode number in the name' };
+    return titled
+      ? byItsTitle(unnumbered, base, { name, packTitle, ctx, numbers }, titled)
+      : unnumbered;
   }
   // A file holding several episodes keeps all of them: S01E01E02, 01-02.
   const many =
@@ -179,12 +194,78 @@ export const judgeFile = async (
       ? many[many.length - 1]
       : undefined);
 
-  return judgeNumber(base, through ? { ...number, through } : number, {
-    name,
-    packTitle,
-    ctx,
-    numbers,
-  });
+  const judged = await judgeNumber(
+    base,
+    through ? { ...number, through } : number,
+    { name, packTitle, ctx, numbers }
+  );
+  // A file of several episodes keeps what its numbers say: one title
+  // can't speak for all of them.
+  if (through || judged.episodeIds.length > 1) return judged;
+  return byItsTitle(judged, base, { name, packTitle, ctx, numbers });
+};
+
+/**
+ * A file whose name carries the very title of another episode than the one
+ * its number makes it (or has no number at all, `titled` then). Some
+ * groups number a special as S03E01, and a series Sonarr numbers by the
+ * scene (TheXEM) reads S08E01 as the scene's S08E01, another library
+ * episode. The title says which it is, so the file is judged again as that
+ * episode: by the scene's numbers when they differ, else by the library's.
+ * When Sonarr won't read it as that episode either way, it is turned down.
+ * A name whose title fits the episode its number gives is left alone.
+ */
+const byItsTitle = async (
+  judged: Judgement,
+  base: Judgement,
+  options: {
+    name: string;
+    packTitle: string;
+    ctx: SeriesContext;
+    numbers: { version?: number };
+  },
+  titled = episodeTitled(options.name, options.ctx.episodes)
+): Promise<Judgement> => {
+  const { ctx } = options;
+  if (!titled || judged.episodeIds.includes(titled.id)) return judged;
+  const numbered = ctx.episodes.find((ep) => ep.id === judged.episodeIds[0]);
+  if (numbered && titleFits(options.name, numbered)) return judged;
+  const anime = ctx.series.seriesType === 'anime';
+  const tries: { absolute?: number; season?: number; episode?: number }[] = [];
+  if (anime && titled.seasonNumber > 0 && titled.absoluteEpisodeNumber) {
+    tries.push({ absolute: titled.absoluteEpisodeNumber });
+  }
+  if (sceneDiffers(titled)) {
+    tries.push({
+      season: titled.sceneSeasonNumber!,
+      episode: titled.sceneEpisodeNumber!,
+    });
+  }
+  tries.push({ season: titled.seasonNumber, episode: titled.episodeNumber });
+  for (const number of tries) {
+    const again = await judgeNumber(base, number, options);
+    if (
+      !again.problem &&
+      again.episodeIds.length === 1 &&
+      again.episodeIds[0] === titled.id
+    ) {
+      return {
+        ...again,
+        season: titled.seasonNumber,
+        episode: titled.episodeNumber,
+        absolute: titled.absoluteEpisodeNumber ?? again.absolute,
+        matchedBy: 'title',
+      };
+    }
+  }
+  return {
+    ...judged,
+    episodeIds: [],
+    problem: `Its title is ${episodeLabel(
+      titled.seasonNumber,
+      titled.episodeNumber
+    )} "${titled.title}", which Sonarr won't read it as`,
+  };
 };
 
 type Judgement = Omit<PlanEntry, 'action' | 'reason' | 'replaces'> & {
@@ -336,6 +417,16 @@ const askAbout = async (
       anime && first.seasonNumber > 0 && first.absoluteEpisodeNumber
         ? { absolute: first.absoluteEpisodeNumber }
         : { season: first.seasonNumber, episode: first.episodeNumber };
+    // The AI read the name without its title; a title that is another
+    // episode is the stronger reading.
+    const titled = episodeTitled(baseName(before.path), ctx.episodes);
+    if (titled && !opinion.episodeIds.includes(titled.id)) {
+      placed.set(opinion.index, {
+        ...base,
+        problem: `AI suggested ${label}, but its title is another episode`,
+      });
+      continue;
+    }
     const result = await judgeNumber(base, number, {
       name: baseName(before.path),
       packTitle,

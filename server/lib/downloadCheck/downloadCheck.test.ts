@@ -1,6 +1,8 @@
 import QBittorrentAPI from '@server/api/downloadclients/qbittorrent';
 import { getRepository } from '@server/datasource';
+import BackfillSeries from '@server/entity/BackfillSeries';
 import DownloadCheck from '@server/entity/DownloadCheck';
+import backfill from '@server/lib/backfill/engine';
 import downloadCheck from '@server/lib/downloadCheck';
 import type {
   CheckServer,
@@ -897,6 +899,107 @@ describe('Download Check', () => {
     assert.equal(row.finding, 'renumbered');
     assert.equal(row.action, 'import');
     assert.deepEqual(sonarr.imported[0][0].episodeIds, [705]);
+  });
+
+  describe('a grab whose episode title is another episode', () => {
+    // Sonarr reads names by the scene's numbers: this one is filed as
+    // S01E03, but its title is S02E05's.
+    const NAME = 'Show.S01E03.Atoll.Exile.1080p.WEB-DL-GRP';
+    const other = (hasFile: boolean): QueueEpisode => ({
+      id: 205,
+      seasonNumber: 2,
+      episodeNumber: 5,
+      title: 'Atoll Exile',
+      hasFile,
+      episodeFileId: hasFile ? 57 : 0,
+    });
+    let looked: number[];
+    let enabled: boolean;
+
+    beforeEach(() => {
+      looked = [];
+      enabled = getSettings().backfill.enabled;
+      getSettings().backfill = { ...getSettings().backfill, enabled: true };
+      mock.method(backfill, 'startSearch', (id: number) => {
+        looked.push(id);
+      });
+      sonarr.parsed.set(NAME, 10);
+    });
+
+    afterEach(async () => {
+      getSettings().backfill = { ...getSettings().backfill, enabled };
+      await getRepository(BackfillSeries)
+        .createQueryBuilder()
+        .delete()
+        .execute();
+    });
+
+    it('rejects it before it goes in as the wrong episode', async () => {
+      const wrong = grab({ title: NAME });
+      sonarr.seriesEpisodes.set(10, [wrong.episodes[0], other(true)]);
+      sonarr.queueNow = [wrong];
+      await downloadCheck.run();
+      const [row] = await rows();
+      assert.equal(row.finding, 'renumbered');
+      assert.equal(row.action, 'reject');
+      assert.equal(row.status, 'done');
+      const params = JSON.parse(row.params);
+      assert.equal(params.episode.label, 'S02E05');
+      assert.equal(params.episode.hasFile, true);
+      assert.equal(sonarr.removed[0].how.blocklist, true);
+      assert.deepEqual(looked, [], 'that episode is in already');
+    });
+
+    it('has Backfill look for the episode it is, when that one is missing', async () => {
+      const title = await getRepository(BackfillSeries).save(
+        new BackfillSeries({
+          kind: 'series',
+          serverId: 0,
+          arrId: 10,
+          tmdbId: 1,
+          title: 'Show',
+          status: 'none',
+          missing: 2,
+          searchTerms: [],
+        })
+      );
+      const wrong = grab({ title: NAME });
+      sonarr.seriesEpisodes.set(10, [wrong.episodes[0], other(false)]);
+      sonarr.queueNow = [wrong];
+      await downloadCheck.run();
+      const [row] = await rows();
+      assert.equal(row.finding, 'renumbered');
+      assert.equal(row.action, 'reject');
+      assert.deepEqual(looked, [title.id]);
+    });
+
+    it('passes it by while the episode it was filed as has no title yet, or the titles only share words', async () => {
+      const early = grab({ title: NAME });
+      early.episodes[0].title = 'TBA';
+      sonarr.seriesEpisodes.set(10, [early.episodes[0], other(true)]);
+      sonarr.queueNow = [early];
+      await downloadCheck.run();
+      assert.equal((await rows()).length, 0);
+
+      downloadCheck.forget();
+      const loose = grab({
+        title: 'Show.S01E03.Atoll.Exile.Part.Two.1080p-GRP',
+      });
+      sonarr.parsed.set(loose.title, 10);
+      sonarr.seriesEpisodes.set(10, [loose.episodes[0], other(true)]);
+      sonarr.queueNow = [loose];
+      await downloadCheck.run();
+      assert.equal((await rows()).length, 0);
+    });
+
+    it('passes it by when its title is the episode it was filed as', async () => {
+      const right = grab({ title: 'Show.S01E03.Reboot.1080p.WEB-DL-GRP' });
+      sonarr.parsed.set(right.title, 10);
+      sonarr.seriesEpisodes.set(10, [right.episodes[0], other(false)]);
+      sonarr.queueNow = [right];
+      await downloadCheck.run();
+      assert.equal((await rows()).length, 0);
+    });
   });
 
   it('waits before touching a stuck import, in case it clears', async () => {

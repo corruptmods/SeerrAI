@@ -35,8 +35,11 @@ export interface PlanEntry {
   reason?: string;
   /** Existing files this one would replace. */
   replaces: number;
-  /** Placed by the AI second opinion rather than by its name. */
-  matchedBy?: 'ai';
+  /**
+   * Placed by the AI second opinion, or by the episode title in its name
+   * where its number is another episode's, rather than by its number.
+   */
+  matchedBy?: 'ai' | 'title';
   /** What the model read in the name, for an AI match. */
   why?: string;
   /**

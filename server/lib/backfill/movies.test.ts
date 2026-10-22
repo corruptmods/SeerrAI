@@ -991,6 +991,124 @@ describe('Backfill: searching for what a series is missing', () => {
     assert.deepEqual(queries, ['Wayfarer Ledger', 'Wayfarer Ledger S17']);
     assert.equal(opened[0], 'the-episode');
   });
+
+  it('searches for specials and renumbered episodes by title, and opens what names them first', async () => {
+    getSettings().sonarr = [
+      {
+        id: 0,
+        name: 'Sonarr',
+        hostname: 'sonarr',
+        port: 8989,
+        apiKey: 'x',
+        useSsl: false,
+      } as unknown as SonarrSettings,
+    ];
+    const includeSpecials = getSettings().backfill.includeSpecials;
+    getSettings().backfill = {
+      ...getSettings().backfill,
+      includeSpecials: true,
+    };
+    const sonarr = BackfillSonarr.prototype;
+    mock.method(sonarr, 'getSeriesDetail', async () => ({
+      id: 892,
+      title: 'Wayfarer Ledger',
+      year: 2015,
+      tvdbId: 391427,
+      seriesType: 'standard',
+      qualityProfileId: 6,
+      path: '/tv/Wayfarer Ledger',
+    }));
+    const ep = (
+      id: number,
+      season: number,
+      episode: number,
+      title: string,
+      hasFile: boolean,
+      scene?: [number, number]
+    ) => ({
+      id,
+      seriesId: 892,
+      seasonNumber: season,
+      episodeNumber: episode,
+      title,
+      hasFile,
+      monitored: true,
+      episodeFileId: 0,
+      airDateUtc: '2020-09-01T00:00:00Z',
+      ...(scene
+        ? { sceneSeasonNumber: scene[0], sceneEpisodeNumber: scene[1] }
+        : {}),
+    });
+    mock.method(sonarr, 'getSeriesEpisodes', async () => [
+      ep(1, 0, 1, 'Beyond the Map', false),
+      ep(2, 0, 2, 'Special', false),
+      // The scene's S06E15.
+      ep(3, 8, 1, 'Atoll Exile', false, [6, 15]),
+      ep(4, 9, 1, 'River Bend', true, [8, 1]),
+    ]);
+    mock.method(sonarr, 'getEpisodeFiles', async () => []);
+    mock.method(sonarr, 'getQualityProfile', async () => PROFILE);
+    mock.method(sonarr, 'parse', async (title: string) => ({ title }));
+    const queries: string[] = [];
+    mock.method(ProwlarrAPI.prototype, 'search', async (query: string) => {
+      queries.push(query);
+      return [
+        {
+          ...RELEASE,
+          guid: 'old-pack',
+          title: 'Wayfarer Ledger Season 4 Complete 720p HDTV x264',
+          seeders: 90,
+        },
+        {
+          ...RELEASE,
+          guid: 'the-special',
+          title: 'Wayfarer.Ledger.Beyond.the.Map.1080p.WEB-DL-GRP',
+          seeders: 1,
+        },
+        {
+          ...RELEASE,
+          guid: 'by-the-scene',
+          title: 'Wayfarer.Ledger.S06E15.720p.HDTV.x264-GRP',
+          seeders: 2,
+        },
+      ];
+    });
+    const opened: string[] = [];
+    mock.method(
+      ProwlarrAPI.prototype,
+      'fetchRelease',
+      async (release: ProwlarrRelease) => {
+        opened.push(release.guid);
+        throw new Error('not needed');
+      }
+    );
+    const row = await getRepository(BackfillSeries).save(
+      new BackfillSeries({
+        kind: 'series',
+        serverId: 0,
+        arrId: 892,
+        title: 'Wayfarer Ledger',
+        status: 'stuck',
+      })
+    );
+    try {
+      await backfill.search(row.id);
+    } finally {
+      getSettings().backfill = { ...getSettings().backfill, includeSpecials };
+    }
+    // Not by "Special": a title that says nothing.
+    assert.deepEqual(queries, [
+      'Wayfarer Ledger',
+      'Wayfarer Ledger S08',
+      'Wayfarer Ledger Beyond the Map',
+      'Wayfarer Ledger Atoll Exile',
+    ]);
+    assert.deepEqual(
+      [...opened.slice(0, 2)].sort(),
+      ['by-the-scene', 'the-special'],
+      'what names a missing episode is opened before the popular pack'
+    );
+  });
 });
 
 describe('Backfill when something goes wrong', () => {

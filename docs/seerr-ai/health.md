@@ -7,7 +7,7 @@
 **Settings → Health** (admins) checks everything Seerr AI depends on and lists what has quietly gone wrong, each with a link to fix it.
 
 - **Services**: whether each connected service answers (media servers with their version, Radarr, Sonarr, Lidarr, Prowlarr, download clients, Bazarr, the AI provider, Tautulli, Maintainerr, the PostgreSQL pool), plus their own warnings: low disks, paused indexers or subtitle providers, an AI account out of credit. The download client Backfill uses also lists what it's missing (Deluge's Label plugin, rTorrent commands, Transmission 3.0+, NZBGet 16+).
-- **Backfill**: titles it couldn't search, packs waiting for approval, downloads that failed this week.
+- **Backfill**: titles it couldn't search, packs waiting for approval, downloads that failed this week, Download Check findings and admin agent conversations waiting for you, and what Download Check and the agent did this week.
 - **Requests**: failed, approved but never sent, waiting on approval for over a week, and requests no longer linked to a title (with a button to remove them).
 - **Titles**: processing for over a week (with **Search now** for each and **Search all**, which searches a season missing entirely as one), series requests with no TVDB id, folders a server matched to the wrong title, collections partly in the library.
 - **Music** (once Lidarr is added): albums no server lists after a day, requested albums with no release after a week (with **Search now**), and whether MusicBrainz is answering. See [Music](./music.md#keeping-track).

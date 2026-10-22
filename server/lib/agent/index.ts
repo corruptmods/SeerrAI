@@ -10,6 +10,13 @@ import { MediaEventType } from '@server/entity/MediaEvent';
 import { User } from '@server/entity/User';
 import type { Proposal, ProposedChange } from '@server/lib/agent/changes';
 import { applyChange, applySeasonChange } from '@server/lib/agent/changes';
+import type { AgentNote } from '@server/lib/agent/notes';
+import {
+  addNotes,
+  describeNotes,
+  noteOfCall,
+  notesOf,
+} from '@server/lib/agent/notes';
 import { episodeLabel, rangeLabel } from '@server/lib/agent/rules';
 import type {
   AgentState,
@@ -20,7 +27,9 @@ import type {
 import {
   TOOLS,
   adminPresent,
+  boundTitle,
   notLookedFor,
+  readTitleRef,
   runTool,
   startApprovedGrab,
   titleRef,
@@ -242,7 +251,7 @@ const SYSTEM = `You are the admin agent of a home media server run with Seerr, S
 
 How to work:
 1. Find the title (find_title) and read what it lacks (title_status).
-2. Search two ways. search_releases is Sonarr's or Radarr's own search; the reasons they turned results down show problems you can work around: a wrong year or odd name, the collection's own episode numbering, a size limit, a quality the profile does not want. search_indexers searches Prowlarr directly with any words: try other names, the year, "complete", "collection", a season, the original title. Searches take a while, so ask for the ones you want together in one turn: they run at the same time. For anime, Sonarr's search is slow and goes episode by episode; search_indexers with the English and the original (romaji) names is usually quicker, and fansub releases often number episodes across all seasons. Search one episode a search, by its number and its title ("Show S03E04 Title"), and by the title alone when that finds nothing; a search naming several episodes finds nothing. Releases often number episodes their own way (a special counted as episode 1, the scene's seasons): the results say which library episode each is by its title, and when its number and its title disagree, the title is right. A season pack is opened with release_files and each file mapped by its title, never grabbed blind.
+2. Search two ways. search_releases is Sonarr's or Radarr's own search; the reasons they turned results down show problems you can work around: a wrong year or odd name, the collection's own episode numbering, a size limit, a quality the profile does not want. search_indexers searches Prowlarr directly with any words: try other names, the year, "complete", "collection", a season, the original title. Searches take a while, so ask for the ones you want together in one turn: they run at the same time. For anime, Sonarr's search is slow and goes episode by episode; search_indexers with the English and the original (romaji) names is usually quicker, and fansub releases often number episodes across all seasons. Search one episode a search, by its number and its title ("Show S03E04 Title"), and by the title alone when that finds nothing; a search naming several episodes finds nothing. Specials (season 0) are seldom named S00E01: search for each by the show's name and its title first ("Show Title"). Releases often number episodes their own way (a special counted as episode 1, the scene's seasons): the results say which library episode each is by its title, and when its number and its title disagree, the title is right. A season pack is opened with release_files and each file mapped by its title, never grabbed blind.
 3. Steps are limited, so do not spend them on what you already know. A release whose name plainly says it is one missing episode, with no other language in its name, needs neither release_files nor check_language: grab it. Grab several in the same turn. When the admin tells you to start what you found, grab it at once, without checking again what you checked earlier in this conversation. Before you grab a release with several files, or one whose name does not plainly say which episode it is, open it with release_files. Map each file to an episode by its number AND its title. Collections often number files in their own order (shorts or specials first, or one numbering across seasons): compare each file's title with the episode titles from title_status, and never trust the numbers alone.
 4. Be certain before you grab. Check the language with check_language when there is any question. Grab only files for missing episodes. One file per episode is preferred: take a release whose files each hold several episodes (S06E01-02, "Title A + Title B") only when no release has those episodes one per file, and then give each such file every episode it holds (episodes: [1, 2]), so Sonarr names it S06E01-E02. Weigh it in this order: the right content; English or the title's original language; covering as much as possible; quality; size. When nothing meets the quality profile, a lower quality is fine as a stopgap, since Sonarr and Radarr keep looking for upgrades. Prefer a well-seeded torrent or usenet.
 5. Turn down dubs in other languages (TRUEFRENCH, iTALiAN, GERMAN and so on, unless that is the original language), fakes (sizes far too small, torrents of archives or executables only), samples, and other shows. A Usenet post packed in archives, or with scrambled file names (only its PAR2 repair files named), is normal but cannot be opened: when its name is exactly one missing episode, or the movie, grab it whole (whole: true); a season pack like that cannot be used.
@@ -1481,6 +1490,38 @@ class Agent {
           proposed.push(change);
         },
       };
+      // What it does is kept with the title, for later conversations about
+      // it, once it knows which title it works on.
+      // Each with the title its call named, or else the one it works on.
+      const unfiled: { title?: TitleRef; note: AgentNote }[] = [];
+      const fileNotes = () => {
+        const bound = boundTitle(run);
+        const byTitle = new Map<
+          string,
+          { title: TitleRef; notes: AgentNote[] }
+        >();
+        for (let i = 0; i < unfiled.length; ) {
+          const title = unfiled[i].title ?? bound;
+          if (!title) {
+            i++;
+            continue;
+          }
+          const key = titleRef(title);
+          const entry = byTitle.get(key) ?? { title, notes: [] };
+          entry.notes.push(unfiled[i].note);
+          byTitle.set(key, entry);
+          unfiled.splice(i, 1);
+        }
+        for (const { title, notes } of byTitle.values()) {
+          addNotes(title, notes).catch((e: unknown) =>
+            logger.warn('Could not keep the admin agent’s notes', {
+              label: LABEL,
+              runId: run.id,
+              errorMessage: e instanceof Error ? e.message : String(e),
+            })
+          );
+        }
+      };
       const keep = (messages: ConverseMessage[]) => {
         run.conversation = messages;
         run.memory = {
@@ -1557,6 +1598,29 @@ class Agent {
           stoppedBy = live.stopBy;
           break;
         }
+        // What earlier conversations tried for the title, told once it is
+        // known: at the start, or once it has found the title.
+        const told = (run.memory as { notesTold?: boolean }).notesTold;
+        const title = boundTitle(run);
+        if (!told && title) {
+          run.memory = { ...run.memory, notesTold: true };
+          const since = (run.startedAt ?? new Date()).getTime();
+          const earlier = describeNotes(
+            (await notesOf(title).catch(() => [])).filter(
+              (note) => new Date(note.at).getTime() < since
+            )
+          );
+          if (earlier) {
+            // Set apart from what the admin said: it is Seerr's record.
+            const told = `---\n${earlier}`;
+            const last = messages[messages.length - 1];
+            if (last?.role === 'user') {
+              last.text = `${last.text}\n\n${told}`;
+            } else {
+              messages.push({ role: 'user', text: told });
+            }
+          }
+        }
         if (live?.notes.length) {
           const notes = live.notes.splice(0);
           for (const note of notes) step('reply', `${note.by}: ${note.text}`);
@@ -1618,7 +1682,7 @@ class Agent {
               role: 'user',
               text: `Not yet: ${left.length} missing episode${left.length === 1 ? ' was' : 's were'} never searched for: ${listed}${
                 left.length > 40 ? ` and ${left.length - 40} more` : ''
-              }. Search for each, one episode a search, by its number and by its title (releases may number them differently), and open any season pack with release_files. Then say where things stand.`,
+              }. Search for each, one episode a search, by its number and by its title (releases may number them differently; a special by the show's name and its title), and open any season pack with release_files. Then say where things stand.`,
             });
             continue;
           }
@@ -1685,6 +1749,21 @@ class Agent {
           const answers = await Promise.all(
             calls.map(async ({ call, at }) => {
               const result = await runTool(state, call.name, call.input);
+              const note = noteOfCall(
+                call.name,
+                call.input,
+                result,
+                state.releases.get(String(call.input.release ?? ''))?.title
+              );
+              if (note) {
+                let title: TitleRef | undefined;
+                try {
+                  title = readTitleRef(call.input.title);
+                } catch {
+                  title = undefined;
+                }
+                unfiled.push({ title, note });
+              }
               // Its answer goes right after its call, as it comes back.
               const answer: AgentStep = {
                 at: new Date().toISOString(),
@@ -1719,6 +1798,7 @@ class Agent {
               isError: result.isError,
             })
           );
+          fileNotes();
         }
         for (const call of skipped) {
           results.push({
@@ -1756,6 +1836,7 @@ class Agent {
       }
 
       keep(messages);
+      fileNotes();
       if (proposed.length) {
         const proposal: Proposal = {
           id: randomUUID(),
@@ -1832,6 +1913,34 @@ class Agent {
   }
 
   /**
+   * A download it started that failed, kept with its title. Best effort:
+   * what it does next doesn't wait on it working.
+   */
+  private async noteFailed(job: BackfillJob): Promise<void> {
+    try {
+      const row = await getRepository(BackfillSeries).findOne({
+        select: { id: true, kind: true, serverId: true, arrId: true },
+        where: { id: job.seriesId },
+      });
+      if (!row) return;
+      await addNotes(row, [
+        {
+          at: new Date().toISOString(),
+          kind: 'failed',
+          what: job.title,
+          ...(job.error ? { why: job.error } : {}),
+        },
+      ]);
+    } catch (e) {
+      logger.warn('Could not keep the admin agent’s notes', {
+        label: LABEL,
+        jobId: job.id,
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  /**
    * A download it started failed for its release (Backfill found no good
    * pack to take its place). It looks again in the same conversation, with
    * the same say as before, unless replacements for the same episodes have
@@ -1840,6 +1949,7 @@ class Agent {
    */
   public async afterFailedDownload(job: BackfillJob): Promise<AgentHandBack> {
     const run = await this.runOf(job);
+    if (run) await this.noteFailed(job);
     if (!run || this.problem(await owner())) return null;
     const wanted = new Set(jobEpisodes(job));
     const failed = (

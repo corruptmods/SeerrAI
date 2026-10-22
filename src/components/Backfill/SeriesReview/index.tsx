@@ -114,9 +114,10 @@ const messages = defineMessages('components.Backfill.SeriesReview', {
   aiMatched:
     '{count, plural, one {# file was} other {# files were}} placed by the AI, not by name. Check under Show files before approving.',
   aiBadge: 'AI',
+  byTitleBadge: 'By title',
   aiWhy: 'AI: {why}',
   matchedHow:
-    'Files are matched by episode number and checked by Sonarr, whatever the pack’s season split.',
+    'Files are matched by episode number, or by episode title when the two disagree, and checked by Sonarr, whatever the pack’s season split.',
   movieMatchedHow:
     'Matched by name and year and checked by Radarr. From a collection, only this movie is downloaded.',
   movieLabel: 'Movie',
@@ -837,6 +838,13 @@ const SeriesReview = () => {
                                   {entry.matchedBy === 'ai' && (
                                     <span className="rounded bg-purple-500/20 px-2 py-0.5 text-purple-200 light:text-purple-700">
                                       {intl.formatMessage(messages.aiBadge)}
+                                    </span>
+                                  )}
+                                  {entry.matchedBy === 'title' && (
+                                    <span className="rounded bg-gray-500/20 px-2 py-0.5 text-gray-300 light:text-gray-700">
+                                      {intl.formatMessage(
+                                        messages.byTitleBadge
+                                      )}
                                     </span>
                                   )}
                                   <span

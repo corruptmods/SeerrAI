@@ -20,18 +20,24 @@ import {
   VIDEO_MEDIA_TYPES,
 } from '@server/constants/media';
 import dataSource, { getRepository } from '@server/datasource';
+import AgentRun from '@server/entity/AgentRun';
 import AlbumRequest from '@server/entity/AlbumRequest';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
+import DownloadCheck from '@server/entity/DownloadCheck';
 import { MatchProblem } from '@server/entity/MatchWatch';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import { User } from '@server/entity/User';
+import { aiFeatureOn } from '@server/lib/ai';
 import { listModels } from '@server/lib/ai/providers';
 import { getCollectionGaps } from '@server/lib/collectionGaps';
 import { getMaintainerrStatus } from '@server/lib/deletingSoon';
+import downloadCheck from '@server/lib/downloadCheck';
 import { featureEnabled } from '@server/lib/features';
+import type { HealthActivity } from '@server/lib/healthActivity';
+import { healthActivity } from '@server/lib/healthActivity';
 import {
   connectedServers,
   hostnameFor,
@@ -1628,7 +1634,9 @@ const collectionGapsCheck = (page: Page): HealthCheck => {
 
 /**
  * Backfill: titles it could not search, packs waiting on an admin, and
- * downloads that failed this week. Only when Backfill is on.
+ * downloads that failed this week; Download Check's findings and the admin
+ * agent's conversations waiting on an admin, while each is on. Only when
+ * Backfill is on.
  */
 const backfillChecks = async (
   page: Page = FIRST_PAGE
@@ -1671,6 +1679,24 @@ const backfillChecks = async (
       })
     ).map((row) => [row.id, row.title])
   );
+  const [findings, asking] = await Promise.all([
+    getRepository(DownloadCheck).findAndCount({
+      where: { status: 'waiting' },
+      order: { createdAt: 'DESC' },
+      skip: page.skip,
+      take: page.take,
+    }),
+    aiFeatureOn('aiAgent')
+      ? getRepository(AgentRun).findAndCount({
+          select: { id: true, title: true, question: true, finishedAt: true },
+          where: { status: 'waiting' },
+          order: { finishedAt: 'DESC' },
+          skip: page.skip,
+          take: page.take,
+        })
+      : null,
+  ]);
+  const checking = downloadCheck.mode() !== 'off' || findings[1] > 0;
   return [
     {
       id: 'backfillSearchErrors',
@@ -1714,6 +1740,43 @@ const backfillChecks = async (
         href: `/backfill/jobs/${job.id}`,
       })),
     },
+    ...(checking
+      ? [
+          {
+            id: 'downloadCheckWaiting',
+            group: 'backfill' as const,
+            status: findings[1] > 0 ? ('warning' as const) : ('ok' as const),
+            count: findings[1],
+            items: findings[0].map((row) => ({
+              title: row.episodes
+                ? `${row.itemTitle} ${row.episodes}`
+                : row.itemTitle,
+              detail: [row.title, ago(row.createdAt)].join(' · '),
+              href: '/backfill#download-check',
+            })),
+          },
+        ]
+      : []),
+    ...(asking
+      ? [
+          {
+            id: 'agentWaiting',
+            group: 'backfill' as const,
+            status: asking[1] > 0 ? ('warning' as const) : ('ok' as const),
+            count: asking[1],
+            items: asking[0].map((run) => ({
+              title: run.title ?? `#${run.id}`,
+              detail: [
+                run.question?.split('\n')[0].slice(0, 160),
+                run.finishedAt ? ago(run.finishedAt) : '',
+              ]
+                .filter(Boolean)
+                .join(' · '),
+              href: `/backfill/agent/${run.id}`,
+            })),
+          },
+        ]
+      : []),
   ];
 };
 
@@ -1770,8 +1833,15 @@ const guarded = async (
 export const runHealthChecks = async (): Promise<{
   checkedAt: Date;
   checks: HealthCheck[];
+  /** What Download Check and the admin agent did this week. */
+  activity?: HealthActivity;
 }> => {
-  const groups = await Promise.all([
+  const [activity, ...groups] = await Promise.all([
+    // Only worth counting while Backfill is on; a week it can't count is
+    // left out rather than failing the page.
+    getSettings().backfill.enabled
+      ? healthActivity().catch(() => undefined)
+      : undefined,
     guarded('services', serviceChecks),
     guarded('backfill', backfillChecks),
     guarded('requests', requestChecks),
@@ -1779,7 +1849,11 @@ export const runHealthChecks = async (): Promise<{
     guarded('users', userChecks),
   ]);
 
-  return { checkedAt: new Date(), checks: groups.flat() };
+  return {
+    checkedAt: new Date(),
+    checks: groups.flat(),
+    ...(activity ? { activity } : {}),
+  };
 };
 
 const WEEK_MS = 7 * DAY_MS;
@@ -1804,6 +1878,8 @@ export const runHealthCheck = async (
     backfillSearchErrors: backfillChecks,
     backfillAwaiting: backfillChecks,
     backfillFailed: backfillChecks,
+    downloadCheckWaiting: backfillChecks,
+    agentWaiting: backfillChecks,
   }[id];
 
   if (!group) {

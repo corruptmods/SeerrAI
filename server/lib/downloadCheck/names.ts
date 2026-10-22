@@ -139,7 +139,7 @@ const splitTail = (
 };
 
 /** The words after the episode marker, up to the quality or the group. */
-const episodeTitleOf = (rest: string): string | undefined => {
+export const episodeTitleOf = (rest: string): string | undefined => {
   const words: string[] = [];
   for (const raw of rest.split(/[\s._]+/)) {
     if (!raw || raw === '-') continue;

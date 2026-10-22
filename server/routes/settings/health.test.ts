@@ -9,9 +9,11 @@ import {
 } from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
 import dataSource, { getRepository } from '@server/datasource';
+import AgentRun from '@server/entity/AgentRun';
 import AlbumRequest from '@server/entity/AlbumRequest';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
+import DownloadCheck from '@server/entity/DownloadCheck';
 import Media from '@server/entity/Media';
 import MediaEvent from '@server/entity/MediaEvent';
 import { MediaRequest } from '@server/entity/MediaRequest';
@@ -604,6 +606,192 @@ describe('Backfill', () => {
   it('is left off the page while Backfill is off', async () => {
     const checks = await health();
     assert.equal(checks.filter((c) => c.group === 'backfill').length, 0);
+  });
+
+  it('lists what Download Check and the agent wait on, and says what both did this week', async () => {
+    const settings = getSettings();
+    const ai = settings.ai;
+    const disabled = settings.main.disabledFeatures;
+    settings.backfill = {
+      ...BACKFILL_DEFAULTS,
+      enabled: true,
+      downloadCheck: { mode: 'on' },
+    };
+    // A local model server, the stand-in: the AI check asks it too.
+    settings.ai = {
+      enabled: true,
+      provider: 'openai',
+      apiKey: '',
+      baseUrl: `http://127.0.0.1:${fakePort}/v1`,
+      model: 'local-test',
+      featureModels: {},
+      dailyLimit: 0,
+    };
+    settings.main.disabledFeatures = [];
+    try {
+      const now = new Date();
+      const checks = getRepository(DownloadCheck);
+      let key = 0;
+      const finding = (over: Partial<DownloadCheck>) =>
+        checks.save(
+          new DownloadCheck({
+            app: 'sonarr',
+            serverId: 0,
+            downloadKey: `key${++key}`,
+            stage: 'grab',
+            title: 'Remote.Reach.S08E01.720p-GRP',
+            itemId: 77,
+            itemTitle: 'Remote Reach',
+            episodes: 'S08E01',
+            finding: 'early',
+            action: 'reject',
+            status: 'done',
+            params: '{}',
+            detail: '',
+            createdAt: now,
+            updatedAt: now,
+            ...over,
+          })
+        );
+      await finding({});
+      await finding({ action: 'import', finding: 'renumbered' });
+      await finding({ action: 'clear', finding: 'alreadyImported' });
+      await finding({ status: 'failed' });
+      await finding({
+        action: 'review',
+        finding: 'unsureTitle',
+        status: 'waiting',
+        title: 'Remote.Reach.Revisited.S01E02-GRP',
+      });
+      // Last week's: not this week's.
+      await finding({ createdAt: new Date(Date.now() - 8 * DAY) });
+
+      const runs = getRepository(AgentRun);
+      const waiting = await runs.save(
+        new AgentRun({
+          trigger: 'ask',
+          status: 'waiting',
+          title: 'Remote Reach',
+          question: 'Should I take the 1080p pack?\nIt replaces 3 files.',
+          finishedAt: now,
+        })
+      );
+      const done = await runs.save(
+        new AgentRun({
+          trigger: 'auto',
+          status: 'done',
+          title: 'Far Afield',
+          finishedAt: now,
+          actions: [
+            {
+              at: now.toISOString(),
+              type: 'change',
+              title: 'Far Afield',
+              detail: 'Deleted the wrong file',
+            },
+          ],
+        })
+      );
+      const title = await getRepository(BackfillSeries).save(
+        new BackfillSeries({
+          kind: 'series',
+          serverId: 0,
+          arrId: 77,
+          title: 'Far Afield',
+          status: 'downloading',
+        })
+      );
+      const job = (status: BackfillJob['status'], imported: number) =>
+        new BackfillJob({
+          seriesId: title.id,
+          title: 'Far.Afield.S01E01-GRP',
+          status,
+          mode: 'missing',
+          protocol: 'torrent',
+          clientId: 1,
+          files: [],
+          imported,
+          agentRunId: done.id,
+          finishedAt: now,
+        });
+      await getRepository(BackfillJob).save([
+        job('done', 1),
+        job('failed', 0),
+        job('downloading', 0),
+      ]);
+
+      const body = await new Promise<{
+        checks: Check[];
+        activity: Record<string, Record<string, unknown>>;
+      }>((resolve, reject) => {
+        http
+          .get(
+            { host: '127.0.0.1', port, path: '/api/v1/settings/health' },
+            (res) => {
+              let raw = '';
+              res.on('data', (c) => (raw += c));
+              res.on('end', () => resolve(JSON.parse(raw)));
+            }
+          )
+          .on('error', reject);
+      });
+      const byId = new Map(body.checks.map((c) => [c.id, c]));
+      const findings = byId.get('downloadCheckWaiting')!;
+      assert.equal(findings.status, 'warning');
+      assert.equal(findings.count, 1);
+      assert.equal(findings.items[0].title, 'Remote Reach S08E01');
+      assert.match(
+        findings.items[0].detail!,
+        /^Remote\.Reach\.Revisited\.S01E02-GRP · /
+      );
+      assert.equal(findings.items[0].href, '/backfill#download-check');
+      const asking = byId.get('agentWaiting')!;
+      assert.equal(asking.count, 1);
+      assert.equal(asking.items[0].href, `/backfill/agent/${waiting.id}`);
+      assert.match(
+        asking.items[0].detail!,
+        /^Should I take the 1080p pack\? · /
+      );
+
+      assert.deepEqual(body.activity, {
+        downloadCheck: {
+          mode: 'on',
+          rejected: 1,
+          imported: 1,
+          cleared: 1,
+          wouldHave: 0,
+          failed: 1,
+        },
+        agent: {
+          conversations: 2,
+          downloads: 3,
+          imported: 1,
+          failed: 1,
+          changes: 1,
+        },
+      });
+    } finally {
+      settings.ai = ai;
+      settings.main.disabledFeatures = disabled;
+      await getRepository(DownloadCheck)
+        .createQueryBuilder()
+        .delete()
+        .execute();
+      await getRepository(BackfillJob).createQueryBuilder().delete().execute();
+      await getRepository(AgentRun).createQueryBuilder().delete().execute();
+    }
+  });
+
+  it('leaves Download Check and the agent out while they are off', async () => {
+    getSettings().backfill = { ...BACKFILL_DEFAULTS, enabled: true };
+    const ids = (await health())
+      .filter((c) => c.group === 'backfill')
+      .map((c) => c.id);
+    assert.deepEqual(ids, [
+      'backfillSearchErrors',
+      'backfillAwaiting',
+      'backfillFailed',
+    ]);
   });
 });
 

@@ -3,6 +3,7 @@ import { VIDEO_RX } from '@server/lib/backfill/naming';
 import {
   GENERIC_EPISODE,
   episodeTitleLikeness,
+  episodeTitleOf,
   normalize,
   readEpisodeRelease,
 } from '@server/lib/downloadCheck/names';
@@ -65,6 +66,117 @@ export const episodeByTitle = <T extends NumberedEpisode>(
     return undefined;
   }
   return scored[0].ep;
+};
+
+const NUMBER_WORDS: Record<string, string> = {
+  one: '1',
+  two: '2',
+  three: '3',
+  four: '4',
+  five: '5',
+  six: '6',
+  seven: '7',
+  eight: '8',
+  nine: '9',
+  ten: '10',
+};
+
+/**
+ * A title as names and Sonarr both write it: words only, and a part
+ * written one way ("Part Two", "Pt 2", "(2)") the same as another ("2").
+ */
+const titleKey = (title: string): string =>
+  normalize(title)
+    .replace(
+      /\b(?:part|pt)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/g,
+      (_, n: string) => NUMBER_WORDS[n] ?? n
+    )
+    .trim();
+
+/** Each episode's title key, worked out once. */
+const keys = new WeakMap<object, string>();
+const keyOf = (ep: NumberedEpisode): string => {
+  let key = keys.get(ep);
+  if (key === undefined) {
+    const title = normalize(ep.title ?? '');
+    key = title && !GENERIC_EPISODE.test(title) ? titleKey(title) : '';
+    keys.set(ep, key);
+  }
+  return key;
+};
+
+/** The one episode with exactly this title key, if just one has it. */
+const onlyWith = <T extends NumberedEpisode>(
+  key: string,
+  episodes: T[]
+): T | undefined => {
+  if (!key) return undefined;
+  const found = episodes.filter((ep) => keyOf(ep) === key);
+  return found.length === 1 ? found[0] : undefined;
+};
+
+/**
+ * The library episode a numbered name's title is, exactly: the words after
+ * its episode number are one episode's very title, and no other's. Used
+ * where the title overrules the number, so a title that only shares a
+ * word or two with an episode's ("The Reckoning Begins", "Reckoning") is
+ * never taken for it.
+ */
+export const episodeTitled = <T extends NumberedEpisode>(
+  name: string,
+  episodes: T[]
+): T | undefined => {
+  const said = readEpisodeRelease(name.replace(VIDEO_RX, '')).episodeTitle;
+  return said ? onlyWith(titleKey(said), episodes) : undefined;
+};
+
+/** Whether a name's episode title is this episode's, more or less. */
+export const titleFits = (name: string, ep: NumberedEpisode): boolean => {
+  const said = readEpisodeRelease(name.replace(VIDEO_RX, '')).episodeTitle;
+  const own = keyOf(ep);
+  return (
+    !!said &&
+    !!own &&
+    (titleKey(said) === own ||
+      episodeTitleLikeness(said, ep.title ?? '') >= 0.5)
+  );
+};
+
+/** Whether an episode has a title of its own to search for it by. */
+export const ownTitle = (ep: NumberedEpisode): boolean => {
+  const key = keyOf(ep);
+  return (
+    !!key &&
+    (key.split(' ').filter((w) => w.length > 3).length >= 2 || key.length >= 12)
+  );
+};
+
+/**
+ * The library episode a name without any episode number is, by its title
+ * alone ("Remote Reach - Beyond the Map", a special named only so). The
+ * whole of what follows the show's name, up to the release's tags, must be
+ * one episode's very title, and a title of some length: "Day One
+ * Interview" is not "Day One".
+ */
+export const episodeNamedIn = <T extends NumberedEpisode>(
+  name: string,
+  episodes: T[],
+  showNames: string[] = []
+): T | undefined => {
+  let words = normalize(
+    name.replace(VIDEO_RX, '').replace(/^(\s*\[[^\]]*\]\s*)+/, '')
+  );
+  const show = showNames
+    .map(normalize)
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length)
+    .find((n) => words.startsWith(`${n} `));
+  if (show) words = words.slice(show.length + 1);
+  // A year after the show's name: "Remote Reach (2010) - Beyond the Map".
+  words = words.replace(/^(19|20)\d{2} /, '');
+  const said = episodeTitleOf(words);
+  const found = said ? onlyWith(titleKey(said), episodes) : undefined;
+  return found && ownTitle(found) ? found : undefined;
 };
 
 /** Whether a series is numbered differently by the scene than by TVDB. */

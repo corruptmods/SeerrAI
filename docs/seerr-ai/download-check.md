@@ -18,6 +18,7 @@ Checked as soon as Sonarr or Radarr takes it, and while a delay profile still ho
 |---|---|
 | A program in it (`.exe`, `.scr`, `.lnk`, `.bat` and the like), only archives, no video, or only a sample. Torrents, once the client has their file list | Rejected |
 | Grabbed a day or more before the episode aired | Rejected |
+| One episode whose name carries another episode's title (a series Sonarr reads by the scene's numbering, or a group's own numbering): it would go in as the wrong episode | Rejected. When the episode it really is is missing, Backfill looks for it, as it goes by titles |
 | Another title: another country's version (The.Turnstile.AU for The Turnstile), another year (Gurneys.2026 for the 2001 series), or an episode whose title is another episode's | Rejected |
 | No better than the file you have, compared as the import compares: quality, then revision, then custom format score | Rejected, not searched again |
 | A single episode where your file holds two | Rejected, not searched again |

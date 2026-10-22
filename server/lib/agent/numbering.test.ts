@@ -1,6 +1,7 @@
 import type { NumberedEpisode } from '@server/lib/agent/numbering';
 import {
   episodeByTitle,
+  episodeNamedIn,
   indexerReading,
   nameReading,
   numbersInName,
@@ -113,6 +114,57 @@ describe('Release numbering', () => {
     );
     assert.equal(
       episodeByTitle('Remote.Reach.S09E01.720p.HDTV', LIBRARY),
+      undefined
+    );
+  });
+
+  it('finds the episode a name without numbers is, by its very title', () => {
+    const names = ['Remote Reach'];
+    assert.equal(
+      episodeNamedIn(
+        '[GRP] Remote Reach - Beyond the Map [1080p].mkv',
+        LIBRARY,
+        names
+      )?.id,
+      863
+    );
+    // A title held in a longer one: the longer is it.
+    const trails = [
+      ep(1, 0, 2, 'Long Trail', false),
+      ep(2, 0, 3, 'Long Trail Revisited', false),
+    ];
+    assert.equal(
+      episodeNamedIn('Remote.Reach.Long.Trail.Revisited.720p', trails, names)
+        ?.id,
+      2
+    );
+    assert.equal(
+      episodeNamedIn('Remote.Reach.Long.Trail.720p', trails, names)?.id,
+      1
+    );
+    // Too short, generic, shared by two, or part of the show's name.
+    assert.equal(
+      episodeNamedIn('Remote Reach Thin Ice 720p', LIBRARY, names),
+      undefined
+    );
+    assert.equal(
+      episodeNamedIn('Remote Reach Episode 9', LIBRARY, names),
+      undefined
+    );
+    assert.equal(
+      episodeNamedIn(
+        'Remote Reach 720p',
+        [ep(3, 0, 4, 'Remote Reach', false)],
+        names
+      ),
+      undefined
+    );
+    assert.equal(
+      episodeNamedIn(
+        'Remote Reach Ice 720p',
+        [ep(4, 0, 5, 'Ice', false)],
+        names
+      ),
       undefined
     );
   });

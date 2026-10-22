@@ -27,6 +27,21 @@ export type BackfillSeriesStatus =
   /** Nothing missing any more. */
   | 'done';
 
+/** Something the admin agent did for a title, kept for the next time. */
+export interface AgentNote {
+  /** When, as an ISO date. */
+  at: string;
+  kind: 'searched' | 'grabbed' | 'failed' | 'refused';
+  /** The search's words, or the release's name. */
+  what: string;
+  /** The episodes it was for: "S08E01". */
+  episodes?: string[];
+  /** Why it failed or was turned down. */
+  why?: string;
+  /** How many results a search found. */
+  results?: number;
+}
+
 /** A Sonarr series or a Radarr movie Backfill is following. */
 @Entity()
 @Unique(['kind', 'serverId', 'arrId'])
@@ -98,6 +113,14 @@ export class BackfillSeries {
    */
   @DbAwareColumn({ type: 'datetime', nullable: true })
   public agentAutoRunAt: Date | null;
+
+  /**
+   * What the admin agent tried for this title, oldest first: told to its
+   * next conversation about it (see agent/notes.ts). Read only when asked
+   * for, as nothing else needs it.
+   */
+  @Column({ type: 'simple-json', default: '[]', select: false })
+  public agentNotes: AgentNote[];
 
   @OneToMany(() => BackfillCandidate, (candidate) => candidate.series)
   public candidates: BackfillCandidate[];

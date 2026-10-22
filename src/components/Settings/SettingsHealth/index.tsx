@@ -19,6 +19,7 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import type { HealthCheck, HealthItem, HealthStatus } from '@server/lib/health';
+import type { HealthActivity } from '@server/lib/healthActivity';
 import axios from 'axios';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -88,6 +89,17 @@ const messages = defineMessages('components.Settings.SettingsHealth', {
   backfillSearchErrors: 'Titles Backfill could not search',
   backfillAwaiting: 'Packs waiting for approval',
   backfillFailed: 'Downloads that failed this week',
+  downloadCheckWaiting: 'Download Check findings waiting for you',
+  agentWaiting: 'Admin agent conversations waiting for you',
+  thisWeek: 'This week',
+  weekDownloadCheck:
+    'Download Check: {rejected} rejected, {imported} imported, {cleared} cleared',
+  weekDownloadCheckReport:
+    'Download Check (Report only): would have acted on {count, plural, one {# download} other {# downloads}}',
+  weekFailed: '{count} could not be done',
+  weekAgent:
+    'Admin agent: {conversations, plural, one {# conversation} other {# conversations}}, {downloads, plural, one {# download} other {# downloads}} started ({imported} imported, {failed} failed)',
+  weekAgentChanges: '{count, plural, one {# change} other {# changes}} made',
   unreachable: 'Not answering',
   issues: '{count, plural, one {# issue} other {# issues}}',
   statusOk: 'OK',
@@ -98,6 +110,7 @@ const messages = defineMessages('components.Settings.SettingsHealth', {
 interface HealthResponse {
   checkedAt: string;
   checks: HealthCheck[];
+  activity?: HealthActivity;
 }
 
 const PAGE_SIZE = 10;
@@ -598,6 +611,61 @@ const CheckRow = ({
   );
 };
 
+/** What Download Check and the admin agent did this week, in a line each. */
+const WeekActivity = ({ activity }: { activity: HealthActivity }) => {
+  const intl = useIntl();
+  const lines: string[] = [];
+  const check = activity.downloadCheck;
+  if (check) {
+    const done =
+      check.mode === 'report'
+        ? intl.formatMessage(messages.weekDownloadCheckReport, {
+            count: check.wouldHave,
+          })
+        : intl.formatMessage(messages.weekDownloadCheck, {
+            rejected: check.rejected,
+            imported: check.imported,
+            cleared: check.cleared,
+          });
+    lines.push(
+      check.failed
+        ? `${done}, ${intl.formatMessage(messages.weekFailed, {
+            count: check.failed,
+          })}`
+        : done
+    );
+  }
+  const agent = activity.agent;
+  if (agent) {
+    const did = intl.formatMessage(messages.weekAgent, {
+      conversations: agent.conversations,
+      downloads: agent.downloads,
+      imported: agent.imported,
+      failed: agent.failed,
+    });
+    lines.push(
+      agent.changes
+        ? `${did}, ${intl.formatMessage(messages.weekAgentChanges, {
+            count: agent.changes,
+          })}`
+        : did
+    );
+  }
+  if (!lines.length) return null;
+  return (
+    <div className="mt-3 rounded-md border border-gray-700 bg-gray-800 px-4 py-3 text-sm shadow">
+      <div className="mb-1 font-medium text-strong">
+        {intl.formatMessage(messages.thisWeek)}
+      </div>
+      {lines.map((line) => (
+        <p key={line} className="text-gray-400">
+          {line}
+        </p>
+      ))}
+    </div>
+  );
+};
+
 const GROUPS: { id: HealthCheck['group']; label: keyof typeof messages }[] = [
   { id: 'services', label: 'services' },
   { id: 'backfill', label: 'backfill' },
@@ -721,6 +789,9 @@ const SettingsHealth = () => {
                         />
                       ))}
                     </ul>
+                  )}
+                  {group.id === 'backfill' && data.activity && (
+                    <WeekActivity activity={data.activity} />
                   )}
                 </div>
               );

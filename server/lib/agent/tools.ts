@@ -128,6 +128,13 @@ export interface AgentState {
 /** A refusal the model is told about, to try something else. */
 export class ToolError extends Error {}
 
+/**
+ * A release turned down for what it is (a dub in another language), not
+ * for how it was asked for: remembered for the title, so later
+ * conversations don't try it again.
+ */
+export class Refused extends ToolError {}
+
 export interface AgentTool extends ConverseTool {
   /** Only when an admin asked, never on its own. */
   askOnly?: boolean;
@@ -431,7 +438,7 @@ const sameRelease = (
   pack.title.toLowerCase() === release.title.toLowerCase();
 
 /** The title a run is bound to, once it is. */
-const boundTitle = (run: AgentRun): TitleRef | null =>
+export const boundTitle = (run: AgentRun): TitleRef | null =>
   run.kind && run.arrId !== null && run.arrId !== undefined
     ? { kind: run.kind, serverId: run.serverId ?? 0, arrId: run.arrId }
     : null;
@@ -1365,7 +1372,7 @@ const prepareWhole = async (
       parsed.languages,
       movie.originalLanguage?.name
     );
-    if (problem) throw new ToolError(problem);
+    if (problem) throw new Refused(problem);
     Object.assign(entry, {
       // A movie's plan entry carries the movie's id, as Backfill's own do.
       episodeIds: [movie.id],
@@ -1467,7 +1474,7 @@ const prepareWhole = async (
       throw new ToolError(`Nothing was started. ${problems.join(' ')}`);
     }
     const problem = languageProblem(parsed.languages, originalOf(series));
-    if (problem) throw new ToolError(problem);
+    if (problem) throw new Refused(problem);
     const full = seriesCtx.episodes.find((e) => e.id === episode.id);
     Object.assign(entry, {
       episodeIds: [episode.id],
@@ -1611,7 +1618,7 @@ const prepareGrab = async (
     }
     const original = ctx.movie.originalLanguage?.name;
     const releaseProblem = await titleLanguage(original);
-    if (releaseProblem) throw new ToolError(releaseProblem);
+    if (releaseProblem) throw new Refused(releaseProblem);
     if (!mentionsShow(known.title, ctx.names)) {
       doubts.push(`The release's name does not name ${ctx.movie.title}.`);
     }
@@ -1623,7 +1630,7 @@ const prepareGrab = async (
     });
     const parsed = await ctx.radarr.parse(judgedAs).catch(() => null);
     const problem = languageProblem(parsed?.languages, original);
-    if (problem) throw new ToolError(problem);
+    if (problem) throw new Refused(problem);
     plan.push({
       index: file.index,
       path: file.path,
@@ -1667,7 +1674,7 @@ const prepareGrab = async (
     }
     const original = originalOf(ctx.series);
     const releaseProblem = await titleLanguage(original);
-    if (releaseProblem) throw new ToolError(releaseProblem);
+    if (releaseProblem) throw new Refused(releaseProblem);
     if (!mentionsShow(known.title, ctx.names)) {
       doubts.push(`The release's name does not name ${ctx.series.title}.`);
     }
@@ -1749,6 +1756,7 @@ const prepareGrab = async (
       const parsed = await ctx.sonarr.parse(judgedAs).catch(() => null);
       const problem = languageProblem(parsed?.languages, original);
       if (problem) {
+        // One file of a pack: the rest may be fine.
         throw new ToolError(`File #${file.index}: ${problem}`);
       }
       plan.push({
@@ -2616,7 +2624,7 @@ export const runTool = async (
   state: AgentState,
   name: string,
   input: Record<string, unknown>
-): Promise<{ text: string; isError: boolean }> => {
+): Promise<{ text: string; isError: boolean; refused?: boolean }> => {
   const tool = TOOLS.find((t) => t.name === name);
   if (!tool || (tool.askOnly && !adminPresent(state.run))) {
     return { text: `There is no tool called ${name}.`, isError: true };
@@ -2634,6 +2642,10 @@ export const runTool = async (
         : e instanceof Error
           ? e.message
           : String(e);
-    return { text: clip(why, 1500), isError: true };
+    return {
+      text: clip(why, 1500),
+      isError: true,
+      ...(e instanceof Refused ? { refused: true } : {}),
+    };
   }
 };

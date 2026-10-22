@@ -7,8 +7,8 @@ Sonarr and Radarr search their indexers and give up quietly when nothing matches
 ## What Backfill does
 
 1. Every 6 hours (the **Backfill Scan** job) it finds series and movies that Sonarr or Radarr searched for and didn't grab, once their last search is older than **Stuck after** (24 hours by default).
-2. It searches Prowlarr itself, under every name the title goes by, a few titles per scan (requested titles first).
-3. It opens the likeliest packs (reading the torrent or NZB, without downloading it) and asks Sonarr or Radarr how they would import each file and whether it meets the quality profile.
+2. It searches Prowlarr itself, under every name the title goes by, a few titles per scan (requested titles first). Missing specials, and episodes the scene numbers another way, are also searched for by their titles.
+3. It opens the likeliest packs (reading the torrent or NZB, without downloading it) and asks Sonarr or Radarr how they would import each file and whether it meets the quality profile. A file whose name carries another episode's title than its number is taken as the episode its title is (**By title**), and one Sonarr won't read that way is turned down; a file named only by its title, as specials often are, is placed by it too.
 4. It offers the packs that fill what is missing, with a score and a plan for each file, and sends a **Backfill** notification; tap it to review.
 5. When a pack is approved, it downloads only the chosen files to its own category, imports them through Sonarr or Radarr, and cleans up. Torrents aren't seeded afterwards.
 
@@ -80,7 +80,8 @@ An AI with tools that looks further when Backfill finds nothing usable for a req
 - **Standing instructions**: what it should always do, in your words ("always check it's English before downloading", "prefer Usenet", "nothing under 720p for new shows").
 - **While it works**, you can tell it something ("that's the wrong show", "skip the specials"): it reads it before its next step. **Stop** stops it before its next step; downloads it already started carry on, and replying later picks up where it was.
 - **Episode numbering**: releases often number episodes their own way (a special counted as episode 1, or the scene's seasons, which Sonarr goes by for some series). The agent goes by each episode's title: search results say which library episode each release is, a file whose title is another episode is never taken for this one, and a release named by the library's numbers is taken when its title agrees, even if Sonarr reads it as another episode.
-- **Asked for everything missing**, it doesn't stop while there are missing episodes it never searched for: it's told which, once, and looks for each.
+- **Asked for everything missing**, it doesn't stop while there are missing episodes it never searched for: it's told which, once, and looks for each. Specials are searched for by the show's name and their titles first.
+- **It remembers each title**: its searches and what they found, the releases it started, those that failed and those it turned down for being in another language. The next conversation about the title is told, so it doesn't repeat searches that found nothing or take what failed. Kept as long as Backfill waits before searching a title again.
 - Every conversation is kept, step by step, with what it cost; you can reply to it or answer its questions. Finished ones are removed after 30 days; ones waiting for your answer are kept. **Clear finished** removes them now, except those whose downloads are still going, and never touches what they downloaded.
 
 What it does shows in each title's history and in Backfill notifications.

@@ -71,7 +71,7 @@ export interface EntryView {
   reason?: string;
   replaces: number;
   /** Placed by the AI second opinion, with what it read in the name. */
-  matchedBy?: 'ai';
+  matchedBy?: 'ai' | 'title';
   why?: string;
 }
 

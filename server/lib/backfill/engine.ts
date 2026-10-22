@@ -24,6 +24,12 @@ import type { BackfillKind } from '@server/entity/BackfillSeries';
 import BackfillSeries from '@server/entity/BackfillSeries';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
+import {
+  episodeNamedIn,
+  episodeTitled,
+  ownTitle,
+  sceneDiffers,
+} from '@server/lib/agent/numbering';
 import { magnetHash, parseTorrent } from '@server/lib/backfill/bencode';
 import {
   IndexerLimitReached,
@@ -191,6 +197,11 @@ const RECENTLY_DONE_MS = 10 * 60_000;
 const MAX_TERMS = 5;
 /** Seasons with missing episodes searched for by number, most missing first. */
 const MAX_SEASON_TERMS = 3;
+/**
+ * Missing specials, and episodes the scene numbers another way, searched
+ * for by their titles: releases seldom name them by the library's number.
+ */
+const MAX_TITLE_TERMS = 3;
 /** Packs opened per search: opening one fetches it and parses every file. */
 const MAX_INSPECT = 10;
 /** Packs per search the AI second opinion is asked about. */
@@ -1769,13 +1780,32 @@ class Backfill {
             .sort((a, b) => b[1] - a[1])
             .slice(0, MAX_SEASON_TERMS)
             .map(([season]) => season);
-    const wanted = missing.map(
-      (ep) =>
-        new RegExp(
-          `\\bS${pad(ep.seasonNumber)}E${pad(ep.episodeNumber)}\\b`,
-          'i'
-        )
+    const wanted = missing.flatMap((ep) =>
+      [
+        [ep.seasonNumber, ep.episodeNumber],
+        // Named by the scene's numbers, as Sonarr searches for it.
+        ...(sceneDiffers(ep)
+          ? [[ep.sceneSeasonNumber!, ep.sceneEpisodeNumber!]]
+          : []),
+      ].map(
+        ([season, episode]) =>
+          new RegExp(`\\bS${pad(season)}E${pad(episode)}\\b`, 'i')
+      )
     );
+    const missingIds = new Set(missing.map((ep) => ep.id));
+    /** Names a missing episode by its title, with or without numbers. */
+    const namesMissing = (title: string) => {
+      const ep =
+        episodeTitled(title, ctx.episodes) ??
+        episodeNamedIn(title, ctx.episodes, ctx.names);
+      return !!ep && missingIds.has(ep.id);
+    };
+    const byTitle = [
+      ...missing.filter((ep) => ep.seasonNumber === 0),
+      ...missing.filter((ep) => ep.seasonNumber > 0 && sceneDiffers(ep)),
+    ]
+      .filter(ownTitle)
+      .slice(0, MAX_TITLE_TERMS);
     const wantedSeasons = [...bySeason.keys()].map(
       (season) => new RegExp(`\\bS${pad(season)}\\b(?!E)`, 'i')
     );
@@ -1785,12 +1815,18 @@ class Backfill {
       names: ctx.names,
       missing: missing.length,
       categories: TV_CATEGORIES,
-      extraTerms: seasons.map(
-        (season) => `${titleWithoutYear(ctx.series.title)} S${pad(season)}`
-      ),
+      extraTerms: [
+        ...seasons.map(
+          (season) => `${titleWithoutYear(ctx.series.title)} S${pad(season)}`
+        ),
+        ...byTitle.map(
+          (ep) => `${titleWithoutYear(ctx.series.title)} ${ep.title}`
+        ),
+      ],
       wants: (title) =>
         wanted.filter((rx) => rx.test(title)).length +
-        wantedSeasons.filter((rx) => rx.test(title)).length,
+        wantedSeasons.filter((rx) => rx.test(title)).length +
+        Number(namesMissing(title)),
       // A title Sonarr matches to another show it has (Tsumuden, for
       // Kitsuraga) is that show's.
       readTitle: async (title) => {
@@ -1915,12 +1951,14 @@ class Backfill {
       );
       // What names a missing episode is opened first, then the likeliest
       // packs.
+      const wanting = new Map(
+        titled.map((t) => [t.release, target.wants(t.release.title) > 0])
+      );
       const toOpen = titled
         .filter((t) => !t.other)
         .sort(
           (a, b) =>
-            Number(target.wants(b.release.title) > 0) -
-              Number(target.wants(a.release.title) > 0) ||
+            Number(wanting.get(b.release)) - Number(wanting.get(a.release)) ||
             packScore(b.release) - packScore(a.release) ||
             (b.release.seeders ?? 0) - (a.release.seeders ?? 0)
         )

@@ -865,6 +865,209 @@ describe('Backfill: a two-part finale the scene numbers as one', () => {
   });
 });
 
+describe('Backfill: a name whose episode title is another episode', () => {
+  // A made-up series Sonarr numbers by the scene (TheXEM): library S08E01
+  // is the scene's S06E15, and the scene's S08E01 is library S09E01. Some
+  // groups name files by the library's numbers, some count the special as
+  // S03E01; the episode title in the name says which episode it is.
+  const ep = (
+    id: number,
+    season: number,
+    episode: number,
+    title: string,
+    hasFile: boolean,
+    scene?: [number, number]
+  ): SonarrEpisode => ({
+    id,
+    seriesId: 77,
+    seasonNumber: season,
+    episodeNumber: episode,
+    title,
+    hasFile,
+    monitored: true,
+    episodeFileId: hasFile ? id + 1000 : 0,
+    ...(scene
+      ? { sceneSeasonNumber: scene[0], sceneEpisodeNumber: scene[1] }
+      : {}),
+  });
+  const atoll = ep(941, 8, 1, 'Atoll Exile', false, [6, 15]);
+  const river = ep(948, 9, 1, 'River Bend', true, [8, 1]);
+  const map = ep(863, 0, 1, 'Beyond the Map', false);
+  const ochre = ep(893, 3, 1, 'Ochre Canyon', true);
+  const kiln = ep(895, 3, 3, 'Into the Kiln', false);
+  const salt = ep(912, 5, 2, 'Salt Flats', false);
+  const wayOut = ep(920, 1, 2, 'The Long Way Out', false);
+  const reckoning = ep(927, 1, 7, 'Reckoning', true);
+  const dayOne = ep(940, 0, 9, 'Day One', false);
+  const episodes = [
+    atoll,
+    river,
+    map,
+    ochre,
+    kiln,
+    salt,
+    wayOut,
+    reckoning,
+    dayOne,
+  ];
+
+  const ctx = (): SeriesContext => ({
+    series: {
+      id: 77,
+      title: 'Remote Reach',
+      year: 2010,
+      tvdbId: 999001,
+      seriesType: 'standard',
+      qualityProfileId: 13,
+      path: '/tv/Remote Reach',
+    },
+    episodes,
+    files: [river, ochre].map((e) => ({
+      id: e.episodeFileId,
+      seasonNumber: e.seasonNumber,
+      size: 300e6,
+      quality: q(4, 'HDTV-720p'),
+      customFormatScore: 0,
+    })),
+    profile: ANIME_1080P,
+    names: ['Remote Reach'],
+    sonarr: {
+      // As Sonarr reads a series numbered by the scene: by the scene's
+      // numbers, then by TVDB's for an episode the scene doesn't renumber.
+      // It has nothing for season 5.
+      parse: async (title: string) => {
+        const m = /S(\d+)E(\d+)/i.exec(title);
+        if (!m) {
+          return {
+            title,
+            parsedEpisodeInfo: { seriesTitle: 'Remote Reach' },
+            customFormatScore: 0,
+          };
+        }
+        const season = Number(m[1]);
+        const episode = Number(m[2]);
+        const found =
+          season === 5
+            ? undefined
+            : (episodes.find(
+                (e) =>
+                  e.sceneSeasonNumber === season &&
+                  e.sceneEpisodeNumber === episode
+              ) ??
+              episodes.find(
+                (e) =>
+                  e.sceneSeasonNumber === undefined &&
+                  e.seasonNumber === season &&
+                  e.episodeNumber === episode
+              ));
+        return {
+          title,
+          parsedEpisodeInfo: {
+            seriesTitle: 'Remote Reach',
+            quality: q(3, 'WEBDL-1080p'),
+            seasonNumber: season,
+            episodeNumbers: [episode],
+            releaseGroup: 'GRP',
+          },
+          series: { id: 77, title: 'Remote Reach' },
+          episodes: found ? [found] : [],
+          customFormatScore: 500,
+        };
+      },
+    } as unknown as SeriesContext['sonarr'],
+  });
+
+  const PACK = 'Remote.Reach.Complete.1080p.WEB-DL-GRP';
+  const file = (index: number, name: string) => ({
+    index,
+    path: `${PACK}/${name}.mkv`,
+    size: 900e6,
+  });
+
+  it('takes a file by its title when Sonarr reads its number as another episode', async () => {
+    const { plan } = await judgePack(
+      [file(0, 'Remote.Reach.S08E01.Atoll.Exile.1080p.WEB-DL-GRP')],
+      PACK,
+      ctx()
+    );
+    assert.deepEqual(plan[0].episodeIds, [atoll.id], 'not River Bend');
+    assert.equal(plan[0].season, 8);
+    assert.equal(plan[0].episode, 1);
+    assert.equal(plan[0].matchedBy, 'title');
+    assert.equal(plan[0].action, 'fill');
+  });
+
+  it('takes a special a group numbered as a season’s first episode', async () => {
+    const { plan } = await judgePack(
+      [file(0, 'Remote.Reach.S03E01.Beyond.the.Map.1080p.WEB-DL-GRP')],
+      PACK,
+      ctx()
+    );
+    assert.deepEqual(plan[0].episodeIds, [map.id], 'not Ochre Canyon');
+    assert.equal(plan[0].season, 0);
+    assert.equal(plan[0].matchedBy, 'title');
+    assert.equal(plan[0].action, 'fill');
+  });
+
+  it('takes a special named only by its title', async () => {
+    const { plan } = await judgePack(
+      [
+        file(0, 'Specials/Remote Reach - Beyond the Map'),
+        file(1, 'Specials/Remote Reach - Salt Flats'),
+      ],
+      PACK,
+      ctx()
+    );
+    const byIndex = new Map(plan.map((e) => [e.index, e]));
+    assert.deepEqual(byIndex.get(0)?.episodeIds, [map.id]);
+    assert.equal(byIndex.get(0)?.matchedBy, 'title');
+    assert.equal(byIndex.get(0)?.action, 'fill');
+    // Sonarr has nothing for season 5, as before.
+    assert.equal(byIndex.get(1)?.action, 'reject');
+  });
+
+  it('goes by the number when the title only shares a word with another episode’s', async () => {
+    const { plan } = await judgePack(
+      [
+        file(0, 'Remote.Reach.S01E02.The.Reckoning.Begins.1080p.WEB-DL-GRP'),
+        // Not an episode, though it holds one's title.
+        file(1, 'Specials/Remote Reach - Day One Interview'),
+      ],
+      PACK,
+      ctx()
+    );
+    const byIndex = new Map(plan.map((e) => [e.index, e]));
+    assert.deepEqual(byIndex.get(0)?.episodeIds, [wayOut.id]);
+    assert.equal(byIndex.get(0)?.matchedBy, undefined);
+    assert.equal(byIndex.get(1)?.action, 'reject');
+    assert.deepEqual(byIndex.get(1)?.episodeIds, []);
+  });
+
+  it('leaves a file whose number and title agree as it was', async () => {
+    const { plan } = await judgePack(
+      [file(0, 'Remote.Reach.S03E03.Into.the.Kiln.1080p.WEB-DL-GRP')],
+      PACK,
+      ctx()
+    );
+    assert.deepEqual(plan[0].episodeIds, [kiln.id]);
+    assert.equal(plan[0].matchedBy, undefined);
+  });
+
+  it('turns a file down when Sonarr won’t read it as the episode its title is', async () => {
+    const { plan } = await judgePack(
+      [file(0, 'Remote.Reach.S03E01.Salt.Flats.1080p.WEB-DL-GRP')],
+      PACK,
+      ctx()
+    );
+    assert.equal(plan[0].action, 'reject');
+    assert.deepEqual(plan[0].episodeIds, []);
+    assert.equal(
+      plan[0].reason,
+      'Its title is S05E02 "Salt Flats", which Sonarr won\'t read it as'
+    );
+  });
+});
+
 describe('Backfill: the AI second opinion', () => {
   const special = (
     id: number,

@@ -21,6 +21,8 @@ import { MediaEvent, MediaEventType } from '@server/entity/MediaEvent';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
 import agent, { NoSuchRun, compact } from '@server/lib/agent';
+import type { AgentNote } from '@server/lib/agent/notes';
+import { notesOf } from '@server/lib/agent/notes';
 import {
   MIN_VIDEO_BYTES,
   checkMapping,
@@ -230,6 +232,17 @@ const waitForRun = async (id: number, until = ['done', 'failed']) => {
 };
 
 const WAIT_MS = searchTiming.waitMs;
+
+/** The series' notes, once they hold what `done` looks for: kept a moment after. */
+const notesOnceKept = async (done: (notes: AgentNote[]) => boolean) => {
+  const title = { kind: 'series' as const, serverId: 0, arrId: SERIES_ID };
+  for (let i = 0; i < 200; i++) {
+    const notes = await notesOf(title);
+    if (done(notes)) return notes;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error('The notes were not kept');
+};
 
 beforeEach(async () => {
   forgetSearches();
@@ -567,6 +580,21 @@ describe('the admin agent', () => {
     // The model saw every tool, the request one included, as an admin asked.
     const names = (bodies[0].tools as { name: string }[]).map((t) => t.name);
     assert.ok(names.includes('request_title'));
+
+    // The dub is kept with the title as turned down; the file it mapped
+    // to the wrong episode isn't, as the release itself was fine.
+    const notes = await notesOnceKept((kept) =>
+      kept.some((note) => note.kind === 'grabbed')
+    );
+    assert.deepEqual(
+      notes
+        .filter((note) => note.kind !== 'searched')
+        .map((note) => [note.kind, note.what, note.why]),
+      [
+        ['refused', FRENCH.title, 'It is in French, not English.'],
+        ['grabbed', COLLECTION.title, undefined],
+      ]
+    );
   });
 
   // Packed in archives, or with scrambled names (only its PAR2 repair
@@ -3725,6 +3753,49 @@ describe('when a download the admin agent started fails', () => {
     assert.equal(failed.replacedById, replacement.id);
     assert.equal(replacement.title, LESIGH.title);
     assert.equal(replacement.agentRunId, run.id);
+
+    // Kept with the title: its searches (the first made before it knew
+    // the title), both downloads, and the one that failed and why.
+    const notes = await notesOnceKept((kept) => kept.length >= 5);
+    assert.deepEqual(
+      notes.map((note) => [note.kind, note.what]),
+      [
+        ['searched', 'Wendle the Gentle Lantern S01E02'],
+        ['grabbed', KILN.title],
+        ['failed', KILN.title],
+        ['searched', 'Wendle the Gentle Lantern S01E02'],
+        ['grabbed', LESIGH.title],
+      ]
+    );
+    assert.deepEqual(notes[1].episodes, ['S01E02']);
+    assert.equal(notes[0].results, 2);
+    assert.match(notes[2].why ?? '', /SABnzbd could not finish it/);
+
+    // The next conversation about the title is told, before it starts.
+    script = [
+      (body) => {
+        const first = (body.messages as { content: string }[])[0].content;
+        assert.match(first, /^An admin asked about Wendle/);
+        assert.match(
+          first,
+          /Downloads that failed:\n- \d{4}-\d\d-\d\d "Wendle\.the\.Gentle\.Lantern\.S01E02\.DVDRip\.x264-KILN" \("SABnzbd could not finish it/
+        );
+        assert.match(
+          first,
+          /Downloads started:\n- \S+ "Wendle\.the\.Gentle\.Lantern\.S01E02\.480p\.WEB-LeSigh" for S01E02\n/
+        );
+        assert.match(
+          first,
+          /Searches:\n- \S+ "Wendle the Gentle Lantern S01E02": 2 results$/
+        );
+        return say('S01E02 is downloading already.');
+      },
+    ];
+    const next = await agent.ask('Is S01E02 coming?', await admin(), {
+      title: { kind: 'series', serverId: 0, arrId: SERIES_ID },
+      name: 'Wendle the Gentle Lantern',
+    });
+    assert.equal((await waitForRun(next.id)).status, 'done');
   });
 
   it('gives up after three replacements of the same episodes fail in a day, and says so', async () => {

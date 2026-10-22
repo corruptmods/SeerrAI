@@ -37,6 +37,7 @@ Each can be turned off in **Settings → Features** (for everyone) or in your ow
 | **Catch Me Up** (`aiRecap`) | Series pages | Everyone | A spoiler-free recap up to where you are (from your watch history on any connected server, or an episode you pick), built from TMDB's episode synopses; only those up to there are sent. |
 | **Review Deletions** (`aiDeletionReview`) | The Deleting Soon row | Request managers | Flags what Maintainerr is about to delete that might be a mistake: someone part-way through, often rewatched, recently requested, on a list. |
 | **Suggest Issue Fixes** (`aiIssueTriage`) | An issue's page | Issue managers | Suggests a fix from the report and its comments. |
+| **Understand Reports** (`aiReports`) | Issues, and [Siri](./siri.md) | Everyone | Works out what a problem report asks for when the usual rules can't tell. Sends only the report's words. Fixes that replace files are asked about first (Siri) or left for an admin (issues). |
 | **Explain Logs** (`aiLogs`) | Settings → Logs | Admins | Explains a log entry. Keys, tokens and emails are removed first. |
 | **Backfill Second Opinion** (`aiBackfill`) | Backfill, when an admin searches one title | Admins | Places files whose names don't say which episode they are. Its placements are marked and left out of approval unless you include them. |
 | **Admin Agent** (`aiAgent`) | Backfill → Agent | Admins | See [Backfill and the admin agent](./backfill-and-agent.md#the-admin-agent). |

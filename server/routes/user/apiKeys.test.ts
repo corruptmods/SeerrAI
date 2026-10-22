@@ -8,6 +8,7 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import UserApiKey from '@server/entity/UserApiKey';
+import nowPlaying from '@server/lib/nowPlaying';
 import { Permission } from '@server/lib/permissions';
 import {
   hashKey,
@@ -17,6 +18,7 @@ import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
 import authRoutes from '@server/routes/auth';
+import nowPlayingRoutes from '@server/routes/nowPlaying';
 import settingsRoutes from '@server/routes/settings';
 import { setupTestDb } from '@server/test/db';
 import type { Express } from 'express';
@@ -53,6 +55,7 @@ function createApp(withSpec = false) {
   api.use('/auth', authRoutes);
   api.use('/user', isAuthenticated(), userRoutes);
   api.use('/settings', isAuthenticated(Permission.ADMIN), settingsRoutes);
+  api.use('/now-playing', isAuthenticated(), nowPlayingRoutes);
   if (withSpec) {
     // As the app runs: the spec checked before any route.
     app.use(
@@ -118,6 +121,7 @@ afterEach(() => {
   getSettings().main.apiKey = settingsBefore.serverKey;
   getSettings().main.mediaServerType = settingsBefore.mediaServerType;
   getSettings().jellyfin = { ...settingsBefore.jellyfin };
+  getSettings().main.disabledFeatures = [];
 });
 
 async function signIn(email: string) {
@@ -655,6 +659,154 @@ describe("someone else's keys", () => {
       404
     );
     assert.equal(await getRepository(UserApiKey).count(), 1);
+  });
+});
+
+describe('a Siri key', () => {
+  const specApp = () => createApp(true);
+
+  /** Friend, who may report problems, signed in through the API spec. */
+  async function siriUser(app: Express) {
+    const id = (await friend()).id;
+    await getRepository(User).update(id, {
+      permissions: Permission.REQUEST | Permission.CREATE_ISSUES,
+    });
+    const agent = request.agent(app);
+    const res = await agent
+      .post('/api/v1/auth/local')
+      .set('X-Forwarded-For', ip)
+      .send({ email: 'friend@seerr.dev', password: 'test1234' });
+    assert.equal(res.status, 200, res.body.message);
+    return { agent, id };
+  }
+
+  const makeSiriKey = async (
+    agent: ReturnType<typeof request.agent>,
+    id: number
+  ) => {
+    const res = await agent.post(`/api/v1/user/${id}/settings/siri`);
+    assert.equal(res.status, 201, res.body.message);
+    return res.body as { secret: string; key: { id: number } };
+  };
+
+  it('reports with Siri and does nothing else, with personal keys off', async () => {
+    getSettings().main.personalApiKeys = 'off';
+    mock.method(nowPlaying, 'playingFor', async () => []);
+    const app = specApp();
+    const { agent, id } = await siriUser(app);
+    const { secret } = await makeSiriKey(agent, id);
+    const as = (path: string) =>
+      request(app)
+        .get(path)
+        .set('X-Forwarded-For', ip)
+        .set('X-Api-Key', secret);
+
+    const playing = await as('/api/v1/now-playing');
+    assert.equal(playing.status, 200, playing.body.message);
+    assert.match(playing.body.say, /Nothing is playing/);
+
+    const me = await as('/api/v1/auth/me');
+    assert.equal(me.status, 403);
+    assert.match(me.body.message, /only works for reporting with Siri/);
+
+    // Listed on the Siri page, not with the API keys.
+    const page = await agent.get(`/api/v1/user/${id}/settings/siri`);
+    assert.equal(page.status, 200);
+    assert.ok(page.body.key);
+    assert.equal(JSON.stringify(page.body).includes(secret), false);
+    const keys = await agent.get(`/api/v1/user/${id}/settings/api-keys`);
+    assert.equal(keys.body.keys.length, 0);
+    mock.restoreAll();
+  });
+
+  it('replaces the one before it', async () => {
+    mock.method(nowPlaying, 'playingFor', async () => []);
+    const app = specApp();
+    const { agent, id } = await siriUser(app);
+    const first = await makeSiriKey(agent, id);
+    const second = await makeSiriKey(agent, id);
+    const as = (key: string) =>
+      request(app)
+        .get('/api/v1/now-playing')
+        .set('X-Forwarded-For', ip)
+        .set('X-Api-Key', key);
+    assert.equal((await as(first.secret)).status, 401);
+    assert.equal((await as(second.secret)).status, 200);
+    assert.equal(
+      await getRepository(UserApiKey).count({ where: { userId: id } }),
+      1
+    );
+    mock.restoreAll();
+  });
+
+  it('stops working, out loud, while Siri reports are off', async () => {
+    const app = specApp();
+    const { agent, id } = await siriUser(app);
+    const { secret } = await makeSiriKey(agent, id);
+    getSettings().main.disabledFeatures = ['siri'];
+    const res = await request(app)
+      .get('/api/v1/now-playing')
+      .set('X-Forwarded-For', ip)
+      .set('X-Api-Key', secret);
+    assert.equal(res.status, 401);
+    assert.equal(res.body.say, 'Reporting with Siri is turned off.');
+  });
+
+  it('is made only while signed in, by someone who may report problems', async () => {
+    const app = specApp();
+    const { agent, id } = await siriUser(app);
+    const { secret } = await makeSiriKey(agent, id);
+    // Not by a key, not even itself.
+    const byKey = await request(app)
+      .post(`/api/v1/user/${id}/settings/siri`)
+      .set('X-Forwarded-For', ip)
+      .set('X-Api-Key', secret);
+    assert.equal(byKey.status, 403);
+
+    await getRepository(User).update(id, { permissions: Permission.REQUEST });
+    const res = await agent.post(`/api/v1/user/${id}/settings/siri`);
+    assert.equal(res.status, 403);
+    assert.match(res.body.message, /permission to report problems/);
+  });
+
+  it('is revoked from the Siri page, and stops at once', async () => {
+    const app = specApp();
+    const { agent, id } = await siriUser(app);
+    const { secret } = await makeSiriKey(agent, id);
+    assert.equal(
+      (await agent.delete(`/api/v1/user/${id}/settings/siri`)).status,
+      204
+    );
+    const res = await request(app)
+      .get('/api/v1/now-playing')
+      .set('X-Forwarded-For', ip)
+      .set('X-Api-Key', secret);
+    assert.equal(res.status, 401);
+    assert.ok(res.body.say, 'Siri says why');
+    assert.equal(
+      (await agent.delete(`/api/v1/user/${id}/settings/siri`)).status,
+      404
+    );
+  });
+
+  it('takes the shortcut’s iCloud link from an admin, and nothing else', async () => {
+    const app = specApp();
+    const agent = request.agent(app);
+    await agent
+      .post('/api/v1/auth/local')
+      .set('X-Forwarded-For', ip)
+      .send({ email: 'admin@seerr.dev', password: 'test1234' });
+    const link =
+      'https://www.icloud.com/shortcuts/0123456789abcdef0123456789abcdef';
+    const set = (shortcutUrl: string) =>
+      agent.post('/api/v1/settings/siri').send({ shortcutUrl });
+    assert.equal((await set('https://example.com/evil')).status, 400);
+    assert.equal((await set(link)).status, 200);
+    assert.equal(getSettings().main.siriShortcutUrl, link);
+    const page = await agent.get('/api/v1/user/1/settings/siri');
+    assert.equal(page.body.shortcutUrl, link);
+    assert.equal((await set('')).status, 200);
+    assert.equal(getSettings().main.siriShortcutUrl, '');
   });
 });
 

@@ -15,7 +15,7 @@ Switch: `subtitles`.
 
 ## Auto-fix
 
-When someone reports a problem, as an issue or in AI Search, Seerr AI tries to fix it and writes each step on the issue ("Automatic fix: …"):
+When someone reports a problem, as an issue, in AI Search or [with Siri](./siri.md), Seerr AI tries to fix it and writes each step on the issue ("Automatic fix: …"):
 
 - **Subtitles** missing or wrong: searched for, or transcribed.
 - **Episodes or a movie missing**: searched for by Sonarr or Radarr, then Backfill, then the admin agent if it steps in on its own.
@@ -28,6 +28,8 @@ When someone reports a problem, as an issue or in AI Search, Seerr AI tries to f
 The season and episode you name ("season 6", "S06E03", "episode 3 of season 6") are kept with the fix and on the issue it files, so it shows that season rather than All Seasons. An issue filed on All Seasons whose description names a season is moved to that season.
 
 When you ask to fix a season and nothing is missing from it, AI Search says what it checked and asks what's wrong: replace the whole season, check it for mixed-up episodes, or its subtitles. Answer in a few words ("replace all of it") and it carries on with the same season.
+
+What a report asks for is read from its words. When those don't say clearly and AI is set up, the AI model reads them (**Understand Reports**, which sends only the report's words). On an issue it then fixes subtitles and missing episodes; anything that would replace files is left for an admin, with a comment saying what it read.
 
 People who aren't admins are limited to 30 fixes, and 10 file replacements, a day.
 

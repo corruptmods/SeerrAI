@@ -642,6 +642,11 @@ export interface MainSettings {
    * turns it on.
    */
   personalApiKeys: PersonalApiKeyAccess;
+  /**
+   * The iCloud link to the "Fix this show" shortcut an admin made and
+   * shared (Settings → Features), offered on everyone's Siri page.
+   */
+  siriShortcutUrl: string;
   discoverRegion: string;
   streamingRegion: string;
   originalLanguage: string;
@@ -1035,6 +1040,7 @@ class Settings {
         mediaServerLogin: true,
         newPlexLogin: true,
         personalApiKeys: 'off',
+        siriShortcutUrl: '',
         discoverRegion: '',
         streamingRegion: '',
         originalLanguage: '',

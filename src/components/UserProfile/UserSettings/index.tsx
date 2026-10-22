@@ -4,6 +4,7 @@ import PageTitle from '@app/components/Common/PageTitle';
 import type { SettingsRoute } from '@app/components/Common/SettingsTabs';
 import SettingsTabs from '@app/components/Common/SettingsTabs';
 import ProfileHeader from '@app/components/UserProfile/ProfileHeader';
+import useFeature from '@app/hooks/useFeature';
 import useSettings from '@app/hooks/useSettings';
 import { useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
@@ -23,6 +24,7 @@ const messages = defineMessages('components.UserProfile.UserSettings', {
   menuLinkedAccounts: 'Linked Accounts',
   menuPasskeys: 'Passkeys',
   menuApiKeys: 'API Keys',
+  menuSiri: 'Siri',
   menuNotifications: 'Notifications',
   menuPermissions: 'Permissions',
   unauthorizedDescription:
@@ -39,6 +41,7 @@ const UserSettings = ({ children }: UserSettingsProps) => {
   const { user: currentUser } = useUser();
   const { user, error } = useUser({ id: Number(router.query.userId) });
   const intl = useIntl();
+  const siriOn = useFeature('siri');
   const { data } = useSWR<UserSettingsNotificationsResponse>(
     user ? `/api/v1/user/${user?.id}/settings/notifications` : null
   );
@@ -121,6 +124,29 @@ const UserSettings = ({ children }: UserSettingsProps) => {
             (currentUser?.id !== 1 &&
               (user.id === 1 ||
                 hasPermission(Permission.ADMIN, user.permissions ?? 0)))),
+    },
+    {
+      text: intl.formatMessage(messages.menuSiri),
+      route: '/settings/siri',
+      regex: /\/settings\/siri/,
+      // Your own, while Siri reports are on and you may report problems.
+      // Someone who manages users sees another person's, to revoke its key,
+      // except the owner's or another admin's.
+      hidden:
+        currentUser?.id === user.id
+          ? !siriOn ||
+            !hasPermission(
+              [Permission.CREATE_ISSUES, Permission.MANAGE_ISSUES],
+              user.permissions ?? 0,
+              { type: 'or' }
+            )
+          : !hasPermission(
+              Permission.MANAGE_USERS,
+              currentUser?.permissions ?? 0
+            ) ||
+            (currentUser?.id !== 1 &&
+              (user.id === 1 ||
+                hasPermission(Permission.ADMIN, user.permissions ?? 0))),
     },
     {
       text: intl.formatMessage(messages.menuNotifications),

@@ -74,6 +74,7 @@ const messages = defineMessages('components.Settings.SettingsAi', {
   aiRecap: 'Catch Me Up',
   aiDeletionReview: 'Review Deletions',
   aiIssueTriage: 'Suggest Issue Fixes',
+  aiReports: 'Understand Reports',
   aiLogs: 'Explain Logs',
   aiBackfill: 'Backfill Second Opinion',
   aiAgent: 'Admin Agent',

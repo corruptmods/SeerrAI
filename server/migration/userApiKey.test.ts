@@ -2,7 +2,9 @@ import dataSource, { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import UserApiKey from '@server/entity/UserApiKey';
 import { AddUserApiKey1795700000000 as PostgresMigration } from '@server/migration/postgres/1795700000000-AddUserApiKey';
+import { AddApiKeyScope1796000000000 as PostgresScope } from '@server/migration/postgres/1796000000000-AddApiKeyScope';
 import { AddUserApiKey1795700000000 as SqliteMigration } from '@server/migration/sqlite/1795700000000-AddUserApiKey';
+import { AddApiKeyScope1796000000000 as SqliteScope } from '@server/migration/sqlite/1796000000000-AddApiKeyScope';
 import { setupTestDb } from '@server/test/db';
 import { isPgsql } from '@server/utils/dbType';
 import assert from 'node:assert/strict';
@@ -43,6 +45,8 @@ describe('the personal API keys migration', () => {
       assert.equal(await tableExists(), false);
       await migration.up(runner);
       assert.equal(await tableExists(), true);
+      // And the column added since, for Siri keys.
+      await (isPgsql ? new PostgresScope() : new SqliteScope()).up(runner);
 
       const table = await runner.getTable('user_api_key');
       const columns = new Map(

@@ -22,6 +22,8 @@ import {
   planHeadline,
   planSeason,
 } from '@server/lib/autofix/season';
+import type { ReadReport } from '@server/lib/autofix/understand';
+import { REPLACES_FILES, askAboutReport } from '@server/lib/autofix/understand';
 import backfill from '@server/lib/backfill/engine';
 import { featureEnabled } from '@server/lib/features';
 import { owner } from '@server/lib/owner';
@@ -297,6 +299,32 @@ export const classify = (
   if (TRANSCRIBE.test(text) || SUBTITLE.test(text)) return subtitles();
   if (BROKEN.test(text)) return { kind: 'broken' };
   return undefined;
+};
+
+/** What each fix is, in a sentence: "this reads as …". */
+export const KIND_SAID: Record<FixKind, string> = {
+  subtitles: 'a subtitle problem',
+  transcribe: 'a request for subtitles from the audio',
+  missing: 'something missing',
+  broken: 'a bad or broken file',
+  wrongEpisode: 'the wrong episode',
+  replaceSeason: 'a whole bad season',
+};
+
+/**
+ * What a report asks to have fixed: the word rules first, then the AI
+ * model when they can't tell and "Understand Reports" is on. `by` says
+ * which, as a model's reading is only ever a suggestion for files to be
+ * replaced.
+ */
+export const readReport = async (
+  text: string,
+  { user, episode }: { user: User; episode: boolean }
+): Promise<(ReadReport & { by: 'rules' | 'ai' }) | undefined> => {
+  const rule = classify(text);
+  if (rule) return { ...rule, by: 'rules' };
+  const read = await askAboutReport(text, { user, episode });
+  return read ? { ...read, by: 'ai' } : undefined;
 };
 
 /** The server and id a title has there; the 4K one only when that is all. */
@@ -1387,8 +1415,27 @@ class AutoFix {
         .sort((a, b) => a.id - b.id)
         .map((c) => c.message)
         .join('\n');
-      const asked = options.asked ?? classify(text, issue.issueType);
-      if (!asked) return undefined;
+      let asked = options.asked ?? classify(text, issue.issueType);
+      if (!asked) {
+        // The rules couldn't tell: the AI model may. What it reads as a fix
+        // that replaces files is left for an admin, as nobody confirmed it.
+        const read = await askAboutReport(text, {
+          user: actor,
+          episode: issue.media.mediaType === MediaType.TV,
+        });
+        if (!read) return undefined;
+        if (REPLACES_FILES.includes(read.kind)) {
+          await getRepository(IssueComment).save(
+            new IssueComment({
+              issue,
+              user: (await owner()) ?? issue.createdBy,
+              message: `Automatic fix: this reads as ${KIND_SAID[read.kind]}. That replaces files, so it is left for an admin.`,
+            })
+          );
+          return undefined;
+        }
+        asked = read;
+      }
       // Filed on All Seasons, but the report names one: that one, on the
       // issue too, so it shows where the problem is.
       let seasonNumber = issue.problemSeason || undefined;

@@ -40,6 +40,10 @@ const UserFeatureSettings = () => {
   const adminTools: Feature[] = [
     ...(can(Permission.MANAGE_REQUESTS) ? [] : ['aiDeletionReview' as const]),
     ...(can(Permission.MANAGE_ISSUES) ? [] : ['aiIssueTriage' as const]),
+    // Siri only reports problems, which they may not.
+    ...(can(Permission.CREATE_ISSUES) || can(Permission.MANAGE_ISSUES)
+      ? []
+      : ['siri' as const]),
     ...(can(Permission.ADMIN)
       ? []
       : ['aiLogs' as const, 'aiBackfill' as const, 'aiAgent' as const]),

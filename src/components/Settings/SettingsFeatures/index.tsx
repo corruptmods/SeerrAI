@@ -4,6 +4,7 @@ import FeatureSwitches, {
 import { NOT_ON_FEATURES_PAGE } from '@app/components/Common/FeatureSwitches/shown';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
+import SiriShortcut from '@app/components/Settings/SettingsFeatures/SiriShortcut';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
@@ -122,6 +123,7 @@ const SettingsFeatures = () => {
       ) : (
         <LoadingSpinner />
       )}
+      <SiriShortcut />
     </>
   );
 };

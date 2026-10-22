@@ -913,6 +913,57 @@ describe('Auto-fix: reported issues', () => {
     );
   });
 
+  it('asks the model about a report the rules can’t read, and fixes its subtitles', async () => {
+    modelAnswer = JSON.stringify({
+      kind: 'subtitles',
+      language: 'en',
+      wrongSubtitles: true,
+    });
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.OTHER,
+      message: 'people talk but the words at the bottom say something else',
+      mediaId: movie.id,
+    });
+    const comment = await commentOn(res.body.id);
+    assert.match(comment, /Downloaded en subtitles from subdl/);
+    assert.deepEqual(downloads, ['subdl-1']);
+  });
+
+  it('leaves a file the model reads as bad for an admin', async () => {
+    modelAnswer = JSON.stringify({ kind: 'broken' });
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.OTHER,
+      message: 'something about this one is not right',
+      mediaId: series.id,
+      problemSeason: 1,
+      problemEpisode: 2,
+    });
+    const comment = await commentOn(res.body.id);
+    assert.equal(
+      comment,
+      'Automatic fix: this reads as a bad or broken file. That replaces files, so it is left for an admin.'
+    );
+    assert.deepEqual(deleted, []);
+    assert.deepEqual(grabbed, []);
+  });
+
+  it('reads nothing into a report when Understand Reports is off', async () => {
+    getSettings().main.disabledFeatures = ['aiReports'];
+    modelAnswer = JSON.stringify({ kind: 'broken' });
+    const res = await call('POST', '/api/v1/issue', {
+      issueType: IssueType.OTHER,
+      message: 'something about this one is not right',
+      mediaId: series.id,
+      problemSeason: 1,
+      problemEpisode: 2,
+    });
+    await autofix.idle();
+    const comments = await getRepository(IssueComment).find({
+      where: { issue: { id: res.body.id } },
+    });
+    assert.equal(comments.length, 1, 'only the report itself');
+  });
+
   it('does nothing when an admin turned it off', async () => {
     getSettings().main.disabledFeatures = ['autoFix'];
     const res = await call('POST', '/api/v1/issue', {

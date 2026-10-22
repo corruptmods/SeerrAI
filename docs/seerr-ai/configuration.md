@@ -19,6 +19,7 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | **Settings → Users → Let People Make Their Own API Keys** | Personal API keys for apps and scripts, each acting as the person who made it with exactly their permissions. **Who Can Make Them**: admins and people who can manage users, or everyone. Turning it off stops every personal key until it's turned back on. See [API](#api). | Off; admins and user managers once on |
 | **Settings → Users → Single Sign-On** | Providers people can sign in with (Authentik, Authelia, Keycloak, Pocket ID, Google…): name, issuer URL, client ID and secret (never sent back to the browser), button logo, scopes, **Enabled**, **Let New People Sign Up**, **Who Can Sign In** (rules on the provider's claims, such as a group), **Test**, and the redirect URL to give the provider. Needs the Application URL. See [Single sign-on](./single-sign-on.md). | None; scopes `openid profile email`; enabled; sign-up off; no rules (anyone with an account at the provider) |
 | **Settings → Features** | Turns optional features off for everyone. See [Feature switches](#feature-switches). | All on |
+| **Settings → Features → Siri Shortcut** | The iCloud link to the "Fix this show" shortcut, offered on everyone's Siri page. See [Reporting with Siri](./siri.md#making-the-shortcut-admins). | Empty |
 | **Settings → Services → Download Clients** | SABnzbd, NZBGet, qBittorrent, Transmission, Deluge and rTorrent, read for live progress, and for Backfill to send what it finds to. Keys and passwords are never sent back to the browser. | None |
 | **Settings → Services → Bazarr** | Subtitles and transcription. | Port 6767 |
 | **Settings → Services → Tautulli** | Watch history from Plex, for Suggested for You, "up next" on lists, Who Watched, Pick for the Room and Catch Me Up. Plex only; Jellyfin and Emby need nothing. Its API key is never sent back to the browser. | Port 8181 |
@@ -114,6 +115,7 @@ Every feature below is on unless an admin turns it off for everyone (**Settings 
 | `passkeyPrompt` | The banner offering to add a passkey (passkeys still work) |
 | `subtitles` | The Subtitles panel and episode subtitle tags |
 | `autoFix` | Fixing reported problems automatically |
+| `siri` | Reporting with Siri, the Siri page and Siri keys. See [Reporting with Siri](./siri.md) |
 | `music` | Music: the Music item, music in search and on Discover, requesting music, and the Lidarr and music settings. Switched for everyone under Settings → Music, which is there before a Lidarr is added |
 | `aiChat` | AI Search |
 | `aiReasons` | Why These Suggestions |
@@ -121,6 +123,7 @@ Every feature below is on unless an admin turns it off for everyone (**Settings 
 | `aiRecap` | Catch Me Up |
 | `aiDeletionReview` | Review Deletions (request managers) |
 | `aiIssueTriage` | Suggest Issue Fixes (issue managers) |
+| `aiReports` | Understand Reports |
 | `aiLogs` | Explain Logs (admins) |
 | `aiBackfill` | Backfill Second Opinion (admins) |
 | `aiAgent` | The admin agent (admins) |

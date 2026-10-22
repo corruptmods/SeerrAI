@@ -53,3 +53,20 @@ export interface ApiKeyCreatedResponse {
   /** The whole key. Shown this once and never again. */
   secret: string;
 }
+
+/**
+ * What a key may do besides everything its owner may: 'siri' keys only
+ * report problems with what is playing (/api/v1/now-playing).
+ */
+export const API_KEY_SCOPES = ['siri'] as const;
+export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
+
+/** Someone's Siri page: their Siri key, and what the shortcut needs. */
+export interface SiriKeyResponse {
+  /** Their Siri key, if they have one: never the key itself. */
+  key: ApiKeySummary | null;
+  /** The iCloud link to the shortcut an admin shared; empty until then. */
+  shortcutUrl: string;
+  /** The address the shortcut reaches Seerr at, when one is set. */
+  applicationUrl: string;
+}

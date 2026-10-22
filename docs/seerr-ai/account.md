@@ -34,6 +34,10 @@ The list shows when each key was made, last used and expires. **Revoke** stops o
 
 Keys also stop working while an admin has keys turned off, and when you can no longer sign in (for example, no longer shared on Plex). Deleting your account deletes them.
 
+## Siri
+
+**Profile → Settings → Siri** sets up "Fix this show": add the shortcut, then give it the server address and a Siri key, which can only report problems with what you're watching. See [Reporting with Siri](./siri.md).
+
 ## Notifications
 
 **Profile → Settings → Notifications** sets what reaches you and where: **Email**, **Web Push** (your phone or browser) and **Telegram** when an admin has set them up, and **Discord**, **Pushbullet** or **Pushover** with your own details. Tick the kinds you want on each.

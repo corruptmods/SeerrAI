@@ -10,6 +10,7 @@ import {
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import UserApiKey from '@server/entity/UserApiKey';
+import { featureEnabled } from '@server/lib/features';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import { maySignIn } from '@server/lib/signIn';
@@ -35,6 +36,9 @@ import type { Request } from 'express';
  * them, and, every few minutes, that the owner could still sign in (a Plex
  * friend no longer shared with, a Jellyfin or Emby account switched off).
  * A key never acts for anyone else (no X-API-User), and can't make keys.
+ *
+ * A Siri key (scope 'siri', made on the Siri page) works only on
+ * /api/v1/now-playing, and needs Siri reports on rather than keys.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -46,6 +50,9 @@ const OWNER_CHECK_EVERY_MS = 10 * 60 * 1000;
 const OWNER_CHECK_TIMEOUT_MS = 10 * 1000;
 /** The same refusal of the same key is logged at most this often. */
 const REFUSAL_LOG_EVERY_MS = 15 * 60 * 1000;
+
+/** Where a Siri key works: the now-playing routes. */
+const SIRI_PATH = /^\/api\/v1\/now-playing(?:\/|$)/;
 
 const KEY_PATTERN = /^sai_([0-9a-f]{8})_[A-Za-z0-9_-]{43}$/;
 
@@ -170,6 +177,7 @@ type Refusal =
   | 'notAllowed'
   | 'ownerCannotSignIn'
   | 'actsForSomeoneElse'
+  | 'outsideScope'
   | 'tooManyAttempts';
 
 const logRefusal = (
@@ -248,6 +256,7 @@ export const authenticateApiKey = async (
       userId: true,
       expiresAt: true,
       lastUsedAt: true,
+      scope: true,
     },
     where: { publicId },
   });
@@ -289,7 +298,23 @@ export const authenticateApiKey = async (
     return { status: 401, message: INVALID };
   }
 
-  const status = apiKeyStatus(user);
+  // A Siri key reports what is playing, and nothing else. It is for
+  // whoever may report with Siri, whether or not they may make keys.
+  if (key.scope === 'siri') {
+    if (!SIRI_PATH.test(req.originalUrl.split('?')[0])) {
+      logRefusal(req, 'outsideScope', details);
+      return {
+        status: 403,
+        message: 'A Siri key only works for reporting with Siri.',
+      };
+    }
+    if (!featureEnabled('siri', user)) {
+      logRefusal(req, 'switchedOff', details);
+      return { status: 401, message: 'Reporting with Siri is turned off.' };
+    }
+  }
+
+  const status = key.scope === 'siri' ? 'on' : apiKeyStatus(user);
   if (status === 'off') {
     logRefusal(req, 'switchedOff', details);
     return {

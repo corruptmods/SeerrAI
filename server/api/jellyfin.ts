@@ -200,6 +200,25 @@ export interface JellyfinUserItemsResponse {
 }
 
 /** One account on the server, with whether it is switched off. */
+/** One device's session, as /Sessions lists it. */
+export interface JellyfinSession {
+  UserId?: string;
+  UserName?: string;
+  DeviceName?: string;
+  NowPlayingItem?: {
+    Type?: string;
+    /** The film's, or the episode's. */
+    Id: string;
+    Name?: string;
+    SeriesId?: string;
+    SeriesName?: string;
+    /** An episode's season and number. */
+    ParentIndexNumber?: number;
+    IndexNumber?: number;
+  };
+  PlayState?: { IsPaused?: boolean };
+}
+
 export interface JellyfinAccount {
   Name: string;
   Id: string;
@@ -445,6 +464,19 @@ class JellyfinAPI extends ExternalAPI {
 
       throw new ApiError(e.response.status, ApiErrorCode.InvalidAuthToken);
     }
+  }
+
+  /**
+   * Every device's session, with what each is playing. Needs the server's
+   * API key; never cached.
+   */
+  public async getSessions(): Promise<JellyfinSession[]> {
+    const sessions = await this.get<JellyfinSession[]>(
+      '/Sessions',
+      undefined,
+      0
+    );
+    return Array.isArray(sessions) ? sessions : [];
   }
 
   public async getUser(): Promise<JellyfinUserResponse> {

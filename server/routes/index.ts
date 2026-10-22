@@ -51,6 +51,7 @@ import maintainerrRoutes from './maintainerr';
 import mediaRoutes from './media';
 import movieRoutes from './movie';
 import musicRoutes from './music';
+import nowPlayingRoutes from './nowPlaying';
 import personRoutes from './person';
 import requestRoutes from './request';
 import searchRoutes from './search';
@@ -187,6 +188,7 @@ router.use('/collection', isAuthenticated(), collectionRoutes);
 router.use('/service', isAuthenticated(), serviceRoutes);
 router.use('/issue', isAuthenticated(), issueRoutes);
 router.use('/issueComment', isAuthenticated(), issueCommentRoutes);
+router.use('/now-playing', isAuthenticated(), nowPlayingRoutes);
 router.use('/auth', authRoutes);
 router.use('/style', styleRoutes);
 // Signed-in only at the group, as every other group is. Each list route also

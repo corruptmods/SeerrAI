@@ -5,6 +5,7 @@ import type {
   ApiKeyCreatedResponse,
   ApiKeyLifetime,
   ApiKeyListResponse,
+  SiriKeyResponse,
 } from '@server/constants/apiKeys';
 import {
   API_KEY_LIFETIMES,
@@ -35,7 +36,7 @@ import {
   DiscoverNetworksError,
   sanitizeDiscoverNetworks,
 } from '@server/lib/discoverNetworks';
-import { cleanFeatureList } from '@server/lib/features';
+import { cleanFeatureList, featureEnabled } from '@server/lib/features';
 import { mayEditUser, mayManageUser } from '@server/lib/manageUser';
 import type {
   JellyfinFamilyKind,
@@ -1577,8 +1578,9 @@ userSettingsRoutes.get<{ id: string }, ApiKeyListResponse>(
       if (!(user instanceof User)) {
         return next(user);
       }
+      // A Siri key is on the Siri page.
       const keys = await getRepository(UserApiKey).find({
-        where: { userId: user.id },
+        where: { userId: user.id, scope: IsNull() },
         order: { createdAt: 'ASC', id: 'ASC' },
       });
       return res.status(200).json({
@@ -1647,8 +1649,8 @@ userSettingsRoutes.post<
     });
     const live = await repository.count({
       where: [
-        { userId: user.id, expiresAt: IsNull() },
-        { userId: user.id, expiresAt: MoreThan(now) },
+        { userId: user.id, scope: IsNull(), expiresAt: IsNull() },
+        { userId: user.id, scope: IsNull(), expiresAt: MoreThan(now) },
       ],
     });
     if (live >= MAX_API_KEYS_PER_PERSON) {
@@ -1697,7 +1699,11 @@ userSettingsRoutes.delete<{ id: string; keyId: string }>(
       }
       const repository = getRepository(UserApiKey);
       const key = await repository.findOne({
-        where: { id: Number(req.params.keyId), userId: user.id },
+        where: {
+          id: Number(req.params.keyId),
+          userId: user.id,
+          scope: IsNull(),
+        },
       });
       if (!key) {
         return next({ status: 404, message: 'API key not found.' });
@@ -1717,5 +1723,125 @@ userSettingsRoutes.delete<{ id: string; keyId: string }>(
     }
   }
 );
+
+/*
+ * Someone's Siri key: one key that only reports what is playing
+ * (lib/siri), for the "Fix this show" shortcut. Made on their Siri page
+ * while signed in, whether or not people may make their own API keys; a
+ * new one replaces the old. Like other keys, someone who manages users
+ * can see that it is there and revoke it.
+ */
+const mayUseSiri = (user: User) =>
+  featureEnabled('siri', user) &&
+  user.hasPermission([Permission.CREATE_ISSUES, Permission.MANAGE_ISSUES], {
+    type: 'or',
+  });
+
+userSettingsRoutes.get<{ id: string }, SiriKeyResponse>(
+  '/siri',
+  async (req, res, next) => {
+    try {
+      const user = await apiKeyOwner(req);
+      if (!(user instanceof User)) {
+        return next(user);
+      }
+      const key = await getRepository(UserApiKey).findOne({
+        where: { userId: user.id, scope: 'siri' },
+        order: { createdAt: 'DESC', id: 'DESC' },
+      });
+      const { main } = getSettings();
+      return res.status(200).json({
+        key: key ? keySummary(key) : null,
+        shortcutUrl: main.siriShortcutUrl ?? '',
+        applicationUrl: main.applicationUrl ?? '',
+      });
+    } catch (e) {
+      return next({ status: 500, message: e.message });
+    }
+  }
+);
+
+userSettingsRoutes.post<{ id: string }, ApiKeyCreatedResponse>(
+  '/siri',
+  isOwnProfile(),
+  async (req, res, next) => {
+    const user = req.user as User;
+    if (req.authMethod !== 'session') {
+      return next({
+        status: 403,
+        message: 'A Siri key can only be made while signed in, not with a key.',
+      });
+    }
+    if (!mayUseSiri(user)) {
+      return next({
+        status: 403,
+        message: featureEnabled('siri', user)
+          ? 'Reporting with Siri needs permission to report problems.'
+          : 'Reporting with Siri is turned off.',
+      });
+    }
+    try {
+      const repository = getRepository(UserApiKey);
+      const before = await repository.find({
+        where: { userId: user.id, scope: 'siri' },
+      });
+      let made = makeKey();
+      while (await repository.exists({ where: { publicId: made.publicId } })) {
+        made = makeKey();
+      }
+      const saved = await repository.save(
+        new UserApiKey({
+          userId: user.id,
+          publicId: made.publicId,
+          secretHash: made.secretHash,
+          name: 'Siri',
+          scope: 'siri',
+          createdAt: new Date(),
+          expiresAt: null,
+        })
+      );
+      // The old key stops working once the new one is there.
+      if (before.length) {
+        await repository.delete(before.map((k) => k.id));
+      }
+      logger.info('Siri key created', {
+        label: 'API Key',
+        userId: user.id,
+        keyId: saved.id,
+        publicId: saved.publicId,
+        replaced: before.map((k) => k.publicId),
+      });
+      return res.status(201).json({ key: keySummary(saved), secret: made.key });
+    } catch (e) {
+      return next({ status: 500, message: e.message });
+    }
+  }
+);
+
+userSettingsRoutes.delete<{ id: string }>('/siri', async (req, res, next) => {
+  try {
+    const user = await apiKeyOwner(req);
+    if (!(user instanceof User)) {
+      return next(user);
+    }
+    const repository = getRepository(UserApiKey);
+    const keys = await repository.find({
+      where: { userId: user.id, scope: 'siri' },
+    });
+    if (!keys.length) {
+      return next({ status: 404, message: 'There is no Siri key.' });
+    }
+    await repository.delete(keys.map((k) => k.id));
+    logger.info('Siri key revoked', {
+      label: 'API Key',
+      userId: user.id,
+      keyIds: keys.map((k) => k.id),
+      revokedBy: req.user?.id,
+    });
+    return res.status(204).send();
+  } catch (e) {
+    return next({ status: 500, message: e.message });
+  }
+});
 
 export default userSettingsRoutes;

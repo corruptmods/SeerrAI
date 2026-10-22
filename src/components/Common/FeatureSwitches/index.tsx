@@ -32,6 +32,9 @@ const messages = defineMessages('components.Common.FeatureSwitches', {
   autoFix: 'Fix Reported Problems',
   autoFixTip:
     'Fixes reported issues right away: subtitles, missing episodes, broken or wrong files. Comments with what it did',
+  siri: 'Siri Reports',
+  siriTip:
+    'Say “Fix this show” to Siri to report what’s playing, with the shortcut on the Siri page',
   music: 'Music',
   musicTip:
     'Music in search, Discover and its own pages, and requesting albums through Lidarr',
@@ -58,6 +61,9 @@ const messages = defineMessages('components.Common.FeatureSwitches', {
   aiIssueTriage: 'Suggest Issue Fixes',
   aiIssueTriageTip:
     'Likely cause and fix on each issue (issue managers). Sends the issue and comments',
+  aiReports: 'Understand Reports',
+  aiReportsTip:
+    'Works out what a report asks for when the usual rules can’t tell. Sends the report’s words only',
   aiLogs: 'Explain Logs',
   aiLogsTip:
     'Explains log entries in plain English (admins). Keys, tokens and emails are removed first',

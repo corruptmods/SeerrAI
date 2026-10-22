@@ -13,6 +13,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 - **[Single sign-on](./single-sign-on.md)**: signing in with Authentik, Google and the like.
 - **[AI](./ai.md)**: AI Search, Pick for the Room, Catch Me Up.
 - **[Subtitles and fixing problems](./subtitles-and-autofix.md)**: subtitles from Bazarr, and problems fixed from a report.
+- **[Reporting with Siri](./siri.md)**: "Fix this show" while something is playing.
 
 ## For admins
 

@@ -55,9 +55,14 @@ export const checkUser: Middleware = async (req, res, next) => {
       if (outcome.retryAfter) {
         res.set('Retry-After', String(outcome.retryAfter));
       }
-      res
-        .status(outcome.status)
-        .json({ status: outcome.status, message: outcome.message });
+      // Siri's shortcut says `say` aloud, so a refused Siri key is heard.
+      res.status(outcome.status).json({
+        status: outcome.status,
+        message: outcome.message,
+        ...(req.originalUrl.startsWith('/api/v1/now-playing')
+          ? { say: outcome.message }
+          : {}),
+      });
       return;
     }
     user = outcome.user;

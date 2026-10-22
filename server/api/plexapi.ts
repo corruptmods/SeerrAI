@@ -133,6 +133,27 @@ interface PlexMusicResponse {
   };
 }
 
+/** One thing playing on the server, as /status/sessions lists it. */
+export interface PlexSession {
+  type: string;
+  /** The film's, or the episode's. */
+  ratingKey: string;
+  /** An episode's series. */
+  grandparentRatingKey?: string;
+  title?: string;
+  grandparentTitle?: string;
+  /** An episode's season and number. */
+  parentIndex?: number;
+  index?: number;
+  /** Who is watching: their plex.tv id, or "1" for the server's owner. */
+  User?: { id?: string; title?: string };
+  Player?: { state?: string; title?: string };
+}
+
+interface PlexSessionsResponse {
+  MediaContainer: { size?: number; Metadata?: PlexSession[] };
+}
+
 /** Plex's numbers for the kinds of music item, in its listings. */
 const PLEX_MUSIC_TYPE = { artist: 8, album: 9 } as const;
 
@@ -357,6 +378,19 @@ class PlexAPI extends ExternalAPI {
       totalSize: response.MediaContainer.totalSize ?? items.length,
       items,
     };
+  }
+
+  /**
+   * What is playing on the server now, for everyone. Needs the owner's
+   * token; never cached, as it changes by the second.
+   */
+  public async getSessions(): Promise<PlexSession[]> {
+    const response = await this.get<PlexSessionsResponse>(
+      '/status/sessions',
+      undefined,
+      0
+    );
+    return response.MediaContainer?.Metadata ?? [];
   }
 
   /** Albums added to a music library since a time, newest first. */

@@ -1,3 +1,4 @@
+import type { ApiKeyScope } from '@server/constants/apiKeys';
 import { User } from '@server/entity/User';
 import { DbAwareColumn } from '@server/utils/DbColumnHelper';
 import {
@@ -53,6 +54,15 @@ export class UserApiKey {
   /** Written at most once a minute, not on every request. */
   @DbAwareColumn({ type: 'datetime', nullable: true })
   public lastUsedAt?: Date | null;
+
+  /**
+   * What it may do: empty for everything its owner may, 'siri' for Siri's
+   * reports alone (/api/v1/now-playing). A Siri key is made on the Siri
+   * page, not listed with the others, and works whether or not people may
+   * make their own keys.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  public scope?: ApiKeyScope | null;
 
   constructor(init?: Partial<UserApiKey>) {
     Object.assign(this, init);

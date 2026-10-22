@@ -91,8 +91,11 @@ const Prefix = ({ prefix }: { prefix: string }) => (
   </code>
 );
 
-/** The new key, once: shown in full with a copy button that says so. */
-const NewKey = ({ secret }: { secret: string }) => {
+/**
+ * The new key, once: shown in full with a copy button that says so, and
+ * what to do with it (`hint`; how apps send a key, unless given).
+ */
+export const NewKey = ({ secret, hint }: { secret: string; hint?: string }) => {
   const intl = useIntl();
   const [copied, copy] = useClipboard(secret, { successDuration: 3000 });
   const inputId = useId();
@@ -129,7 +132,7 @@ const NewKey = ({ secret }: { secret: string }) => {
           </Button>
         </div>
         <p className="mt-2 text-sm text-gray-400">
-          {intl.formatMessage(messages.howToUse)}
+          {hint ?? intl.formatMessage(messages.howToUse)}
         </p>
       </div>
     </div>

@@ -207,6 +207,38 @@ settingsRoutes.post('/features', async (req, res, next) => {
   return res.status(200).json({ disabled });
 });
 
+/**
+ * The iCloud link to the "Fix this show" shortcut, which an admin makes
+ * once and shares; everyone's Siri page offers it. Empty for none.
+ */
+const SHORTCUT_LINK =
+  /^https:\/\/(?:www\.)?icloud\.com\/shortcuts\/[0-9a-f]{32}\/?$/i;
+
+settingsRoutes.get('/siri', (_req, res) => {
+  return res
+    .status(200)
+    .json({ shortcutUrl: getSettings().main.siriShortcutUrl ?? '' });
+});
+
+settingsRoutes.post('/siri', async (req, res, next) => {
+  const asked = (req.body as { shortcutUrl?: unknown }).shortcutUrl;
+  const shortcutUrl = typeof asked === 'string' ? asked.trim() : undefined;
+  if (
+    shortcutUrl === undefined ||
+    (shortcutUrl && !SHORTCUT_LINK.test(shortcutUrl))
+  ) {
+    return next({
+      status: 400,
+      message:
+        'Paste the link iCloud gives when you share the shortcut: https://www.icloud.com/shortcuts/…',
+    });
+  }
+  const settings = getSettings();
+  settings.main.siriShortcutUrl = shortcutUrl;
+  await settings.save();
+  return res.status(200).json({ shortcutUrl });
+});
+
 /*
  * What counts as anime: the countries whose anime is left out unless it is
  * in Japanese (utils/isAnime). Set as a whole list, like the features.

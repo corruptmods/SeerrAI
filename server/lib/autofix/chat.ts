@@ -123,6 +123,27 @@ const findOnServer = async (
   return (await onServer(any)) ?? { result: dated[0] ?? any[0] };
 };
 
+/**
+ * This person's open report of the same title, season and episode from the
+ * last day, if there is one: asking again adds nothing to it.
+ */
+export const reportedToday = (
+  user: User,
+  media: Media,
+  seasonNumber?: number,
+  episodeNumber?: number
+): Promise<Issue | null> =>
+  getRepository(Issue).findOne({
+    where: {
+      media: { id: media.id },
+      createdBy: { id: user.id },
+      status: IssueStatus.OPEN,
+      problemSeason: seasonNumber ?? 0,
+      problemEpisode: episodeNumber ?? 0,
+      createdAt: MoreThan(new Date(Date.now() - DAY)),
+    },
+  });
+
 /** The checks before a file-replacing fix is offered, and again when done. */
 const refuseToFile = async (
   user: User,
@@ -142,16 +163,12 @@ const refuseToFile = async (
     };
   }
   // Asked again about the same episode: the open report already covers it.
-  const open = await getRepository(Issue).findOne({
-    where: {
-      media: { id: media.id },
-      createdBy: { id: user.id },
-      status: IssueStatus.OPEN,
-      problemSeason: fix.seasonNumber ?? 0,
-      problemEpisode: fix.episodeNumber ?? 0,
-      createdAt: MoreThan(new Date(Date.now() - DAY)),
-    },
-  });
+  const open = await reportedToday(
+    user,
+    media,
+    fix.seasonNumber,
+    fix.episodeNumber
+  );
   if (open) {
     return {
       reply: 'You reported this already today; what happened is on the issue.',

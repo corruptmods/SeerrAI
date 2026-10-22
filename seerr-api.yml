@@ -50,6 +50,8 @@ tags:
     description: Collection of media to watch later
   - name: blocklist
     description: Blocklisted media from discovery page.
+  - name: siri
+    description: Reporting a problem with what is playing, from Siri's "Fix this show" shortcut.
 servers:
   - url: '{server}/api/v1'
     variables:
@@ -252,6 +254,30 @@ components:
     BackfillAnswer:
       type: object
       additionalProperties: true
+    SiriShortcut:
+      type: object
+      properties:
+        shortcutUrl:
+          type: string
+          maxLength: 200
+          example: https://www.icloud.com/shortcuts/0123456789abcdef0123456789abcdef
+      required:
+        - shortcutUrl
+    SiriAnswer:
+      type: object
+      description: What Siri says back. Refusals have `say` too.
+      properties:
+        say:
+          type: string
+          example: Reported. I’m looking for English subtitles now. You’ll be told how it goes.
+        confirm:
+          type: string
+          description: A question is waiting for a yes or no; send this back to /now-playing/answer within 5 minutes.
+        issueId:
+          type: number
+          description: The issue the report was filed as.
+      required:
+        - say
     FeatureSwitches:
       type: object
       description: Optional features that are turned off. Anything not listed is on.
@@ -4157,6 +4183,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FeatureSwitches'
+  /settings/siri:
+    get:
+      summary: The Siri shortcut's iCloud link
+      tags:
+        - settings
+      responses:
+        '200':
+          description: The link, empty when none is set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiriShortcut'
+    post:
+      summary: Set the Siri shortcut's iCloud link
+      description: The link iCloud gives when the shortcut is shared, offered on everyone's Siri page. Empty removes it.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiriShortcut'
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiriShortcut'
+        '400':
+          description: Not an iCloud shortcut link
   /settings/network:
     get:
       summary: Get network settings
@@ -11667,6 +11725,64 @@ paths:
           description: Not your key, and you may not manage this user
         '404':
           description: No such key for this user
+  /user/{userId}/settings/siri:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: number
+    get:
+      summary: A user's Siri key and the shortcut's link
+      description: Your own, or, with `MANAGE_USERS`, someone else's. The key itself is never returned.
+      tags:
+        - siri
+      responses:
+        '200':
+          description: The Siri key, if there is one, and what the shortcut needs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    nullable: true
+                    allOf:
+                      - $ref: '#/components/schemas/ApiKeySummary'
+                  shortcutUrl:
+                    type: string
+                  applicationUrl:
+                    type: string
+        '403':
+          description: Not yours, and you may not manage this user
+    post:
+      summary: Make a Siri key
+      description: For your own account, while signed in. It works only on /now-playing, needs Siri reports on and permission to report problems, but not personal API keys. It never expires, and replaces your previous Siri key. The whole key is in `secret` and is never shown again.
+      tags:
+        - siri
+      responses:
+        '201':
+          description: Made
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    $ref: '#/components/schemas/ApiKeySummary'
+                  secret:
+                    type: string
+        '403':
+          description: Not your account, made with a key, Siri reports turned off, or no permission to report problems
+    delete:
+      summary: Revoke a Siri key
+      tags:
+        - siri
+      responses:
+        '204':
+          description: Revoked
+        '404':
+          description: There is no Siri key
   /user/{userId}/settings/password:
     get:
       summary: Get password page informatiom
@@ -15479,6 +15595,129 @@ paths:
                 type: array
                 items:
                   type: string
+  /now-playing:
+    get:
+      summary: What is playing for you
+      description: What each connected media server is playing for you, playing before paused, or what you stopped in the last half hour. Up to three titles, only ones in Seerr's library. `say` is what Siri asks next; `item` is the first title, to send with the report.
+      tags:
+        - siri
+      parameters:
+        - in: query
+          name: kind
+          required: false
+          description: Films or series only, unless nothing of that kind is there
+          schema:
+            type: string
+            enum: [movie, tv]
+      responses:
+        '200':
+          description: What is playing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  say:
+                    type: string
+                    example: What’s wrong with The Bear, season 2 episode 3?
+                  item:
+                    type: string
+                    example: '42:2:3'
+                  playing:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        item:
+                          type: string
+                        mediaId:
+                          type: number
+                        tmdbId:
+                          type: number
+                        mediaType:
+                          type: string
+                          enum: [movie, tv]
+                        title:
+                          type: string
+                        season:
+                          type: number
+                        episode:
+                          type: number
+                        seen:
+                          type: string
+                          enum: [now, recent]
+        '403':
+          description: Siri reports are turned off
+  /now-playing/report:
+    post:
+      summary: Report what's wrong with what is playing
+      description: Filed as an issue and fixed in the background, as one made in Seerr would be. The words are read by the auto-fix rules, then by the AI model when they can't tell and Understand Reports is on. A fix that replaces files comes back as a question with `confirm`. Needs `CREATE_ISSUES`.
+      tags:
+        - siri
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                problem:
+                  type: string
+                  maxLength: 2000
+                  example: the subtitles are out of sync
+                item:
+                  type: string
+                  maxLength: 40
+                  description: From /now-playing. Left out, what is playing now.
+                kind:
+                  type: string
+                  enum: [movie, tv]
+              required:
+                - problem
+      responses:
+        '200':
+          description: Reported, or asked first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiriAnswer'
+        '400':
+          description: Nothing said, or too long
+        '403':
+          description: Siri reports turned off, or no permission to report problems
+        '404':
+          description: Nothing is playing
+  /now-playing/answer:
+    post:
+      summary: Answer yes or no to a fix that replaces files
+      description: Yes files the report and starts the fix; no files it for an admin and changes nothing.
+      tags:
+        - siri
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirm:
+                  type: string
+                  maxLength: 64
+                answer:
+                  type: string
+                  example: 'yes'
+              required:
+                - confirm
+                - answer
+      responses:
+        '200':
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SiriAnswer'
+        '410':
+          description: The question ran out, or was answered already
   /issue:
     get:
       summary: Get all issues

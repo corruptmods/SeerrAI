@@ -68,13 +68,13 @@
     "http-proxy-agent": "^7.0.2",
     "https-proxy-agent": "^7.0.6",
     "humanize-duration": "^3.35.0",
-    "ip-address": "^10.7.2",
+    "ip-address": "^10.7.4",
     "js-yaml": "^5.4.2",
     "lodash": "4.18.1",
     "lru-cache": "11.2.1",
     "mime": "^4.1.0",
     "nanoid": "^6.0.1",
-    "next": "16.3.8",
+    "next": "16.4.2",
     "node-gyp": "12.2.0",
     "node-schedule": "2.1.1",
     "nodemailer": "10.0.13",
@@ -119,7 +119,7 @@
     "@commitlint/cli": "20.5.0",
     "@commitlint/config-conventional": "20.5.0",
     "@eslint/js": "9.39.3",
-    "@next/eslint-plugin-next": "16.3.8",
+    "@next/eslint-plugin-next": "16.4.2",
     "@svgr/webpack": "8.1.0",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/forms": "^0.5.11",
@@ -159,7 +159,7 @@
     "cypress": "15.13.1",
     "cz-conventional-changelog": "3.3.0",
     "eslint": "9.39.3",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.2",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-formatjs": "6.4.5",
     "eslint-plugin-jsx-a11y": "6.10.2",
@@ -208,6 +208,11 @@
     ]
   },
   "pnpm": {
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-ch52-4w7c-c8xp"
+      ]
+    },
     "onlyBuiltDependencies": [
       "@swc/core",
       "bcrypt",
@@ -223,7 +228,11 @@
       "handlebars": ">=4.7.10",
       "tar": ">=7.5.19",
       "nodemailer": "10.0.13",
-      "ip-address": ">=10.7.3",
+      "ip-address": ">=10.7.4",
+      "@tootallnate/once": ">=2.0.1",
+      "commitizen>lodash": "4.18.1",
+      "external-editor>tmp": ">=0.2.6",
+      "@cypress/request>qs": ">=6.16.0",
       "follow-redirects": ">=1.16.1",
       "source-map-js": ">=1.2.2"
     }

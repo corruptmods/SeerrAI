@@ -291,7 +291,7 @@ const deluge: http.RequestListener = async (req, res) => {
   switch (method) {
     case 'web.connected':
       return answer(true);
-    case 'daemon.info':
+    case 'daemon.get_version':
       return answer('2.1.1');
     case 'core.get_enabled_plugins':
       return answer(['Label']);

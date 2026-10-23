@@ -419,8 +419,18 @@ class DelugeAPI implements TorrentClient {
         ];
   }
 
+  /**
+   * The daemon's version. Deluge 2 answers daemon.get_version, and has no
+   * daemon.info; Deluge 1.3 has only daemon.info.
+   */
   public async getVersion(): Promise<string> {
-    const version = await this.call<string>('daemon.info', []);
+    let version: string;
+    try {
+      version = await this.call<string>('daemon.get_version', []);
+    } catch (e) {
+      if (!(e instanceof Error) || !/unknown method/i.test(e.message)) throw e;
+      version = await this.call<string>('daemon.info', []);
+    }
     return version || 'unknown';
   }
 

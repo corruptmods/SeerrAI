@@ -271,7 +271,9 @@ describe('talking to them', () => {
     });
 
     // Deluge: signs in with its password, and is not yet connected to its
-    // daemon, as after a restart.
+    // daemon, as after a restart. Deluge 2 lists daemon.get_version and no
+    // daemon.info, as a 2.x Web UI answered system.listMethods; Deluge 1.3
+    // (on its own port) the other way round.
     let delugeConnected = false;
     await listen('deluge', async (req, res) => {
       const { method, params, id } = JSON.parse(await body(req));
@@ -296,7 +298,12 @@ describe('talking to them', () => {
       }
       if (!delugeConnected)
         return answer(null, { message: 'Not connected', code: 2 });
-      if (method === 'daemon.info') return answer('2.1.1');
+      if (method === 'daemon.get_version' && req.url !== '/old/json') {
+        return answer('2.1.1');
+      }
+      if (method === 'daemon.info' && req.url === '/old/json') {
+        return answer('1.3.15');
+      }
       if (method === 'core.get_torrents_status') {
         return answer({
           [HASH]: {
@@ -424,6 +431,13 @@ describe('talking to them', () => {
     assert.equal(found.get(HASH)?.stage, 'importing');
     assert.equal(found.has(OTHER), false);
     assert.ok(calls.includes('deluge web.connect'));
+  });
+
+  it('Deluge: reads the version of a 1.3 daemon, which has no daemon.get_version', async () => {
+    const api = new DelugeAPI(
+      at('deluge', { password: 'deluge-pass', urlBase: '/old' })
+    );
+    assert.equal(await api.getVersion(), '1.3.15');
   });
 
   it('Deluge: says so when the password is wrong', async () => {

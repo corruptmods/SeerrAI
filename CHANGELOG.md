@@ -21,6 +21,17 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - The admin agent trusted episode numbers over titles. A release numbered its own way (a special counted as episode 1, or the scene's seasons Sonarr goes by) could be imported as the wrong episode, or passed over: a file whose title is another episode is now refused, and one named by the library's numbers is taken when its title agrees.
 - The admin agent could take a release's sample file for the episode.
 
+## 2.0.2 (23 October 2026)
+
+### Security
+
+- Next.js 16.4.2 ([security update](https://nextjs.org/blog/nextjs-security-update-october-14-2026)): two critical remote code execution flaws and a denial of service. None could be reached in Seerr AI, which uses the Pages Router, has image optimization off and runs on Alpine, but they're fixed all the same.
+- [GHSA-rxp7-6hxx-x8q5](https://github.com/advisories/GHSA-rxp7-6hxx-x8q5): ip-address 10.7.4, which rate limiting uses: a crafted IPv6 address took long to reject
+- [GHSA-vpq2-c234-7xj6](https://github.com/advisories/GHSA-vpq2-c234-7xj6): @tootallnate/once 2.0.1; build only
+- [GHSA-ch52-4w7c-c8xp](https://github.com/advisories/GHSA-ch52-4w7c-c8xp): node-gyp and its download cache are no longer in the image. They only build sqlite3, and the cache has an advisory with no fix yet
+- The image takes Alpine's security fixes when it's built
+- `build.sh` checks for security advisories first, and builds nothing while one stands
+
 ## 2.0.1 (21 October 2026)
 
 ### Security

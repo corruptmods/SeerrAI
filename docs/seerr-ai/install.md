@@ -106,6 +106,8 @@ If you build it yourself, `build.sh` pulls the latest code and builds the image:
 
 Then restart the container (or redeploy the stack).
 
+Before building, it checks for security advisories (`security-check.sh`, run in the image's own Node.js, so the host needs only Docker): every package that goes in the image, and whether Node.js 22 has a newer release with security fixes. If it finds anything, or can't check, nothing is built and it says what to fix. An advisory with no fix yet, for a package the server never loads, can be left out under `pnpm.auditConfig.ignoreGhsas` in `package.json`; the check still names it each time. Alpine's own security fixes are applied to the image on the first build of each day.
+
 ### Updating with patches
 
 Changes can also arrive as numbered patch files (`0154-….patch`). They go onto the `dev` branch (see [Branches](#branches)). Apply them in order with:

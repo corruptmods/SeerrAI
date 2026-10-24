@@ -1,4 +1,3 @@
-import type LidarrAPI from '@server/api/servarr/lidarr';
 import type { RadarrMovieOptions } from '@server/api/servarr/radarr';
 import RadarrAPI from '@server/api/servarr/radarr';
 import type { AddSeriesOptions } from '@server/api/servarr/sonarr';
@@ -680,47 +679,9 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         }
 
         if (radarrSettings.tagRequests) {
-          const radarrTags = await radarr.getTags();
-          // old tags had space around the hyphen
-          let userTag = radarrTags.find((v) =>
-            v.label.startsWith(entity.requestedBy.id + ' - ')
-          );
-          // new tags do not have spaces around the hyphen, since spaces are not allowed anymore
-          if (!userTag) {
-            userTag = radarrTags.find((v) =>
-              v.label.startsWith(entity.requestedBy.id + '-')
-            );
-          }
-          if (!userTag) {
-            logger.info(`Requester has no active tag. Creating new`, {
-              label: 'Media Request',
-              requestId: entity.id,
-              mediaId: entity.media.id,
-              userId: entity.requestedBy.id,
-              newTag:
-                entity.requestedBy.id +
-                '-' +
-                sanitizeDisplayName(entity.requestedBy.displayName),
-            });
-            userTag = await radarr.createTag({
-              label:
-                entity.requestedBy.id +
-                '-' +
-                sanitizeDisplayName(entity.requestedBy.displayName),
-            });
-          }
-          if (userTag.id) {
-            if (!tags?.find((v) => v === userTag?.id)) {
-              tags?.push(userTag.id);
-            }
-          } else {
-            logger.warn(`Requester has no tag and failed to add one`, {
-              label: 'Media Request',
-              requestId: entity.id,
-              mediaId: entity.media.id,
-              userId: entity.requestedBy.id,
-              radarrServer: radarrSettings.hostname + ':' + radarrSettings.port,
-            });
+          const userTag = await this.requesterTag(radarr, entity, 'Radarr');
+          if (userTag !== undefined && !tags?.includes(userTag)) {
+            tags?.push(userTag);
           }
         }
 
@@ -1037,47 +998,9 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         }
 
         if (sonarrSettings.tagRequests) {
-          const sonarrTags = await sonarr.getTags();
-          // old tags had space around the hyphen
-          let userTag = sonarrTags.find((v) =>
-            v.label.startsWith(entity.requestedBy.id + ' - ')
-          );
-          // new tags do not have spaces around the hyphen, since spaces are not allowed anymore
-          if (!userTag) {
-            userTag = sonarrTags.find((v) =>
-              v.label.startsWith(entity.requestedBy.id + '-')
-            );
-          }
-          if (!userTag) {
-            logger.info(`Requester has no active tag. Creating new`, {
-              label: 'Media Request',
-              requestId: entity.id,
-              mediaId: entity.media.id,
-              userId: entity.requestedBy.id,
-              newTag:
-                entity.requestedBy.id +
-                '-' +
-                sanitizeDisplayName(entity.requestedBy.displayName),
-            });
-            userTag = await sonarr.createTag({
-              label:
-                entity.requestedBy.id +
-                '-' +
-                sanitizeDisplayName(entity.requestedBy.displayName),
-            });
-          }
-          if (userTag.id) {
-            if (!tags?.find((v) => v === userTag?.id)) {
-              tags?.push(userTag.id);
-            }
-          } else {
-            logger.warn(`Requester has no tag and failed to add one`, {
-              label: 'Media Request',
-              requestId: entity.id,
-              mediaId: entity.media.id,
-              userId: entity.requestedBy.id,
-              sonarrServer: sonarrSettings.hostname + ':' + sonarrSettings.port,
-            });
+          const userTag = await this.requesterTag(sonarr, entity, 'Sonarr');
+          if (userTag !== undefined && !tags?.includes(userTag)) {
+            tags?.push(userTag);
           }
         }
 
@@ -1346,7 +1269,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       const artistMbid = media.foreignId;
 
       const requesterTag = lidarrSettings.tagRequests
-        ? await this.lidarrRequesterTag(lidarr, entity)
+        ? await this.requesterTag(lidarr, entity, 'Lidarr')
         : undefined;
       const tags = [...(entity.tags ?? lidarrSettings.tags ?? [])];
       if (requesterTag !== undefined && !tags.includes(requesterTag)) {
@@ -1508,20 +1431,48 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     }
   }
 
-  /** The requester's tag in Lidarr ("12-alex"), made if it is not there. */
-  private async lidarrRequesterTag(
-    lidarr: LidarrAPI,
-    entity: MediaRequest
+  /**
+   * The requester's tag ("12-alex") in Radarr, Sonarr or Lidarr, made if it
+   * is not there. Only a label to sort by: when it cannot be had, the
+   * request is sent without it rather than failed over it.
+   */
+  private async requesterTag(
+    api: Pick<RadarrAPI, 'getTags' | 'createTag'>,
+    entity: MediaRequest,
+    server: 'Radarr' | 'Sonarr' | 'Lidarr'
   ): Promise<number | undefined> {
     const label = `${entity.requestedBy.id}-${sanitizeDisplayName(
       entity.requestedBy.displayName
     )}`;
-    const existing = (await lidarr.getTags()).find(
-      (tag) =>
-        tag.label.startsWith(`${entity.requestedBy.id} - `) ||
-        tag.label.startsWith(`${entity.requestedBy.id}-`)
-    );
-    return (existing ?? (await lidarr.createTag({ label }))).id;
+    try {
+      // Older tags had spaces around the hyphen; spaces are no longer allowed.
+      const existing = (await api.getTags()).find(
+        (tag) =>
+          tag.label.startsWith(`${entity.requestedBy.id} - `) ||
+          tag.label.startsWith(`${entity.requestedBy.id}-`)
+      );
+      const tag = existing ?? (await api.createTag({ label }));
+      if (!existing) {
+        logger.info(`Made the requester's tag in ${server}`, {
+          label: 'Media Request',
+          requestId: entity.id,
+          userId: entity.requestedBy.id,
+          newTag: label,
+        });
+      }
+      return tag.id || undefined;
+    } catch (e) {
+      logger.warn(
+        `${server} couldn't give the requester's tag; sent without it`,
+        {
+          label: 'Media Request',
+          requestId: entity.id,
+          userId: entity.requestedBy.id,
+          errorMessage: e instanceof Error ? e.message : String(e),
+        }
+      );
+      return undefined;
+    }
   }
 
   /**

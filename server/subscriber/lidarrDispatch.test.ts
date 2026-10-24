@@ -404,6 +404,29 @@ describe('sending a music request to Lidarr', () => {
     assert.equal(body.addOptions.searchForMissingAlbums, false);
   });
 
+  it('sends it without the tag when Lidarr cannot give one', async () => {
+    const tagging = lidarr.settings({ tagRequests: true, tags: [3] });
+    lidarr.lookupAlbums.set(STATIC_GARDEN, lookedUpAlbum(STATIC_GARDEN, 'OK'));
+    lidarr.failing.add('/api/v1/tag');
+    const request = await approvedRequest([
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
+    ]);
+
+    await subscriber.dispatchToLidarr(request, tagging);
+
+    const artist = (
+      calls('POST', '/api/v1/album')[0].body as Record<
+        string,
+        { tags: number[] }
+      >
+    ).artist;
+    assert.deepEqual(artist.tags, [3]);
+    const sent = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: request.id },
+    });
+    assert.equal(sent.status, MediaRequestStatus.APPROVED);
+  });
+
   it('tags the artist with whoever asked, when the server tags requests', async () => {
     const tagging = lidarr.settings({ tagRequests: true, tags: [3] });
     lidarr.lookupAlbums.set(STATIC_GARDEN, lookedUpAlbum(STATIC_GARDEN, 'OK'));

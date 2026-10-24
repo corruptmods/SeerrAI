@@ -28,6 +28,8 @@ export interface FakeLidarr {
   tags: { id: number; label: string }[];
   /** Answers every call with a server error while set. */
   down: boolean;
+  /** Paths answered with a server error, the rest as usual. */
+  failing: Set<string>;
   settings: (overrides?: Partial<LidarrSettings>) => LidarrSettings;
   reset: () => void;
   start: () => Promise<void>;
@@ -51,6 +53,7 @@ export const createFakeLidarr = (): FakeLidarr => {
     lookupAlbums: new Map(),
     tags: [],
     down: false,
+    failing: new Set(),
     settings: (overrides = {}) =>
       ({
         id: 0,
@@ -82,6 +85,7 @@ export const createFakeLidarr = (): FakeLidarr => {
       fake.lookupAlbums = new Map();
       fake.tags = [];
       fake.down = false;
+      fake.failing = new Set();
     },
     start: () =>
       new Promise<void>((resolve) =>
@@ -189,9 +193,10 @@ export const createFakeLidarr = (): FakeLidarr => {
         body: raw ? JSON.parse(raw) : undefined,
       };
       fake.calls.push(call);
-      const [status, data] = fake.down
-        ? [500, { message: 'Lidarr is down' }]
-        : answer(call);
+      const [status, data] =
+        fake.down || fake.failing.has(call.path)
+          ? [500, { message: 'Lidarr is down' }]
+          : answer(call);
       res.writeHead(status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(data ?? {}));
     });

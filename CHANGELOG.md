@@ -20,6 +20,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - Deluge 2 couldn't be connected ("Deluge: Unknown method"): Seerr AI asked for its version the way only Deluge 1.3 answers.
 - rTorrent: a Backfill download with files skipped (most packs) never finished, as rTorrent counts the skipped files as still to come. It's now done once the files chosen are in, and its size and progress are of those files.
 - SABnzbd: a finished Backfill download couldn't be removed from SABnzbd's history ("SABnzbd: request refused"), so it and its files stayed there.
+- A request for something already in your library was marked failed, not completed, when the server it was sent to had been removed.
+- Requesting a movie as a request manager without auto-approve showed it as pending, though it was approved.
 - The admin agent found more missing episodes each time it was asked. It now searches each missing episode by number and title, opens season packs instead of grabbing them blind, and is told about any it never looked for before it stops.
 - The admin agent trusted episode numbers over titles. A release numbered its own way (a special counted as episode 1, or the scene's seasons Sonarr goes by) could be imported as the wrong episode, or passed over: a file whose title is another episode is now refused, and one named by the library's numbers is taken when its title agrees.
 - The admin agent could take a release's sample file for the episode.

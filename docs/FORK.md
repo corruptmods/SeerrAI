@@ -105,6 +105,14 @@ any failing test exits with 1.
 pushes it also runs the suite on Postgres, one file at a time, which takes
 about an hour. A red cross on a commit links to the log of what failed.
 
+`real-clients.yml` runs alongside it: the download client code against the
+real clients, not stand-ins (Deluge, qBittorrent, Transmission, SABnzbd and
+NZBGet in their latest linuxserver.io images, rTorrent behind nginx), each
+given a torrent or Usenet job to add, stop, finish and delete
+(`server/api/downloadclients/realClients.test.ts`, skipped unless
+`REAL_CLIENTS` is set). To run it by hand against clients of your own, see
+the variables at the top of that file.
+
 ### Against Postgres
 
 Production runs Postgres; the default test run is in-memory SQLite. That gap
@@ -311,8 +319,8 @@ Do not undo these without reading why first — each was tried the other way.
   viewer has an account on (the primary one first), else the first that
   has it (`pickPlayLink` in `src/utils/playLinks.ts`). Notifications link
   to Seerr's own page, which is the same for everyone.
-- **Two GitHub Actions workflows: checks and images.** `ci.yml` checks
-  every push and pull request to `dev` and `main` (see Tests).
+- **GitHub Actions: checks and images.** `ci.yml` and `real-clients.yml`
+  check every push and pull request to `dev` and `main` (see Tests).
   `release.yml` builds and publishes the image for an `ai-v*` tag,
   `:preview-<name>` for a `preview-<name>` tag, and `:develop` when run by
   hand from `dev` (pushes to `dev` publish nothing; run by hand from any

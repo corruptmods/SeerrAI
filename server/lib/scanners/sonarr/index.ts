@@ -35,6 +35,10 @@ class SonarrScanner
   private sonarrApi: SonarrAPI;
   private scannedTvdbIds: Set<number> = new Set();
   private scanned4kTvdbIds: Set<number> = new Set();
+  // The titles Sonarr has, whatever TVDB id it has them under: after TheTVDB
+  // merges or renumbers a series, Sonarr's id is not the one Seerr kept.
+  private scannedTmdbIds: Set<number> = new Set();
+  private scanned4kTmdbIds: Set<number> = new Set();
   // Keyed on tmdbId: media.tvdbId can be null. Excludes unmonitored titles.
   private processingTmdbIds: Set<number> = new Set();
   private processing4kTmdbIds: Set<number> = new Set();
@@ -62,6 +66,8 @@ class SonarrScanner
     const sessionId = this.startRun();
     this.scannedTvdbIds.clear();
     this.scanned4kTvdbIds.clear();
+    this.scannedTmdbIds.clear();
+    this.scanned4kTmdbIds.clear();
     this.processingTmdbIds.clear();
     this.processing4kTmdbIds.clear();
     this.didScanStandard = false;
@@ -187,6 +193,7 @@ class SonarrScanner
       }
 
       const tmdbId = tvShow.id;
+      (server4k ? this.scanned4kTmdbIds : this.scannedTmdbIds).add(tmdbId);
       const metadataProvider = detectAnime(tvShow)
         ? await getMetadataProvider('anime')
         : await getMetadataProvider('tv');
@@ -321,7 +328,11 @@ class SonarrScanner
       });
 
       for (const media of processingShows) {
-        if (media.tvdbId && !this.scannedTvdbIds.has(media.tvdbId)) {
+        if (
+          media.tvdbId &&
+          !this.scannedTvdbIds.has(media.tvdbId) &&
+          !this.scannedTmdbIds.has(media.tmdbId)
+        ) {
           if (await this.existsInAnyServer(media.tvdbId, false)) {
             continue;
           }
@@ -354,7 +365,11 @@ class SonarrScanner
       });
 
       for (const media of processing4kShows) {
-        if (media.tvdbId && !this.scanned4kTvdbIds.has(media.tvdbId)) {
+        if (
+          media.tvdbId &&
+          !this.scanned4kTvdbIds.has(media.tvdbId) &&
+          !this.scanned4kTmdbIds.has(media.tmdbId)
+        ) {
           if (await this.existsInAnyServer(media.tvdbId, true)) {
             continue;
           }

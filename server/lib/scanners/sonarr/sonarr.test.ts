@@ -753,6 +753,77 @@ describe('Sonarr Scanner', () => {
       assert.strictEqual(updatedRequest.status, MediaRequestStatus.APPROVED);
     });
 
+    it('keeps a series Sonarr has under another TVDB id, and its request', async () => {
+      const mediaRepository = getRepository(Media);
+      const requestRepository = getRepository(MediaRequest);
+      const requestedBy = await getRepository(User).findOneOrFail({
+        where: { id: 1 },
+      });
+      // TheTVDB merged the series: Seerr kept 610, Sonarr has it as 611.
+      const media = await mediaRepository.save(
+        new Media({
+          tmdbId: 2011,
+          tvdbId: 610,
+          mediaType: MediaType.TV,
+          status: MediaStatus.PROCESSING,
+          seasons: [
+            new Season({
+              seasonNumber: 1,
+              status: MediaStatus.PROCESSING,
+              status4k: MediaStatus.UNKNOWN,
+            }),
+          ],
+        })
+      );
+      const settings = getSettings();
+      settings.sonarr = [];
+      settings.radarr = [];
+      const request = await requestRepository.save(
+        new MediaRequest({
+          type: MediaType.TV,
+          status: MediaRequestStatus.APPROVED,
+          media,
+          requestedBy,
+          is4k: false,
+        })
+      );
+
+      configureSonarr([{ syncEnabled: true }]);
+      getSeriesImpl = async () => [
+        fakeSonarrSeries({
+          tvdbId: 611,
+          seasons: [
+            {
+              seasonNumber: 1,
+              monitored: true,
+              statistics: {
+                episodeFileCount: 0,
+                totalEpisodeCount: 10,
+                episodeCount: 10,
+                percentOfEpisodes: 0,
+                sizeOnDisk: 0,
+                previousAiring: undefined,
+              },
+            },
+          ],
+        }),
+      ];
+      getLibrarySeriesByTvdbIdImpl = async () => [];
+      getShowByTvdbIdImpl = async () => fakeTmdbShow(2011);
+      getTvShowImpl = async () => fakeTmdbShow(2011);
+
+      await runWithMockTimers(() => sonarrScanner.run());
+
+      const kept = await mediaRepository.findOneOrFail({
+        where: { id: media.id },
+      });
+      assert.strictEqual(kept.status, MediaStatus.PROCESSING);
+      const stillApproved = await requestRepository.findOneOrFail({
+        where: { id: request.id },
+      });
+      assert.strictEqual(stillApproved.status, MediaRequestStatus.APPROVED);
+    });
+
     it('keeps a new monitored series requested while Sonarr lists no seasons for it yet', async () => {
       const mediaRepository = getRepository(Media);
       const requestRepository = getRepository(MediaRequest);

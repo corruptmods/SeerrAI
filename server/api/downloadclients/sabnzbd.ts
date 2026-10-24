@@ -233,19 +233,27 @@ class SabnzbdAPI implements UsenetClient {
   }
 
   /** Removes the job, from the queue or the history, and its files. */
+  /**
+   * Removes the job, with its files, from the queue or, once it has left
+   * the queue, from the history. SABnzbd answers status false, with no
+   * error, when the job isn't in the queue.
+   */
   public async deleteJob(nzoId: string): Promise<void> {
-    await this.call({
-      mode: 'queue',
-      name: 'delete',
-      value: nzoId,
-      del_files: 1,
-    });
-    await this.call({
-      mode: 'history',
-      name: 'delete',
-      value: nzoId,
-      del_files: 1,
-    });
+    for (const mode of ['queue', 'history']) {
+      const { data } = await this.axios.get<Answer>('', {
+        params: {
+          mode,
+          name: 'delete',
+          value: nzoId,
+          del_files: 1,
+          output: 'json',
+          apikey: this.apiKey,
+        },
+      });
+      if (data?.error) throw new Error(`SABnzbd: ${data.error}`);
+      if (data?.status !== false) return;
+    }
+    throw new Error('SABnzbd: the job is in neither its queue nor its history');
   }
 
   // The same call, typed loosely: the queue and history slots carry more

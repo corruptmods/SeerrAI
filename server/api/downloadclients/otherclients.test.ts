@@ -162,6 +162,8 @@ describe('reading each client’s states', () => {
         downRate: 10,
         isHashChecking: 0,
         peersConnected: 4,
+        chunkSize: 10,
+        wantedChunks: 5,
         ...extra,
       });
     assert.deepEqual(r(), {
@@ -171,6 +173,20 @@ describe('reading each client’s states', () => {
       secondsLeft: 5,
     });
     assert.equal(r({ complete: 1, leftBytes: 0 }).stage, 'importing');
+    // A file skipped: rTorrent counts it as left, and never as complete,
+    // as a real rTorrent 0.9.8 does. The files wanted are in.
+    assert.deepEqual(r({ leftBytes: 30, wantedChunks: 0 }), {
+      size: 70,
+      sizeLeft: 0,
+      stage: 'importing',
+    });
+    // Still downloading the files wanted: what's left of them only.
+    assert.deepEqual(r({ leftBytes: 60, wantedChunks: 2 }), {
+      size: 60,
+      sizeLeft: 20,
+      stage: 'downloading',
+      secondsLeft: 2,
+    });
     assert.equal(r({ isActive: 0 }).stage, 'paused');
     assert.equal(r({ state: 0 }).stage, 'paused');
     assert.equal(r({ peersConnected: 0 }).step, 'noPeers');

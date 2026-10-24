@@ -44,6 +44,9 @@ export interface RtorrentTorrent {
   downRate: number;
   isHashChecking: number;
   peersConnected: number;
+  chunkSize: number;
+  /** Chunks still to come of the files wanted (once it's been opened). */
+  wantedChunks: number;
 }
 
 const FIELDS = [
@@ -57,13 +60,45 @@ const FIELDS = [
   'd.down.rate=',
   'd.is_hash_checking=',
   'd.peers_connected=',
+  'd.chunk_size=',
+  'd.wanted_chunks=',
 ];
 
+/**
+ * What is wanted of a torrent, and what of it is still to come. rTorrent's
+ * sizes count files that were skipped, and it calls a torrent complete only
+ * once every file is in, so a torrent with files skipped is measured by
+ * the chunks of the wanted files still to come. Until it is first opened,
+ * rTorrent counts every chunk as wanted, which is no harm: nothing is in.
+ */
+export const rtorrentWanted = (torrent: {
+  sizeBytes: number;
+  completedBytes: number;
+  complete: number;
+  isOpen: number;
+  chunkSize: number;
+  wantedChunks: number;
+}): { size: number; left: number; done: boolean } => {
+  const all = Math.max(0, Number(torrent.sizeBytes) || 0);
+  const have = Math.min(all, Math.max(0, Number(torrent.completedBytes) || 0));
+  const chunks = Number(torrent.wantedChunks);
+  const measured = Number.isFinite(chunks) && chunks >= 0 && !!torrent.isOpen;
+  const left = measured
+    ? Math.min(all - have, chunks * Math.max(0, Number(torrent.chunkSize) || 0))
+    : all - have;
+  const done = !!torrent.complete || (all > 0 && measured && chunks === 0);
+  return { size: done ? have : have + left, left: done ? 0 : left, done };
+};
+
 export const rtorrentDownload = (torrent: RtorrentTorrent): LiveDownload => {
-  const size = Math.max(0, Number(torrent.sizeBytes) || 0);
-  const sizeLeft = Math.max(0, Number(torrent.leftBytes) || 0);
-  const base = { size, sizeLeft };
-  const done = !!torrent.complete || (size > 0 && sizeLeft === 0);
+  const all = Math.max(0, Number(torrent.sizeBytes) || 0);
+  const wanted = rtorrentWanted({
+    ...torrent,
+    completedBytes: all - Math.max(0, Number(torrent.leftBytes) || 0),
+  });
+  const sizeLeft = wanted.left;
+  const base = { size: wanted.size, sizeLeft };
+  const done = wanted.done || (all > 0 && sizeLeft === 0);
 
   if (torrent.isHashChecking) {
     return done
@@ -210,6 +245,8 @@ const INFO_FIELDS = [
   'd.is_multi_file=',
   'd.custom1=',
   'd.custom=seerr_added',
+  'd.chunk_size=',
+  'd.wanted_chunks=',
 ];
 
 export interface RtorrentInfo {
@@ -230,6 +267,9 @@ export interface RtorrentInfo {
   label: string;
   /** When Seerr added it, in seconds; empty for another's. */
   addedBySeerr: string;
+  chunkSize: number;
+  /** Chunks still to come of the files wanted (once it's been opened). */
+  wantedChunks: number;
 }
 
 const infoOf = (row: XmlValue[]): RtorrentInfo => {
@@ -249,6 +289,8 @@ const infoOf = (row: XmlValue[]): RtorrentInfo => {
     isMultiFile,
     label,
     addedBySeerr,
+    chunkSize,
+    wantedChunks,
   ] = row;
   return {
     hash: String(hash ?? ''),
@@ -266,6 +308,8 @@ const infoOf = (row: XmlValue[]): RtorrentInfo => {
     isMultiFile: Number(isMultiFile),
     label: decodeLabel(String(label ?? '')),
     addedBySeerr: String(addedBySeerr ?? ''),
+    chunkSize: Number(chunkSize),
+    wantedChunks: Number(wantedChunks),
   };
 };
 
@@ -286,8 +330,7 @@ const lastPart = (path: string) =>
   path.replace(/\/+$/, '').split('/').pop() ?? '';
 
 export const rtorrentTorrent = (info: RtorrentInfo): ClientTorrent => {
-  const size = Math.max(0, info.sizeBytes || 0);
-  const left = Math.max(0, size - (info.completedBytes || 0));
+  const { size, left, done } = rtorrentWanted(info);
   const speed = Math.max(0, info.downRate || 0);
   const added = Number(info.addedBySeerr);
   const base = {
@@ -303,7 +346,7 @@ export const rtorrentTorrent = (info: RtorrentInfo): ClientTorrent => {
   };
   if (isMeta(info.name)) return { ...base, state: 'metadata' };
   if (info.isHashChecking) return { ...base, state: 'checking' };
-  if (info.complete) return { ...base, state: 'done' };
+  if (done) return { ...base, state: 'done' };
   // rTorrent closes a torrent it hits an error with, and says why.
   if (!info.state && info.message && !/tracker/i.test(info.message)) {
     return { ...base, state: 'error', error: info.message };
@@ -556,6 +599,8 @@ class RtorrentAPI implements TorrentClient {
         downRate,
         isHashChecking,
         peersConnected,
+        chunkSize,
+        wantedChunks,
       ] = rest.map(Number);
       found.set(
         id,
@@ -570,6 +615,8 @@ class RtorrentAPI implements TorrentClient {
           downRate,
           isHashChecking,
           peersConnected,
+          chunkSize,
+          wantedChunks,
         })
       );
     }

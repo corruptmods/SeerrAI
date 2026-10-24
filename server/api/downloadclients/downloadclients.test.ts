@@ -112,6 +112,10 @@ describe('talking to them', () => {
   let logins = 0;
   let session = 'first';
   const servers: http.Server[] = [];
+  /** What was deleted from SABnzbd, and where its jobs are. */
+  let deleted: string[] = [];
+  const queuedJobs = ['SABnzbd_nzo_one'];
+  const historyJobs = ['SABnzbd_nzo_two'];
   /** SABnzbd's whole queue, as asked for without nzo_ids. */
   let wholeQueue: { kbpersec: string; slots: Record<string, string>[] } = {
     kbpersec: '0',
@@ -137,6 +141,18 @@ describe('talking to them', () => {
       if (url.searchParams.get('apikey') !== 'right') {
         return res.end(
           JSON.stringify({ status: false, error: 'API Key Incorrect' })
+        );
+      }
+      // Deleting, as a real SABnzbd 4.2 answers: status false, with no
+      // error, for a job that isn't in the queue.
+      if (url.searchParams.get('name') === 'delete') {
+        const id = url.searchParams.get('value') ?? '';
+        const mode = url.searchParams.get('mode');
+        deleted.push(`${mode} ${id}`);
+        const there =
+          mode === 'queue' ? queuedJobs.includes(id) : historyJobs.includes(id);
+        return res.end(
+          JSON.stringify({ status: there, nzo_ids: there ? [id] : [] })
         );
       }
       const ids = (url.searchParams.get('nzo_ids') ?? '').split(',');
@@ -267,6 +283,26 @@ describe('talking to them', () => {
     assert.equal(found.get(UUID_JOB)?.step, 'unpacking', 'current SABnzbd');
     assert.equal(found.get('sabnzbd_nzo_one')?.stage, 'downloading');
     assert.equal(found.get('sabnzbd_nzo_two')?.step, 'script');
+  });
+
+  it('deletes a SABnzbd job from its queue, or from its history once it has finished', async () => {
+    deleted = [];
+    await sab('right').deleteJob('SABnzbd_nzo_one');
+    assert.deepEqual(deleted, ['queue SABnzbd_nzo_one']);
+    deleted = [];
+    await sab('right').deleteJob('SABnzbd_nzo_two');
+    assert.deepEqual(deleted, [
+      'queue SABnzbd_nzo_two',
+      'history SABnzbd_nzo_two',
+    ]);
+    await assert.rejects(
+      sab('right').deleteJob('SABnzbd_nzo_gone'),
+      /neither its queue nor its history/
+    );
+    await assert.rejects(
+      sab('wrong').deleteJob('SABnzbd_nzo_one'),
+      /API Key Incorrect/
+    );
   });
 
   it("gives a SABnzbd job the queue's speed only when it is the one downloading", async () => {

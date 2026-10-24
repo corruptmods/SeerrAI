@@ -282,6 +282,10 @@ class NzbgetAPI implements UsenetClient {
     this.axios = axios.create({
       baseURL: `${clientBaseUrl(settings)}/jsonrpc`,
       timeout: CLIENT_TIMEOUT_MS,
+      // NZBGet closes its connection after every answer. One kept open to be
+      // used again, as Node does, was gone by the next request: after a
+      // refused sign-in, that request failed with "socket hang up".
+      headers: { Connection: 'close' },
       auth: settings.username
         ? { username: settings.username, password: settings.password ?? '' }
         : undefined,

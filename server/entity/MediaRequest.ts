@@ -141,6 +141,16 @@ const musicNotification = async (
  */
 const savedStatus = new WeakMap<MediaRequest, MediaRequestStatus>();
 
+/**
+ * A new request as it stands once saved. Saving it approves it, sends it
+ * on and marks its title requested, each on its own copy, so the object
+ * that was saved still says what it was beforehand: a request approved at
+ * once would still say pending, and its title not yet requested. Read
+ * back, unless saving it removed it.
+ */
+const asSaved = async (request: MediaRequest): Promise<MediaRequest> =>
+  (await getRepository(MediaRequest).findOneBy({ id: request.id })) ?? request;
+
 @Entity()
 export class MediaRequest {
   public static async request(
@@ -415,7 +425,7 @@ export class MediaRequest {
     });
 
     await requestRepository.save(request);
-    return request;
+    return asSaved(request);
   }
 
   private static async createRequest(
@@ -786,7 +796,7 @@ export class MediaRequest {
       });
 
       await requestRepository.save(request);
-      return request;
+      return asSaved(request);
     } else {
       const tmdbMediaShow = tmdbMedia as Awaited<
         ReturnType<typeof tmdb.getTvShow>
@@ -926,7 +936,7 @@ export class MediaRequest {
       });
 
       await requestRepository.save(request);
-      return request;
+      return asSaved(request);
     }
   }
 

@@ -1268,6 +1268,31 @@ describe('DELETE /request/:requestId, deleted media status restoration', () => {
   });
 });
 
+describe('POST /request answers with the request as saved', () => {
+  it('says approved, and the film requested, when it is approved at once', async () => {
+    getSettings().radarr = [];
+    getSettings().sonarr = [];
+
+    const admin = await loginAs('admin@seerr.dev', 'test1234');
+    const approved = await admin.post('/request').send({
+      mediaType: MediaType.MOVIE,
+      mediaId: 88101,
+    });
+    assert.strictEqual(approved.status, 201);
+    assert.strictEqual(approved.body.status, MediaRequestStatus.APPROVED);
+    assert.strictEqual(approved.body.media.status, MediaStatus.PROCESSING);
+
+    const friend = await loginAs('friend@seerr.dev', 'test1234');
+    const pending = await friend.post('/request').send({
+      mediaType: MediaType.MOVIE,
+      mediaId: 88102,
+    });
+    assert.strictEqual(pending.status, 201);
+    assert.strictEqual(pending.body.status, MediaRequestStatus.PENDING);
+    assert.strictEqual(pending.body.media.status, MediaStatus.PENDING);
+  });
+});
+
 describe('POST /request (movie), override rules', () => {
   it('applies an override rule when the default Radarr server id differs from its array index', async () => {
     configureRadarr([{ id: 5, isDefault: true, is4k: false }]);

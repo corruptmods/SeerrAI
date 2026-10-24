@@ -127,13 +127,8 @@ const MovieRequestModal = ({
         }
 
         if (onComplete) {
-          // The server's answer, not a guess from permissions: it also
-          // approves for anyone who manages requests.
-          onComplete(
-            response.data.status === MediaRequestStatus.PENDING
-              ? MediaStatus.PENDING
-              : MediaStatus.PROCESSING
-          );
+          // The film as the server left it, not a guess from permissions.
+          onComplete(response.data.media[is4k ? 'status4k' : 'status']);
         }
         addToast(
           <span>

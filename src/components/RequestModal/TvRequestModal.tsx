@@ -389,7 +389,7 @@ const TvRequestModal = ({
         }
 
         if (onComplete) {
-          onComplete(response.data.media.status);
+          onComplete(response.data.media[is4k ? 'status4k' : 'status']);
         }
         addToast(
           <span>

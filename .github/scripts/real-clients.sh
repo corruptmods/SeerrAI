@@ -18,13 +18,24 @@ for client in deluge qbittorrent transmission sabnzbd nzbget; do
 done
 mkdir -p "$ROOT/rtorrent/session" "$ROOT/rtorrent/downloads" "$ROOT/rtorrent/nginx/tmp"
 
+# What went wrong, in the run's summary as well as its log.
+fail() {
+  echo "::error title=$1::$(printf '%s' "$2" | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')"
+  exit 1
+}
+
 run() {
-  local name=$1 image=$2
+  local name=$1 image=$2 out
   shift 2
-  docker run -d --name "real-$name" --network host \
+  # A registry that hiccups is tried again.
+  for _ in 1 2 3; do
+    out=$(docker pull -q "$image" 2>&1) && break
+    sleep 15
+  done || true
+  out=$(docker run -d --name "real-$name" --network host \
     -e PUID="$U" -e PGID="$G" -e TZ=Etc/UTC \
     -v "$ROOT/$name/config:/config" -v "$ROOT/$name/downloads:/downloads" \
-    "$@" "$image" >/dev/null
+    "$@" "$image" 2>&1) || fail "$name" "$out"
   # SABnzbd, for one, finishes into /config/Downloads unless told otherwise.
   echo "REAL_${name^^}_PATHS=/downloads=$ROOT/$name/downloads,/config=$ROOT/$name/config" >>"$OUT"
 }
@@ -100,8 +111,7 @@ wait_for() {
     if [ "$code" != 000 ]; then return 0; fi
     sleep 2
   done
-  echo "$what did not start" >&2
-  return 1
+  fail "$what" "$what did not start"
 }
 wait_for Deluge http://127.0.0.1:8112/
 wait_for qBittorrent http://127.0.0.1:8090/
@@ -137,7 +147,8 @@ for _ in $(seq 1 30); do
   sleep 2
 done
 qbit_login adminadmin >/dev/null
-qbit_ok || { echo "qBittorrent would not take the checks' password" >&2; docker logs real-qbittorrent 2>&1 | tail -n 30 >&2; exit 1; }
+qbit_ok || fail qBittorrent "It would not take the checks' password.
+$(docker logs real-qbittorrent 2>&1 | tail -n 15)"
 rm -f "$ROOT/qbittorrent/jar"
 for _ in $(seq 1 30); do
   if curl -fsS -o /dev/null -u rtuser:rtpass -H 'Content-Type: text/xml' \
@@ -152,7 +163,7 @@ for _ in $(seq 1 30); do
   [ -n "$key" ] && break
   sleep 1
 done
-[ -n "$key" ] || { echo "SABnzbd made no API key" >&2; exit 1; }
+[ -n "$key" ] || fail SABnzbd "It made no API key"
 if [ -n "${GITHUB_ENV:-}" ]; then echo "::add-mask::$key"; fi
 echo "REAL_SABNZBD_KEY=$key" >>"$OUT"
 echo "REAL_CLIENTS=all" >>"$OUT"

@@ -639,6 +639,58 @@ describe('connecting Plex', () => {
   });
 });
 
+describe("a server's own settings page", () => {
+  it('drops the libraries of the Plex server it pointed at before', async () => {
+    stub(PlexAPI.prototype, 'getStatus', async () => ({
+      MediaContainer: {
+        machineIdentifier: 'den-plex-id',
+        friendlyName: 'Den Plex',
+      },
+    }));
+    const same = await post('/plex', { ip: '127.0.0.1', port: 32400 });
+    assert.equal(same.status, 200);
+    assert.equal(getSettings().plex.libraries.length, 2, 'the same server');
+
+    stub(PlexAPI.prototype, 'getStatus', async () => ({
+      MediaContainer: {
+        machineIdentifier: 'loft-plex-id',
+        friendlyName: 'Loft',
+      },
+    }));
+    getSettings().plex.musicLibraries = [
+      { id: '3', name: 'Music', enabled: true, type: 'artist' },
+    ];
+    const other = await post('/plex', { ip: '10.0.0.9', port: 32400 });
+    assert.equal(other.status, 200);
+    const plex = getSettings().plex;
+    assert.equal(plex.machineId, 'loft-plex-id');
+    assert.deepEqual(plex.libraries, []);
+    assert.deepEqual(plex.musicLibraries, []);
+  });
+
+  it('drops the libraries of the Jellyfin server it pointed at before', async () => {
+    connectJellyfin();
+    getSettings().jellyfin.libraries = [
+      { id: 'a1', name: 'Films', enabled: true, type: 'movie' },
+    ];
+    const same = await post('/jellyfin', {
+      ip: '127.0.0.1',
+      port: jellyfinPort,
+    });
+    assert.equal(same.status, 200);
+    assert.equal(getSettings().jellyfin.libraries.length, 1, 'the same server');
+
+    getSettings().jellyfin.serverId = 'attic-jellyfin-id';
+    const other = await post('/jellyfin', {
+      ip: '127.0.0.1',
+      port: jellyfinPort,
+    });
+    assert.equal(other.status, 200);
+    assert.equal(getSettings().jellyfin.serverId, 'den-jellyfin-id');
+    assert.deepEqual(getSettings().jellyfin.libraries, []);
+  });
+});
+
 describe('removing a server', () => {
   const problem = (mediaServer: PlexMatchProblem['mediaServer']) => ({
     kind: 'movie' as const,

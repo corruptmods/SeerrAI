@@ -400,7 +400,14 @@ settingsRoutes.post('/plex', async (req, res, next) => {
       throw new Error('Server not found');
     }
 
-    settings.plex.machineId = result.MediaContainer.machineIdentifier;
+    // Plex numbers every server's libraries 1, 2, 3…: another server's
+    // switches and last scans would land on whatever this one numbers so.
+    const machineId = result.MediaContainer.machineIdentifier;
+    if (settings.plex.machineId && settings.plex.machineId !== machineId) {
+      settings.plex.libraries = [];
+      settings.plex.musicLibraries = [];
+    }
+    settings.plex.machineId = machineId;
     settings.plex.name = result.MediaContainer.friendlyName;
 
     await settings.save();

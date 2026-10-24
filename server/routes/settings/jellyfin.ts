@@ -65,6 +65,11 @@ const jellyfinSettingsRoutes = (kind: JellyfinFamilyKind): Router => {
       // Whether the server is connected, and whether people may sign in
       // with it, are changed under Settings → Media Servers.
       Object.assign(settings[kind], omit(req.body, 'connected', 'signIn'));
+      // Another server's libraries are not this one's.
+      if (settings[kind].serverId && settings[kind].serverId !== result.Id) {
+        settings[kind].libraries = [];
+        settings[kind].musicLibraries = [];
+      }
       settings[kind].serverId = result.Id;
       settings[kind].name = result.ServerName;
       await settings.save();

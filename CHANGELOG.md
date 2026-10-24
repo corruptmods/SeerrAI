@@ -2,6 +2,19 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
+## 2.0.3 (24 October 2026)
+
+### Security
+
+Package updates for advisories published on 23 October:
+
+- [GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828): body-parser 2.4.0, with Express 5.3.0: a compressed request with bytes after its body could tie the server up
+- [GHSA-xjj6-f33q-929c](https://github.com/advisories/GHSA-xjj6-f33q-929c), [GHSA-4qv8-2p9j-2685](https://github.com/advisories/GHSA-4qv8-2p9j-2685), [GHSA-f72v-6w45-q472](https://github.com/advisories/GHSA-f72v-6w45-q472): undici 8.12.3 and 6.29.1: a reply with too many encodings, or an endless event stream, could take the server down
+- [GHSA-q7qp-rjg7-q26m](https://github.com/advisories/GHSA-q7qp-rjg7-q26m): multer 2.5.0: an upload cut off at the wrong moment could leave a request hanging
+- [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5): zod 4.6.7: an oversized list could use up memory while being checked
+- [GHSA-8c8m-p3m8-cjg8](https://github.com/advisories/GHSA-8c8m-p3m8-cjg8), [GHSA-m943-m63m-w62w](https://github.com/advisories/GHSA-m943-m63m-w62w), [GHSA-85x2-q946-cp5h](https://github.com/advisories/GHSA-85x2-q946-cp5h): Nodemailer 10.1.4: a crafted email address could send mail to someone it didn't name
+- [GHSA-w74x-v6f9-j3xg](https://github.com/advisories/GHSA-w74x-v6f9-j3xg), [GHSA-wjr9-j795-jxcr](https://github.com/advisories/GHSA-wjr9-j795-jxcr), [GHSA-xhq7-xmqj-769h](https://github.com/advisories/GHSA-xhq7-xmqj-769h), [GHSA-333x-w4r6-6crp](https://github.com/advisories/GHSA-333x-w4r6-6crp): fast-uri 3.1.9, which checks addresses in API requests: crafted addresses were read wrongly
+
 ## 2.0.2 (23 October 2026)
 
 ### Security

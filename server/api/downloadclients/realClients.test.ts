@@ -334,18 +334,41 @@ const usenetClients: [string, () => UsenetClient][] = [
   ['SABnzbd', () => new SabnzbdAPI(sabnzbdAt())],
 ];
 
+/** NZBGet's and SABnzbd's own APIs, for what the checks set up. */
+const nzbgetRpc = async (method: string, params: unknown[] = []) => {
+  const at = nzbgetAt();
+  return (
+    await axios.post(
+      `http://${at.hostname}:${at.port}/jsonrpc`,
+      { method, params },
+      {
+        auth: { username: at.username, password: at.password },
+        headers: { Connection: 'close' },
+      }
+    )
+  ).data.result;
+};
+const sabnzbdApi = (params: Record<string, string | number>) => {
+  const at = sabnzbdAt();
+  return axios.get(`http://${at.hostname}:${at.port}/api`, {
+    params: { ...params, apikey: at.apiKey, output: 'json' },
+  });
+};
+
+/**
+ * Holds every download back, or lets them go: from the news server here a
+ * job is done before it could be paused.
+ */
+const holdDownloads: Record<string, (hold: boolean) => Promise<unknown>> = {
+  NZBGet: (hold) => nzbgetRpc(hold ? 'pausedownload' : 'resumedownload'),
+  SABnzbd: (hold) => sabnzbdApi({ mode: hold ? 'pause' : 'resume' }),
+};
+
 /** Points a Usenet client at the news server here, through its own API. */
 const useNewsServer: Record<string, () => Promise<void>> = {
   NZBGet: async () => {
     const at = nzbgetAt();
-    const rpc = async (method: string, params: unknown[]) =>
-      (
-        await axios.post(
-          `http://${at.hostname}:${at.port}/jsonrpc`,
-          { method, params },
-          { auth: { username: at.username, password: at.password } }
-        )
-      ).data.result;
+    const rpc = nzbgetRpc;
     const options: { Name: string; Value: string }[] = await rpc('config', []);
     const set: Record<string, string> = {
       'Server1.Active': 'yes',
@@ -385,11 +408,7 @@ const useNewsServer: Record<string, () => Promise<void>> = {
     await rpc('resumepost', []);
   },
   SABnzbd: async () => {
-    const at = sabnzbdAt();
-    const api = (params: Record<string, string | number>) =>
-      axios.get(`http://${at.hostname}:${at.port}/api`, {
-        params: { ...params, apikey: at.apiKey, output: 'json' },
-      });
+    const api = sabnzbdApi;
     await api({
       mode: 'set_config',
       section: 'servers',
@@ -617,12 +636,20 @@ describe('the real download clients', { skip }, () => {
       });
 
       it('pauses, resumes and finishes a job, and says where its files are', async () => {
-        const id = await api.addNzb(
-          nzbOf(POSTED, POSTED_FILE),
-          'Real.Check.S01E04',
-          'tv'
-        );
-        await api.pauseJob(id);
+        await holdDownloads[name](true);
+        let id: string;
+        try {
+          id = await api.addNzb(
+            nzbOf(POSTED, POSTED_FILE),
+            'Real.Check.S01E04',
+            'tv'
+          );
+          await api.pauseJob(id);
+        } finally {
+          await holdDownloads[name](false);
+        }
+        // Paused itself: let go with the rest, it stays where it is.
+        await sleep(3000);
         const paused = await until(
           'paused',
           () => api.getJob(id),

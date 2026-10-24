@@ -61,6 +61,7 @@ jobs:
         run: .github/scripts/real-clients.sh
 
       - name: Check them
+        id: check
         run: >-
           pnpm test
           --test-reporter spec --test-reporter-destination stdout
@@ -73,9 +74,20 @@ jobs:
           if [ -f real-clients.tap ]; then
             node .github/scripts/tap-annotations.mjs real-clients.tap
           fi
-          if ! pgrep -x rtorrent >/dev/null; then
-            log=$(tail -n 15 /tmp/real-clients/rtorrent/rtorrent.log 2>&1 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')
+          enc() { sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g'; }
+          if ! pgrep -f 'rtorrent -n' >/dev/null; then
+            log=$(tail -n 15 /tmp/real-clients/rtorrent/rtorrent.log 2>&1 | enc)
             echo "::warning title=rTorrent::It was not running after the checks.%0A$log"
+          fi
+          # A client that failed a check: the end of its own log, and whether
+          # it restarted along the way.
+          if [ "${{ steps.check.outcome }}" = failure ]; then
+            for name in deluge qbittorrent transmission sabnzbd nzbget; do
+              restarts=$(docker inspect -f '{{.RestartCount}} {{.State.StartedAt}}' "real-$name" 2>&1)
+              own=$(find "/tmp/real-clients/$name/config" -maxdepth 3 -name '*.log' -size +0 -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
+              log=$({ docker logs "real-$name" 2>&1 | tail -n 8; [ -n "$own" ] && tail -n 12 "$own"; } | enc)
+              echo "::warning title=$name log::started $restarts%0A$log"
+            done
           fi
 
       - name: The clients' logs

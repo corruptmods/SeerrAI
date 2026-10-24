@@ -127,17 +127,12 @@ const MovieRequestModal = ({
         }
 
         if (onComplete) {
+          // The server's answer, not a guess from permissions: it also
+          // approves for anyone who manages requests.
           onComplete(
-            hasPermission(
-              is4k ? Permission.AUTO_APPROVE_4K : Permission.AUTO_APPROVE
-            ) ||
-              hasPermission(
-                is4k
-                  ? Permission.AUTO_APPROVE_4K_MOVIE
-                  : Permission.AUTO_APPROVE_MOVIE
-              )
-              ? MediaStatus.PROCESSING
-              : MediaStatus.PENDING
+            response.data.status === MediaRequestStatus.PENDING
+              ? MediaStatus.PENDING
+              : MediaStatus.PROCESSING
           );
         }
         addToast(
@@ -169,7 +164,6 @@ const MovieRequestModal = ({
     onComplete,
     addToast,
     intl,
-    hasPermission,
   ]);
 
   const cancelRequest = async () => {

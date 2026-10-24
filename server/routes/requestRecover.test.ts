@@ -1,6 +1,7 @@
 import type { LidarrAlbum } from '@server/api/servarr/lidarr';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
+import TheMovieDb from '@server/api/themoviedb';
 import {
   MediaRequestStatus,
   MediaStatus,
@@ -137,12 +138,15 @@ const requester = () =>
 let nextTmdbId = 9000;
 
 /** A film request, saved as it stands (an approved one is sent on). */
-const movieRequest = async (overrides: Partial<MediaRequest> = {}) => {
+const movieRequest = async (
+  overrides: Partial<MediaRequest> = {},
+  status = MediaStatus.PROCESSING
+) => {
   const media = await getRepository(Media).save(
     new Media({
       mediaType: MediaType.MOVIE,
       tmdbId: nextTmdbId++,
-      status: MediaStatus.PROCESSING,
+      status,
       status4k: MediaStatus.UNKNOWN,
     })
   );
@@ -160,13 +164,16 @@ const movieRequest = async (overrides: Partial<MediaRequest> = {}) => {
 };
 
 /** A request for the first season of a series. */
-const seriesRequest = async (overrides: Partial<MediaRequest> = {}) => {
+const seriesRequest = async (
+  overrides: Partial<MediaRequest> = {},
+  status = MediaStatus.PROCESSING
+) => {
   const media = await getRepository(Media).save(
     new Media({
       mediaType: MediaType.TV,
       tmdbId: nextTmdbId++,
       tvdbId: 1234,
-      status: MediaStatus.PROCESSING,
+      status,
       status4k: MediaStatus.UNKNOWN,
     })
   );
@@ -247,6 +254,20 @@ const lookedUpAlbum = (): LidarrAlbum => ({
     qualityProfileId: 0,
     metadataProfileId: 0,
     tags: [],
+  },
+});
+
+// A film already there is completed and announced: TMDB answered here.
+Object.defineProperty(TheMovieDb.prototype, 'getMovie', {
+  configurable: true,
+  set() {},
+  get() {
+    return async ({ movieId }: { movieId: number }) => ({
+      id: movieId,
+      title: 'Film',
+      overview: '',
+      release_date: '2020-01-01',
+    });
   },
 });
 
@@ -385,6 +406,36 @@ describe('a request whose server is gone', () => {
       (await history(MediaEventType.FAILED)).join('\n'),
       /Sonarr server chosen for this request no longer exists/
     );
+  });
+
+  it('is completed, not failed, when the film is already there', async () => {
+    getSettings().radarr = [radarr(0, { isDefault: true })];
+
+    const request = await movieRequest(
+      { status: MediaRequestStatus.APPROVED, serverId: 5 },
+      MediaStatus.AVAILABLE
+    );
+
+    assert.equal(
+      (await stored(request.id)).status,
+      MediaRequestStatus.COMPLETED
+    );
+    assert.deepEqual(await history(MediaEventType.FAILED), []);
+  });
+
+  it('is completed, not failed, when the series is already there', async () => {
+    getSettings().sonarr = [sonarr(0, { isDefault: true })];
+
+    const request = await seriesRequest(
+      { status: MediaRequestStatus.APPROVED, serverId: 3 },
+      MediaStatus.AVAILABLE
+    );
+
+    assert.equal(
+      (await stored(request.id)).status,
+      MediaRequestStatus.COMPLETED
+    );
+    assert.deepEqual(await history(MediaEventType.FAILED), []);
   });
 
   it('is marked failed when its 4K server was removed and only others are left', async () => {

@@ -358,6 +358,11 @@ const useNewsServer: Record<string, () => Promise<void>> = {
       'Server1.Password': '',
       // Twice the same post in one run is no duplicate here.
       DupeCheck: 'no',
+      // Signed in to, even from this machine, so a wrong password is turned
+      // away as it is for anyone else.
+      ControlUsername: at.username,
+      ControlPassword: at.password,
+      AuthorizedIP: '',
     };
     const others = options.filter(
       (o) => !(o.Name in set) && !/^Server[2-9]\./.test(o.Name)
@@ -375,6 +380,8 @@ const useNewsServer: Record<string, () => Promise<void>> = {
       () => rpc('version', []),
       (v) => !!v
     );
+    // A new NZBGet can start with downloading paused.
+    await rpc('resumedownload', []);
   },
   SABnzbd: async () => {
     const at = sabnzbdAt();

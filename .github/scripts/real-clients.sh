@@ -25,7 +25,8 @@ run() {
     -e PUID="$U" -e PGID="$G" -e TZ=Etc/UTC \
     -v "$ROOT/$name/config:/config" -v "$ROOT/$name/downloads:/downloads" \
     "$@" "$image" >/dev/null
-  echo "REAL_${name^^}_PATHS=/downloads=$ROOT/$name/downloads" >>"$OUT"
+  # SABnzbd, for one, finishes into /config/Downloads unless told otherwise.
+  echo "REAL_${name^^}_PATHS=/downloads=$ROOT/$name/downloads,/config=$ROOT/$name/config" >>"$OUT"
 }
 
 # qBittorrent signs in with a password it's given, not the one it makes up.
@@ -107,6 +108,37 @@ wait_for qBittorrent http://127.0.0.1:8090/
 wait_for Transmission http://127.0.0.1:9091/transmission/web/
 wait_for SABnzbd http://127.0.0.1:8080/
 wait_for NZBGet http://127.0.0.1:6789/
+
+# qBittorrent 5 may ignore the password above and make up one for the
+# session, which it logs: then it's signed in with that and given ours.
+qbit_login() {
+  curl -s -o /dev/null -w '%{http_code}' -c "$ROOT/qbittorrent/jar" \
+    --data-urlencode username=admin --data-urlencode "password=$1" \
+    http://127.0.0.1:8090/api/v2/auth/login
+}
+qbit_ok() {
+  [ "$(curl -s -b "$ROOT/qbittorrent/jar" http://127.0.0.1:8090/api/v2/app/version -o /dev/null -w '%{http_code}')" = 200 ]
+}
+for _ in $(seq 1 30); do
+  qbit_login adminadmin >/dev/null
+  if qbit_ok; then break; fi
+  temp=$(docker logs real-qbittorrent 2>&1 | sed -n 's/.*temporary password is provided for this session: *\(.*\)$/\1/p' | tail -n 1 | tr -d '\r')
+  if [ -n "$temp" ]; then
+    if [ -n "${GITHUB_ENV:-}" ]; then echo "::add-mask::$temp"; fi
+    qbit_login "$temp" >/dev/null
+    if qbit_ok; then
+      curl -s -b "$ROOT/qbittorrent/jar" \
+        --data-urlencode 'json={"web_ui_password":"adminadmin"}' \
+        http://127.0.0.1:8090/api/v2/app/setPreferences
+      echo "qBittorrent made up its own password; it now has the one the checks use"
+      break
+    fi
+  fi
+  sleep 2
+done
+qbit_login adminadmin >/dev/null
+qbit_ok || { echo "qBittorrent would not take the checks' password" >&2; docker logs real-qbittorrent 2>&1 | tail -n 30 >&2; exit 1; }
+rm -f "$ROOT/qbittorrent/jar"
 for _ in $(seq 1 30); do
   if curl -fsS -o /dev/null -u rtuser:rtpass -H 'Content-Type: text/xml' \
     -d '<?xml version="1.0"?><methodCall><methodName>system.client_version</methodName><params/></methodCall>' \

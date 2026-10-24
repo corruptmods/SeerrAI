@@ -183,20 +183,42 @@ class QBittorrentAPI implements TorrentClient {
     });
   }
 
+  /**
+   * Signs in. qBittorrent before 5.2 answers "Ok." or "Fails."; 5.2 and
+   * later answer 204 with nothing, or 401.
+   */
   private async signIn(): Promise<void> {
-    const response = await this.axios.post<string>(
-      '/auth/login',
-      new URLSearchParams({
-        username: this.username,
-        password: this.password,
-      }).toString(),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    const refused = new Error(
+      'qBittorrent did not accept the username or password.'
     );
+    let response: AxiosResponse<string>;
+    try {
+      response = await this.axios.post<string>(
+        '/auth/login',
+        new URLSearchParams({
+          username: this.username,
+          password: this.password,
+        }).toString(),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+    } catch (e) {
+      if (isAxiosError(e) && e.response?.status === 401) {
+        throw refused;
+      }
+      if (isAxiosError(e) && e.response?.status === 403) {
+        throw new Error(
+          'qBittorrent has turned this address away after too many failed sign-ins. It lets it in again after a while, or when restarted.'
+        );
+      }
+      throw e;
+    }
     const cookies = (response.headers['set-cookie'] ?? [])
       .map((cookie) => cookie.split(';')[0])
       .join('; ');
-    if (String(response.data).trim() !== 'Ok.' || !cookies) {
-      throw new Error('qBittorrent did not accept the username or password.');
+    const accepted =
+      response.status === 204 || String(response.data).trim() === 'Ok.';
+    if (!accepted || !cookies) {
+      throw refused;
     }
     sessions.set(this.sessionKey, cookies);
   }

@@ -18,6 +18,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 ### Fixed
 
 - Deluge 2 couldn't be connected ("Deluge: Unknown method"): Seerr AI asked for its version the way only Deluge 1.3 answers.
+- qBittorrent 5.2 and later couldn't be connected ("did not accept the username or password"): they answer a sign-in differently. Found by the new checks against the real clients.
 - rTorrent: a Backfill download with files skipped (most packs) never finished, as rTorrent counts the skipped files as still to come. It's now done once the files chosen are in, and its size and progress are of those files.
 - SABnzbd: a finished Backfill download couldn't be removed from SABnzbd's history ("SABnzbd: request refused"), so it and its files stayed there.
 - A request for something already in your library was marked failed, not completed, when the server it was sent to had been removed.

@@ -111,6 +111,7 @@ describe('talking to them', () => {
   let qbitPort = 0;
   let logins = 0;
   let session = 'first';
+  let qbitAnswersByStatus = false;
   const servers: http.Server[] = [];
   /** What was deleted from SABnzbd, and where its jobs are. */
   let deleted: string[] = [];
@@ -201,12 +202,15 @@ describe('talking to them', () => {
         req.on('data', (chunk) => (body += chunk));
         req.on('end', () => {
           const form = new URLSearchParams(body);
+          // qBittorrent 5.2 and later answer with a status, not words.
           if (form.get('password') !== 'secret') {
-            return res.end('Fails.');
+            res.statusCode = qbitAnswersByStatus ? 401 : 200;
+            return res.end(qbitAnswersByStatus ? '' : 'Fails.');
           }
           logins++;
           res.setHeader('Set-Cookie', `QBT_SID_8080=${session}; HttpOnly`);
-          res.end('Ok.');
+          res.statusCode = qbitAnswersByStatus ? 204 : 200;
+          res.end(qbitAnswersByStatus ? '' : 'Ok.');
         });
         return;
       }
@@ -356,6 +360,27 @@ describe('talking to them', () => {
     const torrent = await qbit('secret').getTorrent('B'.repeat(40));
     assert.equal(torrent?.hash, 'b'.repeat(40));
     assert.equal(torrent?.dlspeed, 2000);
+  });
+
+  it('signs in to qBittorrent 5.2, which answers with a status', async () => {
+    qbitAnswersByStatus = true;
+    session = 'five-two';
+    try {
+      assert.equal(await qbit('secret').getVersion(), 'v5.0.4');
+      await assert.rejects(
+        new QBittorrentAPI({
+          hostname: '127.0.0.1',
+          port: qbitPort,
+          useSsl: false,
+          urlBase: '',
+          username: 'someone-else',
+          password: 'nope',
+        }).getVersion(),
+        /did not accept/
+      );
+    } finally {
+      qbitAnswersByStatus = false;
+    }
   });
 
   it('says so when the qBittorrent password is wrong', async () => {

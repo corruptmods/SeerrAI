@@ -380,8 +380,9 @@ const useNewsServer: Record<string, () => Promise<void>> = {
       () => rpc('version', []),
       (v) => !!v
     );
-    // A new NZBGet can start with downloading paused.
+    // A new NZBGet can start with downloading and post-processing paused.
     await rpc('resumedownload', []);
+    await rpc('resumepost', []);
   },
   SABnzbd: async () => {
     const at = sabnzbdAt();

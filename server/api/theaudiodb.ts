@@ -35,8 +35,13 @@ class TheAudioDb extends ExternalAPI {
     super(THE_AUDIO_DB_URL, {}, { timeout: TIMEOUT_MS });
   }
 
-  /** The artist's pictures; none when it is not known or cannot be asked. */
-  public async getArtistPictures(artistMbid: string): Promise<ArtistPictures> {
+  /**
+   * The artist's pictures, none when it is not known; null when TheAudioDB
+   * could not be asked, which says nothing of whether it has any.
+   */
+  public async getArtistPictures(
+    artistMbid: string
+  ): Promise<ArtistPictures | null> {
     const none = { thumb: null, fanart: null };
     if (!this.apiKey) {
       return none;
@@ -53,12 +58,12 @@ class TheAudioDb extends ExternalAPI {
         fanart: artist?.strArtistFanart || artist?.strArtistWideThumb || null,
       };
     } catch (e) {
-      logger.debug('TheAudioDB had no artist pictures', {
+      logger.debug('TheAudioDB could not be asked for artist pictures', {
         label: 'TheAudioDB',
         artistMbid,
         errorMessage: e instanceof Error ? e.message : String(e),
       });
-      return none;
+      return null;
     }
   }
 }

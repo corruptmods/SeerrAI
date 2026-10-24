@@ -96,7 +96,7 @@ const newestAlbumCover = async (
 
 /**
  * The artist's pictures. What Lidarr and TheAudioDB say is kept for a
- * week; when Lidarr cannot be asked, nothing is kept, so the next visit
+ * week; when either cannot be asked, nothing is kept, so the next visit
  * asks again.
  */
 export const artistImages = async (
@@ -126,10 +126,14 @@ export const artistImages = async (
     const apiKey = getSettings().music.theAudioDbApiKey;
     if (apiKey && (!images.photo || !images.backdrop)) {
       const tadb = await new TheAudioDb(apiKey).getArtistPictures(artistMbid);
-      images = {
-        photo: images.photo ?? musicImageFrom(tadb.thumb),
-        backdrop: images.backdrop ?? musicImageFrom(tadb.fanart),
-      };
+      if (tadb) {
+        images = {
+          photo: images.photo ?? musicImageFrom(tadb.thumb),
+          backdrop: images.backdrop ?? musicImageFrom(tadb.fanart),
+        };
+      } else {
+        answered = false;
+      }
     }
 
     if (answered) {

@@ -857,6 +857,27 @@ describe('an artist’s picture', () => {
     );
   });
 
+  it('is asked for again next time when TheAudioDB does not answer', async () => {
+    lookupImages = [];
+    getSettings().music = { ...musicDefaults(), theAudioDbApiKey: 'key' };
+    const down = mock.method(
+      TheAudioDb.prototype,
+      'getArtistPictures',
+      async () => null
+    );
+    assert.equal((await get(`/music/artist/${IDS.artist}/image`)).status, 404);
+    down.mock.restore();
+    mock.method(TheAudioDb.prototype, 'getArtistPictures', async () => ({
+      thumb: 'https://www.theaudiodb.com/images/media/artist/thumb/abc.jpg',
+      fanart: null,
+    }));
+    const { res } = await get(`/music/artist/${IDS.artist}/image`);
+    assert.equal(
+      res.headers.get('location'),
+      '/imageproxy/tadb/images/media/artist/thumb/abc.jpg'
+    );
+  });
+
   it('is asked for again next time when Lidarr does not answer', async () => {
     lidarrUp = false;
     assert.equal((await get(`/music/artist/${IDS.artist}/image`)).status, 404);

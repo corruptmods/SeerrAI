@@ -69,12 +69,17 @@ class ExternalAPI {
     this.cache = options.nodeCache;
   }
 
-  // transform runs before the cache write.
+  // transform runs before the cache write; an answer `keep` turns down is
+  // returned but not kept, so the next call asks again.
   protected async get<T>(
     endpoint: string,
     config?: AxiosRequestConfig,
     ttl?: number,
-    options?: { cache?: CacheStore; transform?: (data: T) => T }
+    options?: {
+      cache?: CacheStore;
+      transform?: (data: T) => T;
+      keep?: (data: T) => boolean;
+    }
   ): Promise<T> {
     const cache = options?.cache ?? this.cache;
     const cacheKey = this.serializeCacheKey(endpoint, {
@@ -91,7 +96,7 @@ class ExternalAPI {
       ? options.transform(response.data)
       : response.data;
 
-    if (cache && ttl !== 0) {
+    if (cache && ttl !== 0 && (options?.keep?.(data) ?? true)) {
       cache.set(cacheKey, data, ttl ?? DEFAULT_TTL);
     }
 

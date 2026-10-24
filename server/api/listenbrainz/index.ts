@@ -22,6 +22,13 @@ const TIMEOUT_MS = 15_000;
 
 export type LbRange = 'week' | 'month' | 'quarter' | 'year' | 'all_time';
 
+/**
+ * Kept only with something in it: an empty answer kept would leave its row
+ * empty for six hours, where asking again may well fill it.
+ */
+const listed = (list: unknown[] | undefined): boolean =>
+  Array.isArray(list) && list.length > 0;
+
 class ListenBrainzAPI extends ExternalAPI {
   constructor(baseUrl = LISTENBRAINZ_URL) {
     super(
@@ -49,7 +56,8 @@ class ListenBrainzAPI extends ExternalAPI {
     return this.get<LbFreshReleasesResponse>(
       '/explore/fresh-releases',
       { params: { days, sort, past: true, future: false } },
-      TTL_SECONDS
+      TTL_SECONDS,
+      { keep: (data) => listed(data?.payload?.releases) }
     );
   }
 
@@ -66,7 +74,8 @@ class ListenBrainzAPI extends ExternalAPI {
     return this.get<LbTopReleaseGroupsResponse>(
       '/stats/sitewide/release-groups',
       { params: { range, count, offset } },
-      TTL_SECONDS
+      TTL_SECONDS,
+      { keep: (data) => listed(data?.payload?.release_groups) }
     );
   }
 
@@ -83,7 +92,8 @@ class ListenBrainzAPI extends ExternalAPI {
     return this.get<LbTopArtistsResponse>(
       '/stats/sitewide/artists',
       { params: { range, count, offset } },
-      TTL_SECONDS
+      TTL_SECONDS,
+      { keep: (data) => listed(data?.payload?.artists) }
     );
   }
 }

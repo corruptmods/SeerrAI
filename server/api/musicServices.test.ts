@@ -73,6 +73,19 @@ describe('ListenBrainz', () => {
       ]
     );
   });
+
+  it('asks again after an empty answer, rather than keep it', async () => {
+    const lb = new ListenBrainzAPI();
+    let releases: { release_group_mbid: string }[] = [];
+    const get = mock.method(getAxios(lb), 'get', async () => ({
+      data: { payload: { releases } },
+    }));
+    assert.deepEqual((await lb.getFreshReleases()).payload.releases, []);
+    releases = [{ release_group_mbid: ALBUM }];
+    assert.equal((await lb.getFreshReleases()).payload.releases.length, 1);
+    await lb.getFreshReleases();
+    assert.equal(get.mock.callCount(), 2, 'kept once it had some');
+  });
 });
 
 describe('the Cover Art Archive', () => {
@@ -134,7 +147,7 @@ describe('TheAudioDB', () => {
     ]);
   });
 
-  it('has no pictures for an artist it does not know, or when down', async () => {
+  it('has no pictures for an artist it does not know, and cannot say when down', async () => {
     const tadb = new TheAudioDb('key');
     mock.method(getAxios(tadb), 'get', async () => ({
       data: { artists: null },
@@ -147,9 +160,6 @@ describe('TheAudioDB', () => {
     mock.method(getAxios(tadb), 'get', async () => {
       throw new Error('timeout');
     });
-    assert.deepEqual(await tadb.getArtistPictures(ARTIST), {
-      thumb: null,
-      fanart: null,
-    });
+    assert.equal(await tadb.getArtistPictures(ARTIST), null);
   });
 });

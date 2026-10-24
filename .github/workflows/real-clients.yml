@@ -1,0 +1,76 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+#
+# Seerr AI's download client code against the real clients, not stand-ins:
+# Deluge, qBittorrent, Transmission, SABnzbd and NZBGet in their current
+# linuxserver.io images, and rTorrent behind nginx at /RPC2. Each is signed
+# in to, given a torrent to stop, choose files of, start, finish and delete,
+# or a Usenet job to pause, finish and fail, from a news server the checks
+# run themselves (server/api/downloadclients/realClients.test.ts).
+#
+# A stand-in only answers what its writer believed a client answers; this
+# is what caught Deluge 2 having no daemon.info, rTorrent never finishing
+# a torrent with files skipped, and SABnzbd refusing to delete a finished
+# job. The images are the latest on purpose: a new client version that
+# answers differently shows up here first. Nothing here publishes anything.
+name: Seerr AI real download clients
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+    branches:
+      - dev
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clients:
+    name: Real download clients
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: 'package.json'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+
+      - name: Start the clients
+        run: .github/scripts/real-clients.sh
+
+      - name: Check them
+        run: pnpm test --test-reporter spec server/api/downloadclients/realClients.test.ts
+
+      - name: The clients' logs
+        if: failure()
+        run: |
+          for name in deluge qbittorrent transmission sabnzbd nzbget; do
+            echo "::group::$name"
+            docker logs "real-$name" 2>&1 | tail -n 100
+            echo "::endgroup::"
+          done
+          echo "::group::rtorrent"
+          cat /tmp/real-clients/rtorrent/rtorrent.log /tmp/real-clients/rtorrent/nginx/error.log 2>/dev/null | tail -n 100
+          echo "::endgroup::"

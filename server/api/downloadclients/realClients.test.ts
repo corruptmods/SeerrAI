@@ -11,7 +11,13 @@ import type {
 import axios from 'axios';
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import net from 'node:net';
 import { join, posix } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -141,8 +147,18 @@ const MAGNET = `magnet:?xt=urn:btih:${MAGNET_HASH}&dn=Real.Check.Magnet&tr=${enc
 const CATEGORY = 'seerr-backfill-check';
 const EPISODES = FILES[0].size + FILES[1].size;
 
-/** The pack's files under `folder`; the skipped one only in part. */
-const lay = (folder: string, sample: 'all' | 'shared' | 'none') => {
+/**
+ * The pack's files under `folder`; the skipped one only in part. A client
+ * removes a deleted torrent's files a moment after the torrent itself, so
+ * the last check's copy is waited out first: laid too soon, some of these
+ * would go with it.
+ */
+const lay = async (folder: string, sample: 'all' | 'shared' | 'none') => {
+  const pack = join(folder, PACK);
+  for (let i = 0; i < 20 && existsSync(pack); i++) {
+    await sleep(250);
+  }
+  rmSync(pack, { recursive: true, force: true });
   FILES.forEach((file, i) => {
     const path = join(folder, PACK, ...file.path);
     mkdirSync(join(path, '..'), { recursive: true });
@@ -538,7 +554,7 @@ describe('the real download clients', { skip }, () => {
       });
 
       it('finishes once the files chosen are in, though one is skipped', async () => {
-        lay(local(name, save), 'shared');
+        await lay(local(name, save), 'shared');
         await api.addTorrent({ torrent: TORRENT, category: CATEGORY });
         await until(
           'its files',
@@ -568,7 +584,7 @@ describe('the real download clients', { skip }, () => {
       });
 
       it('deletes what it downloaded with it', async () => {
-        lay(local(name, save), 'all');
+        await lay(local(name, save), 'all');
         await api.addTorrent({ torrent: TORRENT, category: CATEGORY });
         await until(
           'found',

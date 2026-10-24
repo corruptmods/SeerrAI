@@ -4,46 +4,56 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ## 2.1.0 (24 October 2026)
 
+Seerr AI now stops bad downloads before they start, takes "fix this show" from Siri, and its admin agent remembers what it has tried. Every download client Seerr AI supports now works with its newest version, and this release has security updates.
+
 ### New
 
-- **Download Check**: rejects fakes, other titles and copies no better than yours before they download, and sorts out imports that get stuck, importing the right title when it's named another way. Start with Report only, in Settings → Backfill. ([guide](./docs/seerr-ai/download-check.md))
+- **Download Check**: rejects fakes, other titles, wrong episodes and copies no better than yours before they download, and sorts out imports that get stuck, importing the right title when it's named another way. Start with Report only, in Settings → Backfill. ([guide](./docs/seerr-ai/download-check.md))
 - **Fix this show with Siri**: say "Fix this show" or "Fix this movie" while something is playing, and say what's wrong. It's reported and fixed like an issue; anything that replaces files is asked about first. Set it up in Profile → Settings → Siri. ([guide](./docs/seerr-ai/siri.md))
-- **Admin agent: Stop, and corrections while it works.** Tell it something mid-run and it reads it before its next step; Stop ends it there, leaving what it started downloading.
 - **Understand Reports**: when a report's words don't say what to fix, the AI model works it out, if AI is set up. On issues, fixes that replace files are left for an admin.
-- **Backfill goes by episode titles.** A file named S08E01 whose title is another episode is taken as that episode, and specials named only by their title are placed by it. Missing specials and episodes the scene numbers another way are searched for by title.
-- **Download Check catches the wrong episode**: a single episode whose title is another episode's is rejected before it goes in under the wrong number, and Backfill looks for the one it really is.
-- **The admin agent remembers each title**: what it searched, started, and what failed or was turned down, so the next conversation doesn't repeat it.
-- **Health shows Download Check and the agent**: findings and conversations waiting for you, and what both did this week.
+- **Backfill goes by episode titles**: a file whose title is another episode's is taken as that episode, specials named only by their title are placed by it, and episodes numbered differently elsewhere are searched for by title.
+- **The admin agent remembers each title**: what it searched, started, and what failed or was turned down, so the next conversation doesn't repeat it. You can also correct it while it works, and Stop ends it there.
+- **Health shows Download Check and the agent**: what's waiting for you, and what both did this week.
 
 ### Fixed
 
-- Deluge 2 couldn't be connected ("Deluge: Unknown method"): Seerr AI asked for its version the way only Deluge 1.3 answers.
-- NZBGet: a request could fail with "socket hang up", as Seerr AI tried to reuse a connection NZBGet had closed.
-- qBittorrent 5.2 and later couldn't be connected ("did not accept the username or password"): they answer a sign-in differently. Found by the new checks against the real clients.
-- rTorrent: a Backfill download with files skipped (most packs) never finished, as rTorrent counts the skipped files as still to come. It's now done once the files chosen are in, and its size and progress are of those files.
-- SABnzbd: a finished Backfill download couldn't be removed from SABnzbd's history ("SABnzbd: request refused"), so it and its files stayed there.
-- A request for something already in your library was marked failed, not completed, when the server it was sent to had been removed.
-- Requesting a movie as a request manager without auto-approve showed it as pending, though it was approved.
-- A request approved at once could still show as pending on its title until the page was reloaded, for series too, and for 4K by the 4K status.
-- Music search: names with punctuation (AC/DC, !!!, brackets, colons) or a word like AND searched wrongly, or failed with "MusicBrainz did not answer".
-- Pointing Plex, Jellyfin or Emby settings at another server kept the old server's library switches, which landed on the new server's libraries.
-- A series Sonarr has under a different TVDB id than Seerr AI (after TheTVDB merges one) was reset on each Sonarr scan and its request declined while it downloaded.
+Download clients, now checked against the real, newest version of each before every release:
+
+- qBittorrent 5.2 and later couldn't be connected ("did not accept the username or password").
+- Deluge 2 couldn't be connected ("Deluge: Unknown method").
+- NZBGet: a request could fail with "socket hang up".
+- rTorrent: a Backfill download with files skipped (most season packs) never finished.
+- SABnzbd: a finished Backfill download couldn't be removed from SABnzbd's history, so it and its files stayed there.
+
+Requests:
+
+- A request approved at once could show as pending until the page was reloaded, and a movie requested by a request manager without auto-approve stayed shown as pending.
+- A request for something already in your library was marked failed, not completed, when its server had been removed.
 - One failed tag lookup in Radarr, Sonarr or Lidarr failed the whole request. It's now sent without the requester's tag.
-- An artist's picture went missing for a week after one failed try at TheAudioDB, and an empty answer from ListenBrainz left its Discover row empty for six hours. Both are asked again next time.
-- The admin agent found more missing episodes each time it was asked. It now searches each missing episode by number and title, opens season packs instead of grabbing them blind, and is told about any it never looked for before it stops.
-- The admin agent trusted episode numbers over titles. A release numbered its own way (a special counted as episode 1, or the scene's seasons Sonarr goes by) could be imported as the wrong episode, or passed over: a file whose title is another episode is now refused, and one named by the library's numbers is taken when its title agrees.
-- The admin agent could take a release's sample file for the episode.
+- A series Sonarr has under a different TVDB id (after TheTVDB merges one) was reset on every Sonarr scan, and its request declined while it downloaded.
+- Pointing Plex, Jellyfin or Emby settings at another server kept the old server's library switches, which landed on the new server's libraries.
+
+Music:
+
+- Names with punctuation (AC/DC, !!!, brackets, colons) or a word like AND searched wrongly, or failed with "MusicBrainz did not answer".
+- An artist's picture went missing for a week after one failed try at TheAudioDB, and an empty answer from ListenBrainz left its Discover row empty for six hours.
+
+The admin agent:
+
+- It found more missing episodes each time it was asked. It now searches each one by number and title, opens season packs instead of grabbing them blind, and is reminded of any it never looked for before it stops.
+- It trusted episode numbers over titles, so a release numbered its own way could go in as the wrong episode, or be passed over.
+- It could take a release's sample file for the episode.
 
 ### Security
 
 Package updates for advisories published on 23 October:
 
-- [GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828): body-parser 2.4.0, with Express 5.3.0: a compressed request with bytes after its body could tie the server up
-- [GHSA-xjj6-f33q-929c](https://github.com/advisories/GHSA-xjj6-f33q-929c), [GHSA-4qv8-2p9j-2685](https://github.com/advisories/GHSA-4qv8-2p9j-2685), [GHSA-f72v-6w45-q472](https://github.com/advisories/GHSA-f72v-6w45-q472): undici 8.12.3 and 6.29.1: a reply with too many encodings, or an endless event stream, could take the server down
-- [GHSA-q7qp-rjg7-q26m](https://github.com/advisories/GHSA-q7qp-rjg7-q26m): multer 2.5.0: an upload cut off at the wrong moment could leave a request hanging
-- [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5): zod 4.6.7: an oversized list could use up memory while being checked
-- [GHSA-8c8m-p3m8-cjg8](https://github.com/advisories/GHSA-8c8m-p3m8-cjg8), [GHSA-m943-m63m-w62w](https://github.com/advisories/GHSA-m943-m63m-w62w), [GHSA-85x2-q946-cp5h](https://github.com/advisories/GHSA-85x2-q946-cp5h): Nodemailer 10.1.4: a crafted email address could send mail to someone it didn't name
-- [GHSA-w74x-v6f9-j3xg](https://github.com/advisories/GHSA-w74x-v6f9-j3xg), [GHSA-wjr9-j795-jxcr](https://github.com/advisories/GHSA-wjr9-j795-jxcr), [GHSA-xhq7-xmqj-769h](https://github.com/advisories/GHSA-xhq7-xmqj-769h), [GHSA-333x-w4r6-6crp](https://github.com/advisories/GHSA-333x-w4r6-6crp): fast-uri 3.1.9, which checks addresses in API requests: crafted addresses were read wrongly
+- [GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828): body-parser 2.4.0, with Express 5.3.0: a compressed request with bytes after its body could tie the server up. Anyone who could reach Seerr AI could send one.
+- [GHSA-xjj6-f33q-929c](https://github.com/advisories/GHSA-xjj6-f33q-929c), [GHSA-4qv8-2p9j-2685](https://github.com/advisories/GHSA-4qv8-2p9j-2685), [GHSA-f72v-6w45-q472](https://github.com/advisories/GHSA-f72v-6w45-q472): undici 8.12.3 and 6.29.1: a reply with too many encodings, or an endless event stream, could take the server down. Only a service Seerr AI connects to could send such a reply.
+- [GHSA-q7qp-rjg7-q26m](https://github.com/advisories/GHSA-q7qp-rjg7-q26m): multer 2.5.0: an upload cut off at the wrong moment could leave a request hanging. Not reachable: Seerr AI's API takes no uploads of that kind.
+- [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5): zod 4.6.7: an oversized list could use up memory while being checked. Only through a signed-in user's request or the AI model's answers.
+- [GHSA-8c8m-p3m8-cjg8](https://github.com/advisories/GHSA-8c8m-p3m8-cjg8), [GHSA-m943-m63m-w62w](https://github.com/advisories/GHSA-m943-m63m-w62w), [GHSA-85x2-q946-cp5h](https://github.com/advisories/GHSA-85x2-q946-cp5h): Nodemailer 10.1.4: a crafted email address could send mail to someone it didn't name. Only through an email address saved in Seerr AI.
+- [GHSA-w74x-v6f9-j3xg](https://github.com/advisories/GHSA-w74x-v6f9-j3xg), [GHSA-wjr9-j795-jxcr](https://github.com/advisories/GHSA-wjr9-j795-jxcr), [GHSA-xhq7-xmqj-769h](https://github.com/advisories/GHSA-xhq7-xmqj-769h), [GHSA-333x-w4r6-6crp](https://github.com/advisories/GHSA-333x-w4r6-6crp): fast-uri 3.1.9, which checks addresses in API requests: crafted addresses were read wrongly. Reachable through API requests.
 
 ## 2.0.2 (23 October 2026)
 

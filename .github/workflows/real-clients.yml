@@ -61,7 +61,18 @@ jobs:
         run: .github/scripts/real-clients.sh
 
       - name: Check them
-        run: pnpm test --test-reporter spec server/api/downloadclients/realClients.test.ts
+        run: >-
+          pnpm test
+          --test-reporter spec --test-reporter-destination stdout
+          --test-reporter tap --test-reporter-destination real-clients.tap
+          server/api/downloadclients/realClients.test.ts
+
+      - name: What failed, and the clients' versions
+        if: always()
+        run: |
+          if [ -f real-clients.tap ]; then
+            node .github/scripts/tap-annotations.mjs real-clients.tap
+          fi
 
       - name: The clients' logs
         if: failure()

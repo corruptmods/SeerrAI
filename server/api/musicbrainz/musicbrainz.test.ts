@@ -6,6 +6,7 @@ import MusicBrainz, {
   musicBrainz,
   musicBrainzUserAgent,
   plainText,
+  searchText,
 } from '@server/api/musicbrainz';
 import {
   MusicBrainzBusyError,
@@ -453,6 +454,25 @@ describe('the MusicBrainz client', () => {
     await client.searchArtists(' glasswing ');
     assert.equal(get.mock.callCount(), 1);
     assert.equal(await getRepository(MusicMetadata).count(), 0);
+  });
+
+  it('searches for what was typed as text, not as search syntax', async () => {
+    const { client, get } = stubbed({
+      '/ws/2/artist': { count: 0, offset: 0, artists: [] },
+      '/ws/2/release-group': { count: 0, offset: 0, 'release-groups': [] },
+    });
+    await client.searchArtists('AC/DC (Live) + 1992');
+    await client.searchReleaseGroups('Sunn O))) !!!: Simon AND Garfunkel');
+    const sent = get.mock.calls.map(
+      (call) =>
+        (call.arguments[1] as { params: { query: string } }).params.query
+    );
+    assert.deepEqual(sent, [
+      'AC\\/DC \\(Live\\) \\+ 1992',
+      'Sunn O\\)\\)\\) \\!\\!\\!\\: Simon and Garfunkel',
+    ]);
+    assert.equal(searchText('Jay-Z ~ "x"*?'), 'Jay\\-Z \\~ \\"x\\"\\*\\?');
+    assert.equal(searchText('Anderson .Paak'), 'Anderson .Paak');
   });
 
   it('refuses anything but a MusicBrainz id, without asking', async () => {

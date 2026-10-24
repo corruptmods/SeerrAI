@@ -83,6 +83,17 @@ const requireMbid = (value: string): string => {
   return value;
 };
 
+/**
+ * What someone typed, as words to look for: MusicBrainz reads its search
+ * as Lucene, where `AC/DC`, `!!!` or `Sunn O)))` are syntax (and an
+ * unbalanced bracket fails the search), and AND, OR and NOT are operators
+ * ("Simon AND Garfunkel"). Each of those is matched as text instead.
+ */
+export const searchText = (typed: string): string =>
+  typed
+    .replace(/[+\-&|!(){}[\]^"~*?:\\/]/g, '\\$&')
+    .replace(/\b(AND|OR|NOT)\b/g, (word) => word.toLowerCase());
+
 const trimSlashes = (url: string): string => url.trim().replace(/\/+$/, '');
 
 /** The public MusicBrainz, which allows a request a second. */
@@ -326,7 +337,7 @@ export class MusicBrainz extends ExternalAPI {
     const key = `search-artist:${limit}:${offset}:${query.trim().toLowerCase()}`;
     return this.searched(key, () =>
       this.request<MbArtistSearchResponse>(priority, '/ws/2/artist', {
-        query,
+        query: searchText(query),
         limit,
         offset,
       })
@@ -343,7 +354,7 @@ export class MusicBrainz extends ExternalAPI {
       this.request<MbReleaseGroupSearchResponse>(
         priority,
         '/ws/2/release-group',
-        { query, limit, offset }
+        { query: searchText(query), limit, offset }
       )
     );
   }

@@ -150,12 +150,18 @@ qbit_login adminadmin >/dev/null
 qbit_ok || fail qBittorrent "It would not take the checks' password.
 $(docker logs real-qbittorrent 2>&1 | tail -n 15)"
 rm -f "$ROOT/qbittorrent/jar"
-for _ in $(seq 1 30); do
-  if curl -fsS -o /dev/null -u rtuser:rtpass -H 'Content-Type: text/xml' \
+rtorrent_up() {
+  curl -fsS -o /dev/null -u rtuser:rtpass -H 'Content-Type: text/xml' \
     -d '<?xml version="1.0"?><methodCall><methodName>system.client_version</methodName><params/></methodCall>' \
-    http://127.0.0.1:8081/RPC2; then break; fi
+    http://127.0.0.1:8081/RPC2 2>/dev/null
+}
+for _ in $(seq 1 30); do
+  if rtorrent_up; then break; fi
   sleep 1
 done
+rtorrent_up || fail rTorrent "It did not answer through nginx.
+$(tail -n 20 "$ROOT/rtorrent/rtorrent.log" "$ROOT/rtorrent/nginx/error.log" 2>&1)
+$(pgrep -a rtorrent || echo 'rtorrent is not running')"
 
 # SABnzbd makes its API key on its first start.
 for _ in $(seq 1 30); do

@@ -73,6 +73,10 @@ jobs:
           if [ -f real-clients.tap ]; then
             node .github/scripts/tap-annotations.mjs real-clients.tap
           fi
+          if ! pgrep -x rtorrent >/dev/null; then
+            log=$(tail -n 15 /tmp/real-clients/rtorrent/rtorrent.log 2>&1 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')
+            echo "::warning title=rTorrent::It was not running after the checks.%0A$log"
+          fi
 
       - name: The clients' logs
         if: failure()

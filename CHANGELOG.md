@@ -22,6 +22,12 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - SABnzbd: a finished Backfill download couldn't be removed from SABnzbd's history ("SABnzbd: request refused"), so it and its files stayed there.
 - A request for something already in your library was marked failed, not completed, when the server it was sent to had been removed.
 - Requesting a movie as a request manager without auto-approve showed it as pending, though it was approved.
+- A request approved at once could still show as pending on its title until the page was reloaded, for series too, and for 4K by the 4K status.
+- Music search: names with punctuation (AC/DC, !!!, brackets, colons) or a word like AND searched wrongly, or failed with "MusicBrainz did not answer".
+- Pointing Plex, Jellyfin or Emby settings at another server kept the old server's library switches, which landed on the new server's libraries.
+- A series Sonarr has under a different TVDB id than Seerr AI (after TheTVDB merges one) was reset on each Sonarr scan and its request declined while it downloaded.
+- One failed tag lookup in Radarr, Sonarr or Lidarr failed the whole request. It's now sent without the requester's tag.
+- An artist's picture went missing for a week after one failed try at TheAudioDB, and an empty answer from ListenBrainz left its Discover row empty for six hours. Both are asked again next time.
 - The admin agent found more missing episodes each time it was asked. It now searches each missing episode by number and title, opens season packs instead of grabbing them blind, and is told about any it never looked for before it stops.
 - The admin agent trusted episode numbers over titles. A release numbered its own way (a special counted as episode 1, or the scene's seasons Sonarr goes by) could be imported as the wrong episode, or passed over: a file whose title is another episode is now refused, and one named by the library's numbers is taken when its title agrees.
 - The admin agent could take a release's sample file for the episode.

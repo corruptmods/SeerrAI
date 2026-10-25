@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Pertsona bakoitzak zenbat abesti eska ditzakeen. Mugagabeak abesti bakoitza bere musika-mugako album bat bezala zenbatzen du.",
   "components.Settings.SettingsMusic.songRequests": "Abesti-eskaerak",
   "components.Settings.SettingsMusic.songRequestsTip": "Abestiak banan-banan eska daitezke, bertsio bakoitza bere aldetik (irratirako bertsioa, club nahasketa), bilaketatik eta albumen orrietatik.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Hartu abestiak albumetatik",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Singlean argitaratu ez den abesti bat bere albumetik hartzen da: Backfill-en indexatzaileek eta deskarga-bezeroak albuma deskargatzen dute, Lidarr-ek abestia bakarrik inportatzen du eta gainerakoa ezabatzen da. Backfill konfiguratuta behar da.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB API gakoa",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Aukerakoa: Lidarr-ek irudirik ez duen artisten irudiak. Gakoa TheAudioDB-ren babesle-kontu batekin dator.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Gako bat gordeta dago. Utzi hutsik mantentzeko.",

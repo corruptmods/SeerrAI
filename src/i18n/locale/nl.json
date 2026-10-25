@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Hoeveel nummers iedereen mag aanvragen. Onbeperkt telt elk nummer in plaats daarvan als één album van hun muzieklimiet.",
   "components.Settings.SettingsMusic.songRequests": "Aanvragen van nummers",
   "components.Settings.SettingsMusic.songRequestsTip": "Nummers kunnen één voor één worden aangevraagd, elke versie apart (radio-edit, clubmix), via zoeken en albumpagina’s.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Nummers uit albums halen",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Een nummer dat op geen single verscheen, wordt uit zijn album gehaald: de indexers en downloadclient van Backfill halen het album op, Lidarr importeert alleen het nummer en de rest wordt verwijderd. Backfill moet ingesteld zijn.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB API-sleutel",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Optioneel: foto's van artiesten waarvan Lidarr er geen heeft. Een sleutel krijg je bij een supportersaccount van TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Er is een sleutel opgeslagen. Laat leeg om hem te houden.",

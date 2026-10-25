@@ -10,7 +10,7 @@ import SongRequest from '@server/entity/SongRequest';
 import type { SongVersion } from '@server/lib/music/songs';
 import { toVersion } from '@server/lib/music/songs';
 import type { MusicSongStatus } from '@server/models/Music';
-import { In, IsNull, Not } from 'typeorm';
+import { In, Not } from 'typeorm';
 
 /*
  * What a music request needs to know about the songs asked for: each
@@ -26,13 +26,17 @@ export class NotTheArtistsSongError extends Error {}
 /** A song only on unofficial copies, or only a part of a DJ mix. */
 export class UnrequestableSongError extends Error {}
 
-/** An album's status that means it, and every song on it, is coming. */
+/**
+ * An album's status that means it, and every song on it, is coming. One
+ * only partly here may not have the song (one taken from it has only that
+ * song), unless the song came on it.
+ */
 const COVERING = [
   MediaStatus.PENDING,
   MediaStatus.PROCESSING,
-  MediaStatus.PARTIALLY_AVAILABLE,
   MediaStatus.AVAILABLE,
 ];
+const CAME_ON = [...COVERING, MediaStatus.PARTIALLY_AVAILABLE];
 
 /**
  * A song request's status that means the song is on its way. One done is
@@ -113,31 +117,40 @@ export const songsCovered = async (
     }
   }
 
-  // The singles songs asked for before came on, as albums each is on: a
-  // track list does not say which singles hold its songs.
+  // The singles and albums songs asked for before came on, as albums each
+  // is on: a track list does not say which singles hold its songs, and an
+  // album a song was taken from holds it even though partly here.
   const done = await getRepository(SongRequest).find({
     select: {
       id: true,
       recordingMbid: true,
       singleMbid: true,
       singleTitle: true,
+      sourceAlbumMbid: true,
+      sourceAlbumTitle: true,
     },
     where: {
       recordingMbid: In(versions.map((version) => version.mbId)),
       status: MediaRequestStatus.COMPLETED,
-      singleMbid: Not(IsNull()),
     },
   });
   const groupsOf = (version: Pick<SongVersion, 'mbId' | 'releaseGroups'>) => [
     ...version.releaseGroups.map((group) => ({
       mbId: group.mbId,
       title: group.title,
+      came: false,
     })),
     ...done
-      .filter((song) => song.recordingMbid === version.mbId)
+      .filter(
+        (song) =>
+          song.recordingMbid === version.mbId &&
+          (song.singleMbid || song.sourceAlbumMbid)
+      )
       .map((song) => ({
-        mbId: song.singleMbid as string,
-        title: song.singleTitle ?? '',
+        mbId: (song.singleMbid ?? song.sourceAlbumMbid) as string,
+        title:
+          (song.singleMbid ? song.singleTitle : song.sourceAlbumTitle) ?? '',
+        came: true,
       })),
   ];
 
@@ -151,13 +164,13 @@ export const songsCovered = async (
   const albums = groupIds.length
     ? await getRepository(MusicAlbum).find({
         select: { id: true, mbId: true, status: true },
-        where: { mbId: In(groupIds), status: In(COVERING) },
+        where: { mbId: In(groupIds), status: In(CAME_ON) },
       })
     : [];
   const albumStatus = new Map<string, MediaStatus>();
   for (const album of albums) {
     const known = albumStatus.get(album.mbId as string);
-    if (!known || COVERING.indexOf(album.status) > COVERING.indexOf(known)) {
+    if (!known || CAME_ON.indexOf(album.status) > CAME_ON.indexOf(known)) {
       albumStatus.set(album.mbId as string, album.status);
     }
   }
@@ -167,11 +180,15 @@ export const songsCovered = async (
     }
     // The one furthest along; among those, the best known.
     const on = groupsOf(version)
-      .filter((group) => albumStatus.has(group.mbId))
+      .filter((group) =>
+        (group.came ? CAME_ON : COVERING).includes(
+          albumStatus.get(group.mbId) as MediaStatus
+        )
+      )
       .sort(
         (a, b) =>
-          COVERING.indexOf(albumStatus.get(b.mbId) as MediaStatus) -
-          COVERING.indexOf(albumStatus.get(a.mbId) as MediaStatus)
+          CAME_ON.indexOf(albumStatus.get(b.mbId) as MediaStatus) -
+          CAME_ON.indexOf(albumStatus.get(a.mbId) as MediaStatus)
       )[0];
     if (on) {
       covered.set(version.mbId, {

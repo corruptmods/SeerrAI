@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Ile utworów każdy może zamówić. Bez limitu liczy zamiast tego każdy utwór jako jeden album w limicie muzyki.",
   "components.Settings.SettingsMusic.songRequests": "Prośby o utwory",
   "components.Settings.SettingsMusic.songRequestsTip": "O utwory można prosić pojedynczo, każdą wersję osobno (wersja radiowa, mix klubowy), z wyszukiwania i stron albumów.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Bierz utwory z albumów",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Utwór, który nie ukazał się na singlu, jest brany z albumu: indeksery i klient pobierania Backfill pobierają album, Lidarr importuje tylko utwór, a reszta jest usuwana. Wymaga skonfigurowanego Backfill.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "Klucz API TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Opcjonalnie: zdjęcia wykonawców, których nie ma w Lidarr. Klucz dostaniesz z kontem wspierającym TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Klucz jest zapisany. Zostaw puste, aby go zachować.",

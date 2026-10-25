@@ -113,6 +113,7 @@ export const musicDefaults = (): MusicSettings => ({
   theAudioDbApiKey: '',
   maxAlbumsPerRequest: 100,
   songRequests: false,
+  songsFromAlbums: false,
   songQuota: { quotaLimit: 0, quotaDays: 7 },
   search: { inAll: false },
 });
@@ -493,6 +494,12 @@ export interface MusicSettings {
   maxAlbumsPerRequest: number;
   /** Whether songs can be asked for one at a time, not only albums. */
   songRequests: boolean;
+  /**
+   * Whether a song released on no single can be taken from its album:
+   * Backfill's indexers and download client fetch the album, and Lidarr
+   * imports only the song.
+   */
+  songsFromAlbums: boolean;
   /**
    * Songs a person may ask for in so many days. No limit (0) counts each
    * song as one item of their music limit instead.

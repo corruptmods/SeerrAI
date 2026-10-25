@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "हर व्यक्ति कितने गानों का अनुरोध कर सकता है। असीमित होने पर हर गाना उनकी संगीत सीमा में एक एल्बम गिना जाता है।",
   "components.Settings.SettingsMusic.songRequests": "गानों के अनुरोध",
   "components.Settings.SettingsMusic.songRequestsTip": "गानों का अनुरोध एक-एक करके किया जा सकता है, हर संस्करण अलग से (रेडियो एडिट, क्लब मिक्स), खोज और एल्बम पेजों से।",
+  "components.Settings.SettingsMusic.songsFromAlbums": "एल्बमों से गाने लें",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "जो गाना किसी सिंगल पर नहीं आया, उसे उसके एल्बम से लिया जाता है: Backfill के इंडेक्सर और डाउनलोड क्लाइंट एल्बम लाते हैं, Lidarr सिर्फ़ गाना इम्पोर्ट करता है और बाकी हटा दिया जाता है। Backfill सेट होना चाहिए।",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB API कुंजी",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "वैकल्पिक: उन कलाकारों की तस्वीरें जिनकी कोई तस्वीर Lidarr के पास नहीं है। कुंजी TheAudioDB के सपोर्टर खाते के साथ मिलती है।",
   "components.Settings.SettingsMusic.theAudioDbSaved": "एक कुंजी सहेजी हुई है। इसे रखने के लिए खाली छोड़ें।",

@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Hur många låtar var och en får begära. Obegränsat räknar i stället varje låt som ett album av musikgränsen.",
   "components.Settings.SettingsMusic.songRequests": "Låtförfrågningar",
   "components.Settings.SettingsMusic.songRequestsTip": "Låtar kan begäras en i taget, varje version för sig (radioversion, klubbmix), från sökningen och albumsidorna.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Ta låtar från album",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "En låt som inte kom ut på en singel tas från sitt album: Backfills indexerare och nedladdningsklient hämtar albumet, Lidarr importerar bara låten och resten tas bort. Kräver att Backfill är inställt.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "API-nyckel för TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Valfritt: bilder på artister som Lidarr inte har några bilder på. En nyckel ingår i ett supporterkonto hos TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "En nyckel är sparad. Lämna tomt för att behålla den.",

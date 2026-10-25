@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Amḍan n tezlatin i yezmer ad isuter yal yiwen. War talast yettḥasab yal tizlit am walbom deg talast-is n uẓawan.",
   "components.Settings.SettingsMusic.songRequests": "Tuttriwin n tezlatin",
   "components.Settings.SettingsMusic.songRequestsTip": "Tizlatin zemrent ad ttwasutrent yiwet yiwet, yal lqem iman-is (radio edit, club mix), seg unadi akked yisebtar n yilbumen.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Awi tizlatin seg yilbumen",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Tizlit ur d-neffiɣen ara di single tettwaṭṭaf seg albom-is: imsismilen d umsaɣ n usader n Backfill ad d-sidren albom, Lidarr ad d-yekter kan tizlit, ayen nniḍen ad yettwakkes. Yesra Backfill yettwasbadu.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "Tasarut API n TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "D tafrayant: tugniwin n yinaẓuren ur nesɛi Lidarr ula d yiwet. Tasarut d-tettas s umiḍan n umsefrak n TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Tasarut tettwasekles. Eǧǧ-itt d tilemt akken ad tt-teḥrezeḍ.",

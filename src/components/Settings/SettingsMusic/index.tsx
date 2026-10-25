@@ -29,6 +29,9 @@ export const messages = defineMessages('components.Settings.SettingsMusic', {
   songRequests: 'Song Requests',
   songRequestsTip:
     'Songs can be asked for one at a time, each version on its own (radio edit, club mix), from search and album pages.',
+  songsFromAlbums: 'Take Songs from Albums',
+  songsFromAlbumsTip:
+    'A song that came out on no single is taken from its album: Backfill’s indexers and download client fetch the album, Lidarr imports only the song, and the rest is deleted. Needs Backfill set up.',
   songQuota: 'Song Limit',
   songQuotaTip:
     'Songs each person may ask for. Unlimited counts each song as one album against their music limit instead.',
@@ -46,6 +49,7 @@ export interface ShownMusicSettings {
   listenBrainz: boolean;
   maxAlbumsPerRequest: number;
   songRequests: boolean;
+  songsFromAlbums: boolean;
   songQuota: { quotaLimit: number; quotaDays: number };
   hasTheAudioDbApiKey: boolean;
   search: { inAll: boolean };
@@ -59,6 +63,7 @@ export interface MusicSourceValues {
   removeTheAudioDbApiKey: boolean;
   maxAlbumsPerRequest: number | string;
   songRequests: boolean;
+  songsFromAlbums: boolean;
   songQuotaLimit: number;
   songQuotaDays: number;
 }
@@ -77,6 +82,7 @@ export const musicSourceValues = (
   removeTheAudioDbApiKey: false,
   maxAlbumsPerRequest: data.maxAlbumsPerRequest,
   songRequests: data.songRequests,
+  songsFromAlbums: data.songsFromAlbums,
   songQuotaLimit: data.songQuota.quotaLimit,
   songQuotaDays: data.songQuota.quotaDays,
 });
@@ -241,6 +247,23 @@ const MusicSources = ({
           <Field type="checkbox" id="songRequests" name="songRequests" />
         </div>
       </div>
+      {values.songRequests && (
+        <div className="form-row">
+          <label htmlFor="songsFromAlbums" className="checkbox-label">
+            {intl.formatMessage(messages.songsFromAlbums)}
+            <span className="label-tip">
+              {intl.formatMessage(messages.songsFromAlbumsTip)}
+            </span>
+          </label>
+          <div className="form-input-area">
+            <Field
+              type="checkbox"
+              id="songsFromAlbums"
+              name="songsFromAlbums"
+            />
+          </div>
+        </div>
+      )}
       {values.songRequests && (
         <div className="form-row">
           <label htmlFor="songQuotaLimit" className="text-label">

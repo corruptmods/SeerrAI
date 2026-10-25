@@ -56,6 +56,33 @@ export interface LidarrTrack {
   /** The track's MusicBrainz recording id. */
   foreignRecordingId?: string;
   hasFile: boolean;
+  trackFileId?: number;
+}
+
+/** A file as Lidarr's manual import reads it. */
+export interface LidarrManualImportItem {
+  path: string;
+  name?: string;
+  size?: number;
+  quality?: LidarrQualityModel;
+}
+
+/** A quality as Lidarr writes it on a file. */
+export interface LidarrQualityModel {
+  quality: { id: number; name: string };
+  revision?: { version: number; real: number; isRepack?: boolean };
+}
+
+/** One file for Lidarr's manual import, and the tracks it is. */
+export interface LidarrManualImportFile {
+  path: string;
+  artistId: number;
+  albumId: number;
+  albumReleaseId: number;
+  trackIds: number[];
+  quality: LidarrQualityModel;
+  indexerFlags: 0;
+  disableReleaseSwitching: boolean;
 }
 
 export interface LidarrAlbum {
@@ -228,6 +255,74 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
+  /**
+   * What Lidarr's manual import makes of the files in a folder (paths as
+   * Lidarr sees them): each file's quality, and what it takes it to be.
+   */
+  public getManualImport = async (
+    folder: string,
+    artistId: number
+  ): Promise<LidarrManualImportItem[]> => {
+    try {
+      const response = await this.axios.get<LidarrManualImportItem[]>(
+        '/manualimport',
+        { params: { folder, artistId, filterExistingFiles: false } }
+      );
+      return response.data;
+    } catch (e) {
+      this.fail('read the folder for import', e);
+    }
+  };
+
+  /**
+   * Imports files into the tracks given, as Lidarr's manual import does;
+   * answers the command's id. Copies, so the download can be removed after.
+   */
+  public manualImport = async (
+    files: LidarrManualImportFile[]
+  ): Promise<number> => {
+    try {
+      const response = await this.axios.post<{ id: number }>('/command', {
+        name: 'ManualImport',
+        importMode: 'copy',
+        files,
+      });
+      return response.data.id;
+    } catch (e) {
+      this.fail('import the files', e);
+    }
+  };
+
+  /** A command Lidarr was given, and how far it is. */
+  public getCommand = async (
+    id: number
+  ): Promise<{ id: number; status: string; message?: string }> => {
+    try {
+      return (
+        await this.axios.get<{ id: number; status: string; message?: string }>(
+          `/command/${id}`
+        )
+      ).data;
+    } catch (e) {
+      this.fail('read the command', e);
+    }
+  };
+
+  /** Where a download client's folders are, as Lidarr sees them. */
+  public getRemotePathMappings = async (): Promise<
+    { host: string; remotePath: string; localPath: string }[]
+  > => {
+    try {
+      return (
+        await this.axios.get<
+          { host: string; remotePath: string; localPath: string }[]
+        >('/remotepathmapping')
+      ).data;
+    } catch (e) {
+      this.fail('read the remote path mappings', e);
+    }
+  };
+
   /** An album's track files: where it sits on disk. */
   public getTrackFiles = async (
     albumId: number
@@ -262,24 +357,27 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
   /**
    * Adds one album from a lookup. With an artist Lidarr does not have yet,
    * `artist` carries how to set it up and Lidarr adds it too; for one it
-   * has, it is `{ id }`.
+   * has, it is `{ id }`. Monitored unless `monitored` is false, as for an
+   * album only one song is taken from.
    */
   public addAlbum = async (
     album: LidarrAlbum,
     {
       artist,
       searchForNewAlbum,
+      monitored = true,
     }: {
       artist:
         | { id: number }
         | (LidarrArtist & LidarrArtistOptions & LidarrAddArtistOptions);
       searchForNewAlbum: boolean;
+      monitored?: boolean;
     }
   ): Promise<LidarrAlbum> => {
     try {
       const response = await this.axios.post<LidarrAlbum>('/album', {
         ...album,
-        monitored: true,
+        monitored,
         anyReleaseOk: true,
         artist,
         addOptions: { searchForNewAlbum },

@@ -1,8 +1,13 @@
-import { MediaStatus, MediaType } from '@server/constants/media';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import { lidarrOnly } from '@server/lib/music/availability';
+import { songFetchStages } from '@server/lib/music/songFetch';
 import { In } from 'typeorm';
 
 /**
@@ -13,8 +18,9 @@ import { In } from 'typeorm';
  * left as they are.
  */
 export const attachAlbumStatuses = async (
-  requests: Pick<MediaRequest, 'type' | 'media' | 'albums'>[]
+  requests: Pick<MediaRequest, 'type' | 'media' | 'albums' | 'songs'>[]
 ): Promise<void> => {
+  await attachSongStages(requests);
   const music = requests.filter(
     (request) =>
       request.type === MediaType.MUSIC &&
@@ -54,5 +60,30 @@ export const attachAlbumStatuses = async (
         album.addingToLibrary = true;
       }
     }
+  }
+};
+
+/**
+ * Fills in, on each song being taken from an album, what is being done
+ * for it now ("Downloading, 40%"), for the request cards.
+ */
+const attachSongStages = async (
+  requests: Pick<MediaRequest, 'type' | 'songs'>[]
+): Promise<void> => {
+  const songs = requests
+    .filter((request) => request.type === MediaType.MUSIC)
+    .flatMap((request) => request.songs ?? [])
+    .filter(
+      (song) =>
+        song.sourceAlbumMbid && song.status === MediaRequestStatus.APPROVED
+    );
+  if (!songs.length) {
+    return;
+  }
+  const stages = await songFetchStages(songs);
+  for (const song of songs) {
+    song.fetchStage = stages.get(
+      `${song.sourceAlbumMbid}:${song.recordingMbid}`
+    );
   }
 };

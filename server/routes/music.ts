@@ -20,6 +20,7 @@ import {
   rankArtists,
   searchWhileTied,
 } from '@server/lib/music/searchRank';
+import { songFetchProblem } from '@server/lib/music/songFetchReady';
 import { groupSongs } from '@server/lib/music/songs';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
@@ -196,7 +197,9 @@ musicRoutes.get('/search/songs', async (req, res, next) => {
       songs.flatMap((song) => song.versions)
     );
     return res.status(200).json({
-      songs: songs.map((song) => mapSongResult(song, standing)),
+      songs: songs.map((song) =>
+        mapSongResult(song, standing, !songFetchProblem())
+      ),
     } satisfies MusicSongSearchResponse);
   } catch (e) {
     return mbFailed(next, e, 'search');

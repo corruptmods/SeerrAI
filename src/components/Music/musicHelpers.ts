@@ -144,7 +144,11 @@ export const allowedByProfile = (
 
 /** An album that can still be asked for: not here, and not on its way. */
 export const requestable = (status?: MediaStatus): boolean =>
-  !status || status === MediaStatus.UNKNOWN || status === MediaStatus.DELETED;
+  !status ||
+  status === MediaStatus.UNKNOWN ||
+  status === MediaStatus.DELETED ||
+  // The rest of it: songs taken from it, or what Lidarr has of it.
+  status === MediaStatus.PARTIALLY_AVAILABLE;
 
 /**
  * How far along a music request is, as a title's status, for its badge:

@@ -259,6 +259,36 @@ export const singleFor = (
         (a.date || '9999').localeCompare(b.date || '9999')
     )[0] ?? null;
 
+/** How well an album serves to take one song from. */
+const asAlbum = (group: SongRelease): number =>
+  group.secondaryTypes.some((type) => ['Compilation', 'Live'].includes(type))
+    ? 2
+    : group.secondaryTypes.length
+      ? 1
+      : 0;
+
+/**
+ * The album a version only on albums is taken from: the artist's own (as
+ * Lidarr adds albums by their artist), a studio album before a soundtrack
+ * or remix album, a compilation or live album only when nothing else has
+ * it, the earliest first. Never part of a DJ mix.
+ */
+export const albumFor = (
+  version: Pick<SongVersion, 'releaseGroups'>
+): SongRelease | null =>
+  version.releaseGroups
+    .filter(
+      (group) =>
+        group.byArtist &&
+        group.primaryType === 'Album' &&
+        !group.secondaryTypes.includes(MIX_ONLY)
+    )
+    .sort(
+      (a, b) =>
+        asAlbum(a) - asAlbum(b) ||
+        (a.date || '9999').localeCompare(b.date || '9999')
+    )[0] ?? null;
+
 /**
  * Recordings found for what was typed, as songs: each artist's versions
  * of one title together, best known first. Only the artists given count

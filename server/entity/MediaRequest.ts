@@ -20,8 +20,9 @@ import {
   resolveRequestSongs,
   songsCovered,
 } from '@server/lib/music/requestSongs';
+import { songFetchProblem } from '@server/lib/music/songFetchReady';
 import type { SongRelease, SongVersion } from '@server/lib/music/songs';
-import { singleFor } from '@server/lib/music/songs';
+import { albumFor, singleFor } from '@server/lib/music/songs';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import type { NotificationEvent } from '@server/lib/notifications/eventTitles';
 import { mediaEvent } from '@server/lib/notifications/eventTitles';
@@ -361,7 +362,8 @@ export class MediaRequest {
       : [];
 
     // Albums someone else is already waiting for, and albums already here
-    // or on their way, are left out; the rest are requested.
+    // or on their way, are left out; the rest are requested. One only partly
+    // here (songs taken from it) can be asked for whole.
     const openRequests = media
       ? await requestRepository.find({
           where: {
@@ -381,7 +383,8 @@ export class MediaRequest {
           (album) =>
             album.mbId &&
             album.status !== MediaStatus.UNKNOWN &&
-            album.status !== MediaStatus.DELETED
+            album.status !== MediaStatus.DELETED &&
+            album.status !== MediaStatus.PARTIALLY_AVAILABLE
         )
         .map((album) => album.mbId as string),
     ]);
@@ -410,14 +413,22 @@ export class MediaRequest {
           : coveredMessage(versions, covered)
       );
     }
-    // A song is fetched through a single or EP that has it; one only on
-    // albums cannot be fetched on its own.
-    const albumOnly = songs.find((song) => !singleFor(song));
-    if (albumOnly) {
+    // A song is fetched through a single or EP that has it, or, where
+    // Settings → Music allows and Backfill is set up, taken from one of the
+    // artist's albums.
+    const fromAlbums = !songFetchProblem();
+    const unfetchable = songs.find(
+      (song) => !singleFor(song) && !(fromAlbums && albumFor(song))
+    );
+    if (unfetchable) {
       throw new InvalidMusicRequestError(
-        `${albumOnly.songTitle} is only on albums, so it can't be requested on its own${
-          albumOnly.from ? `. Request ${albumOnly.from.title} instead.` : '.'
-        }`
+        fromAlbums
+          ? `${unfetchable.songTitle} is only on compilations, so it can't be requested on its own.`
+          : `${unfetchable.songTitle} is only on albums, so it can't be requested on its own${
+              unfetchable.from
+                ? `. Request ${unfetchable.from.title} instead.`
+                : '.'
+            }`
       );
     }
     if (!ignoreQuota) {
@@ -574,6 +585,12 @@ export class MediaRequest {
             albumTitle: song.from?.title ?? null,
             singleMbid: singleFor(song)?.mbId ?? null,
             singleTitle: singleFor(song)?.title ?? null,
+            sourceAlbumMbid: singleFor(song)
+              ? null
+              : (albumFor(song)?.mbId ?? null),
+            sourceAlbumTitle: singleFor(song)
+              ? null
+              : (albumFor(song)?.title ?? null),
             releaseGroups: song.releaseGroups.map((group) => group.mbId),
             status,
           })

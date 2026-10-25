@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "عدد الأغاني التي يمكن لكل شخص طلبها. «غير محدود» يحتسب كل أغنية كألبوم واحد ضمن حد الموسيقى الخاص به بدلًا من ذلك.",
   "components.Settings.SettingsMusic.songRequests": "طلبات الأغاني",
   "components.Settings.SettingsMusic.songRequestsTip": "يمكن طلب الأغاني واحدة تلو الأخرى، وكل إصدار على حدة (نسخة إذاعية، مزيج للنوادي)، من البحث وصفحات الألبومات.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "أخذ الأغاني من الألبومات",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "الأغنية التي لم تصدر منفردة تُؤخذ من ألبومها: تجلب فهارس Backfill وعميل التنزيل الألبوم، ويستورد Lidarr الأغنية وحدها، ويُحذف الباقي. يتطلب إعداد Backfill.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "مفتاح API لـ TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "اختياري: صور للفنانين الذين لا يملك Lidarr صورًا لهم. يأتي المفتاح مع حساب داعم في TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "يوجد مفتاح محفوظ. اتركه فارغًا للإبقاء عليه.",

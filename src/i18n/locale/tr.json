@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Her kişinin isteyebileceği şarkı sayısı. Sınırsız, bunun yerine her şarkıyı müzik sınırında bir albüm olarak sayar.",
   "components.Settings.SettingsMusic.songRequests": "Şarkı istekleri",
   "components.Settings.SettingsMusic.songRequestsTip": "Şarkılar tek tek, her sürümü ayrı ayrı (radyo versiyonu, kulüp miksi) arama ve albüm sayfalarından istenebilir.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Şarkıları albümlerden al",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Single olarak çıkmamış bir şarkı albümünden alınır: Backfill’in dizinleyicileri ve indirme istemcisi albümü indirir, Lidarr yalnızca şarkıyı içe aktarır, gerisi silinir. Backfill’in kurulu olması gerekir.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB API Anahtarı",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "İsteğe bağlı: Lidarr’da resmi olmayan sanatçıların resimleri. Anahtar, TheAudioDB destekçi hesabıyla gelir.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Bir anahtar kayıtlı. Korumak için boş bırakın.",

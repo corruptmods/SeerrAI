@@ -23,6 +23,7 @@ import BackfillJob from '@server/entity/BackfillJob';
 import type { BackfillKind } from '@server/entity/BackfillSeries';
 import BackfillSeries from '@server/entity/BackfillSeries';
 import { MediaRequest } from '@server/entity/MediaRequest';
+import SongFetch from '@server/entity/SongFetch';
 import type { User } from '@server/entity/User';
 import {
   episodeNamedIn,
@@ -2308,12 +2309,17 @@ class Backfill {
     const api = torrentClientFor(client);
     const torrents = await api.listCategory(getSettings().backfill.category);
     const owned = new Set(
-      (
-        await getRepository(BackfillJob).find({
+      [
+        ...(await getRepository(BackfillJob).find({
           select: { downloadId: true },
           where: { protocol: 'torrent', downloadId: Not(IsNull()) },
-        })
-      ).map((j) => j.downloadId!.toLowerCase())
+        })),
+        // Songs taken from albums share the category (lib/music/songFetch).
+        ...(await getRepository(SongFetch).find({
+          select: { id: true, downloadId: true },
+          where: { downloadId: Not(IsNull()) },
+        })),
+      ].map((j) => j.downloadId!.toLowerCase())
     );
     let removed = 0;
     for (const t of torrents) {

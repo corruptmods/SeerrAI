@@ -276,6 +276,16 @@ export const recordServerAlbums = async (
 
       for (const match of group) {
         const { album, albumMbid, lidarr } = match;
+        // An album Lidarr has only some of the files of and is not
+        // fetching the rest of (songs taken from it, say) is only partly
+        // here. One Lidarr has no files of is the server's own.
+        const here =
+          lidarr &&
+          !lidarr.monitored &&
+          lidarr.trackFileCount > 0 &&
+          lidarr.trackFileCount < lidarr.trackCount
+            ? MediaStatus.PARTIALLY_AVAILABLE
+            : MediaStatus.AVAILABLE;
         const byItem = rows.find((row) => row[idColumn] === album.itemId);
         let row = albumMbid
           ? rows.find((r) => r.mbId === albumMbid)
@@ -317,7 +327,7 @@ export const recordServerAlbums = async (
             secondaryTypes: [],
             releaseDate: album.year ? String(album.year) : null,
             ...(lidarr ? fromLidarr(lidarr) : {}),
-            status: MediaStatus.AVAILABLE,
+            status: here,
             [idColumn]: album.itemId,
             folder: folder ?? null,
             mediaAddedAt: album.addedAt ?? new Date(),
@@ -331,14 +341,18 @@ export const recordServerAlbums = async (
 
         if (
           row.status !== MediaStatus.AVAILABLE &&
-          row.status !== MediaStatus.BLOCKLISTED
+          row.status !== MediaStatus.BLOCKLISTED &&
+          row.status !== here
         ) {
-          changes.status = MediaStatus.AVAILABLE;
-          events.push({
-            mediaId: media.id,
-            type: MediaEventType.AVAILABLE,
-            title: changes.title ?? row.title,
-          });
+          changes.status = here;
+          const type = STATUS_EVENTS[here];
+          if (type) {
+            events.push({
+              mediaId: media.id,
+              type,
+              title: changes.title ?? row.title,
+            });
+          }
         }
         if (row[idColumn] !== album.itemId) {
           changes[idColumn] = album.itemId;

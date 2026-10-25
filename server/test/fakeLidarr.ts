@@ -31,6 +31,12 @@ export interface FakeLidarr {
   lookupAlbums: Map<string, LidarrAlbum>;
   /** Each album's tracks, by its Lidarr id. */
   tracks: Map<number, LidarrTrack[]>;
+  /** The tracks an album gets once added, by its MusicBrainz id. */
+  tracksOnAdd: Map<string, Omit<LidarrTrack, 'albumId'>[]>;
+  /** Where the download client's folders are, as Lidarr sees them. */
+  remotePathMappings: { host: string; remotePath: string; localPath: string }[];
+  /** Whether a manual import takes its files (or refuses them all). */
+  importTakes: boolean;
   tags: { id: number; label: string }[];
   /** Answers every call with a server error while set. */
   down: boolean;
@@ -58,6 +64,9 @@ export const createFakeLidarr = (): FakeLidarr => {
     lookupArtists: new Map(),
     lookupAlbums: new Map(),
     tracks: new Map(),
+    tracksOnAdd: new Map(),
+    remotePathMappings: [],
+    importTakes: true,
     tags: [],
     down: false,
     failing: new Set(),
@@ -91,6 +100,9 @@ export const createFakeLidarr = (): FakeLidarr => {
       fake.lookupArtists = new Map();
       fake.lookupAlbums = new Map();
       fake.tracks = new Map();
+      fake.tracksOnAdd = new Map();
+      fake.remotePathMappings = [];
+      fake.importTakes = true;
       fake.tags = [];
       fake.down = false;
       fake.failing = new Set();
@@ -170,6 +182,13 @@ export const createFakeLidarr = (): FakeLidarr => {
         artist,
       } as LidarrAlbum;
       fake.albums.push(album);
+      const tracks = fake.tracksOnAdd.get(album.foreignAlbumId);
+      if (tracks) {
+        fake.tracks.set(
+          album.id,
+          tracks.map((track) => ({ ...track, albumId: album.id }))
+        );
+      }
       return [201, album];
     }
     if (method === 'PUT' && path.startsWith('/api/v1/artist/')) {
@@ -179,7 +198,32 @@ export const createFakeLidarr = (): FakeLidarr => {
       return [202, {}];
     }
     if (method === 'POST' && path === '/api/v1/command') {
+      // A manual import gives each track its file, as Lidarr would.
+      if (body?.name === 'ManualImport' && fake.importTakes) {
+        for (const file of (body.files ?? []) as { trackIds: number[] }[]) {
+          for (const tracks of fake.tracks.values()) {
+            for (const track of tracks) {
+              if (file.trackIds.includes(track.id)) track.hasFile = true;
+            }
+          }
+        }
+      }
       return [201, { id: 1, ...body }];
+    }
+    if (method === 'GET' && path.startsWith('/api/v1/command/')) {
+      return [200, { id: Number(path.split('/').pop()), status: 'completed' }];
+    }
+    if (method === 'GET' && path === '/api/v1/remotepathmapping') {
+      return [200, fake.remotePathMappings];
+    }
+    if (method === 'GET' && path === '/api/v1/manualimport') {
+      return [200, []];
+    }
+    if (method === 'GET' && /^\/api\/v1\/album\/\d+$/.test(path)) {
+      const album = fake.albums.find(
+        (a) => a.id === Number(path.split('/').pop())
+      );
+      return album ? [200, album] : [404, { message: 'Not found' }];
     }
     if (method === 'GET' && path === '/api/v1/tag') {
       return [200, fake.tags];

@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Nombre de titres que chacun peut demander. Illimité compte plutôt chaque titre comme un album de sa limite de musique.",
   "components.Settings.SettingsMusic.songRequests": "Demandes de titres",
   "components.Settings.SettingsMusic.songRequestsTip": "Les titres peuvent être demandés un par un, chaque version à part (radio edit, club mix), depuis la recherche et les pages d’album.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Prendre les titres dans les albums",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Un titre jamais sorti en single est pris dans son album : les indexeurs et le client de téléchargement de Backfill récupèrent l’album, Lidarr n’importe que le titre et le reste est supprimé. Nécessite Backfill configuré.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "Clé d’API TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Facultatif : des photos des artistes pour lesquels Lidarr n’en a pas. Une clé est fournie avec un compte de soutien TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Une clé est enregistrée. Laissez vide pour la conserver.",

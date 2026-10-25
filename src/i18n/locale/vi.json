@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Số bài hát mỗi người có thể yêu cầu. Không giới hạn sẽ tính mỗi bài hát là một album trong giới hạn âm nhạc của họ.",
   "components.Settings.SettingsMusic.songRequests": "Yêu cầu bài hát",
   "components.Settings.SettingsMusic.songRequestsTip": "Có thể yêu cầu từng bài hát, mỗi phiên bản riêng (radio edit, club mix), từ tìm kiếm và trang album.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Lấy bài hát từ album",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Bài hát không phát hành dưới dạng single sẽ được lấy từ album: trình lập chỉ mục và ứng dụng tải xuống của Backfill tải album, Lidarr chỉ nhập bài hát và phần còn lại bị xóa. Cần thiết lập Backfill.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "Khóa API TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Không bắt buộc: ảnh của những nghệ sĩ mà Lidarr không có ảnh. Khóa đi kèm tài khoản người ủng hộ TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Đã lưu một khóa. Để trống để giữ nguyên.",

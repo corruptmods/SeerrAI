@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Wéi vill Lidder all Persoun ufroe kann. Onbegrenzt zielt amplaz all Lidd als een Album vun hirem Musek-Limit.",
   "components.Settings.SettingsMusic.songRequests": "Lidder-Ufroen",
   "components.Settings.SettingsMusic.songRequestsTip": "Lidder kënnen eenzel ugefrot ginn, all Versioun fir sech (Radio-Edit, Club-Mix), aus der Sich an op den Albumsäiten.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Lidder aus Alben huelen",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "E Lidd, dat op kenger Single erauskomm ass, gëtt aus sengem Album geholl: dem Backfill seng Indexer an Download-Client lueden den Album erof, Lidarr importéiert nëmmen d’Lidd, de Rescht gëtt geläscht. Backfill muss agericht sinn.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB-API-Schlëssel",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Fakultativ: Biller vun Artisten, vun deenen Lidarr keng huet. E Schlëssel gëtt et mat engem TheAudioDB-Supporterkont.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "E Schlëssel ass gespäichert. Eidel loossen, fir e ze halen.",

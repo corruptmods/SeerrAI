@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Сколько песен может запросить каждый. «Без ограничений» вместо этого считает каждую песню одним альбомом в музыкальном лимите.",
   "components.Settings.SettingsMusic.songRequests": "Запросы песен",
   "components.Settings.SettingsMusic.songRequestsTip": "Песни можно запрашивать по одной, каждую версию отдельно (радиоверсия, клубный микс), из поиска и со страниц альбомов.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Брать песни из альбомов",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Песня, не выходившая синглом, берётся из альбома: индексаторы и клиент загрузки Backfill скачивают альбом, Lidarr импортирует только песню, остальное удаляется. Нужен настроенный Backfill.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "Ключ API TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Необязательно: фото исполнителей, для которых их нет в Lidarr. Ключ выдаётся с аккаунтом поддерживающего участника TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Ключ сохранён. Оставьте поле пустым, чтобы сохранить его.",

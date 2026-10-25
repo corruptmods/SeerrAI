@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Câte melodii poate solicita fiecare. Nelimitat numără în schimb fiecare melodie ca un album din limita sa de muzică.",
   "components.Settings.SettingsMusic.songRequests": "Solicitări de melodii",
   "components.Settings.SettingsMusic.songRequestsTip": "Melodiile pot fi solicitate una câte una, fiecare versiune separat (radio edit, club mix), din căutare și din paginile albumelor.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Ia melodii din albume",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "O melodie apărută pe niciun single este luată din albumul ei: indexatorii și clientul de descărcare ale Backfill descarcă albumul, Lidarr importă doar melodia, iar restul se șterge. Necesită Backfill configurat.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "Cheie API TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Opțional: imagini ale artiștilor pentru care Lidarr nu are niciuna. Cheia vine cu un cont de susținător TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "O cheie este salvată. Lăsați gol pentru a o păstra.",

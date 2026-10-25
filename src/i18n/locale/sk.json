@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Koľko skladieb môže každý žiadať. Bez obmedzenia namiesto toho počíta každú skladbu ako jeden album v jeho hudobnom limite.",
   "components.Settings.SettingsMusic.songRequests": "Žiadosti o skladby",
   "components.Settings.SettingsMusic.songRequestsTip": "O skladby možno žiadať jednotlivo, každú verziu zvlášť (rádiová verzia, klubový mix), z vyhľadávania a zo stránok albumov.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Brať skladby z albumov",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Skladba, ktorá nevyšla na singli, sa vezme z albumu: indexery a klient na sťahovanie Backfillu stiahnu album, Lidarr importuje len skladbu a zvyšok sa zmaže. Vyžaduje nastavený Backfill.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "Kľúč API pre TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Voliteľné: obrázky interpretov, pre ktoré Lidarr žiadne nemá. Kľúč získate s podporovateľským účtom TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Kľúč je uložený. Ak ho chcete ponechať, nechajte pole prázdne.",

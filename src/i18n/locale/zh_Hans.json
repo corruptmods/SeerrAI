@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "每人可请求的歌曲数量。设为无限制时，每首歌曲改为按其音乐限额中的一张专辑计算。",
   "components.Settings.SettingsMusic.songRequests": "歌曲请求",
   "components.Settings.SettingsMusic.songRequestsTip": "可以从搜索和专辑页面逐首请求歌曲，每个版本单独请求（电台版、俱乐部混音等）。",
+  "components.Settings.SettingsMusic.songsFromAlbums": "从专辑中获取歌曲",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "未以单曲发行的歌曲将从其专辑中获取：Backfill 的索引器和下载客户端下载专辑，Lidarr 只导入这首歌，其余内容会被删除。需要先设置 Backfill。",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB API 密钥",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "可选：为 Lidarr 中没有图片的艺人提供图片。TheAudioDB 支持者账户附带密钥。",
   "components.Settings.SettingsMusic.theAudioDbSaved": "已保存密钥。留空即可保留。",

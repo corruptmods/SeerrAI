@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Montako kappaletta kukin saa pyytää. Rajaton laskee jokaisen kappaleen sen sijaan yhdeksi albumiksi musiikkirajaan.",
   "components.Settings.SettingsMusic.songRequests": "Kappalepyynnöt",
   "components.Settings.SettingsMusic.songRequestsTip": "Kappaleita voi pyytää yksi kerrallaan, kunkin version erikseen (radioversio, klubimiksaus), hausta ja albumisivuilta.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Ota kappaleet albumeilta",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Kappale, jota ei ole julkaistu singlenä, otetaan sen albumilta: Backfillin indeksoijat ja latausohjelma lataavat albumin, Lidarr tuo vain kappaleen ja loput poistetaan. Vaatii Backfillin asetukset.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB API-avain",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Valinnainen: kuvat artisteista, joista Lidarrilla ei ole kuvaa. Avaimen saa TheAudioDB:n tukijatilillä.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Avain on tallennettu. Jätä tyhjäksi säilyttääksesi sen.",

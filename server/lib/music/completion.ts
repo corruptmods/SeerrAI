@@ -59,6 +59,14 @@ const wantedSongs = (request: Pick<MediaRequest, 'songs'>): SongRequest[] =>
     (song) => song.status !== MediaRequestStatus.DECLINED
   );
 
+/**
+ * What a song comes on: the single it is fetched through, or the album it
+ * is taken from.
+ */
+const sourceOf = (
+  song: Pick<SongRequest, 'singleMbid' | 'sourceAlbumMbid'>
+): string | null => song.singleMbid ?? song.sourceAlbumMbid;
+
 /** A single that has arrived, all of it or some. */
 const HERE = [MediaStatus.AVAILABLE, MediaStatus.PARTIALLY_AVAILABLE];
 
@@ -82,7 +90,7 @@ export const musicRequestAvailable = (
     songs.every(
       (song) =>
         song.status === MediaRequestStatus.COMPLETED &&
-        HERE.includes(statusOf(song.singleMbid) as MediaStatus)
+        HERE.includes(statusOf(sourceOf(song)) as MediaStatus)
     )
   );
 };
@@ -244,10 +252,10 @@ export const completeMusicRequests = async (
       const lidarr = server ? lidarrApi(server) : undefined;
       const songsFinished: SongRequest[] = [];
       for (const song of songs) {
-        if (song.status === MediaRequestStatus.COMPLETED || !song.singleMbid) {
+        if (song.status === MediaRequestStatus.COMPLETED || !sourceOf(song)) {
           continue;
         }
-        const row = own.find((r) => r.mbId === song.singleMbid);
+        const row = own.find((r) => r.mbId === sourceOf(song));
         if (
           row &&
           (DONE.includes(row.status) ||

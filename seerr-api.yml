@@ -2198,6 +2198,9 @@ components:
         songRequests:
           type: boolean
           description: Songs can be asked for one at a time, not only albums.
+        songsFromAlbums:
+          type: boolean
+          description: A song on no single is taken from its album, through Backfill's indexers and download client, with only the song imported by Lidarr.
         songQuota:
           $ref: '#/components/schemas/SongQuota'
         hasTheAudioDbApiKey:
@@ -2920,6 +2923,16 @@ components:
         singleTitle:
           type: string
           nullable: true
+        sourceAlbumMbid:
+          type: string
+          nullable: true
+          description: For a song on no single, the album it is taken from, when songs can be taken from albums.
+        sourceAlbumTitle:
+          type: string
+          nullable: true
+        fetchStage:
+          type: string
+          description: Where the request lists are sent it, what is being done for a song taken from an album ("Downloading, 40%").
         releaseGroups:
           type: array
           description: Every album and single it is on, best known first.
@@ -7988,6 +8001,9 @@ paths:
                 songRequests:
                   type: boolean
                   description: Songs can be asked for one at a time. Left as it is when not sent.
+                songsFromAlbums:
+                  type: boolean
+                  description: Songs on no single are taken from their album through Backfill. Left as it is when not sent.
                 songQuota:
                   $ref: '#/components/schemas/SongQuota'
                 search:
@@ -14055,7 +14071,7 @@ paths:
     post:
       summary: Request music
       description: |
-        Requests albums of one artist, sent to Lidarr once approved: one album, several, or a whole discography, as one request. Once Settings → Music allows it, songs too, each one version (a MusicBrainz recording) that credits the artist. A song is fetched through a single or EP of the artist's that holds that very version, which Lidarr adds like any album; one only on albums cannot be asked for on its own (400). The `REQUEST` or `REQUEST_MUSIC` permission is required, and music must be set up (a default Lidarr) and on for the person.
+        Requests albums of one artist, sent to Lidarr once approved: one album, several, or a whole discography, as one request. Once Settings → Music allows it, songs too, each one version (a MusicBrainz recording) that credits the artist. A song is fetched through a single or EP of the artist's that holds that very version, which Lidarr adds like any album. One only on albums is taken from the artist's album where Settings → Music allows it and Backfill is set up: the album is found through Backfill's Prowlarr, only the song downloaded where a torrent allows, and only it imported by Lidarr into the album, unmonitored. Otherwise it cannot be asked for on its own (400). The `REQUEST` or `REQUEST_MUSIC` permission is required, and music must be set up (a default Lidarr) and on for the person.
 
         Albums already here or already requested are left out, and so are songs already asked for or on an album that is. With the `AUTO_APPROVE`, `AUTO_APPROVE_MUSIC` or `MANAGE_REQUESTS` permission the request is approved at once. Quotas count albums, and songs one each (against their own limit when they have one).
       tags:

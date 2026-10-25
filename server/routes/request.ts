@@ -1027,7 +1027,8 @@ const editMusicRequest = async (
           album.mbId &&
           !currentIds.includes(album.mbId) &&
           album.status !== MediaStatus.UNKNOWN &&
-          album.status !== MediaStatus.DELETED
+          album.status !== MediaStatus.DELETED &&
+          album.status !== MediaStatus.PARTIALLY_AVAILABLE
       )
       .map((album) => album.mbId as string),
   ]);

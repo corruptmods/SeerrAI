@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Kiek dainų kiekvienas gali užsakyti. Neribota kiekvieną dainą skaičiuoja kaip vieną albumą jo muzikos riboje.",
   "components.Settings.SettingsMusic.songRequests": "Dainų užsakymai",
   "components.Settings.SettingsMusic.songRequestsTip": "Dainas galima užsakyti po vieną, kiekvieną versiją atskirai (radijo versija, klubinis miksas), iš paieškos ir albumų puslapių.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Imti dainas iš albumų",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Daina, neišleista single, paimama iš jos albumo: Backfill indeksuotojai ir atsisiuntimo programa atsisiunčia albumą, Lidarr importuoja tik dainą, o likusi dalis ištrinama. Reikia nustatyto Backfill.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB API raktas",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Neprivaloma: atlikėjų, kurių nuotraukų Lidarr neturi, nuotraukos. Raktas suteikiamas su TheAudioDB rėmėjo paskyra.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Raktas išsaugotas. Palikite tuščią, kad jį išlaikytumėte.",

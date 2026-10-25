@@ -55,12 +55,30 @@ class SongRequest {
   @Column({ type: 'varchar', nullable: true })
   public singleTitle: string | null;
 
+  /**
+   * The album it is taken from when it is on no single: the artist's own,
+   * the earliest (see lib/music/songs albumFor). Only once Settings → Music
+   * allows songs to be taken from albums.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  public sourceAlbumMbid: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  public sourceAlbumTitle: string | null;
+
   /** Every album and single it is on, best known first. */
   @Column({ type: 'simple-array', default: '' })
   public releaseGroups: string[];
 
   @Column({ type: 'int', default: MediaRequestStatus.PENDING })
   public status: MediaRequestStatus;
+
+  /**
+   * For one being taken from an album: what is being done for it now
+   * ("Downloading, 40%"). Not a column: filled in where requests are
+   * listed (lib/music/albumStatuses).
+   */
+  public fetchStage?: string;
 
   @ManyToOne(() => MediaRequest, (request) => request.songs, {
     onDelete: 'CASCADE',

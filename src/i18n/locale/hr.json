@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Koliko pjesama svatko smije zatražiti. Neograničeno umjesto toga broji svaku pjesmu kao jedan album u glazbenom ograničenju.",
   "components.Settings.SettingsMusic.songRequests": "Zahtjevi za pjesme",
   "components.Settings.SettingsMusic.songRequestsTip": "Pjesme se mogu tražiti jedna po jedna, svaka verzija zasebno (radijska verzija, klupski miks), iz pretraživanja i sa stranica albuma.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Uzmi pjesme s albuma",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Pjesma koja nije izašla na singlu uzima se s albuma: Backfillovi indekseri i klijent za preuzimanje preuzimaju album, Lidarr uvozi samo pjesmu, a ostatak se briše. Potreban je postavljen Backfill.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB API ključ",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Neobavezno: slike izvođača za koje Lidarr nema nijednu. Ključ se dobiva uz TheAudioDB račun podržavatelja.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Ključ je spremljen. Ostavite prazno da biste ga zadržali.",

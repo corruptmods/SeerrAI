@@ -44,6 +44,8 @@ export type FetchedRelease =
 export const TV_CATEGORIES = [5000, 5070];
 /** Movies, and anime, which anime trackers file under TV/Anime. */
 export const MOVIE_CATEGORIES = [2000, 5070];
+/** Music: albums, in any format. */
+export const AUDIO_CATEGORIES = [3000];
 
 /** A search fans out to every indexer; slow ones take most of a minute. */
 const SEARCH_TIMEOUT_MS = 90_000;

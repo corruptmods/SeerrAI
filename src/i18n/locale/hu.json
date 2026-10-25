@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Hány dalt kérhet egy-egy személy. A Korlátlan ehelyett minden dalt egy albumnak számít a zenei korlátjában.",
   "components.Settings.SettingsMusic.songRequests": "Dalkérések",
   "components.Settings.SettingsMusic.songRequestsTip": "A dalok egyenként kérhetők, minden változat külön (rádióváltozat, klubmix), a keresésből és az albumoldalakról.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Dalok albumokról",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Az a dal, amely nem jelent meg kislemezen, az albumáról kerül le: a Backfill indexelői és letöltőkliense letöltik az albumot, a Lidarr csak a dalt importálja, a többi törlődik. Beállított Backfill kell hozzá.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB API-kulcs",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Nem kötelező: képek azokról az előadókról, akikről a Lidarrnak nincs. Kulcsot egy TheAudioDB támogatói fiókkal kaphat.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Egy kulcs mentve van. Hagyja üresen a megtartásához.",

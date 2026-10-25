@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "כמה שירים כל אחד יכול לבקש. ללא הגבלה סופר כל שיר כאלבום אחד במגבלת המוזיקה שלו במקום זאת.",
   "components.Settings.SettingsMusic.songRequests": "בקשות שירים",
   "components.Settings.SettingsMusic.songRequestsTip": "אפשר לבקש שירים אחד בכל פעם, כל גרסה בנפרד (גרסת רדיו, מיקס למועדונים), מהחיפוש ומדפי האלבומים.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "לקחת שירים מאלבומים",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "שיר שלא יצא בסינגל נלקח מהאלבום שלו: האינדקסרים ולקוח ההורדות של Backfill מורידים את האלבום, Lidarr מייבא רק את השיר והשאר נמחק. נדרש Backfill מוגדר.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "מפתח API של TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "לא חובה: תמונות של אמנים שאין להם תמונה ב-Lidarr. מפתח מגיע עם חשבון תומך ב-TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "מפתח שמור. השאר ריק כדי לשמור עליו.",

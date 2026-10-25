@@ -33,6 +33,7 @@ const musicBody = z.object({
   removeTheAudioDbApiKey: z.boolean().default(false),
   maxAlbumsPerRequest: z.coerce.number().int().min(1).max(1000).default(100),
   songRequests: z.boolean().optional(),
+  songsFromAlbums: z.boolean().optional(),
   songQuota: z
     .object({
       quotaLimit: z.coerce.number().int().min(0).max(1000),
@@ -50,6 +51,7 @@ const shown = (music: MusicSettings) => ({
   listenBrainz: music.listenBrainz,
   maxAlbumsPerRequest: music.maxAlbumsPerRequest,
   songRequests: !!music.songRequests,
+  songsFromAlbums: !!music.songsFromAlbums,
   songQuota: music.songQuota,
   hasTheAudioDbApiKey: !!music.theAudioDbApiKey,
   search: { inAll: music.search.inAll },
@@ -73,6 +75,7 @@ musicSettingsRoutes.post('/', async (req, res, next) => {
     listenBrainz: body.listenBrainz,
     maxAlbumsPerRequest: body.maxAlbumsPerRequest,
     songRequests: body.songRequests ?? !!saved.songRequests,
+    songsFromAlbums: body.songsFromAlbums ?? !!saved.songsFromAlbums,
     songQuota: body.songQuota ?? saved.songQuota,
     theAudioDbApiKey: body.removeTheAudioDbApiKey
       ? ''

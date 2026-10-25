@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Quanti brani può richiedere ciascuno. Illimitato conta invece ogni brano come un album del suo limite musicale.",
   "components.Settings.SettingsMusic.songRequests": "Richieste di brani",
   "components.Settings.SettingsMusic.songRequestsTip": "I brani si possono richiedere uno alla volta, ogni versione a sé (radio edit, club mix), dalla ricerca e dalle pagine degli album.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Prendi i brani dagli album",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Un brano mai uscito come singolo viene preso dal suo album: gli indexer e il client di download di Backfill scaricano l’album, Lidarr importa solo il brano e il resto viene eliminato. Richiede Backfill configurato.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "Chiave API di TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Facoltativa: immagini degli artisti di cui Lidarr non ne ha. La chiave si ottiene con un account sostenitore di TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Una chiave è salvata. Lascia vuoto per mantenerla.",

@@ -13,6 +13,7 @@ import matchWatch from '@server/lib/matchWatch';
 import type { MediaServerKind } from '@server/lib/mediaServers';
 import { connectedServers, serverName } from '@server/lib/mediaServers';
 import { musicReady } from '@server/lib/music/access';
+import songFetcher from '@server/lib/music/songFetch';
 import notificationReconciler from '@server/lib/notificationReconciler';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import plexUserImport from '@server/lib/plexUserImport';
@@ -601,8 +602,16 @@ export const startJobs = (): void => {
     cronSchedule: jobs['backfill-monitor'].schedule,
     job: schedule.scheduleJob(
       jobs['backfill-monitor'].schedule,
-      runJob('Backfill Downloads', () => {
-        return backfill.tick();
+      runJob('Backfill Downloads', async () => {
+        // And songs taken from albums, through Backfill's indexers and
+        // client; neither waits on the other's trouble.
+        const [series, songs] = await Promise.allSettled([
+          backfill.tick(),
+          songFetcher.tick(),
+        ]);
+        for (const result of [series, songs]) {
+          if (result.status === 'rejected') throw result.reason;
+        }
       })
     ),
     running: () => backfill.monitorStatus().running,

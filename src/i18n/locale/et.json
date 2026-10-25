@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Mitu laulu igaüks võib taotleda. Piiramatu loeb iga laulu tema muusikapiirangus üheks albumiks.",
   "components.Settings.SettingsMusic.songRequests": "Laulude taotlused",
   "components.Settings.SettingsMusic.songRequestsTip": "Laule saab taotleda ükshaaval, iga versiooni eraldi (raadioversioon, klubimiks), otsingust ja albumilehtedelt.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Võta laulud albumitelt",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Laul, mis pole singlil ilmunud, võetakse selle albumilt: Backfilli indekseerijad ja allalaadimiskliient laadivad albumi alla, Lidarr impordib ainult laulu ja ülejäänu kustutatakse. Vajab seadistatud Backfilli.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB API võti",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Valikuline: pildid esitajatest, kelle kohta Lidarril pilte pole. Võtme saab TheAudioDB toetajakontoga.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Võti on salvestatud. Selle säilitamiseks jäta tühjaks.",

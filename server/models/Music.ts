@@ -19,7 +19,7 @@ import type { MediaStatus } from '@server/constants/media';
 import type Media from '@server/entity/Media';
 import type { PlayLink } from '@server/entity/Media';
 import type { Song } from '@server/lib/music/songs';
-import { singleFor } from '@server/lib/music/songs';
+import { albumFor, singleFor } from '@server/lib/music/songs';
 
 /*
  * Artists and albums as the pages show them, shaped from MusicBrainz and
@@ -301,7 +301,9 @@ export const mapTracks = (media: MbMedium[]): MusicTrack[] =>
 /** A song and its versions as search shows them, with where each stands. */
 export const mapSongResult = (
   song: Song,
-  standing: Map<string, MusicSongStatus>
+  standing: Map<string, MusicSongStatus>,
+  /** Songs on no single can be taken from their albums. */
+  fromAlbums = false
 ): MusicSongResult => ({
   mediaType: 'song',
   id: song.key,
@@ -323,7 +325,9 @@ export const mapSongResult = (
         }
       : undefined,
     releaseCount: version.releaseCount,
-    ...(singleFor(version) ? {} : { onlyOnAlbums: true }),
+    ...(singleFor(version) || (fromAlbums && albumFor(version))
+      ? {}
+      : { onlyOnAlbums: true }),
     ...standing.get(version.mbId),
   })),
 });

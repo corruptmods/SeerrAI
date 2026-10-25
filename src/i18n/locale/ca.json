@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Cançons que cada persona pot sol·licitar. Il·limitat compta cada cançó com un àlbum del seu límit de música.",
   "components.Settings.SettingsMusic.songRequests": "Sol·licituds de cançons",
   "components.Settings.SettingsMusic.songRequestsTip": "Les cançons es poden sol·licitar d’una en una, cada versió per separat (edició per a ràdio, mescla de club), des de la cerca i les pàgines dels àlbums.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Agafa cançons dels àlbums",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Una cançó que no ha sortit en cap senzill s’agafa del seu àlbum: els indexadors i el client de baixades del Backfill baixen l’àlbum, Lidarr només n’importa la cançó i la resta s’esborra. Cal tenir el Backfill configurat.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "Clau de l'API de TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Opcional: imatges dels artistes dels quals Lidarr no en té. La clau ve amb un compte de col·laborador de TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Hi ha una clau desada. Deixeu-ho en blanc per conservar-la.",

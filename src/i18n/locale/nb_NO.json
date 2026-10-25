@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Hvor mange sanger hver person kan be om. Ubegrenset teller i stedet hver sang som ett album av musikkgrensen.",
   "components.Settings.SettingsMusic.songRequests": "Forespørsler om sanger",
   "components.Settings.SettingsMusic.songRequestsTip": "Sanger kan forespørres én om gangen, hver versjon for seg (radioversjon, klubbmiks), fra søk og albumsider.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Ta sanger fra album",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "En sang som ikke kom ut på en singel, tas fra albumet sitt: Backfills indeksere og nedlastingsklient henter albumet, Lidarr importerer bare sangen, og resten slettes. Krever at Backfill er satt opp.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB API-nøkkel",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Valgfritt: bilder av artister som Lidarr ikke har bilder av. En nøkkel følger med en supporterkonto hos TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "En nøkkel er lagret. La stå tomt for å beholde den.",

@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Πόσα τραγούδια μπορεί να ζητήσει ο καθένας. Το «Απεριόριστο» μετρά κάθε τραγούδι ως ένα άλμπουμ του ορίου μουσικής του.",
   "components.Settings.SettingsMusic.songRequests": "Αιτήματα τραγουδιών",
   "components.Settings.SettingsMusic.songRequestsTip": "Τα τραγούδια μπορούν να ζητηθούν ένα-ένα, κάθε εκδοχή χωριστά (radio edit, club mix), από την αναζήτηση και τις σελίδες άλμπουμ.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Λήψη τραγουδιών από άλμπουμ",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Ένα τραγούδι που δεν κυκλοφόρησε σε σινγκλ λαμβάνεται από το άλμπουμ του: οι indexers και το πρόγραμμα λήψης του Backfill κατεβάζουν το άλμπουμ, το Lidarr εισάγει μόνο το τραγούδι και τα υπόλοιπα διαγράφονται. Απαιτεί ρυθμισμένο Backfill.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "Κλειδί API TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Προαιρετικό: εικόνες καλλιτεχνών για τους οποίους το Lidarr δεν έχει. Κλειδί παρέχεται με λογαριασμό υποστηρικτή του TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Υπάρχει αποθηκευμένο κλειδί. Αφήστε το κενό για να διατηρηθεί.",

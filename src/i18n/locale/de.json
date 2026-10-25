@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Wie viele Songs jede Person anfragen darf. Unbegrenzt zählt jeden Song stattdessen als ein Album ihres Musik-Limits.",
   "components.Settings.SettingsMusic.songRequests": "Song-Anfragen",
   "components.Settings.SettingsMusic.songRequestsTip": "Songs können einzeln angefragt werden, jede Version für sich (Radio-Edit, Club-Mix), über die Suche und die Albumseiten.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Songs aus Alben holen",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Ein Song, der auf keiner Single erschienen ist, wird aus seinem Album geholt: Backfills Indexer und Download-Client laden das Album, Lidarr importiert nur den Song, der Rest wird gelöscht. Backfill muss eingerichtet sein.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB-API-Schlüssel",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Optional: Bilder von Künstlern, für die Lidarr keine hat. Einen Schlüssel gibt es mit einem TheAudioDB-Unterstützerkonto.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Ein Schlüssel ist gespeichert. Leer lassen, um ihn beizubehalten.",

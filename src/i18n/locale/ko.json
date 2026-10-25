@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "각 사용자가 요청할 수 있는 곡 수입니다. 무제한이면 각 곡을 음악 한도에서 앨범 하나로 셉니다.",
   "components.Settings.SettingsMusic.songRequests": "곡 요청",
   "components.Settings.SettingsMusic.songRequestsTip": "검색과 앨범 페이지에서 곡을 하나씩, 버전별로(라디오 에디트, 클럽 믹스 등) 요청할 수 있습니다.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "앨범에서 곡 가져오기",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "싱글로 나오지 않은 곡은 수록 앨범에서 가져옵니다. Backfill의 인덱서와 다운로드 클라이언트가 앨범을 받고, Lidarr는 그 곡만 가져오며 나머지는 삭제됩니다. Backfill 설정이 필요합니다.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB API 키",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "선택 사항: Lidarr에 사진이 없는 아티스트의 사진을 가져옵니다. 키는 TheAudioDB 후원자 계정에 포함되어 있습니다.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "키가 저장되어 있습니다. 유지하려면 비워 두세요.",

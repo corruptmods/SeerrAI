@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "各ユーザーがリクエストできる曲数。無制限にすると、各曲は音楽の上限でアルバム1枚として数えられます。",
   "components.Settings.SettingsMusic.songRequests": "曲のリクエスト",
   "components.Settings.SettingsMusic.songRequestsTip": "曲を1曲ずつ、バージョンごとに(ラジオ・エディット、クラブ・ミックスなど)検索やアルバムページからリクエストできます。",
+  "components.Settings.SettingsMusic.songsFromAlbums": "アルバムから曲を取り出す",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "シングルとして出ていない曲は収録アルバムから取り出します。Backfill のインデクサーとダウンロードクライアントがアルバムを取得し、Lidarr はその曲だけをインポートし、残りは削除されます。Backfill の設定が必要です。",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "TheAudioDB の APIキー",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "任意：Lidarr に画像がないアーティストの画像を取得します。キーは TheAudioDB のサポーターアカウントで入手できます。",
   "components.Settings.SettingsMusic.theAudioDbSaved": "キーは保存済みです。変更しない場合は空欄のままにしてください。",

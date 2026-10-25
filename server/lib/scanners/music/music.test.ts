@@ -563,6 +563,31 @@ describe('music scans', () => {
       assert.equal(state.mb.calls, 0);
     });
 
+    it('places an album songs were taken from as only partly here', async () => {
+      state.lidarr.artists = [lidarrArtist()];
+      // Unmonitored, with one of its 14 tracks on file.
+      state.lidarr.albums = [
+        lidarrAlbum({
+          statistics: {
+            trackCount: 14,
+            trackFileCount: 1,
+            totalTrackCount: 14,
+            sizeOnDisk: 40_000_000,
+            percentOfTracks: 7,
+          },
+        }),
+      ];
+      state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
+      state.plex.albums = [plexAlbum('600', 'Sing', { guid: SING })];
+
+      await musicFullScan.run();
+
+      assert.equal(
+        (await albumOf(SING)).status,
+        MediaStatus.PARTIALLY_AVAILABLE
+      );
+    });
+
     it('asks MusicBrainz about an id Lidarr does not know, as a release then as an album', async () => {
       state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
       state.plex.albums = [

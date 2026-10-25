@@ -3850,6 +3850,8 @@
   "components.Settings.SettingsMusic.songQuotaTip": "Sa këngë mund të kërkojë secili. Pa kufi e numëron çdo këngë si një album të kufirit të tyre muzikor.",
   "components.Settings.SettingsMusic.songRequests": "Kërkesat për këngë",
   "components.Settings.SettingsMusic.songRequestsTip": "Këngët mund të kërkohen një nga një, çdo version veçmas (radio edit, club mix), nga kërkimi dhe faqet e albumeve.",
+  "components.Settings.SettingsMusic.songsFromAlbums": "Merr këngë nga albumet",
+  "components.Settings.SettingsMusic.songsFromAlbumsTip": "Një këngë që nuk ka dalë në single merret nga albumi: indeksuesit dhe klienti i shkarkimeve të Backfill shkarkojnë albumin, Lidarr importon vetëm këngën dhe pjesa tjetër fshihet. Kërkon Backfill të konfiguruar.",
   "components.Settings.SettingsMusic.theAudioDbApiKey": "Çelësi API i TheAudioDB",
   "components.Settings.SettingsMusic.theAudioDbApiKeyTip": "Opsional: foto të artistëve për të cilët Lidarr nuk ka asnjë. Çelësi vjen me një llogari mbështetësi në TheAudioDB.",
   "components.Settings.SettingsMusic.theAudioDbSaved": "Një çelës është ruajtur. Lëreni bosh për ta mbajtur.",

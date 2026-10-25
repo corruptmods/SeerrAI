@@ -284,6 +284,7 @@ describe('music settings', () => {
       listenBrainz: false,
       maxAlbumsPerRequest: 50,
       songRequests: false,
+      songsFromAlbums: false,
       songQuota: { quotaLimit: 0, quotaDays: 7 },
       hasTheAudioDbApiKey: true,
       search: { inAll: false },

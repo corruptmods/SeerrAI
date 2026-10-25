@@ -147,6 +147,8 @@ describe('what the request window ticks to begin with', () => {
     assert.equal(requestable(undefined), true);
     assert.equal(requestable(MediaStatus.UNKNOWN), true);
     assert.equal(requestable(MediaStatus.DELETED), true);
+    // The rest of an album only partly here can be asked for.
+    assert.equal(requestable(MediaStatus.PARTIALLY_AVAILABLE), true);
     assert.equal(requestable(MediaStatus.PENDING), false);
     assert.equal(requestable(MediaStatus.PROCESSING), false);
     assert.equal(requestable(MediaStatus.AVAILABLE), false);

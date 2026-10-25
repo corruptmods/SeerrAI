@@ -6,7 +6,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### New
 
-- **Song requests**: ask for one song instead of its album, from music search (**Songs**) or a track on an album's page. Each version is shown and asked for on its own (radio edit, club mix). Lidarr fetches the single or EP that has that version, and you're told when it's here. A song that's only on albums can't be asked for on its own yet. Turn it on in Settings → Music, with a song limit if you want one. ([guide](./docs/seerr-ai/music.md))
+- **Song requests**: ask for one song, not the whole album, from music search or an album's track list. Each version (radio edit, club mix) is asked for on its own. Lidarr fetches the single that has it; with Take Songs from Albums on, a song only on albums is taken from its album through Backfill. Turn it on in Settings → Music. ([guide](./docs/seerr-ai/music.md))
 
 ## 2.1.0 (24 October 2026)
 

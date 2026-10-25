@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Från {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Visa # version till} other {Visa # versioner till}}",
   "components.Music.SongResults.onAlbum": "På {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Bara på album",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Inte utgiven för sig, så den kan inte begäras ensam. Begär albumet i stället.",
   "components.Music.SongResults.request": "Begär",
   "components.Music.SongResults.songs": "Låtar",
   "components.Music.useRequestSong.failed": "Något gick fel när förfrågan skulle skickas.",

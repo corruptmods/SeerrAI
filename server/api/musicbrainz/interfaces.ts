@@ -98,6 +98,8 @@ export interface MbRelease extends MbReleaseSummary {
 
 /** A release a recording is on, as a recording search gives it. */
 export interface MbRecordingRelease extends MbReleaseSummary {
+  /** Whom the release is by: Various Artists on a compilation. */
+  'artist-credit'?: MbArtistCredit[];
   'release-group'?: Pick<
     MbReleaseGroup,
     'id' | 'title' | 'primary-type' | 'secondary-types'

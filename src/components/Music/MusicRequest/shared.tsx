@@ -153,7 +153,18 @@ export const SongsField = ({
                 <span className="truncate">
                   {songName(song.title, song.version)}
                 </span>
-                <MusicStatusBadge status={SONG_STATUS[song.status]} plain />
+                <MusicStatusBadge
+                  status={SONG_STATUS[song.status]}
+                  downloads={
+                    song.singleMbid
+                      ? albumDownloads(
+                          request.media?.downloadStatus,
+                          song.singleMbid
+                        )
+                      : []
+                  }
+                  plain
+                />
               </li>
             ))}
           </ul>
@@ -235,10 +246,13 @@ export const MusicRequestBadge = ({ request }: { request: Request }) => {
   return status === MediaStatus.UNKNOWN ? null : (
     <MusicStatusBadge
       status={status}
-      downloads={albumDownloads(
-        request.media?.downloadStatus,
-        albums.map((album) => album.albumMbid)
-      )}
+      downloads={albumDownloads(request.media?.downloadStatus, [
+        ...albums.map((album) => album.albumMbid),
+        // The singles its songs come on.
+        ...songsOf(request).flatMap((song) =>
+          song.singleMbid ? [song.singleMbid] : []
+        ),
+      ])}
       addingToLibrary={albums.some((album) => album.addingToLibrary)}
       artistId={request.media?.foreignId ?? undefined}
       title={musicRequestTitle(request, intl)}

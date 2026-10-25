@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Julkaisulta {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Näytä # versio lisää} other {Näytä # versiota lisää}}",
   "components.Music.SongResults.onAlbum": "Albumilla {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Vain albumeilla",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Ei julkaistu erikseen, joten sitä ei voi pyytää yksinään. Pyydä sen albumia.",
   "components.Music.SongResults.request": "Pyydä",
   "components.Music.SongResults.songs": "Kappaleet",
   "components.Music.useRequestSong.failed": "Jokin meni vikaan pyyntöä lähetettäessä.",

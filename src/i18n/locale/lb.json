@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Vun {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Nach # Versioun weisen} other {Nach # Versioune weisen}}",
   "components.Music.SongResults.onAlbum": "Op {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Nëmmen op Alben",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Net eenzel erauskomm, dofir kann et net eleng ugefrot ginn. Frot amplaz säin Album un.",
   "components.Music.SongResults.request": "Ufroen",
   "components.Music.SongResults.songs": "Lidder",
   "components.Music.useRequestSong.failed": "Beim Ofschécke vun der Ufro ass eppes schifgaang.",

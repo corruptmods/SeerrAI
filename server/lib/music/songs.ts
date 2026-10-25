@@ -46,6 +46,11 @@ export interface SongRelease {
   secondaryTypes: string[];
   /** Its earliest release with this song on it. */
   date: string | null;
+  /**
+   * One of its releases is credited to the song's artist (or says nothing
+   * of whom it is by): it is theirs, not a compilation of others'.
+   */
+  byArtist: boolean;
 }
 
 /** A song: its versions by one artist under one title. */
@@ -172,6 +177,7 @@ export const toVersion = (recording: MbRecording): SongVersion | null => {
   if (recording.video || !credits.length) {
     return null;
   }
+  const artist = credits[0].artist.id;
   const releases = (recording.releases ?? []).filter(usable);
   const groups = new Map<string, SongRelease>();
   for (const release of releases) {
@@ -180,11 +186,15 @@ export const toVersion = (recording: MbRecording): SongVersion | null => {
       continue;
     }
     const date = release.date || null;
+    const byArtist =
+      !release['artist-credit']?.length ||
+      release['artist-credit'].some((credit) => credit.artist.id === artist);
     const known = groups.get(group.id);
     if (known) {
       if (date && (!known.date || date < known.date)) {
         known.date = date;
       }
+      known.byArtist ||= byArtist;
       continue;
     }
     groups.set(group.id, {
@@ -193,6 +203,7 @@ export const toVersion = (recording: MbRecording): SongVersion | null => {
       primaryType: group['primary-type'] ?? null,
       secondaryTypes: group['secondary-types'] ?? [],
       date,
+      byArtist,
     });
   }
   const releaseGroups = [...groups.values()].sort(byStanding);
@@ -209,7 +220,7 @@ export const toVersion = (recording: MbRecording): SongVersion | null => {
     songTitle: splitTitle(recording.title).songTitle,
     version: versionLabel(recording),
     length: recording.length ?? null,
-    artistMbid: credits[0].artist.id,
+    artistMbid: artist,
     artistName: credits
       .map((credit) => `${credit.name}${credit.joinphrase ?? ''}`)
       .join('')
@@ -219,6 +230,34 @@ export const toVersion = (recording: MbRecording): SongVersion | null => {
     releaseCount: releases.length,
   };
 };
+
+/** How well a single or EP serves to fetch one song through. */
+const asSingle = (group: SongRelease): number =>
+  (group.secondaryTypes.length ? 2 : 0) + (group.primaryType === 'EP' ? 1 : 0);
+
+/**
+ * The single or EP a version can be fetched through, as Lidarr fetches any
+ * album: the artist's own that holds this very recording, a plain single
+ * before an EP or a remix single, the earliest first. None for a version
+ * only on albums.
+ */
+export const singleFor = (
+  version: Pick<SongVersion, 'releaseGroups'>
+): SongRelease | null =>
+  version.releaseGroups
+    .filter(
+      (group) =>
+        group.byArtist &&
+        (group.primaryType === 'Single' || group.primaryType === 'EP') &&
+        !group.secondaryTypes.some((type) =>
+          ['Compilation', 'DJ-mix', 'Live'].includes(type)
+        )
+    )
+    .sort(
+      (a, b) =>
+        asSingle(a) - asSingle(b) ||
+        (a.date || '9999').localeCompare(b.date || '9999')
+    )[0] ?? null;
 
 /**
  * Recordings found for what was typed, as songs: each artist's versions

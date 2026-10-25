@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Z {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Zobraziť # ďalšiu verziu} few {Zobraziť # ďalšie verzie} many {Zobraziť # ďalšie verzie} other {Zobraziť # ďalších verzií}}",
   "components.Music.SongResults.onAlbum": "Na {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Len na albumoch",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Nevyšla samostatne, takže o ňu nemožno žiadať zvlášť. Požiadajte o jej album.",
   "components.Music.SongResults.request": "Vyžiadať",
   "components.Music.SongResults.songs": "Skladby",
   "components.Music.useRequestSong.failed": "Pri odosielaní žiadosti sa niečo pokazilo.",

@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "من {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, zero {لا إصدارات أخرى} one {عرض إصدار آخر} two {عرض إصدارين آخرين} few {عرض # إصدارات أخرى} many {عرض # إصدارًا آخر} other {عرض # إصدار آخر}}",
   "components.Music.SongResults.onAlbum": "ضمن {album}",
+  "components.Music.SongResults.onlyOnAlbums": "على الألبومات فقط",
+  "components.Music.SongResults.onlyOnAlbumsTip": "لم يصدر منفردًا، لذا لا يمكن طلبه وحده. اطلب ألبومه بدلًا من ذلك.",
   "components.Music.SongResults.request": "طلب",
   "components.Music.SongResults.songs": "الأغاني",
   "components.Music.useRequestSong.failed": "حدث خطأ أثناء تقديم الطلب.",

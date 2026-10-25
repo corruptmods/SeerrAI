@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Z {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Zobrazit # další verzi} few {Zobrazit # další verze} many {Zobrazit # další verze} other {Zobrazit # dalších verzí}}",
   "components.Music.SongResults.onAlbum": "Na {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Jen na albech",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Nevyšla samostatně, takže o ni nelze požádat zvlášť. Požádejte o její album.",
   "components.Music.SongResults.request": "Zažádat",
   "components.Music.SongResults.songs": "Skladby",
   "components.Music.useRequestSong.failed": "Při odesílání žádosti došlo k chybě.",

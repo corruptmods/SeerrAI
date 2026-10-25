@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Từ {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, other {Hiện thêm # phiên bản}}",
   "components.Music.SongResults.onAlbum": "Trong {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Chỉ có trong album",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Không phát hành riêng nên không thể yêu cầu riêng. Hãy yêu cầu album của nó.",
   "components.Music.SongResults.request": "Yêu cầu",
   "components.Music.SongResults.songs": "Bài hát",
   "components.Music.useRequestSong.failed": "Đã xảy ra lỗi khi gửi yêu cầu.",

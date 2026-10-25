@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Van {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Nog # versie tonen} other {Nog # versies tonen}}",
   "components.Music.SongResults.onAlbum": "Op {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Alleen op albums",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Niet los uitgebracht, dus niet apart aan te vragen. Vraag het album aan.",
   "components.Music.SongResults.request": "Aanvragen",
   "components.Music.SongResults.songs": "Nummers",
   "components.Music.useRequestSong.failed": "Er ging iets mis bij het indienen van de aanvraag.",

@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Väljaandelt {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Näita veel # versiooni} other {Näita veel # versiooni}}",
   "components.Music.SongResults.onAlbum": "Albumil {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Ainult albumitel",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Pole eraldi välja antud, seega ei saa seda eraldi taotleda. Taotle selle albumit.",
   "components.Music.SongResults.request": "Taotle",
   "components.Music.SongResults.songs": "Laulud",
   "components.Music.useRequestSong.failed": "Taotluse esitamisel läks midagi valesti.",

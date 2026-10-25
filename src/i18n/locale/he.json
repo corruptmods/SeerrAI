@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "מתוך {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {הצג גרסה אחת נוספת} other {הצג # גרסאות נוספות}}",
   "components.Music.SongResults.onAlbum": "באלבום {album}",
+  "components.Music.SongResults.onlyOnAlbums": "רק באלבומים",
+  "components.Music.SongResults.onlyOnAlbumsTip": "לא יצא בנפרד, ולכן אי אפשר לבקש אותו לבד. בקשו את האלבום שלו במקום זאת.",
   "components.Music.SongResults.request": "בקש",
   "components.Music.SongResults.songs": "שירים",
   "components.Music.useRequestSong.failed": "משהו השתבש בעת שליחת הבקשה.",

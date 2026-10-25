@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "De pe {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Arată încă # versiune} few {Arată încă # versiuni} other {Arată încă # de versiuni}}",
   "components.Music.SongResults.onAlbum": "Pe {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Doar pe albume",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Nu a apărut separat, așa că nu poate fi solicitată singură. Solicită albumul ei.",
   "components.Music.SongResults.request": "Solicită",
   "components.Music.SongResults.songs": "Melodii",
   "components.Music.useRequestSong.failed": "Ceva nu a funcționat la trimiterea solicitării.",

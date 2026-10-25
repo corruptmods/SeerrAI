@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "З {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Показати ще # версію} few {Показати ще # версії} many {Показати ще # версій} other {Показати ще # версії}}",
   "components.Music.SongResults.onAlbum": "На {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Лише в альбомах",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Не виходила окремо, тож її не можна запитати окремо. Запитайте її альбом.",
   "components.Music.SongResults.request": "Запитати",
   "components.Music.SongResults.songs": "Пісні",
   "components.Music.useRequestSong.failed": "Під час надсилання запиту сталася помилка.",

@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "De {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Mostra # versió més} other {Mostra # versions més}}",
   "components.Music.SongResults.onAlbum": "A {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Només en àlbums",
+  "components.Music.SongResults.onlyOnAlbumsTip": "No s’ha publicat sola, així que no es pot sol·licitar per separat. Sol·licita’n l’àlbum.",
   "components.Music.SongResults.request": "Sol·licita",
   "components.Music.SongResults.songs": "Cançons",
   "components.Music.useRequestSong.failed": "S'ha produït un error en enviar la sol·licitud.",

@@ -2913,6 +2913,13 @@ components:
         albumTitle:
           type: string
           nullable: true
+        singleMbid:
+          type: string
+          nullable: true
+          description: The single or EP it is fetched through, of the artist's and holding this very version. None when it is only on albums.
+        singleTitle:
+          type: string
+          nullable: true
         releaseGroups:
           type: array
           description: Every album and single it is on, best known first.
@@ -2990,6 +2997,9 @@ components:
                   releaseCount:
                     type: number
                     description: How many releases it is on.
+                  onlyOnAlbums:
+                    type: boolean
+                    description: On no single or EP of the artist's, only on albums, so it cannot be asked for on its own.
     MediaInfo:
       type: object
       properties:
@@ -14045,7 +14055,7 @@ paths:
     post:
       summary: Request music
       description: |
-        Requests albums of one artist, sent to Lidarr once approved: one album, several, or a whole discography, as one request. Once Settings → Music allows it, songs too, each one version (a MusicBrainz recording) that credits the artist; songs are not yet sent to Lidarr. The `REQUEST` or `REQUEST_MUSIC` permission is required, and music must be set up (a default Lidarr) and on for the person.
+        Requests albums of one artist, sent to Lidarr once approved: one album, several, or a whole discography, as one request. Once Settings → Music allows it, songs too, each one version (a MusicBrainz recording) that credits the artist. A song is fetched through a single or EP of the artist's that holds that very version, which Lidarr adds like any album; one only on albums cannot be asked for on its own (400). The `REQUEST` or `REQUEST_MUSIC` permission is required, and music must be set up (a default Lidarr) and on for the person.
 
         Albums already here or already requested are left out, and so are songs already asked for or on an album that is. With the `AUTO_APPROVE`, `AUTO_APPROVE_MUSIC` or `MANAGE_REQUESTS` permission the request is approved at once. Quotas count albums, and songs one each (against their own limit when they have one).
       tags:

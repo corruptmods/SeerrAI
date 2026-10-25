@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "来自《{release}》",
   "components.Music.SongResults.moreVersions": "{count, plural, other {再显示 # 个版本}}",
   "components.Music.SongResults.onAlbum": "收录于《{album}》",
+  "components.Music.SongResults.onlyOnAlbums": "仅收录于专辑",
+  "components.Music.SongResults.onlyOnAlbumsTip": "未单独发行，无法单独请求。请改为请求其专辑。",
   "components.Music.SongResults.request": "请求",
   "components.Music.SongResults.songs": "歌曲",
   "components.Music.useRequestSong.failed": "提交请求时出错。",

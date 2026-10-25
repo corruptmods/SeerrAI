@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "De {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Afficher # autre version} other {Afficher # autres versions}}",
   "components.Music.SongResults.onAlbum": "Sur {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Uniquement sur des albums",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Pas sorti seul, il ne peut donc pas être demandé à part. Demandez plutôt son album.",
   "components.Music.SongResults.request": "Demander",
   "components.Music.SongResults.songs": "Titres",
   "components.Music.useRequestSong.failed": "Une erreur est survenue lors de l’envoi de la demande.",

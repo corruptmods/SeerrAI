@@ -28,6 +28,9 @@ const messages = defineMessages('components.Music.SongResults', {
   moreVersions:
     '{count, plural, one {Show # more version} other {Show # more versions}}',
   fewerVersions: 'Show fewer versions',
+  onlyOnAlbums: 'Only on albums',
+  onlyOnAlbumsTip:
+    'Not released on its own, so it can’t be requested by itself. Request its album instead.',
 });
 
 /** Versions shown before the rest are asked for. */
@@ -83,6 +86,15 @@ const Version = ({
       <div className="shrink-0">
         {!requestable(version.status) ? (
           <MusicStatusBadge status={version.status} plain />
+        ) : version.onlyOnAlbums ? (
+          canRequest && (
+            <span
+              className="text-xs text-muted"
+              title={intl.formatMessage(messages.onlyOnAlbumsTip)}
+            >
+              {intl.formatMessage(messages.onlyOnAlbums)}
+            </span>
+          )
         ) : canRequest ? (
           <Button
             buttonType="primary"

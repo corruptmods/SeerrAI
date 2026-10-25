@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Nga {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Shfaq edhe # version} other {Shfaq edhe # versione}}",
   "components.Music.SongResults.onAlbum": "Në {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Vetëm në albume",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Nuk ka dalë veçmas, ndaj nuk mund të kërkohet më vete. Kërko albumin e saj.",
   "components.Music.SongResults.request": "Kërko",
   "components.Music.SongResults.songs": "Këngë",
   "components.Music.useRequestSong.failed": "Diçka shkoi keq gjatë dërgimit të kërkesës.",

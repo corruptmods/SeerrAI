@@ -4,6 +4,7 @@ import type {
 } from '@server/api/musicbrainz/interfaces';
 import {
   groupSongs,
+  singleFor,
   splitTitle,
   toVersion,
   versionLabel,
@@ -225,5 +226,55 @@ describe('groupSongs', () => {
         ['Lantern Song Reprise', ARTIST],
       ]
     );
+  });
+});
+
+describe('singleFor', () => {
+  it('picks the artist’s plain single that holds the version', () => {
+    const theirs = (
+      group: string,
+      title: string,
+      type: string,
+      secondary: string[] = [],
+      date = '2001-01-01'
+    ) => ({
+      ...release(group, title, { type, secondary, date }),
+      'artist-credit': [
+        { name: 'Glasswing', artist: { id: ARTIST, name: 'X' } },
+      ],
+    });
+    const version = toVersion(
+      recording('Lantern Song', [
+        release('a1', 'Harbour Lights'),
+        theirs(
+          'r1',
+          'Lantern Song (remixes)',
+          'Single',
+          ['Remix'],
+          '2000-01-01'
+        ),
+        theirs('e1', 'Harbour EP', 'EP', [], '2000-06-01'),
+        theirs('s1', 'Lantern Song', 'Single', [], '2001-02-01'),
+        {
+          ...release('v1', 'Hits Single', { type: 'Single' }),
+          'artist-credit': [
+            { name: 'Various', artist: { id: COVER_BAND, name: 'Various' } },
+          ],
+        },
+      ])
+    );
+    assert.ok(version);
+    assert.equal(singleFor(version)?.mbId, 's1');
+  });
+
+  it('is none for a version only on albums and compilations', () => {
+    const version = toVersion(
+      recording('Lantern Song', [
+        release('a1', 'Harbour Lights'),
+        release('c1', 'Hits', { type: 'Single', secondary: ['Compilation'] }),
+      ])
+    );
+    assert.ok(version);
+    assert.equal(singleFor(version), null);
   });
 });

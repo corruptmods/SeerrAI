@@ -48,6 +48,16 @@ export interface LidarrRelease {
   trackCount?: number;
 }
 
+/** A track of an album in Lidarr, of the release Lidarr chose. */
+export interface LidarrTrack {
+  id: number;
+  albumId: number;
+  title: string;
+  /** The track's MusicBrainz recording id. */
+  foreignRecordingId?: string;
+  hasFile: boolean;
+}
+
 export interface LidarrAlbum {
   id: number;
   title: string;
@@ -204,6 +214,17 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
       return (await this.axios.get<LidarrAlbum>(`/album/${id}`)).data;
     } catch (e) {
       this.fail('retrieve the album', e);
+    }
+  };
+
+  /** An album's tracks, and which of them have a file. */
+  public getTracks = async (albumId: number): Promise<LidarrTrack[]> => {
+    try {
+      return (
+        await this.axios.get<LidarrTrack[]>('/track', { params: { albumId } })
+      ).data;
+    } catch (e) {
+      this.fail('retrieve tracks', e);
     }
   };
 

@@ -20,6 +20,7 @@ import type { User } from '@server/entity/User';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
 import { lidarrApi } from '@server/lib/music/access';
 import { notifyAvailableMusic } from '@server/lib/music/completion';
+import { lidarrTargets } from '@server/lib/music/requestTargets';
 import {
   claimDelivery,
   notifyRequestWatchers,
@@ -1153,9 +1154,9 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     ) {
       return;
     }
-    // Songs are not sent to Lidarr yet: a request for songs alone stays
-    // approved, and one with albums too sends only its albums.
-    if (!entity.albums?.length) {
+    // Songs go as the singles they are on; one only on albums is not sent
+    // anywhere yet, and a request with nothing else to send stays approved.
+    if (!lidarrTargets(entity).length) {
       return;
     }
     if (await this.titleBlocklisted(entity, manager)) {
@@ -1263,9 +1264,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
   ): Promise<void> {
     const lidarr = lidarrApi(lidarrSettings);
     const search = !lidarrSettings.preventSearch;
-    const wanted = [...(entity.albums ?? [])]
-      .sort((a, b) => a.id - b.id)
-      .map((album) => album.albumMbid);
+    // Its albums, and the singles its songs come on.
+    const wanted = lidarrTargets(entity).map((target) => target.mbId);
     let media: Media | null = null;
 
     try {
@@ -1514,19 +1514,22 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     }
 
     const albums = entity.albums ?? [];
-    if (!albums.length) {
+    // Its albums' rows, and those of its songs' singles.
+    const mbIds = lidarrTargets(entity).map((target) => target.mbId);
+    if (!mbIds.length) {
       return;
     }
     const albumRequests = manager.getRepository(AlbumRequest);
     const musicAlbums = manager.getRepository(MusicAlbum);
-    const mbIds = albums.map((album) => album.albumMbid);
 
     if (entity.status === MediaRequestStatus.APPROVED) {
-      await albumRequests.update(
-        { id: In(albums.map((album) => album.id)) },
-        { status: MediaRequestStatus.APPROVED }
-      );
-      albums.forEach((album) => (album.status = MediaRequestStatus.APPROVED));
+      if (albums.length) {
+        await albumRequests.update(
+          { id: In(albums.map((album) => album.id)) },
+          { status: MediaRequestStatus.APPROVED }
+        );
+        albums.forEach((album) => (album.status = MediaRequestStatus.APPROVED));
+      }
       await musicAlbums.update(
         {
           mediaId: entity.media.id,
@@ -1542,11 +1545,13 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     }
 
     if (entity.status === MediaRequestStatus.DECLINED) {
-      await albumRequests.update(
-        { id: In(albums.map((album) => album.id)) },
-        { status: MediaRequestStatus.DECLINED }
-      );
-      albums.forEach((album) => (album.status = MediaRequestStatus.DECLINED));
+      if (albums.length) {
+        await albumRequests.update(
+          { id: In(albums.map((album) => album.id)) },
+          { status: MediaRequestStatus.DECLINED }
+        );
+        albums.forEach((album) => (album.status = MediaRequestStatus.DECLINED));
+      }
       const stillWanted = await this.albumsStillWanted(
         manager,
         entity.media.id,
@@ -1566,12 +1571,28 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     }
   }
 
-  /** Albums another open request for the artist is waiting for. */
+  /**
+   * Albums another open request for the artist is waiting for: asked for,
+   * or the single a song of it comes on.
+   */
   private async albumsStillWanted(
     manager: EntityManager,
     mediaId: number,
     exceptRequestId?: number
   ): Promise<Set<string>> {
+    const singles = manager
+      .getRepository(SongRequest)
+      .createQueryBuilder('song')
+      .innerJoin('song.request', 'request')
+      .select('song.singleMbid', 'singleMbid')
+      .where('request.mediaId = :mediaId', { mediaId })
+      .andWhere('song.singleMbid IS NOT NULL')
+      .andWhere('request.status NOT IN (:...statuses)', {
+        statuses: [MediaRequestStatus.DECLINED, MediaRequestStatus.COMPLETED],
+      });
+    if (exceptRequestId !== undefined) {
+      singles.andWhere('request.id != :exceptRequestId', { exceptRequestId });
+    }
     const query = manager
       .getRepository(AlbumRequest)
       .createQueryBuilder('album')
@@ -1585,7 +1606,11 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       query.andWhere('request.id != :exceptRequestId', { exceptRequestId });
     }
     const rows = await query.getRawMany<{ albumMbid: string }>();
-    return new Set(rows.map((row) => row.albumMbid));
+    const songs = await singles.getRawMany<{ singleMbid: string }>();
+    return new Set([
+      ...rows.map((row) => row.albumMbid),
+      ...songs.map((row) => row.singleMbid),
+    ]);
   }
 
   public async updateParentStatus(
@@ -1733,7 +1758,10 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
   ): Promise<void> {
     const fullMedia = await manager.findOneOrFail(Media, {
       where: { id: entity.media.id },
-      relations: { requests: { seasons: true, albums: true }, seasons: true },
+      relations: {
+        requests: { seasons: true, albums: true, songs: true },
+        seasons: true,
+      },
     });
 
     const hasActive = fullMedia.requests.some(
@@ -1826,7 +1854,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     // Albums only this request was waiting for go back to nobody having
     // asked, so they can be requested again. Lidarr is left as it is.
     if (fullMedia.mediaType === MediaType.MUSIC) {
-      const removed = (entity.albums ?? []).map((album) => album.albumMbid);
+      const removed = lidarrTargets(entity).map((target) => target.mbId);
       const stillWanted = new Set(
         fullMedia.requests
           .filter(
@@ -1835,7 +1863,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
               request.status !== MediaRequestStatus.DECLINED
           )
           .flatMap((request) =>
-            (request.albums ?? []).map((album) => album.albumMbid)
+            lidarrTargets(request).map((target) => target.mbId)
           )
       );
       const free = removed.filter((id) => !stillWanted.has(id));

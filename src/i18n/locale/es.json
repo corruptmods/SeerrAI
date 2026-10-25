@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "De {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Mostrar # versión más} other {Mostrar # versiones más}}",
   "components.Music.SongResults.onAlbum": "En {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Solo en álbumes",
+  "components.Music.SongResults.onlyOnAlbumsTip": "No se publicó por separado, así que no se puede solicitar sola. Solicita su álbum.",
   "components.Music.SongResults.request": "Pedir",
   "components.Music.SongResults.songs": "Canciones",
   "components.Music.useRequestSong.failed": "Algo salió mal al enviar la petición.",

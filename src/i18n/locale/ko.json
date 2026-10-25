@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "{release} 수록",
   "components.Music.SongResults.moreVersions": "{count, plural, other {버전 #개 더 보기}}",
   "components.Music.SongResults.onAlbum": "{album} 수록",
+  "components.Music.SongResults.onlyOnAlbums": "앨범에만 수록",
+  "components.Music.SongResults.onlyOnAlbumsTip": "단독으로 발매되지 않아 따로 요청할 수 없습니다. 수록 앨범을 요청하세요.",
   "components.Music.SongResults.request": "요청",
   "components.Music.SongResults.songs": "곡",
   "components.Music.useRequestSong.failed": "요청을 제출하는 중 문제가 발생했습니다.",

@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Aus {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {# weitere Version anzeigen} other {# weitere Versionen anzeigen}}",
   "components.Music.SongResults.onAlbum": "Auf {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Nur auf Alben",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Nicht einzeln veröffentlicht, daher nicht einzeln anfragbar. Frag stattdessen das Album an.",
   "components.Music.SongResults.request": "Anfragen",
   "components.Music.SongResults.songs": "Songs",
   "components.Music.useRequestSong.failed": "Beim Senden der Anfrage ist ein Fehler aufgetreten.",

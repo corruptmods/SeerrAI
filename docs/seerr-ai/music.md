@@ -36,7 +36,7 @@ While Lidarr downloads, the status shows how far along it is, then **Adding to P
 
 An artist shows **Partially Available** once any album is here, and **Available** once every album asked for (or monitored in Lidarr) is.
 
-**One song** (once an admin turns on **Song Requests**): search for it and look under **Songs**, or press **Request Song** on a track of an album's page. Each version is listed and asked for on its own: the album take, the radio edit, a club mix, each with where it's from and its length. A song already asked for, or on an album that's here or on its way, says so instead. Songs take the same approval and limits as albums. Songs aren't fetched from Lidarr yet: the request waits, approved, until they are.
+**One song** (once an admin turns on **Song Requests**): search for it and look under **Songs**, or press **Request Song** on a track of an album's page. Each version is listed and asked for on its own: the album take, the radio edit, a club mix, each with where it's from and its length. A song already asked for, or on an album that's here or on its way, says so instead. Songs take the same approval and limits as albums. Once approved, a song comes through a single or EP of the artist's that has that very version: Lidarr fetches it like any album, and the song is here once the single is (or once Lidarr has the song's own track, when only part of the single came). The rest of that single comes with it. A song that's only on albums says **Only on albums**: request its album instead.
 
 Don't want music? Turn it off for yourself in **Profile → Settings → Features**.
 

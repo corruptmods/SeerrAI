@@ -704,6 +704,10 @@ describe('requesting songs', () => {
   const CLUB_MIX = 'a1b2c3d4-0003-4000-8000-000000000003';
   const BOOTLEG = 'a1b2c3d4-0004-4000-8000-000000000004';
   const NOT_THEIRS = 'a1b2c3d4-0005-4000-8000-000000000005';
+  const ACOUSTIC = 'a1b2c3d4-0006-4000-8000-000000000006';
+  const ACOUSTIC_EP = '8d3f2a61-5c47-4e19-b0a2-3f6e9d1c7b58';
+  const NIGHT_SWIM = 'a1b2c3d4-0007-4000-8000-000000000007';
+  const NIGHT_SWIM_SINGLE = '3e9a7c15-2d84-4f60-a1b3-c5d7e9f02468';
 
   const onRelease = (
     groupId: string,
@@ -763,6 +767,22 @@ describe('requesting songs', () => {
       ],
       releases: [onRelease(HITS, 'Tape', 'Album', { status: 'Bootleg' })],
     },
+    [ACOUSTIC]: {
+      id: ACOUSTIC,
+      title: 'Harbour Song (acoustic)',
+      'artist-credit': [
+        { name: 'Glasswing', artist: { id: ARTIST, name: 'Glasswing' } },
+      ],
+      releases: [onRelease(ACOUSTIC_EP, 'Harbour Sessions', 'EP')],
+    },
+    [NIGHT_SWIM]: {
+      id: NIGHT_SWIM,
+      title: 'Night Swim',
+      'artist-credit': [
+        { name: 'Glasswing', artist: { id: ARTIST, name: 'Glasswing' } },
+      ],
+      releases: [onRelease(NIGHT_SWIM_SINGLE, 'Night Swim', 'Single')],
+    },
     [NOT_THEIRS]: {
       id: NOT_THEIRS,
       title: 'Other Song',
@@ -817,8 +837,44 @@ describe('requesting songs', () => {
     assert.equal((await artistMedia()).status, MediaStatus.PENDING);
   });
 
-  it('is approved with Auto-Approve Music, and not sent to Lidarr yet', async () => {
+  it('is fetched through its single, which waits like an album', async () => {
+    const res = await requestSongs([RADIO_EDIT]);
+    assert.equal(res.status, 201);
+    const [song] = await getRepository(SongRequest).find();
+    assert.equal(song.singleMbid, SINGLE);
+    assert.equal(song.singleTitle, 'Lantern Song');
+    const single = await albumRow(SINGLE);
+    assert.equal(single.status, MediaStatus.PENDING);
+    assert.equal(single.primaryType, 'Single');
+
+    // The rest of that single comes with it.
+    await actAs(Permission.REQUEST, 'second@x');
+    const club = await requestSongs([CLUB_MIX]);
+    assert.equal(club.status, 409);
+    assert.equal(
+      message(club),
+      'Lantern Song is on Lantern Song, which is already here or on its way.'
+    );
+  });
+
+  it('is approved with Auto-Approve Music, and Lidarr fetches its single', async () => {
     await actAs(Permission.REQUEST + Permission.AUTO_APPROVE_MUSIC);
+    lidarr.lookupAlbums.set(SINGLE, {
+      id: 0,
+      title: 'Lantern Song',
+      foreignAlbumId: SINGLE,
+      artistId: 0,
+      monitored: false,
+      artist: {
+        id: 0,
+        artistName: 'Glasswing',
+        foreignArtistId: ARTIST,
+        monitored: false,
+        qualityProfileId: 0,
+        metadataProfileId: 0,
+        tags: [],
+      },
+    });
     const res = await requestSongs([CLUB_MIX]);
 
     assert.equal(res.status, 201);
@@ -826,11 +882,29 @@ describe('requesting songs', () => {
       (res.body as { status: number }).status,
       MediaRequestStatus.APPROVED
     );
+    await lidarr.waitFor(
+      (c) => c.method === 'POST' && c.path === '/api/v1/album'
+    );
+    const sent = lidarr.calls.filter(
+      (c) => c.method === 'POST' && c.path === '/api/v1/album'
+    );
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].body?.foreignAlbumId, SINGLE);
     const [song] = await getRepository(SongRequest).find();
     assert.equal(song.status, MediaRequestStatus.APPROVED);
-    assert.equal(song.version, 'Club Mix');
-    // Give a send the time it would take to start.
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal((await albumRow(SINGLE)).status, MediaStatus.PROCESSING);
+    assert.ok((await albumRow(SINGLE)).lidarrAlbumId);
+  });
+
+  it('refuses a song only on albums, naming the album to ask for', async () => {
+    const res = await requestSongs([ALBUM_TAKE]);
+
+    assert.equal(res.status, 400);
+    assert.equal(
+      message(res),
+      "Lantern Song is only on albums, so it can't be requested on its own. Request Static Garden instead."
+    );
+    assert.equal(await getRepository(SongRequest).count(), 0);
     assert.equal(lidarr.calls.length, 0);
   });
 
@@ -889,13 +963,13 @@ describe('requesting songs', () => {
 
     let res = await requestMusic({
       albums: [STATIC_GARDEN],
-      songs: [RADIO_EDIT, CLUB_MIX],
+      songs: [RADIO_EDIT, ACOUSTIC],
     });
     assert.equal(res.status, 403);
     assert.equal(message(res), 'You can request 2 more albums or songs.');
 
     assert.equal((await requestSongs([RADIO_EDIT])).status, 201);
-    assert.equal((await requestSongs([CLUB_MIX])).status, 201);
+    assert.equal((await requestSongs([ACOUSTIC])).status, 201);
     let quota = await call('GET', `/user/${user.id}/quota`);
     assert.equal((quota.body as { music: { used: number } }).music.used, 2);
     assert.equal((quota.body as { song?: unknown }).song, undefined);
@@ -913,7 +987,7 @@ describe('requesting songs', () => {
     });
     assert.equal((quota.body as { music: { used: number } }).music.used, 0);
     assert.equal((await requestMusic({ albums: [FOG_B] })).status, 201);
-    res = await requestSongs([ALBUM_TAKE]);
+    res = await requestSongs([NIGHT_SWIM]);
     assert.equal(res.status, 201);
     res = await requestMusic({
       albums: [IN_LANTERNS],
@@ -936,13 +1010,26 @@ describe('requesting songs', () => {
     const [song] = await getRepository(SongRequest).find();
     assert.equal(song.status, MediaRequestStatus.DECLINED);
     assert.equal((await artistMedia()).status, MediaStatus.UNKNOWN);
+    assert.equal((await albumRow(SINGLE)).status, MediaStatus.UNKNOWN);
 
     await actAs(Permission.REQUEST, 'again@x');
     assert.equal((await requestSongs([RADIO_EDIT])).status, 201);
   });
 
-  it('when approved, carries its songs, and its options can still change', async () => {
-    const res = await requestSongs([RADIO_EDIT]);
+  it('when approved, sends its single, and its options can still change', async () => {
+    lidarr.lookupArtists.set(ARTIST, {
+      id: 0,
+      artistName: 'Glasswing',
+      foreignArtistId: ARTIST,
+      monitored: false,
+      qualityProfileId: 0,
+      metadataProfileId: 0,
+      tags: [],
+    });
+    const res = await requestMusic({
+      albums: [STATIC_GARDEN],
+      songs: [RADIO_EDIT],
+    });
     const id = (res.body as { id: number }).id;
 
     await actAs(Permission.MANAGE_REQUESTS, 'manager@x');
@@ -952,15 +1039,32 @@ describe('requesting songs', () => {
     });
     assert.equal(edit.status, 200);
     assert.equal((await call('POST', `/request/${id}/approve`)).status, 200);
+    await lidarr.waitFor(
+      (c) => c.method === 'POST' && c.path === '/api/v1/artist'
+    );
 
     const request = await getRepository(MediaRequest).findOneOrFail({
       where: { id },
     });
     assert.equal(request.rootFolder, '/music');
     assert.equal(request.songs[0].status, MediaRequestStatus.APPROVED);
-    assert.equal(request.status, MediaRequestStatus.APPROVED);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    assert.equal(lidarr.calls.length, 0);
+    const sent = lidarr.calls.find(
+      (c) => c.method === 'POST' && c.path === '/api/v1/artist'
+    );
+    assert.equal(sent?.body?.rootFolderPath, '/music');
+    assert.deepEqual(
+      (sent?.body?.addOptions as { albumsToMonitor: string[] }).albumsToMonitor,
+      [STATIC_GARDEN, SINGLE]
+    );
+  });
+
+  it('when deleted, frees its single to be asked for again', async () => {
+    const res = await requestSongs([RADIO_EDIT]);
+    const id = (res.body as { id: number }).id;
+
+    assert.equal((await call('DELETE', `/request/${id}`)).status, 204);
+    assert.equal((await albumRow(SINGLE)).status, MediaStatus.UNKNOWN);
+    assert.equal((await requestSongs([CLUB_MIX])).status, 201);
   });
 
   it('keeps a request open while its songs are not here', async () => {
@@ -996,9 +1100,120 @@ describe('requesting songs', () => {
     assert.equal(request.status, MediaRequestStatus.APPROVED);
   });
 
+  /** A song request on its way, as a send to Lidarr leaves it. */
+  const songOnItsWay = async (songs: string[]) => {
+    const res = await requestSongs(songs);
+    const id = (res.body as { id: number }).id;
+    await getRepository(MediaRequest).update(id, {
+      status: MediaRequestStatus.APPROVED,
+    });
+    await getRepository(SongRequest).update(
+      { request: { id } },
+      { status: MediaRequestStatus.APPROVED }
+    );
+    // Lidarr has the artist, and the single as its album 7.
+    await getRepository(Media).update((await artistMedia()).id, {
+      serviceId: 0,
+      externalServiceId: 1,
+    });
+    await getRepository(MusicAlbum).update(
+      { mbId: SINGLE },
+      { status: MediaStatus.PROCESSING, lidarrAlbumId: 7 }
+    );
+    return id;
+  };
+
+  const availableSent = () =>
+    (
+      MediaRequest.sendNotification as unknown as {
+        mock: { calls: { arguments: [MediaRequest, Media, Notification] }[] };
+      }
+    ).mock.calls.filter(
+      (call) => call.arguments[2] === Notification.MEDIA_AVAILABLE
+    );
+
+  it('is done, and says so once, when its single is here', async () => {
+    const id = await songOnItsWay([RADIO_EDIT]);
+    await getRepository(MusicAlbum).update(
+      { mbId: SINGLE },
+      { status: MediaStatus.AVAILABLE }
+    );
+
+    await completeMusicRequests([(await artistMedia()).id]);
+    await completeMusicRequests([(await artistMedia()).id]);
+
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id },
+    });
+    assert.equal(request.songs[0].status, MediaRequestStatus.COMPLETED);
+    assert.equal(request.status, MediaRequestStatus.COMPLETED);
+    assert.equal(availableSent().length, 1);
+
+    // Here now, through its single: not asked for again.
+    await actAs(Permission.REQUEST, 'second@x');
+    const again = await requestSongs([RADIO_EDIT]);
+    assert.equal(again.status, 409);
+    assert.equal(
+      message(again),
+      'Lantern Song is on Lantern Song, which is already here or on its way.'
+    );
+  });
+
+  it('with its single partly here, is done once Lidarr has this very song', async () => {
+    const id = await songOnItsWay([RADIO_EDIT]);
+    await getRepository(MusicAlbum).update(
+      { mbId: SINGLE },
+      { status: MediaStatus.PARTIALLY_AVAILABLE }
+    );
+    lidarr.tracks.set(7, [
+      {
+        id: 1,
+        albumId: 7,
+        title: 'Lantern Song (radio edit)',
+        foreignRecordingId: RADIO_EDIT,
+        hasFile: false,
+      },
+      {
+        id: 2,
+        albumId: 7,
+        title: 'Lantern Song (Club Mix)',
+        foreignRecordingId: CLUB_MIX,
+        hasFile: true,
+      },
+    ]);
+    const done = async () => {
+      await completeMusicRequests([(await artistMedia()).id]);
+      return (
+        await getRepository(MediaRequest).findOneOrFail({ where: { id } })
+      ).status;
+    };
+
+    assert.equal(await done(), MediaRequestStatus.APPROVED);
+
+    lidarr.tracks.get(7)![0].hasFile = true;
+    assert.equal(await done(), MediaRequestStatus.COMPLETED);
+    assert.equal(availableSent().length, 1);
+  });
+
+  it('is done without a word when its single is deleted', async () => {
+    const id = await songOnItsWay([RADIO_EDIT]);
+    await getRepository(MusicAlbum).update(
+      { mbId: SINGLE },
+      { status: MediaStatus.DELETED }
+    );
+
+    await completeMusicRequests([(await artistMedia()).id]);
+
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id },
+    });
+    assert.equal(request.status, MediaRequestStatus.COMPLETED);
+    assert.equal(availableSent().length, 0);
+  });
+
   it('are named in the request’s notification', async () => {
     await requestMusic({ albums: [STATIC_GARDEN], songs: [RADIO_EDIT] });
-    await requestSongs([CLUB_MIX]);
+    await requestSongs([ACOUSTIC]);
     const sent = (
       MediaRequest.sendNotification as unknown as {
         mock: { calls: { arguments: [MediaRequest, Media] }[] };
@@ -1028,7 +1243,7 @@ describe('requesting songs', () => {
           'Glasswing — 1 album, 1 song',
           'Static Garden, Lantern Song (radio edit)',
         ],
-        ['Lantern Song (Club Mix) — Glasswing', 'Lantern Song (Club Mix)'],
+        ['Harbour Song (acoustic) — Glasswing', 'Harbour Song (acoustic)'],
       ]
     );
   });
@@ -1127,6 +1342,7 @@ describe('songs in search and on album pages', () => {
           status?: number;
           onAlbum?: { id: string; title: string };
           from?: { title: string };
+          onlyOnAlbums?: boolean;
         }[];
       }[];
     };
@@ -1142,6 +1358,9 @@ describe('songs in search and on album pages', () => {
     });
     assert.equal(take?.status, MediaStatus.PENDING);
     assert.equal(edit?.version, 'radio edit');
+    // Only on an album: not asked for alone. The radio edit has its single.
+    assert.equal(take?.onlyOnAlbums, true);
+    assert.equal(edit?.onlyOnAlbums, undefined);
     assert.equal(edit?.status, MediaStatus.PENDING);
     assert.equal(edit?.onAlbum, undefined);
   });

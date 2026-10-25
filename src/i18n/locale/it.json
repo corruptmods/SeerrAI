@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Da {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Mostra # altra versione} other {Mostra altre # versioni}}",
   "components.Music.SongResults.onAlbum": "Su {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Solo negli album",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Non è uscito da solo, quindi non si può richiedere a parte. Richiedi il suo album.",
   "components.Music.SongResults.request": "Richiedi",
   "components.Music.SongResults.songs": "Brani",
   "components.Music.useRequestSong.failed": "Si è verificato un errore durante l’invio della richiesta.",

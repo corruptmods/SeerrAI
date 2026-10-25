@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "От {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Покажи още # версия} other {Покажи още # версии}}",
   "components.Music.SongResults.onAlbum": "В {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Само в албуми",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Не е издавана самостоятелно, затова не може да се заяви отделно. Заявете албума ѝ.",
   "components.Music.SongResults.request": "Заяви",
   "components.Music.SongResults.songs": "Песни",
   "components.Music.useRequestSong.failed": "Нещо се обърка при подаването на заявката.",

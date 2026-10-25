@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Fra {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Vis # version mere} other {Vis # versioner mere}}",
   "components.Music.SongResults.onAlbum": "På {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Kun på albums",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Ikke udgivet for sig selv, så den kan ikke anmodes om alene. Anmod om albummet i stedet.",
   "components.Music.SongResults.request": "Anmod",
   "components.Music.SongResults.songs": "Sange",
   "components.Music.useRequestSong.failed": "Noget gik galt under afsendelse af anmodningen.",

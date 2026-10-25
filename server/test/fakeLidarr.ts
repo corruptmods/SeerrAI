@@ -1,4 +1,8 @@
-import type { LidarrAlbum, LidarrArtist } from '@server/api/servarr/lidarr';
+import type {
+  LidarrAlbum,
+  LidarrArtist,
+  LidarrTrack,
+} from '@server/api/servarr/lidarr';
 import type { LidarrSettings } from '@server/lib/settings';
 import http from 'node:http';
 
@@ -25,6 +29,8 @@ export interface FakeLidarr {
   /** What Lidarr's metadata service can look up, by MusicBrainz id. */
   lookupArtists: Map<string, LidarrArtist>;
   lookupAlbums: Map<string, LidarrAlbum>;
+  /** Each album's tracks, by its Lidarr id. */
+  tracks: Map<number, LidarrTrack[]>;
   tags: { id: number; label: string }[];
   /** Answers every call with a server error while set. */
   down: boolean;
@@ -51,6 +57,7 @@ export const createFakeLidarr = (): FakeLidarr => {
     albums: [],
     lookupArtists: new Map(),
     lookupAlbums: new Map(),
+    tracks: new Map(),
     tags: [],
     down: false,
     failing: new Set(),
@@ -83,6 +90,7 @@ export const createFakeLidarr = (): FakeLidarr => {
       fake.albums = [];
       fake.lookupArtists = new Map();
       fake.lookupAlbums = new Map();
+      fake.tracks = new Map();
       fake.tags = [];
       fake.down = false;
       fake.failing = new Set();
@@ -137,6 +145,9 @@ export const createFakeLidarr = (): FakeLidarr => {
             !query.artistId || album.artistId === Number(query.artistId)
         ),
       ];
+    }
+    if (method === 'GET' && path === '/api/v1/track') {
+      return [200, fake.tracks.get(Number(query.albumId)) ?? []];
     }
     if (method === 'POST' && path === '/api/v1/artist') {
       const artist = { ...(body as object), id: nextId++ } as LidarrArtist;

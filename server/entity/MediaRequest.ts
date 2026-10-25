@@ -20,7 +20,8 @@ import {
   resolveRequestSongs,
   songsCovered,
 } from '@server/lib/music/requestSongs';
-import type { SongVersion } from '@server/lib/music/songs';
+import type { SongRelease, SongVersion } from '@server/lib/music/songs';
+import { singleFor } from '@server/lib/music/songs';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import type { NotificationEvent } from '@server/lib/notifications/eventTitles';
 import { mediaEvent } from '@server/lib/notifications/eventTitles';
@@ -87,16 +88,11 @@ const coveredMessage = (
   const [song] = versions;
   const by = covered.get(song.mbId);
   if (by?.by === 'album') {
-    const album = song.releaseGroups.find(
-      (group) => group.mbId === by.albumMbid
-    );
     return `${song.songTitle} is on ${
-      album?.title ?? 'an album'
+      by.albumTitle || 'an album'
     }, which is already here or on its way.`;
   }
-  return by?.status === MediaRequestStatus.COMPLETED
-    ? `${song.songTitle} is already here.`
-    : `${song.songTitle} is already requested.`;
+  return `${song.songTitle} is already requested.`;
 };
 
 type MediaRequestOptions = {
@@ -414,6 +410,16 @@ export class MediaRequest {
           : coveredMessage(versions, covered)
       );
     }
+    // A song is fetched through a single or EP that has it; one only on
+    // albums cannot be fetched on its own.
+    const albumOnly = songs.find((song) => !singleFor(song));
+    if (albumOnly) {
+      throw new InvalidMusicRequestError(
+        `${albumOnly.songTitle} is only on albums, so it can't be requested on its own${
+          albumOnly.from ? `. Request ${albumOnly.from.title} instead.` : '.'
+        }`
+      );
+    }
     if (!ignoreQuota) {
       const over = (quota: typeof songQuota, count: number) =>
         !!quota.limit && count > (quota.remaining ?? 0);
@@ -496,6 +502,35 @@ export class MediaRequest {
       }
     }
 
+    // And each single a song is fetched through, waiting the same way.
+    const singles = new Map(
+      songs
+        .map((song) => singleFor(song))
+        .filter((single): single is SongRelease => !!single)
+        .map((single) => [single.mbId, single])
+    );
+    for (const single of singles.values()) {
+      const row = knownAlbums.find((known) => known.mbId === single.mbId);
+      if (!row) {
+        await albumRepository.insert(
+          new MusicAlbum({
+            mediaId: artist.id,
+            mbId: single.mbId,
+            title: single.title,
+            primaryType: single.primaryType,
+            secondaryTypes: single.secondaryTypes,
+            releaseDate: single.date,
+            status: MediaStatus.PENDING,
+          })
+        );
+      } else if (
+        row.status === MediaStatus.UNKNOWN ||
+        row.status === MediaStatus.DELETED
+      ) {
+        await albumRepository.update(row.id, { status: MediaStatus.PENDING });
+      }
+    }
+
     const autoApproved = user.hasPermission(
       [
         Permission.AUTO_APPROVE,
@@ -537,6 +572,8 @@ export class MediaRequest {
             length: song.length,
             albumMbid: song.from?.mbId ?? null,
             albumTitle: song.from?.title ?? null,
+            singleMbid: singleFor(song)?.mbId ?? null,
+            singleTitle: singleFor(song)?.title ?? null,
             releaseGroups: song.releaseGroups.map((group) => group.mbId),
             status,
           })

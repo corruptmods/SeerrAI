@@ -10,7 +10,7 @@ import SongRequest from '@server/entity/SongRequest';
 import type { SongVersion } from '@server/lib/music/songs';
 import { toVersion } from '@server/lib/music/songs';
 import type { MusicSongStatus } from '@server/models/Music';
-import { In, Not } from 'typeorm';
+import { In, IsNull, Not } from 'typeorm';
 
 /*
  * What a music request needs to know about the songs asked for: each
@@ -34,12 +34,11 @@ const COVERING = [
   MediaStatus.AVAILABLE,
 ];
 
-/** A song request's status that means the song is asked for or here. */
-const ASKED = [
-  MediaRequestStatus.PENDING,
-  MediaRequestStatus.APPROVED,
-  MediaRequestStatus.COMPLETED,
-];
+/**
+ * A song request's status that means the song is on its way. One done is
+ * as here as the single it came on, which the albums below say.
+ */
+const ASKED = [MediaRequestStatus.PENDING, MediaRequestStatus.APPROVED];
 
 /**
  * The versions asked for, in the order asked. Each must credit the
@@ -79,11 +78,12 @@ export const resolveRequestSongs = async (
 /** Why a song cannot be asked for: already asked for, or its album is. */
 export type SongCovered =
   | { by: 'request'; status: MediaRequestStatus }
-  | { by: 'album'; albumMbid: string; status: MediaStatus };
+  | { by: 'album'; albumMbid: string; albumTitle: string; status: MediaStatus };
 
 /**
  * For each version, whatever already brings it: a request for it that is
- * not declined, or an album or single it is on that is here or on its way.
+ * not declined, or an album or single it is on that is here or on its way
+ * (a single it was fetched through, too).
  */
 export const songsCovered = async (
   versions: Pick<SongVersion, 'mbId' | 'releaseGroups'>[]
@@ -107,19 +107,44 @@ export const songsCovered = async (
   });
   for (const song of asked) {
     const known = covered.get(song.recordingMbid);
-    // A song here outranks one only asked for.
-    if (
-      !known ||
-      (known.by === 'request' && song.status === MediaRequestStatus.COMPLETED)
-    ) {
+    // One approved outranks one only waiting for approval.
+    if (!known || song.status === MediaRequestStatus.APPROVED) {
       covered.set(song.recordingMbid, { by: 'request', status: song.status });
     }
   }
 
+  // The singles songs asked for before came on, as albums each is on: a
+  // track list does not say which singles hold its songs.
+  const done = await getRepository(SongRequest).find({
+    select: {
+      id: true,
+      recordingMbid: true,
+      singleMbid: true,
+      singleTitle: true,
+    },
+    where: {
+      recordingMbid: In(versions.map((version) => version.mbId)),
+      status: MediaRequestStatus.COMPLETED,
+      singleMbid: Not(IsNull()),
+    },
+  });
+  const groupsOf = (version: Pick<SongVersion, 'mbId' | 'releaseGroups'>) => [
+    ...version.releaseGroups.map((group) => ({
+      mbId: group.mbId,
+      title: group.title,
+    })),
+    ...done
+      .filter((song) => song.recordingMbid === version.mbId)
+      .map((song) => ({
+        mbId: song.singleMbid as string,
+        title: song.singleTitle ?? '',
+      })),
+  ];
+
   const groupIds = [
     ...new Set(
       versions.flatMap((version) =>
-        version.releaseGroups.map((group) => group.mbId)
+        groupsOf(version).map((group) => group.mbId)
       )
     ),
   ];
@@ -141,7 +166,7 @@ export const songsCovered = async (
       continue;
     }
     // The one furthest along; among those, the best known.
-    const on = version.releaseGroups
+    const on = groupsOf(version)
       .filter((group) => albumStatus.has(group.mbId))
       .sort(
         (a, b) =>
@@ -152,6 +177,7 @@ export const songsCovered = async (
       covered.set(version.mbId, {
         by: 'album',
         albumMbid: on.mbId,
+        albumTitle: on.title,
         status: albumStatus.get(on.mbId) as MediaStatus,
       });
     }
@@ -163,7 +189,6 @@ export const songsCovered = async (
 const REQUEST_STANDING: Partial<Record<MediaRequestStatus, MediaStatus>> = {
   [MediaRequestStatus.PENDING]: MediaStatus.PENDING,
   [MediaRequestStatus.APPROVED]: MediaStatus.PROCESSING,
-  [MediaRequestStatus.COMPLETED]: MediaStatus.AVAILABLE,
 };
 
 /**
@@ -180,12 +205,9 @@ export const songStandings = async (
     if (by?.by === 'request') {
       standings.set(version.mbId, { status: REQUEST_STANDING[by.status] });
     } else if (by?.by === 'album') {
-      const album = version.releaseGroups.find(
-        (group) => group.mbId === by.albumMbid
-      );
       standings.set(version.mbId, {
         status: by.status,
-        onAlbum: { id: by.albumMbid, title: album?.title ?? '' },
+        onAlbum: { id: by.albumMbid, title: by.albumTitle },
       });
     }
   }

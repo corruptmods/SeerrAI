@@ -44,6 +44,17 @@ class SongRequest {
   @Column({ type: 'varchar', nullable: true })
   public albumTitle: string | null;
 
+  /**
+   * The single or EP it is fetched through: one of the artist's that holds
+   * this very version, as Lidarr adds any album. None when it is only on
+   * albums.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  public singleMbid: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  public singleTitle: string | null;
+
   /** Every album and single it is on, best known first. */
   @Column({ type: 'simple-array', default: '' })
   public releaseGroups: string[];

@@ -19,6 +19,7 @@ import type { MediaStatus } from '@server/constants/media';
 import type Media from '@server/entity/Media';
 import type { PlayLink } from '@server/entity/Media';
 import type { Song } from '@server/lib/music/songs';
+import { singleFor } from '@server/lib/music/songs';
 
 /*
  * Artists and albums as the pages show them, shaped from MusicBrainz and
@@ -126,6 +127,11 @@ export interface MusicSongVersion extends MusicSongStatus {
   };
   /** How many releases it is on. */
   releaseCount: number;
+  /**
+   * It is on no single or EP of the artist's, only on albums, so it cannot
+   * be fetched, or asked for, on its own.
+   */
+  onlyOnAlbums?: boolean;
 }
 
 /** A song: one artist's versions of one title. */
@@ -317,6 +323,7 @@ export const mapSongResult = (
         }
       : undefined,
     releaseCount: version.releaseCount,
+    ...(singleFor(version) ? {} : { onlyOnAlbums: true }),
     ...standing.get(version.mbId),
   })),
 });

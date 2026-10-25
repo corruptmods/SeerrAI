@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Sa {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Prikaži još # verziju} few {Prikaži još # verzije} other {Prikaži još # verzija}}",
   "components.Music.SongResults.onAlbum": "Na {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Samo na albumima",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Nije izdata zasebno, pa se ne može tražiti sama. Umesto toga zatražite album.",
   "components.Music.SongResults.request": "Zatraži",
   "components.Music.SongResults.songs": "Pesme",
   "components.Music.useRequestSong.failed": "Došlo je do greške pri slanju zahteva.",

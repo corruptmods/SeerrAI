@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Innen: {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Még # változat} other {Még # változat}}",
   "components.Music.SongResults.onAlbum": "Albumon: {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Csak albumokon",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Nem jelent meg önállóan, ezért külön nem kérhető. Kérd inkább az albumát.",
   "components.Music.SongResults.request": "Kérés",
   "components.Music.SongResults.songs": "Dalok",
   "components.Music.useRequestSong.failed": "Hiba történt a kérés beküldése során.",

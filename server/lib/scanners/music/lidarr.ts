@@ -17,6 +17,7 @@ import {
   recordAlbumEvents,
 } from '@server/lib/music/availability';
 import type { IndexAlbum, LidarrIndex } from '@server/lib/music/matcher';
+import { lidarrTargets } from '@server/lib/music/requestTargets';
 import { markUndispatchable } from '@server/lib/requestDispatch';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -42,7 +43,7 @@ const LABEL = 'Music Scan';
 /** How long a requested album may wait for Lidarr's metadata to know it. */
 export const LOOKUP_WAIT_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** Album requests still to be fetched. */
+/** Albums and songs asked for that are still to be fetched. */
 const OPEN = [MediaRequestStatus.PENDING, MediaRequestStatus.APPROVED];
 
 const errorMessage = (e: unknown) =>
@@ -144,13 +145,12 @@ export const lidarrInFlight = async (
     for (const request of requests) {
       // Albums added for an earlier request count for this one.
       albums = index.loadedAlbumsOf(server.id, artist.foreignId);
-      const open = (request.albums ?? []).filter((album) =>
-        OPEN.includes(album.status)
-      );
+      // Its albums still to come, and the singles its songs come on.
+      const open = lidarrTargets(request, OPEN);
       const unmonitored: number[] = [];
       const missing: typeof open = [];
       for (const album of open) {
-        const inLidarr = albums.find((a) => a.mbid === album.albumMbid);
+        const inLidarr = albums.find((a) => a.mbid === album.mbId);
         if (!inLidarr) {
           missing.push(album);
         } else if (!inLidarr.monitored) {
@@ -179,7 +179,7 @@ export const lidarrInFlight = async (
       const unknown: string[] = [];
       for (const album of missing) {
         try {
-          const found = await api.lookupAlbum(album.albumMbid);
+          const found = await api.lookupAlbum(album.mbId);
           if (!found) {
             unknown.push(album.title);
             continue;
@@ -192,14 +192,14 @@ export const lidarrInFlight = async (
           logger.info('Added a requested album Lidarr did not have', {
             label: LABEL,
             requestId: request.id,
-            album: album.albumMbid,
+            album: album.mbId,
           });
         } catch (e) {
           unknown.push(album.title);
           logger.debug('Lidarr could not add a requested album yet', {
             label: LABEL,
             requestId: request.id,
-            album: album.albumMbid,
+            album: album.mbId,
             errorMessage: errorMessage(e),
           });
         }

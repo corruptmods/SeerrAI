@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Iš {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Rodyti dar # versiją} few {Rodyti dar # versijas} other {Rodyti dar # versijų}}",
   "components.Music.SongResults.onAlbum": "Albume {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Tik albumuose",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Neišleista atskirai, todėl jos negalima užsakyti vienos. Užsakykite jos albumą.",
   "components.Music.SongResults.request": "Rezervuoti",
   "components.Music.SongResults.songs": "Dainos",
   "components.Music.useRequestSong.failed": "Teikiant rezervaciją kažkas nepavyko.",

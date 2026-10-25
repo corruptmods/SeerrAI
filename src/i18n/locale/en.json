@@ -1427,6 +1427,8 @@
   "components.Music.SongResults.from": "From {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Show # more version} other {Show # more versions}}",
   "components.Music.SongResults.onAlbum": "On {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Only on albums",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Not released on its own, so it can’t be requested by itself. Request its album instead.",
   "components.Music.SongResults.request": "Request",
   "components.Music.SongResults.songs": "Songs",
   "components.Music.useRequestSong.failed": "Something went wrong while submitting the request.",

@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "{release}-(e)tik",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Erakutsi bertsio # gehiago} other {Erakutsi # bertsio gehiago}}",
   "components.Music.SongResults.onAlbum": "{album}-(e)n",
+  "components.Music.SongResults.onlyOnAlbums": "Albumetan bakarrik",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Ez da bakarka argitaratu, beraz ezin da bakarrik eskatu. Eskatu bere albuma.",
   "components.Music.SongResults.request": "Eskatu",
   "components.Music.SongResults.songs": "Abestiak",
   "components.Music.useRequestSong.failed": "Zerbait gaizki joan da eskaera bidaltzean.",

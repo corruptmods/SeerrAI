@@ -14,6 +14,7 @@ import MediaEvent from '@server/entity/MediaEvent';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import MusicMetadata from '@server/entity/MusicMetadata';
+import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
 import downloadTracker from '@server/lib/downloadtracker';
@@ -1116,6 +1117,44 @@ describe('music scans', () => {
       // Lidarr's ids are kept on the albums.
       assert.equal((await albumOf(SING)).lidarrAlbumId, 70);
       assert.equal((await albumOf(FOG_B)).lidarrAlbumId, 901);
+    });
+
+    it('adds the single a song asked for is fetched through', async () => {
+      const SINGLE = '6b2e9c41-7d38-3f05-a6e1-0c4d8b7f2a93';
+      const media = await seedArtist([{ mbId: SINGLE }]);
+      const request = await seedRequest(media, []);
+      await getRepository(SongRequest).save(
+        new SongRequest({
+          request,
+          recordingMbid: 'a1b2c3d4-0002-4000-8000-000000000002',
+          title: 'Lantern Song',
+          version: 'radio edit',
+          length: null,
+          albumMbid: SINGLE,
+          albumTitle: 'Lantern Song',
+          singleMbid: SINGLE,
+          singleTitle: 'Lantern Song',
+          releaseGroups: [SINGLE],
+          status: MediaRequestStatus.APPROVED,
+        })
+      );
+      state.lidarr.artists = [lidarrArtist()];
+      state.lidarr.albums = [];
+      state.lidarr.lookups[SINGLE] = lidarrAlbum({
+        id: 0,
+        foreignAlbumId: SINGLE,
+        title: 'Lantern Song',
+        releases: [],
+      });
+
+      await musicSync.run();
+
+      assert.equal(state.lidarr.added.length, 1);
+      assert.equal(
+        (state.lidarr.added[0] as { foreignAlbumId: string }).foreignAlbumId,
+        SINGLE
+      );
+      assert.deepEqual(state.lidarr.added[0].artist, { id: 7 });
     });
 
     it('fails a request after a week of Lidarr not knowing an album', async () => {

@@ -1,3 +1,4 @@
+import type LidarrAPI from '@server/api/servarr/lidarr';
 import {
   MediaRequestStatus,
   MediaStatus,
@@ -8,6 +9,9 @@ import AlbumRequest from '@server/entity/AlbumRequest';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
+import SongRequest from '@server/entity/SongRequest';
+import { lidarrApi } from '@server/lib/music/access';
+import { normalizeTitle } from '@server/lib/music/songs';
 import {
   claimDelivery,
   notifyRequestWatchers,
@@ -15,6 +19,7 @@ import {
 } from '@server/lib/notificationDelivery';
 import { Notification } from '@server/lib/notifications';
 import { requestAvailableEvent } from '@server/lib/notifications/eventTitles';
+import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { In } from 'typeorm';
 
@@ -28,9 +33,11 @@ import { In } from 'typeorm';
  * their albums arrived.
  *
  * Each album asked for is done once it is here, or gone again (deleted, as
- * a series' season is). A request is done once all of them are. Only a
- * request whose albums are all here says so; one finished by albums being
- * deleted says nothing. Every notification is claimed first, so nothing is
+ * a series' season is). So is each song, by the single it was fetched
+ * through: once the single is here, or partly here with this very song
+ * among the tracks Lidarr has files for. A request is done once all of
+ * them are. Only a request whose albums and songs are all here says so;
+ * one finished by albums being deleted says nothing. Every notification is claimed first, so nothing is
  * announced twice, whichever of this and the catch-up pass gets there
  * first.
  */
@@ -46,34 +53,78 @@ const wantedAlbums = (request: Pick<MediaRequest, 'albums'>): AlbumRequest[] =>
     (album) => album.status !== MediaRequestStatus.DECLINED
   );
 
-/** Whether every song a request asked for, if any, is done. */
-const songsDone = (request: Pick<MediaRequest, 'songs'>): boolean =>
-  (request.songs ?? []).every(
-    (song) =>
-      song.status === MediaRequestStatus.COMPLETED ||
-      song.status === MediaRequestStatus.DECLINED
+/** The songs of a request that count: all but those declined. */
+const wantedSongs = (request: Pick<MediaRequest, 'songs'>): SongRequest[] =>
+  (request.songs ?? []).filter(
+    (song) => song.status !== MediaRequestStatus.DECLINED
   );
+
+/** A single that has arrived, all of it or some. */
+const HERE = [MediaStatus.AVAILABLE, MediaStatus.PARTIALLY_AVAILABLE];
 
 /**
  * Whether every album a request asked for is here, from the artist's
- * album rows, and every song it asked for too.
+ * album rows, and every song too: done, with its single here.
  */
 export const musicRequestAvailable = (
   request: Pick<MediaRequest, 'albums' | 'songs'>,
   rows: Pick<MusicAlbum, 'mbId' | 'status'>[]
 ): boolean => {
-  const wanted = wantedAlbums(request);
+  const albums = wantedAlbums(request);
+  const songs = wantedSongs(request);
+  const statusOf = (mbId?: string | null) =>
+    rows.find((row) => row.mbId === mbId)?.status;
   return (
-    wanted.length > 0 &&
-    songsDone(request) &&
-    wanted.every((album) =>
-      rows.some(
-        (row) =>
-          row.mbId === album.albumMbid && row.status === MediaStatus.AVAILABLE
-      )
+    albums.length + songs.length > 0 &&
+    albums.every(
+      (album) => statusOf(album.albumMbid) === MediaStatus.AVAILABLE
+    ) &&
+    songs.every(
+      (song) =>
+        song.status === MediaRequestStatus.COMPLETED &&
+        HERE.includes(statusOf(song.singleMbid) as MediaStatus)
     )
   );
 };
+
+/**
+ * Whether Lidarr has a file for this very song on the single it came on:
+ * its recording among the tracks, or else a track of its name. Asked only
+ * of a single partly here; any failure is a no, asked again next scan.
+ */
+const songOnFile = async (
+  song: SongRequest,
+  lidarr: LidarrAPI | undefined,
+  lidarrAlbumId: number | null | undefined
+): Promise<boolean> => {
+  if (!lidarr || !lidarrAlbumId) {
+    return false;
+  }
+  try {
+    const tracks = await lidarr.getTracks(lidarrAlbumId);
+    const named = normalizeTitle(songName(song));
+    const track =
+      tracks.find((t) => t.foreignRecordingId === song.recordingMbid) ??
+      tracks.find(
+        (t) =>
+          normalizeTitle(t.title) === named ||
+          (!song.version &&
+            normalizeTitle(t.title) === normalizeTitle(song.title))
+      );
+    return !!track?.hasFile;
+  } catch (e) {
+    logger.debug('Lidarr did not list a single’s tracks', {
+      label: 'Music Scan',
+      lidarrAlbumId,
+      errorMessage: e instanceof Error ? e.message : String(e),
+    });
+    return false;
+  }
+};
+
+/** A song as its track is named: "Song (radio edit)". */
+const songName = (song: Pick<SongRequest, 'title' | 'version'>): string =>
+  song.version ? `${song.title} (${song.version})` : song.title;
 
 /**
  * Tells whoever asked, and everyone watching, that a music request is
@@ -155,9 +206,25 @@ export const completeMusicRequests = async (
       continue;
     }
     const rows = await getRepository(MusicAlbum).find({
-      select: { id: true, mediaId: true, mbId: true, status: true },
+      select: {
+        id: true,
+        mediaId: true,
+        mbId: true,
+        status: true,
+        lidarrAlbumId: true,
+      },
       where: { mediaId: In([...new Set(requests.map((r) => r.media.id))]) },
     });
+    // Each artist's Lidarr, to ask about singles only partly here.
+    const servers = new Map(
+      (
+        await getRepository(Media).find({
+          select: { id: true, serviceId: true },
+          where: { id: In([...new Set(requests.map((r) => r.media.id))]) },
+        })
+      ).map((media) => [media.id, media.serviceId])
+    );
+    const settings = getSettings();
 
     for (const request of requests) {
       const own = rows.filter((row) => row.mediaId === request.media.id);
@@ -170,15 +237,39 @@ export const completeMusicRequests = async (
           DONE.includes(statusOf(album.albumMbid) as MediaStatus)
       );
       // Songs it asked for too keep it open until they are here.
+      const songs = wantedSongs(request);
+      const server = settings.lidarr.find(
+        (s) => s.id === servers.get(request.media.id)
+      );
+      const lidarr = server ? lidarrApi(server) : undefined;
+      const songsFinished: SongRequest[] = [];
+      for (const song of songs) {
+        if (song.status === MediaRequestStatus.COMPLETED || !song.singleMbid) {
+          continue;
+        }
+        const row = own.find((r) => r.mbId === song.singleMbid);
+        if (
+          row &&
+          (DONE.includes(row.status) ||
+            (row.status === MediaStatus.PARTIALLY_AVAILABLE &&
+              (await songOnFile(song, lidarr, row.lidarrAlbumId))))
+        ) {
+          songsFinished.push(song);
+        }
+      }
       const allDone =
-        wanted.length > 0 &&
+        wanted.length + songs.length > 0 &&
         wanted.every(
           (album) =>
             album.status === MediaRequestStatus.COMPLETED ||
             finished.includes(album)
         ) &&
-        songsDone(request);
-      if (!finished.length && !allDone) {
+        songs.every(
+          (song) =>
+            song.status === MediaRequestStatus.COMPLETED ||
+            songsFinished.includes(song)
+        );
+      if (!finished.length && !songsFinished.length && !allDone) {
         continue;
       }
 
@@ -190,6 +281,13 @@ export const completeMusicRequests = async (
             { status: MediaRequestStatus.COMPLETED }
           );
         }
+        if (songsFinished.length) {
+          await manager.update(
+            SongRequest,
+            { id: In(songsFinished.map((song) => song.id)) },
+            { status: MediaRequestStatus.COMPLETED }
+          );
+        }
         if (allDone) {
           await manager.update(MediaRequest, request.id, {
             status: MediaRequestStatus.COMPLETED,
@@ -198,6 +296,9 @@ export const completeMusicRequests = async (
       });
       finished.forEach(
         (album) => (album.status = MediaRequestStatus.COMPLETED)
+      );
+      songsFinished.forEach(
+        (song) => (song.status = MediaRequestStatus.COMPLETED)
       );
 
       if (allDone) {

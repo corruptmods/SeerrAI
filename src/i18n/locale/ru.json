@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Из {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Показать ещё # версию} few {Показать ещё # версии} many {Показать ещё # версий} other {Показать ещё # версии}}",
   "components.Music.SongResults.onAlbum": "На {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Только в альбомах",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Не выходила отдельно, поэтому её нельзя запросить отдельно. Запросите её альбом.",
   "components.Music.SongResults.request": "Запросить",
   "components.Music.SongResults.songs": "Песни",
   "components.Music.useRequestSong.failed": "Что-то пошло не так при отправке запроса.",

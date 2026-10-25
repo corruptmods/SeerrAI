@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Fra {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Vis # versjon til} other {Vis # versjoner til}}",
   "components.Music.SongResults.onAlbum": "På {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Bare på album",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Ikke utgitt for seg selv, så den kan ikke forespørres alene. Be om albumet i stedet.",
   "components.Music.SongResults.request": "Forespør",
   "components.Music.SongResults.songs": "Sanger",
   "components.Music.useRequestSong.failed": "Noe gikk galt under innsending av forespørselen.",

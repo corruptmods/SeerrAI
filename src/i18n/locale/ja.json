@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "収録: {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, other {ほかのバージョンを#件表示}}",
   "components.Music.SongResults.onAlbum": "{album} に収録",
+  "components.Music.SongResults.onlyOnAlbums": "アルバムのみ",
+  "components.Music.SongResults.onlyOnAlbumsTip": "単独でリリースされていないため、単独ではリクエストできません。収録アルバムをリクエストしてください。",
   "components.Music.SongResults.request": "リクエスト",
   "components.Music.SongResults.songs": "曲",
   "components.Music.useRequestSong.failed": "リクエストの送信中に問題が発生しました。",

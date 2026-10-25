@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "{release} albümünden",
   "components.Music.SongResults.moreVersions": "{count, plural, one {# sürüm daha göster} other {# sürüm daha göster}}",
   "components.Music.SongResults.onAlbum": "{album} albümünde",
+  "components.Music.SongResults.onlyOnAlbums": "Yalnızca albümlerde",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Tek başına yayımlanmadığı için ayrı istenemez. Bunun yerine albümünü iste.",
   "components.Music.SongResults.request": "Talep Et",
   "components.Music.SongResults.songs": "Şarkılar",
   "components.Music.useRequestSong.failed": "Talep gönderilirken bir sorun oluştu.",

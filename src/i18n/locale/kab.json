@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Seg {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Sken # n lqem-nniḍen} other {Sken # n leqmamen-nniḍen}}",
   "components.Music.SongResults.onAlbum": "Deg {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Deg yilbumen kan",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Ur d-teffiɣ ara weḥd-s, ihi ur tettwasuter ara weḥd-s. Suter albom-is.",
   "components.Music.SongResults.request": "Suter",
   "components.Music.SongResults.songs": "Tizlatin",
   "components.Music.useRequestSong.failed": "Yella wayen ur nteddu ara mi ara yettwazen usuter.",

@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "{release} से",
   "components.Music.SongResults.moreVersions": "{count, plural, one {# और संस्करण दिखाएँ} other {# और संस्करण दिखाएँ}}",
   "components.Music.SongResults.onAlbum": "{album} पर",
+  "components.Music.SongResults.onlyOnAlbums": "केवल एल्बमों पर",
+  "components.Music.SongResults.onlyOnAlbumsTip": "यह अलग से रिलीज़ नहीं हुआ, इसलिए इसे अकेले अनुरोध नहीं किया जा सकता। इसके एल्बम का अनुरोध करें।",
   "components.Music.SongResults.request": "अनुरोध करें",
   "components.Music.SongResults.songs": "गाने",
   "components.Music.useRequestSong.failed": "अनुरोध भेजते समय कुछ गड़बड़ हो गई।",

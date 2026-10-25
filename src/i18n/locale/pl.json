@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Z {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Pokaż # wersję więcej} few {Pokaż # wersje więcej} many {Pokaż # wersji więcej} other {Pokaż # wersji więcej}}",
   "components.Music.SongResults.onAlbum": "Na {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Tylko na albumach",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Nie ukazał się osobno, więc nie można o niego poprosić osobno. Poproś o jego album.",
   "components.Music.SongResults.request": "Poproś",
   "components.Music.SongResults.songs": "Utwory",
   "components.Music.useRequestSong.failed": "Coś poszło nie tak podczas wysyłania prośby.",

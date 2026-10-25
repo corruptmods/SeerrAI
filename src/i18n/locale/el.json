@@ -3603,6 +3603,8 @@
   "components.Music.SongResults.from": "Από {release}",
   "components.Music.SongResults.moreVersions": "{count, plural, one {Εμφάνιση # ακόμη εκδοχής} other {Εμφάνιση # ακόμη εκδοχών}}",
   "components.Music.SongResults.onAlbum": "Στο {album}",
+  "components.Music.SongResults.onlyOnAlbums": "Μόνο σε άλμπουμ",
+  "components.Music.SongResults.onlyOnAlbumsTip": "Δεν κυκλοφόρησε μόνο του, οπότε δεν μπορεί να ζητηθεί χωριστά. Ζητήστε το άλμπουμ του.",
   "components.Music.SongResults.request": "Αίτημα",
   "components.Music.SongResults.songs": "Τραγούδια",
   "components.Music.useRequestSong.failed": "Κάτι πήγε στραβά κατά την υποβολή του αιτήματος.",

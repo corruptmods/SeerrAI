@@ -3,7 +3,7 @@ import {
   isMbid,
   musicBrainz,
 } from '@server/api/musicbrainz';
-import { MediaType } from '@server/constants/media';
+import { MediaType, VARIOUS_ARTISTS_MBID } from '@server/constants/media';
 import mediaForViewer from '@server/lib/mediaForViewer';
 import { mediaHistory } from '@server/lib/mediaHistory';
 import { artistImages, musicImageUrl } from '@server/lib/music/artistImage';
@@ -14,12 +14,15 @@ import {
   artistStatuses,
   markBeingAdded,
 } from '@server/lib/music/library';
+import { songStandings } from '@server/lib/music/requestSongs';
 import {
   rankAlbums,
   rankArtists,
   searchWhileTied,
 } from '@server/lib/music/searchRank';
+import { groupSongs } from '@server/lib/music/songs';
 import { Permission } from '@server/lib/permissions';
+import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { requireMusic } from '@server/middleware/music';
@@ -27,12 +30,14 @@ import type {
   MusicAlbumResult,
   MusicPage,
   MusicSearchResponse,
+  MusicSongSearchResponse,
 } from '@server/models/Music';
 import {
   mapAlbumDetails,
   mapAlbumResult,
   mapArtistDetails,
   mapArtistResult,
+  mapSongResult,
   mapTracks,
 } from '@server/models/Music';
 import type { NextFunction } from 'express';
@@ -53,6 +58,12 @@ musicRoutes.use(requireMusic);
 
 const SEARCH_ARTISTS = 8;
 const SEARCH_ALBUMS = 12;
+const SEARCH_SONGS = 8;
+
+/** Whose songs a search looks among: the artists of the best albums… */
+const SONG_ARTISTS_FROM_ALBUMS = 3;
+/** …and the best artists. */
+const SONG_ARTISTS_FROM_ARTISTS = 2;
 
 /*
  * How many a search asks MusicBrainz for, to pick the ones shown from: a
@@ -87,6 +98,40 @@ const mbFailed = (next: NextFunction, e: unknown, what: string) => {
   return next({ status: 502, message: 'MusicBrainz did not answer.' });
 };
 
+/**
+ * The artists and albums a search shows, best first. The same search asked
+ * again within the hour (as the songs below ask it) is answered from
+ * memory.
+ */
+const searchArtistsAndAlbums = async (query: string) => {
+  const mb = musicBrainz();
+  const [artists, albums] = await Promise.all([
+    searchWhileTied(
+      async (offset) => {
+        const page = await mb.searchArtists(query, {
+          limit: ARTIST_PAGE,
+          offset,
+        });
+        return { count: page.count, items: page.artists ?? [] };
+      },
+      { pageSize: ARTIST_PAGE, maxPages: ARTIST_PAGES }
+    ),
+    searchWhileTied(
+      async (offset) => {
+        const page = await mb.searchReleaseGroups(query, {
+          limit: ALBUM_PAGE,
+          offset,
+        });
+        return { count: page.count, items: page['release-groups'] ?? [] };
+      },
+      { pageSize: ALBUM_PAGE, maxPages: ALBUM_PAGES }
+    ),
+  ]);
+  const albumList = rankAlbums(albums, SEARCH_ALBUMS);
+  const artistList = rankArtists(artists, albumList, SEARCH_ARTISTS);
+  return { artistList, albumList };
+};
+
 musicRoutes.get('/search', async (req, res, next) => {
   const query = String(req.query.query ?? '').trim();
   if (!query) {
@@ -95,31 +140,7 @@ musicRoutes.get('/search', async (req, res, next) => {
       .json({ artists: [], albums: [] } satisfies MusicSearchResponse);
   }
   try {
-    const mb = musicBrainz();
-    const [artists, albums] = await Promise.all([
-      searchWhileTied(
-        async (offset) => {
-          const page = await mb.searchArtists(query, {
-            limit: ARTIST_PAGE,
-            offset,
-          });
-          return { count: page.count, items: page.artists ?? [] };
-        },
-        { pageSize: ARTIST_PAGE, maxPages: ARTIST_PAGES }
-      ),
-      searchWhileTied(
-        async (offset) => {
-          const page = await mb.searchReleaseGroups(query, {
-            limit: ALBUM_PAGE,
-            offset,
-          });
-          return { count: page.count, items: page['release-groups'] ?? [] };
-        },
-        { pageSize: ALBUM_PAGE, maxPages: ALBUM_PAGES }
-      ),
-    ]);
-    const albumList = rankAlbums(albums, SEARCH_ALBUMS);
-    const artistList = rankArtists(artists, albumList, SEARCH_ARTISTS);
+    const { artistList, albumList } = await searchArtistsAndAlbums(query);
     const [knownArtists, knownAlbums] = await Promise.all([
       artistStatuses(artistList.map((a) => a.id)),
       albumStatuses(albumList.map((a) => a.id)),
@@ -128,6 +149,55 @@ musicRoutes.get('/search', async (req, res, next) => {
       artists: artistList.map((a) => mapArtistResult(a, knownArtists)),
       albums: albumList.map((a) => mapAlbumResult(a, knownAlbums)),
     } satisfies MusicSearchResponse);
+  } catch (e) {
+    return mbFailed(next, e, 'search');
+  }
+});
+
+/*
+ * Songs, once Settings → Music lets them be asked for one at a time: each
+ * with its versions (the radio edit, the club mix…), and where each stands.
+ *
+ * MusicBrainz scores every recording of a title the same, and a hit has
+ * hundreds of covers, so its recordings are searched among the artists
+ * the same search finds: those of the best albums first (a song's single
+ * is an album there), then the best artists. Its own request, so artists
+ * and albums are shown without waiting for it.
+ */
+musicRoutes.get('/search/songs', async (req, res, next) => {
+  const query = String(req.query.query ?? '').trim();
+  if (!query || !getSettings().music.songRequests) {
+    return res
+      .status(200)
+      .json({ songs: [] } satisfies MusicSongSearchResponse);
+  }
+  try {
+    const { artistList, albumList } = await searchArtistsAndAlbums(query);
+    const artistOrder = [
+      ...new Set([
+        ...albumList
+          .slice(0, SONG_ARTISTS_FROM_ALBUMS)
+          .map((album) => album['artist-credit']?.[0]?.artist.id),
+        ...artistList
+          .slice(0, SONG_ARTISTS_FROM_ARTISTS)
+          .map((artist) => artist.id),
+      ]),
+    ].filter((id): id is string => isMbid(id) && id !== VARIOUS_ARTISTS_MBID);
+    if (!artistOrder.length) {
+      return res
+        .status(200)
+        .json({ songs: [] } satisfies MusicSongSearchResponse);
+    }
+    const found = await musicBrainz().searchRecordings(query, artistOrder);
+    const songs = groupSongs(found.recordings ?? [], query, artistOrder, {
+      songs: SEARCH_SONGS,
+    });
+    const standing = await songStandings(
+      songs.flatMap((song) => song.versions)
+    );
+    return res.status(200).json({
+      songs: songs.map((song) => mapSongResult(song, standing)),
+    } satisfies MusicSongSearchResponse);
   } catch (e) {
     return mbFailed(next, e, 'search');
   }
@@ -256,8 +326,22 @@ musicRoutes.get<{ mbid: string }>(
   '/album/:mbid/tracks',
   async (req, res, next) => {
     try {
-      const media = await musicBrainz().getTracks(req.params.mbid);
-      return res.status(200).json({ tracks: mapTracks(media) });
+      const tracks = mapTracks(await musicBrainz().getTracks(req.params.mbid));
+      // Where each stands, once songs can be asked for one at a time.
+      if (getSettings().music.songRequests) {
+        const standing = await songStandings(
+          tracks
+            .filter((track) => track.recordingId)
+            .map((track) => ({
+              mbId: track.recordingId as string,
+              releaseGroups: [],
+            }))
+        );
+        for (const track of tracks) {
+          Object.assign(track, standing.get(track.recordingId ?? ''));
+        }
+      }
+      return res.status(200).json({ tracks });
     } catch (e) {
       return mbFailed(next, e, 'album');
     }

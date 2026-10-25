@@ -8,9 +8,9 @@ import { z } from 'zod';
  * Settings → Music: where music's details come from, and whether music
  * comes below the films and series in All, saved together. The TheAudioDB
  * key is never sent back; saving without one keeps the saved key, and only
- * `removeTheAudioDbApiKey` clears it. A save that leaves out `search` keeps
- * it as it is. There before a Lidarr is added, gone while music is off for
- * everyone.
+ * `removeTheAudioDbApiKey` clears it. A save that leaves out `search`, or
+ * the song settings, keeps them as they are. There before a Lidarr is
+ * added, gone while music is off for everyone.
  */
 const musicSettingsRoutes = Router();
 
@@ -32,6 +32,13 @@ const musicBody = z.object({
   theAudioDbApiKey: z.string().trim().default(''),
   removeTheAudioDbApiKey: z.boolean().default(false),
   maxAlbumsPerRequest: z.coerce.number().int().min(1).max(1000).default(100),
+  songRequests: z.boolean().optional(),
+  songQuota: z
+    .object({
+      quotaLimit: z.coerce.number().int().min(0).max(1000),
+      quotaDays: z.coerce.number().int().min(0).max(100),
+    })
+    .optional(),
   // Anything else an older page sends with it is left out.
   search: z.object({ inAll: z.boolean() }).optional(),
 });
@@ -42,6 +49,8 @@ const shown = (music: MusicSettings) => ({
   contactEmail: music.contactEmail,
   listenBrainz: music.listenBrainz,
   maxAlbumsPerRequest: music.maxAlbumsPerRequest,
+  songRequests: !!music.songRequests,
+  songQuota: music.songQuota,
   hasTheAudioDbApiKey: !!music.theAudioDbApiKey,
   search: { inAll: music.search.inAll },
 });
@@ -63,6 +72,8 @@ musicSettingsRoutes.post('/', async (req, res, next) => {
     contactEmail: body.contactEmail,
     listenBrainz: body.listenBrainz,
     maxAlbumsPerRequest: body.maxAlbumsPerRequest,
+    songRequests: body.songRequests ?? !!saved.songRequests,
+    songQuota: body.songQuota ?? saved.songQuota,
     theAudioDbApiKey: body.removeTheAudioDbApiKey
       ? ''
       : body.theAudioDbApiKey || saved.theAudioDbApiKey,

@@ -1,8 +1,10 @@
 import ArtistCard from '@app/components/Music/ArtistCard';
 import MusicCard from '@app/components/Music/MusicCard';
 import MusicSlider from '@app/components/Music/MusicSlider';
+import SongResults from '@app/components/Music/SongResults';
 import useDebouncedState from '@app/hooks/useDebouncedState';
 import useFeature from '@app/hooks/useFeature';
+import useSettings from '@app/hooks/useSettings';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import type { MusicSearchResponse } from '@server/models/Music';
@@ -22,7 +24,8 @@ const messages = defineMessages('components.Music.MusicSearchResults', {
  * longer pause in typing than films and series, as MusicBrainz answers one
  * request a second for the whole server. Shown where music is asked for
  * (Search's Music, the Music page) as a page of cards, or, with `rows`, as
- * an Artists row and an Albums row below the films and series in All.
+ * an Artists row and an Albums row below the films and series in All. Once
+ * songs can be asked for one at a time, their songs come after.
  */
 const MusicSearchResults = ({
   query,
@@ -33,6 +36,7 @@ const MusicSearchResults = ({
 }) => {
   const intl = useIntl();
   const musicOn = useFeature('music');
+  const { currentSettings } = useSettings();
   const [, settled, setQuery] = useDebouncedState(query.trim(), 700);
 
   useEffect(() => {
@@ -66,6 +70,11 @@ const MusicSearchResults = ({
   }
 
   const waiting = !data && (isLoading || settled !== query.trim());
+  // Asked for once the artists and albums are in: the same search, then
+  // one more, as MusicBrainz takes one request a second.
+  const songs = currentSettings.musicSongs && data && !waiting && (
+    <SongResults query={settled} />
+  );
 
   if (rows) {
     // Below the films and series: a row with nothing in it is left out, and
@@ -85,6 +94,7 @@ const MusicSearchResults = ({
           items={data?.albums}
           isLoading={waiting}
         />
+        {songs}
       </div>
     );
   }
@@ -142,6 +152,7 @@ const MusicSearchResults = ({
           </ul>
         </section>
       )}
+      {songs}
     </div>
   );
 };

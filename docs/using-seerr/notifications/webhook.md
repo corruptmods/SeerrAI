@@ -106,6 +106,7 @@ These following special variables are only included in media-related notificatio
 | `{{media_tmdbid}}`          | The media's TMDB ID (`0` for music)                                                                            |
 | `{{media_mbid}}`            | For music, the artist's MusicBrainz ID; empty otherwise                                                        |
 | `{{music_albums}}`          | For music, the titles of the albums asked for, one per line; empty otherwise                                   |
+| `{{music_songs}}`           | For music, the songs asked for, one per line, each with its version (`Song (radio edit)`); empty otherwise       |
 | `{{media_tvdbid}}`          | The media's TheTVDB ID                                                                                         |
 | `{{media_status}}`          | The media's availability status (`UNKNOWN`, `PENDING`, `PROCESSING`, `PARTIALLY_AVAILABLE`, or `AVAILABLE`)    |
 | `{{media_status4k}}`        | The media's 4K availability status (`UNKNOWN`, `PENDING`, `PROCESSING`, `PARTIALLY_AVAILABLE`, or `AVAILABLE`) |

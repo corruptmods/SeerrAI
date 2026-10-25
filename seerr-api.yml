@@ -1931,6 +1931,9 @@ components:
           properties:
             inAll:
               type: boolean
+        musicSongs:
+          type: boolean
+          description: Songs can be asked for one at a time. Set through /settings/music.
         themeDefault:
           $ref: '#/components/schemas/ThemeDefaults'
         seasons:
@@ -2192,10 +2195,28 @@ components:
         maxAlbumsPerRequest:
           type: number
           example: 100
+        songRequests:
+          type: boolean
+          description: Songs can be asked for one at a time, not only albums.
+        songQuota:
+          $ref: '#/components/schemas/SongQuota'
         hasTheAudioDbApiKey:
           type: boolean
         search:
           $ref: '#/components/schemas/MusicSearchSettings'
+    SongQuota:
+      type: object
+      description: Songs a person may ask for in so many days. No limit (0) counts each song as one item of their music limit instead.
+      properties:
+        quotaLimit:
+          type: number
+          minimum: 0
+          maximum: 1000
+        quotaDays:
+          type: number
+          description: 0 for no time limit.
+          minimum: 0
+          maximum: 100
     MusicSearchSettings:
       type: object
       properties:
@@ -2813,6 +2834,12 @@ components:
           description: For music, the albums asked for.
           items:
             $ref: '#/components/schemas/AlbumRequest'
+        songs:
+          type: array
+          readOnly: true
+          description: For music, the songs asked for, each one version of a song.
+          items:
+            $ref: '#/components/schemas/SongRequest'
         serverIssue:
           $ref: '#/components/schemas/RequestServerIssue'
       required:
@@ -2856,6 +2883,113 @@ components:
         addingToLibrary:
           type: boolean
           description: Where the request lists are sent it, whether Lidarr has the album's files and no media server lists it yet.
+    SongRequest:
+      type: object
+      properties:
+        id:
+          type: number
+          readOnly: true
+        recordingMbid:
+          type: string
+          description: The version asked for, as a MusicBrainz recording id.
+          example: 2b7d4f19-6c3e-4a85-9d10-e5f8a2c3b741
+        title:
+          type: string
+          description: The song's title, without what names the version.
+          example: Lantern Song
+        version:
+          type: string
+          nullable: true
+          description: What tells the version apart, when anything does.
+          example: radio edit
+        length:
+          type: number
+          nullable: true
+          description: Milliseconds.
+        albumMbid:
+          type: string
+          nullable: true
+          description: The album or single it is best known from (a release-group id).
+        albumTitle:
+          type: string
+          nullable: true
+        releaseGroups:
+          type: array
+          description: Every album and single it is on, best known first.
+          items:
+            type: string
+        status:
+          type: number
+          description: As the request's. 1 = PENDING APPROVAL, 2 = APPROVED, 3 = DECLINED, 4 = FAILED, 5 = COMPLETED
+    MusicSongStatus:
+      type: object
+      properties:
+        status:
+          type: number
+          description: Its own request's status (pending, processing, available), or else that of the album bringing it.
+        onAlbum:
+          type: object
+          description: The album here or on its way that brings it, when one does.
+          properties:
+            id:
+              type: string
+            title:
+              type: string
+    MusicSongResult:
+      type: object
+      properties:
+        mediaType:
+          type: string
+          enum: [song]
+        id:
+          type: string
+          description: The artist and the song's title, as one key.
+        title:
+          type: string
+        artistId:
+          type: string
+          description: The first credited artist, whom the song belongs to here.
+        artistName:
+          type: string
+        versions:
+          type: array
+          description: Best known first.
+          items:
+            allOf:
+              - $ref: '#/components/schemas/MusicSongStatus'
+              - type: object
+                properties:
+                  id:
+                    type: string
+                    description: The recording's MusicBrainz id.
+                  title:
+                    type: string
+                  version:
+                    type: string
+                    description: What tells it apart ("radio edit"), when anything does.
+                  length:
+                    type: number
+                    nullable: true
+                    description: Milliseconds.
+                  from:
+                    type: object
+                    description: The album or single it is best known from.
+                    properties:
+                      id:
+                        type: string
+                      title:
+                        type: string
+                      primaryType:
+                        type: string
+                      secondaryTypes:
+                        type: array
+                        items:
+                          type: string
+                      coverUrl:
+                        type: string
+                  releaseCount:
+                    type: number
+                    description: How many releases it is on.
     MediaInfo:
       type: object
       properties:
@@ -7841,6 +7975,11 @@ paths:
                   type: number
                   minimum: 1
                   maximum: 1000
+                songRequests:
+                  type: boolean
+                  description: Songs can be asked for one at a time. Left as it is when not sent.
+                songQuota:
+                  $ref: '#/components/schemas/SongQuota'
                 search:
                   type: object
                   properties:
@@ -10373,7 +10512,26 @@ paths:
                         type: boolean
                         example: false
                   music:
-                    description: Albums, counted as seasons are for series.
+                    description: Albums, counted as seasons are for series, and songs one each unless they have a limit of their own.
+                    type: object
+                    properties:
+                      days:
+                        type: number
+                        example: 7
+                      limit:
+                        type: number
+                        example: 10
+                      used:
+                        type: number
+                        example: 6
+                      remaining:
+                        type: number
+                        example: 4
+                      restricted:
+                        type: boolean
+                        example: false
+                  song:
+                    description: Songs, only when Settings → Music gives them a limit of their own.
                     type: object
                     properties:
                       days:
@@ -12429,6 +12587,31 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/MusicAlbumResult'
+  /music/search/songs:
+    get:
+      summary: Search songs
+      description: Songs (up to 8), each with its versions (up to 25, best known first), once Settings → Music lets songs be asked for one at a time; none until then. Recordings are searched among the artists the same search finds (those of the best three albums, then the best two artists), as MusicBrainz scores every recording of a title the same. Videos, and versions only on bootlegs or as part of a DJ mix, are left out. Each version says where it stands — its own request, or an album here or on its way that holds it. Refused while music is off for the person (403) or before Lidarr is set up (404); 503 when MusicBrainz is too busy to answer in time.
+      tags:
+        - music
+      parameters:
+        - in: query
+          name: query
+          required: true
+          schema:
+            type: string
+            maxLength: 200
+      responses:
+        '200':
+          description: Results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  songs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MusicSongResult'
   /music/artist/{mbid}:
     get:
       summary: An artist
@@ -12564,7 +12747,7 @@ paths:
   /music/album/{mbid}/tracks:
     get:
       summary: An album's tracks
-      description: The track list of one of the album's releases, an official one, the earliest.
+      description: The track list of one of the album's releases, an official one, the earliest. Once songs can be asked for one at a time, each track says where its song stands when it is asked for.
       tags:
         - music
       parameters:
@@ -12602,6 +12785,12 @@ paths:
                           type: number
                           nullable: true
                           description: Milliseconds.
+                        recordingId:
+                          type: string
+                          description: The recording on this track, the version asked for when it is.
+                        status:
+                          type: number
+                          description: Its song's request's status, when asked for.
   /discover/music/new-releases:
     get:
       summary: New music
@@ -13856,9 +14045,9 @@ paths:
     post:
       summary: Request music
       description: |
-        Requests albums of one artist, sent to Lidarr once approved: one album, several, or a whole discography, as one request. The `REQUEST` or `REQUEST_MUSIC` permission is required, and music must be set up (a default Lidarr) and on for the person.
+        Requests albums of one artist, sent to Lidarr once approved: one album, several, or a whole discography, as one request. Once Settings → Music allows it, songs too, each one version (a MusicBrainz recording) that credits the artist; songs are not yet sent to Lidarr. The `REQUEST` or `REQUEST_MUSIC` permission is required, and music must be set up (a default Lidarr) and on for the person.
 
-        Albums already here or already requested are left out. With the `AUTO_APPROVE`, `AUTO_APPROVE_MUSIC` or `MANAGE_REQUESTS` permission the request is approved at once. Quotas count albums.
+        Albums already here or already requested are left out, and so are songs already asked for or on an album that is. With the `AUTO_APPROVE`, `AUTO_APPROVE_MUSIC` or `MANAGE_REQUESTS` permission the request is approved at once. Quotas count albums, and songs one each (against their own limit when they have one).
       tags:
         - request
       requestBody:
@@ -13874,8 +14063,13 @@ paths:
                   example: 3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844
                 albums:
                   type: array
-                  description: The albums' MusicBrainz release-group ids.
-                  minItems: 1
+                  description: The albums' MusicBrainz release-group ids. Albums, songs or both.
+                  items:
+                    type: string
+                songs:
+                  type: array
+                  description: Songs' MusicBrainz recording ids, each one version of a song. Only once Settings → Music allows it.
+                  maxItems: 50
                   items:
                     type: string
                 serverId:
@@ -13899,7 +14093,6 @@ paths:
                   description: If true, this request will not count against the user's quota. Requires MANAGE_REQUESTS permission.
               required:
                 - artistMbid
-                - albums
       responses:
         '201':
           description: Succesfully created the request
@@ -13908,13 +14101,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/MediaRequest'
         '400':
-          description: Not an artist's albums, or more than one request may ask for
+          description: Not an artist's albums or songs, songs while they cannot be asked for, or more than one request may ask for
         '403':
           description: Not allowed, over quota, or music is turned off
         '404':
           description: Music is not set up
         '409':
-          description: Every album asked for is already here or already requested
+          description: Every album or song asked for is already here or on its way
         '503':
           description: MusicBrainz is too busy to answer in time
   /request/eta:

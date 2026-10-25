@@ -18,6 +18,7 @@ import type {
 import type { MediaStatus } from '@server/constants/media';
 import type Media from '@server/entity/Media';
 import type { PlayLink } from '@server/entity/Media';
+import type { Song } from '@server/lib/music/songs';
 
 /*
  * Artists and albums as the pages show them, shaped from MusicBrainz and
@@ -95,7 +96,57 @@ export interface MusicAlbumDetails extends MusicAlbumResult {
   playLinks: PlayLink[];
 }
 
-export interface MusicTrack {
+/** Where a song stands here, when it is asked for or coming. */
+export interface MusicSongStatus {
+  /**
+   * Its own request's (pending, processing, available), or else that of
+   * the album bringing it.
+   */
+  status?: MediaStatus;
+  /** The album here or on its way that brings it, when one does. */
+  onAlbum?: { id: string; title: string };
+}
+
+/** One version of a song: a MusicBrainz recording. */
+export interface MusicSongVersion extends MusicSongStatus {
+  /** The recording's MusicBrainz id. */
+  id: string;
+  title: string;
+  /** What tells it apart ("radio edit"), when anything does. */
+  version?: string;
+  /** Milliseconds. */
+  length?: number | null;
+  /** The album or single it is best known from. */
+  from?: {
+    id: string;
+    title: string;
+    primaryType?: string;
+    secondaryTypes: string[];
+    coverUrl: string;
+  };
+  /** How many releases it is on. */
+  releaseCount: number;
+}
+
+/** A song: one artist's versions of one title. */
+export interface MusicSongResult {
+  mediaType: 'song';
+  /** The artist and title, as one key. */
+  id: string;
+  title: string;
+  /** The first credited artist, whom the song belongs to here. */
+  artistId: string;
+  /** Everyone credited, as MusicBrainz writes it ("A feat. B"). */
+  artistName: string;
+  /** Best known first. */
+  versions: MusicSongVersion[];
+}
+
+export interface MusicSongSearchResponse {
+  songs: MusicSongResult[];
+}
+
+export interface MusicTrack extends MusicSongStatus {
   disc: number;
   /** The disc's own name, when it has one. */
   discTitle?: string;
@@ -105,6 +156,8 @@ export interface MusicTrack {
   title: string;
   /** Milliseconds. */
   length?: number | null;
+  /** The recording on this track: the version asked for when it is. */
+  recordingId?: string;
 }
 
 export interface MusicPage<T> {
@@ -235,8 +288,38 @@ export const mapTracks = (media: MbMedium[]): MusicTrack[] =>
       number: track.number,
       title: track.title,
       length: track.length ?? track.recording?.length ?? null,
+      recordingId: track.recording?.id,
     }))
   );
+
+/** A song and its versions as search shows them, with where each stands. */
+export const mapSongResult = (
+  song: Song,
+  standing: Map<string, MusicSongStatus>
+): MusicSongResult => ({
+  mediaType: 'song',
+  id: song.key,
+  title: song.title,
+  artistId: song.artistMbid,
+  artistName: song.artistName,
+  versions: song.versions.map((version) => ({
+    id: version.mbId,
+    title: version.title,
+    version: version.version ?? undefined,
+    length: version.length,
+    from: version.from
+      ? {
+          id: version.from.mbId,
+          title: version.from.title,
+          primaryType: version.from.primaryType ?? undefined,
+          secondaryTypes: version.from.secondaryTypes,
+          coverUrl: albumCoverUrl(version.from.mbId),
+        }
+      : undefined,
+    releaseCount: version.releaseCount,
+    ...standing.get(version.mbId),
+  })),
+});
 
 /**
  * ListenBrainz's own cover for a release when it names one (it knows the

@@ -45,7 +45,9 @@ export type MusicRequestBody = {
   /** The artist's MusicBrainz id. */
   artistMbid: string;
   /** The albums' MusicBrainz release-group ids. */
-  albums: string[];
+  albums?: string[];
+  /** Songs, each one version of one: their MusicBrainz recording ids. */
+  songs?: string[];
   serverId?: number;
   profileId?: number;
   metadataProfileId?: number;

@@ -1,4 +1,5 @@
 import SensitiveInput from '@app/components/Common/SensitiveInput';
+import QuotaSelector from '@app/components/QuotaSelector';
 import defineMessages from '@app/utils/defineMessages';
 import { Field, useFormikContext } from 'formik';
 import type { IntlShape } from 'react-intl';
@@ -25,6 +26,12 @@ export const messages = defineMessages('components.Settings.SettingsMusic', {
   maxAlbumsPerRequest: 'Most Albums in One Request',
   maxAlbumsPerRequestTip:
     'The most albums a whole-discography request asks for.',
+  songRequests: 'Song Requests',
+  songRequestsTip:
+    'Songs can be asked for one at a time, each version on its own (radio edit, club mix), from search and album pages.',
+  songQuota: 'Song Limit',
+  songQuotaTip:
+    'Songs each person may ask for. Unlimited counts each song as one album against their music limit instead.',
   validationUrl: 'You must provide a valid URL',
   validationEmail: 'You must provide a valid email address',
   validationMaxAlbums: 'A number from 1 to 1000',
@@ -38,6 +45,8 @@ export interface ShownMusicSettings {
   contactEmail: string;
   listenBrainz: boolean;
   maxAlbumsPerRequest: number;
+  songRequests: boolean;
+  songQuota: { quotaLimit: number; quotaDays: number };
   hasTheAudioDbApiKey: boolean;
   search: { inAll: boolean };
 }
@@ -49,6 +58,9 @@ export interface MusicSourceValues {
   theAudioDbApiKey: string;
   removeTheAudioDbApiKey: boolean;
   maxAlbumsPerRequest: number | string;
+  songRequests: boolean;
+  songQuotaLimit: number;
+  songQuotaDays: number;
 }
 
 /** The fields as the form starts: the public MusicBrainz shows as blank. */
@@ -64,6 +76,20 @@ export const musicSourceValues = (
   theAudioDbApiKey: '',
   removeTheAudioDbApiKey: false,
   maxAlbumsPerRequest: data.maxAlbumsPerRequest,
+  songRequests: data.songRequests,
+  songQuotaLimit: data.songQuota.quotaLimit,
+  songQuotaDays: data.songQuota.quotaDays,
+});
+
+/** The fields as the server takes them. */
+export const musicSourceBody = ({
+  songQuotaLimit,
+  songQuotaDays,
+  ...sources
+}: MusicSourceValues) => ({
+  ...sources,
+  maxAlbumsPerRequest: Number(sources.maxAlbumsPerRequest),
+  songQuota: { quotaLimit: songQuotaLimit, quotaDays: songQuotaDays },
 });
 
 /** What the fields must be before they are saved. */
@@ -83,8 +109,9 @@ export const musicSourceSchema = (intl: IntlShape) => ({
 });
 
 /*
- * Where music's details come from: MusicBrainz, ListenBrainz, TheAudioDB
- * and the most albums one request may ask for. The fields of Settings →
+ * Where music's details come from: MusicBrainz, ListenBrainz, TheAudioDB,
+ * the most albums one request may ask for, and asking for songs one at a
+ * time. The fields of Settings →
  * Music's form, which loads and saves them with the rest of the page.
  */
 const MusicSources = ({
@@ -93,7 +120,8 @@ const MusicSources = ({
   hasTheAudioDbApiKey: boolean;
 }) => {
   const intl = useIntl();
-  const { errors, touched, values } = useFormikContext<MusicSourceValues>();
+  const { errors, touched, values, setFieldValue } =
+    useFormikContext<MusicSourceValues>();
 
   return (
     <>
@@ -202,6 +230,37 @@ const MusicSources = ({
           )}
         </div>
       </div>
+      <div className="form-row">
+        <label htmlFor="songRequests" className="checkbox-label">
+          {intl.formatMessage(messages.songRequests)}
+          <span className="label-tip">
+            {intl.formatMessage(messages.songRequestsTip)}
+          </span>
+        </label>
+        <div className="form-input-area">
+          <Field type="checkbox" id="songRequests" name="songRequests" />
+        </div>
+      </div>
+      {values.songRequests && (
+        <div className="form-row">
+          <label htmlFor="songQuotaLimit" className="text-label">
+            {intl.formatMessage(messages.songQuota)}
+            <span className="label-tip">
+              {intl.formatMessage(messages.songQuotaTip)}
+            </span>
+          </label>
+          <div className="form-input-area">
+            <QuotaSelector
+              mediaType="song"
+              limitFieldName="songQuotaLimit"
+              dayFieldName="songQuotaDays"
+              defaultLimit={Number(values.songQuotaLimit)}
+              defaultDays={Number(values.songQuotaDays)}
+              onChange={setFieldValue}
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 };

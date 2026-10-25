@@ -96,6 +96,45 @@ export interface MbRelease extends MbReleaseSummary {
   media?: MbMedium[];
 }
 
+/** A release a recording is on, as a recording search gives it. */
+export interface MbRecordingRelease extends MbReleaseSummary {
+  'release-group'?: Pick<
+    MbReleaseGroup,
+    'id' | 'title' | 'primary-type' | 'secondary-types'
+  >;
+  /** The medium and track the recording is on: `track`, not `tracks`. */
+  media?: {
+    position?: number;
+    format?: string | null;
+    track?: { id: string; number?: string; title: string }[];
+  }[];
+}
+
+/**
+ * One recording: a song as recorded once, in one version. A radio edit
+ * and the album take are different recordings of the same song.
+ */
+export interface MbRecording {
+  id: string;
+  title: string;
+  /** What tells it apart: "radio edit", "live, 2013-05-31: …". */
+  disambiguation?: string;
+  /** Milliseconds. */
+  length?: number | null;
+  video?: boolean | null;
+  'first-release-date'?: string;
+  'artist-credit'?: MbArtistCredit[];
+  releases?: MbRecordingRelease[];
+  /** Search results only: how well it matched, out of 100. */
+  score?: number;
+}
+
+export interface MbRecordingSearchResponse {
+  count: number;
+  offset: number;
+  recordings: MbRecording[];
+}
+
 export interface MbArtistSearchResponse {
   count: number;
   offset: number;

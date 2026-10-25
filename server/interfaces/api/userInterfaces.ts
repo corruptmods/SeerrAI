@@ -22,8 +22,13 @@ export interface QuotaStatus {
 export interface QuotaResponse {
   movie: QuotaStatus;
   tv: QuotaStatus;
-  /** Albums, counted as seasons are for series. */
+  /**
+   * Albums, counted as seasons are for series, and songs, one each, unless
+   * songs have a limit of their own.
+   */
   music: QuotaStatus;
+  /** Songs, when Settings → Music gives them a limit of their own. */
+  song?: QuotaStatus;
 }
 
 export interface UserWatchDataResponse {

@@ -5,6 +5,7 @@ import {
   albumDownloads,
   artistImageUrl,
   musicRequestStatus,
+  songName,
 } from '@app/components/Music/musicHelpers';
 import useRequestAction from '@app/hooks/useRequestAction';
 import useRetryRequest from '@app/hooks/useRetryRequest';
@@ -27,13 +28,15 @@ import useSWR, { mutate } from 'swr';
 
 /*
  * What a music request's card and list row share: how it is named, where
- * it links, its picture, its albums, its status, and approving, retrying
+ * it links, its picture, its albums and songs, its status, and approving, retrying
  * and removing it. Nothing here asks TMDB: music has no TMDB id.
  */
 
 export const messages = defineMessages('components.Music.MusicRequest', {
   albumCount: '{count, plural, one {# album} other {# albums}}',
   albums: '{count, plural, one {Album} other {Albums}}',
+  songCount: '{count, plural, one {# song} other {# songs}}',
+  songs: '{count, plural, one {Song} other {Songs}}',
   unknownArtist: 'Unknown Artist',
   failedretry: 'Something went wrong while retrying the request.',
   failedmodify: 'Something went wrong while modifying the request.',
@@ -44,38 +47,124 @@ type Request = NonFunctionProperties<MediaRequest>;
 const albumsOf = (request: Request) =>
   [...(request.albums ?? [])].sort((a, b) => a.id - b.id);
 
-/** "Artist — Album", or "Artist — 3 albums". */
+const songsOf = (request: Request) =>
+  [...(request.songs ?? [])].sort((a, b) => a.id - b.id);
+
+/** The one album, or one song, a request asked for, if that is all. */
+const onlyOne = (request: Request) => {
+  const albums = albumsOf(request);
+  const songs = songsOf(request);
+  if (albums.length === 1 && !songs.length) {
+    return { title: albums[0].title, albumMbid: albums[0].albumMbid };
+  }
+  if (songs.length === 1 && !albums.length) {
+    return {
+      title: songName(songs[0].title, songs[0].version),
+      albumMbid: songs[0].albumMbid ?? undefined,
+    };
+  }
+  return undefined;
+};
+
+/** "Artist — Album", "Artist — Song", or "Artist — 3 albums, 2 songs". */
 export const musicRequestTitle = (
   request: Request,
   intl: IntlShape
 ): string => {
   const artist =
     request.media?.foreignTitle || intl.formatMessage(messages.unknownArtist);
-  const albums = albumsOf(request);
-  return albums.length === 1
-    ? `${artist} — ${albums[0].title}`
-    : `${artist} — ${intl.formatMessage(messages.albumCount, {
-        count: albums.length,
-      })}`;
+  const one = onlyOne(request);
+  if (one) {
+    return `${artist} — ${one.title}`;
+  }
+  const albums = albumsOf(request).length;
+  const songs = songsOf(request).length;
+  return `${artist} — ${[
+    albums || !songs
+      ? intl.formatMessage(messages.albumCount, { count: albums })
+      : undefined,
+    songs
+      ? intl.formatMessage(messages.songCount, { count: songs })
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join(', ')}`;
 };
 
-/** The album's page for one album, the artist's for several. */
+/**
+ * The album's page for one album (or the one a song is from), the
+ * artist's for more.
+ */
 export const musicRequestHref = (request: Request): string => {
-  const albums = albumsOf(request);
-  return albums.length === 1
-    ? `/music/album/${albums[0].albumMbid}`
+  const album = onlyOne(request)?.albumMbid;
+  return album
+    ? `/music/album/${album}`
     : `/music/artist/${request.media?.foreignId}`;
 };
 
-/** The album's cover for one album, a picture of the artist otherwise. */
+/**
+ * The album's cover for one album (or the one a song is from), a picture
+ * of the artist otherwise.
+ */
 export const musicRequestImage = (request: Request): string | undefined => {
-  const albums = albumsOf(request);
-  if (albums.length === 1) {
-    return albumCoverUrl(albums[0].albumMbid);
+  const album = onlyOne(request)?.albumMbid;
+  if (album) {
+    return albumCoverUrl(album);
   }
   return request.media?.foreignId
     ? artistImageUrl(request.media.foreignId)
     : undefined;
+};
+
+/** What stands in for a missing picture: a record, or a person. */
+export const musicRequestFallback = (request: Request): 'album' | 'artist' =>
+  onlyOne(request)?.albumMbid ? 'album' : 'artist';
+
+/** A song asked for, as a status: waiting, on its way, or here. */
+const SONG_STATUS: Partial<Record<MediaRequestStatus, MediaStatus>> = {
+  [MediaRequestStatus.PENDING]: MediaStatus.PENDING,
+  [MediaRequestStatus.APPROVED]: MediaStatus.PROCESSING,
+  [MediaRequestStatus.COMPLETED]: MediaStatus.AVAILABLE,
+};
+
+/** How many songs, with each one and where it is, on hover. */
+export const SongsField = ({
+  request,
+  className = 'card-field',
+}: {
+  request: Request;
+  className?: string;
+}) => {
+  const intl = useIntl();
+  const songs = songsOf(request);
+  if (!songs.length) {
+    return null;
+  }
+  return (
+    <div className={className}>
+      <span className="card-field-name">
+        {intl.formatMessage(messages.songs, { count: songs.length })}
+      </span>
+      <Tooltip
+        content={
+          <ul className="space-y-1 text-left">
+            {songs.map((song) => (
+              <li key={song.id} className="flex items-center gap-2">
+                <span className="truncate">
+                  {songName(song.title, song.version)}
+                </span>
+                <MusicStatusBadge status={SONG_STATUS[song.status]} plain />
+              </li>
+            ))}
+          </ul>
+        }
+      >
+        <span>
+          <Badge>{songs.length}</Badge>
+        </span>
+      </Tooltip>
+    </div>
+  );
 };
 
 /** How many albums, with each one and where it is, on hover. */

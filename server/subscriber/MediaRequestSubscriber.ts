@@ -15,6 +15,7 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
+import SongRequest from '@server/entity/SongRequest';
 import type { User } from '@server/entity/User';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
 import { lidarrApi } from '@server/lib/music/access';
@@ -66,18 +67,21 @@ const sanitizeDisplayName = (displayName: string): string => {
 };
 
 /**
- * Which albums a music request asked for, as its history says it: the
- * album's title, or how many and the first few.
+ * What a music request asked for, as its history says it: the album's or
+ * song's title, or how many and the first few.
  */
-const albumScope = (titles: string[]): string | undefined => {
-  if (!titles.length) {
-    return undefined;
-  }
-  if (titles.length === 1) {
+const musicScope = (albums: string[], songs: string[]): string | undefined => {
+  const titles = [...albums, ...songs];
+  if (titles.length <= 1) {
     return titles[0];
   }
+  const counted = (count: number, one: string, many: string) =>
+    count ? [`${count} ${count === 1 ? one : many}`] : [];
   const shown = titles.slice(0, 3).join(', ');
-  return `${titles.length} albums: ${shown}${titles.length > 3 ? '…' : ''}`;
+  return `${[
+    ...counted(albums.length, 'album', 'albums'),
+    ...counted(songs.length, 'song', 'songs'),
+  ].join(', ')}: ${shown}${titles.length > 3 ? '…' : ''}`;
 };
 
 /**
@@ -1149,6 +1153,11 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     ) {
       return;
     }
+    // Songs are not sent to Lidarr yet: a request for songs alone stays
+    // approved, and one with albums too sends only its albums.
+    if (!entity.albums?.length) {
+      return;
+    }
     if (await this.titleBlocklisted(entity, manager)) {
       return;
     }
@@ -1484,6 +1493,26 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     manager: EntityManager,
     entity: MediaRequest
   ): Promise<void> {
+    // Its songs follow it: on their way or declined with it.
+    const songs = (entity.songs ?? []).filter(
+      (song) =>
+        song.status !== MediaRequestStatus.COMPLETED &&
+        song.status !== MediaRequestStatus.DECLINED
+    );
+    if (
+      songs.length &&
+      (entity.status === MediaRequestStatus.APPROVED ||
+        entity.status === MediaRequestStatus.DECLINED)
+    ) {
+      await manager
+        .getRepository(SongRequest)
+        .update(
+          { id: In(songs.map((song) => song.id)) },
+          { status: entity.status }
+        );
+      songs.forEach((song) => (song.status = entity.status));
+    }
+
     const albums = entity.albums ?? [];
     if (!albums.length) {
       return;
@@ -1860,20 +1889,27 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         (a, b) => a.seasonNumber - b.seasonNumber
       );
       const albums = [...(request.albums ?? [])].sort((a, b) => a.id - b.id);
-      const scope = albums.length
-        ? albumScope(albums.map((album) => album.title))
-        : seasons.length === 1 && seasons[0].episodes?.length
-          ? `Season ${seasons[0].seasonNumber}, ${
-              seasons[0].episodes.length === 1 ? 'episode' : 'episodes'
-            } ${seasons[0].episodes
-              .map((episode) => episode.episodeNumber)
-              .sort((a, b) => a - b)
-              .join(', ')}`
-          : seasons.length
-            ? `${seasons.length === 1 ? 'Season' : 'Seasons'} ${seasons
-                .map((season) => season.seasonNumber)
+      const songs = [...(request.songs ?? [])].sort((a, b) => a.id - b.id);
+      const scope =
+        albums.length || songs.length
+          ? musicScope(
+              albums.map((album) => album.title),
+              songs.map((song) =>
+                song.version ? `${song.title} (${song.version})` : song.title
+              )
+            )
+          : seasons.length === 1 && seasons[0].episodes?.length
+            ? `Season ${seasons[0].seasonNumber}, ${
+                seasons[0].episodes.length === 1 ? 'episode' : 'episodes'
+              } ${seasons[0].episodes
+                .map((episode) => episode.episodeNumber)
+                .sort((a, b) => a - b)
                 .join(', ')}`
-            : undefined;
+            : seasons.length
+              ? `${seasons.length === 1 ? 'Season' : 'Seasons'} ${seasons
+                  .map((season) => season.seasonNumber)
+                  .join(', ')}`
+              : undefined;
 
       await recordMediaEvent(
         {

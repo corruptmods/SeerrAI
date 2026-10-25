@@ -8,6 +8,8 @@ import MusicImage from '@app/components/Music/MusicImage';
 import {
   AlbumsField,
   MusicRequestBadge,
+  SongsField,
+  musicRequestFallback,
   musicRequestHref,
   musicRequestImage,
   musicRequestTitle,
@@ -148,6 +150,10 @@ const MusicRequestCard = ({
             request={requestData}
             className="my-0.5 hidden items-center gap-2 text-sm sm:my-1 sm:flex"
           />
+          <SongsField
+            request={requestData}
+            className="my-0.5 hidden items-center gap-2 text-sm sm:my-1 sm:flex"
+          />
           <div className="mt-2 flex items-center text-sm sm:mt-1">
             <span className="mr-2 hidden font-bold sm:block">
               {intl.formatMessage(globalMessages.status)}
@@ -254,7 +260,7 @@ const MusicRequestCard = ({
             <NearScreen.Provider value={nearness}>
               <MusicImage
                 src={musicRequestImage(requestData)}
-                fallback={requestData.albums?.length === 1 ? 'album' : 'artist'}
+                fallback={musicRequestFallback(requestData)}
                 sizes="7rem"
               />
             </NearScreen.Provider>

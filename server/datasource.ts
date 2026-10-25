@@ -34,6 +34,7 @@ import RemovedPlexAccount from '@server/entity/RemovedPlexAccount';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { Session } from '@server/entity/Session';
+import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
 import UserApiKey from '@server/entity/UserApiKey';
 import UserPasskey from '@server/entity/UserPasskey';
@@ -90,6 +91,7 @@ const entities = [
   Season,
   SeasonRequest,
   Session,
+  SongRequest,
   User,
   UserApiKey,
   UserPasskey,

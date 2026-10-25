@@ -87,6 +87,8 @@ export interface PublicSettingsResponse {
   musicReady: boolean;
   /** Whether music comes below the films and series in All (Settings → Music). */
   musicSearch: { inAll: boolean };
+  /** Songs can be asked for one at a time (Settings → Music). */
+  musicSongs: boolean;
   /** The look of everyone who has not chosen their own (Settings → Appearance). */
   themeDefault: ThemeDefaults;
   /** The seasonal themes that run, and their days (Settings → Appearance). */

@@ -112,6 +112,8 @@ export const musicDefaults = (): MusicSettings => ({
   listenBrainz: true,
   theAudioDbApiKey: '',
   maxAlbumsPerRequest: 100,
+  songRequests: false,
+  songQuota: { quotaLimit: 0, quotaDays: 7 },
   search: { inAll: false },
 });
 
@@ -489,6 +491,13 @@ export interface MusicSettings {
   theAudioDbApiKey: string;
   /** The most albums one request may ask for. */
   maxAlbumsPerRequest: number;
+  /** Whether songs can be asked for one at a time, not only albums. */
+  songRequests: boolean;
+  /**
+   * Songs a person may ask for in so many days. No limit (0) counts each
+   * song as one item of their music limit instead.
+   */
+  songQuota: { quotaLimit: number; quotaDays: number };
   /** How music is searched (Settings → Music). */
   search: MusicSearchSettings;
 }
@@ -774,6 +783,8 @@ interface FullPublicSettings extends PublicSettings {
   musicReady: boolean;
   /** Whether music comes below the films and series in All. */
   musicSearch: MusicSearchSettings;
+  /** Songs can be asked for one at a time (Settings → Music). */
+  musicSongs: boolean;
   /** The look of everyone who has not chosen their own. */
   themeDefault: ThemeDefaults;
   /** The seasonal themes that run, and their days. */
@@ -1524,6 +1535,9 @@ class Settings {
     if (!this.data.music.search) {
       this.data.music.search = musicDefaults().search;
     }
+    if (!this.data.music.songQuota) {
+      this.data.music.songQuota = musicDefaults().songQuota;
+    }
     return this.data.music;
   }
 
@@ -1629,6 +1643,7 @@ class Settings {
         (this.data.lidarr ?? []).some((lidarr) => lidarr.isDefault) &&
         !(this.data.main.disabledFeatures ?? []).includes('music'),
       musicSearch: { inAll: this.music.search.inAll },
+      musicSongs: !!this.music.songRequests,
       // Checked again here: settings.json can be edited by hand.
       themeDefault:
         cleanThemeDefaults(this.appearance.default) ?? SERVER_THEME_DEFAULTS,

@@ -12,6 +12,8 @@ import type {
   MbArtist,
   MbArtistSearchResponse,
   MbMedium,
+  MbRecording,
+  MbRecordingSearchResponse,
   MbRelease,
   MbReleaseGroup,
   MbReleaseGroupBrowseResponse,
@@ -50,6 +52,7 @@ export const MB_LIFETIMES = {
   /** Which album a release belongs to never changes. */
   releaseGroupOfRelease: null,
   tracks: 30 * DAY,
+  recording: 30 * DAY,
   wikipedia: 30 * DAY,
 } as const;
 
@@ -357,6 +360,61 @@ export class MusicBrainz extends ExternalAPI {
         { query: searchText(query), limit, offset }
       )
     );
+  }
+
+  /**
+   * Recordings whose title holds what was typed, as a phrase, by any of
+   * these artists. MusicBrainz scores every exact title the same, and a
+   * well-known song has hundreds of covers, so a search by title alone
+   * rarely reaches the original: the artists narrow it to the ones meant.
+   */
+  public searchRecordings(
+    query: string,
+    artistIds: string[],
+    { limit = 100 }: { limit?: number } = {},
+    priority: MbPriority = 'interactive'
+  ): Promise<MbRecordingSearchResponse> {
+    const artists = [...new Set(artistIds.map(requireMbid))].sort();
+    const phrase = query.trim().replace(/["\\]/g, '\\$&');
+    const key = `search-rec:${limit}:${artists.join(',')}:${query.trim().toLowerCase()}`;
+    return this.searched(key, () =>
+      this.request<MbRecordingSearchResponse>(priority, '/ws/2/recording', {
+        query: `recording:"${phrase}" AND (${artists
+          .map((id) => `arid:${id}`)
+          .join(' OR ')})`,
+        limit,
+      })
+    );
+  }
+
+  /**
+   * One recording, with every release it is on and their albums. Asked as
+   * a search by id: a lookup lists only the first 25 releases, and a hit
+   * song is on far more.
+   */
+  public async getRecording(
+    id: string,
+    priority: MbPriority = 'interactive'
+  ): Promise<MbRecording | null> {
+    requireMbid(id);
+    const found = await this.cached<{ recording: MbRecording | null }>(
+      `recording:${id}`,
+      MB_LIFETIMES.recording,
+      priority,
+      async (p) => {
+        const data = await this.request<MbRecordingSearchResponse>(
+          p,
+          '/ws/2/recording',
+          { query: `rid:${id}`, limit: 1 }
+        );
+        return {
+          recording:
+            (data.recordings ?? []).find((recording) => recording.id === id) ??
+            null,
+        };
+      }
+    );
+    return found.recording;
   }
 
   public async getArtist(

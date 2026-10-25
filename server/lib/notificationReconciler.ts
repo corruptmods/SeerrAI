@@ -170,6 +170,7 @@ const findUnclaimedRequests = (
       .leftJoinAndSelect('requestedBy.settings', 'requestedBySettings')
       .leftJoinAndSelect('request.seasons', 'seasons')
       .leftJoinAndSelect('request.albums', 'albums')
+      .leftJoinAndSelect('request.songs', 'songs')
       .where('request.status = :status', { status })
       // Films, series and music: what these notifications are worded for.
       .andWhere('request.type IN (:...types)', {

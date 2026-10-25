@@ -45,6 +45,18 @@ export const KeyMap: Record<string, string | KeyMapFunction> = {
     payload.media?.mediaType === MediaType.MUSIC
       ? (payload.request?.albums ?? []).map((album) => album.title).join('\n')
       : '',
+  /**
+   * For music: the songs asked for, one per line, each with what names its
+   * version: "Song (radio edit)".
+   */
+  music_songs: (payload) =>
+    payload.media?.mediaType === MediaType.MUSIC
+      ? (payload.request?.songs ?? [])
+          .map((song) =>
+            song.version ? `${song.title} (${song.version})` : song.title
+          )
+          .join('\n')
+      : '',
   media_jellyfinMediaId: (payload) =>
     payload.media?.jellyfinMediaId ??
     payload.media?.jellyfinMediaId4k ??

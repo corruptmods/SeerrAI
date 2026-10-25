@@ -283,6 +283,8 @@ describe('music settings', () => {
       contactEmail: 'admin@example.com',
       listenBrainz: false,
       maxAlbumsPerRequest: 50,
+      songRequests: false,
+      songQuota: { quotaLimit: 0, quotaDays: 7 },
       hasTheAudioDbApiKey: true,
       search: { inAll: false },
     });
@@ -300,6 +302,34 @@ describe('music settings', () => {
         'hasTheAudioDbApiKey' as never
       ],
       false
+    );
+  });
+
+  it('turn song requests on, with a limit of their own, and keep them', async () => {
+    const saved = await call('POST', '/settings/music', {
+      songRequests: true,
+      songQuota: { quotaLimit: 5, quotaDays: 30 },
+    });
+    assert.equal(saved.status, 200);
+    assert.equal(getSettings().music.songRequests, true);
+    assert.deepEqual(getSettings().music.songQuota, {
+      quotaLimit: 5,
+      quotaDays: 30,
+    });
+    assert.equal(getSettings().fullPublicSettings.musicSongs, true);
+
+    // A save that leaves them out keeps them.
+    await call('POST', '/settings/music', { listenBrainz: true });
+    assert.equal(getSettings().music.songRequests, true);
+    assert.equal(getSettings().music.songQuota.quotaLimit, 5);
+
+    assert.equal(
+      (
+        await call('POST', '/settings/music', {
+          songQuota: { quotaLimit: -1, quotaDays: 7 },
+        })
+      ).status,
+      400
     );
   });
 

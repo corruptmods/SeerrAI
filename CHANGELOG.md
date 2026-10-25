@@ -2,6 +2,12 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
+## Unreleased
+
+### New
+
+- **Song requests**: ask for one song instead of its album, from music search (**Songs**) or a track on an album's page. Each version is shown and asked for on its own (radio edit, club mix). Turn it on in Settings → Music, with a song limit if you want one. Songs aren't fetched from Lidarr yet. ([guide](./docs/seerr-ai/music.md))
+
 ## 2.1.0 (24 October 2026)
 
 Seerr AI now stops bad downloads before they start, takes "fix this show" from Siri, and its admin agent remembers what it has tried. Every download client Seerr AI supports now works with its newest version, and this release has security updates.

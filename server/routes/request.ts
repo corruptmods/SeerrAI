@@ -39,6 +39,10 @@ import {
   NotTheArtistsAlbumError,
   resolveRequestAlbums,
 } from '@server/lib/music/requestAlbums';
+import {
+  NotTheArtistsSongError,
+  UnrequestableSongError,
+} from '@server/lib/music/requestSongs';
 import { getNotificationChannels } from '@server/lib/notificationChannels';
 import { releaseDelivery } from '@server/lib/notificationDelivery';
 import { Notification } from '@server/lib/notifications';
@@ -265,6 +269,7 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         .leftJoinAndSelect('request.media', 'media')
         .leftJoinAndSelect('request.seasons', 'seasons')
         .leftJoinAndSelect('request.albums', 'albums')
+        .leftJoinAndSelect('request.songs', 'songs')
         .leftJoinAndSelect('request.modifiedBy', 'modifiedBy')
         .leftJoinAndSelect('request.requestedBy', 'requestedBy')
         .where(
@@ -587,6 +592,8 @@ const musicRequestError = (
       return { status: 409, message: error.message };
     case InvalidMusicRequestError:
     case NotTheArtistsAlbumError:
+    case NotTheArtistsSongError:
+    case UnrequestableSongError:
       return { status: 400, message: error.message };
     case MusicBrainzBusyError:
       return { status: 503, message: error.message };
@@ -977,7 +984,9 @@ const editMusicRequest = async (
   const current = request.albums ?? [];
   const asked = [...new Set(body.albums ?? current.map((a) => a.albumMbid))];
 
-  if (!asked.length) {
+  // A request for songs may hold no albums; their songs are kept as they are.
+  const songs = request.songs ?? [];
+  if (!asked.length && !songs.length) {
     return {
       error: {
         status: 400,
@@ -1028,7 +1037,7 @@ const editMusicRequest = async (
   );
   const dropped = current.filter((album) => !asked.includes(album.albumMbid));
 
-  if (!kept.length && !added.length) {
+  if (!kept.length && !added.length && !songs.length) {
     return {
       error: {
         status: 409,

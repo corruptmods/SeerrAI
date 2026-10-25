@@ -10,6 +10,7 @@ import type {
   ShownMusicSettings,
 } from '@app/components/Settings/SettingsMusic';
 import MusicSources, {
+  musicSourceBody,
   musicSourceSchema,
   musicSourceValues,
   messages as sourceMessages,
@@ -128,11 +129,7 @@ const MusicSettingsForm = () => {
         try {
           const response = await axios.post<ShownMusicSettings>(
             '/api/v1/settings/music',
-            {
-              ...sources,
-              maxAlbumsPerRequest: Number(sources.maxAlbumsPerRequest),
-              search: { inAll },
-            }
+            { ...musicSourceBody(sources), search: { inAll } }
           );
           await mutate(response.data, { revalidate: false });
           // The search page reads whether music is in All from the public

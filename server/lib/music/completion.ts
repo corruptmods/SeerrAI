@@ -46,17 +46,26 @@ const wantedAlbums = (request: Pick<MediaRequest, 'albums'>): AlbumRequest[] =>
     (album) => album.status !== MediaRequestStatus.DECLINED
   );
 
+/** Whether every song a request asked for, if any, is done. */
+const songsDone = (request: Pick<MediaRequest, 'songs'>): boolean =>
+  (request.songs ?? []).every(
+    (song) =>
+      song.status === MediaRequestStatus.COMPLETED ||
+      song.status === MediaRequestStatus.DECLINED
+  );
+
 /**
  * Whether every album a request asked for is here, from the artist's
- * album rows.
+ * album rows, and every song it asked for too.
  */
 export const musicRequestAvailable = (
-  request: Pick<MediaRequest, 'albums'>,
+  request: Pick<MediaRequest, 'albums' | 'songs'>,
   rows: Pick<MusicAlbum, 'mbId' | 'status'>[]
 ): boolean => {
   const wanted = wantedAlbums(request);
   return (
     wanted.length > 0 &&
+    songsDone(request) &&
     wanted.every((album) =>
       rows.some(
         (row) =>
@@ -160,13 +169,15 @@ export const completeMusicRequests = async (
           album.status !== MediaRequestStatus.COMPLETED &&
           DONE.includes(statusOf(album.albumMbid) as MediaStatus)
       );
+      // Songs it asked for too keep it open until they are here.
       const allDone =
         wanted.length > 0 &&
         wanted.every(
           (album) =>
             album.status === MediaRequestStatus.COMPLETED ||
             finished.includes(album)
-        );
+        ) &&
+        songsDone(request);
       if (!finished.length && !allDone) {
         continue;
       }

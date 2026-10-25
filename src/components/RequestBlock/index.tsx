@@ -4,6 +4,7 @@ import CachedImage from '@app/components/Common/CachedImage';
 import Tooltip from '@app/components/Common/Tooltip';
 import DeclineReason from '@app/components/DeclineReason';
 import DeclineRequestModal from '@app/components/DeclineRequestModal';
+import { songName } from '@app/components/Music/musicHelpers';
 import RequestModal from '@app/components/RequestModal';
 import RequestServerIssue from '@app/components/RequestServerIssue';
 import useRequestAction from '@app/hooks/useRequestAction';
@@ -34,6 +35,7 @@ import { mutate } from 'swr';
 const messages = defineMessages('components.RequestBlock', {
   seasons: '{seasonCount, plural, one {Season} other {Seasons}}',
   albums: '{albumCount, plural, one {Album} other {Albums}}',
+  songs: '{songCount, plural, one {Song} other {Songs}}',
   requestoverrides: 'Request Overrides',
   server: 'Destination Server',
   profilechanged: 'Quality Profile',
@@ -376,6 +378,27 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
                     className="mb-1 mr-2 inline-block"
                   >
                     <Badge>{album.title}</Badge>
+                  </span>
+                ))}
+            </div>
+          </div>
+        )}
+        {(request.songs ?? []).length > 0 && (
+          <div className="mt-2 flex flex-col text-sm">
+            <div className="mb-1 font-medium">
+              {intl.formatMessage(messages.songs, {
+                songCount: request.songs.length,
+              })}
+            </div>
+            <div>
+              {[...request.songs]
+                .sort((a, b) => a.id - b.id)
+                .map((song) => (
+                  <span
+                    key={`song-${song.id}`}
+                    className="mb-1 mr-2 inline-block"
+                  >
+                    <Badge>{songName(song.title, song.version)}</Badge>
                   </span>
                 ))}
             </div>

@@ -11,10 +11,12 @@ import {
   trackLength,
   yearOf,
 } from '@app/components/Music/musicHelpers';
+import useRequestSong from '@app/components/Music/useRequestSong';
 import RequestModal from '@app/components/RequestModal';
 import useFeature from '@app/hooks/useFeature';
 import useMediaQuery from '@app/hooks/useMediaQuery';
 import usePlayLinks from '@app/hooks/usePlayLinks';
+import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
@@ -42,14 +44,27 @@ const messages = defineMessages('components.Music.AlbumDetails', {
   released: 'Released',
   links: 'Links',
   requestAlbum: 'Request Album',
+  requestSong: 'Request Song',
   variousArtists:
     'Lidarr cannot add Various Artists, so this compilation cannot be requested.',
   playOn: 'Play on {server}',
 });
 
-/** The album's tracks, disc by disc; folded away on a phone at first. */
-const TrackList = ({ albumId }: { albumId: string }) => {
+/**
+ * The album's tracks, disc by disc; folded away on a phone at first. Once
+ * songs can be asked for one at a time, each track that can be has its
+ * own Request (`songsOf`: the artist they are asked for under), and each
+ * asked for says where it stands.
+ */
+const TrackList = ({
+  albumId,
+  songsOf,
+}: {
+  albumId: string;
+  songsOf?: string;
+}) => {
   const intl = useIntl();
+  const { requestSong, busy } = useRequestSong();
   const wide = useMediaQuery('(min-width: 640px)');
   // Until someone opens or closes it, it follows the screen.
   const [chosen, setChosen] = useState<boolean>();
@@ -124,6 +139,40 @@ const TrackList = ({ albumId }: { albumId: string }) => {
                         <span className="shrink-0 tabular-nums text-muted">
                           {trackLength(track.length)}
                         </span>
+                        {!requestable(track.status) ? (
+                          <span className="shrink-0">
+                            <MusicStatusBadge status={track.status} plain />
+                          </span>
+                        ) : (
+                          songsOf &&
+                          track.recordingId && (
+                            <Button
+                              buttonType="ghost"
+                              buttonSize="sm"
+                              className="shrink-0"
+                              disabled={busy === track.recordingId}
+                              aria-label={`${intl.formatMessage(
+                                messages.requestSong
+                              )}: ${track.title}`}
+                              onClick={async () => {
+                                if (
+                                  await requestSong({
+                                    artistMbid: songsOf,
+                                    recordingMbid: track.recordingId as string,
+                                    name: track.title,
+                                  })
+                                ) {
+                                  mutate();
+                                }
+                              }}
+                            >
+                              <ArrowDownTrayIcon />
+                              <span className="hidden sm:inline">
+                                {intl.formatMessage(messages.requestSong)}
+                              </span>
+                            </Button>
+                          )
+                        )}
                       </li>
                     ))}
                 </Fragment>
@@ -144,6 +193,7 @@ interface AlbumDetailsProps {
 const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
   const intl = useIntl();
   const musicOn = useFeature('music');
+  const { currentSettings } = useSettings();
   const { hasPermission } = useUser();
   const [requesting, setRequesting] = useState(false);
   const { data, error, mutate } = useSWR<MusicAlbumDetails>(
@@ -281,7 +331,14 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
       )}
       <div className="media-overview">
         <div className="media-overview-left">
-          <TrackList albumId={data.id} />
+          <TrackList
+            albumId={data.id}
+            songsOf={
+              canRequest && currentSettings.musicSongs
+                ? data.artistId
+                : undefined
+            }
+          />
           {data.genres.length > 0 && (
             <div className="mt-6 flex flex-wrap gap-2">
               {data.genres.slice(0, 8).map((genre) => (

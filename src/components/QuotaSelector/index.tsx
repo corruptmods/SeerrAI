@@ -9,17 +9,20 @@ const messages = defineMessages('components.QuotaSelector', {
     '{quotaLimit} <quotaUnits>{seasons} per {quotaDays} {days}</quotaUnits>',
   musicRequests:
     '{quotaLimit} <quotaUnits>{albums} per {quotaDays} {days}</quotaUnits>',
+  songRequests:
+    '{quotaLimit} <quotaUnits>{songs} per {quotaDays} {days}</quotaUnits>',
   movies: '{count, plural, one {movie} other {movies}}',
   seasons: '{count, plural, one {season} other {seasons}}',
   albums: '{count, plural, one {album} other {albums}}',
+  songs: '{count, plural, one {song} other {songs}}',
   days: '{count, plural, one {day} other {days}}',
   unlimited: 'Unlimited',
   perDays: 'Days',
 });
 
 interface QuotaSelectorProps {
-  /** Music counts albums, as series count seasons. */
-  mediaType: 'movie' | 'tv' | 'music';
+  /** Music counts albums, as series count seasons; songs count songs. */
+  mediaType: 'movie' | 'tv' | 'music' | 'song';
   defaultDays?: number;
   defaultLimit?: number;
   dayOverride?: number;
@@ -62,7 +65,9 @@ const QuotaSelector = ({
           ? messages.movieRequests
           : mediaType === 'music'
             ? messages.musicRequests
-            : messages.tvRequests,
+            : mediaType === 'song'
+              ? messages.songRequests
+              : messages.tvRequests,
         {
           quotaLimit: (
             <select
@@ -104,6 +109,7 @@ const QuotaSelector = ({
           movies: intl.formatMessage(messages.movies, { count: quotaLimit }),
           seasons: intl.formatMessage(messages.seasons, { count: quotaLimit }),
           albums: intl.formatMessage(messages.albums, { count: quotaLimit }),
+          songs: intl.formatMessage(messages.songs, { count: quotaLimit }),
           days: intl.formatMessage(messages.days, { count: quotaDays }),
           quotaUnits: function quotaUnits(msg) {
             return (

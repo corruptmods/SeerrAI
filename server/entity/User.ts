@@ -472,36 +472,47 @@ export class User {
     const musicQuotaDays =
       this.musicQuotaDays ?? defaultQuotas.music?.quotaDays;
 
-    // Count the albums in music requests made during the quota period, as
-    // seasons are counted for series.
-    const musicDate = quotaWindowStart(musicQuotaDays);
-    const musicQuotaUsedQuery = requestRepository
-      .createQueryBuilder('request')
-      .leftJoin('request.requestedBy', 'requestedBy')
-      .where('request.type = :requestType', {
-        requestType: MediaType.MUSIC,
-      })
-      .andWhere('requestedBy.id = :userId', { userId: this.id })
-      .andWhere('request.status != :declinedStatus', {
-        declinedStatus: MediaRequestStatus.DECLINED,
-      })
-      .andWhere('request.ignoreQuota = :ignoreQuota', { ignoreQuota: false });
+    // Songs count as music, one each, unless Settings → Music gives them a
+    // limit of their own.
+    const songQuota = getSettings().music.songQuota;
+    const songsApart = !!songQuota?.quotaLimit;
+    const songQuotaLimit = songsApart && !canBypass ? songQuota.quotaLimit : 0;
+    const songQuotaDays = songsApart ? songQuota.quotaDays : undefined;
 
-    if (musicDate) {
-      musicQuotaUsedQuery.andWhere('request.createdAt > :date', {
-        date: musicDate,
-      });
-    }
+    // The albums, or songs, in music requests made during the quota period,
+    // as seasons are counted for series.
+    const countMusic = async (
+      kind: 'albums' | 'songs',
+      days: number | undefined
+    ): Promise<number> => {
+      const date = quotaWindowStart(days);
+      const query = requestRepository
+        .createQueryBuilder('request')
+        .leftJoin('request.requestedBy', 'requestedBy')
+        .where('request.type = :requestType', {
+          requestType: MediaType.MUSIC,
+        })
+        .andWhere('requestedBy.id = :userId', { userId: this.id })
+        .andWhere('request.status != :declinedStatus', {
+          declinedStatus: MediaRequestStatus.DECLINED,
+        })
+        .andWhere('request.ignoreQuota = :ignoreQuota', { ignoreQuota: false });
+      if (date) {
+        query.andWhere('request.createdAt > :date', { date });
+      }
+      const counted = await query
+        .leftJoin(`request.${kind}`, 'quotaItem')
+        .select('COUNT(quotaItem.id)', 'itemCount')
+        .getRawOne<{ itemCount: string | null }>();
+      return Number(counted?.itemCount ?? 0);
+    };
 
     const musicQuotaUsed = musicQuotaLimit
-      ? Number(
-          (
-            await musicQuotaUsedQuery
-              .leftJoin('request.albums', 'quotaAlbum')
-              .select('COUNT(quotaAlbum.id)', 'albumCount')
-              .getRawOne<{ albumCount: string | null }>()
-          )?.albumCount ?? 0
-        )
+      ? (await countMusic('albums', musicQuotaDays)) +
+        (songsApart ? 0 : await countMusic('songs', musicQuotaDays))
+      : 0;
+    const songQuotaUsed = songQuotaLimit
+      ? await countMusic('songs', songQuotaDays)
       : 0;
 
     return {
@@ -536,6 +547,21 @@ export class User {
           musicQuotaLimit && musicQuotaLimit - musicQuotaUsed <= 0
         ),
       },
+      ...(songsApart
+        ? {
+            song: {
+              days: songQuotaDays,
+              limit: songQuotaLimit || undefined,
+              used: songQuotaUsed,
+              remaining: songQuotaLimit
+                ? Math.max(0, songQuotaLimit - songQuotaUsed)
+                : undefined,
+              restricted: !!(
+                songQuotaLimit && songQuotaLimit - songQuotaUsed <= 0
+              ),
+            },
+          }
+        : {}),
     };
   }
 }

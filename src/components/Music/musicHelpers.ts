@@ -196,3 +196,7 @@ export const albumDownloads = (
     (item) => !!item.album && wanted.has(item.album.foreignAlbumId)
   );
 };
+
+/** A song as it is named: "Song (radio edit)", or just "Song". */
+export const songName = (title: string, version?: string | null): string =>
+  version ? `${title} (${version})` : title;

@@ -18,7 +18,7 @@ An artist's page lists their releases as albums, EPs and singles, with live albu
 
 Details come from MusicBrainz, which answers one request a second for each server. If a page would wait too long, it says MusicBrainz is busy and offers to try again.
 
-A search shows up to 8 artists and 12 albums, the one you most likely mean first.
+A search shows up to 8 artists and 12 albums, the one you most likely mean first, and with **Song Requests** on, up to 8 songs by the artists it found.
 
 ## Requesting music
 
@@ -36,13 +36,15 @@ While Lidarr downloads, the status shows how far along it is, then **Adding to P
 
 An artist shows **Partially Available** once any album is here, and **Available** once every album asked for (or monitored in Lidarr) is.
 
+**One song** (once an admin turns on **Song Requests**): search for it and look under **Songs**, or press **Request Song** on a track of an album's page. Each version is listed and asked for on its own: the album take, the radio edit, a club mix, each with where it's from and its length. A song already asked for, or on an album that's here or on its way, says so instead. Songs take the same approval and limits as albums. Songs aren't fetched from Lidarr yet: the request waits, approved, until they are.
+
 Don't want music? Turn it off for yourself in **Profile → Settings → Features**.
 
 ## Setting it up (admins)
 
 1. **Settings → Services → Lidarr**: add Lidarr with its address and API key, then the quality profile, metadata profile (which kinds of release Lidarr lists: albums, EPs, singles, live albums), root folder and tags new artists get. Make it the default; you can add more than one Lidarr. **Enable Scan** brings in what Lidarr already has, so those albums show as here.
 2. **Music libraries**: tick them when connecting a server, or later under **Settings → Media Servers → Edit → Music Libraries** (press **Sync Libraries** if the list is empty). An album counts as here once any server's music library lists it. With none switched on anywhere, Lidarr's files decide.
-3. **Settings → Music** (optional): **Include Music in All Search Results**, and under **Where Music Comes From**: a **MusicBrainz Address** (your own mirror has no limit), a **Contact Email** (so MusicBrainz can reach you instead of slowing every Seerr AI down), **New and Popular Music** (the ListenBrainz rows), a **TheAudioDB API Key** for artist pictures, and **Most Albums in One Request** (100 to start). The page links to the rest of music's settings.
+3. **Settings → Music** (optional): **Include Music in All Search Results**, and under **Where Music Comes From**: a **MusicBrainz Address** (your own mirror has no limit), a **Contact Email** (so MusicBrainz can reach you instead of slowing every Seerr AI down), **New and Popular Music** (the ListenBrainz rows), a **TheAudioDB API Key** for artist pictures, **Most Albums in One Request** (100 to start), and **Song Requests** (off to start) with a **Song Limit**. The page links to the rest of music's settings.
 
 In Lidarr, turn on **Settings → Metadata → Write Audio Tags**: Jellyfin and Emby match albums by the MusicBrainz ids in the tags; without them, by folder name and then title and year.
 
@@ -51,6 +53,7 @@ In Lidarr, turn on **Settings → Metadata → Write Audio Tags**: Jellyfin and 
 - **Request** covers music. For music only, give someone **Request Music** instead (Users → a person → Permissions).
 - **Auto-Approve** covers music; **Auto-Approve Music** approves only music.
 - Album limits work like season limits: **Global Album Request Limit** in **Settings → Users**, and a limit on each person.
+- Each song counts as one album against that limit, unless **Settings → Music** gives songs a **Song Limit** of their own.
 
 ### What Lidarr is told
 
@@ -64,7 +67,7 @@ Lidarr sometimes takes days to learn about a new album. Seerr AI keeps trying fo
 - **The Manage panel** (the cog on an artist's page) shows what Lidarr is downloading, every request (approve, decline, edit, delete), and the history. Admins also get **Open in Lidarr**, **Search Lidarr for Missing Albums** and **Clear Data** (removes Seerr AI's own record; Lidarr is left alone).
 - **Health** checks Lidarr, lists albums Lidarr has that no server lists after a day, requested albums with no release after a week (with **Search now**), and whether MusicBrainz is answering.
 - **Music Sync** runs every five minutes and a minute after Lidarr imports; **Music Full Scan** reads every music library and all of Lidarr nightly (03:40).
-- **Webhooks** get `media_type` `music`, the artist's MusicBrainz id as `media_mbid`, the albums as `music_albums`, and `media_tmdbid` 0.
+- **Webhooks** get `media_type` `music`, the artist's MusicBrainz id as `media_mbid`, the albums as `music_albums`, the songs as `music_songs`, and `media_tmdbid` 0.
 
 ### Turning it off
 

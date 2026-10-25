@@ -1109,6 +1109,7 @@ describe('an album', () => {
         number: '2',
         title: 'Lie Down. Get Up.',
         length: 259000,
+        recordingId: 'r',
       },
     ]);
   });

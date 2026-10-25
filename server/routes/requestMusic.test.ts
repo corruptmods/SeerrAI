@@ -1,6 +1,8 @@
 import { MusicBrainz } from '@server/api/musicbrainz';
 import type {
   MbArtist,
+  MbRecording,
+  MbRecordingRelease,
   MbReleaseGroup,
 } from '@server/api/musicbrainz/interfaces';
 import {
@@ -14,8 +16,11 @@ import AlbumRequest from '@server/entity/AlbumRequest';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
+import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
+import { completeMusicRequests } from '@server/lib/music/completion';
+import notificationManager, { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import { getSettings, musicDefaults } from '@server/lib/settings';
 import musicRoutes from '@server/routes/music';
@@ -688,5 +693,508 @@ describe('a music request’s history', () => {
     await requestMusic({ albums: [STATIC_GARDEN] });
     const res = await call('GET', `/music/artist/${ARTIST}/history`);
     assert.equal(res.status, 403);
+  });
+});
+
+describe('requesting songs', () => {
+  const SINGLE = '6b2e9c41-7d38-3f05-a6e1-0c4d8b7f2a93';
+  const HITS = '2f8c1e7a-4b6d-3c92-8e05-d7a3f19b6c40';
+  const ALBUM_TAKE = 'a1b2c3d4-0001-4000-8000-000000000001';
+  const RADIO_EDIT = 'a1b2c3d4-0002-4000-8000-000000000002';
+  const CLUB_MIX = 'a1b2c3d4-0003-4000-8000-000000000003';
+  const BOOTLEG = 'a1b2c3d4-0004-4000-8000-000000000004';
+  const NOT_THEIRS = 'a1b2c3d4-0005-4000-8000-000000000005';
+
+  const onRelease = (
+    groupId: string,
+    title: string,
+    type = 'Album',
+    { secondary = [] as string[], status = 'Official' } = {}
+  ): MbRecordingRelease => ({
+    id: `${groupId.slice(0, 30)}r1`,
+    title,
+    status,
+    date: '2001-03-04',
+    'release-group': {
+      id: groupId,
+      title,
+      'primary-type': type,
+      'secondary-types': secondary,
+    },
+  });
+
+  const recordings: Record<string, MbRecording> = {
+    [ALBUM_TAKE]: {
+      id: ALBUM_TAKE,
+      title: 'Lantern Song',
+      length: 301_000,
+      'artist-credit': [
+        { name: 'Glasswing', artist: { id: ARTIST, name: 'Glasswing' } },
+      ],
+      releases: [onRelease(STATIC_GARDEN, 'Static Garden')],
+    },
+    [RADIO_EDIT]: {
+      id: RADIO_EDIT,
+      title: 'Lantern Song',
+      disambiguation: 'radio edit',
+      length: 214_000,
+      'artist-credit': [
+        { name: 'Glasswing', artist: { id: ARTIST, name: 'Glasswing' } },
+      ],
+      releases: [
+        onRelease(HITS, 'Hits', 'Album', { secondary: ['Compilation'] }),
+        onRelease(SINGLE, 'Lantern Song', 'Single'),
+      ],
+    },
+    [CLUB_MIX]: {
+      id: CLUB_MIX,
+      title: 'Lantern Song (Club Mix)',
+      'artist-credit': [
+        { name: 'Glasswing', artist: { id: ARTIST, name: 'Glasswing' } },
+      ],
+      releases: [onRelease(SINGLE, 'Lantern Song', 'Single')],
+    },
+    [BOOTLEG]: {
+      id: BOOTLEG,
+      title: 'Lantern Song',
+      disambiguation: 'live',
+      'artist-credit': [
+        { name: 'Glasswing', artist: { id: ARTIST, name: 'Glasswing' } },
+      ],
+      releases: [onRelease(HITS, 'Tape', 'Album', { status: 'Bootleg' })],
+    },
+    [NOT_THEIRS]: {
+      id: NOT_THEIRS,
+      title: 'Other Song',
+      'artist-credit': [
+        { name: 'Someone', artist: { id: OTHER_ARTIST, name: 'Someone' } },
+      ],
+      releases: [onRelease(HITS, 'Hits')],
+    },
+  };
+
+  const requestSongs = (songs: string[], body: Record<string, unknown> = {}) =>
+    requestMusic({ songs, ...body });
+
+  const message = (res: { body: never }) =>
+    (res.body as { message: string }).message;
+
+  beforeEach(() => {
+    getSettings().music.songRequests = true;
+    mock.method(
+      MusicBrainz.prototype,
+      'getRecording',
+      async (id: string) => recordings[id] ?? null
+    );
+  });
+
+  it('is refused until Settings → Music allows it', async () => {
+    getSettings().music.songRequests = false;
+    const res = await requestSongs([RADIO_EDIT]);
+    assert.equal(res.status, 400);
+    assert.equal(await getRepository(SongRequest).count(), 0);
+  });
+
+  it('asks for one version of a song, kept with what names it', async () => {
+    const res = await requestSongs([RADIO_EDIT]);
+
+    assert.equal(res.status, 201);
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: (res.body as { id: number }).id },
+    });
+    assert.equal(request.status, MediaRequestStatus.PENDING);
+    assert.deepEqual(request.albums, []);
+    assert.equal(request.songs.length, 1);
+    const [song] = request.songs;
+    assert.equal(song.recordingMbid, RADIO_EDIT);
+    assert.equal(song.title, 'Lantern Song');
+    assert.equal(song.version, 'radio edit');
+    assert.equal(song.length, 214_000);
+    // Best known from its single, ahead of a compilation.
+    assert.equal(song.albumMbid, SINGLE);
+    assert.equal(song.albumTitle, 'Lantern Song');
+    assert.deepEqual(song.releaseGroups, [SINGLE, HITS]);
+    assert.equal((await artistMedia()).status, MediaStatus.PENDING);
+  });
+
+  it('is approved with Auto-Approve Music, and not sent to Lidarr yet', async () => {
+    await actAs(Permission.REQUEST + Permission.AUTO_APPROVE_MUSIC);
+    const res = await requestSongs([CLUB_MIX]);
+
+    assert.equal(res.status, 201);
+    assert.equal(
+      (res.body as { status: number }).status,
+      MediaRequestStatus.APPROVED
+    );
+    const [song] = await getRepository(SongRequest).find();
+    assert.equal(song.status, MediaRequestStatus.APPROVED);
+    assert.equal(song.version, 'Club Mix');
+    // Give a send the time it would take to start.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(lidarr.calls.length, 0);
+  });
+
+  it('refuses a song already asked for, or on an album that is', async () => {
+    assert.equal((await requestSongs([RADIO_EDIT])).status, 201);
+
+    await actAs(Permission.REQUEST, 'second@x');
+    let res = await requestSongs([RADIO_EDIT]);
+    assert.equal(res.status, 409);
+    assert.equal(message(res), 'Lantern Song is already requested.');
+
+    assert.equal((await requestMusic({ albums: [STATIC_GARDEN] })).status, 201);
+    res = await requestSongs([ALBUM_TAKE]);
+    assert.equal(res.status, 409);
+    assert.equal(
+      message(res),
+      'Lantern Song is on Static Garden, which is already here or on its way.'
+    );
+  });
+
+  it('leaves out a song an album in the same request brings', async () => {
+    const res = await requestMusic({
+      albums: [STATIC_GARDEN],
+      songs: [ALBUM_TAKE, RADIO_EDIT],
+    });
+
+    assert.equal(res.status, 201);
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: (res.body as { id: number }).id },
+    });
+    assert.deepEqual(
+      request.albums.map((album) => album.albumMbid),
+      [STATIC_GARDEN]
+    );
+    assert.deepEqual(
+      request.songs.map((song) => song.recordingMbid),
+      [RADIO_EDIT]
+    );
+  });
+
+  it("refuses someone else's song, and one only on bootlegs", async () => {
+    let res = await requestSongs([NOT_THEIRS]);
+    assert.equal(res.status, 400);
+    res = await requestSongs([BOOTLEG]);
+    assert.equal(res.status, 400);
+    assert.equal(await getRepository(SongRequest).count(), 0);
+  });
+
+  it('counts songs as music, or against a song limit of their own', async () => {
+    const user = await actAs(Permission.REQUEST);
+    await getRepository(User).update(user.id, {
+      musicQuotaLimit: 2,
+      musicQuotaDays: 7,
+    });
+    actingAs = await getRepository(User).findOneByOrFail({ id: user.id });
+
+    let res = await requestMusic({
+      albums: [STATIC_GARDEN],
+      songs: [RADIO_EDIT, CLUB_MIX],
+    });
+    assert.equal(res.status, 403);
+    assert.equal(message(res), 'You can request 2 more albums or songs.');
+
+    assert.equal((await requestSongs([RADIO_EDIT])).status, 201);
+    assert.equal((await requestSongs([CLUB_MIX])).status, 201);
+    let quota = await call('GET', `/user/${user.id}/quota`);
+    assert.equal((quota.body as { music: { used: number } }).music.used, 2);
+    assert.equal((quota.body as { song?: unknown }).song, undefined);
+    assert.equal((await requestMusic({ albums: [FOG_B] })).status, 403);
+
+    // A limit of their own: albums and songs each count apart.
+    getSettings().music.songQuota = { quotaLimit: 3, quotaDays: 7 };
+    quota = await call('GET', `/user/${user.id}/quota`);
+    assert.deepEqual((quota.body as { song: unknown }).song, {
+      days: 7,
+      limit: 3,
+      used: 2,
+      remaining: 1,
+      restricted: false,
+    });
+    assert.equal((quota.body as { music: { used: number } }).music.used, 0);
+    assert.equal((await requestMusic({ albums: [FOG_B] })).status, 201);
+    res = await requestSongs([ALBUM_TAKE]);
+    assert.equal(res.status, 201);
+    res = await requestMusic({
+      albums: [IN_LANTERNS],
+      songs: [],
+    });
+    assert.equal(res.status, 201);
+    quota = await call('GET', `/user/${user.id}/quota`);
+    assert.equal(
+      (quota.body as { song: { restricted: boolean } }).song.restricted,
+      true
+    );
+  });
+
+  it('when declined, takes its songs with it, and they can be asked again', async () => {
+    const res = await requestSongs([RADIO_EDIT]);
+    const id = (res.body as { id: number }).id;
+
+    await actAs(Permission.MANAGE_REQUESTS, 'manager@x');
+    assert.equal((await call('POST', `/request/${id}/decline`)).status, 200);
+    const [song] = await getRepository(SongRequest).find();
+    assert.equal(song.status, MediaRequestStatus.DECLINED);
+    assert.equal((await artistMedia()).status, MediaStatus.UNKNOWN);
+
+    await actAs(Permission.REQUEST, 'again@x');
+    assert.equal((await requestSongs([RADIO_EDIT])).status, 201);
+  });
+
+  it('when approved, carries its songs, and its options can still change', async () => {
+    const res = await requestSongs([RADIO_EDIT]);
+    const id = (res.body as { id: number }).id;
+
+    await actAs(Permission.MANAGE_REQUESTS, 'manager@x');
+    const edit = await call('PUT', `/request/${id}`, {
+      mediaType: 'music',
+      rootFolder: '/music',
+    });
+    assert.equal(edit.status, 200);
+    assert.equal((await call('POST', `/request/${id}/approve`)).status, 200);
+
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id },
+    });
+    assert.equal(request.rootFolder, '/music');
+    assert.equal(request.songs[0].status, MediaRequestStatus.APPROVED);
+    assert.equal(request.status, MediaRequestStatus.APPROVED);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(lidarr.calls.length, 0);
+  });
+
+  it('keeps a request open while its songs are not here', async () => {
+    const res = await requestMusic({
+      albums: [STATIC_GARDEN],
+      songs: [RADIO_EDIT],
+    });
+    const id = (res.body as { id: number }).id;
+    // On its way, as a send to Lidarr leaves it, and its album now here.
+    await getRepository(MediaRequest).update(id, {
+      status: MediaRequestStatus.APPROVED,
+    });
+    await getRepository(AlbumRequest).update(
+      { request: { id } },
+      { status: MediaRequestStatus.APPROVED }
+    );
+    await getRepository(SongRequest).update(
+      { request: { id } },
+      { status: MediaRequestStatus.APPROVED }
+    );
+    await getRepository(MusicAlbum).update(
+      { mbId: STATIC_GARDEN },
+      { status: MediaStatus.AVAILABLE }
+    );
+
+    await completeMusicRequests([(await artistMedia()).id]);
+
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id },
+    });
+    assert.equal(request.albums[0].status, MediaRequestStatus.COMPLETED);
+    assert.equal(request.songs[0].status, MediaRequestStatus.APPROVED);
+    assert.equal(request.status, MediaRequestStatus.APPROVED);
+  });
+
+  it('are named in the request’s notification', async () => {
+    await requestMusic({ albums: [STATIC_GARDEN], songs: [RADIO_EDIT] });
+    await requestSongs([CLUB_MIX]);
+    const sent = (
+      MediaRequest.sendNotification as unknown as {
+        mock: { calls: { arguments: [MediaRequest, Media] }[] };
+      }
+    ).mock.calls;
+    assert.equal(sent.length, 2);
+    // The real notification text, from the requests the hook was given.
+    mock.restoreAll();
+    const notified: { subject: string; message: string }[] = [];
+    mock.method(
+      notificationManager,
+      'sendNotification',
+      (_type: Notification, payload: { subject: string; message: string }) =>
+        notified.push(payload)
+    );
+    for (const call of sent) {
+      await MediaRequest.sendNotification(
+        call.arguments[0],
+        call.arguments[1],
+        Notification.MEDIA_PENDING
+      );
+    }
+    assert.deepEqual(
+      notified.map((payload) => [payload.subject, payload.message]),
+      [
+        [
+          'Glasswing — 1 album, 1 song',
+          'Static Garden, Lantern Song (radio edit)',
+        ],
+        ['Lantern Song (Club Mix) — Glasswing', 'Lantern Song (Club Mix)'],
+      ]
+    );
+  });
+});
+
+describe('songs in search and on album pages', () => {
+  const RADIO_EDIT = 'a1b2c3d4-0002-4000-8000-000000000002';
+  const ALBUM_TAKE = 'a1b2c3d4-0001-4000-8000-000000000001';
+  const SINGLE = '6b2e9c41-7d38-3f05-a6e1-0c4d8b7f2a93';
+
+  const credit = [
+    { name: 'Glasswing', artist: { id: ARTIST, name: 'Glasswing' } },
+  ];
+  const found: MbRecording[] = [
+    {
+      id: ALBUM_TAKE,
+      title: 'Lantern Song',
+      'artist-credit': credit,
+      releases: [
+        {
+          id: 'r-1',
+          title: 'Static Garden',
+          status: 'Official',
+          'release-group': {
+            id: STATIC_GARDEN,
+            title: 'Static Garden',
+            'primary-type': 'Album',
+          },
+        },
+      ],
+    },
+    {
+      id: RADIO_EDIT,
+      title: 'Lantern Song (radio edit)',
+      'artist-credit': credit,
+      releases: [
+        {
+          id: 'r-2',
+          title: 'Lantern Song',
+          status: 'Official',
+          'release-group': {
+            id: SINGLE,
+            title: 'Lantern Song',
+            'primary-type': 'Single',
+          },
+        },
+      ],
+    },
+  ];
+
+  beforeEach(() => {
+    getSettings().music.songRequests = true;
+    mock.method(MusicBrainz.prototype, 'searchArtists', async () => ({
+      count: 1,
+      offset: 0,
+      artists: [{ id: ARTIST, name: 'Glasswing', score: 100 }],
+    }));
+    mock.method(MusicBrainz.prototype, 'searchReleaseGroups', async () => ({
+      count: 1,
+      offset: 0,
+      'release-groups': [
+        { ...group(SINGLE, 'Lantern Song', '2001'), score: 100 },
+      ],
+    }));
+    mock.method(
+      MusicBrainz.prototype,
+      'getRecording',
+      async (id: string) =>
+        found.find((recording) => recording.id === id) ?? null
+    );
+  });
+
+  it('finds a song’s versions among the artists the search finds', async () => {
+    const searchRecordings = mock.method(
+      MusicBrainz.prototype,
+      'searchRecordings',
+      async () => ({ count: 2, offset: 0, recordings: found })
+    );
+    assert.equal((await requestMusic({ albums: [STATIC_GARDEN] })).status, 201);
+    await actAs(Permission.REQUEST, 'second@x');
+    assert.equal((await requestMusic({ songs: [RADIO_EDIT] })).status, 201);
+
+    const res = await call('GET', '/music/search/songs?query=lantern%20song');
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(searchRecordings.mock.calls[0].arguments.slice(0, 2), [
+      'lantern song',
+      [ARTIST],
+    ]);
+    const { songs } = res.body as {
+      songs: {
+        title: string;
+        versions: {
+          id: string;
+          version?: string;
+          status?: number;
+          onAlbum?: { id: string; title: string };
+          from?: { title: string };
+        }[];
+      }[];
+    };
+    assert.equal(songs.length, 1);
+    assert.equal(songs[0].title, 'Lantern Song');
+    const take = songs[0].versions.find((v) => v.id === ALBUM_TAKE);
+    const edit = songs[0].versions.find((v) => v.id === RADIO_EDIT);
+    assert.equal(take?.version, undefined);
+    assert.equal(take?.from?.title, 'Static Garden');
+    assert.deepEqual(take?.onAlbum, {
+      id: STATIC_GARDEN,
+      title: 'Static Garden',
+    });
+    assert.equal(take?.status, MediaStatus.PENDING);
+    assert.equal(edit?.version, 'radio edit');
+    assert.equal(edit?.status, MediaStatus.PENDING);
+    assert.equal(edit?.onAlbum, undefined);
+  });
+
+  it('finds none until songs can be asked for', async () => {
+    getSettings().music.songRequests = false;
+    const searchRecordings = mock.method(
+      MusicBrainz.prototype,
+      'searchRecordings',
+      async () => ({ count: 2, offset: 0, recordings: found })
+    );
+    const res = await call('GET', '/music/search/songs?query=lantern%20song');
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body, { songs: [] });
+    assert.equal(searchRecordings.mock.callCount(), 0);
+  });
+
+  it('says on an album page which tracks are asked for', async () => {
+    mock.method(MusicBrainz.prototype, 'getTracks', async () => [
+      {
+        position: 1,
+        tracks: [
+          {
+            id: 't1',
+            position: 1,
+            number: '1',
+            title: 'Lantern Song',
+            recording: { id: RADIO_EDIT, title: 'Lantern Song' },
+          },
+          {
+            id: 't2',
+            position: 2,
+            number: '2',
+            title: 'B-Side',
+            recording: { id: ALBUM_TAKE, title: 'B-Side' },
+          },
+        ],
+      },
+    ]);
+    assert.equal((await requestMusic({ songs: [RADIO_EDIT] })).status, 201);
+
+    const res = await call('GET', `/music/album/${SINGLE}/tracks`);
+
+    assert.equal(res.status, 200);
+    const { tracks } = res.body as {
+      tracks: { recordingId?: string; status?: number }[];
+    };
+    assert.deepEqual(
+      tracks.map((track) => [track.recordingId, track.status]),
+      [
+        [RADIO_EDIT, MediaStatus.PENDING],
+        [ALBUM_TAKE, undefined],
+      ]
+    );
   });
 });

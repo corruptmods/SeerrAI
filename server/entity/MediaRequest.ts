@@ -1,5 +1,5 @@
 import { albumCoverUrl } from '@server/api/coverartarchive';
-import { isMbid } from '@server/api/musicbrainz';
+import { isMbid, musicBrainz } from '@server/api/musicbrainz';
 import TheMovieDb from '@server/api/themoviedb';
 import {
   MediaRequestStatus,
@@ -15,6 +15,12 @@ import type {
   MusicRequestBody,
 } from '@server/interfaces/api/requestInterfaces';
 import { resolveRequestAlbums } from '@server/lib/music/requestAlbums';
+import type { SongCovered } from '@server/lib/music/requestSongs';
+import {
+  resolveRequestSongs,
+  songsCovered,
+} from '@server/lib/music/requestSongs';
+import type { SongVersion } from '@server/lib/music/songs';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import type { NotificationEvent } from '@server/lib/notifications/eventTitles';
 import { mediaEvent } from '@server/lib/notifications/eventTitles';
@@ -51,6 +57,7 @@ import EpisodeRequest from './EpisodeRequest';
 import Media from './Media';
 import MusicAlbum from './MusicAlbum';
 import SeasonRequest from './SeasonRequest';
+import SongRequest from './SongRequest';
 import { User } from './User';
 
 export class RequestPermissionError extends Error {}
@@ -58,10 +65,39 @@ export class QuotaRestrictedError extends Error {}
 export class DuplicateMediaRequestError extends Error {}
 export class NoSeasonsAvailableError extends Error {}
 export class BlocklistedMediaError extends Error {}
-/** Every album asked for is already here or already asked for. */
+/**
+ * Every album or song asked for is already here or already asked for (a
+ * song also when an album it is on is).
+ */
 export class NoAlbumsAvailableError extends Error {}
 /** A music request that cannot be made as asked: no albums, too many. */
 export class InvalidMusicRequestError extends Error {}
+
+/** The most songs one request may ask for. */
+const MAX_SONGS_PER_REQUEST = 50;
+
+/** Why the songs asked for are not requested: each is here or coming. */
+const coveredMessage = (
+  versions: SongVersion[],
+  covered: Map<string, SongCovered>
+): string => {
+  if (versions.length !== 1) {
+    return 'Every song asked for is already here or on its way.';
+  }
+  const [song] = versions;
+  const by = covered.get(song.mbId);
+  if (by?.by === 'album') {
+    const album = song.releaseGroups.find(
+      (group) => group.mbId === by.albumMbid
+    );
+    return `${song.songTitle} is on ${
+      album?.title ?? 'an album'
+    }, which is already here or on its way.`;
+  }
+  return by?.status === MediaRequestStatus.COMPLETED
+    ? `${song.songTitle} is already here.`
+    : `${song.songTitle} is already requested.`;
+};
 
 type MediaRequestOptions = {
   isAutoRequest?: boolean;
@@ -93,11 +129,15 @@ const approvalExtra = (
   return expected ? [{ name: 'Expected', value: expected }] : [];
 };
 
+/** A song as a notification names it: "Song (radio edit)". */
+const songName = (song: Pick<SongRequest, 'title' | 'version'>): string =>
+  song.version ? `${song.title} (${song.version})` : song.title;
+
 /**
- * What a music notification says, from what Seerr kept when the albums were
- * asked for, so nothing waits on MusicBrainz: "Album — Artist (2003)" for
- * one album, "Artist — 3 albums" for several, with the albums' titles and
- * the first one's cover.
+ * What a music notification says, from what Seerr kept when the albums and
+ * songs were asked for, so nothing waits on MusicBrainz: "Album — Artist
+ * (2003)" for one album, "Song — Artist" for one song, "Artist — 3 albums,
+ * 2 songs" for more, with their titles and the first one's cover.
  */
 const musicNotification = async (
   request: MediaRequest,
@@ -109,18 +149,27 @@ const musicNotification = async (
   extra: { name: string; value: string }[];
 }> => {
   const asked = [...(request.albums ?? [])].sort((a, b) => a.id - b.id);
+  const songs = [...(request.songs ?? [])].sort((a, b) => a.id - b.id);
   const artist = media.foreignTitle || 'Unknown Artist';
-  const titles = asked.map((album) => album.title);
+  const titles = [...asked.map((album) => album.title), ...songs.map(songName)];
 
-  let subject = `${artist} — ${asked.length} albums`;
-  if (asked.length === 1) {
+  const counted = (count: number, one: string, many: string) =>
+    count ? [`${count} ${count === 1 ? one : many}`] : [];
+  let subject = `${artist} — ${[
+    ...counted(asked.length, 'album', 'albums'),
+    ...counted(songs.length, 'song', 'songs'),
+  ].join(', ')}`;
+  if (asked.length === 1 && !songs.length) {
     const row = await getRepository(MusicAlbum).findOne({
       where: { mediaId: media.id, mbId: asked[0].albumMbid },
     });
     const year = row?.releaseDate?.slice(0, 4);
     subject = `${asked[0].title} — ${artist}${year ? ` (${year})` : ''}`;
+  } else if (songs.length === 1 && !asked.length) {
+    subject = `${songName(songs[0])} — ${artist}`;
   }
 
+  const cover = asked[0]?.albumMbid ?? songs[0]?.albumMbid;
   return {
     subject,
     message: truncate(titles.join(', '), {
@@ -128,8 +177,15 @@ const musicNotification = async (
       separator: /,? /,
       omission: '…',
     }),
-    image: asked[0] ? albumCoverUrl(asked[0].albumMbid) : undefined,
-    extra: [{ name: 'Requested Albums', value: String(asked.length) }],
+    image: cover ? albumCoverUrl(cover) : undefined,
+    extra: [
+      ...(asked.length
+        ? [{ name: 'Requested Albums', value: String(asked.length) }]
+        : []),
+      ...(songs.length
+        ? [{ name: 'Requested Songs', value: String(songs.length) }]
+        : []),
+    ],
   };
 };
 
@@ -179,7 +235,8 @@ export class MediaRequest {
 
   /**
    * Albums of one artist, as one request: one album, several, or a whole
-   * discography. Sent to Lidarr once approved.
+   * discography, and songs of theirs, one version each. Sent to Lidarr once
+   * approved.
    */
   public static async requestMusic(
     requestBody: MusicRequestBody,
@@ -245,8 +302,19 @@ export class MediaRequest {
       );
     }
     const asked = [...new Set(requestBody.albums ?? [])];
-    if (!asked.length || !asked.every(isMbid)) {
-      throw new InvalidMusicRequestError('Choose the albums to request.');
+    const askedSongs = [...new Set(requestBody.songs ?? [])];
+    if (askedSongs.length && !settings.music.songRequests) {
+      throw new InvalidMusicRequestError(
+        'Songs cannot be requested one at a time on this server.'
+      );
+    }
+    if (
+      (!asked.length && !askedSongs.length) ||
+      ![...asked, ...askedSongs].every(isMbid)
+    ) {
+      throw new InvalidMusicRequestError(
+        'Choose the albums or songs to request.'
+      );
     }
     const maxAlbums = settings.music.maxAlbumsPerRequest;
     if (maxAlbums > 0 && asked.length > maxAlbums) {
@@ -254,20 +322,30 @@ export class MediaRequest {
         `One request can ask for at most ${maxAlbums} albums.`
       );
     }
+    if (askedSongs.length > MAX_SONGS_PER_REQUEST) {
+      throw new InvalidMusicRequestError(
+        `One request can ask for at most ${MAX_SONGS_PER_REQUEST} songs.`
+      );
+    }
 
     const quotas = await requestUser.getQuota();
+    // Songs count against a limit of their own when they have one.
+    const songQuota = quotas.song ?? quotas.music;
     const canBypassQuota = user.hasPermission(Permission.MANAGE_REQUESTS);
     const ignoreQuota =
       requestBody.ignoreQuota === true &&
       canBypassQuota &&
-      (quotas.music.limit ?? 0) > 0;
+      ((quotas.music.limit ?? 0) > 0 || (songQuota.limit ?? 0) > 0);
 
     if (!ignoreQuota) {
       if (requestBody.ignoreQuota && !canBypassQuota) {
         throw new RequestPermissionError(
           'You do not have permission to bypass user quota limits.'
         );
-      } else if (quotas.music.restricted) {
+      } else if (
+        (asked.length && quotas.music.restricted) ||
+        (askedSongs.length && songQuota.restricted)
+      ) {
         throw new QuotaRestrictedError('Music Quota exceeded.');
       }
     }
@@ -313,28 +391,58 @@ export class MediaRequest {
     ]);
     const wanted = asked.filter((id) => !taken.has(id));
 
-    if (!wanted.length) {
+    if (!wanted.length && !askedSongs.length) {
       throw new NoAlbumsAvailableError(
         'Every album asked for is already here or already requested.'
       );
     }
-    if (
-      !ignoreQuota &&
-      quotas.music.limit &&
-      wanted.length > (quotas.music.remaining ?? 0)
-    ) {
-      throw new QuotaRestrictedError(
-        `You can request ${quotas.music.remaining ?? 0} more ${
-          quotas.music.remaining === 1 ? 'album' : 'albums'
-        }.`
+
+    // Songs already asked for, or on an album here or on its way (this
+    // request's own albums too), are left out the same way.
+    const versions = await resolveRequestSongs(artistMbid, askedSongs);
+    const covered = await songsCovered(versions);
+    const songs = versions.filter(
+      (version) =>
+        !covered.has(version.mbId) &&
+        !version.releaseGroups.some((group) => wanted.includes(group.mbId))
+    );
+
+    if (!wanted.length && !songs.length) {
+      throw new NoAlbumsAvailableError(
+        asked.length
+          ? 'Every album and song asked for is already here or on its way.'
+          : coveredMessage(versions, covered)
       );
     }
+    if (!ignoreQuota) {
+      const over = (quota: typeof songQuota, count: number) =>
+        !!quota.limit && count > (quota.remaining ?? 0);
+      const left = (quota: typeof songQuota, one: string, many: string) =>
+        `You can request ${quota.remaining ?? 0} more ${
+          quota.remaining === 1 ? one : many
+        }.`;
+      if (quotas.song) {
+        if (over(quotas.music, wanted.length)) {
+          throw new QuotaRestrictedError(left(quotas.music, 'album', 'albums'));
+        }
+        if (over(quotas.song, songs.length)) {
+          throw new QuotaRestrictedError(left(quotas.song, 'song', 'songs'));
+        }
+      } else if (over(quotas.music, wanted.length + songs.length)) {
+        throw new QuotaRestrictedError(
+          songs.length
+            ? left(quotas.music, 'album or song', 'albums or songs')
+            : left(quotas.music, 'album', 'albums')
+        );
+      }
+    }
 
-    const { artistName, albums } = await resolveRequestAlbums(
-      artistMbid,
-      wanted,
-      knownAlbums
-    );
+    const { artistName, albums } = wanted.length
+      ? await resolveRequestAlbums(artistMbid, wanted, knownAlbums)
+      : {
+          artistName: (await musicBrainz().getArtist(artistMbid)).name,
+          albums: [],
+        };
 
     let artist: Media;
     if (media) {
@@ -417,6 +525,19 @@ export class MediaRequest {
           new AlbumRequest({
             albumMbid: album.mbId,
             title: album.title,
+            status,
+          })
+      ),
+      songs: songs.map(
+        (song) =>
+          new SongRequest({
+            recordingMbid: song.mbId,
+            title: song.songTitle,
+            version: song.version,
+            length: song.length,
+            albumMbid: song.from?.mbId ?? null,
+            albumTitle: song.from?.title ?? null,
+            releaseGroups: song.releaseGroups.map((group) => group.mbId),
             status,
           })
       ),
@@ -1016,6 +1137,13 @@ export class MediaRequest {
     cascade: true,
   })
   public albums: AlbumRequest[];
+
+  /** For music: the songs asked for, each one version of a song. */
+  @OneToMany(() => SongRequest, (song) => song.request, {
+    eager: true,
+    cascade: true,
+  })
+  public songs: SongRequest[];
 
   @Column({ default: false })
   public is4k: boolean;

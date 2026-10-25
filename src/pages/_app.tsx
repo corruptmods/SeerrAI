@@ -359,6 +359,7 @@ CoreApp.getInitialProps = async (initialProps) => {
     traktReady: false,
     musicReady: false,
     musicSearch: { inAll: false },
+    musicSongs: false,
     themeDefault: SERVER_THEME_DEFAULTS,
     seasons: [],
     customCss: { server: null, personal: false },

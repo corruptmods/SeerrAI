@@ -8,6 +8,8 @@ import MusicImage from '@app/components/Music/MusicImage';
 import {
   AlbumsField,
   MusicRequestBadge,
+  SongsField,
+  musicRequestFallback,
   musicRequestHref,
   musicRequestImage,
   musicRequestTitle,
@@ -163,9 +165,7 @@ const MusicRequestItem = ({
                 <NearScreen.Provider value={nearness}>
                   <MusicImage
                     src={musicRequestImage(requestData)}
-                    fallback={
-                      requestData.albums?.length === 1 ? 'album' : 'artist'
-                    }
+                    fallback={musicRequestFallback(requestData)}
                     sizes="3rem"
                   />
                 </NearScreen.Provider>
@@ -182,6 +182,7 @@ const MusicRequestItem = ({
                 {title}
               </Link>
               <AlbumsField request={requestData} />
+              <SongsField request={requestData} />
             </div>
           </div>
           <div className="z-10 ml-4 mt-4 flex w-full flex-col justify-center gap-1 overflow-hidden pr-4 text-sm sm:ml-2 sm:mt-0 xl:flex-1 xl:pr-0">

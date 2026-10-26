@@ -15,6 +15,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - Search's All said "No results." above the music it found.
 - An album you'd taken one song from said **Available**, so the rest of it couldn't be requested. It now says **Partially Available**, with **Request More**, and the song you asked for says Available.
+- An album's tracks now show **Available** when the whole album is here.
 - Long titles on request cards were cut short; they now take a second line, and the year (or a song's artist) shows on phones too.
 - The artist page's **Request** button sat out of line with **Play** on phones.
 - Asking for an album Lidarr didn't list yet, by an artist Lidarr already had, failed a week later with "Lidarr couldn't look up". Lidarr now adds it.

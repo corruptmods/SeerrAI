@@ -1450,7 +1450,8 @@ describe('songs in search and on album pages', () => {
       tracks.map((track) => [track.recordingId, track.status]),
       [
         [RADIO_EDIT, MediaStatus.PENDING],
-        [ALBUM_TAKE, undefined],
+        // The rest of the single comes with it.
+        [ALBUM_TAKE, MediaStatus.PENDING],
       ]
     );
   });

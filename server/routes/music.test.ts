@@ -19,6 +19,7 @@ import { MediaServerType } from '@server/constants/server';
 import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
 import Media from '@server/entity/Media';
+import MusicAlbum from '@server/entity/MusicAlbum';
 import MusicMetadata from '@server/entity/MusicMetadata';
 import { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
@@ -1086,6 +1087,10 @@ describe('an album', () => {
   });
 
   it('lists its tracks, disc by disc', async () => {
+    await seedMusicFixtures();
+    mock.method(MusicBrainz.prototype, 'getReleaseGroup', async () =>
+      album(IDS.album, 'Sing to the Ferryman', '2003-06-09')
+    );
     mock.method(MusicBrainz.prototype, 'getTracks', async () => [
       {
         position: 1,
@@ -1109,6 +1114,7 @@ describe('an album', () => {
     ]);
     const { status, body } = await get(`/music/album/${IDS.album}/tracks`);
     assert.equal(status, 200);
+    // The album is here: so is each song on it.
     assert.deepEqual((body as { tracks: unknown[] }).tracks, [
       { disc: 1, position: 1, number: '1', title: '3 + 3 = 7', length: 199000 },
       {
@@ -1118,8 +1124,21 @@ describe('an album', () => {
         title: 'Lie Down. Get Up.',
         length: 259000,
         recordingId: 'r',
+        status: MediaStatus.AVAILABLE,
+        onAlbum: { id: IDS.album, title: 'Sing to the Ferryman' },
       },
     ]);
+
+    // Only partly here: its songs can still be asked for.
+    await getRepository(MusicAlbum).update(
+      { mbId: IDS.album },
+      { status: MediaStatus.PARTIALLY_AVAILABLE }
+    );
+    const partly = await get(`/music/album/${IDS.album}/tracks`);
+    assert.equal(
+      (partly.body as { tracks: { status?: number }[] }).tracks[1].status,
+      undefined
+    );
   });
 });
 

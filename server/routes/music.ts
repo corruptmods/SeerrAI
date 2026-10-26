@@ -363,20 +363,23 @@ musicRoutes.get<{ mbid: string }>(
   '/album/:mbid/tracks',
   async (req, res, next) => {
     try {
-      const tracks = mapTracks(await musicBrainz().getTracks(req.params.mbid));
-      // Where each stands, once songs can be asked for one at a time.
-      if (getSettings().music.songRequests) {
-        const standing = await songStandings(
-          tracks
-            .filter((track) => track.recordingId)
-            .map((track) => ({
-              mbId: track.recordingId as string,
-              releaseGroups: [],
-            }))
-        );
-        for (const track of tracks) {
-          Object.assign(track, standing.get(track.recordingId ?? ''));
-        }
+      const mb = musicBrainz();
+      const [tracks, group] = await Promise.all([
+        mb.getTracks(req.params.mbid).then(mapTracks),
+        mb.getReleaseGroup(req.params.mbid),
+      ]);
+      // Where each stands: here with the album when all of it is, else
+      // as asked for (or as it came, taken from this album).
+      const standing = await songStandings(
+        tracks
+          .filter((track) => track.recordingId)
+          .map((track) => ({
+            mbId: track.recordingId as string,
+            releaseGroups: [{ mbId: group.id, title: group.title }],
+          }))
+      );
+      for (const track of tracks) {
+        Object.assign(track, standing.get(track.recordingId ?? ''));
       }
       return res.status(200).json({ tracks });
     } catch (e) {

@@ -438,16 +438,7 @@ describe('taking a song from its album', () => {
     const standing = await songStandings([
       {
         mbId: LANTERN,
-        releaseGroups: [
-          {
-            mbId: STATIC_GARDEN,
-            title: 'Static Garden',
-            primaryType: 'Album',
-            secondaryTypes: [],
-            date: '1997-05-21',
-            byArtist: true,
-          },
-        ],
+        releaseGroups: [{ mbId: STATIC_GARDEN, title: 'Static Garden' }],
       },
     ]);
     assert.equal(standing.get(LANTERN)?.status, MediaStatus.AVAILABLE);

@@ -7,7 +7,7 @@ import {
 import { getRepository } from '@server/datasource';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import SongRequest from '@server/entity/SongRequest';
-import type { SongVersion } from '@server/lib/music/songs';
+import type { SongRelease, SongVersion } from '@server/lib/music/songs';
 import { toVersion } from '@server/lib/music/songs';
 import type { MusicSongStatus } from '@server/models/Music';
 import { In, Not } from 'typeorm';
@@ -89,8 +89,13 @@ export type SongCovered =
  * not declined, or an album or single it is on that is here or on its way
  * (a single it was fetched through, too).
  */
+/** A song as covering needs it: its id and the albums it is on. */
+type CoverableSong = Pick<SongVersion, 'mbId'> & {
+  releaseGroups: Pick<SongRelease, 'mbId' | 'title'>[];
+};
+
 export const songsCovered = async (
-  versions: Pick<SongVersion, 'mbId' | 'releaseGroups'>[]
+  versions: CoverableSong[]
 ): Promise<Map<string, SongCovered>> => {
   const covered = new Map<string, SongCovered>();
   if (!versions.length) {
@@ -134,7 +139,7 @@ export const songsCovered = async (
       status: MediaRequestStatus.COMPLETED,
     },
   });
-  const groupsOf = (version: Pick<SongVersion, 'mbId' | 'releaseGroups'>) => [
+  const groupsOf = (version: CoverableSong) => [
     ...version.releaseGroups.map((group) => ({
       mbId: group.mbId,
       title: group.title,
@@ -218,7 +223,7 @@ const REQUEST_STANDING: Partial<Record<MediaRequestStatus, MediaStatus>> = {
  * or the album bringing it, by recording id.
  */
 export const songStandings = async (
-  versions: Pick<SongVersion, 'mbId' | 'releaseGroups'>[]
+  versions: CoverableSong[]
 ): Promise<Map<string, MusicSongStatus>> => {
   const covered = await songsCovered(versions);
   const standings = new Map<string, MusicSongStatus>();

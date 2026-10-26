@@ -352,11 +352,7 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
         </div>
         <div className="media-actions">
           {canRequest && (
-            <Button
-              buttonType="primary"
-              onClick={() => setRequesting(true)}
-              className="mb-2 sm:mb-0"
-            >
+            <Button buttonType="primary" onClick={() => setRequesting(true)}>
               <ArrowDownTrayIcon />
               <span>{intl.formatMessage(messages.request)}</span>
             </Button>

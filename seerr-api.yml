@@ -12900,6 +12900,66 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MusicPage'
+  /discover/music/your-requests:
+    get:
+      summary: Your music requests
+      description: The albums the person asked for, and those their songs are on, newest first. Only their own requests. Twenty a page. Refused while music is off for the person (403) or before Lidarr is set up (404).
+      tags:
+        - music
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: number
+            example: 1
+            default: 1
+      responses:
+        '200':
+          description: One page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicPage'
+  /discover/music/more-from-your-artists:
+    get:
+      summary: More from your artists
+      description: Other studio albums and EPs by the artists the person asked for, newest first. Twenty a page. Refused while music is off for the person (403) or before Lidarr is set up (404).
+      tags:
+        - music
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: number
+            example: 1
+            default: 1
+      responses:
+        '200':
+          description: One page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicPage'
+  /discover/music/artists-like-yours:
+    get:
+      summary: Artists like yours
+      description: Artists people listen to alongside those the person asked for, from ListenBrainz. Empty with ListenBrainz switched off. Twenty a page. Refused while music is off for the person (403) or before Lidarr is set up (404).
+      tags:
+        - music
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: number
+            example: 1
+            default: 1
+      responses:
+        '200':
+          description: One page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicPage'
   /discover/movies:
     get:
       summary: Discover movies

@@ -10,6 +10,7 @@ import MusicSearchResults from '@app/components/Music/MusicSearchResults';
 import MusicSlider from '@app/components/Music/MusicSlider';
 import {
   MUSIC_ROWS,
+  PERSONAL_MUSIC_ROWS,
   musicRowLink,
   musicRowUrl,
 } from '@app/components/Music/musicRows';
@@ -172,6 +173,9 @@ const NothingYet = ({ hints }: { hints: MusicPageHint[] }) => {
   );
 };
 
+/** Each person's own rows first, then everyone's. */
+const PAGE_ROWS = [...PERSONAL_MUSIC_ROWS, ...MUSIC_ROWS];
+
 /**
  * Music to discover: every music row, or one of them in full
  * (/discover/music?show=new-releases).
@@ -182,7 +186,7 @@ const DiscoverMusic = () => {
   const musicOn = useFeature('music');
   const { hasPermission } = useUser();
   const admin = hasPermission(Permission.ADMIN);
-  const row = MUSIC_ROWS.find((r) => r.show === router.query.show);
+  const row = PAGE_ROWS.find((r) => r.show === router.query.show);
   const [search, setSearch] = useMusicSearch();
   const searching = !!search.trim();
 
@@ -195,7 +199,7 @@ const DiscoverMusic = () => {
       ),
     []
   );
-  const rowStates = MUSIC_ROWS.map((r) => ({
+  const rowStates = PAGE_ROWS.map((r) => ({
     loaded: r.show in rowCounts,
     count: rowCounts[r.show] ?? 0,
   }));
@@ -242,7 +246,7 @@ const DiscoverMusic = () => {
         <MusicGrid url={musicRowUrl(row)} />
       ) : (
         <>
-          {MUSIC_ROWS.map((r) => (
+          {PAGE_ROWS.map((r) => (
             <MusicSlider
               key={r.show}
               sliderKey={`music-page-${r.show}`}

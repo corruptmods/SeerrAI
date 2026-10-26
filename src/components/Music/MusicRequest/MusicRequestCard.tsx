@@ -135,13 +135,15 @@ const MusicRequestCard = ({
           className="relative z-10 flex min-w-0 flex-1 flex-col pr-4"
           data-testid="request-card-title"
         >
-          <div className="hidden truncate text-xs font-medium text-strong sm:block">
+          {/* The artist on a phone too: the name alone says little. */}
+          <div className="truncate text-xs font-medium text-strong">
             {musicRequestArtist(requestData, intl)}
           </div>
+          {/* A long name takes a second line rather than being cut short. */}
           <Link
             href={href}
             title={title}
-            className="overflow-hidden overflow-ellipsis whitespace-nowrap text-base font-bold text-strong hover:underline sm:text-lg"
+            className="line-clamp-2 break-words text-base font-bold leading-tight text-strong hover:underline sm:text-lg sm:leading-snug"
           >
             {musicRequestName(requestData, intl)}
           </Link>

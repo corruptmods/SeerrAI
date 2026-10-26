@@ -18,8 +18,7 @@ import { Permission, useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
-import type { MediaStatus } from '@server/constants/media';
-import { VARIOUS_ARTISTS_MBID } from '@server/constants/media';
+import { MediaStatus, VARIOUS_ARTISTS_MBID } from '@server/constants/media';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
 import type { MusicAlbumResult } from '@server/models/Music';
 import { useEffect, useState } from 'react';
@@ -30,6 +29,7 @@ const messages = defineMessages('components.Music.MusicCard', {
   ep: 'EP',
   single: 'Single',
   release: 'Release',
+  requestMore: 'Request More',
 });
 
 interface MusicCardProps {
@@ -175,7 +175,14 @@ const MusicCard = ({
             className="h-7 w-full"
           >
             <ArrowDownTrayIcon />
-            <span>{intl.formatMessage(globalMessages.request)}</span>
+            <span>
+              {intl.formatMessage(
+                // Part of it is here: the rest is what's asked for.
+                status === MediaStatus.PARTIALLY_AVAILABLE
+                  ? messages.requestMore
+                  : globalMessages.request
+              )}
+            </span>
           </Button>
         )
       }

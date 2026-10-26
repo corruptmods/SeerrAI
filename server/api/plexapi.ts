@@ -114,6 +114,8 @@ export interface PlexMusicItem {
   parentTitle?: string;
   year?: number;
   addedAt?: number;
+  /** An album's tracks in the library. */
+  leafCount?: number;
   /**
    * The ids its agent matched it to. With Plex's music agent an artist has
    * `mbid://<artist>` and an album `mbid://<id>`, which may be the album's

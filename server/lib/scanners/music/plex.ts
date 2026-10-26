@@ -93,6 +93,7 @@ export class PlexMusicSource implements MusicSource {
       title: album.title,
       year: album.year,
       addedAt: album.addedAt ? new Date(album.addedAt * 1000) : undefined,
+      trackCount: album.leafCount,
       artistItemId: album.parentRatingKey,
       artistName: album.parentTitle ?? artist?.title,
       artistMbid: plexMbid(artist),

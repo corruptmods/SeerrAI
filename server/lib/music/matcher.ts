@@ -312,6 +312,8 @@ export interface ServerAlbum {
   addedAt?: Date;
   /** The album's folder on disk. */
   path?: string;
+  /** How many of its tracks the server lists, when it says. */
+  trackCount?: number;
   artistItemId?: string;
   artistName?: string;
   /** The artist's MusicBrainz id, as the server has it. */

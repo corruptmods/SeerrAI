@@ -155,6 +155,8 @@ export interface JellyfinMusicItem {
   ProductionYear?: number;
   AlbumArtist?: string;
   AlbumArtists?: { Name: string; Id: string }[];
+  /** An album's tracks, when the server gives them. */
+  ChildCount?: number;
 }
 
 export interface JellyfinItemsReponse {

@@ -5,6 +5,11 @@ import { MediaStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import { albumStatuses, artistStatuses } from '@server/lib/music/library';
+import {
+  artistsLikeYours,
+  moreFromYourArtists,
+  yourMusicRequests,
+} from '@server/lib/music/personalRows';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { requireMusic } from '@server/middleware/music';
@@ -155,6 +160,41 @@ discoverMusicRoutes.get('/popular-artists', async (req, res, next) => {
     return listenBrainzFailed(next, e);
   }
 });
+
+/*
+ * Each person's own rows, from the music they have asked for (see
+ * lib/music/personalRows): only theirs, and empty for someone who has
+ * asked for none.
+ */
+for (const [show, row] of [
+  ['your-requests', yourMusicRequests],
+  ['more-from-your-artists', moreFromYourArtists],
+  ['artists-like-yours', artistsLikeYours],
+] as const) {
+  discoverMusicRoutes.get(`/${show}`, async (req, res, next) => {
+    const page = pageOf(req);
+    if (!req.user) {
+      return res.status(200).json(empty(page));
+    }
+    try {
+      return res
+        .status(200)
+        .json(
+          paged<MusicAlbumResult | MusicArtistResult>(
+            await row(req.user.id),
+            page
+          )
+        );
+    } catch (e) {
+      logger.warn('Could not make a person’s music row', {
+        label: 'Music',
+        row: show,
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+      return next({ status: 502, message: 'Could not make this row.' });
+    }
+  });
+}
 
 /** Albums a media server has, newest first, from Seerr's own records. */
 discoverMusicRoutes.get('/recently-added', async (req, res) => {

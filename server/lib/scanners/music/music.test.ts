@@ -406,12 +406,14 @@ const plexAlbum = (
     guid,
     year,
     addedAt = 1_700_000_000,
+    leafCount,
   }: {
     artist?: string;
     artistName?: string;
     guid?: string;
     year?: number;
     addedAt?: number;
+    leafCount?: number;
   } = {}
 ): PlexMusicItem => ({
   ratingKey,
@@ -421,6 +423,7 @@ const plexAlbum = (
   title,
   year,
   addedAt,
+  leafCount,
   Guid: guid ? [{ id: `mbid://${guid}` }] : [],
 });
 
@@ -587,6 +590,51 @@ describe('music scans', () => {
         (await albumOf(SING)).status,
         MediaStatus.PARTIALLY_AVAILABLE
       );
+    });
+
+    it('corrects an album songs were taken from that was marked available', async () => {
+      state.lidarr.artists = [lidarrArtist()];
+      state.lidarr.albums = [
+        lidarrAlbum({
+          statistics: {
+            trackCount: 1,
+            trackFileCount: 1,
+            totalTrackCount: 14,
+            sizeOnDisk: 40_000_000,
+            percentOfTracks: 7,
+          },
+        }),
+      ];
+      state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
+      state.plex.albums = [
+        plexAlbum('600', 'Sing', { guid: SING, leafCount: 1 }),
+      ];
+      await musicFullScan.run();
+      // As an earlier version left it.
+      await getRepository(MusicAlbum).update(
+        { mbId: SING },
+        { status: MediaStatus.AVAILABLE }
+      );
+      const history = await getRepository(MediaEvent).count();
+
+      await musicFullScan.run();
+
+      assert.equal(
+        (await albumOf(SING)).status,
+        MediaStatus.PARTIALLY_AVAILABLE
+      );
+      assert.equal(
+        await getRepository(MediaEvent).count(),
+        history,
+        'nothing in the artist’s history'
+      );
+
+      // Plex listing every track of it: here after all.
+      state.plex.albums = [
+        plexAlbum('600', 'Sing', { guid: SING, leafCount: 14 }),
+      ];
+      await musicFullScan.run();
+      assert.equal((await albumOf(SING)).status, MediaStatus.AVAILABLE);
     });
 
     it('asks MusicBrainz about an id Lidarr does not know, as a release then as an album', async () => {

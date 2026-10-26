@@ -92,6 +92,7 @@ export class JellyfinMusicSource implements MusicSource {
       year: album.ProductionYear,
       addedAt: album.DateCreated ? new Date(album.DateCreated) : undefined,
       path: album.Path,
+      trackCount: album.ChildCount,
       artistItemId: credited?.Id,
       artistName: credited?.Name ?? album.AlbumArtist,
       artistMbid:

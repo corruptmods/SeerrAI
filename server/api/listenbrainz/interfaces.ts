@@ -55,3 +55,17 @@ export interface LbTopArtistsResponse {
     artists: LbTopArtist[];
   };
 }
+
+/** An artist ListenBrainz finds people listen to alongside another. */
+export interface LbSimilarArtist {
+  artist_mbid: string;
+  name: string;
+  /** MusicBrainz's disambiguation ("French electronic duo"). */
+  comment?: string;
+  /** Person, Group and so on. */
+  type?: string | null;
+  /** How strongly, against the others for the same artist. */
+  score: number;
+  /** The artist they are like. */
+  reference_mbid: string;
+}

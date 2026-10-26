@@ -278,14 +278,17 @@ export const recordServerAlbums = async (
         const { album, albumMbid, lidarr } = match;
         // An album Lidarr has only some of the files of and is not
         // fetching the rest of (songs taken from it, say) is only partly
-        // here. One Lidarr has no files of is the server's own.
-        const here =
-          lidarr &&
+        // here, unless the server lists all of it. One Lidarr has no files
+        // of is the server's own.
+        const partly =
+          !!lidarr &&
           !lidarr.monitored &&
           lidarr.trackFileCount > 0 &&
-          lidarr.trackFileCount < lidarr.trackCount
-            ? MediaStatus.PARTIALLY_AVAILABLE
-            : MediaStatus.AVAILABLE;
+          lidarr.trackFileCount < lidarr.trackCount &&
+          !((album.trackCount ?? 0) >= lidarr.trackCount);
+        const here = partly
+          ? MediaStatus.PARTIALLY_AVAILABLE
+          : MediaStatus.AVAILABLE;
         const byItem = rows.find((row) => row[idColumn] === album.itemId);
         let row = albumMbid
           ? rows.find((r) => r.mbId === albumMbid)
@@ -339,7 +342,16 @@ export const recordServerAlbums = async (
           continue;
         }
 
+        // Marked available before, and the server too says only part of
+        // it is here: partly, without a word in the artist's history.
         if (
+          partly &&
+          row.status === MediaStatus.AVAILABLE &&
+          album.trackCount !== undefined &&
+          album.trackCount < (lidarr?.trackCount ?? 0)
+        ) {
+          changes.status = here;
+        } else if (
           row.status !== MediaStatus.AVAILABLE &&
           row.status !== MediaStatus.BLOCKLISTED &&
           row.status !== here

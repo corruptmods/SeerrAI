@@ -27,7 +27,7 @@ import {
   ChevronUpIcon,
   PlayIcon,
 } from '@heroicons/react/24/outline';
-import { VARIOUS_ARTISTS_MBID } from '@server/constants/media';
+import { MediaStatus, VARIOUS_ARTISTS_MBID } from '@server/constants/media';
 import type { MusicAlbumDetails, MusicTrack } from '@server/models/Music';
 import Link from 'next/link';
 import { Fragment, useMemo, useState } from 'react';
@@ -45,6 +45,7 @@ const messages = defineMessages('components.Music.AlbumDetails', {
   released: 'Released',
   links: 'Links',
   requestAlbum: 'Request Album',
+  requestMore: 'Request More',
   requestSong: 'Request Song',
   variousArtists:
     'Lidarr cannot add Various Artists, so this compilation cannot be requested.',
@@ -308,7 +309,14 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
           {canRequest && (
             <Button buttonType="primary" onClick={() => setRequesting(true)}>
               <ArrowDownTrayIcon />
-              <span>{intl.formatMessage(messages.requestAlbum)}</span>
+              <span>
+                {intl.formatMessage(
+                  // Part of it is here: the rest is what's asked for.
+                  data.status === MediaStatus.PARTIALLY_AVAILABLE
+                    ? messages.requestMore
+                    : messages.requestAlbum
+                )}
+              </span>
             </Button>
           )}
         </div>

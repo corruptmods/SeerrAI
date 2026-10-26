@@ -5,6 +5,8 @@ import SlideOver from '@app/components/Common/SlideOver';
 import VoiceInputButton, {
   useVoiceInput,
 } from '@app/components/Common/VoiceInput';
+import ArtistCard from '@app/components/Music/ArtistCard';
+import MusicCard from '@app/components/Music/MusicCard';
 import useAi, { aiErrorMessage } from '@app/hooks/useAi';
 import useFeature from '@app/hooks/useFeature';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -21,6 +23,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { MediaStatus } from '@server/constants/media';
+import type { MusicAlbumResult, MusicArtistResult } from '@server/models/Music';
 import type { MovieResult, TvResult } from '@server/models/Search';
 import axios from 'axios';
 import { useRouter } from 'next/router';
@@ -32,8 +35,11 @@ const messages = defineMessages('components.AiChat.AiChatPanel', {
   remaining: '{count, plural, one {# answer} other {# answers}} left today',
   intro:
     'Describe what you’re after, even a whole franchise. Open, add to a list or request what it finds.',
+  introMusic:
+    'Describe a film, series, album or artist, even a whole franchise. Open or request what it finds, and add films and series to a list.',
   example1: 'the movie where a man relives the same day',
   example2: 'something like the last series I watched, but lighter',
+  exampleMusic: 'albums for a long road trip',
   example3: 'add every Pixar film to a new list',
   example4: 'request all of Christopher Nolan’s films',
   introFix:
@@ -42,6 +48,8 @@ const messages = defineMessages('components.AiChat.AiChatPanel', {
   fixExample2: 'season 2 episode 5 of Breaking Bad is the wrong episode',
   fixExample3: 'Interstellar has no sound',
   introPhoto: 'Or send a photo of a poster or screen to find what’s in it.',
+  introPhotoMusic:
+    'Or send a photo of a poster, album cover or screen to find what’s in it.',
   attachPhoto: 'Send a Photo',
   removePhoto: 'Remove the Photo',
   photoAlt: 'The photo sent',
@@ -76,12 +84,27 @@ type Title = MovieResult | TvResult;
 
 const keyOf = (title: Title) => `${title.mediaType}:${title.id}`;
 
+interface TurnMusic {
+  albums: MusicAlbumResult[];
+  artists: MusicArtistResult[];
+}
+
+/** Music as it is named back, so it is not offered again. */
+const musicLabels = (music?: TurnMusic): string[] => [
+  ...(music?.albums ?? []).map((album) =>
+    album.artistName ? `${album.title} by ${album.artistName}` : album.title
+  ),
+  ...(music?.artists ?? []).map((artist) => artist.name),
+];
+
 interface Turn {
   ask: string;
   /** A small copy of the photo sent with it, if any. */
   photo?: string;
   reply?: string;
   results?: Title[];
+  /** Albums and artists, for someone with music. */
+  music?: TurnMusic;
   /** A whole set read from TMDB: its name, and whether it was cut short. */
   source?: { name: string; more: boolean };
   /** A fix that was done or started, and the page that follows it. */
@@ -131,6 +154,7 @@ const AiChatPanel = ({
   const router = useRouter();
   const { remaining, refresh } = useAi();
   const canFix = useFeature('autoFix');
+  const musicOn = useFeature('music');
   const [turns, setTurns] = useState<Turn[]>([]);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -214,7 +238,10 @@ const AiChatPanel = ({
           MAX_ASK
         ),
         reply: t.reply,
-        offered: (t.results ?? []).slice(0, 8).map(resultLabel),
+        offered: [
+          ...(t.results ?? []).slice(0, 8).map(resultLabel),
+          ...musicLabels(t.music),
+        ].slice(0, 10),
       }));
     const shown = withPhoto?.thumbnail;
     setTurns((all) => [...all, { ask, photo: shown }]);
@@ -222,6 +249,7 @@ const AiChatPanel = ({
       const response = await axios.post<{
         reply: string;
         results: Title[];
+        music?: TurnMusic;
         source?: Turn['source'];
         action?: ChatAction;
         fix?: Turn['fix'];
@@ -233,10 +261,11 @@ const AiChatPanel = ({
           image: { type: withPhoto.type, data: withPhoto.data },
         }),
       });
-      const { reply, results, source, action, fix, confirm } = response.data;
+      const { reply, results, music, source, action, fix, confirm } =
+        response.data;
       setTurns((all) => [
         ...all.slice(0, -1),
-        { ask, photo: shown, reply, results, source, fix, confirm },
+        { ask, photo: shown, reply, results, music, source, fix, confirm },
       ]);
       // Asked to list or request titles: set it up to confirm, never more.
       if (action) {
@@ -477,12 +506,20 @@ const AiChatPanel = ({
           <div className="space-y-6 pb-4">
             {turns.length === 0 && (
               <div className="space-y-3 text-sm text-gray-300">
-                <p>{intl.formatMessage(messages.intro)}</p>
+                <p>
+                  {intl.formatMessage(
+                    musicOn ? messages.introMusic : messages.intro
+                  )}
+                </p>
                 {canFix && <p>{intl.formatMessage(messages.introFix)}</p>}
-                <p>{intl.formatMessage(messages.introPhoto)}</p>
+                <p>
+                  {intl.formatMessage(
+                    musicOn ? messages.introPhotoMusic : messages.introPhoto
+                  )}
+                </p>
                 {[
                   messages.example1,
-                  messages.example2,
+                  musicOn ? messages.exampleMusic : messages.example2,
                   messages.example3,
                   messages.example4,
                   ...(canFix
@@ -537,6 +574,7 @@ const AiChatPanel = ({
                     )}
                     {turn.reply ||
                       (!turn.results?.length &&
+                        !turn.music &&
                         intl.formatMessage(messages.nothingFound))}
                   </div>
                 )}
@@ -664,6 +702,22 @@ const AiChatPanel = ({
                       onOpen={(mode, titles) => setSheet({ mode, titles })}
                     />
                   </>
+                )}
+                {turn.music && (
+                  // Each requested from its own tile: lists and requests
+                  // together are for films and series.
+                  <ul className="cards-vertical">
+                    {turn.music.artists.map((artist) => (
+                      <li key={`artist-${artist.id}`}>
+                        <ArtistCard artist={artist} canExpand />
+                      </li>
+                    ))}
+                    {turn.music.albums.map((album) => (
+                      <li key={`album-${album.id}`}>
+                        <MusicCard album={album} showArtist canExpand />
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
             ))}

@@ -10,6 +10,7 @@ Music appears once an admin adds Lidarr. Anyone who can request films and series
 
 - **Music** in the sidebar: new music, popular albums and artists, and a search box for artists and albums. Above them, rows of your own, from the music you've asked for: **Your Music Requests**, **More from Your Artists** (their other albums and EPs) and **Artists Like Yours** (from ListenBrainz). Only your own requests count, and each row shows once there's something in it.
 - **Search**: pick **Music** above the results for artists and albums. **All** keeps to films, series, collections and people, unless an admin adds music below them.
+- **AI Search** finds albums and artists too: describe them, or send a photo of an album cover. Each is requested from its own tile.
 - **Discover** gains **Recently Added Music**, **New Music**, **Popular Albums** and **Popular Artists** rows.
 
 Album and artist tiles say what they are (Album, EP, Single, Artist) and their status; hover or tap for the name, year and **Request**.
@@ -75,4 +76,4 @@ Switch **Music** off for everyone in **Settings → Music**: the Music page, mus
 
 ## Not for music yet
 
-Backfill and the admin agent, AI Search and picks, watch lists, Suggested for You, Who Watched, the blocklist, issues, the calendar, override rules and following an artist's new releases are for films and series only.
+Backfill and the admin agent, Pick for the Room, watch lists, Suggested for You, Who Watched, the blocklist, issues, the calendar, override rules and following an artist's new releases are for films and series only.

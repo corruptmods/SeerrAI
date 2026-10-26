@@ -1,3 +1,4 @@
+import { MusicBrainz } from '@server/api/musicbrainz';
 import TautulliAPI from '@server/api/tautulli';
 import TheMovieDb from '@server/api/themoviedb';
 import { MediaServerType } from '@server/constants/server';
@@ -683,6 +684,115 @@ describe('the AI chat', () => {
     assert.equal(body.fix, undefined);
     assert.equal(ask.mock.callCount(), 0);
     ask.mock.restore();
+  });
+
+  describe('music, for someone who has it', () => {
+    const GROUP = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
+    const OTHER_GROUP = '4f6a2d93-c1e8-3a57-9b02-6d3e8f1c7a40';
+    const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
+    const credit = (name: string) => [{ name, artist: { id: ARTIST, name } }];
+
+    const withMusic = async (run: () => Promise<void>) => {
+      const settings = getSettings();
+      const saved = settings.lidarr;
+      settings.lidarr = [
+        { ...((saved[0] ?? {}) as object), id: 0, isDefault: true } as never,
+      ];
+      mock.method(MusicBrainz.prototype, 'searchReleaseGroups', async () => ({
+        count: 2,
+        offset: 0,
+        'release-groups': [
+          // A near miss, ranked first: never taken for the album named.
+          {
+            id: OTHER_GROUP,
+            title: 'Static Garden (Live)',
+            score: 100,
+            'artist-credit': credit('Glasswing'),
+          },
+          {
+            id: GROUP,
+            title: 'Static Garden',
+            'primary-type': 'Album',
+            'first-release-date': '1997-05-21',
+            score: 95,
+            'artist-credit': credit('Glasswing'),
+          },
+        ],
+      }));
+      mock.method(MusicBrainz.prototype, 'searchArtists', async () => ({
+        count: 1,
+        offset: 0,
+        artists: [{ id: ARTIST, name: 'Glasswing', score: 100 }],
+      }));
+      try {
+        await run();
+      } finally {
+        settings.lidarr = saved;
+      }
+    };
+
+    it('finds the albums and artists named, beside films and series', async () =>
+      withMusic(async () => {
+        answers = [
+          '{"r":"An album and its band.","titles":[{"t":"Hedgehog Morning","y":1993,"k":"movie"}],"music":[{"t":"Static Garden","a":"Glasswing","y":1997,"k":"album"},{"t":"Glasswing","k":"artist"},{"t":"Nobody Here","k":"artist"},{"k":"song","t":"x"}]}',
+        ];
+        const { status, body } = await call<{
+          results: { id: number }[];
+          music?: {
+            albums: { id: string; title: string }[];
+            artists: { id: string; name: string }[];
+          };
+        }>('POST', '/api/v1/ai/chat', { message: 'that 90s album' });
+        assert.equal(status, 200);
+        assert.deepEqual(
+          body.results.map((r) => r.id),
+          [137]
+        );
+        assert.deepEqual(
+          body.music?.albums.map((a) => [a.id, a.title]),
+          [[GROUP, 'Static Garden']]
+        );
+        assert.deepEqual(
+          body.music?.artists.map((a) => a.name),
+          ['Glasswing']
+        );
+        // Told music is there, and how to give it.
+        assert.match(calls[0].system, /"music":/);
+      }));
+
+    it('answers music alone without setting up a request for it', async () =>
+      withMusic(async () => {
+        answers = [
+          '{"r":"Here it is.","titles":[],"do":"request","music":[{"t":"Static Garden","a":"Glasswing","k":"album"}]}',
+        ];
+        const { body } = await call<{
+          reply: string;
+          action?: unknown;
+          music?: { albums: unknown[] };
+        }>('POST', '/api/v1/ai/chat', { message: 'request Static Garden' });
+        assert.equal(body.reply, 'Here it is.');
+        assert.equal(body.action, undefined);
+        assert.equal(body.music?.albums.length, 1);
+      }));
+
+    it('is neither asked about nor looked up without music', async () => {
+      const search = mock.method(
+        MusicBrainz.prototype,
+        'searchReleaseGroups',
+        async () => ({ count: 0, offset: 0, 'release-groups': [] })
+      );
+      answers = [
+        '{"r":"Films only.","titles":[],"music":[{"t":"Static Garden","k":"album"}]}',
+      ];
+      const { body } = await call<{ music?: unknown }>(
+        'POST',
+        '/api/v1/ai/chat',
+        { message: 'some album' }
+      );
+      assert.equal(body.music, undefined);
+      assert.equal(search.mock.callCount(), 0);
+      assert.doesNotMatch(calls[0].system, /"music":/);
+    });
   });
 
   it('ignores an action it does not know', async () => {

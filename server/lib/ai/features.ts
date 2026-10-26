@@ -28,6 +28,7 @@ import {
   recentWatching,
   resolveTitles,
 } from '@server/lib/ai/context';
+import { musicFor, musicReply, resolveMusic } from '@server/lib/ai/music';
 import { preparePhoto } from '@server/lib/ai/photo';
 import type { CompletionImage } from '@server/lib/ai/providers';
 import type { TitleSource } from '@server/lib/ai/titleSource';
@@ -162,21 +163,26 @@ const chatReply = z
     n: text(80).nullish().catch(null),
     /** Films, series, or both, for a set. */
     m: z.enum(['movie', 'tv', 'any']).nullish().catch(null),
+    /** Albums and artists, for someone with music. */
+    music: musicReply,
   })
   .passthrough()
-  .transform(({ r, titles, do: action, n, m, fx, se, ep, lang, ...rest }) => ({
-    r,
-    titles,
-    do: action,
-    n,
-    m,
-    fx,
-    se,
-    ep,
-    lang: lang?.toLowerCase(),
-    /** A whole set of titles to read from TMDB instead of naming them. */
-    src: readSet(rest),
-  }));
+  .transform(
+    ({ r, titles, music, do: action, n, m, fx, se, ep, lang, ...rest }) => ({
+      r,
+      titles,
+      music,
+      do: action,
+      n,
+      m,
+      fx,
+      se,
+      ep,
+      lang: lang?.toLowerCase(),
+      /** A whole set of titles to read from TMDB instead of naming them. */
+      src: readSet(rest),
+    })
+  );
 
 /**
  * A title's name for comparing, without the year or "(series)" and ignoring
@@ -231,6 +237,16 @@ const PICTURE_NOTE =
  */
 const ADMIN_NOTE =
   'They are an admin. If they ask to change what is on the server beyond the fixes below (replace a file with a better or different release, block or unblock a release group, mark a download as failed, delete a title\'s files, move a title to another quality profile, search for a better release), add "do":"admin" with the one title in "titles" (none when it is only about a release group). Say in "r" that the admin agent is on it and that nothing changes until they approve. ';
+
+/**
+ * What the model is told when the person has music: albums and artists
+ * come apart from films and series, and only films and series go on lists,
+ * in sets or into a request together.
+ */
+const MUSIC_NOTE =
+  'They also have music. Albums and artists they ask for, or that fit what they want, go in "music": [{"t":"album or artist name","a":"the album\'s artist","y":the album\'s year or null,"k":"album" or "artist"}], up to 6, best first; never in "titles". ' +
+  'An album cover in a picture is that album, in "music". ' +
+  'Lists, sets, "do":"request" and fixes are for films and series only; music is requested from its own result. ';
 
 /** An admin's change, handed to the admin agent; where to follow it. */
 const toAgent = async (
@@ -321,14 +337,18 @@ export const chat = async (
     .join('\n\n');
 
   const admin = user.hasPermission(Permission.ADMIN);
+  const music = musicFor(user);
   const answer = await askAiJson(chatReply, {
     feature: 'aiChat',
     user,
     image,
     paid,
     system:
-      'You help someone find films and TV series for their home media server. ' +
+      `You help someone find films and TV series${
+        music ? ', and music,' : ''
+      } for their home media server. ` +
       (image ? PICTURE_NOTE : '') +
+      (music ? MUSIC_NOTE : '') +
       'The watch history is theirs, newest first: its first entry is what they "just watched" or "last watched". Use it to answer questions about what they watched and to understand "like what I watched". It is not a list of suggestions. ' +
       'Answer, do not ask: always give your best titles, and if a request could mean more than one thing, go with the likeliest and say in "r" what you went with, e.g. "Lighter shows in the spirit of Survivor:". ' +
       'When they say yes, more, or agree, give new titles that fit what was discussed, never one already offered. ' +
@@ -338,12 +358,16 @@ export const chat = async (
       'For a whole set, do not list titles: name the set and every title is read from TMDB. Use "set": "series" for a film series (Harry Potter, John Wick), "universe" for a shared universe or theme (Marvel Cinematic Universe), "studio" for a studio\'s films (Pixar, A24), "director" or "actor" for someone\'s films; "of": the name to search for; "m": "movie", "tv" or "any". For example, "request all of Nolan\'s films" is {"r":"Christopher Nolan\'s films as director.","titles":[],"do":"request","set":"director","of":"Christopher Nolan","m":"movie"}. ' +
       (admin ? ADMIN_NOTE : '') +
       'If they report a problem with a title on the server or ask for something done to it, add "do":"fix" with "fx": "subtitles" (get or replace subtitles), "transcribe" (make subtitles from the audio), "missing" (find missing or lost episodes, or a movie that never arrived), "broken" (will not play, corrupt, no sound, bad quality), "wrongEpisode" (an episode is the wrong one, or episodes are mixed up) or "replaceSeason" (a whole season is bad, messed up or wrong, or they want all of it replaced or downloaded again); the one title in "titles"; "se" and "ep" as numbers for the season and episode when given, also when said earlier in the conversation; "lang" as a two-letter code for a subtitle language. "This episode" or "it" means the title just discussed. Say in "r" what will be done. ' +
-      'Reply with JSON only: {"r":"one or two short sentences","titles":[{"t":"title","y":first release year or null,"k":"movie" or "tv"}]}, plus "do", "n", "set", "of" and "m" when they apply. Up to 6 titles, best first; up to 20 when they ask for a list.',
+      `Reply with JSON only: {"r":"one or two short sentences","titles":[{"t":"title","y":first release year or null,"k":"movie" or "tv"}]}, plus "do", "n", "set", "of" and "m"${
+        music ? ' and "music"' : ''
+      } when they apply. Up to 6 titles, best first; up to 20 when they ask for a list.`,
     prompt,
     maxTokens: 700,
     cache: {
       key: cacheKey(
         user.id,
+        // Asked differently with music than without.
+        music ? 'music' : '',
         history,
         earlier,
         offered,
@@ -410,8 +434,19 @@ export const chat = async (
   // unless it is being put on a list or requested: then the person named it
   // again on purpose. (What they watched stays findable: "that island show
   // I was watching" should find it.)
+  // Music, looked up on MusicBrainz, beside the films and series.
+  const found =
+    music && answer.music.length
+      ? await resolveMusic(answer.music)
+      : { albums: [], artists: [] };
+  const anyMusic = found.albums.length + found.artists.length > 0;
+  // Lists and requests together are for films and series: music alone
+  // answers with its own results, each requested from its own.
   const action =
-    answer.do === 'list' || answer.do === 'request' ? answer.do : undefined;
+    (answer.do === 'list' || answer.do === 'request') &&
+    !(answer.music.length && !answer.titles.length)
+      ? answer.do
+      : undefined;
   // Asked to list or request, with no titles, no set and nothing offered
   // before to mean: say what would work rather than show nothing.
   if (action && !answer.titles.length && !offered.length) {
@@ -447,13 +482,17 @@ export const chat = async (
   // Only repeats, or titles that do not exist: say so rather than leave a
   // "here are some more" with nothing under it.
   const reply =
-    answer.titles.length && !results.length && !action
+    (answer.titles.length || answer.music.length) &&
+    !results.length &&
+    !anyMusic &&
+    !action
       ? 'Nothing new turned up for that. Try describing it another way.'
       : answer.r;
 
   return {
     reply,
     results,
+    ...(anyMusic && { music: found }),
     ...(action && {
       action: {
         do: action,

@@ -1,4 +1,8 @@
-import type { BazarrSearchResult, BazarrSubtitle } from '@server/api/bazarr';
+import type {
+  BazarrJobEnd,
+  BazarrSearchResult,
+  BazarrSubtitle,
+} from '@server/api/bazarr';
 import { WHISPER_PROVIDER } from '@server/api/bazarr';
 import { IssueType } from '@server/constants/issue';
 import { MediaType } from '@server/constants/media';
@@ -623,7 +627,7 @@ class AutoFix {
     };
     let lastProvider: string | null | undefined;
     let results: BazarrSearchResult[];
-    let download: (r: BazarrSearchResult) => Promise<void>;
+    let download: (r: BazarrSearchResult) => Promise<BazarrJobEnd>;
     if (isMovie) {
       const movie = await api.getMovie(arrId);
       if (!movie) return NOT_ON_SERVER;
@@ -649,7 +653,7 @@ class AutoFix {
       results = await api.searchEpisode(episode.sonarrEpisodeId);
       download = async (r) => {
         try {
-          await api.downloadEpisode(
+          return await api.downloadEpisode(
             arrId,
             episode.sonarrEpisodeId,
             choiceOf(r)
@@ -697,12 +701,20 @@ class AutoFix {
       );
     const best = found[0];
     if (best) {
-      await download(best);
+      const end = await download(best);
+      if (end === 'failed' || end === 'gone') {
+        return {
+          ok: false,
+          message: `Bazarr could not download the ${best.language} subtitles from ${best.provider}.`,
+        };
+      }
+      const match = Math.round(Number(best.score));
       return {
         ok: true,
-        message: `Downloaded ${best.language} subtitles from ${best.provider} (match ${Math.round(
-          Number(best.score)
-        )}%).`,
+        message:
+          end === 'timedOut'
+            ? `Asked Bazarr for ${best.language} subtitles from ${best.provider} (match ${match}%); it is still getting them.`
+            : `Downloaded ${best.language} subtitles from ${best.provider} (match ${match}%).`,
         link: isMovie
           ? `/movie/${req.media.tmdbId}`
           : `/tv/${req.media.tmdbId}`,

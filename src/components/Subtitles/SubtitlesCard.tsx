@@ -85,6 +85,8 @@ const messages = defineMessages('components.Subtitles.SubtitlesCard', {
     'Transcribe: AI subtitles from the audio, {left} of {total} to do',
   transcribingNow: 'Transcribing now…',
   transcribingEpisode: 'Transcribing S{season} E{episode}…',
+  waitingInBazarr: 'Waiting its turn in Bazarr…',
+  waitingInBazarrEpisode: 'S{season} E{episode} waiting its turn in Bazarr…',
   transcribingQueued: '{count} more queued',
   searchingNow: 'Searching for the missing subtitles…',
   noneFoundMovie: 'no provider had one',
@@ -411,11 +413,20 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
       status?.searching ? intl.formatMessage(messages.searchingNow) : '',
       status?.running
         ? status.current
-          ? intl.formatMessage(messages.transcribingEpisode, {
-              season: status.current.seasonNumber,
-              episode: status.current.episodeNumber,
-            })
-          : intl.formatMessage(messages.transcribingNow)
+          ? intl.formatMessage(
+              status.waitingInBazarr
+                ? messages.waitingInBazarrEpisode
+                : messages.transcribingEpisode,
+              {
+                season: status.current.seasonNumber,
+                episode: status.current.episodeNumber,
+              }
+            )
+          : intl.formatMessage(
+              status.waitingInBazarr
+                ? messages.waitingInBazarr
+                : messages.transcribingNow
+            )
         : '',
       status?.running && status.queued
         ? intl.formatMessage(messages.transcribingQueued, {

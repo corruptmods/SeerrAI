@@ -303,7 +303,10 @@ subtitleRoutes.post<{ tmdbId: string }>(
       return;
     }
     try {
-      await bazarr().downloadMovie(radarrId, choice.data);
+      const end = await bazarr().downloadMovie(radarrId, choice.data);
+      if (end === 'failed' || end === 'gone') {
+        throw new Error(`Bazarr's download job ${end}`);
+      }
       return res.status(204).send();
     } catch (e) {
       return bazarrFailed(next, e, 'download a movie’s subtitle');
@@ -324,12 +327,15 @@ subtitleRoutes.post<EpisodeParams>(
       return;
     }
     try {
-      await bazarr().downloadEpisode(
+      const end = await bazarr().downloadEpisode(
         found.seriesId,
         found.episode.sonarrEpisodeId,
         choice.data
       );
       forgetEpisodeHistory(found.episode.sonarrEpisodeId);
+      if (end === 'failed' || end === 'gone') {
+        throw new Error(`Bazarr's download job ${end}`);
+      }
       return res.status(204).send();
     } catch (e) {
       return bazarrFailed(next, e, 'download an episode’s subtitle');

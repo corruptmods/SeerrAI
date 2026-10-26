@@ -11,6 +11,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 ### Fixed
 
 - Asking for an album Lidarr didn't list yet, by an artist Lidarr already had, failed a week later with "Lidarr couldn't look up". Lidarr now adds it.
+- **Transcribe** said a transcription was done as soon as Bazarr queued it, and **Search for the Missing** then sent every episode still missing to Whisper at once, before Bazarr had searched. That could jam Bazarr's queue for hours. Now each transcription waits until Bazarr saves the subtitle, the page says when one is waiting in Bazarr, and one Bazarr loses by restarting is asked for again.
 
 ## 2.1.0 (24 October 2026)
 

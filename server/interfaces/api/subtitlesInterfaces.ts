@@ -125,6 +125,8 @@ export interface TranscriptionStatus {
   auto: number;
   /** The episode being transcribed now, for a series. */
   current?: { seasonNumber: number; episodeNumber: number };
+  /** The one under way is waiting its turn in Bazarr's own queue. */
+  waitingInBazarr?: boolean;
   /** Why the last one that failed did. */
   error?: SubtitleError;
 }
@@ -154,6 +156,10 @@ export type SubtitleErrorCode =
   | 'noWhisper'
   /** Bazarr did not answer, or answered with an error. */
   | 'bazarrFailed'
+  /** Bazarr had not finished a transcription after a day. */
+  | 'bazarrStuck'
+  /** Bazarr's transcription ended without a subtitle saved. */
+  | 'noSubtitleSaved'
   /** The title is not in Plex. */
   | 'notInPlex'
   /** Plex did not answer. */

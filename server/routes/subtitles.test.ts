@@ -1,3 +1,4 @@
+import { bazarrJobPoll } from '@server/api/bazarr';
 import PlexTvAPI from '@server/api/plextv';
 import { MediaStatus, MediaType } from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
@@ -37,7 +38,9 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 /*
  * Subtitles, against a stand-in Bazarr answering with what a real one
  * (1.6.3) sends, and a stand-in Plex server, behind the real OpenAPI
- * validator.
+ * validator. Like a real Bazarr, it runs downloads and searches as jobs
+ * in its queue and answers as soon as one is queued; a job that finishes
+ * a transcription writes Whisper's subtitle into the history.
  */
 
 setupTestDb();
@@ -185,6 +188,20 @@ let searchGate: Promise<void> | undefined;
 /** Holds Plex's answers about single episodes open until released. */
 let plexGate: Promise<void> | undefined;
 
+/** Off: an older Bazarr, with no job list, that answers once it is done. */
+let jobsApi = true;
+let jobs: { job_id: number; job_name: string; status: string }[] = [];
+let nextJob = 1;
+/** Holds every job waiting in the queue until released. */
+let jobGate: Promise<void> | undefined;
+/**
+ * How the next jobs end: done, done with nothing saved, failed, or lost
+ * to Bazarr restarting. Done when there are none left.
+ */
+let jobEnds: ('completed' | 'empty' | 'failed' | 'lost')[] = [];
+/** Whisper subtitles finished jobs wrote, newest first, by episode id or "movie". */
+let whisperWritten: Record<string, unknown[]> = {};
+
 const movieHistory = [
   { action: 5, provider: null, subtitles_path: movie.subtitles[1].path },
   {
@@ -271,6 +288,7 @@ const plexEpisode = (ratingKey: string, partId: number, selected?: number) => ({
 });
 
 before(async () => {
+  bazarrJobPoll.ms = 10;
   bazarrPort = await listen(async (req, res) => {
     const url = new URL(req.url ?? '', 'http://x');
     const send = (body: unknown, status = 200) => {
@@ -318,7 +336,13 @@ before(async () => {
         return send({ data: episodes });
       }
       if (p === '/movies/history') {
-        return send({ data: movieHistory, total: 7535 });
+        return send({
+          data: [...(whisperWritten.movie ?? []), ...movieHistory],
+          total: 7535,
+        });
+      }
+      if (p === '/system/jobs' && jobsApi) {
+        return send({ data: jobs });
       }
       if (p === '/providers') {
         return send({
@@ -331,7 +355,10 @@ before(async () => {
       }
       if (p === '/episodes/history') {
         const id = Number(url.searchParams.get('episodeid'));
-        return send({ data: historyFor[id] ?? [], total: 122492 });
+        return send({
+          data: [...(whisperWritten[id] ?? []), ...(historyFor[id] ?? [])],
+          total: 122492,
+        });
       }
       if (p === '/providers/movies' || p === '/providers/episodes') {
         return send({ data: resultsNow });
@@ -342,11 +369,54 @@ before(async () => {
         new URLSearchParams(await readBody(req))
       );
       writes.push({ method: req.method, path: p, fields });
-      if (req.method === 'PATCH' && searchGate) {
-        await searchGate;
+      // What a finished transcription leaves: Whisper's subtitle.
+      const done = () => {
+        if (fields.provider !== 'whisperai') return;
+        const key = fields.episodeid ?? 'movie';
+        whisperWritten[key] = [
+          {
+            action: 2,
+            provider: 'whisperai',
+            subtitles_path: `${key}.en.srt`,
+            parsed_timestamp: `10/25/26 16:${String(nextJob).padStart(2, '0')}:00`,
+            description: 'English subtitles manually downloaded from whisperai',
+          },
+          ...(whisperWritten[key] ?? []),
+        ];
+      };
+      if (!jobsApi) {
+        if (req.method === 'PATCH' && searchGate) {
+          await searchGate;
+        }
+        done();
+        res.statusCode = 204;
+        return res.end();
       }
+      const job = {
+        job_id: nextJob++,
+        job_name: p.startsWith('/providers')
+          ? 'Manually downloading Subtitles'
+          : 'Downloading missing subtitles for BRIXO Shurikan: Wyverns Waking',
+        status: 'pending',
+      };
+      jobs.push(job);
       res.statusCode = 204;
-      return res.end();
+      res.end();
+      void (async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        if (jobGate) await jobGate;
+        job.status = 'running';
+        if (req.method === 'PATCH' && searchGate) await searchGate;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const end = jobEnds.shift() ?? 'completed';
+        if (end === 'lost') {
+          jobs = jobs.filter((j) => j !== job);
+          return;
+        }
+        job.status = end === 'empty' ? 'completed' : end;
+        if (end === 'completed') done();
+      })();
+      return;
     }
     if (req.method === 'DELETE') {
       writes.push({
@@ -463,6 +533,11 @@ beforeEach(async () => {
   pausedNow = {};
   searchGate = undefined;
   plexGate = undefined;
+  jobsApi = true;
+  jobs = [];
+  jobGate = undefined;
+  jobEnds = [];
+  whisperWritten = {};
   forgetWhisper();
   const settings = getSettings();
   settings.bazarr = {
@@ -726,6 +801,17 @@ describe('searching, downloading and deleting', () => {
     ]);
   });
 
+  it('says so when Bazarr’s download job fails', async () => {
+    actingAs = manager;
+    jobEnds = ['failed'];
+    const res = await call('POST', '/movie/471906/download', {
+      provider: 'opensubtitlescom',
+      subtitle: 'f5039fa8',
+    });
+    assert.equal(res.status, 502);
+    assert.equal(res.body.code, 'bazarrFailed');
+  });
+
   it('deletes only files, and only for admins', async () => {
     actingAs = manager;
     assert.equal(
@@ -791,6 +877,20 @@ describe('searching, downloading and deleting', () => {
     assert.deepEqual(
       [after.searching, after.queued, after.auto],
       [false, 0, 0]
+    );
+  });
+
+  it('transcribes nothing after a search Bazarr did not finish', async () => {
+    actingAs = manager;
+    jobEnds = ['failed'];
+    await call('POST', '/tv/318472/search-missing');
+    await waitFor(() => writes.length === 1);
+    await waitFor(() => !transcriber.status('tv:318472').searching);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.deepEqual(
+      writes.map((w) => w.path),
+      ['/series'],
+      'what it would have found is not known'
     );
   });
 
@@ -951,6 +1051,8 @@ describe('transcribing', () => {
         ['139859', 'whisperai'],
       ]
     );
+    // Done once Bazarr's job for the last one is.
+    await waitFor(() => !transcriber.status('tv:318472').running);
     const after = await call<TranscriptionStatus>(
       'GET',
       '/tv/318472/transcription'
@@ -964,6 +1066,83 @@ describe('transcribing', () => {
       ],
       [0, false, 3, 0]
     );
+  });
+
+  it('asks for one only once Bazarr has finished the one before', async () => {
+    actingAs = manager;
+    let release: () => void = () => undefined;
+    jobGate = new Promise<void>((resolve) => (release = resolve));
+    await call('POST', '/tv/318472/transcription', {
+      scope: 'season',
+      seasonNumber: 4,
+    });
+    await waitFor(() => writes.length === 1);
+    // Queued in Bazarr behind its other jobs: the page says so.
+    await waitFor(() => !!transcriber.status('tv:318472').waitingInBazarr);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(writes.length, 1, 'the next waits its turn');
+    assert.deepEqual(transcriber.status('tv:318472').current, {
+      seasonNumber: 4,
+      episodeNumber: 10,
+    });
+
+    release();
+    await waitFor(() => !transcriber.status('tv:318472').running);
+    assert.equal(writes.length, 3);
+    const { done, failed, waitingInBazarr } = transcriber.status('tv:318472');
+    assert.deepEqual([done, failed, waitingInBazarr], [3, 0, undefined]);
+  });
+
+  it('asks again for one Bazarr lost by restarting', async () => {
+    actingAs = manager;
+    jobEnds = ['lost'];
+    await call('POST', '/movie/471906/transcription');
+    await waitFor(() => !transcriber.status('movie:471906').running);
+    // Searched again: the result it had was Bazarr's before the restart.
+    assert.deepEqual(
+      writes.map((w) => [w.path, w.fields.provider]),
+      [
+        ['/providers/movies', 'whisperai'],
+        ['/providers/movies', 'whisperai'],
+      ]
+    );
+    const { done, failed } = transcriber.status('movie:471906');
+    assert.deepEqual([done, failed], [1, 0]);
+  });
+
+  it('fails, saying so, when Bazarr finishes without a subtitle', async () => {
+    actingAs = manager;
+    jobEnds = ['empty'];
+    await call('POST', '/movie/471906/transcription');
+    await waitFor(() => !transcriber.status('movie:471906').running);
+    const status = transcriber.status('movie:471906');
+    assert.deepEqual(
+      [status.done, status.failed, status.error],
+      [0, 1, { code: 'noSubtitleSaved' }]
+    );
+  });
+
+  it('says Whisper was paused when that is why Bazarr saved nothing', async () => {
+    actingAs = manager;
+    jobEnds = ['failed'];
+    await call('POST', '/movie/471906/transcription');
+    await waitFor(() => writes.length === 1);
+    pausedNow = { whisperai: { status: 'ReadTimeout', retry: 'in an hour' } };
+    await waitFor(() => !transcriber.status('movie:471906').running);
+    assert.deepEqual(transcriber.status('movie:471906').error, {
+      code: 'whisperPaused',
+      error: 'ReadTimeout',
+      retry: 'in an hour',
+    });
+  });
+
+  it('still works with a Bazarr that answers only once it is done', async () => {
+    actingAs = manager;
+    jobsApi = false;
+    await call('POST', '/movie/471906/transcription');
+    await waitFor(() => !transcriber.status('movie:471906').running);
+    const { done, failed } = transcriber.status('movie:471906');
+    assert.deepEqual([done, failed], [1, 0]);
   });
 
   it('wants a season for a season', async () => {

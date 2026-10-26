@@ -50,6 +50,8 @@ export const messages = defineMessages('components.Subtitles', {
     'Bazarr paused WhisperAI after an error ({error}), and tries again {retry}. Whisper may be busy with another job.',
   reasonNoWhisper: 'Bazarr offered no Whisper transcription for it.',
   reasonBazarrFailed: 'Bazarr did not answer.',
+  reasonBazarrStuck: 'Bazarr hadn’t finished it after a day.',
+  reasonNoSubtitleSaved: 'Bazarr finished without saving a subtitle.',
   reasonNotInPlex: 'This is not in Plex.',
   reasonPlexFailed: 'Plex did not answer.',
   reasonNotOffered: 'Plex did not offer that.',
@@ -112,6 +114,10 @@ export const useSubtitleReasons = (kind: SubtitlesKind) => {
         return intl.formatMessage(messages.reasonNotOffered);
       case 'noPlexSignIn':
         return intl.formatMessage(messages.reasonNoPlexSignIn);
+      case 'bazarrStuck':
+        return intl.formatMessage(messages.reasonBazarrStuck);
+      case 'noSubtitleSaved':
+        return intl.formatMessage(messages.reasonNoSubtitleSaved);
       default:
         return intl.formatMessage(messages.reasonBazarrFailed);
     }

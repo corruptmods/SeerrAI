@@ -1,14 +1,17 @@
 import type {
   BazarrEpisode,
   BazarrHistoryEntry,
+  BazarrJobEnd,
   BazarrMissing,
   BazarrMovie,
   BazarrSearchResult,
   BazarrSubtitle,
+  JobWatch,
 } from '@server/api/bazarr';
 import BazarrAPI, {
   WHISPER_PROVIDER,
   bazarrConfigured,
+  bazarrJobPoll,
 } from '@server/api/bazarr';
 import { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
@@ -29,6 +32,7 @@ import type { DVRSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import type { TranscriptionTask } from '@server/lib/transcriber';
 import transcriber, { SubtitleProblem } from '@server/lib/transcriber';
+import logger from '@server/logger';
 
 /*
  * Subtitles as Bazarr has them, for title pages. Bazarr knows a movie by
@@ -433,41 +437,121 @@ interface TranscribeOptions {
   known?: BazarrSearchResult;
 }
 
+/** Times a transcription Bazarr lost (by restarting) is asked for again. */
+const MAX_ASKS = 3;
+/** How long Bazarr may take to come back after it restarts. */
+const BACK_WAIT_MS = 10 * 60_000;
+
+/** Each Whisper subtitle in a history, told apart by when and where. */
+const whisperMarks = (history: BazarrHistoryEntry[]): Set<string> =>
+  new Set(
+    history
+      .filter((entry) => entry.provider === WHISPER_PROVIDER)
+      .map((entry) =>
+        [entry.parsed_timestamp, entry.subtitles_path, entry.description].join(
+          '|'
+        )
+      )
+  );
+
+/** Waits until Bazarr answers again, for a while; whether it did. */
+const bazarrBack = async (): Promise<boolean> => {
+  const until = Date.now() + BACK_WAIT_MS;
+  for (;;) {
+    if (
+      await bazarr()
+        .getVersion()
+        .then(
+          () => true,
+          () => false
+        )
+    ) {
+      return true;
+    }
+    if (Date.now() >= until) return false;
+    await new Promise((resolve) => setTimeout(resolve, bazarrJobPoll.ms));
+  }
+};
+
 /**
- * Bazarr's way to transcribe: download the Whisper result of a search. A
- * transcription queued because nothing was found checks first that the gap
- * is still there; Bazarr's own searches may have filled it meanwhile.
+ * Bazarr's way to transcribe: download the Whisper result of a search, and
+ * follow Bazarr's job until it ends. It is done once Bazarr's history has
+ * a new Whisper subtitle for it. A transcription Bazarr lost, by being
+ * restarted, is searched for and asked for again; one queued because
+ * nothing was found checks first that the gap is still there, as Bazarr's
+ * own searches may have filled it meanwhile.
  */
 const transcribeWith = async ({
   search,
   download,
   gaps,
+  history,
   auto,
   known,
+  watch,
 }: TranscribeOptions & {
   search: () => Promise<BazarrSearchResult[]>;
-  download: (result: BazarrSearchResult) => Promise<void>;
+  download: (
+    result: BazarrSearchResult,
+    watch: JobWatch
+  ) => Promise<BazarrJobEnd>;
   gaps: () => Promise<string[]>;
+  history: () => Promise<BazarrHistoryEntry[]>;
+  watch: JobWatch;
 }) => {
-  // Asked for by hand, the gaps only say which language to prefer.
-  const languages = await gaps().catch((e) => {
-    if (auto) {
-      throw e;
+  for (let ask = 1; ; ask++) {
+    // Asked for by hand, the gaps only say which language to prefer.
+    const languages = await gaps().catch((e) => {
+      if (auto) {
+        throw e;
+      }
+      return [] as string[];
+    });
+    // Its search result is Bazarr's no longer once Bazarr restarted.
+    const offered = ask === 1 ? known : undefined;
+    if (
+      auto &&
+      (offered ? !languages.includes(languageOf(offered)) : !languages.length)
+    ) {
+      return;
     }
-    return [] as string[];
-  });
-  if (
-    auto &&
-    (known ? !languages.includes(languageOf(known)) : !languages.length)
-  ) {
-    return;
+    const whisper = offered ?? whisperResult(await search(), languages, auto);
+    if (!whisper) {
+      const reason = await noWhisperReason();
+      throw new SubtitleProblem(reason, whisperProblemText(reason));
+    }
+    const before = await history().catch(() => undefined);
+    const end = await download(whisper, watch);
+    const after = await history().catch(() => undefined);
+    if (before && after) {
+      const seen = whisperMarks(before);
+      if ([...whisperMarks(after)].some((mark) => !seen.has(mark))) {
+        return;
+      }
+    } else if (end === 'finished') {
+      // Nothing to check it by: Bazarr says it is done.
+      return;
+    }
+    if (end === 'gone' && ask < MAX_ASKS && (await bazarrBack())) {
+      logger.info('Bazarr lost a transcription, restarted; asking again', {
+        label: 'Subtitles',
+      });
+      continue;
+    }
+    if (end === 'timedOut') {
+      throw new SubtitleProblem(
+        { code: 'bazarrStuck' },
+        'Bazarr did not finish the transcription in a day.'
+      );
+    }
+    const reason = await whisperUnavailable();
+    throw reason
+      ? new SubtitleProblem(reason, whisperProblemText(reason))
+      : new SubtitleProblem(
+          { code: 'noSubtitleSaved' },
+          `Bazarr's transcription ended (${end}) with no subtitle saved.`
+        );
   }
-  const whisper = known ?? whisperResult(await search(), languages, auto);
-  if (!whisper) {
-    const reason = await noWhisperReason();
-    throw new SubtitleProblem(reason, whisperProblemText(reason));
-  }
-  await download(whisper);
 };
 
 /**
@@ -566,13 +650,15 @@ export const queueMovieTranscription = (
       key: `movie:${radarrId}`,
       owner,
       ...(options.auto ? { auto: true } : {}),
-      run: () =>
+      run: (watch) =>
         transcribeWith({
           ...options,
+          watch,
           search: () => bazarr().searchMovie(radarrId),
-          download: (whisper) =>
-            bazarr().downloadMovie(radarrId, choiceOf(whisper)),
+          download: (whisper, jobWatch) =>
+            bazarr().downloadMovie(radarrId, choiceOf(whisper), jobWatch),
           gaps: async () => gapsOf(await bazarr().getMovie(radarrId)),
+          history: () => bazarr().getMovieHistory(radarrId),
         }),
     },
   ]);
@@ -591,13 +677,20 @@ const episodeTask = (
     seasonNumber: episode.season,
     episodeNumber: episode.episode,
     ...(options.auto ? { auto: true } : {}),
-    run: async () => {
+    run: async (watch) => {
       try {
         await transcribeWith({
           ...options,
+          watch,
           search: () => bazarr().searchEpisode(episodeId),
-          download: (whisper) =>
-            bazarr().downloadEpisode(seriesId, episodeId, choiceOf(whisper)),
+          download: (whisper, jobWatch) =>
+            bazarr().downloadEpisode(
+              seriesId,
+              episodeId,
+              choiceOf(whisper),
+              jobWatch
+            ),
+          history: () => bazarr().getEpisodeHistory(episodeId),
           gaps: async () =>
             gapsOf(
               (await bazarr().getEpisodes(seriesId)).find(
@@ -750,10 +843,11 @@ export const searchMissingMovieOrTranscribe = async (
   owner: string,
   radarrId: number
 ): Promise<number> => {
-  await transcriber.searching(owner, () =>
+  const searched = await transcriber.searching(owner, () =>
     bazarr().searchMissingMovie(radarrId)
   );
-  if (!(await whisperOn())) {
+  // What a search Bazarr did not finish would have found is not known.
+  if (searched !== 'finished' || !(await whisperOn())) {
     return 0;
   }
   if (!gapsOf(await bazarr().getMovie(radarrId)).length) {
@@ -767,13 +861,14 @@ export const searchMissingSeriesOrTranscribe = async (
   owner: string,
   seriesId: number
 ): Promise<number> => {
-  await transcriber.searching(owner, () =>
+  const searched = await transcriber.searching(owner, () =>
     bazarr().searchMissingSeries(seriesId)
   );
   const episodes = await bazarr().getEpisodes(seriesId);
   // What the search downloaded changes where their subtitles came from.
   episodes.forEach((episode) => forgetEpisodeHistory(episode.sonarrEpisodeId));
-  if (!(await whisperOn())) {
+  // What a search Bazarr did not finish would have found is not known.
+  if (searched !== 'finished' || !(await whisperOn())) {
     return 0;
   }
   return transcriber.enqueue(

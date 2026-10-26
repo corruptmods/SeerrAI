@@ -1,3 +1,4 @@
+import type { JobWatch } from '@server/api/bazarr';
 import type {
   SubtitleError,
   TranscriptionStatus,
@@ -6,9 +7,9 @@ import logger from '@server/logger';
 
 /*
  * Transcriptions run one at a time, in the order they were asked for:
- * Whisper uses the whole of whatever machine runs it, and Bazarr answers
- * each one only once it is finished. Asking for an episode already queued
- * or under way does nothing.
+ * Whisper uses the whole of whatever machine runs it, so each is followed
+ * in Bazarr until it is finished before the next is asked for. Asking for
+ * an episode already queued or under way does nothing.
  *
  * The queue is in memory. A restart forgets what had not started yet; what
  * was under way finishes in Bazarr regardless.
@@ -36,7 +37,8 @@ export interface TranscriptionTask {
   episodeNumber?: number;
   /** Queued because a search found nothing, rather than asked for. */
   auto?: boolean;
-  run: () => Promise<void>;
+  /** Told when Bazarr has it queued, and when it starts on it. */
+  run: (watch: JobWatch) => Promise<void>;
 }
 
 interface Tally {
@@ -53,6 +55,8 @@ interface Tally {
 export class Transcriber {
   private queue: TranscriptionTask[] = [];
   private current?: TranscriptionTask;
+  /** The one under way is waiting in Bazarr's own queue. */
+  private waiting = false;
   private tallies = new Map<string, Tally>();
   /** Titles Bazarr is searching for, and how many searches each. */
   private searches = new Map<string, number>();
@@ -126,6 +130,7 @@ export class Transcriber {
       failed: tally.failed,
       searching: this.searches.has(owner),
       auto: mine.filter((task) => task.auto).length,
+      ...(running && this.waiting ? { waitingInBazarr: true } : {}),
       ...(tally.error ? { error: tally.error } : {}),
       ...(running &&
       this.current?.seasonNumber !== undefined &&
@@ -149,9 +154,17 @@ export class Transcriber {
       return;
     }
     this.current = task;
+    this.waiting = false;
     const tally = this.tallies.get(task.owner) ?? { done: 0, failed: 0 };
     try {
-      await task.run();
+      await task.run({
+        onWaiting: () => {
+          if (this.current === task) this.waiting = true;
+        },
+        onRunning: () => {
+          if (this.current === task) this.waiting = false;
+        },
+      });
       tally.done++;
     } catch (e) {
       tally.failed++;
@@ -165,6 +178,7 @@ export class Transcriber {
     } finally {
       this.tallies.set(task.owner, tally);
       this.current = undefined;
+      this.waiting = false;
       void this.pump();
     }
   }

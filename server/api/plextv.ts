@@ -3,6 +3,7 @@ import cacheManager from '@server/lib/cache';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
+import { seededShuffle } from '@server/utils/shuffle';
 import { randomUUID } from 'node:crypto';
 import xml2js from 'xml2js';
 import ExternalAPI from './externalapi';
@@ -194,6 +195,12 @@ const USER_STATE_TTL_S = 15 * 60;
 /** Longest to wait on a plex.tv request before giving up its slot. */
 const PLEX_TV_TIMEOUT_MS = 20000;
 
+/**
+ * The most titles of a watchlist a shuffle mixes: they come in one listing,
+ * and only a page's are looked up.
+ */
+export const WATCHLIST_SHUFFLE_MAX = 300;
+
 class PlexTvAPI extends ExternalAPI {
   private authToken: string;
 
@@ -337,7 +344,17 @@ class PlexTvAPI extends ExternalAPI {
   public async getWatchlist({
     offset = 0,
     size = 20,
-  }: { offset?: number; size?: number } = {}): Promise<{
+    shuffle,
+  }: {
+    offset?: number;
+    size?: number;
+    /**
+     * A seed: the whole watchlist (up to WATCHLIST_SHUFFLE_MAX titles) in
+     * an order it sets, this page of it. The same seed gives the same
+     * order, so the pages of one visit follow on.
+     */
+    shuffle?: number;
+  } = {}): Promise<{
     offset: number;
     size: number;
     totalSize: number;
@@ -355,17 +372,22 @@ class PlexTvAPI extends ExternalAPI {
     failed?: boolean;
   }> {
     try {
+      const shuffled = shuffle !== undefined;
+      const start = shuffled ? 0 : offset;
+      const count = shuffled ? WATCHLIST_SHUFFLE_MAX : size;
+      // Each stretch of the watchlist kept apart: one's tag says nothing of
+      // another's.
+      const cacheKey = `${this.authToken}:${start}:${count}`;
       const watchlistCache = cacheManager.getCache('plexwatchlist');
-      let cachedWatchlist = watchlistCache.data.get<PlexWatchlistCache>(
-        this.authToken
-      );
+      let cachedWatchlist =
+        watchlistCache.data.get<PlexWatchlistCache>(cacheKey);
 
       const response = await this.axios.get<WatchlistResponse>(
         '/library/sections/watchlist/all',
         {
           params: {
-            'X-Plex-Container-Start': offset,
-            'X-Plex-Container-Size': size,
+            'X-Plex-Container-Start': start,
+            'X-Plex-Container-Size': count,
           },
           headers: cachedWatchlist?.etag
             ? { 'If-None-Match': cachedWatchlist.etag }
@@ -386,7 +408,7 @@ class PlexTvAPI extends ExternalAPI {
           };
 
           watchlistCache.data.set<PlexWatchlistCache>(
-            this.authToken,
+            cacheKey,
             cachedWatchlist
           );
         } else {
@@ -406,11 +428,15 @@ class PlexTvAPI extends ExternalAPI {
       // keep a small number in flight (seerr-team/seerr#3235).
       // Upstream #3406: some replies list the items under Video instead.
       const listed = cachedWatchlist?.response.MediaContainer;
-      const watchlistItems = Array.isArray(listed?.Metadata)
+      const everyItem = Array.isArray(listed?.Metadata)
         ? listed.Metadata
         : Array.isArray(listed?.Video)
           ? listed.Video
           : [];
+      // Shuffled, only this page's titles are looked up.
+      const watchlistItems = shuffled
+        ? seededShuffle(everyItem, shuffle).slice(offset, offset + size)
+        : everyItem;
       const watchlistDetails = await mapWithConcurrency(
         watchlistItems,
         5,
@@ -504,7 +530,9 @@ class PlexTvAPI extends ExternalAPI {
       return {
         offset,
         size,
-        totalSize: cachedWatchlist?.response.MediaContainer.totalSize ?? 0,
+        totalSize: shuffled
+          ? everyItem.length
+          : (cachedWatchlist?.response.MediaContainer.totalSize ?? 0),
         items: filteredList,
       };
     } catch (e) {

@@ -39,6 +39,7 @@ import {
 } from '@server/utils/animeSeason';
 import type { AnimeSignals } from '@server/utils/isAnime';
 import { leftOutAsAnime } from '@server/utils/isAnime';
+import { seededShuffle, shuffleSeed } from '@server/utils/shuffle';
 import { isCollection, isMovie, isPerson } from '@server/utils/typeHelpers';
 import { Router } from 'express';
 import { sortBy } from 'lodash';
@@ -1138,6 +1139,9 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
     const page = req.query.page ? Number(req.query.page) : 1;
     const offset = (page - 1) * itemsPerPage;
 
+    // A seed from the page: the watchlist mixed anew for each visit.
+    const shuffle = shuffleSeed(req.query.shuffle);
+
     const activeUser = await userRepository.findOne({
       where: { id: req.user?.id },
       select: ['id', 'plexToken'],
@@ -1145,15 +1149,26 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
 
     if (activeUser && !activeUser?.plexToken) {
       // Non-Plex users can only see their own watchlist
-      const [result, total] = await getRepository(Watchlist).findAndCount({
-        where: { requestedBy: { id: activeUser?.id } },
-        relations: {
-          /*requestedBy: true,media:true*/
-        },
-        // loadRelationIds: true,
-        take: itemsPerPage,
-        skip: offset,
-      });
+      const where = { requestedBy: { id: activeUser?.id } };
+      const [result, total] =
+        shuffle === undefined
+          ? await getRepository(Watchlist).findAndCount({
+              where,
+              take: itemsPerPage,
+              skip: offset,
+            })
+          : await getRepository(Watchlist)
+              .find({ where, order: { id: 'ASC' } })
+              .then(
+                (all) =>
+                  [
+                    seededShuffle(all, shuffle).slice(
+                      offset,
+                      offset + itemsPerPage
+                    ),
+                    all.length,
+                  ] as const
+              );
       if (total) {
         return res.json({
           page: page,
@@ -1176,7 +1191,7 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
     // List watchlist from Plex
     const plexTV = new PlexTvAPI(activeUser.plexToken);
 
-    const watchlist = await plexTV.getWatchlist({ offset });
+    const watchlist = await plexTV.getWatchlist({ offset, shuffle });
 
     return res.json({
       page,

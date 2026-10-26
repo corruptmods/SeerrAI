@@ -8,6 +8,7 @@ import defineMessages from '@app/utils/defineMessages';
 import type { WatchlistItem } from '@server/interfaces/api/discoverInterfaces';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { useState } from 'react';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Discover.DiscoverWatchlist', {
@@ -22,6 +23,8 @@ const DiscoverWatchlist = () => {
     id: Number(router.query.userId),
   });
   const { user: currentUser } = useUser();
+  // A new order each visit; the same one while scrolling through it.
+  const [shuffle] = useState(() => Math.floor(Math.random() * 2 ** 32));
 
   const {
     isLoadingInitialData,
@@ -39,7 +42,8 @@ const DiscoverWatchlist = () => {
         : router.query.userId
           ? `user/${router.query.userId}`
           : 'discover'
-    }/watchlist`
+    }/watchlist`,
+    { shuffle }
   );
 
   if (error) {

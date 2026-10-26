@@ -51,6 +51,7 @@ import { checkAvatarChanged } from '@server/routes/avatarproxy';
 import { normalizeJellyfinGuid } from '@server/utils/jellyfin';
 import { pageOf } from '@server/utils/pagination';
 import { isOwnProfileOrAdmin } from '@server/utils/profileMiddleware';
+import { shuffleSeed } from '@server/utils/shuffle';
 import { Router } from 'express';
 import gravatarUrl from 'gravatar-url';
 import { findIndex, sortBy } from 'lodash';
@@ -1242,7 +1243,11 @@ router.get<{ id: string }, WatchlistResponse>(
 
     const plexTV = new PlexTvAPI(user.plexToken);
 
-    const watchlist = await plexTV.getWatchlist({ offset });
+    const watchlist = await plexTV.getWatchlist({
+      offset,
+      // A seed from the page: the watchlist mixed anew for each visit.
+      shuffle: shuffleSeed(req.query.shuffle),
+    });
 
     return res.json({
       page,

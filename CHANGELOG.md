@@ -9,6 +9,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - **Song requests**: ask for one song, not the whole album, from music search or an album's track list. Each version (radio edit, club mix) is asked for on its own. Lidarr fetches the single that has it; with Take Songs from Albums on, a song only on albums is taken from its album through Backfill. On to start; turn it off in Settings → Music. ([guide](./docs/seerr-ai/music.md))
 - **Your own Music page**: rows from the music you've asked for: your requests, more from your artists, and artists like yours. Only your own requests count.
 - **Faster music search**: a search you've typed past no longer holds up the one you want, and songs are looked up alongside artists and albums.
+- **Your Watchlist** shows your titles in a new order each time you open it.
 - **Music request cards** match films' and series': the cover behind them, the artist above, the album or song as the title.
 
 ### Fixed

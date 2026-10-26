@@ -16,7 +16,7 @@ import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
 import type { AlbumContext } from '@server/lib/backfill/albums';
-import { judgeAlbumPack } from '@server/lib/backfill/albums';
+import { judgeAlbumPack, mapTracks } from '@server/lib/backfill/albums';
 import backfill from '@server/lib/backfill/engine';
 import type {
   AlbumImportFile,
@@ -316,6 +316,72 @@ describe('Backfill for albums: judging a release', () => {
   });
 });
 
+describe('Backfill for albums: placing files by number', () => {
+  const disc = (id: number, medium: number, number: number): AlbumTrack => ({
+    ...track(id, number, `Untitled ${id}`, 9),
+    mediumNumber: medium,
+  });
+
+  it('places a file by number only on the disc its name says', () => {
+    const tracks = [disc(1, 1, 1), disc(2, 1, 2), disc(3, 2, 1), disc(4, 2, 2)];
+    const audio = [
+      { index: 0, path: 'Box/1-01 Track.flac', size: 30 * MB },
+      { index: 1, path: 'Box/1-02 Track.flac', size: 30 * MB },
+      { index: 2, path: 'Box/2-01 Track.flac', size: 30 * MB },
+      { index: 3, path: 'Box/2-02 Track.flac', size: 30 * MB },
+    ];
+    const placed = mapTracks(audio, tracks, 'Glasswing');
+    assert.deepEqual([...placed].map(([id, file]) => [id, file.index]).sort(), [
+      [1, 0],
+      [2, 1],
+      [3, 2],
+      [4, 3],
+    ]);
+  });
+
+  it('leaves files unplaced on several discs when their names say no disc', () => {
+    const tracks = [disc(1, 1, 1), disc(2, 2, 1)];
+    const audio = [
+      { index: 0, path: 'Box/01 Track.flac', size: 30 * MB },
+      { index: 1, path: 'Box/01 Track (2).flac', size: 30 * MB },
+    ];
+    assert.equal(mapTracks(audio, tracks, 'Glasswing').size, 0);
+  });
+});
+
+describe('Backfill for albums: Lidarr’s queue', () => {
+  it('counts only this album’s downloads, from the queue’s details', async () => {
+    // The flow tests stand in for it; here, the real one.
+    (
+      BackfillLidarr.prototype.getAlbumQueueCount as unknown as {
+        mock: { restore: () => void };
+      }
+    ).mock.restore();
+    const lidarr = BackfillLidarr.forServer({
+      id: 0,
+      name: 'Lidarr',
+      hostname: 'lidarr',
+      port: 8686,
+      apiKey: 'x',
+      useSsl: false,
+    } as unknown as LidarrSettings);
+    const asked: { url: string; params: unknown }[] = [];
+    mock.method(
+      (lidarr as unknown as { axios: { get: (...a: unknown[]) => unknown } })
+        .axios,
+      'get',
+      async (url: string, config: { params: unknown }) => {
+        asked.push({ url, params: config.params });
+        return { data: [{ albumId: 70 }, { albumId: 70 }, { albumId: 71 }] };
+      }
+    );
+    assert.equal(await lidarr.getAlbumQueueCount(70), 2);
+    assert.deepEqual(asked, [
+      { url: '/queue/details', params: { albumIds: 70 } },
+    ]);
+  });
+});
+
 // ---- from Lidarr's wanted list to the library ------------------------------
 
 const ben = (value: unknown): Buffer => {
@@ -540,16 +606,21 @@ afterEach(() => {
 
 /** Someone's approved request for the album, made `daysAgo`. */
 const requestAlbum = async (daysAgo = 2) => {
-  const media = await dataSource.manager.save(
-    new Media({
+  const media =
+    (await getRepository(Media).findOneBy({
       mediaType: MediaType.MUSIC,
-      tmdbId: 0,
       foreignId: ARTIST.foreignArtistId,
-      foreignTitle: 'Glasswing',
-      status: MediaStatus.PROCESSING,
-    }),
-    { listeners: false }
-  );
+    })) ??
+    (await dataSource.manager.save(
+      new Media({
+        mediaType: MediaType.MUSIC,
+        tmdbId: 0,
+        foreignId: ARTIST.foreignArtistId,
+        foreignTitle: 'Glasswing',
+        status: MediaStatus.PROCESSING,
+      }),
+      { listeners: false }
+    ));
   const request = await dataSource.manager.save(
     new MediaRequest({
       type: MediaType.MUSIC,
@@ -708,6 +779,80 @@ describe('Backfill for albums: from Lidarr’s wanted list to the library', () =
       where: { id: chosen.id },
     });
     assert.equal(kept.status, 'found');
+  });
+
+  it('stops searching an album no longer requested that it downloaded for before', async () => {
+    await getRepository(MediaRequest).createQueryBuilder().delete().execute();
+    const row = await getRepository(BackfillSeries).save(
+      new BackfillSeries({
+        kind: 'album',
+        serverId: 0,
+        arrId: 70,
+        title: 'Static Garden',
+        foreignId: ALBUM_MBID,
+        status: 'stuck',
+        missing: 1,
+        searchTerms: [],
+      })
+    );
+    const candidate = await getRepository(BackfillCandidate).save(
+      new BackfillCandidate({
+        seriesId: row.id,
+        guid: 'https://indexer/1',
+        title: 'Glasswing - Static Garden (2001) [FLAC]',
+        indexer: 'Uindex',
+        indexerId: 3,
+        protocol: 'torrent',
+        size: 90 * MB,
+        status: 'dead',
+        plan: [],
+      })
+    );
+    await getRepository(BackfillJob).save(
+      new BackfillJob({
+        seriesId: row.id,
+        candidateId: candidate.id,
+        title: candidate.title,
+        protocol: 'torrent',
+        clientId: 1,
+        status: 'failed',
+        files: [],
+      })
+    );
+
+    await backfill.scan();
+    const kept = await getRepository(BackfillSeries).findOneByOrFail({
+      id: row.id,
+    });
+    assert.equal(kept.status, 'done', 'kept for its history, not searched');
+    assert.deepEqual(searchedFor, []);
+
+    // Requested again: followed once more.
+    await requestAlbum();
+    await backfill.scan();
+    const again = await getRepository(BackfillSeries).findOneByOrFail({
+      id: row.id,
+    });
+    assert.notEqual(again.status, 'done');
+  });
+
+  it('refuses a pack planned for one edition once Lidarr has files in another', async () => {
+    await backfill.scan();
+    const row = await getRepository(BackfillSeries).findOneOrFail({
+      where: { kind: 'album', arrId: 70 },
+    });
+    const candidate = await getRepository(BackfillCandidate).findOneOrFail({
+      where: { seriesId: row.id },
+    });
+    // Planned into the deluxe edition, while Lidarr keeps the standard one,
+    // with files, monitored.
+    await getRepository(BackfillCandidate).update(candidate.id, {
+      plan: candidate.plan.map((e) => ({ ...e, releaseId: 10 })),
+    });
+    await assert.rejects(
+      backfill.approve(candidate.id, { mode: 'missing' }),
+      /another edition of this album/
+    );
   });
 
   it('leaves albums alone with music turned off for Backfill', async () => {

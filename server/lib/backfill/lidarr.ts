@@ -159,12 +159,19 @@ class BackfillLidarr extends LidarrAPI {
     return Array.isArray(data) ? data : [];
   }
 
-  /** How many of Lidarr's own downloads are for this album. */
+  /**
+   * How many of Lidarr's own downloads are for this album. The paged
+   * /queue has no album filter (it would answer the whole queue); its
+   * details do.
+   */
   public async getAlbumQueueCount(albumId: number): Promise<number> {
-    const { data } = await this.axios.get<{ records?: unknown[] }>('/queue', {
-      params: { albumIds: albumId, pageSize: 50 },
-    });
-    return data?.records?.length ?? 0;
+    const { data } = await this.axios.get<{ albumId?: number }[]>(
+      '/queue/details',
+      { params: { albumIds: albumId } }
+    );
+    return (Array.isArray(data) ? data : []).filter(
+      (item) => item.albumId === albumId
+    ).length;
   }
 
   public async getRootFoldersNow(): Promise<

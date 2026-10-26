@@ -60,14 +60,22 @@ export const asQuality = (model: LidarrQualityModel): SonarrQuality => ({
   revision: model.revision ?? { version: 1, real: 0 },
 });
 
-/** "03 - Song.flac" is 3, "1-03 Song.flac" and "103 Song.flac" are 3 too. */
-const fileNumber = (path: string): number | undefined => {
+/**
+ * A file's place by its name: "03 - Song.flac" is track 3, "1-03 Song.flac"
+ * and "103 Song.flac" track 3 of disc 1. The disc only when the name says.
+ */
+const fileNumber = (
+  path: string
+): { disc?: number; track: number } | undefined => {
   const name = path.replace(/\\/g, '/').split('/').pop() ?? path;
-  const match = name.match(/^(?:\d{1,2}[-.\s]+)?(\d{1,3})(?=[\s._-])/);
+  const match = name.match(/^(?:(\d{1,2})[-.\s]+)?(\d{1,3})(?=[\s._-])/);
   if (!match) return undefined;
-  const n = Number(match[1]);
-  // "103" on a single disc is track 3 of disc 1.
-  return n > 100 && n < 1000 ? n % 100 : n;
+  const n = Number(match[2]);
+  if (match[1] !== undefined) return { disc: Number(match[1]), track: n };
+  // "103" is track 3 of disc 1.
+  return n > 100 && n < 1000
+    ? { disc: Math.floor(n / 100), track: n % 100 }
+    : { track: n };
 };
 
 /** Each track's file in the release: by its title, else by its number. */
@@ -90,15 +98,23 @@ export const mapTracks = (
     }
   }
   // Untitled files ("Track 03.flac"), or titles spelt otherwise: by number,
-  // when the release has one file for each track.
+  // when the release has one file for each track. On an edition of several
+  // discs, only a name that says its disc places it.
   if (audio.length === tracks.length) {
+    const discs = new Set(tracks.map((t) => t.mediumNumber ?? 1)).size;
     for (const track of tracks) {
       if (placed.has(track.id)) continue;
-      const number =
-        track.absoluteTrackNumber ?? (Number(track.trackNumber) || undefined);
-      const file = audio.find(
-        (f) => !used.has(f.index) && number && fileNumber(f.path) === number
-      );
+      const numbers = [
+        track.absoluteTrackNumber,
+        Number(track.trackNumber) || undefined,
+      ].filter((n): n is number => !!n);
+      const file = audio.find((f) => {
+        if (used.has(f.index)) return false;
+        const at = fileNumber(f.path);
+        if (!at || !numbers.includes(at.track)) return false;
+        if (discs === 1) return true;
+        return at.disc !== undefined && at.disc === (track.mediumNumber ?? 1);
+      });
       if (file) {
         placed.set(track.id, file);
         used.add(file.index);

@@ -1368,22 +1368,25 @@ const releaseFiles: AgentTool = {
       return `${known.ref} "${known.title}" (${sizeOf(known.size)}) is a Usenet post ${what}. If its name is exactly one missing episode (or the movie), grab it whole: grab with whole: true and one file entry with index 0 and the season and episode its name gives. A season pack like this cannot be used.`;
     }
     const sorted = [...files].sort((a, b) => a.index - b.index);
-    // For an album, what is not music is marked; otherwise what is not video.
-    const music = boundTitle(state.run)?.kind === 'album';
-    const lines = sorted
-      .slice(0, MAX_LISTED_FILES)
-      .map(
-        (f) =>
-          `#${f.index}  ${f.path}  (${sizeOf(f.size)}${
-            music
-              ? isAudio(f.path)
-                ? ''
-                : ', not audio'
-              : isVideo(f.path) && f.size >= MIN_VIDEO_BYTES
-                ? ''
-                : ', not a video'
-          })`
-      );
+    // For an album, what is not music is marked; for a series or a movie,
+    // what is not video; before a title is chosen, what is neither.
+    const kind = boundTitle(state.run)?.kind;
+    const video = (f: PackFile) => isVideo(f.path) && f.size >= MIN_VIDEO_BYTES;
+    const lines = sorted.slice(0, MAX_LISTED_FILES).map((f) => {
+      const note =
+        kind === 'album'
+          ? isAudio(f.path)
+            ? ''
+            : ', not audio'
+          : kind
+            ? video(f)
+              ? ''
+              : ', not a video'
+            : video(f) || isAudio(f.path)
+              ? ''
+              : ', not a video or audio';
+      return `#${f.index}  ${f.path}  (${sizeOf(f.size)}${note})`;
+    });
     return `${known.ref} "${known.title}": ${files.length} files\n${lines.join('\n')}${
       files.length > MAX_LISTED_FILES
         ? `\n… and ${files.length - MAX_LISTED_FILES} more`

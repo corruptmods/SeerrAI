@@ -776,6 +776,10 @@ const albumsAskedSince = async (
       .where('request.status = :status', {
         status: MediaRequestStatus.APPROVED,
       })
+      // An album already here, in a request still open for others, is not.
+      .andWhere('album.status = :albumStatus', {
+        albumStatus: MediaRequestStatus.APPROVED,
+      })
       .andWhere('album.albumMbid IN (:...mbids)', {
         mbids: ids.slice(i, i + 400),
       })
@@ -1865,18 +1869,42 @@ class Backfill {
    * packs found for it, unless Backfill has downloaded anything for it.
    */
   private async letGo(rows: BackfillSeries[]): Promise<void> {
-    if (!rows.length) return;
-    const withJobs = new Set(
-      (
-        await getRepository(BackfillJob).find({
-          select: { seriesId: true },
-          where: { seriesId: In(rows.map((r) => r.id)) },
-        })
-      ).map((job) => job.seriesId)
+    // One being searched now is left to the next scan.
+    const idle = rows.filter((row) => !this.isSearching(row.id));
+    if (!idle.length) return;
+    const jobs = await getRepository(BackfillJob).find({
+      select: { seriesId: true, status: true },
+      where: { seriesId: In(idle.map((r) => r.id)) },
+    });
+    const repo = getRepository(BackfillSeries);
+    // Downloaded for before: kept for its history, as complete, so it is
+    // no longer searched; requested again, a scan follows it once more.
+    // One with a download running is left alone.
+    const kept = idle.filter(
+      (row) =>
+        jobs.some((job) => job.seriesId === row.id) &&
+        !jobs.some(
+          (job) =>
+            job.seriesId === row.id &&
+            [...ACTIVE, 'paused'].includes(job.status)
+        )
     );
-    const gone = rows.filter((row) => !withJobs.has(row.id));
+    if (kept.length) {
+      await repo.update(
+        {
+          id: In(kept.map((row) => row.id)),
+          byHand: false,
+          status: In(['stuck', 'none', 'found']),
+        },
+        { status: 'done', missing: 0, belowCutoff: 0 }
+      );
+    }
+    const gone = idle.filter(
+      (row) => !jobs.some((job) => job.seriesId === row.id)
+    );
     if (!gone.length) return;
-    await getRepository(BackfillSeries).delete(gone.map((row) => row.id));
+    // Chosen by an admin since the scan read it: kept.
+    await repo.delete({ id: In(gone.map((row) => row.id)), byHand: false });
     logger.info(
       `Backfill no longer follows ${gone.length} album${gone.length === 1 ? '' : 's'} nobody requested`,
       { label: LABEL }
@@ -2853,6 +2881,22 @@ class Backfill {
         `${appOf(row.kind)} has a file for this now. Search again for an up-to-date plan.`
       );
     }
+    // An album's plan is for one edition. Should Lidarr since have taken
+    // files into another, importing into this one would switch the album
+    // over and leave those files unlinked.
+    if (row.kind === 'album' && [...now.values()].some(Boolean)) {
+      const monitored = (
+        await this.lidarrFor(row.serverId).getAlbumDetail(row.arrId)
+      ).releases?.find((r) => r.monitored)?.id;
+      if (
+        monitored != null &&
+        selected.some((e) => e.releaseId != null && e.releaseId !== monitored)
+      ) {
+        throw new Error(
+          'Lidarr has files in another edition of this album now. Search again for an up-to-date plan.'
+        );
+      }
+    }
     // Several downloads may run for one series, for different episodes; a
     // movie has only the one.
     const jobs = getRepository(BackfillJob);
@@ -3330,10 +3374,24 @@ class Backfill {
         downloadId: Not(IsNull()),
       },
     });
-    return !owners.some(
-      (other) =>
-        other.downloadId!.toLowerCase() === id && other.status !== 'failed'
-    );
+    if (
+      owners.some(
+        (other) =>
+          other.downloadId!.toLowerCase() === id && other.status !== 'failed'
+      )
+    ) {
+      return false;
+    }
+    // Songs taken from albums share the category (lib/music/songFetch): a
+    // fetch still under way owns its torrent.
+    const songFetches = await getRepository(SongFetch).find({
+      select: { id: true, downloadId: true },
+      where: {
+        downloadId: Not(IsNull()),
+        status: In(['queued', 'searching', 'downloading', 'importing']),
+      },
+    });
+    return !songFetches.some((f) => f.downloadId!.toLowerCase() === id);
   }
 
   /** Skips every file but the chosen ones, then starts the torrent. */

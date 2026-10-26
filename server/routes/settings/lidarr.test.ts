@@ -283,8 +283,8 @@ describe('music settings', () => {
       contactEmail: 'admin@example.com',
       listenBrainz: false,
       maxAlbumsPerRequest: 50,
-      songRequests: false,
-      songsFromAlbums: false,
+      songRequests: true,
+      songsFromAlbums: true,
       songQuota: { quotaLimit: 0, quotaDays: 7 },
       hasTheAudioDbApiKey: true,
       search: { inAll: false },
@@ -306,7 +306,30 @@ describe('music settings', () => {
     );
   });
 
-  it('turn song requests on, with a limit of their own, and keep them', async () => {
+  it('start with songs on, even where music was set up before them', () => {
+    const settings = getSettings();
+    const { songRequests, songsFromAlbums, ...older } = settings.music;
+    assert.deepEqual([songRequests, songsFromAlbums], [true, true]);
+    settings.music = older as typeof settings.music;
+    assert.equal(settings.music.songRequests, true);
+    assert.equal(settings.music.songsFromAlbums, true);
+    assert.equal(settings.fullPublicSettings.musicSongs, true);
+  });
+
+  it('turn song requests off and on, with a limit of their own, and keep them', async () => {
+    const off = await call('POST', '/settings/music', {
+      songRequests: false,
+      songsFromAlbums: false,
+    });
+    assert.equal(off.status, 200);
+    // A save that leaves them out keeps them off.
+    await call('POST', '/settings/music', { listenBrainz: true });
+    assert.deepEqual(
+      [getSettings().music.songRequests, getSettings().music.songsFromAlbums],
+      [false, false]
+    );
+    assert.equal(getSettings().fullPublicSettings.musicSongs, false);
+
     const saved = await call('POST', '/settings/music', {
       songRequests: true,
       songQuota: { quotaLimit: 5, quotaDays: 30 },

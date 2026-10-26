@@ -112,8 +112,8 @@ export const musicDefaults = (): MusicSettings => ({
   listenBrainz: true,
   theAudioDbApiKey: '',
   maxAlbumsPerRequest: 100,
-  songRequests: false,
-  songsFromAlbums: false,
+  songRequests: true,
+  songsFromAlbums: true,
   songQuota: { quotaLimit: 0, quotaDays: 7 },
   search: { inAll: false },
 });
@@ -1544,6 +1544,13 @@ class Settings {
     }
     if (!this.data.music.songQuota) {
       this.data.music.songQuota = musicDefaults().songQuota;
+    }
+    // Saved before song requests existed: they start on there too.
+    if (this.data.music.songRequests === undefined) {
+      this.data.music.songRequests = musicDefaults().songRequests;
+    }
+    if (this.data.music.songsFromAlbums === undefined) {
+      this.data.music.songsFromAlbums = musicDefaults().songsFromAlbums;
     }
     return this.data.music;
   }

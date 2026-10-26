@@ -4,6 +4,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ## Unreleased
 
+Seerr AI can now fetch one song instead of a whole album, and Backfill and the admin agent go after music Lidarr couldn't find. AI Search finds music too, and Seerr AI is ready for Radarr 7.
+
 ### New
 
 - **Song requests**: ask for one song, not the whole album, from music search or an album's track list. Each version (radio edit, club mix) is asked for on its own. Lidarr fetches the single that has it; with Take Songs from Albums on, a song only on albums is taken from its album through Backfill. On to start; turn it off in Settings → Music. ([guide](./docs/seerr-ai/music.md))
@@ -26,6 +28,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - The artist page's **Request** button sat out of line with **Play** on phones.
 - Asking for an album Lidarr didn't list yet, by an artist Lidarr already had, failed a week later with "Lidarr couldn't look up". Lidarr now adds it.
 - **Transcribe** said a transcription was done as soon as Bazarr queued it, and **Search for the Missing** then sent every episode still missing to Whisper at once, before Bazarr had searched. That could jam Bazarr's queue for hours. Now each transcription waits until Bazarr saves the subtitle, the page says when one is waiting in Bazarr, and one Bazarr loses by restarting is asked for again.
+- With subtitle downloads for several titles running in Bazarr at once, Seerr AI could follow another title's download and call yours finished. It now follows its own.
 
 ## 2.1.0 (24 October 2026)
 

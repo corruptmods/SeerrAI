@@ -33,6 +33,12 @@ export interface FakeLidarr {
   tracks: Map<number, LidarrTrack[]>;
   /** The tracks an album gets once added, by its MusicBrainz id. */
   tracksOnAdd: Map<string, Omit<LidarrTrack, 'albumId'>[]>;
+  /**
+   * Each release's own tracks, by its Lidarr id. An album's tracks (above)
+   * are its monitored release's; a manual import into another release
+   * makes that one monitored, as Lidarr does.
+   */
+  releaseTracks: Map<number, LidarrTrack[]>;
   /** Where the download client's folders are, as Lidarr sees them. */
   remotePathMappings: { host: string; remotePath: string; localPath: string }[];
   /** Whether a manual import takes its files (or refuses them all). */
@@ -65,6 +71,7 @@ export const createFakeLidarr = (): FakeLidarr => {
     lookupAlbums: new Map(),
     tracks: new Map(),
     tracksOnAdd: new Map(),
+    releaseTracks: new Map(),
     remotePathMappings: [],
     importTakes: true,
     tags: [],
@@ -101,6 +108,7 @@ export const createFakeLidarr = (): FakeLidarr => {
       fake.lookupAlbums = new Map();
       fake.tracks = new Map();
       fake.tracksOnAdd = new Map();
+      fake.releaseTracks = new Map();
       fake.remotePathMappings = [];
       fake.importTakes = true;
       fake.tags = [];
@@ -159,6 +167,17 @@ export const createFakeLidarr = (): FakeLidarr => {
       ];
     }
     if (method === 'GET' && path === '/api/v1/track') {
+      if (query.albumReleaseId) {
+        const id = Number(query.albumReleaseId);
+        const owner = fake.albums.find((a) =>
+          a.releases?.some((release) => release.id === id)
+        );
+        return [
+          200,
+          fake.releaseTracks.get(id) ??
+            (owner ? (fake.tracks.get(owner.id) ?? []) : []),
+        ];
+      }
       return [200, fake.tracks.get(Number(query.albumId)) ?? []];
     }
     if (method === 'POST' && path === '/api/v1/artist') {
@@ -170,6 +189,18 @@ export const createFakeLidarr = (): FakeLidarr => {
       const given = body as unknown as LidarrAlbum & {
         artist: Partial<LidarrArtist>;
       };
+      // Lidarr's own checks: the artist whole, whether new or not.
+      if (
+        !given.artist?.foreignArtistId ||
+        !(Number(given.artist.qualityProfileId) > 0) ||
+        !(Number(given.artist.metadataProfileId) > 0) ||
+        !(given.artist.rootFolderPath || given.artist.path)
+      ) {
+        return [
+          400,
+          [{ propertyName: 'Artist.ForeignArtistId', errorMessage: 'empty' }],
+        ];
+      }
       let artist = fake.artists.find((a) => a.id === given.artist.id);
       if (!artist) {
         artist = { ...given.artist, id: nextId++ } as LidarrArtist;
@@ -198,10 +229,27 @@ export const createFakeLidarr = (): FakeLidarr => {
       return [202, {}];
     }
     if (method === 'POST' && path === '/api/v1/command') {
-      // A manual import gives each track its file, as Lidarr would.
+      // A manual import gives each track its file, and has Lidarr
+      // monitor the release imported into, as Lidarr does.
       if (body?.name === 'ManualImport' && fake.importTakes) {
-        for (const file of (body.files ?? []) as { trackIds: number[] }[]) {
-          for (const tracks of fake.tracks.values()) {
+        for (const file of (body.files ?? []) as {
+          albumId: number;
+          albumReleaseId: number;
+          trackIds: number[];
+        }[]) {
+          const album = fake.albums.find((a) => a.id === file.albumId);
+          if (album?.releases?.some((r) => r.id === file.albumReleaseId)) {
+            album.releases = album.releases.map((release) => ({
+              ...release,
+              monitored: release.id === file.albumReleaseId,
+            }));
+            const own = fake.releaseTracks.get(file.albumReleaseId);
+            if (own) fake.tracks.set(album.id, own);
+          }
+          for (const tracks of [
+            ...fake.tracks.values(),
+            ...fake.releaseTracks.values(),
+          ]) {
             for (const track of tracks) {
               if (file.trackIds.includes(track.id)) track.hasFile = true;
             }

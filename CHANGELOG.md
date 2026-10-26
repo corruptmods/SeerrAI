@@ -8,6 +8,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - **Song requests**: ask for one song, not the whole album, from music search or an album's track list. Each version (radio edit, club mix) is asked for on its own. Lidarr fetches the single that has it; with Take Songs from Albums on, a song only on albums is taken from its album through Backfill. Turn it on in Settings → Music. ([guide](./docs/seerr-ai/music.md))
 
+### Fixed
+
+- Asking for an album Lidarr didn't list yet, by an artist Lidarr already had, failed a week later with "Lidarr couldn't look up". Lidarr now adds it.
+
 ## 2.1.0 (24 October 2026)
 
 Seerr AI now stops bad downloads before they start, takes "fix this show" from Siri, and its admin agent remembers what it has tried. Every download client Seerr AI supports now works with its newest version, and this release has security updates.

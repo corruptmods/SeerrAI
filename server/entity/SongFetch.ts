@@ -81,6 +81,10 @@ class SongFetch {
   @Column({ type: 'int', nullable: true })
   public lidarrAlbumId: number | null;
 
+  /** The album's release in Lidarr the songs are taken into. */
+  @Column({ type: 'int', nullable: true })
+  public lidarrReleaseId: number | null;
+
   /** The release taken, as Prowlarr found it. */
   @Column({ type: 'simple-json', nullable: true })
   public release: {

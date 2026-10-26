@@ -19,6 +19,7 @@ import {
 } from '@server/lib/notificationDelivery';
 import { Notification } from '@server/lib/notifications';
 import { requestAvailableEvent } from '@server/lib/notifications/eventTitles';
+import { markUndispatchable } from '@server/lib/requestDispatch';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { In } from 'typeorm';
@@ -96,17 +97,19 @@ export const musicRequestAvailable = (
 };
 
 /**
- * Whether Lidarr has a file for this very song on the single it came on:
- * its recording among the tracks, or else a track of its name. Asked only
- * of a single partly here; any failure is a no, asked again next scan.
+ * Whether Lidarr has a file for this very song on what it came on: its
+ * recording among the tracks, or else a track of its name. Undefined when
+ * that can't be told: no Lidarr to ask, an error (asked again next scan),
+ * or no file of the album at all, which a media server may list without
+ * Lidarr ever having it.
  */
 const songOnFile = async (
   song: SongRequest,
   lidarr: LidarrAPI | undefined,
   lidarrAlbumId: number | null | undefined
-): Promise<boolean> => {
+): Promise<boolean | undefined> => {
   if (!lidarr || !lidarrAlbumId) {
-    return false;
+    return undefined;
   }
   try {
     const tracks = await lidarr.getTracks(lidarrAlbumId);
@@ -119,14 +122,15 @@ const songOnFile = async (
           (!song.version &&
             normalizeTitle(t.title) === normalizeTitle(song.title))
       );
-    return !!track?.hasFile;
+    if (track?.hasFile) return true;
+    return tracks.some((t) => t.hasFile) ? false : undefined;
   } catch (e) {
-    logger.debug('Lidarr did not list a single’s tracks', {
+    logger.debug('Lidarr did not list an album’s tracks', {
       label: 'Music Scan',
       lidarrAlbumId,
       errorMessage: e instanceof Error ? e.message : String(e),
     });
-    return false;
+    return undefined;
   }
 };
 
@@ -251,18 +255,45 @@ export const completeMusicRequests = async (
       );
       const lidarr = server ? lidarrApi(server) : undefined;
       const songsFinished: SongRequest[] = [];
+      // Here, but Lidarr took an edition without this version.
+      const songsMissing: SongRequest[] = [];
       for (const song of songs) {
         if (song.status === MediaRequestStatus.COMPLETED || !sourceOf(song)) {
           continue;
         }
         const row = own.find((r) => r.mbId === sourceOf(song));
-        if (
-          row &&
-          (DONE.includes(row.status) ||
-            (row.status === MediaStatus.PARTIALLY_AVAILABLE &&
-              (await songOnFile(song, lidarr, row.lidarrAlbumId))))
+        if (!row) {
+          continue;
+        }
+        if (row.status === MediaStatus.DELETED) {
+          songsFinished.push(song);
+        } else if (row.status === MediaStatus.AVAILABLE) {
+          const onFile = await songOnFile(song, lidarr, row.lidarrAlbumId);
+          if (onFile !== false) {
+            songsFinished.push(song);
+          } else if (song.status !== MediaRequestStatus.FAILED) {
+            songsMissing.push(song);
+          }
+        } else if (
+          row.status === MediaStatus.PARTIALLY_AVAILABLE &&
+          (await songOnFile(song, lidarr, row.lidarrAlbumId))
         ) {
           songsFinished.push(song);
+        }
+      }
+      if (songsMissing.length) {
+        const song = songsMissing[0];
+        const from = song.singleTitle ?? song.sourceAlbumTitle ?? '';
+        await getRepository(SongRequest).update(
+          { id: In(songsMissing.map((s) => s.id)) },
+          { status: MediaRequestStatus.FAILED }
+        );
+        songsMissing.forEach((s) => (s.status = MediaRequestStatus.FAILED));
+        if (request.status === MediaRequestStatus.APPROVED) {
+          await markUndispatchable(
+            request,
+            `${from} is here, but Lidarr took an edition without “${songName(song)}”.`
+          );
         }
       }
       const allDone =

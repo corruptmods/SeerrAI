@@ -144,8 +144,21 @@ describe('LidarrAPI', () => {
     const post = mock.method(getAxios(lidarr), 'post', async () => ({
       data: { ...album, id: 12 },
     }));
+    // Lidarr refuses an album whose artist lacks its id, profiles and
+    // folder, so the artist goes as Lidarr gave it.
+    const existing = {
+      id: 4,
+      artistName: 'Artist',
+      foreignArtistId: ARTIST_MBID,
+      monitored: true,
+      qualityProfileId: 1,
+      metadataProfileId: 2,
+      rootFolderPath: '/music',
+      path: '/music/Artist',
+      tags: [],
+    };
     await lidarr.addAlbum(album, {
-      artist: { id: 4 },
+      artist: existing,
       searchForNewAlbum: false,
     });
     const [path, body] = post.mock.calls[0].arguments as [
@@ -155,7 +168,7 @@ describe('LidarrAPI', () => {
     assert.equal(path, '/album');
     assert.equal(body.monitored, true);
     assert.equal(body.anyReleaseOk, true);
-    assert.deepEqual(body.artist, { id: 4 });
+    assert.deepEqual(body.artist, existing);
     assert.deepEqual(body.addOptions, { searchForNewAlbum: false });
   });
 

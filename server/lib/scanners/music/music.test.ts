@@ -1135,7 +1135,8 @@ describe('music scans', () => {
         (state.lidarr.added[0] as { foreignAlbumId: string }).foreignAlbumId,
         FOG_B
       );
-      assert.deepEqual(state.lidarr.added[0].artist, { id: 7 });
+      // The artist as Lidarr has it: Lidarr refuses an album without.
+      assert.deepEqual(state.lidarr.added[0].artist, state.lidarr.artists[0]);
       assert.deepEqual(state.lidarr.added[0].addOptions, {
         searchForNewAlbum: true,
       });
@@ -1179,7 +1180,8 @@ describe('music scans', () => {
         (state.lidarr.added[0] as { foreignAlbumId: string }).foreignAlbumId,
         SINGLE
       );
-      assert.deepEqual(state.lidarr.added[0].artist, { id: 7 });
+      // The artist as Lidarr has it: Lidarr refuses an album without.
+      assert.deepEqual(state.lidarr.added[0].artist, state.lidarr.artists[0]);
     });
 
     it('fails a request after a week of Lidarr not knowing an album', async () => {

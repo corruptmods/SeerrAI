@@ -160,6 +160,12 @@ const actAs = async (permissions: number, email = 'listener@test.local') => {
 const requestSongs = (songs: string[]) =>
   MediaRequest.requestMusic({ artistMbid: ARTIST, songs }, actingAs);
 
+/** Adds the artist, then (next minute) the album, and starts. */
+const startFetching = async () => {
+  await songFetcher.tick();
+  await songFetcher.tick();
+};
+
 const fetchOf = () =>
   getRepository(SongFetch).findOneOrFail({ where: {}, order: { id: 'DESC' } });
 
@@ -337,9 +343,20 @@ describe('taking a song from its album', () => {
     assert.equal(song.sourceAlbumMbid, STATIC_GARDEN);
     assert.equal(request.status, MediaRequestStatus.APPROVED);
 
+    // The artist is added first; Lidarr lists their albums itself.
     await songFetcher.tick();
-
     let fetch = await fetchOf();
+    assert.equal(fetch.status, 'queued');
+    assert.equal(
+      lidarr.calls
+        .filter((c) => c.method === 'POST')
+        .map((c) => c.path)
+        .join(),
+      '/api/v1/artist'
+    );
+
+    await songFetcher.tick();
+    fetch = await fetchOf();
     assert.equal(fetch.status, 'downloading');
     assert.deepEqual(fetch.recordings, [LANTERN]);
     // The artist and album are added, the album unmonitored and unsearched.
@@ -415,7 +432,7 @@ describe('taking a song from its album', () => {
     await requestSongs([LANTERN]);
     await requestSongs([OPENING]);
 
-    await songFetcher.tick();
+    await startFetching();
 
     assert.equal(await getRepository(SongFetch).count(), 1);
     assert.deepEqual(
@@ -432,7 +449,7 @@ describe('taking a song from its album', () => {
     found = [{ ...RELEASE, title: 'Someone Else - Other Album [MP3]' }];
     const request = await requestSongs([LANTERN]);
 
-    await songFetcher.tick();
+    await startFetching();
 
     assert.equal((await fetchOf()).status, 'failed');
     const after = await getRepository(MediaRequest).findOneByOrFail({
@@ -446,9 +463,137 @@ describe('taking a song from its album', () => {
     );
   });
 
+  it('takes the song into an edition with it, not the one Lidarr picked', async () => {
+    // Lidarr already has the artist and album, monitoring a bootleg box
+    // without the song; the usual official edition has it.
+    const artist = {
+      id: 7,
+      artistName: 'Glasswing',
+      foreignArtistId: ARTIST,
+      monitored: false,
+      qualityProfileId: 1,
+      metadataProfileId: 1,
+      rootFolderPath: '/music',
+      path: '/music/Glasswing',
+      tags: [],
+    };
+    lidarr.artists.push(artist);
+    lidarr.albums.push({
+      id: 30,
+      title: 'Static Garden',
+      foreignAlbumId: STATIC_GARDEN,
+      artistId: 7,
+      monitored: false,
+      releases: [
+        {
+          id: 31,
+          albumId: 30,
+          foreignReleaseId: 'r-box',
+          title: 'Static Garden',
+          status: 'Bootleg',
+          trackCount: 40,
+          monitored: true,
+        },
+        {
+          id: 32,
+          albumId: 30,
+          foreignReleaseId: 'r-static',
+          title: 'Static Garden',
+          status: 'Official',
+          trackCount: 2,
+          format: 'Digital Media',
+          monitored: false,
+        },
+      ],
+    });
+    lidarr.tracks.set(30, [
+      { id: 601, albumId: 30, title: 'Opening', hasFile: false },
+    ]);
+    lidarr.releaseTracks.set(32, [
+      {
+        id: 701,
+        albumId: 30,
+        title: 'Opening',
+        foreignRecordingId: OPENING,
+        hasFile: false,
+      },
+      {
+        id: 702,
+        albumId: 30,
+        title: 'Lantern Song',
+        foreignRecordingId: LANTERN,
+        hasFile: false,
+      },
+    ]);
+
+    await requestSongs([LANTERN]);
+    await songFetcher.tick();
+    let fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(fetch.lidarrReleaseId, 32);
+    assert.deepEqual(
+      fetch.files.map((f) => f.trackId),
+      [702]
+    );
+
+    done = true;
+    await songFetcher.tick();
+    const files = lidarr.calls.find(
+      (c) => c.method === 'POST' && c.path === '/api/v1/command'
+    )?.body?.files as { trackIds: number[]; albumReleaseId: number }[];
+    assert.deepEqual(
+      files.map((f) => [f.trackIds, f.albumReleaseId]),
+      [[[702], 32]]
+    );
+    // Neither the album nor the artist was changed to get there.
+    assert.equal(
+      lidarr.calls.filter(
+        (c) =>
+          c.method === 'PUT' ||
+          (c.method === 'POST' && c.path.endsWith('/album'))
+      ).length,
+      0
+    );
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'done');
+  });
+
+  it('uses the album Lidarr listed for the new artist, not a second one', async () => {
+    await requestSongs([LANTERN]);
+    await songFetcher.tick();
+    // Lidarr's refresh of the new artist lists the album meanwhile.
+    const artist = lidarr.artists[0];
+    lidarr.albums.push({
+      ...lidarr.lookupAlbums.get(STATIC_GARDEN)!,
+      id: 40,
+      artistId: artist.id,
+    });
+    lidarr.tracks.set(40, [
+      {
+        id: 801,
+        albumId: 40,
+        title: 'Lantern Song',
+        foreignRecordingId: LANTERN,
+        hasFile: false,
+      },
+    ]);
+
+    await songFetcher.tick();
+    const fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(fetch.lidarrAlbumId, 40);
+    assert.equal(
+      lidarr.calls.filter(
+        (c) => c.method === 'POST' && c.path === '/api/v1/album'
+      ).length,
+      0
+    );
+  });
+
   it('stops, and removes the download, once the request is declined', async () => {
     const request = await requestSongs([LANTERN]);
-    await songFetcher.tick();
+    await startFetching();
     assert.equal((await fetchOf()).status, 'downloading');
 
     await getRepository(MediaRequest).update(request.id, {

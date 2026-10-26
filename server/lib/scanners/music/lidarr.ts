@@ -1,3 +1,4 @@
+import type { LidarrArtist } from '@server/api/servarr/lidarr';
 import {
   MediaRequestStatus,
   MediaStatus,
@@ -177,15 +178,20 @@ export const lidarrInFlight = async (
       }
 
       const unknown: string[] = [];
+      // The artist as Lidarr has it, which Lidarr needs to add an album.
+      let lidarrArtist: LidarrArtist | undefined;
       for (const album of missing) {
         try {
           const found = await api.lookupAlbum(album.mbId);
-          if (!found) {
+          lidarrArtist ??= found
+            ? await api.getArtistByMbid(artist.foreignId)
+            : undefined;
+          if (!found || !lidarrArtist) {
             unknown.push(album.title);
             continue;
           }
           const added = await api.addAlbum(found, {
-            artist: { id: artist.externalServiceId },
+            artist: lidarrArtist,
             searchForNewAlbum: !server.preventSearch,
           });
           index.addAlbum(server.id, added, artist.foreignId);

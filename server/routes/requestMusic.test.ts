@@ -14,6 +14,7 @@ import {
 import dataSource, { getRepository } from '@server/datasource';
 import AlbumRequest from '@server/entity/AlbumRequest';
 import Media from '@server/entity/Media';
+import MediaEvent, { MediaEventType } from '@server/entity/MediaEvent';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import SongRequest from '@server/entity/SongRequest';
@@ -1156,6 +1157,43 @@ describe('requesting songs', () => {
     assert.equal(
       message(again),
       'Lantern Song is on Lantern Song, which is already here or on its way.'
+    );
+  });
+
+  it('fails, saying why, when its single is here without this version', async () => {
+    const id = await songOnItsWay([RADIO_EDIT]);
+    await getRepository(MusicAlbum).update(
+      { mbId: SINGLE },
+      { status: MediaStatus.AVAILABLE }
+    );
+    // Lidarr took an edition of the single with only the club mix.
+    lidarr.tracks.set(7, [
+      {
+        id: 2,
+        albumId: 7,
+        title: 'Lantern Song (Club Mix)',
+        foreignRecordingId: CLUB_MIX,
+        hasFile: true,
+      },
+    ]);
+
+    await completeMusicRequests([(await artistMedia()).id]);
+    await completeMusicRequests([(await artistMedia()).id]);
+
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id },
+    });
+    assert.equal(request.songs[0].status, MediaRequestStatus.FAILED);
+    assert.equal(request.status, MediaRequestStatus.FAILED);
+    assert.equal(availableSent().length, 0);
+    const failed = await getRepository(MediaEvent).find({
+      where: { type: MediaEventType.FAILED },
+    });
+    assert.deepEqual(
+      failed.map((event) => event.detail),
+      [
+        'Lantern Song is here, but Lidarr took an edition without “Lantern Song (radio edit)”.',
+      ]
     );
   });
 

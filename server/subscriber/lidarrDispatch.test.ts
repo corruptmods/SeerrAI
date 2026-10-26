@@ -293,7 +293,10 @@ describe('sending a music request to Lidarr', () => {
       string,
       never
     >;
-    assert.deepEqual(added.artist, { id: 7 });
+    // The artist as Lidarr has it (Lidarr refuses an album without its
+    // id, profiles and folder), its own folder and profiles, not the
+    // request's.
+    assert.deepEqual(added.artist, lidarr.artists[0]);
     assert.deepEqual(added.addOptions, { searchForNewAlbum: true });
     const artist = calls('PUT', '/api/v1/artist/7')[0].body as Record<
       string,

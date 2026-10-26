@@ -1317,7 +1317,10 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           artist: {
             ...found,
             ...setup,
-            addOptions: { monitor: 'none', searchForMissingAlbums: false },
+            addOptions: {
+              monitor: 'none' as const,
+              searchForMissingAlbums: false,
+            },
           },
           searchForNewAlbum: search,
         });
@@ -1370,7 +1373,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
             continue;
           }
           const added = await lidarr.addAlbum(album, {
-            artist: { id: artist.id },
+            artist,
             searchForNewAlbum: search,
           });
           albumIds.set(id, added.id);

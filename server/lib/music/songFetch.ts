@@ -28,6 +28,7 @@ import {
   namesAlbum,
 } from '@server/lib/music/albumRelease';
 import { clientFor, songFetchProblem } from '@server/lib/music/songFetchReady';
+import { releaseForSongs } from '@server/lib/music/songRelease';
 import { normalizeTitle } from '@server/lib/music/songs';
 import { markUndispatchable } from '@server/lib/requestDispatch';
 import type {
@@ -213,6 +214,16 @@ class SongFetcher {
     return lidarrApi(server);
   }
 
+  /** The tracks of the release the songs go into. */
+  private tracksOf(
+    lidarr: LidarrAPI,
+    fetch: SongFetch
+  ): Promise<LidarrTrack[]> {
+    return fetch.lidarrReleaseId
+      ? lidarr.getReleaseTracks(fetch.lidarrReleaseId)
+      : lidarr.getTracks(fetch.lidarrAlbumId!);
+  }
+
   /** The songs it is for that are still asked for, approved. */
   private async songsOf(fetch: SongFetch): Promise<SongRequest[]> {
     if (!fetch.recordings.length) return [];
@@ -296,6 +307,12 @@ class SongFetcher {
         label: LABEL,
         artist: fetch.artistMbid,
       });
+      // Lidarr lists the artist's albums itself, the album perhaps among
+      // them; it is looked for next time rather than added alongside.
+      fetch.lidarrArtistId = artist.id;
+      fetch.stage = 'Waiting for Lidarr to list the artist’s albums';
+      await getRepository(SongFetch).save(fetch);
+      return;
     }
     fetch.lidarrArtistId = artist.id;
 
@@ -310,7 +327,7 @@ class SongFetcher {
         return;
       }
       album = await lidarr.addAlbum(found, {
-        artist: { id: artist.id },
+        artist,
         searchForNewAlbum: false,
         monitored: false,
       });
@@ -318,7 +335,20 @@ class SongFetcher {
     fetch.lidarrAlbumId = album.id;
     await this.keepAlbumRow(fetch, album, songs[0].request);
 
-    const tracks = await lidarr.getTracks(album.id);
+    // The release the songs are imported into: one with them on it.
+    const release = await releaseForSongs(
+      lidarr,
+      album.id,
+      songs.map((song) => song.recordingMbid)
+    );
+    if (!release) {
+      fetch.stage = 'Waiting for Lidarr to list the album’s releases';
+      await getRepository(SongFetch).save(fetch);
+      return;
+    }
+    fetch.lidarrReleaseId = release.id;
+
+    const tracks = await lidarr.getReleaseTracks(release.id);
     if (!tracks.length) {
       fetch.stage = 'Waiting for Lidarr to list the album’s tracks';
       await getRepository(SongFetch).save(fetch);
@@ -387,7 +417,7 @@ class SongFetcher {
    */
   private async search(fetch: SongFetch, songs: SongRequest[]): Promise<void> {
     const lidarr = this.lidarr(fetch);
-    const tracks = await lidarr.getTracks(fetch.lidarrAlbumId!);
+    const tracks = await this.tracksOf(lidarr, fetch);
     // Those Lidarr has no file for yet.
     const wanted = songs
       .map((song) => ({ song, track: trackOf(tracks, song) }))
@@ -747,7 +777,9 @@ class SongFetcher {
     const lidarr = this.lidarr(fetch);
     const album = await lidarr.getAlbum(fetch.lidarrAlbumId!);
     const release =
-      album.releases?.find((r) => r.monitored) ?? album.releases?.[0];
+      album.releases?.find((r) => r.id === fetch.lidarrReleaseId) ??
+      album.releases?.find((r) => r.monitored) ??
+      album.releases?.[0];
     if (!release) throw new Error('Lidarr lists no release of the album.');
     const ready = fetch.files.filter(
       (file) => paths.has(file.index) && isAudio(paths.get(file.index)!)
@@ -822,7 +854,7 @@ class SongFetcher {
         return;
       }
     }
-    const tracks = await lidarr.getTracks(fetch.lidarrAlbumId!);
+    const tracks = await this.tracksOf(lidarr, fetch);
     const landed = fetch.files.filter(
       (file) => tracks.find((t) => t.id === file.trackId)?.hasFile
     );

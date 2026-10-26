@@ -46,6 +46,11 @@ export interface LidarrRelease {
   title: string;
   monitored: boolean;
   trackCount?: number;
+  /** Official, Promotion, Bootleg, Pseudo-Release… */
+  status?: string;
+  /** "Digital Media", "CD", "12\" Vinyl"… */
+  format?: string;
+  country?: string[];
 }
 
 /** A track of an album in Lidarr, of the release Lidarr chose. */
@@ -244,11 +249,29 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
-  /** An album's tracks, and which of them have a file. */
+  /**
+   * An album's tracks, of the release Lidarr monitors, and which of them
+   * have a file.
+   */
   public getTracks = async (albumId: number): Promise<LidarrTrack[]> => {
     try {
       return (
         await this.axios.get<LidarrTrack[]>('/track', { params: { albumId } })
+      ).data;
+    } catch (e) {
+      this.fail('retrieve tracks', e);
+    }
+  };
+
+  /** The tracks of one release of an album, monitored or not. */
+  public getReleaseTracks = async (
+    albumReleaseId: number
+  ): Promise<LidarrTrack[]> => {
+    try {
+      return (
+        await this.axios.get<LidarrTrack[]>('/track', {
+          params: { albumReleaseId },
+        })
       ).data;
     } catch (e) {
       this.fail('retrieve tracks', e);
@@ -357,8 +380,9 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
   /**
    * Adds one album from a lookup. With an artist Lidarr does not have yet,
    * `artist` carries how to set it up and Lidarr adds it too; for one it
-   * has, it is `{ id }`. Monitored unless `monitored` is false, as for an
-   * album only one song is taken from.
+   * has, it is the artist as Lidarr gave it (Lidarr refuses an album whose
+   * artist lacks its id, profiles and folder). Monitored unless `monitored`
+   * is false, as for an album only one song is taken from.
    */
   public addAlbum = async (
     album: LidarrAlbum,
@@ -367,9 +391,7 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
       searchForNewAlbum,
       monitored = true,
     }: {
-      artist:
-        | { id: number }
-        | (LidarrArtist & LidarrArtistOptions & LidarrAddArtistOptions);
+      artist: LidarrArtist | (LidarrArtist & LidarrAddArtistOptions);
       searchForNewAlbum: boolean;
       monitored?: boolean;
     }

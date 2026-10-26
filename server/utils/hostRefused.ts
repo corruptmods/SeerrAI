@@ -1,4 +1,5 @@
 import { isAxiosError } from 'axios';
+import type { Response } from 'express';
 
 /*
  * Radarr 7 (and the apps built like it) can be told which host names to
@@ -40,3 +41,20 @@ export const hostRefusedMessage = (app: string, host: string): string =>
   host
     ? `${app} doesn't answer to "${host}": add ${host} to Allowed Hosts in ${app} (Settings → General), or connect to it by a name it allows.`
     : `${app} doesn't answer to the name Seerr AI uses for it: add that name to Allowed Hosts in ${app} (Settings → General).`;
+
+/**
+ * A connection test turned away for its host name: answered 502 with what
+ * to do, and true. Any other failure: false, for the caller to answer.
+ */
+export const answerHostRefused = (
+  res: Response,
+  app: string,
+  e: unknown
+): boolean => {
+  const host = refusedHost(e);
+  if (host === undefined) return false;
+  res
+    .status(502)
+    .json({ message: hostRefusedMessage(app, host), hostRefused: host });
+  return true;
+};

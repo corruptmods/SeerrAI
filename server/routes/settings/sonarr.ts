@@ -2,7 +2,7 @@ import SonarrAPI from '@server/api/servarr/sonarr';
 import type { SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
-import { hostRefusedMessage, refusedHost } from '@server/utils/hostRefused';
+import { answerHostRefused } from '@server/utils/hostRefused';
 import { Router } from 'express';
 
 const sonarrRoutes = Router();
@@ -71,13 +71,7 @@ sonarrRoutes.post('/test', async (req, res, next) => {
     });
 
     // Turned away for the name it was reached by: say how to let it in.
-    const host = refusedHost(e);
-    if (host !== undefined) {
-      return res.status(502).json({
-        message: hostRefusedMessage('Sonarr', host),
-        hostRefused: host,
-      });
-    }
+    if (answerHostRefused(res, 'Sonarr', e)) return;
     next({ status: 500, message: 'Failed to connect to Sonarr' });
   }
 });

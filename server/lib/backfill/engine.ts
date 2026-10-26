@@ -497,6 +497,16 @@ export interface BackfillReadiness {
   music: boolean;
 }
 
+/** The kinds of title Backfill searches for, as Settings → Backfill has it. */
+const followedKinds = (): BackfillKind[] => {
+  const settings = getSettings().backfill;
+  return [
+    'series',
+    ...(settings.includeMovies ? (['movie'] as const) : []),
+    ...(settings.includeMusic && musicReady() ? (['album'] as const) : []),
+  ];
+};
+
 /** What Sonarr, Radarr and Lidarr all answer, for downloads and imports. */
 type Arr = BackfillSonarr | BackfillRadarr | BackfillLidarr;
 
@@ -1160,13 +1170,8 @@ class Backfill {
     let stoppedBecause: string | undefined;
     try {
       await this.scan({ everything: true, searches: false });
-      const settings = getSettings().backfill;
       const repo = getRepository(BackfillSeries);
-      const kinds: BackfillKind[] = [
-        'series',
-        ...(settings.includeMovies ? (['movie'] as const) : []),
-        ...(settings.includeMusic && musicReady() ? (['album'] as const) : []),
-      ];
+      const kinds = followedKinds();
       const due = await repo.find({
         where: [
           { status: 'stuck', kind: In(kinds) },
@@ -1582,11 +1587,7 @@ class Backfill {
       // A search of everything stuck does the searching while it runs.
       if (!searches || this.searchAllRun) return;
 
-      const kinds: BackfillKind[] = [
-        'series',
-        ...(settings.includeMovies ? (['movie'] as const) : []),
-        ...(settings.includeMusic && musicReady() ? (['album'] as const) : []),
-      ];
+      const kinds = followedKinds();
       const due = await repo.find({
         where: [
           { status: 'stuck', kind: In(kinds) },

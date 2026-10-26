@@ -26,6 +26,7 @@ import {
   songsOfFile,
 } from '@server/lib/music/albumRelease';
 import { completeMusicRequests } from '@server/lib/music/completion';
+import { songStandings } from '@server/lib/music/requestSongs';
 import songFetcher from '@server/lib/music/songFetch';
 import { Permission } from '@server/lib/permissions';
 import {
@@ -431,6 +432,94 @@ describe('taking a song from its album', () => {
     });
     assert.equal(after.songs[0].status, MediaRequestStatus.COMPLETED);
     assert.equal(after.status, MediaRequestStatus.COMPLETED);
+
+    // On the album's page, the song itself is here, though the album is
+    // only partly.
+    const standing = await songStandings([
+      {
+        mbId: LANTERN,
+        releaseGroups: [
+          {
+            mbId: STATIC_GARDEN,
+            title: 'Static Garden',
+            primaryType: 'Album',
+            secondaryTypes: [],
+            date: '1997-05-21',
+            byArtist: true,
+          },
+        ],
+      },
+    ]);
+    assert.equal(standing.get(LANTERN)?.status, MediaStatus.AVAILABLE);
+  });
+
+  it('links the artist of a song taken before artists were linked', async () => {
+    const request = await requestSongs([LANTERN]);
+    await startFetching();
+    done = true;
+    await songFetcher.tick();
+    await songFetcher.tick();
+    assert.equal((await fetchOf()).status, 'done');
+    // As an older Seerr AI left it: the song on file, the artist unlinked.
+    await getRepository(Media).update(request.media.id, {
+      serviceId: null,
+      externalServiceId: null,
+      externalServiceSlug: null,
+    });
+
+    await songFetcher.tick();
+
+    const media = await getRepository(Media).findOneByOrFail({
+      id: request.media.id,
+    });
+    assert.deepEqual(
+      [media.serviceId, media.externalServiceId, media.externalServiceSlug],
+      [0, lidarr.artists[0].id, ARTIST]
+    );
+  });
+
+  it('takes another song from an album one was already taken from', async () => {
+    await requestSongs([LANTERN]);
+    await startFetching();
+    done = true;
+    await songFetcher.tick();
+    await songFetcher.tick();
+    assert.equal((await fetchOf()).status, 'done');
+    const first = await fetchOf();
+    // The scans see the album partly here: one song of it.
+    await getRepository(MusicAlbum).update(
+      { mbId: STATIC_GARDEN },
+      { status: MediaStatus.PARTIALLY_AVAILABLE }
+    );
+
+    // The album's other song, asked for afterwards.
+    done = false;
+    priorities = [];
+    const second = await requestSongs([OPENING]);
+    assert.equal(second.status, MediaRequestStatus.APPROVED, 'not refused');
+    await songFetcher.tick();
+
+    const fetch = await fetchOf();
+    assert.notEqual(fetch.id, first.id, 'a fetch of its own');
+    assert.deepEqual(fetch.recordings, [OPENING]);
+    assert.equal(fetch.status, 'downloading');
+    // Into the same edition the first went into, only its own file.
+    assert.equal(fetch.lidarrReleaseId, first.lidarrReleaseId);
+    assert.deepEqual(
+      fetch.files.map((f) => f.trackId),
+      [501]
+    );
+    assert.deepEqual(priorities, [
+      { indexes: [1, 2], priority: 0 },
+      { indexes: [0], priority: 1 },
+    ]);
+    // Lidarr already had the artist and album: neither added again.
+    assert.equal(
+      lidarr.calls.filter(
+        (c) => c.method === 'POST' && c.path !== '/api/v1/command'
+      ).length,
+      2
+    );
   });
 
   it('takes two songs of one album in one download', async () => {

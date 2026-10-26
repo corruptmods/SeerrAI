@@ -126,6 +126,7 @@ class SongFetcher {
     this.ticking = true;
     try {
       await this.plan();
+      await this.linkFinished();
       const fetches = await getRepository(SongFetch).find({
         where: { status: In(ACTIVE) },
         order: { id: 'ASC' },
@@ -386,8 +387,8 @@ class SongFetcher {
    */
   private async linkArtist(
     request: MediaRequest,
-    server: LidarrSettings,
-    artist: LidarrArtist
+    server: Pick<LidarrSettings, 'id'>,
+    artist: Pick<LidarrArtist, 'id' | 'foreignArtistId'>
   ): Promise<void> {
     const media = request.media;
     if (!media?.id || media.externalServiceId != null) return;
@@ -398,6 +399,29 @@ class SongFetcher {
     });
     media.serviceId = server.id;
     media.externalServiceId = artist.id;
+  }
+
+  /**
+   * Songs taken before the artist was linked to their Lidarr (fixed since)
+   * wait for scans that never looked at their album: linked now, their
+   * requests finish with the next scan.
+   */
+  private async linkFinished(): Promise<void> {
+    const finished = await getRepository(SongFetch).find({
+      where: { status: 'done', lidarrArtistId: Not(IsNull()) },
+      order: { id: 'DESC' },
+      take: 50,
+    });
+    for (const fetch of finished) {
+      const [song] = await this.songsOf(fetch);
+      if (song) {
+        await this.linkArtist(
+          song.request,
+          { id: fetch.lidarrId },
+          { id: fetch.lidarrArtistId!, foreignArtistId: fetch.artistMbid }
+        );
+      }
+    }
   }
 
   /**

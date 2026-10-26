@@ -191,11 +191,16 @@ export const songsCovered = async (
           CAME_ON.indexOf(albumStatus.get(a.mbId) as MediaStatus)
       )[0];
     if (on) {
+      const status = albumStatus.get(on.mbId) as MediaStatus;
       covered.set(version.mbId, {
         by: 'album',
         albumMbid: on.mbId,
         albumTitle: on.title,
-        status: albumStatus.get(on.mbId) as MediaStatus,
+        // Taken from an album only partly here: the song itself is here.
+        status:
+          on.came && status === MediaStatus.PARTIALLY_AVAILABLE
+            ? MediaStatus.AVAILABLE
+            : status,
       });
     }
   }

@@ -1,7 +1,11 @@
+import { MediaType } from '@server/constants/media';
 import type Media from '@server/entity/Media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
-import notificationManager, { Notification } from '@server/lib/notifications';
+import notificationManager, {
+  Notification,
+  digestOf,
+} from '@server/lib/notifications';
 import type {
   NotificationAgent,
   NotificationPayload,
@@ -281,5 +285,40 @@ describe('an agent that fails', () => {
     }
     assert.deepEqual(unhandled, []);
     assert.equal(sent.length, 1, 'the other agents still sent it');
+  });
+});
+
+describe('what a gathered "ready" says', () => {
+  const ready = (subject: string, mediaType: MediaType) => ({
+    subject,
+    notifySystem: false,
+    notifyAdmin: false,
+    media: { mediaType } as Media,
+  });
+
+  it('is to listen to for music, and to watch or listen to for both', () => {
+    const subject = (...items: ReturnType<typeof ready>[]) =>
+      digestOf(Notification.MEDIA_AVAILABLE, items).subject;
+    assert.equal(
+      subject(
+        ready('Static Garden — Glasswing', MediaType.MUSIC),
+        ready('Lantern Song — Glasswing', MediaType.MUSIC)
+      ),
+      '2 music requests are ready to listen to'
+    );
+    assert.equal(
+      subject(
+        ready('Zelvara (2021)', MediaType.MOVIE),
+        ready('Static Garden — Glasswing', MediaType.MUSIC)
+      ),
+      '2 requests are ready to watch or listen to'
+    );
+    assert.equal(
+      subject(
+        ready('Zelvara (2021)', MediaType.MOVIE),
+        ready('Yonder (2009)', MediaType.TV)
+      ),
+      '2 titles are ready to watch'
+    );
   });
 });

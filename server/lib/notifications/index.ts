@@ -1,3 +1,4 @@
+import { MediaType } from '@server/constants/media';
 import type { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
@@ -138,10 +139,23 @@ interface Gathering {
 }
 
 /** The headline of a gathered notification, by kind. */
-const digestSubject = (type: Notification, count: number): string => {
+const digestSubject = (
+  type: Notification,
+  payloads: NotificationPayload[]
+): string => {
+  const count = payloads.length;
   switch (type) {
-    case Notification.MEDIA_AVAILABLE:
-      return `${count} titles are ready to watch`;
+    case Notification.MEDIA_AVAILABLE: {
+      // Music is listened to: said so when it is all, or some, of them.
+      const music = payloads.filter(
+        (p) => p.media?.mediaType === MediaType.MUSIC
+      ).length;
+      return music === count
+        ? `${count} music requests are ready to listen to`
+        : music
+          ? `${count} requests are ready to watch or listen to`
+          : `${count} titles are ready to watch`;
+    }
     case Notification.MEDIA_DECLINED:
       return `${count} requests were declined`;
     case Notification.MEDIA_AUTO_REQUESTED:
@@ -160,7 +174,7 @@ export const digestOf = (
   const shown = names.slice(0, NAMED_IN_DIGEST);
   const more = names.length - shown.length;
   return {
-    subject: digestSubject(type, payloads.length),
+    subject: digestSubject(type, payloads),
     message: `${shown.join(', ')}${more > 0 ? `, and ${more} more` : ''}.`,
     image: payloads.find((p) => p.image)?.image,
     notifyUser: payloads[0].notifyUser,

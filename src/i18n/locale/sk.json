@@ -1355,6 +1355,7 @@
   "components.Settings.SonarrModal.syncEnabled": "Zapnúť kontrolu",
   "components.Settings.SonarrModal.tagRequests": "Označovať žiadosti značkou",
   "components.Settings.apiKey": "Kľúč API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} neodpovedá na „{host}“. Pridajte {host} do Allowed Hosts v {app} (Settings → General) alebo sa pripojte menom, ktoré povoľuje.",
   "components.Settings.blocklistedTagImportInstructions": "Nižšie vložte nastavenie značiek pre zoznam blokovaných.",
   "components.Settings.blocklistedTagImportTitle": "Importovať nastavenie zablokovaných značiek",
   "components.StatusBadge.openinarr": "Otvoriť v {arr}",

@@ -1673,6 +1673,7 @@
   "components.UserProfile.UserSettings.UserNotificationSettings.telegramMessageThreadId": "ID do tópico",
   "components.UserProfile.UserSettings.UserNotificationSettings.UserNotificationsWebPush.webpushsettingssaved": "Configurações de notificações push salvas com sucesso!",
   "components.Settings.apiKey": "Chave de API",
+  "components.Settings.arrTestFailure.hostRefused": "O {app} não responde a “{host}”. Adicione {host} aos Allowed Hosts do {app} (Settings → General) ou conecte-se por um nome que ele permita.",
   "components.UserProfile.UserSettings.UserNotificationSettings.UserNotificationsWebPush.unknown": "Desconhecido",
   "components.Settings.chooseProvider": "Escolha os provedores de metadados para cada tipo de conteúdo",
   "components.Settings.operational": "Funcionando",

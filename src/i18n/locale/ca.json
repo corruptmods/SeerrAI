@@ -1371,6 +1371,7 @@
   "components.Settings.SettingsJobsCache.dnscacheage": "Edat",
   "components.Settings.SettingsMain.youtubeUrl": "URL de YouTube",
   "components.Settings.apiKey": "Clau de l'API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} no respon a «{host}». Afegeix {host} a Allowed Hosts a {app} (Settings → General), o connecta-hi amb un nom que permeti.",
   "components.UserList.toggleSortDirectionAria": "Canvia el sentit de l'ordenació",
   "components.Settings.Notifications.NotificationsWebhook.webhookUrlTip": "L'URL de notificació de prova està definit com a {testUrl} en comptes de l'URL actual del webhook.",
   "components.Settings.OverrideRuleModal.selecttags": "Selecciona etiquetes",

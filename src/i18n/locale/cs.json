@@ -1290,6 +1290,7 @@
   "components.Settings.SettingsMain.streamingRegionTip": "Zobrazit streamovací služby podle dostupnosti v regionu",
   "components.Settings.SettingsMain.discoverRegion": "Region objevování",
   "components.Settings.apiKey": "Klíč API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} neodpovídá na „{host}“. Přidejte {host} do Allowed Hosts v {app} (Settings → General), nebo se připojte jménem, které povoluje.",
   "components.Settings.invalidurlerror": "Nelze se připojit k serveru {mediaServerName}.",
   "components.Settings.jellyfinForgotPasswordUrl": "Adresa URL pro zapomenuté heslo",
   "components.Settings.jellyfinSettings": "Nastavení {mediaServerName}",

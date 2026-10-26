@@ -1663,6 +1663,7 @@
   "components.Blocklist.blocklistdate": "ημερομηνία",
   "components.Selector.returningSeries": "Συνεχίζεται",
   "components.Settings.apiKey": "Κλειδί API",
+  "components.Settings.arrTestFailure.hostRefused": "Το {app} δεν απαντά στο «{host}». Προσθέστε το {host} στα Allowed Hosts του {app} (Settings → General) ή συνδεθείτε με ένα όνομα που επιτρέπει.",
   "components.UserProfile.UserSettings.UserNotificationSettings.UserNotificationsWebPush.webpushhasbeenenabled": "Το web push ενεργοποιήθηκε.",
   "components.UserProfile.UserSettings.UserNotificationSettings.UserNotificationsWebPush.webpushsettingsfailed": "Αποτυχία αποθήκευσης των ρυθμίσεων ειδοποιήσεων web push.",
   "components.Settings.Notifications.NotificationsNtfy.validationTypes": "Πρέπει να επιλέξετε τουλάχιστον έναν τύπο ειδοποίησης",

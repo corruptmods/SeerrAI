@@ -1187,6 +1187,7 @@
   "components.Settings.allChosenProvidersAreOperational": "כל ספקי המטא-דאטה שנבחרו פועלים",
   "components.Settings.animeMetadataProvider": "ספק מטא-דאטה לאנימה",
   "components.Settings.apiKey": "מפתח API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} לא עונה לשם „{host}”. הוסיפו את {host} ל-Allowed Hosts ב-{app} (Settings → General), או התחברו בשם שהוא מתיר.",
   "components.Settings.blocklistedTagImportInstructions": "הדבק למטה את הגדרות התגיות החסומות.",
   "components.Settings.blocklistedTagImportTitle": "ייבוא הגדרות תגיות חסומות",
   "components.Settings.blocklistedTagsText": "תגיות חסומות",

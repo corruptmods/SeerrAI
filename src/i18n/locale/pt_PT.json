@@ -1429,6 +1429,7 @@
   "components.Settings.allChosenProvidersAreOperational": "Todos os fornecedores de metadados selecionados estão operacionais",
   "components.Settings.animeMetadataProvider": "Fornecedor de metadados de anime",
   "components.Settings.apiKey": "Chave API",
+  "components.Settings.arrTestFailure.hostRefused": "O {app} não responde a «{host}». Adicione {host} aos Allowed Hosts do {app} (Settings → General) ou ligue-se por um nome que ele permita.",
   "components.Settings.chooseProvider": "Escolher fornecedores de metadados para diferentes tipos de conteúdo",
   "components.Settings.clickTest": "Use Testar para verificar se os fornecedores de metadados respondem",
   "components.Settings.connectionTestFailed": "Teste de ligação falhou",

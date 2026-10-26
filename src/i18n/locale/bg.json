@@ -1273,6 +1273,7 @@
   "components.Settings.SettingsNetwork.toastSettingsFailure": "Нещо се обърка при запазването на настройките.",
   "components.Settings.SettingsJobsCache.usersavatars": "Потребителски аватари",
   "components.Settings.apiKey": "API ключ",
+  "components.Settings.arrTestFailure.hostRefused": "{app} не отговаря на „{host}“. Добавете {host} в Allowed Hosts в {app} (Settings → General) или се свържете с него с име, което позволява.",
   "components.Settings.SettingsNetwork.proxyBypassFilter": "Игнорирани адреси от проксито",
   "components.MovieDetails.addtowatchlist": "Добавяне към списъка за гледане",
   "components.Settings.OverrideRuleModal.genres": "Жанрове",

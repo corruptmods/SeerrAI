@@ -2,6 +2,7 @@ import ExternalAPI from '@server/api/externalapi';
 import type { AvailableCacheIds } from '@server/lib/cache';
 import cacheManager from '@server/lib/cache';
 import { getSettings, type DVRSettings } from '@server/lib/settings';
+import { hostRefusedMessage, refusedHost } from '@server/utils/hostRefused';
 
 export interface SystemStatus {
   version: string;
@@ -123,6 +124,15 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
     );
 
     this.apiName = apiName;
+    // Turned away for the name it was reached by: every error says how to
+    // let Seerr AI in, rather than "status code 400".
+    this.axios.interceptors.response.use(undefined, (e) => {
+      const host = refusedHost(e);
+      if (host !== undefined && e instanceof Error) {
+        e.message = hostRefusedMessage(apiName, host);
+      }
+      return Promise.reject(e);
+    });
   }
 
   public getSystemStatus = async (): Promise<SystemStatus> => {

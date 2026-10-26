@@ -1694,6 +1694,7 @@
   "components.UserList.toggleSortDirectionAria": "Cambiar el sentido del orden",
   "components.Settings.settings": "Ajustes",
   "components.Settings.apiKey": "Clave de API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} no responde a «{host}». Añade {host} a Allowed Hosts en {app} (Settings → General) o conéctate con un nombre que permita.",
   "components.Settings.SettingsNetwork.proxyUser": "Nombre de usuario del proxy",
   "i18n.blocklist": "Lista de bloqueo",
   "components.Settings.Notifications.validationWebhookThreadId": "Debes proporcionar un ID de hilo de Discord válido",

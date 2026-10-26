@@ -1239,6 +1239,7 @@
   "components.Settings.SettingsMain.hideAvailable": "Elérhető média elrejtése",
   "components.Settings.SettingsNetwork.proxyBypassLocalAddresses": "Proxy megkerülése helyi címek esetében",
   "components.Settings.apiKey": "API kulcs",
+  "components.Settings.arrTestFailure.hostRefused": "A(z) {app} nem válaszol erre: „{host}”. Add hozzá a(z) {host} nevet a(z) {app} Allowed Hosts listájához (Settings → General), vagy kapcsolódj egy általa engedett névvel.",
   "components.Settings.invalidurlerror": "Nem lehet csatlakozni a {mediaServerName} szerverhez.",
   "components.Settings.jellyfinForgotPasswordUrl": "Elfelejtett jelszó URL",
   "components.Settings.jellyfinSettingsFailure": "Hiba történt a {mediaServerName} beállítások mentése közben.",

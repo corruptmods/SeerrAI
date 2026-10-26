@@ -1386,6 +1386,7 @@
   "components.Settings.addrule": "Nuova regola di sostituzione",
   "components.Settings.advancedTooltip": "Una configurazione errata di questa impostazione può causare dei malfunzionamenti",
   "components.Settings.apiKey": "Chiave API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} non risponde a «{host}». Aggiungi {host} agli Allowed Hosts di {app} (Settings → General) o collegati con un nome che consente.",
   "components.Settings.experimentalTooltip": "L'attivazione di questa impostazione può causare un comportamento imprevisto dell'applicazione",
   "components.Settings.jellyfinForgotPasswordUrl": "URL Password dimenticata",
   "components.Settings.jellyfinSettings": "Impostazioni {mediaServerName}",

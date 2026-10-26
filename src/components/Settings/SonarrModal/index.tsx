@@ -1,6 +1,7 @@
 import Modal from '@app/components/Common/Modal';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import type { SonarrTestResponse } from '@app/components/Settings/SettingsServices';
+import { arrTestFailure } from '@app/components/Settings/arrTestFailure';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -198,13 +199,16 @@ const SonarrModal = ({ onClose, sonarr, onSave }: SonarrModalProps) => {
             autoDismiss: true,
           });
         }
-      } catch {
+      } catch (e) {
         setIsValidated(false);
         if (initialLoad.current) {
-          addToast(intl.formatMessage(messages.toastSonarrTestFailure), {
-            appearance: 'error',
-            autoDismiss: true,
-          });
+          addToast(
+            arrTestFailure(intl, e, 'Sonarr', messages.toastSonarrTestFailure),
+            {
+              appearance: 'error',
+              autoDismiss: true,
+            }
+          );
         }
       } finally {
         setIsTesting(false);

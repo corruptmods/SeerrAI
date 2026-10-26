@@ -1571,6 +1571,7 @@
   "components.TvDetails.watchlistDeleted": "<strong>{title}</strong> fjernet fra Se senere-liste!",
   "components.TvDetails.watchlistSuccess": "<strong>{title}</strong> tilføjet til Se senere-liste!",
   "components.Settings.apiKey": "API-nøgle",
+  "components.Settings.arrTestFailure.hostRefused": "{app} svarer ikke på “{host}”. Tilføj {host} til Allowed Hosts i {app} (Settings → General), eller forbind med et navn, den tillader.",
   "components.Settings.OverrideRuleModal.languages": "Sprog",
   "components.Settings.SettingsNetwork.proxyEnabled": "HTTP(S)-proxy",
   "components.Settings.SettingsNetwork.proxyHostname": "Proxy-værtsnavn",

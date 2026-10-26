@@ -1428,6 +1428,7 @@
   "components.Settings.allChosenProvidersAreOperational": "جميع مزودي البيانات الوصفية المختارين يعملون بشكل طبيعي",
   "components.Settings.animeMetadataProvider": "مزوّد البيانات الوصفية للأنمي",
   "components.Settings.apiKey": "مفتاح API",
+  "components.Settings.arrTestFailure.hostRefused": "لا يستجيب {app} للاسم «{host}». أضف {host} إلى Allowed Hosts في {app} (Settings → General)، أو اتصل به باسم يسمح به.",
   "components.Settings.chooseProvider": "اختر مزودي البيانات الوصفية لأنواع المحتوى المختلفة",
   "components.Settings.clickTest": "استخدم Test للتحقق من استجابة مزوّدي البيانات الوصفية",
   "components.Settings.connectionTestFailed": "فشل اختبار الاتصال",

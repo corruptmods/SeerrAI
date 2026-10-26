@@ -983,6 +983,7 @@
   "components.Settings.addrule": "Nei Ofweichungsregel",
   "components.Settings.animeMetadataProvider": "Metadate-Provider fir Anime",
   "components.Settings.apiKey": "API-Schlëssel",
+  "components.Settings.arrTestFailure.hostRefused": "{app} äntwert net op „{host}“. Setz {host} bei Allowed Hosts an {app} derbäi (Settings → General), oder verbann dech iwwer en Numm, deen et erlaabt.",
   "components.Settings.blocklistedTagImportInstructions": "Fügt d’Konfiguratioun vun de gespaarten Tags hei drënner an.",
   "components.Settings.blocklistedTagImportTitle": "Konfiguratioun vu gespaarten Tags importéieren",
   "components.Settings.blocklistedTagsText": "Gespaart Tags",

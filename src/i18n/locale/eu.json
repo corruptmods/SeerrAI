@@ -1078,6 +1078,7 @@
   "components.Settings.SonarrModal.tagRequests": "Etiketa eskaerak",
   "components.Settings.activeProfile": "Gaitutako profila",
   "components.Settings.apiKey": "API gakoa",
+  "components.Settings.arrTestFailure.hostRefused": "{app}-(e)k ez dio «{host}» izenari erantzuten. Gehitu {host} {app}-(e)ko Allowed Hosts-en (Settings → General), edo konektatu onartzen duen izen batekin.",
   "components.Settings.cancelscan": "Utzi eskaneoa",
   "components.Settings.default4k": "4K lehenetsia",
   "components.Settings.enablessl": "Erabili SSL",

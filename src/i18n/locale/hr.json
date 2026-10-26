@@ -1672,6 +1672,7 @@
   "components.Settings.SonarrModal.monitorNewItems": "Prati nove sezone",
   "components.Settings.animeMetadataProvider": "Pružatelj metapodataka za anime",
   "components.Settings.apiKey": "API ključ",
+  "components.Settings.arrTestFailure.hostRefused": "{app} ne odgovara na „{host}”. Dodajte {host} u Allowed Hosts u {app} (Settings → General) ili se povežite imenom koje dopušta.",
   "components.Settings.blocklistedTagImportInstructions": "U nastavku zalijepite konfiguraciju blokiranih oznaka.",
   "components.Settings.blocklistedTagImportTitle": "Uvoz konfiguracije blokiranih oznaka",
   "components.Settings.jellyfinSettings": "Postavke poslužitelja {mediaServerName}",

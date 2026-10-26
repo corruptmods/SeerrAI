@@ -1346,6 +1346,7 @@
   "components.Settings.SettingsMain.discoverRegionTip": "Filtrer le contenu selon la disponibilité par pays",
   "components.Settings.SettingsMain.streamingRegion": "Pays de streaming",
   "components.Settings.apiKey": "Clé API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} ne répond pas à « {host} ». Ajoutez {host} aux Allowed Hosts de {app} (Settings → General), ou connectez-vous avec un nom qu’il autorise.",
   "components.Settings.scanbackground": "L’analyse tourne en arrière-plan ; vous pouvez continuer la configuration.",
   "components.UserProfile.UserSettings.UserGeneralSettings.discoverRegion": "Pays dans Découvrir",
   "components.UserProfile.UserSettings.UserGeneralSettings.discoverRegionTip": "Filtrer le contenu selon la disponibilité par pays",

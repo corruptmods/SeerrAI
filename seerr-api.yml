@@ -7635,6 +7635,19 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/ServiceProfile'
+        '502':
+          description: Radarr turned the request away for the host name it was reached by (its Allowed Hosts). The message says what to add.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  hostRefused:
+                    type: string
+                    description: The host name Radarr does not answer to.
+                    example: radarr.lan
   /settings/radarr/{radarrId}:
     put:
       summary: Update Radarr instance
@@ -7779,6 +7792,19 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/ServiceProfile'
+        '502':
+          description: Sonarr turned the request away for the host name it was reached by (its Allowed Hosts). The message says what to add.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  hostRefused:
+                    type: string
+                    description: The host name Sonarr does not answer to.
+                    example: radarr.lan
   /settings/sonarr/{sonarrId}:
     put:
       summary: Update Sonarr instance
@@ -7918,6 +7944,19 @@ paths:
                       $ref: '#/components/schemas/ServarrTag'
                   urlBase:
                     type: string
+        '502':
+          description: Lidarr turned the request away for the host name it was reached by (its Allowed Hosts). The message says what to add.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  hostRefused:
+                    type: string
+                    description: The host name Lidarr does not answer to.
+                    example: radarr.lan
   /settings/lidarr/{lidarrId}:
     put:
       summary: Change a Lidarr server

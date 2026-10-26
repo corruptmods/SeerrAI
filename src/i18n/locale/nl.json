@@ -1342,6 +1342,7 @@
   "components.RequestList.RequestItem.removearr": "Verwijderen van {arr}",
   "components.UserProfile.UserSettings.UserGeneralSettings.discoverRegion": "Regio voor Ontdekken",
   "components.Settings.apiKey": "API-sleutel",
+  "components.Settings.arrTestFailure.hostRefused": "{app} reageert niet op ‘{host}’. Voeg {host} toe aan Allowed Hosts in {app} (Settings → General), of maak verbinding via een naam die het toestaat.",
   "components.RequestList.sortDirection": "Sorteerrichting wisselen",
   "components.Settings.Notifications.validationWebhookRoleId": "Je moet een geldige Discord Role ID opgeven",
   "components.Settings.Notifications.webhookRoleId": "Role-id melding",

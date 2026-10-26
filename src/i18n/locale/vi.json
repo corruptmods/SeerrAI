@@ -261,6 +261,7 @@
   "components.Settings.addsonarr": "Thêm máy chủ Sonarr",
   "components.Settings.advancedTooltip": "Cấu hình sai mục này có thể khiến một số chức năng ngừng hoạt động",
   "components.Settings.apiKey": "Khóa API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} không phản hồi tên “{host}”. Thêm {host} vào Allowed Hosts trong {app} (Settings → General), hoặc kết nối bằng một tên mà nó cho phép.",
   "components.Settings.blocklistedTagImportInstructions": "Dán cấu hình thẻ bị chặn vào bên dưới.",
   "components.Settings.chooseProvider": "Chọn nhà cung cấp siêu dữ liệu cho từng loại nội dung",
   "components.Settings.clearBlocklistedTagsConfirm": "Xóa các thẻ bị chặn?",

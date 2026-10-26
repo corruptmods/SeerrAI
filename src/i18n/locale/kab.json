@@ -1352,6 +1352,7 @@
   "components.Settings.advancedTooltip": "Aswel ur nṣeḥḥi ara n uɣewwar-a yezmer ad yerreẓ kra n tmahilin",
   "components.Settings.allChosenProvidersAreOperational": "Akk isaǧǧawen n yisefka n uglam yettwafernen teddun",
   "components.Settings.apiKey": "Tasarut API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} ur d-yettarra ara i «{host}». Rnu {host} ɣer Allowed Hosts deg {app} (Settings → General), neɣ qqen ɣur-s s yisem i yettaǧǧa.",
   "components.UserProfile.UserSettings.UserNotificationSettings.UserNotificationsWebPush.nodevicestoshow": "Ulac ɣur-k ijerriden Web push ara d-yettwaskanen.",
   "components.UserProfile.UserSettings.UserNotificationSettings.emailsettingssaved": "Iɣewwaṛen n yilɣa s yimayl ttwaseklesen!",
   "components.UserProfile.UserSettings.UserNotificationSettings.pgpPublicKey": "Tasarut tazayezt PGP",

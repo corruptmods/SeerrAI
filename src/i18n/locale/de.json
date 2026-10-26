@@ -1352,6 +1352,7 @@
   "components.Settings.SettingsMain.discoverRegionTip": "Inhalte nach regionaler Verfügbarkeit filtern",
   "components.Settings.SettingsMain.streamingRegionTip": "Streaming Seiten nach regionaler Verfügbarkeit anzeigen",
   "components.Settings.apiKey": "API-Schlüssel",
+  "components.Settings.arrTestFailure.hostRefused": "{app} antwortet nicht auf „{host}“. Füge {host} in {app} unter Allowed Hosts hinzu (Settings → General) oder verbinde dich über einen Namen, den es erlaubt.",
   "components.Settings.tip": "Tipp",
   "components.UserProfile.UserSettings.UserGeneralSettings.discoverRegionTip": "Inhalte nach regionaler Verfügbarkeit filtern",
   "components.UserProfile.UserSettings.UserGeneralSettings.toastSettingsFailureEmail": "Diese E-Mail-Adresse ist bereits vergeben!",

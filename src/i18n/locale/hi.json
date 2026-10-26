@@ -1161,6 +1161,7 @@
   "components.Settings.allChosenProvidersAreOperational": "चुने गए सभी मेटाडेटा प्रदाता काम कर रहे हैं",
   "components.Settings.animeMetadataProvider": "एनीमे मेटाडेटा प्रदाता",
   "components.Settings.apiKey": "API कुंजी",
+  "components.Settings.arrTestFailure.hostRefused": "{app} “{host}” नाम का जवाब नहीं देता। {app} में Allowed Hosts (Settings → General) में {host} जोड़ें, या किसी ऐसे नाम से जुड़ें जिसकी वह अनुमति देता है।",
   "components.Settings.blocklistedTagImportInstructions": "ब्लॉकलिस्ट टैग का कॉन्फ़िगरेशन नीचे पेस्ट करें।",
   "components.Settings.blocklistedTagsText": "ब्लॉकलिस्ट किए गए टैग",
   "components.Settings.cancelscan": "स्कैन रद्द करें",

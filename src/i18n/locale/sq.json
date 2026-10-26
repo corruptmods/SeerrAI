@@ -1166,6 +1166,7 @@
   "components.Settings.allChosenProvidersAreOperational": "Të gjithë ofruesit e zgjedhur të metadatave funksionojnë",
   "components.Settings.animeMetadataProvider": "Ofruesi i metadatave për anime",
   "components.Settings.apiKey": "Çelësi API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} nuk i përgjigjet “{host}”. Shtoni {host} te Allowed Hosts në {app} (Settings → General), ose lidhuni me një emër që e lejon.",
   "components.Settings.blocklistedTagImportInstructions": "Ngjitni më poshtë konfigurimin e etiketave të bllokuara.",
   "components.Settings.blocklistedTagImportTitle": "Importo konfigurimin e etiketave të bllokuara",
   "components.Settings.blocklistedTagsText": "Etiketat e bllokuara",

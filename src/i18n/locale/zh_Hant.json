@@ -1596,6 +1596,7 @@
   "components.Settings.SettingsNetwork.proxyEnabled": "HTTP(S) 代理伺服器",
   "components.Settings.SettingsNetwork.validationDnsCacheMinTtl": "請輸入有效的最短 TTL",
   "components.Settings.apiKey": "API 金鑰",
+  "components.Settings.arrTestFailure.hostRefused": "{app} 不回應「{host}」。請在 {app} 的 Allowed Hosts（Settings → General）中加入 {host}，或使用它允許的名稱連線。",
   "components.Settings.failedToSaveMetadataSettings": "無法儲存中繼資料來源設定",
   "components.Settings.no": "否",
   "components.Settings.tip": "提示",

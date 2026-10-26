@@ -1343,6 +1343,7 @@
   "components.Settings.SettingsMain.streamingRegion": "Yayın Bölgesi",
   "components.Settings.SettingsMain.streamingRegionTip": "Yayın sitelerini bölgesel kullanılabilirliğe göre göster",
   "components.Settings.apiKey": "API anahtarı",
+  "components.Settings.arrTestFailure.hostRefused": "{app}, “{host}” adına yanıt vermiyor. {host} adını {app} içinde Allowed Hosts listesine ekleyin (Settings → General) veya izin verdiği bir adla bağlanın.",
   "components.UserProfile.UserSettings.UserGeneralSettings.discoverRegion": "Keşfet Bölgesi",
   "components.UserProfile.UserSettings.UserGeneralSettings.streamingRegion": "Yayın Bölgesi",
   "components.UserProfile.UserSettings.UserGeneralSettings.streamingRegionTip": "Yayın sitelerini bölgesel kullanılabilirliğe göre göster",

@@ -18,6 +18,7 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 setupTestDb();
 
 let maintainerrPort = 0;
+let radarr7Port = 0;
 let port = 0;
 const servers: Server[] = [];
 
@@ -34,6 +35,35 @@ before(async () => {
   maintainerrPort = await listen((_req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify('2.14.0'));
+  });
+
+  // Radarr 7 with Allowed Hosts set to localhost: any other name gets
+  // ASP.NET's own page.
+  radarr7Port = await listen((req, res) => {
+    if ((req.headers.host ?? '').split(':')[0] !== 'localhost') {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'text/html');
+      res.end(
+        '<HTML><HEAD><TITLE>Bad Request</TITLE></HEAD>\r\n' +
+          '<BODY><h2>Bad Request - Invalid Hostname</h2>\r\n' +
+          '<hr><p>HTTP Error 400. The request hostname is invalid.</p>\r\n' +
+          '</BODY></HTML>'
+      );
+      return;
+    }
+    res.setHeader('Content-Type', 'application/json');
+    const route = (req.url ?? '').split('?')[0];
+    res.end(
+      JSON.stringify(
+        route.endsWith('/system/status')
+          ? { version: '7.0.0.10815', urlBase: '' }
+          : route.endsWith('/qualityProfile')
+            ? [{ id: 1, name: 'Any' }]
+            : route.endsWith('/rootfolder')
+              ? [{ id: 1, path: '/movies' }]
+              : []
+      )
+    );
   });
 
   const app = express();
@@ -154,6 +184,33 @@ describe('Radarr, Sonarr and Maintainerr servers in settings', () => {
     await call('DELETE', `/maintainerr/${id}`);
     const third = await call('POST', '/maintainerr', server('Third'));
     assert.deepEqual([third.status, third.body.id], [201, id + 1]);
+  });
+
+  it('says how to let Seerr AI into a Radarr that doesn’t answer to its name', async () => {
+    const test = (hostname: string) =>
+      call<{ message?: string; hostRefused?: string; profiles?: unknown[] }>(
+        'POST',
+        '/radarr/test',
+        {
+          hostname,
+          port: radarr7Port,
+          apiKey: 'key',
+          useSsl: false,
+        }
+      );
+
+    const refused = await test('127.0.0.1');
+    assert.equal(refused.status, 502);
+    assert.equal(refused.body.hostRefused, '127.0.0.1');
+    assert.match(
+      refused.body.message ?? '',
+      /add 127\.0\.0\.1 to Allowed Hosts in Radarr/
+    );
+
+    // By a name it allows: connected.
+    const allowed = await test('localhost');
+    assert.equal(allowed.status, 200);
+    assert.deepEqual(allowed.body.profiles, [{ id: 1, name: 'Any' }]);
   });
 
   it('answers 404 for a Radarr server that is not set up', async () => {

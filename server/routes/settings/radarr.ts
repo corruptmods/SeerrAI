@@ -2,6 +2,7 @@ import RadarrAPI from '@server/api/servarr/radarr';
 import type { RadarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import { hostRefusedMessage, refusedHost } from '@server/utils/hostRefused';
 import { Router } from 'express';
 
 const radarrRoutes = Router();
@@ -70,6 +71,14 @@ radarrRoutes.post<
       message: e.message,
     });
 
+    // Turned away for the name it was reached by: say how to let it in.
+    const host = refusedHost(e);
+    if (host !== undefined) {
+      return res.status(502).json({
+        message: hostRefusedMessage('Radarr', host),
+        hostRefused: host,
+      });
+    }
     next({ status: 500, message: 'Failed to connect to Radarr' });
   }
 });

@@ -1343,6 +1343,7 @@
   "components.Login.noadminerror": "На сервере отсутствует администратор.",
   "components.Login.orsigninwith": "Или войдите с",
   "components.Settings.apiKey": "API-ключ",
+  "components.Settings.arrTestFailure.hostRefused": "{app} не отвечает на «{host}». Добавьте {host} в Allowed Hosts в {app} (Settings → General) или подключитесь по имени, которое он разрешает.",
   "components.Settings.OverrideRuleModal.ruleCreated": "Правило переопределения успешно создано!",
   "components.Settings.SettingsMain.discoverRegionTip": "Фильтровать контент по региональной доступности",
   "components.Settings.SettingsMain.enableSpecialEpisodes": "Разрешить запрашивать спец. эпизоды",

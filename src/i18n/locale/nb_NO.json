@@ -1453,6 +1453,7 @@
   "components.MovieDetails.openradarr": "Åpne filmen i Radarr",
   "components.MovieDetails.openradarr4k": "Åpne filmen i 4K-Radarr",
   "components.Settings.apiKey": "API-nøkkel",
+  "components.Settings.arrTestFailure.hostRefused": "{app} svarer ikke på «{host}». Legg til {host} under Allowed Hosts i {app} (Settings → General), eller koble til med et navn den tillater.",
   "components.Discover.timeWindowDay": "Daglig",
   "components.Discover.timeWindowWeek": "Ukentlig",
   "components.Settings.Notifications.usePublicLogo": "Bruk den offentlige Seerr AI-logoen i stedet for instansens logo",

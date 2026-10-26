@@ -822,6 +822,7 @@
   "components.Settings.SettingsAbout.Releases.currentversion": "Nykyinen",
   "components.Settings.SettingsLogs.filterDebug": "Vianhaku",
   "components.Settings.apiKey": "API avain",
+  "components.Settings.arrTestFailure.hostRefused": "{app} ei vastaa nimelle ”{host}”. Lisää {host} sovelluksen {app} Allowed Hosts -luetteloon (Settings → General) tai yhdistä nimellä, jonka se sallii.",
   "components.Settings.cancelscan": "Peru skannaus",
   "components.Settings.menuUsers": "Käyttäjät",
   "components.ResetPassword.email": "Sähköpostiosoite",

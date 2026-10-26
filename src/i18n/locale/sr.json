@@ -1448,6 +1448,7 @@
   "components.UserProfile.limit": "{remaining} od {limit}",
   "components.Settings.SonarrModal.monitorNewItems": "Prati nove sezone",
   "components.Settings.apiKey": "API ključ",
+  "components.Settings.arrTestFailure.hostRefused": "{app} не одговара на „{host}“. Додајте {host} у Allowed Hosts у {app} (Settings → General) или се повежите именом које дозвољава.",
   "components.Settings.invalidurlerror": "Nije moguće povezati se sa {mediaServerName} serverom.",
   "components.TitleCard.addToWatchList": "Dodaj na listu želja",
   "components.Login.validationservertyperequired": "Izaberite tip servera",

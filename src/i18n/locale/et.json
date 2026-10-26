@@ -1133,6 +1133,7 @@
   "components.Settings.allChosenProvidersAreOperational": "Kõik valitud metaandmete pakkujad on töökorras",
   "components.Settings.animeMetadataProvider": "Anime metaandmete pakkuja",
   "components.Settings.apiKey": "API-võti",
+  "components.Settings.arrTestFailure.hostRefused": "{app} ei vasta nimele „{host}“. Lisa {host} rakenduses {app} loendisse Allowed Hosts (Settings → General) või ühenda nimega, mida see lubab.",
   "components.Settings.blocklistedTagImportInstructions": "Kleebi musta nimekirja siltide seadistus allapoole.",
   "components.Settings.blocklistedTagImportTitle": "Impordi musta nimekirja siltide seadistus",
   "components.Settings.blocklistedTagsText": "Mustas nimekirjas olevad sildid",

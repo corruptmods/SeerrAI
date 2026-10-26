@@ -1654,6 +1654,7 @@
   "components.Settings.SonarrModal.testFirstTags": "Testați conexiunea pentru a încărca etichetele",
   "components.Settings.SonarrModal.toastSonarrTestFailure": "Conectarea la Sonarr a eșuat.",
   "components.Settings.apiKey": "Cheie API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} nu răspunde la „{host}”. Adaugă {host} la Allowed Hosts în {app} (Settings → General) sau conectează-te printr-un nume pe care îl permite.",
   "components.Settings.SonarrModal.validationApiKeyRequired": "Trebuie să introduceți o cheie API",
   "components.Settings.SonarrModal.validationRootFolderRequired": "Trebuie să alegeți un dosar rădăcină",
   "components.Settings.blocklistedTagImportTitle": "Importă configurația etichetelor blocate",

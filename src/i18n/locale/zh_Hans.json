@@ -1415,6 +1415,7 @@
   "components.Settings.SettingsUsers.mediaServerLoginTip": "使用 {mediaServerName} 账户登录",
   "components.Settings.jellyfinForgotPasswordUrl": "忘记密码URL",
   "components.Settings.apiKey": "API 密钥",
+  "components.Settings.arrTestFailure.hostRefused": "{app} 不响应“{host}”。请在 {app} 的 Allowed Hosts（Settings → General）中添加 {host}，或使用它允许的名称连接。",
   "components.Settings.jellyfinSyncFailedGenericError": "同步库时出错了",
   "components.Settings.jellyfinSyncFailedNoLibrariesFound": "没有找到库",
   "components.Settings.menuNetwork": "网络",

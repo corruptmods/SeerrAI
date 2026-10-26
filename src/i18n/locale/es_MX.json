@@ -1489,6 +1489,7 @@
   "components.Settings.allChosenProvidersAreOperational": "Todos los proveedores de metadatos elegidos funcionan",
   "components.Settings.animeMetadataProvider": "Proveedor de metadatos para anime",
   "components.Settings.apiKey": "Clave de API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} no responde a «{host}». Agrega {host} a Allowed Hosts en {app} (Settings → General) o conéctate con un nombre que permita.",
   "components.Settings.blocklistedTagImportInstructions": "Pega abajo la configuración de etiquetas bloqueadas.",
   "components.Settings.blocklistedTagImportTitle": "Importar configuración de etiquetas bloqueadas",
   "components.Settings.blocklistedTagsText": "Etiquetas bloqueadas",

@@ -1680,6 +1680,7 @@
   "components.Settings.SonarrModal.syncEnabledHelp": "Oznacz to, co Sonarr już ma, jako dostępne, by nie prosić o to ponownie.",
   "components.Settings.addrule": "Nowa reguła nadpisywania",
   "components.Settings.apiKey": "Klucz API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} nie odpowiada na „{host}”. Dodaj {host} do Allowed Hosts w {app} (Settings → General) albo połącz się przez nazwę, na którą zezwala.",
   "components.Settings.connectionTestFailed": "Test połączenia nie powiódł się",
   "components.Settings.failed": "Nie działa",
   "components.Settings.overrideRules": "Reguły nadpisywania",

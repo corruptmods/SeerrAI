@@ -1636,6 +1636,7 @@
   "components.Settings.allChosenProvidersAreOperational": "선택한 메타데이터 제공자가 모두 정상 작동합니다",
   "components.Settings.animeMetadataProvider": "애니메이션 메타데이터 제공자",
   "components.Settings.apiKey": "API 키",
+  "components.Settings.arrTestFailure.hostRefused": "{app}이(가) \"{host}\"에 응답하지 않습니다. {app}의 Allowed Hosts(Settings → General)에 {host}을(를) 추가하거나 허용된 이름으로 연결하세요.",
   "components.Settings.blocklistedTagImportTitle": "차단 태그 설정 가져오기",
   "components.Settings.blocklistedTagsText": "차단된 태그",
   "components.Settings.jellyfinlibrariesDescription": "Seerr AI가 검사하는 {mediaServerName} 라이브러리. 목록이 없나요? 아래 버튼을 쓰세요.",

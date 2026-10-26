@@ -1576,6 +1576,7 @@
   "components.Settings.SettingsLogs.copiedLogMessage": "ログメッセージをクリップボードにコピーしました。",
   "components.Settings.is4k": "4K",
   "components.Settings.apiKey": "APIキー",
+  "components.Settings.arrTestFailure.hostRefused": "{app} は「{host}」に応答しません。{app} の Allowed Hosts（Settings → General）に {host} を追加するか、許可されている名前で接続してください。",
   "components.Settings.SettingsAbout.aboutseerr": "Seerr AI について",
   "components.Settings.SettingsAbout.contribute": "貢献する",
   "components.Settings.SettingsAbout.supportseerr": "Seerr AI のベースである Seerr を支援する",

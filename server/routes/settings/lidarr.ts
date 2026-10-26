@@ -4,6 +4,7 @@ import type { LidarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { requireMusicSettings } from '@server/middleware/music';
+import { hostRefusedMessage, refusedHost } from '@server/utils/hostRefused';
 import { Router } from 'express';
 
 /*
@@ -95,6 +96,15 @@ lidarrRoutes.post<
       label: 'Lidarr',
       message: e instanceof Error ? e.message : String(e),
     });
+
+    // Turned away for the name it was reached by: say how to let it in.
+    const host = refusedHost(e);
+    if (host !== undefined) {
+      return res.status(502).json({
+        message: hostRefusedMessage('Lidarr', host),
+        hostRefused: host,
+      });
+    }
     next({ status: 500, message: 'Failed to connect to Lidarr' });
   }
 });

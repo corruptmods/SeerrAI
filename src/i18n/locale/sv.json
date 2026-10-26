@@ -1320,6 +1320,7 @@
   "components.MovieDetails.watchlistDeleted": "<strong>{title}</strong> togs bort från bevakningslistan!",
   "components.Settings.SettingsNetwork.networksettingsDescription": "Konfigurera nätverksinställningar för din Seerr AI-instans.",
   "components.Settings.apiKey": "API-nyckel",
+  "components.Settings.arrTestFailure.hostRefused": "{app} svarar inte på ”{host}”. Lägg till {host} under Allowed Hosts i {app} (Settings → General), eller anslut med ett namn som den tillåter.",
   "components.UserProfile.UserSettings.UserGeneralSettings.streamingRegion": "Streamingregion",
   "components.UserProfile.UserSettings.UserNotificationSettings.telegramMessageThreadIdTip": "För en gruppchatt med ämnen: ämnets ID",
   "components.Settings.jellyfinSettingsDescription": "Valfria interna och externa adresser för {mediaServerName}, en sida för lösenordsåterställning och dess API-nyckel.",

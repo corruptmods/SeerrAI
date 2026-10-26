@@ -1013,6 +1013,7 @@
   "components.Settings.allChosenProvidersAreOperational": "Visi pasirinkti metaduomenų tiekėjai veikia",
   "components.Settings.animeMetadataProvider": "Anime metaduomenų tiekėjas",
   "components.Settings.apiKey": "API raktas",
+  "components.Settings.arrTestFailure.hostRefused": "{app} neatsako į „{host}“. Pridėkite {host} prie Allowed Hosts programoje {app} (Settings → General) arba junkitės vardu, kurį ji leidžia.",
   "components.Settings.blocklistedTagImportTitle": "Importuoti juodojo sąrašo žymių konfigūraciją",
   "components.Settings.blocklistedTagsText": "Juodojo sąrašo žymės",
   "components.Settings.plexlibraries": "Plex bibliotekos",

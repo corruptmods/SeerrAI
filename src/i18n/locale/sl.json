@@ -226,6 +226,7 @@
   "components.Settings.allChosenProvidersAreOperational": "Vsi izbrani ponudniki metapodatkov delujejo",
   "components.Settings.animeMetadataProvider": "Ponudnik metapodatkov za anime",
   "components.Settings.apiKey": "Ključ API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} se ne odziva na »{host}«. Dodajte {host} med Allowed Hosts v {app} (Settings → General) ali se povežite z imenom, ki ga dovoli.",
   "components.Settings.blocklistedTagImportInstructions": "Spodaj prilepite nastavitve blokiranih oznak.",
   "components.Settings.blocklistedTagImportTitle": "Uvozi nastavitve blokiranih oznak",
   "components.Settings.chooseProvider": "Izberite ponudnike metapodatkov za različne vrste vsebine",

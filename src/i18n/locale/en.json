@@ -3358,6 +3358,7 @@
   "components.Settings.allChosenProvidersAreOperational": "All chosen metadata providers are operational",
   "components.Settings.animeMetadataProvider": "Anime metadata provider",
   "components.Settings.apiKey": "API key",
+  "components.Settings.arrTestFailure.hostRefused": "{app} doesn’t answer to “{host}”. Add {host} to Allowed Hosts in {app} (Settings → General), or connect to it by a name it allows.",
   "components.Settings.blocklistedTagImportInstructions": "Paste blocklist tag configuration below.",
   "components.Settings.blocklistedTagImportTitle": "Import Blocklisted Tag Configuration",
   "components.Settings.blocklistedTagsText": "Blocklisted Tags",

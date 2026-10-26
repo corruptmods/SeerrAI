@@ -1339,6 +1339,7 @@
   "components.UserProfile.UserSettings.UserGeneralSettings.discoverRegion": "Регіон для пошуку фільмів та серіалів",
   "components.UserProfile.UserSettings.UserGeneralSettings.discoverRegionTip": "Вміст фільтрується за доступністю у вибраному регіоні",
   "components.Settings.apiKey": "Ключ API",
+  "components.Settings.arrTestFailure.hostRefused": "{app} не відповідає на «{host}». Додайте {host} до Allowed Hosts у {app} (Settings → General) або підключіться за іменем, яке він дозволяє.",
   "components.RequestList.RequestItem.removearr": "Видалити з {arr}",
   "components.Settings.SettingsMain.discoverRegion": "Регіон для пошуку фільмів та серіалів",
   "components.Settings.SettingsMain.discoverRegionTip": "Фільтрувати вміст за регіональною доступністю",

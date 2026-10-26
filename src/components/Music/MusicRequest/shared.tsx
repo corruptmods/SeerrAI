@@ -67,7 +67,6 @@ const onlyOne = (request: Request) => {
   return undefined;
 };
 
-/** "Artist — Album", "Artist — Song", or "Artist — 3 albums, 2 songs". */
 /** Whom a music request is for. */
 export const musicRequestArtist = (request: Request, intl: IntlShape): string =>
   request.media?.foreignTitle || intl.formatMessage(messages.unknownArtist);
@@ -92,6 +91,7 @@ export const musicRequestName = (request: Request, intl: IntlShape): string => {
     .join(', ');
 };
 
+/** "Artist — Album", "Artist — Song", or "Artist — 3 albums, 2 songs". */
 export const musicRequestTitle = (request: Request, intl: IntlShape): string =>
   `${musicRequestArtist(request, intl)} — ${musicRequestName(request, intl)}`;
 
@@ -164,20 +164,32 @@ export const SongsField = ({
                     </span>
                   )}
                 </span>
-                <MusicStatusBadge
-                  status={SONG_STATUS[song.status]}
-                  downloads={
-                    song.singleMbid
-                      ? albumDownloads(
-                          request.media?.downloadStatus,
-                          song.singleMbid
-                        )
-                      : songDownloads(request.media?.downloadStatus, [
-                          song.recordingMbid,
-                        ])
-                  }
-                  plain
-                />
+                {song.status === MediaRequestStatus.FAILED ||
+                song.status === MediaRequestStatus.DECLINED ? (
+                  // Why it failed shows on the request.
+                  <Badge badgeType="danger">
+                    {intl.formatMessage(
+                      song.status === MediaRequestStatus.FAILED
+                        ? globalMessages.failed
+                        : globalMessages.declined
+                    )}
+                  </Badge>
+                ) : (
+                  <MusicStatusBadge
+                    status={SONG_STATUS[song.status]}
+                    downloads={
+                      song.singleMbid
+                        ? albumDownloads(
+                            request.media?.downloadStatus,
+                            song.singleMbid
+                          )
+                        : songDownloads(request.media?.downloadStatus, [
+                            song.recordingMbid,
+                          ])
+                    }
+                    plain
+                  />
+                )}
               </li>
             ))}
           </ul>

@@ -609,12 +609,22 @@ export const startJobs = (): void => {
           backfill.tick(),
           songFetcher.tick(),
         ]);
+        // Both told, should both fail.
+        if (series.status === 'rejected' && songs.status === 'rejected') {
+          logger.error('Songs taken from albums could not move along', {
+            label: 'Jobs',
+            errorMessage:
+              songs.reason instanceof Error
+                ? songs.reason.message
+                : String(songs.reason),
+          });
+        }
         for (const result of [series, songs]) {
           if (result.status === 'rejected') throw result.reason;
         }
       })
     ),
-    running: () => backfill.monitorStatus().running,
+    running: () => backfill.monitorStatus().running || songFetcher.isRunning(),
   });
 
   // Looks at what Radarr and Sonarr grab, and at imports that get stuck

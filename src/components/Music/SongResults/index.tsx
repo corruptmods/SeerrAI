@@ -118,12 +118,12 @@ const Version = ({
 const Song = ({
   song,
   canRequest,
-  busy,
+  isBusy,
   onRequest,
 }: {
   song: MusicSongResult;
   canRequest: boolean;
-  busy?: string;
+  isBusy: (recordingMbid: string) => boolean;
   onRequest: (version: MusicSongVersion) => void;
 }) => {
   const intl = useIntl();
@@ -157,7 +157,7 @@ const Song = ({
             song={song}
             version={version}
             canRequest={canRequest}
-            busy={busy === version.id}
+            busy={isBusy(version.id)}
             onRequest={() => onRequest(version)}
           />
         ))}
@@ -188,7 +188,7 @@ const Song = ({
 const SongResults = ({ query }: { query: string }) => {
   const intl = useIntl();
   const { hasPermission } = useUser();
-  const { requestSong, busy } = useRequestSong();
+  const { requestSong, isBusy } = useRequestSong();
   const { data, mutate } = useSWR<MusicSongSearchResponse>(
     query
       ? `/api/v1/music/search/songs?query=${encodeURIComponent(query)}`
@@ -217,17 +217,14 @@ const SongResults = ({ query }: { query: string }) => {
             key={song.id}
             song={song}
             canRequest={canRequest}
-            busy={busy}
+            isBusy={isBusy}
             onRequest={async (version) => {
-              if (
-                await requestSong({
-                  artistMbid: song.artistId,
-                  recordingMbid: version.id,
-                  name: songName(song.title, version.version),
-                })
-              ) {
-                mutate();
-              }
+              await requestSong({
+                artistMbid: song.artistId,
+                recordingMbid: version.id,
+                name: songName(song.title, version.version),
+                then: () => mutate(),
+              });
             }}
           />
         ))}

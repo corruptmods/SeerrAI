@@ -2,6 +2,7 @@ import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import { SmallLoadingSpinner } from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
+import { messages as requestMessages } from '@app/components/Music/MusicRequest/shared';
 import MusicStatusBadge from '@app/components/Music/MusicStatusBadge';
 import type { AlbumGroup } from '@app/components/Music/musicHelpers';
 import {
@@ -10,6 +11,7 @@ import {
   allowedByProfile,
   byNewest,
   requestable,
+  songName,
   yearOf,
 } from '@app/components/Music/musicHelpers';
 import FailedRequestAlert, {
@@ -563,7 +565,10 @@ const MusicRequestModal = ({
         )}
         subTitle={artist?.name}
         onOk={() => updateRequest(manages)}
-        okDisabled={isUpdating || !chosen.length}
+        // A request for songs alone holds no albums, and is still saved.
+        okDisabled={
+          isUpdating || (!chosen.length && !editRequest.songs?.length)
+        }
         okText={intl.formatMessage(
           isFailed
             ? failedMessages.saveAndRetry
@@ -588,6 +593,22 @@ const MusicRequestModal = ({
           intl.formatMessage(messages.requestfrom, {
             username: editRequest.requestedBy.displayName,
           })
+        )}
+        {!!editRequest.songs?.length && (
+          <div className="mt-4">
+            <p className="text-label">
+              {intl.formatMessage(requestMessages.songs, {
+                count: editRequest.songs.length,
+              })}
+            </p>
+            <ul className="mt-1 space-y-1 text-sm text-gray-300">
+              {editRequest.songs.map((song) => (
+                <li key={song.id} className="truncate">
+                  {songName(song.title, song.version)}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
         {albumList}
         {advancedOptions}

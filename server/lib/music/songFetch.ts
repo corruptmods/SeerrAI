@@ -95,6 +95,15 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /** A failure that is the release's fault: the next release is tried. */
 class ReleaseProblem extends Error {}
 
+/** A torrent's stage until only the songs' files are picked and it starts. */
+const CHOOSING = 'Choosing the songs’ files';
+
+/**
+ * Songs in a request another of its songs failed in: the request shows as
+ * failed, but its other songs carry on.
+ */
+const UNDER_WAY = [MediaRequestStatus.APPROVED, MediaRequestStatus.FAILED];
+
 const clientById = (id: number | null): DownloadClientSettings => {
   const client = getSettings().downloadClients.find((c) => c.id === id);
   if (!client) throw new Error('The download client was removed from Seerr.');
@@ -126,6 +135,11 @@ const trackOf = (
 class SongFetcher {
   private ticking = false;
 
+  /** Moving songs along right now, for the job's status. */
+  public isRunning(): boolean {
+    return this.ticking;
+  }
+
   /** Every minute: starts fetches for new songs and moves each along. */
   public async tick(): Promise<void> {
     if (this.ticking || !musicReady() || songFetchProblem()) return;
@@ -141,6 +155,7 @@ class SongFetcher {
       for (const fetch of fetches) {
         try {
           await this.advance(fetch);
+          this.troubleSince.delete(fetch.id);
         } catch (e) {
           await this.stumbled(fetch, e);
         }
@@ -158,7 +173,7 @@ class SongFetcher {
         status: MediaRequestStatus.APPROVED,
         singleMbid: IsNull(),
         sourceAlbumMbid: Not(IsNull()),
-        request: { status: MediaRequestStatus.APPROVED },
+        request: { status: In(UNDER_WAY) },
       },
       relations: { request: { media: true } },
     });
@@ -188,7 +203,15 @@ class SongFetcher {
       const { request } = list[0];
       const media = request.media;
       const server = this.lidarrOf(request.serverId);
-      if (!server || !media?.foreignId) continue;
+      if (!server || !media?.foreignId) {
+        await this.failSongs(
+          list,
+          server
+            ? 'The song’s artist is unknown.'
+            : 'No Lidarr server is set up for music.'
+        );
+        continue;
+      }
       await getRepository(SongFetch).save(
         new SongFetch({
           albumMbid,
@@ -235,7 +258,10 @@ class SongFetcher {
       : lidarr.getTracks(fetch.lidarrAlbumId!);
   }
 
-  /** The songs it is for that are still asked for, approved. */
+  /**
+   * The songs it is for that are still asked for, approved: each by its own
+   * status, so one song failing doesn't stop the others in its request.
+   */
   private async songsOf(fetch: SongFetch): Promise<SongRequest[]> {
     if (!fetch.recordings.length) return [];
     return getRepository(SongRequest).find({
@@ -243,7 +269,7 @@ class SongFetcher {
         recordingMbid: In(fetch.recordings),
         sourceAlbumMbid: fetch.albumMbid,
         status: MediaRequestStatus.APPROVED,
-        request: { status: MediaRequestStatus.APPROVED },
+        request: { status: In(UNDER_WAY) },
       },
       relations: { request: { media: true } },
     });
@@ -253,10 +279,22 @@ class SongFetcher {
     const songs = await this.songsOf(fetch);
     if (!songs.length) {
       await this.removeDownload(fetch).catch(() => undefined);
+      // The scans can finish its songs before it ends (while Lidarr imports).
+      const finished = fetch.recordings.length
+        ? await getRepository(SongRequest).count({
+            where: {
+              recordingMbid: In(fetch.recordings),
+              sourceAlbumMbid: fetch.albumMbid,
+              status: MediaRequestStatus.COMPLETED,
+            },
+          })
+        : 0;
       await this.end(
         fetch,
-        'failed',
-        'Its songs are no longer asked for: declined, removed or done.'
+        finished ? 'done' : 'failed',
+        finished
+          ? null
+          : 'Its songs are no longer asked for: declined, removed or failed.'
       );
       return;
     }
@@ -266,7 +304,8 @@ class SongFetcher {
     ) {
       await this.failSongs(
         songs,
-        `Lidarr couldn’t look up ${fetch.albumTitle} for a week. Retry later.`
+        `Lidarr couldn’t look up ${fetch.albumTitle} for a week. Retry later.`,
+        fetch
       );
       await this.end(fetch, 'failed', 'Lidarr could not look up the album.');
       return;
@@ -276,6 +315,11 @@ class SongFetcher {
         await this.prepare(fetch, songs);
         return;
       case 'searching':
+        // Chosen already, and waiting for a download slot or the indexer.
+        if (fetch.release && fetch.files.length) {
+          await this.start(fetch);
+          return;
+        }
         await this.search(fetch, songs);
         return;
       case 'downloading':
@@ -370,7 +414,8 @@ class SongFetcher {
     if (unknown.length) {
       await this.failSongs(
         unknown,
-        `Lidarr’s ${fetch.albumTitle} has no “${unknown[0].title}”.`
+        `Lidarr’s ${fetch.albumTitle} has no “${unknown[0].title}”.`,
+        fetch
       );
     }
     // Already on file: the scans will find it here.
@@ -444,8 +489,8 @@ class SongFetcher {
   /**
    * An album songs were taken from is only partly here until Lidarr has
    * every track of it, whatever the server listing it shows: before this
-   * was fixed, such albums were taken as wholly here. Lidarr is asked only
-   * while the counts it last gave say the album is not all there.
+   * was fixed, such albums were taken as wholly here. Lidarr is asked once
+   * for each album.
    */
   private async correctFinished(): Promise<void> {
     const finished = await getRepository(SongFetch).find({
@@ -465,11 +510,11 @@ class SongFetcher {
         },
         where: { mbId: fetch.albumMbid },
       });
+      // Asked once: the counts Lidarr gave are kept, and the music scans
+      // keep the album's status from then on.
       if (
         row?.status !== MediaStatus.AVAILABLE ||
-        (row.trackCount != null &&
-          row.trackFileCount != null &&
-          row.trackFileCount >= row.trackCount)
+        (row.trackCount != null && row.trackFileCount != null)
       ) {
         continue;
       }
@@ -627,6 +672,12 @@ class SongFetcher {
         }
         if (picked.length === wanted.length) break;
       } catch (e) {
+        // The indexer's download limit: waits, rather than failing songs.
+        if (e instanceof IndexerLimitReached) {
+          fetch.stage = e.message;
+          await getRepository(SongFetch).save(fetch);
+          return;
+        }
         logger.debug('Could not read a release of an album', {
           label: LABEL,
           release: release.title,
@@ -639,7 +690,8 @@ class SongFetcher {
     if (!best) {
       await this.failSongs(
         needed,
-        `No release of ${fetch.albumTitle} with “${needed[0].title}” was found.`
+        `No release of ${fetch.albumTitle} with “${needed[0].title}” was found.`,
+        fetch
       );
       await this.end(fetch, 'failed', 'No release with the songs was found.');
       return;
@@ -651,7 +703,8 @@ class SongFetcher {
     if (missed.length) {
       await this.failSongs(
         missed,
-        `No release of ${fetch.albumTitle} had “${missed[0].title}”.`
+        `No release of ${fetch.albumTitle} had “${missed[0].title}”.`,
+        fetch
       );
     }
 
@@ -729,7 +782,7 @@ class SongFetcher {
           : { magnet: fetched.uri, category, metadataOnly: true }
       );
       fetch.downloadId = hash;
-      fetch.stage = 'Choosing the songs’ files';
+      fetch.stage = CHOOSING;
     } else {
       if (fetched.kind !== 'nzb') throw new ReleaseProblem('Expected an NZB.');
       fetch.downloadId = await usenetClientFor(client).addNzb(
@@ -798,7 +851,7 @@ class SongFetcher {
       if (!torrent) {
         throw new ReleaseProblem(`The torrent is no longer in ${client.name}.`);
       }
-      if (fetch.stage === 'Choosing the songs’ files') {
+      if (fetch.stage === CHOOSING) {
         if (!(await this.pickFiles(fetch))) {
           if (
             fetch.startedAt &&
@@ -970,10 +1023,12 @@ class SongFetcher {
     if (lost.length) {
       await this.failSongs(
         lost,
-        `“${lost[0].title}” was not in the finished download.`
+        `“${lost[0].title}” was not in the finished download.`,
+        fetch
       );
     }
     if (!ready.length) {
+      await this.removeDownload(fetch).catch(() => undefined);
       await this.end(fetch, 'failed', 'Nothing in the download to import.');
       return;
     }
@@ -1043,18 +1098,20 @@ class SongFetcher {
     if (refused.length) {
       await this.failSongs(
         refused,
-        `Lidarr did not import “${refused[0].title}” from ${fetch.albumTitle}.`
+        `Lidarr did not import “${refused[0].title}” from ${fetch.albumTitle}.`,
+        fetch
       );
     }
+    // Only the songs were wanted, and Lidarr copies them: the download goes,
+    // whatever landed.
+    await this.removeDownload(fetch).catch((e) =>
+      logger.warn('Could not remove a finished song download', {
+        label: LABEL,
+        fetchId: fetch.id,
+        errorMessage: message(e),
+      })
+    );
     if (landed.length) {
-      // Only the songs were wanted; the rest of the download goes.
-      await this.removeDownload(fetch).catch((e) =>
-        logger.warn('Could not remove a finished song download', {
-          label: LABEL,
-          fetchId: fetch.id,
-          errorMessage: message(e),
-        })
-      );
       logger.info('Took songs from an album', {
         label: LABEL,
         album: fetch.albumMbid,
@@ -1068,9 +1125,20 @@ class SongFetcher {
     );
   }
 
-  /** Marks songs failed, and each request they are in, with why. */
-  private async failSongs(songs: SongRequest[], reason: string): Promise<void> {
+  /**
+   * Marks songs failed, and each request they are in, with why. Taken off
+   * the fetch too (saved when it next is), so a retry fetches them again.
+   */
+  private async failSongs(
+    songs: SongRequest[],
+    reason: string,
+    fetch?: SongFetch
+  ): Promise<void> {
     if (!songs.length) return;
+    if (fetch) {
+      const failed = new Set(songs.map((song) => song.recordingMbid));
+      fetch.recordings = fetch.recordings.filter((id) => !failed.has(id));
+    }
     await getRepository(SongRequest).update(
       { id: In(songs.map((song) => song.id)) },
       { status: MediaRequestStatus.FAILED }
@@ -1090,6 +1158,9 @@ class SongFetcher {
   /** Something went wrong: the release's fault, or to be tried again. */
   private async stumbled(fetch: SongFetch, e: unknown): Promise<void> {
     if (e instanceof ReleaseProblem) {
+      // The next release's progress starts afresh.
+      this.gains.delete(fetch.id);
+      this.troubleSince.delete(fetch.id);
       await this.removeDownload(fetch).catch(() => undefined);
       if (fetch.release) {
         fetch.tried = [
@@ -1110,7 +1181,8 @@ class SongFetcher {
         const songs = await this.songsOf(fetch);
         await this.failSongs(
           songs,
-          `No release of ${fetch.albumTitle} could be downloaded: ${message(e)}`
+          `No release of ${fetch.albumTitle} could be downloaded: ${message(e)}`,
+          fetch
         );
         await this.end(fetch, 'failed', message(e));
         return;
@@ -1133,15 +1205,26 @@ class SongFetcher {
       fetchId: fetch.id,
       errorMessage: message(e),
     });
-    if (Date.now() - fetch.createdAt.getTime() > STUMBLE_GIVE_UP_MS) {
+    // Given up after a day of nothing but errors, counted from the first.
+    const since = this.troubleSince.get(fetch.id) ?? Date.now();
+    this.troubleSince.set(fetch.id, since);
+    if (Date.now() - since > STUMBLE_GIVE_UP_MS) {
       const songs = await this.songsOf(fetch);
-      await this.failSongs(songs, message(e));
+      await this.failSongs(songs, message(e), fetch);
+      await this.removeDownload(fetch).catch(() => undefined);
       await this.end(fetch, 'failed', message(e));
       return;
     }
-    fetch.stage = `Trying again: ${message(e)}`.slice(0, 250);
+    // A torrent still to have its files picked keeps that stage, which
+    // picks them on the next try.
+    if (fetch.stage !== CHOOSING) {
+      fetch.stage = `Trying again: ${message(e)}`.slice(0, 250);
+    }
     await getRepository(SongFetch).save(fetch);
   }
+
+  /** When each fetch began failing for reasons other than its release. */
+  private troubleSince = new Map<number, number>();
 
   private async removeDownload(fetch: SongFetch): Promise<void> {
     if (!fetch.downloadId || fetch.clientId == null) return;
@@ -1159,6 +1242,7 @@ class SongFetcher {
     error: string | null
   ): Promise<void> {
     this.gains.delete(fetch.id);
+    this.troubleSince.delete(fetch.id);
     fetch.status = status;
     fetch.error = error?.slice(0, 250) ?? null;
     fetch.stage = null;

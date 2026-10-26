@@ -37,7 +37,7 @@ import type { MusicAlbumDetails, MusicTrack } from '@server/models/Music';
 import Link from 'next/link';
 import { Fragment, useMemo, useState } from 'react';
 import { useIntl } from 'react-intl';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 
 const messages = defineMessages('components.Music.AlbumDetails', {
   tracks: 'Tracks',
@@ -74,7 +74,8 @@ const TrackList = ({
   downloads?: DownloadingItem[];
 }) => {
   const intl = useIntl();
-  const { requestSong, busy } = useRequestSong();
+  const { requestSong, isBusy } = useRequestSong();
+  const { mutate: mutateAlbum } = useSWRConfig();
   const wide = useMediaQuery('(min-width: 640px)');
   // Until someone opens or closes it, it follows the screen.
   const [chosen, setChosen] = useState<boolean>();
@@ -170,21 +171,26 @@ const TrackList = ({
                             buttonType="primary"
                             buttonSize="sm"
                             className="h-7 w-28 shrink-0"
-                            disabled={busy === track.recordingId}
+                            disabled={isBusy(track.recordingId)}
                             aria-label={`${intl.formatMessage(
                               messages.requestSong
                             )}: ${track.title}`}
-                            onClick={async () => {
-                              if (
-                                await requestSong({
-                                  artistMbid: songsOf,
-                                  recordingMbid: track.recordingId as string,
-                                  name: track.title,
-                                })
-                              ) {
-                                mutate();
-                              }
-                            }}
+                            onClick={() =>
+                              requestSong({
+                                artistMbid: songsOf,
+                                recordingMbid: track.recordingId as string,
+                                name: track.title,
+                                // The tracks, and the album's own status and
+                                // downloads.
+                                then: () =>
+                                  Promise.all([
+                                    mutate(),
+                                    mutateAlbum(
+                                      `/api/v1/music/album/${albumId}`
+                                    ),
+                                  ]),
+                              })
+                            }
                           >
                             <ArrowDownTrayIcon />
                             <span>
@@ -217,6 +223,7 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
   const { currentSettings } = useSettings();
   const { hasPermission } = useUser();
   const [requesting, setRequesting] = useState(false);
+  const { mutate: globalMutate } = useSWRConfig();
   const { data, error, mutate } = useSWR<MusicAlbumDetails>(
     musicOn ? `/api/v1/music/album/${albumId}` : null
   );
@@ -367,6 +374,8 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
           onComplete={() => {
             setRequesting(false);
             mutate();
+            // Its tracks show the album's status too.
+            globalMutate(`/api/v1/music/album/${albumId}/tracks`);
           }}
         />
       )}

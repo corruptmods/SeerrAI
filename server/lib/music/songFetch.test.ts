@@ -793,6 +793,128 @@ describe('taking a song from its album', () => {
     assert.deepEqual(removed, [HASH]);
   });
 
+  it('carries on with a request’s other songs when one of them fails', async () => {
+    // Lidarr’s album lacks one of the two songs asked for together.
+    lidarr.tracksOnAdd.set(STATIC_GARDEN, [
+      {
+        id: 502,
+        title: 'Lantern Song',
+        foreignRecordingId: LANTERN,
+        hasFile: false,
+      },
+    ]);
+    const request = await requestSongs([LANTERN, OPENING]);
+    await startFetching();
+
+    let fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.deepEqual(fetch.recordings, [LANTERN], 'the failed song taken off');
+    const failed = await getRepository(MediaRequest).findOneByOrFail({
+      id: request.id,
+    });
+    assert.equal(failed.status, MediaRequestStatus.FAILED);
+    assert.deepEqual(
+      failed.songs
+        .map((song) => [song.recordingMbid, song.status])
+        .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+      [
+        [LANTERN, MediaRequestStatus.APPROVED],
+        [OPENING, MediaRequestStatus.FAILED],
+      ].sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+    );
+
+    // The other song still comes: imported, not dropped with its request.
+    done = true;
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'importing');
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'done');
+
+    // Retried once Lidarr lists it, the failed song is fetched afresh.
+    const albumId = fetch.lidarrAlbumId!;
+    const listed = [
+      ...(lidarr.tracks.get(albumId) ?? []),
+      {
+        id: 501,
+        albumId,
+        title: 'Opening',
+        foreignRecordingId: OPENING,
+        hasFile: false,
+      },
+    ];
+    lidarr.tracks.set(albumId, listed);
+    lidarr.releaseTracks.set(fetch.lidarrReleaseId!, listed);
+    const opening = failed.songs.find(
+      (song) => song.recordingMbid === OPENING
+    )!;
+    await getRepository(SongRequest).update(opening.id, {
+      status: MediaRequestStatus.APPROVED,
+    });
+    await getRepository(MediaRequest).update(request.id, {
+      status: MediaRequestStatus.APPROVED,
+    });
+    await songFetcher.tick();
+    const again = await fetchOf();
+    assert.notEqual(again.id, fetch.id);
+    assert.deepEqual(again.recordings, [OPENING]);
+  });
+
+  it('picks the songs’ files once the client answers again', async () => {
+    const qbit = QBittorrentAPI.prototype;
+    const getFiles = qbit.getFiles;
+    let refused = false;
+    mock.method(qbit, 'getFiles', async function (this: unknown, hash: string) {
+      // The client fails the first time it is asked for the file list.
+      if (!refused) {
+        refused = true;
+        throw new Error('qBittorrent is restarting');
+      }
+      return getFiles.call(this, hash);
+    });
+    await requestSongs([LANTERN]);
+    await startFetching();
+    let fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(fetch.stage, 'Choosing the songs’ files', 'still to pick');
+    assert.deepEqual(priorities, []);
+
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.deepEqual(priorities, [
+      { indexes: [0, 2], priority: 0 },
+      { indexes: [1], priority: 1 },
+    ]);
+    assert.notEqual(fetch.stage, 'Choosing the songs’ files');
+  });
+
+  it('waits for a download slot without searching again', async () => {
+    getSettings().backfill = { ...getSettings().backfill, maxActiveJobs: 0 };
+    await requestSongs([LANTERN]);
+    await startFetching();
+    let fetch = await fetchOf();
+    assert.equal(fetch.status, 'searching');
+    assert.equal(fetch.stage, 'Waiting for another song download to finish');
+    const searches = () =>
+      (
+        ProwlarrAPI.prototype.search as unknown as {
+          mock: { callCount: () => number };
+        }
+      ).mock.callCount();
+    const searched = searches();
+
+    await songFetcher.tick();
+    await songFetcher.tick();
+    assert.equal(searches(), searched, 'the release chosen is kept');
+
+    getSettings().backfill = { ...getSettings().backfill, maxActiveJobs: 1 };
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(searches(), searched);
+  });
+
   it('is refused, naming the album, while taking songs from albums is off', async () => {
     getSettings().music.songsFromAlbums = false;
     await assert.rejects(

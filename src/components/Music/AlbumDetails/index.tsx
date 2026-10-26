@@ -1,3 +1,6 @@
+import BackfillForTitle from '@app/components/Backfill/ForTitle';
+import type { LibraryTitle } from '@app/components/Backfill/StartSearchModal';
+import BackfillTitleButton from '@app/components/Backfill/TitleButton';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
@@ -224,6 +227,18 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
     [data]
   );
   const { links: playLinks } = usePlayLinks(albumLinks);
+  // For admins, Backfill: the album as Lidarr has it, when it does.
+  const lidarrServer = data?.mediaInfo?.serviceId;
+  const { data: inLidarr } = useSWR<LibraryTitle>(
+    musicOn &&
+      hasPermission(Permission.ADMIN) &&
+      data?.mediaInfo?.externalServiceId != null
+      ? `/api/v1/backfill/album/${albumId}${
+          lidarrServer != null ? `?serverId=${lidarrServer}` : ''
+        }`
+      : null,
+    { shouldRetryOnError: false, revalidateOnFocus: false }
+  );
 
   if (!musicOn) {
     return <ErrorPage statusCode={404} />;
@@ -321,6 +336,7 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
                 </span>
               </Button>
             ))}
+          {inLidarr && <BackfillTitleButton id={data.id} target={inLidarr} />}
           {canRequest && (
             <Button buttonType="primary" onClick={() => setRequesting(true)}>
               <ArrowDownTrayIcon />
@@ -374,6 +390,7 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
           )}
         </div>
         <div className="media-overview-right">
+          {inLidarr && <BackfillForTitle id={data.id} target={inLidarr} />}
           <div className="media-facts">
             {kind && (
               <div className="media-fact">

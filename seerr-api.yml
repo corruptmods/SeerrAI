@@ -5944,15 +5944,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BackfillAnswer'
+  /backfill/album/{mbId}:
+    get:
+      summary: Where an album is in Lidarr, for its page to start a search from
+      tags:
+        - backfill
+      parameters:
+        - in: path
+          name: mbId
+          required: true
+          description: The album's MusicBrainz release group id
+          schema:
+            type: string
+        - in: query
+          name: serverId
+          required: false
+          description: The Lidarr server to ask first
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: The album in Lidarr
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kind:
+                    type: string
+                    enum: [album]
+                  serverId:
+                    type: integer
+                  arrId:
+                    type: integer
+                  title:
+                    type: string
+        '404':
+          description: No Lidarr has the album
   /backfill/lookup:
     get:
-      summary: "Backfill's state for titles, by comma-separated TMDB ids"
+      summary: "Backfill's state for titles, by TMDB ids or album MusicBrainz ids"
       tags:
         - backfill
       parameters:
         - in: query
           name: tmdbIds
-          required: true
+          required: false
           description: TMDB ids, comma-separated
           style: form
           explode: false
@@ -5962,6 +5999,18 @@ paths:
             items:
               type: integer
               minimum: 1
+        - in: query
+          name: mbIds
+          required: false
+          description: Album MusicBrainz ids, comma-separated
+          style: form
+          explode: false
+          schema:
+            type: array
+            maxItems: 100
+            items:
+              type: string
+              pattern: '^[0-9a-fA-F-]{36}$'
         - in: query
           name: all
           required: false

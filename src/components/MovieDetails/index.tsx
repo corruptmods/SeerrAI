@@ -682,7 +682,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
             data.mediaInfo?.externalServiceId != null &&
             data.mediaInfo.serviceId != null && (
               <BackfillTitleButton
-                tmdbId={data.id}
+                id={data.id}
                 target={{
                   kind: 'movie',
                   serverId: data.mediaInfo.serviceId,
@@ -792,7 +792,7 @@ const MovieDetails = ({ movie }: MovieDetailsProps) => {
             data.mediaInfo?.externalServiceId != null &&
             data.mediaInfo.serviceId != null && (
               <BackfillForTitle
-                tmdbId={data.id}
+                id={data.id}
                 target={{
                   kind: 'movie',
                   serverId: data.mediaInfo.serviceId,

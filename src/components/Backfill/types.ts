@@ -5,7 +5,7 @@ import type { PlanSummary } from '@server/lib/backfill/plan';
  * import paths and Prowlarr's links stay on the server.
  */
 
-export type TitleKind = 'series' | 'movie';
+export type TitleKind = 'series' | 'movie' | 'album';
 
 export type SeriesStatus =
   | 'stuck'
@@ -32,6 +32,8 @@ export interface Readiness {
   torrentClient?: string;
   usenetClient?: string;
   problem?: string;
+  /** Albums are looked for too. */
+  music: boolean;
 }
 
 export interface SeriesView {
@@ -41,6 +43,9 @@ export interface SeriesView {
   arrId: number;
   tvdbId: number | null;
   tmdbId: number | null;
+  /** An album's MusicBrainz id, for its page. */
+  foreignId?: string | null;
+  artistName?: string | null;
   title: string;
   year: number | null;
   seriesType: string;
@@ -235,6 +240,20 @@ export interface SeriesDetail {
     names: string[];
     available: boolean;
     file?: { quality: string; score?: number; belowCutoff?: boolean };
+  };
+  album?: {
+    title: string;
+    artist: string;
+    profile: string;
+    minFormatScore: number;
+    names: string[];
+    tracks: {
+      id: number;
+      number?: number;
+      title: string;
+      state: 'missing' | 'onDisk';
+      quality?: string;
+    }[];
   };
   arrError?: string;
   candidates: CandidateView[];

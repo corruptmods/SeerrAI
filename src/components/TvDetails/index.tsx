@@ -809,7 +809,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
             data.mediaInfo?.externalServiceId != null &&
             data.mediaInfo.serviceId != null && (
               <BackfillTitleButton
-                tmdbId={data.id}
+                id={data.id}
                 target={{
                   kind: 'series',
                   serverId: data.mediaInfo.serviceId,
@@ -1256,7 +1256,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
             data.mediaInfo?.externalServiceId != null &&
             data.mediaInfo.serviceId != null && (
               <BackfillForTitle
-                tmdbId={data.id}
+                id={data.id}
                 target={{
                   kind: 'series',
                   serverId: data.mediaInfo.serviceId,

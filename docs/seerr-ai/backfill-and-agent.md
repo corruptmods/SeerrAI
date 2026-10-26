@@ -14,13 +14,25 @@ Sonarr and Radarr search their indexers and give up quietly when nothing matches
 
 Approval can be **Missing episodes only** (recommended), or **Missing and upgrades**, which replaces files on disk and asks you to type the title's name to confirm.
 
+### Music
+
+With music set up, Backfill follows albums too: those Lidarr lists as missing (**Music too** in Settings → Backfill turns this off).
+
+- Lidarr doesn't say when it last searched for an album, so an album counts as stuck once its release date, the day its artist was added, and any approved request for it are all older than **Stuck after**, and nothing for it is in Lidarr's queue.
+- Prowlarr is searched under "Artist Album" and the album's name, in its audio categories.
+- Each file of a release is matched to a track by its title, or by its number when the release has one file per track. Lidarr imports into one edition of an album: the one already on disk, or, for an album with nothing yet, the edition most of the files are from.
+- Approval is **Missing tracks only** or **Missing and upgrades**, as for series.
+- An album's page shows admins its Backfill box, and the Backfill button there starts a search.
+
+The admin agent doesn't do music yet.
+
 ### Setting it up
 
 **Settings → Backfill**:
 
 - **Prowlarr**: address and API key.
-- **Downloads**: the client for torrent packs (qBittorrent, Transmission, Deluge or rTorrent) and for Usenet packs (SABnzbd or NZBGet), from **Settings → Services → Download Clients**, and the **category** Backfill uses, kept apart so Sonarr and Radarr don't import on their own.
-- **When a title is stuck**: hours since the last search, movies too, and whether files below the cutoff count as gaps (packs that fill gaps still show their upgrades either way).
+- **Downloads**: the client for torrent packs (qBittorrent, Transmission, Deluge or rTorrent) and for Usenet packs (SABnzbd or NZBGet), from **Settings → Services → Download Clients**, and the **category** Backfill uses, kept apart so Sonarr, Radarr and Lidarr don't import on their own.
+- **When a title is stuck**: hours since the last search, movies too, music too, and whether files below the cutoff count as gaps (packs that fill gaps still show their upgrades either way).
 - **Approval**: approve some packs automatically (only ones that fill what is missing and replace nothing on disk, score at least 700 and are at most 25 GB, by default), and **Replace failed downloads** (on by default): when a download fails or stalls, the next good pack is taken, searching again if need be until none is left; anything outside the limits waits for you.
 - **Advanced**: titles per scan, days before searching again, specials, downloads at once, space to keep free, when to give up on a stalled torrent (time spent "checking" doesn't count; a stalled one is then replaced or offered like a failed one), how long to keep history (removed by the nightly **Database Maintenance** job, with the packs it came from), and the agent's limits. The defaults suit most servers.
 

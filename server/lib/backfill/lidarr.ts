@@ -80,6 +80,16 @@ class BackfillLidarr extends LidarrAPI {
     return data;
   }
 
+  /** The album in this Lidarr, by its MusicBrainz id, if it has it. */
+  public async getAlbumByMbid(mbId: string): Promise<LidarrAlbum | undefined> {
+    const { data } = await this.axios.get<LidarrAlbum[]>('/album', {
+      params: { foreignAlbumId: mbId },
+    });
+    return (Array.isArray(data) ? data : []).find(
+      (album) => album.foreignAlbumId === mbId
+    );
+  }
+
   public async getAlbumDetail(id: number): Promise<LidarrAlbum> {
     const { data } = await this.axios.get<LidarrAlbum>(`/album/${id}`);
     return data;

@@ -48,6 +48,8 @@ const messages = defineMessages('components.Backfill.Dashboard', {
   backfill: 'Backfill',
   description:
     'Finds what Sonarr and Radarr can’t, and imports only what you approve.',
+  descriptionMusic:
+    'Finds what Sonarr, Radarr and Lidarr can’t, and imports only what you approve.',
   scan: 'Scan now',
   scanning: 'Scanning…',
   startSearch: 'Start search…',
@@ -56,6 +58,7 @@ const messages = defineMessages('components.Backfill.Dashboard', {
   stuckHint: 'searched for, never grabbed',
   missing: 'Missing',
   missingHint: 'episodes and movies',
+  missingHintMusic: 'episodes, movies and tracks',
   awaiting: 'Awaiting approval',
   awaitingHint: 'packs found that would help',
   filled: 'Filled this week',
@@ -240,7 +243,13 @@ const BackfillDashboard = () => {
     <>
       <PageTitle title={intl.formatMessage(messages.backfill)} />
       <div className="mb-2 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-        <Header subtext={intl.formatMessage(messages.description)}>
+        <Header
+          subtext={intl.formatMessage(
+            data?.readiness.music
+              ? messages.descriptionMusic
+              : messages.description
+          )}
+        >
           {intl.formatMessage(messages.backfill)}
         </Header>
         {/* One even row at any width: three equal buttons on a phone,
@@ -317,7 +326,11 @@ const BackfillDashboard = () => {
             <Stat
               label={intl.formatMessage(messages.missing)}
               value={intl.formatNumber(data.stats.missing)}
-              hint={intl.formatMessage(messages.missingHint)}
+              hint={intl.formatMessage(
+                data.readiness.music
+                  ? messages.missingHintMusic
+                  : messages.missingHint
+              )}
               icon={<TvIcon className="h-5 w-5" />}
               tone="bg-red-500/15 text-red-400 light:text-danger-text"
             />

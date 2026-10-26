@@ -7,6 +7,7 @@ import BackfillSeries from '@server/entity/BackfillSeries';
 import { User } from '@server/entity/User';
 import { clearAiCache } from '@server/lib/ai';
 import backfill from '@server/lib/backfill/engine';
+import BackfillLidarr from '@server/lib/backfill/lidarr';
 import backfillNotices from '@server/lib/backfill/notices';
 import type { PlanEntry } from '@server/lib/backfill/plan';
 import type { SonarrEpisode } from '@server/lib/backfill/sonarr';
@@ -14,7 +15,7 @@ import BackfillSonarr from '@server/lib/backfill/sonarr';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import type { NotificationPayload } from '@server/lib/notifications/agents/agent';
 import { Permission } from '@server/lib/permissions';
-import type { SonarrSettings } from '@server/lib/settings';
+import type { LidarrSettings, SonarrSettings } from '@server/lib/settings';
 import { BACKFILL_DEFAULTS, getSettings } from '@server/lib/settings';
 import { isAuthenticated } from '@server/middleware/auth';
 import backfillRoutes from '@server/routes/backfill';
@@ -735,6 +736,89 @@ describe('Backfill routes', () => {
     );
     assert.equal(all.body.length, 1);
     assert.equal(all.body[0].status, 'done');
+  });
+
+  it('find an album by its MusicBrainz id, not by a TMDB id', async () => {
+    await seed();
+    const album = await getRepository(BackfillSeries).save(
+      new BackfillSeries({
+        kind: 'album',
+        serverId: 0,
+        arrId: 77,
+        foreignId: '8a6b2d3c-1111-4222-8333-944455556666',
+        artistName: 'Paper Lanterns',
+        artistArrId: 12,
+        title: 'Glasswing',
+        year: 2019,
+        status: 'stuck',
+        missing: 4,
+        searchTerms: [],
+      })
+    );
+    const byMbid = await call(
+      'GET',
+      `/api/v1/backfill/lookup?mbIds=${album.foreignId}`
+    );
+    assert.equal(byMbid.status, 200, JSON.stringify(byMbid.body));
+    assert.deepEqual(
+      byMbid.body.map((row: { id: number }) => row.id),
+      [album.id]
+    );
+    assert.equal(byMbid.body[0].kind, 'album');
+    assert.equal(byMbid.body[0].foreignId, album.foreignId);
+    const byTmdb = await call('GET', '/api/v1/backfill/lookup?tmdbIds=58371');
+    assert.deepEqual(
+      byTmdb.body.map((row: { kind: string }) => row.kind),
+      ['series']
+    );
+  });
+
+  it('find an album in Lidarr for its page only while Backfill does music', async () => {
+    const mbId = '8a6b2d3c-1111-4222-8333-944455556666';
+    const settings = getSettings();
+    settings.backfill = { ...settings.backfill, includeMusic: false };
+    settings.lidarr = [
+      {
+        id: 3,
+        name: 'Lidarr',
+        hostname: 'lidarr',
+        port: 8686,
+        apiKey: 'x',
+        useSsl: false,
+        isDefault: true,
+      } as unknown as LidarrSettings,
+    ];
+    settings.main.disabledFeatures = [];
+    try {
+      mock.method(
+        BackfillLidarr.prototype,
+        'getAlbumByMbid',
+        async (id: string) =>
+          id === mbId ? { id: 77, title: 'Glasswing' } : undefined
+      );
+      const off = await call('GET', `/api/v1/backfill/album/${mbId}`);
+      assert.equal(off.status, 404);
+
+      settings.backfill = { ...settings.backfill, includeMusic: true };
+      const found = await call(
+        'GET',
+        `/api/v1/backfill/album/${mbId}?serverId=3`
+      );
+      assert.equal(found.status, 200, JSON.stringify(found.body));
+      assert.deepEqual(found.body, {
+        kind: 'album',
+        serverId: 3,
+        arrId: 77,
+        title: 'Glasswing',
+      });
+      const missing = await call(
+        'GET',
+        '/api/v1/backfill/album/00000000-0000-4000-8000-000000000000'
+      );
+      assert.equal(missing.status, 404);
+    } finally {
+      settings.lidarr = [];
+    }
   });
 
   it('search the titles by any part of the name, and count matches per tab', async () => {

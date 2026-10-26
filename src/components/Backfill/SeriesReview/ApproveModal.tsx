@@ -19,6 +19,7 @@ const messages = defineMessages('components.Backfill.ApproveModal', {
   recommended: 'Recommended',
   missing: 'Missing episodes only',
   missingMovie: 'The missing movie',
+  missingTracks: 'Missing tracks only',
   missingDetail: '{files} files · {size} · nothing on disk is touched',
   onlyFiles:
     'Only these files are downloaded. After {app} imports them, the torrent is removed without seeding.',
@@ -201,7 +202,11 @@ const ApproveModal = ({
               option(
                 'missing',
                 intl.formatMessage(
-                  kind === 'movie' ? messages.missingMovie : messages.missing
+                  kind === 'movie'
+                    ? messages.missingMovie
+                    : kind === 'album'
+                      ? messages.missingTracks
+                      : messages.missing
                 ),
                 intl.formatMessage(messages.missingDetail, {
                   files: pick.missing.length,

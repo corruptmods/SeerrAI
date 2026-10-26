@@ -20,21 +20,22 @@ const messages = defineMessages('components.Backfill.TitleButton', {
 const loadStart = () => import('@app/components/Backfill/StartSearchModal');
 
 /*
- * Backfill on a series' or movie's page, for admins: opens the title's
+ * Backfill on a series', movie's or album's page, for admins: opens the title's
  * Backfill page (its downloads are listed there and in the page's Backfill
  * box), or starts a search for a title it isn't following yet. The
  * dialog's code loads only when it is opened.
  */
 const BackfillTitleButton = ({
-  tmdbId,
+  id,
   target,
 }: {
-  tmdbId: number;
+  /** The TMDB id; an album's MusicBrainz id. */
+  id: number | string;
   target: LibraryTitle;
 }) => {
   const intl = useIntl();
   const [open, setOpen] = useState(false);
-  const tracked = useBackfillForTitle(tmdbId, target);
+  const tracked = useBackfillForTitle(id, target);
   const loaded = useLazyModule(loadStart, open, () => setOpen(false));
   const Start = loaded?.default;
 

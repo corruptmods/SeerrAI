@@ -332,6 +332,27 @@ backfillRoutes.post('/scan', (_req, res, next) => {
   return res.status(202).json({ started: true });
 });
 
+/** Where an album is in Lidarr, for its page to start a search from. */
+backfillRoutes.get<{ mbId: string }>('/album/:mbId', async (req, res, next) => {
+  if (!/^[0-9a-f-]{36}$/i.test(req.params.mbId)) {
+    return next({ status: 400, message: 'Bad request.' });
+  }
+  // Nothing to start from while Backfill leaves music alone.
+  if (!backfill.readiness().music) {
+    return next({ status: 404, message: 'Backfill does not look for music.' });
+  }
+  try {
+    const serverId = Number(req.query.serverId) || undefined;
+    const found = await backfill.findAlbum(req.params.mbId, serverId);
+    if (!found) {
+      return next({ status: 404, message: 'Lidarr does not have this album.' });
+    }
+    return res.status(200).json({ kind: 'album', ...found });
+  } catch (e) {
+    return fail(next, e, 500);
+  }
+});
+
 /** Every series Sonarr has and movie Radarr has, for starting by hand. */
 backfillRoutes.get('/library', async (_req, res, next) => {
   try {
@@ -429,19 +450,29 @@ backfillRoutes.post('/series', async (req, res, next) => {
  */
 backfillRoutes.get('/lookup', async (req, res, next) => {
   try {
-    // The validator hands the comma-separated list over as an array.
-    const raw = req.query.tmdbIds as unknown;
-    const tmdbIds = (Array.isArray(raw) ? raw : String(raw ?? '').split(','))
+    // The validator hands a comma-separated list over as an array.
+    const list = (raw: unknown): string[] =>
+      (Array.isArray(raw) ? raw : String(raw ?? '').split(','))
+        .map((v) => String(v).trim())
+        .filter(Boolean)
+        .slice(0, 100);
+    const tmdbIds = list(req.query.tmdbIds)
       .map(Number)
-      .filter((n) => Number.isInteger(n) && n > 0)
-      .slice(0, 100);
-    if (!tmdbIds.length) return res.status(200).json([]);
+      .filter((n) => Number.isInteger(n) && n > 0);
+    // Albums go by their MusicBrainz id: they have no TMDB id.
+    const mbIds = list(req.query.mbIds).filter((id) =>
+      /^[0-9a-f-]{36}$/i.test(id)
+    );
+    if (!tmdbIds.length && !mbIds.length) return res.status(200).json([]);
     const everything = ['1', 'true'].includes(String(req.query.all ?? ''));
+    const unfinished = everything ? {} : { status: Not('done' as const) };
     const rows = await getRepository(BackfillSeries).find({
-      where: {
-        tmdbId: In(tmdbIds),
-        ...(everything ? {} : { status: Not('done') }),
-      },
+      where: [
+        ...(tmdbIds.length ? [{ tmdbId: In(tmdbIds), ...unfinished }] : []),
+        ...(mbIds.length
+          ? [{ kind: 'album' as const, foreignId: In(mbIds), ...unfinished }]
+          : []),
+      ],
     });
     const jobs = await backfill.withLiveProgress(
       await getRepository(BackfillJob).find({

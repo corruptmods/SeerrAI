@@ -42,11 +42,14 @@ export interface ForTitleTarget {
  * in one request; it stays live while something downloads.
  */
 export const useBackfillForTitle = (
-  tmdbId: number,
+  /** The TMDB id; an album's MusicBrainz id. */
+  id: number | string,
   target: ForTitleTarget
 ): TitleLookup | undefined => {
   const { data } = useSWR<TitleLookup[]>(
-    `/api/v1/backfill/lookup?tmdbIds=${tmdbId}&all=true`,
+    `/api/v1/backfill/lookup?${
+      target.kind === 'album' ? 'mbIds' : 'tmdbIds'
+    }=${encodeURIComponent(id)}&all=true`,
     {
       refreshInterval: (latest) =>
         latest?.some((row) =>
@@ -69,20 +72,21 @@ export const useBackfillForTitle = (
 };
 
 /**
- * On a series' or movie's page, for admins: where Backfill is with it, the
+ * On a series', movie's or album's page, for admins: where Backfill is with it, the
  * downloads it has running (each opens its own page), and the way to its
  * Backfill page. Nothing for a title it doesn't follow, or has completed
  * with nothing left running; the page's Backfill button still leads there.
  */
 const BackfillForTitle = ({
-  tmdbId,
+  id,
   target,
 }: {
-  tmdbId: number;
+  /** The TMDB id; an album's MusicBrainz id. */
+  id: number | string;
   target: ForTitleTarget;
 }) => {
   const intl = useIntl();
-  const tracked = useBackfillForTitle(tmdbId, target);
+  const tracked = useBackfillForTitle(id, target);
   const jobs = tracked?.jobs ?? [];
   if (!tracked || (tracked.status === 'done' && !jobs.length)) return null;
 

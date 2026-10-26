@@ -8,6 +8,7 @@ import {
   formatBytes,
   formatDuration,
   jobStage,
+  titleHref,
 } from '@app/components/Backfill/shared';
 import type { JobView } from '@app/components/Backfill/types';
 import { ACTIVE_JOB } from '@app/components/Backfill/types';
@@ -201,14 +202,8 @@ const JobDetail = () => {
               </div>
             </div>
             <div className="flex flex-wrap items-start gap-2">
-              {data.series?.tmdbId && (
-                <Link
-                  href={`/${data.series.kind === 'movie' ? 'movie' : 'tv'}/${
-                    data.series.tmdbId
-                  }`}
-                  passHref
-                  legacyBehavior
-                >
+              {data.series && titleHref(data.series) && (
+                <Link href={titleHref(data.series)!} passHref legacyBehavior>
                   <Button as="a" buttonType="default">
                     <FilmIcon />
                     <span>{intl.formatMessage(messages.mediaPage)}</span>

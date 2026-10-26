@@ -13,6 +13,7 @@ import {
   appName,
   episodeLabel,
   formatBytes,
+  titleHref,
 } from '@app/components/Backfill/shared';
 import type {
   CandidateView,
@@ -54,6 +55,7 @@ const messages = defineMessages('components.Backfill.SeriesReview', {
   askAgent: 'Get it with AI',
   askAgentFailed: 'The admin agent could not be started.',
   ignoreMovie: 'Ignore movie',
+  ignoreAlbum: 'Ignore album',
   unignore: 'Stop ignoring',
   openJob: 'Open the running backfill',
   searchingNow:
@@ -72,6 +74,8 @@ const messages = defineMessages('components.Backfill.SeriesReview', {
     'Sonarr can’t read this pack’s title, so it missed it. Backfill matched the {count} files inside.',
   whyMovieTitle:
     'Radarr didn’t match the release’s title to this movie. Backfill matched it by the file inside.',
+  whyAlbumTitle:
+    'Lidarr didn’t match the release’s title to this album. Backfill matched its {count} files to the album’s tracks.',
   whyNone:
     'Your indexers have nothing under {names}. Add the name release groups use and search again.',
   titleBadge: 'Title',
@@ -107,6 +111,7 @@ const messages = defineMessages('components.Backfill.SeriesReview', {
   rejectFiles: 'Not usable',
   episodesCount: '{count, plural, one {# episode} other {# episodes}}',
   filesCount: '{count, plural, one {# file} other {# files}}',
+  tracksCount: '{count, plural, one {# track} other {# tracks}}',
   willDelete:
     '{count} existing {count, plural, one {file is} other {files are}} deleted for good when replacements import.',
   approve: 'Approve & download…',
@@ -121,6 +126,12 @@ const messages = defineMessages('components.Backfill.SeriesReview', {
   movieMatchedHow:
     'Matched by name and year and checked by Radarr. From a collection, only this movie is downloaded.',
   movieLabel: 'Movie',
+  trackLabel: 'Track {number}',
+  albumMatchedHow:
+    'Files are matched to the album’s tracks by title, or by number when there is one file for each track, in the edition Lidarr imports them into.',
+  albumTracks: 'Tracks',
+  trackOnDisk: 'Here, {quality}',
+  trackMissing: 'Missing',
   history: 'Backfills',
   noHistory: 'None yet.',
   imported: '{count} imported',
@@ -206,13 +217,15 @@ const SeriesReview = () => {
   }
   if (!data) return <LoadingSpinner />;
 
-  const { series, sonarr, movie } = data;
+  const { series, sonarr, movie, album } = data;
   const app = appName(series.kind);
-  const names = sonarr?.names ?? movie?.names;
+  const names = sonarr?.names ?? movie?.names ?? album?.names;
+  const mediaHref = titleHref(series);
   const activeJob = data.jobs.find((j) => ACTIVE_JOB.includes(j.status));
   // A series can have more than one download running, for other episodes;
   // a movie only the one.
-  const blocked = !!activeJob && series.kind === 'movie';
+  const blocked =
+    !!activeJob && (series.kind === 'movie' || series.kind === 'album');
 
   const act = async (fn: () => Promise<unknown>) => {
     setProblem(undefined);
@@ -277,10 +290,10 @@ const SeriesReview = () => {
               <div className="mt-2 flex flex-wrap gap-2">
                 <TypeBadge kind={series.kind} seriesType={series.seriesType} />
                 <SeriesStatusBadge status={series.status} />
-                {(sonarr ?? movie) && (
+                {(sonarr ?? movie ?? album) && (
                   <Badge badgeType="dark">
                     {intl.formatMessage(messages.profile, {
-                      name: (sonarr ?? movie)!.profile,
+                      name: (sonarr ?? movie ?? album)!.profile,
                     })}
                   </Badge>
                 )}
@@ -294,21 +307,16 @@ const SeriesReview = () => {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-start xl:flex-none xl:flex-nowrap">
-              {series.tmdbId && (
-                <Link
-                  href={`/${series.kind === 'movie' ? 'movie' : 'tv'}/${
-                    series.tmdbId
-                  }`}
-                  passHref
-                  legacyBehavior
-                >
+              {mediaHref && (
+                <Link href={mediaHref} passHref legacyBehavior>
                   <Button as="a" buttonType="default">
                     <FilmIcon />
                     <span>{intl.formatMessage(messages.mediaPage)}</span>
                   </Button>
                 </Link>
               )}
-              {agentOn && (
+              {/* The agent works on series and movies. */}
+              {agentOn && series.kind !== 'album' && (
                 <Button
                   buttonType="primary"
                   disabled={asking}
@@ -379,7 +387,9 @@ const SeriesReview = () => {
                       ? messages.unignore
                       : series.kind === 'movie'
                         ? messages.ignoreMovie
-                        : messages.ignore
+                        : series.kind === 'album'
+                          ? messages.ignoreAlbum
+                          : messages.ignore
                   )}
                 </span>
               </Button>
@@ -473,6 +483,45 @@ const SeriesReview = () => {
               </div>
             </section>
           )}
+          {album && (
+            <section className="rounded-lg bg-gray-800 ring-1 ring-gray-700">
+              <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-strong">
+                {intl.formatMessage(messages.albumTracks)}
+              </h2>
+              <ol className="divide-y divide-gray-700 px-5 py-2 text-sm">
+                {album.tracks.map((track) => (
+                  <li key={track.id} className="flex items-center gap-3 py-1.5">
+                    <span className="w-8 shrink-0 text-right tabular-nums text-gray-500">
+                      {track.number}
+                    </span>
+                    {/* Green: the chosen pack has it. */}
+                    <span
+                      className={`min-w-0 flex-1 truncate ${
+                        covered.has(track.id)
+                          ? 'text-green-300 light:text-success-text'
+                          : 'text-gray-200'
+                      }`}
+                    >
+                      {track.title}
+                    </span>
+                    <span
+                      className={`shrink-0 ${
+                        track.state === 'missing'
+                          ? 'text-yellow-400 light:text-warning-text'
+                          : 'text-gray-400'
+                      }`}
+                    >
+                      {track.state === 'missing'
+                        ? intl.formatMessage(messages.trackMissing)
+                        : intl.formatMessage(messages.trackOnDisk, {
+                            quality: track.quality ?? '—',
+                          })}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
           {movie && (
             <section className="rounded-lg bg-gray-800 ring-1 ring-gray-700">
               <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-strong">
@@ -515,9 +564,12 @@ const SeriesReview = () => {
                   <span>
                     {series.kind === 'movie'
                       ? intl.formatMessage(messages.whyMovieTitle)
-                      : intl.formatMessage(messages.whyTitle, {
-                          count: fileCount(ranked[0]),
-                        })}
+                      : intl.formatMessage(
+                          series.kind === 'album'
+                            ? messages.whyAlbumTitle
+                            : messages.whyTitle,
+                          { count: fileCount(ranked[0]) }
+                        )}
                   </span>
                 </li>
               )}
@@ -592,7 +644,9 @@ const SeriesReview = () => {
                         {intl.formatMessage(
                           series.kind === 'movie'
                             ? messages.filesCount
-                            : messages.episodesCount,
+                            : series.kind === 'album'
+                              ? messages.tracksCount
+                              : messages.episodesCount,
                           { count: selected.summary![key] }
                         )}
                       </dd>
@@ -650,7 +704,9 @@ const SeriesReview = () => {
                   {intl.formatMessage(
                     series.kind === 'movie'
                       ? messages.movieMatchedHow
-                      : messages.matchedHow
+                      : series.kind === 'album'
+                        ? messages.albumMatchedHow
+                        : messages.matchedHow
                   )}
                 </p>
               </>
@@ -659,15 +715,17 @@ const SeriesReview = () => {
         </section>
       </div>
 
-      <AgentForTitle
-        card
-        autoRanAt={series.agentAutoRunAt}
-        title={{
-          kind: series.kind,
-          serverId: series.serverId,
-          arrId: series.arrId,
-        }}
-      />
+      {series.kind !== 'album' && (
+        <AgentForTitle
+          card
+          autoRanAt={series.agentAutoRunAt}
+          title={{
+            kind: series.kind,
+            serverId: series.serverId,
+            arrId: series.arrId,
+          }}
+        />
+      )}
 
       <section className="mt-4 rounded-lg bg-gray-800 ring-1 ring-gray-700">
         <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-strong">
@@ -822,7 +880,14 @@ const SeriesReview = () => {
                                         ? intl.formatMessage(
                                             messages.movieLabel
                                           )
-                                        : '—')}
+                                        : entry.episodeIds.length &&
+                                            series.kind === 'album' &&
+                                            entry.episode
+                                          ? intl.formatMessage(
+                                              messages.trackLabel,
+                                              { number: entry.episode }
+                                            )
+                                          : '—')}
                                   </span>
                                   <span className="min-w-0 flex-1 break-all text-gray-400">
                                     {entry.name}

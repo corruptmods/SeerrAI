@@ -5,6 +5,7 @@ import SensitiveInput from '@app/components/Common/SensitiveInput';
 import AdvancedSection from '@app/components/Settings/AdvancedSection';
 import BlockedGroups from '@app/components/Settings/SettingsBackfill/BlockedGroups';
 import DownloadCheck from '@app/components/Settings/SettingsBackfill/DownloadCheck';
+import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -42,9 +43,13 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
   category: 'Category',
   categoryTip:
     'Keeps Backfill’s downloads apart, so Sonarr and Radarr don’t import them on their own.',
+  categoryTipMusic:
+    'Keeps Backfill’s downloads apart, so Sonarr, Radarr and Lidarr don’t import them on their own.',
   when: 'When a title is stuck',
   includeMovies: 'Movies too',
   includeMoviesTip: 'Also follow movies Radarr couldn’t find.',
+  includeMusic: 'Music too',
+  includeMusicTip: 'Also follow albums Lidarr couldn’t find.',
   stuckAfterHours: 'Hours since Sonarr’s or Radarr’s last search',
   includeCutoffUnmet: 'Treat files below the cutoff as gaps',
   includeCutoffUnmetTip: 'Off: packs that only upgrade files aren’t offered.',
@@ -112,6 +117,8 @@ const chosen = (id: number | null, clients: { id: number }[]): number | '' =>
 
 const SettingsBackfill = () => {
   const intl = useIntl();
+  const { currentSettings } = useSettings();
+  const musicReady = !!currentSettings.musicReady;
   const { addToast } = useToasts();
   const { data, error, mutate } = useSWR<Shown>('/api/v1/settings/backfill');
   const [test, setTest] = useState<{ ok: boolean; text: string }>();
@@ -168,6 +175,7 @@ const SettingsBackfill = () => {
                   : Number(values.usenetClientId),
               category: values.category,
               includeMovies: values.includeMovies,
+              includeMusic: values.includeMusic,
               stuckAfterHours: Number(values.stuckAfterHours),
               includeCutoffUnmet: values.includeCutoffUnmet,
               includeSpecials: values.includeSpecials,
@@ -416,7 +424,11 @@ const SettingsBackfill = () => {
                 <label htmlFor="category" className="text-label">
                   {intl.formatMessage(messages.category)}
                   <span className="label-tip">
-                    {intl.formatMessage(messages.categoryTip)}
+                    {intl.formatMessage(
+                      musicReady
+                        ? messages.categoryTipMusic
+                        : messages.categoryTip
+                    )}
                   </span>
                 </label>
                 <div className="form-input-area">
@@ -458,6 +470,19 @@ const SettingsBackfill = () => {
                   {checkbox('includeMovies', values.includeMovies)}
                 </div>
               </div>
+              {musicReady && (
+                <div className="form-row">
+                  <label htmlFor="includeMusic" className="checkbox-label">
+                    {intl.formatMessage(messages.includeMusic)}
+                    <span className="label-tip">
+                      {intl.formatMessage(messages.includeMusicTip)}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    {checkbox('includeMusic', values.includeMusic)}
+                  </div>
+                </div>
+              )}
               <div className="form-row">
                 <label htmlFor="includeCutoffUnmet" className="checkbox-label">
                   {intl.formatMessage(messages.includeCutoffUnmet)}

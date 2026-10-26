@@ -34,6 +34,7 @@ const messages = defineMessages('components.Backfill', {
   anime: 'Anime',
   series: 'Series',
   movie: 'Movie',
+  album: 'Album',
   torrent: 'Torrent',
   usenet: 'Usenet',
   fills: 'fills {count} missing',
@@ -56,7 +57,21 @@ const messages = defineMessages('components.Backfill', {
 });
 
 export const appName = (kind: TitleKind) =>
-  kind === 'movie' ? 'Radarr' : 'Sonarr';
+  kind === 'album' ? 'Lidarr' : kind === 'movie' ? 'Radarr' : 'Sonarr';
+
+/** A title's own page in Seerr AI, when it has one. */
+export const titleHref = (title: {
+  kind: TitleKind;
+  tmdbId: number | null;
+  foreignId?: string | null;
+}): string | undefined =>
+  title.kind === 'album'
+    ? title.foreignId
+      ? `/music/album/${title.foreignId}`
+      : undefined
+    : title.tmdbId
+      ? `/${title.kind === 'movie' ? 'movie' : 'tv'}/${title.tmdbId}`
+      : undefined;
 
 export const formatBytes = (bytes: number): string => {
   if (!bytes || bytes < 0) return '0 B';
@@ -231,6 +246,9 @@ export const TypeBadge = ({
   const intl = useIntl();
   if (kind === 'movie') {
     return <Badge>{intl.formatMessage(messages.movie)}</Badge>;
+  }
+  if (kind === 'album') {
+    return <Badge>{intl.formatMessage(messages.album)}</Badge>;
   }
   return seriesType === 'anime' ? (
     <Badge badgeType="primary">{intl.formatMessage(messages.anime)}</Badge>

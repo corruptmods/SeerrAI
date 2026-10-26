@@ -493,6 +493,8 @@ export interface BackfillReadiness {
   torrentClient?: string;
   usenetClient?: string;
   problem?: string;
+  /** Albums are looked for too. */
+  music: boolean;
 }
 
 /** What Sonarr, Radarr and Lidarr all answer, for downloads and imports. */
@@ -1316,6 +1318,7 @@ class Backfill {
       torrentClient: torrent?.name,
       usenetClient: usenet?.name,
       problem,
+      music: backfill.includeMusic && musicReady(),
     };
   }
 
@@ -1364,6 +1367,28 @@ class Backfill {
     const server = getSettings().lidarr.find((s) => s.id === serverId);
     if (!server) throw new Error('That Lidarr server is no longer set up.');
     return BackfillLidarr.forServer(server);
+  }
+
+  /**
+   * Where an album is in Lidarr, by its MusicBrainz id: the server given
+   * first, then the others. Undefined when no Lidarr has it.
+   */
+  public async findAlbum(
+    mbId: string,
+    serverId?: number
+  ): Promise<{ serverId: number; arrId: number; title: string } | undefined> {
+    const servers = this.distinct(getSettings().lidarr).sort(
+      (a, b) => Number(b.id === serverId) - Number(a.id === serverId)
+    );
+    for (const server of servers) {
+      const album = await BackfillLidarr.forServer(server)
+        .getAlbumByMbid(mbId)
+        .catch(() => undefined);
+      if (album) {
+        return { serverId: server.id, arrId: album.id, title: album.title };
+      }
+    }
+    return undefined;
   }
 
   public arrFor(row: BackfillSeries): Arr {

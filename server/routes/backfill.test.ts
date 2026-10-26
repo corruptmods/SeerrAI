@@ -773,6 +773,73 @@ describe('Backfill routes', () => {
     );
   });
 
+  it('list the albums Lidarr monitors for starting a search, while Backfill does music', async () => {
+    const settings = getSettings();
+    settings.backfill = { ...settings.backfill, includeMusic: true };
+    settings.lidarr = [
+      {
+        id: 3,
+        name: 'Lidarr',
+        hostname: 'lidarr',
+        port: 8686,
+        apiKey: 'x',
+        useSsl: false,
+        isDefault: true,
+      } as unknown as LidarrSettings,
+    ];
+    settings.main.disabledFeatures = [];
+    try {
+      mock.method(BackfillSonarr.prototype, 'getAllSeries', async () => [
+        { id: 1279, title: 'Kitsuraga', year: 2002, tvdbId: 63914 },
+      ]);
+      const forServer = BackfillLidarr.forServer;
+      mock.method(BackfillLidarr, 'forServer', (server: LidarrSettings) =>
+        Object.assign(forServer.call(BackfillLidarr, server), {
+          getAlbums: async () => [
+            {
+              id: 77,
+              title: 'Glasswing',
+              foreignAlbumId: '8a6b2d3c-1111-4222-8333-944455556666',
+              artistId: 12,
+              monitored: true,
+              releaseDate: '2019-04-05T00:00:00Z',
+            },
+            {
+              id: 78,
+              title: 'Unwanted Live',
+              foreignAlbumId: '8a6b2d3c-1111-4222-8333-944455556667',
+              artistId: 12,
+              monitored: false,
+            },
+          ],
+          getArtists: async () => [{ id: 12, artistName: 'Paper Lanterns' }],
+        })
+      );
+      const res = await call('GET', '/api/v1/backfill/library');
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.deepEqual(
+        res.body.map((o: { kind: string; title: string }) => [o.kind, o.title]),
+        [
+          ['album', 'Glasswing'],
+          ['series', 'Kitsuraga'],
+        ]
+      );
+      const album = res.body.find((o: { kind: string }) => o.kind === 'album');
+      assert.equal(album.artist, 'Paper Lanterns');
+      assert.equal(album.year, 2019);
+      assert.equal(album.arrId, 77);
+
+      settings.backfill = { ...settings.backfill, includeMusic: false };
+      const off = await call('GET', '/api/v1/backfill/library');
+      assert.deepEqual(
+        off.body.map((o: { kind: string }) => o.kind),
+        ['series']
+      );
+    } finally {
+      settings.lidarr = [];
+    }
+  });
+
   it('find an album in Lidarr for its page only while Backfill does music', async () => {
     const mbId = '8a6b2d3c-1111-4222-8333-944455556666';
     const settings = getSettings();

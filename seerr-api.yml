@@ -5904,7 +5904,7 @@ paths:
                 $ref: '#/components/schemas/BackfillAnswer'
   /backfill/library:
     get:
-      summary: 'Every series in Sonarr and movie in Radarr, to start a search by hand'
+      summary: 'Every series in Sonarr, movie in Radarr and album Lidarr monitors, to start a search by hand'
       tags:
         - backfill
       responses:

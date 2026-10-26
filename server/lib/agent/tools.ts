@@ -1,3 +1,4 @@
+import { musicBrainz } from '@server/api/musicbrainz';
 import type { ProwlarrRelease } from '@server/api/prowlarr';
 import ProwlarrAPI, {
   AUDIO_CATEGORIES,
@@ -69,9 +70,14 @@ import type {
   SonarrSeriesDetail,
 } from '@server/lib/backfill/sonarr';
 import { blockedGroupOf } from '@server/lib/blockedGroups';
+import { musicReady } from '@server/lib/music/access';
 import { isAudio } from '@server/lib/music/albumRelease';
+import { albumStatuses } from '@server/lib/music/library';
+import { rankAlbums } from '@server/lib/music/searchRank';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import type { MusicAlbumResult } from '@server/models/Music';
+import { mapAlbumResult } from '@server/models/Music';
 import { In, MoreThan } from 'typeorm';
 import { z } from 'zod';
 
@@ -278,6 +284,21 @@ const musicOn = () => backfill.readiness().music;
 /** Outside lookups, as a seam for tests. */
 export const lookups = {
   tmdb: (query: string) => new TheMovieDb().searchMulti({ query }),
+  /** Albums on MusicBrainz, as music search ranks them, with Seerr's status. */
+  albums: async (query: string): Promise<MusicAlbumResult[]> => {
+    const page = await musicBrainz().searchReleaseGroups(query, { limit: 10 });
+    const groups = rankAlbums(page['release-groups'] ?? [], 6);
+    const statuses = await albumStatuses(groups.map((g) => g.id));
+    return groups.map((group) => mapAlbumResult(group, statuses));
+  },
+  /** An album's own artist, its first credited, on MusicBrainz. */
+  albumArtist: async (
+    albumMbid: string
+  ): Promise<{ title: string; artistMbid?: string; artist?: string }> => {
+    const group = await musicBrainz().getReleaseGroup(albumMbid);
+    const credit = group['artist-credit']?.[0]?.artist;
+    return { title: group.title, artistMbid: credit?.id, artist: credit?.name };
+  },
 };
 
 const SEERR_STATUS: Record<number, string> = {
@@ -294,17 +315,24 @@ const findTitle: AgentTool = {
   name: 'find_title',
   readOnly: true,
   description:
-    'Finds a series or movie by name in the Sonarr and Radarr libraries, or an album by its name or its artist in Lidarr (giving a title reference to use with the other tools), and on TMDB for films and series not in the library yet.',
+    'Finds a series or movie by name in the Sonarr and Radarr libraries, or an album by its name or its artist in Lidarr (giving a title reference to use with the other tools), and on TMDB for films and series not in the library yet. With music: true it also looks the name up on MusicBrainz, for an album not in Lidarr ("Album Artist" finds it best).',
   parameters: {
     type: 'object',
     properties: {
       query: { type: 'string', description: 'The title, or part of it.' },
+      music: {
+        type: 'boolean',
+        description: 'Also look for albums on MusicBrainz.',
+      },
     },
     required: ['query'],
   },
   async run(state, input) {
-    const { query } = z
-      .object({ query: z.string().trim().min(1).max(200) })
+    const { query, music } = z
+      .object({
+        query: z.string().trim().min(1).max(200),
+        music: z.boolean().optional(),
+      })
       .parse(input);
     const settings = getSettings();
     const lines: string[] = [];
@@ -413,11 +441,32 @@ const findTitle: AgentTool = {
         );
       }
     }
+    if (music && musicReady()) {
+      const albums = await lookups.albums(query).catch(() => null);
+      if (!albums) {
+        lines.push('MusicBrainz did not answer; try again in a minute.');
+      }
+      for (const album of albums ?? []) {
+        lines.push(
+          `mb:album:${album.id}  ${album.title}${
+            album.artistName ? ` by ${album.artistName}` : ''
+          }${album.releaseDate ? ` (${album.releaseDate.slice(0, 4)})` : ''}${
+            album.primaryType ? `, ${album.primaryType}` : ''
+          }${
+            album.secondaryTypes.length
+              ? ` (${album.secondaryTypes.join(', ')})`
+              : ''
+          } — on MusicBrainz, in Seerr: ${
+            SEERR_STATUS[album.status ?? MediaStatus.UNKNOWN] ?? 'unknown'
+          }`
+        );
+      }
+    }
     return lines.length
       ? lines.join('\n')
       : `Nothing called "${query}" in the libraries or on TMDB.${
-          musicOn()
-            ? ' An album not in Lidarr is requested from its page in Seerr.'
+          musicReady() && !music
+            ? ' For an album not in Lidarr, look again with music: true.'
             : ''
         }`;
   },
@@ -2714,11 +2763,55 @@ export const startApprovedGrab = async (
 
 // ---- requesting ----------------------------------------------------------------
 
+/**
+ * An album not in Lidarr, requested for its artist (its first credited,
+ * as the music pages do): once approved, Lidarr adds the artist and
+ * searches for the album.
+ */
+const requestAlbum = async (
+  state: AgentState,
+  value: unknown
+): Promise<string> => {
+  const match = /^mb:album:([0-9a-f-]{36})$/i.exec(String(value ?? ''));
+  if (!match) {
+    throw new ToolError(
+      'Use an album reference from find_title with music: true, like mb:album:4f6a2d93-c1e8-3a57-9b02-6d3e8f1c7a40.'
+    );
+  }
+  if (!musicReady()) {
+    throw new ToolError('Music is not set up, so albums cannot be requested.');
+  }
+  const albumMbid = match[1].toLowerCase();
+  const album = await lookups.albumArtist(albumMbid).catch(() => {
+    throw new ToolError(
+      'MusicBrainz did not answer about that album; try again in a minute.'
+    );
+  });
+  if (!album.artistMbid) {
+    throw new ToolError(
+      `MusicBrainz credits no artist for "${album.title}", so it cannot be requested.`
+    );
+  }
+  const name = album.artist ? `${album.title} by ${album.artist}` : album.title;
+  const request = await MediaRequest.requestMusic(
+    { artistMbid: album.artistMbid, albums: [albumMbid] },
+    state.user
+  );
+  state.act({
+    at: new Date().toISOString(),
+    type: 'request',
+    title: name,
+    detail: `Requested as ${state.user.displayName}`,
+    requestId: request.id,
+  });
+  return `Requested ${name} (request #${request.id}). Once it is approved, Lidarr adds the artist and searches for the album; it can be checked with find_title in a few minutes. If Lidarr finds nothing, Backfill follows it.`;
+};
+
 const requestTitle: AgentTool = {
   name: 'request_title',
   askOnly: true,
   description:
-    'Requests a title that is not in the library yet, as the admin who asked, so Sonarr or Radarr adds and searches for it. Only when the admin asked for something that is not in the library.',
+    'Requests a title that is not in the library yet, as the admin who asked, so Sonarr, Radarr or Lidarr adds and searches for it: a film or series by its TMDB reference, or an album by its MusicBrainz reference. Only when the admin asked for something that is not in the library.',
   parameters: {
     type: 'object',
     properties: {
@@ -2726,14 +2819,19 @@ const requestTitle: AgentTool = {
         type: 'string',
         description: 'Like tmdb:tv:8627 from find_title.',
       },
+      album: {
+        type: 'string',
+        description:
+          'Like mb:album:4f6a2d93-c1e8-3a57-9b02-6d3e8f1c7a40 from find_title with music: true.',
+      },
     },
-    required: ['tmdb'],
   },
   async run(state, input) {
+    if (input.album !== undefined) return requestAlbum(state, input.album);
     const match = /^tmdb:(tv|movie):(\d+)$/.exec(String(input.tmdb ?? ''));
     if (!match) {
       throw new ToolError(
-        'Use a TMDB reference from find_title, like tmdb:tv:8627.'
+        "Use a TMDB reference from find_title, like tmdb:tv:8627, or an album's, like mb:album:…."
       );
     }
     const mediaType = match[1] === 'tv' ? MediaType.TV : MediaType.MOVIE;

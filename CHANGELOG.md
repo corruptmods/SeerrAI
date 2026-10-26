@@ -10,7 +10,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - **Your own Music page**: rows from the music you've asked for: your requests, more from your artists, and artists like yours. Only your own requests count.
 - **Faster music search**: a search you've typed past no longer holds up the one you want, and songs are looked up alongside artists and albums.
 - **Song downloads show their progress**: a song taken from an album shows **Downloading** on its track, its request and its album while it comes, as Lidarr's downloads do.
-- **Backfill and the admin agent find music**: albums Lidarr couldn't find are followed and filled like series, matched track by track, and the admin agent can look for them too. Turn it off with Music too in Settings → Backfill. ([guide](./docs/seerr-ai/backfill-and-agent.md#music))
+- **Backfill and the admin agent find music**: albums Lidarr couldn't find are followed and filled like series, matched track by track. Start search… lists albums too, and the admin agent can look for them, or request one that isn't in Lidarr. Turn it off with Music too in Settings → Backfill. ([guide](./docs/seerr-ai/backfill-and-agent.md#music))
 - **Music in AI Search**: with music on, AI Search finds albums and artists too, from a description or a photo of an album cover.
 - **Radarr 7**: works as before. If Radarr's Allowed Hosts (which Radarr 7 asks for) leaves out the name Seerr AI uses for it, the connection test, Health and errors say what to add, instead of "Failed to connect". Sonarr and Lidarr too.
 - **Your Watchlist** shows your titles in a new order each time you open it.

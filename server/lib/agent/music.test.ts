@@ -5,6 +5,8 @@ import { getRepository } from '@server/datasource';
 import type { AgentAction, AgentRun } from '@server/entity/AgentRun';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import type BackfillJob from '@server/entity/BackfillJob';
+import { MediaRequest } from '@server/entity/MediaRequest';
+import type { MusicRequestBody } from '@server/interfaces/api/requestInterfaces';
 import type { AgentState, KnownRelease } from '@server/lib/agent/tools';
 import { lookups, runTool } from '@server/lib/agent/tools';
 import backfill from '@server/lib/backfill/engine';
@@ -390,5 +392,66 @@ describe('the admin agent and albums', () => {
       reason: 'no',
     });
     assert.equal(relink.isError, true);
+  });
+
+  it('finds an album not in Lidarr on MusicBrainz, and requests it for its artist', async () => {
+    const MBID = 'b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e';
+    mock.method(lookups, 'albums', async () => [
+      {
+        mediaType: 'album',
+        id: MBID,
+        title: 'Paper Moons',
+        primaryType: 'Album',
+        secondaryTypes: [],
+        releaseDate: '2018-03-09',
+        artistName: 'Glasswing',
+        coverUrl: '',
+      },
+    ]);
+    mock.method(lookups, 'albumArtist', async () => ({
+      title: 'Paper Moons',
+      artistMbid: ARTIST.foreignArtistId,
+      artist: 'Glasswing',
+    }));
+    const asked: MusicRequestBody[] = [];
+    mock.method(
+      MediaRequest,
+      'requestMusic',
+      async (body: MusicRequestBody) => {
+        asked.push(body);
+        return { id: 31 } as MediaRequest;
+      }
+    );
+    const state = stateFor();
+    const plain = await runTool(state, 'find_title', { query: 'paper moons' });
+    assert.doesNotMatch(plain.text, /mb:album/);
+    assert.match(plain.text, /look again with music: true/);
+    const found = await runTool(state, 'find_title', {
+      query: 'paper moons',
+      music: true,
+    });
+    assert.match(
+      found.text,
+      new RegExp(
+        `mb:album:${MBID} {2}Paper Moons by Glasswing \\(2018\\), Album — on MusicBrainz, in Seerr: not requested`
+      )
+    );
+    const requested = await runTool(state, 'request_title', {
+      album: `mb:album:${MBID}`,
+    });
+    assert.equal(requested.isError, false, requested.text);
+    assert.match(
+      requested.text,
+      /Requested Paper Moons by Glasswing \(request #31\)/
+    );
+    assert.deepEqual(asked, [
+      { artistMbid: ARTIST.foreignArtistId, albums: [MBID] },
+    ]);
+    assert.equal(actions[0]?.type, 'request');
+    const wrong = await runTool(state, 'request_title', {
+      album: 'Paper Moons',
+    });
+    assert.equal(wrong.isError, true);
+    assert.match(wrong.text, /Use an album reference/);
   });
 });

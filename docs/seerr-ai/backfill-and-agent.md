@@ -22,7 +22,7 @@ With music set up, Backfill follows albums too: those Lidarr lists as missing (*
 - Prowlarr is searched under "Artist Album" and the album's name, in its audio categories.
 - Each file of a release is matched to a track by its title, or by its number when the release has one file per track. Lidarr imports into one edition of an album: the one already on disk, or, for an album with nothing yet, the edition most of the files are from.
 - Approval is **Missing tracks only** or **Missing and upgrades**, as for series.
-- An album's page shows admins its Backfill box, and the Backfill button there starts a search.
+- An album's page shows admins its Backfill box, and the Backfill button there starts a search. **Start search…** lists the albums Lidarr monitors too; type the album or the artist.
 
 ### Setting it up
 
@@ -80,9 +80,9 @@ Without a category or label, a magnet link Backfill was reading when Seerr AI st
 
 An AI with tools that looks further when Backfill finds nothing usable for a requested title. It needs AI set up, with **Admin Agent** on.
 
-**It can:** read why Sonarr, Radarr and Lidarr turned releases down; find a title and see what it has; run Sonarr's, Radarr's or Lidarr's own search; search Prowlarr with any words; list a release's files and check its language; download what is missing; relink a file that holds two episodes; ask you a question; stop its own download; request a film or series that isn't in the library yet.
+**It can:** read why Sonarr, Radarr and Lidarr turned releases down; find a title and see what it has; run Sonarr's, Radarr's or Lidarr's own search; search Prowlarr with any words; list a release's files and check its language; download what is missing; relink a file that holds two episodes; ask you a question; stop its own download; request a title that isn't in the library yet.
 
-**Albums**, while Backfill does music: it finds an album in Lidarr by its name or its artist, sees which tracks are missing, and searches Lidarr and Prowlarr's music. When it takes a release, Backfill matches the files to the album's tracks, as it does for its own finds, and only missing tracks are downloaded. To replace a track, or block a release group, it asks you first, as for films and series.
+**Albums**, while Backfill does music: it finds an album in Lidarr by its name or its artist, sees which tracks are missing, and searches Lidarr and Prowlarr's music. An album that isn't in Lidarr it finds on MusicBrainz, and requests when you ask it to. When it takes a release, Backfill matches the files to the album's tracks, as it does for its own finds, and only missing tracks are downloaded. To replace a track, or block a release group, it asks you first, as for films and series.
 
 **It can't, on its own:** replace or touch a file already on disk; download a language other than English or the title's original language; go past its size or daily limits.
 

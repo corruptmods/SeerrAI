@@ -353,7 +353,10 @@ backfillRoutes.get<{ mbId: string }>('/album/:mbId', async (req, res, next) => {
   }
 });
 
-/** Every series Sonarr has and movie Radarr has, for starting by hand. */
+/**
+ * Every series Sonarr has and movie Radarr has, and while Backfill does
+ * music every album Lidarr monitors, for starting by hand.
+ */
 backfillRoutes.get('/library', async (_req, res, next) => {
   try {
     const settings = getSettings();
@@ -364,6 +367,8 @@ backfillRoutes.get('/library', async (_req, res, next) => {
       arrId: number;
       title: string;
       year: number;
+      /** An album's artist. */
+      artist?: string;
     }[] = [];
     const seen = new Set<string>();
     // A server that is down leaves its titles out rather than the list.
@@ -410,6 +415,35 @@ backfillRoutes.get('/library', async (_req, res, next) => {
         }
       }
     }
+    if (backfill.readiness().music) {
+      for (const server of settings.lidarr) {
+        const lidarr = backfill.lidarrFor(server.id);
+        const [albums, artists] = await Promise.all([
+          orNothing(server.name, () => lidarr.getAlbums()),
+          orNothing(server.name, () => lidarr.getArtists()),
+        ]);
+        const artistOf = new Map(artists.map((a) => [a.id, a.artistName]));
+        for (const album of albums) {
+          // Lidarr only fetches what it monitors; Backfill does the same.
+          if (!album.monitored || seen.has(`album:${album.foreignAlbumId}`)) {
+            continue;
+          }
+          seen.add(`album:${album.foreignAlbumId}`);
+          const year = album.releaseDate
+            ? new Date(album.releaseDate).getUTCFullYear()
+            : 0;
+          out.push({
+            kind: 'album',
+            serverId: server.id,
+            serverName: server.name,
+            arrId: album.id,
+            title: album.title,
+            year: year > 1 ? year : 0,
+            artist: artistOf.get(album.artistId),
+          });
+        }
+      }
+    }
     out.sort((a, b) => a.title.localeCompare(b.title));
     return res.status(200).json(out);
   } catch (e) {
@@ -423,7 +457,7 @@ const trackBody = z.object({
   arrId: z.number().int(),
 });
 
-/** Follows a series or a movie (from a title page, or picked by hand). */
+/** Follows a series, movie or album (from its page, or picked by hand). */
 backfillRoutes.post('/series', async (req, res, next) => {
   const parsed = trackBody.safeParse(req.body);
   if (!parsed.success) return next({ status: 400, message: 'Bad request.' });

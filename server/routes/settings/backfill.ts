@@ -37,6 +37,7 @@ const body = z.object({
     .max(60)
     .regex(/^[\w.-]+$/),
   includeMovies: z.boolean().default(true),
+  includeMusic: z.boolean().default(true),
   stuckAfterHours: z.coerce
     .number()
     .int()

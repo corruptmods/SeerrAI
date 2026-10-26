@@ -43,6 +43,11 @@ export interface PlanEntry {
   /** What the model read in the name, for an AI match. */
   why?: string;
   /**
+   * An album's edition (Lidarr's release) the file is imported into: the
+   * track ids are that edition's.
+   */
+  releaseId?: number;
+  /**
    * The whole release, a Usenet post packed in archives or with scrambled
    * names whose name is this one episode (or the movie): its files are
    * unknown until it is downloaded, and its one video is imported.

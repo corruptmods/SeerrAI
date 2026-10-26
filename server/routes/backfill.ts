@@ -140,6 +140,9 @@ const seriesView = (row: BackfillSeries) => ({
   arrId: row.arrId,
   tvdbId: row.tvdbId,
   tmdbId: row.tmdbId,
+  /** An album's MusicBrainz id, for its page. */
+  foreignId: row.foreignId,
+  artistName: row.artistName,
   title: row.title,
   year: row.year,
   seriesType: row.seriesType,
@@ -394,7 +397,7 @@ backfillRoutes.get('/library', async (_req, res, next) => {
 });
 
 const trackBody = z.object({
-  kind: z.enum(['series', 'movie']),
+  kind: z.enum(['series', 'movie', 'album']),
   serverId: z.number().int(),
   arrId: z.number().int(),
 });
@@ -501,6 +504,49 @@ interface MovieOnDisk {
   file?: { quality: string; score?: number; belowCutoff?: boolean };
 }
 
+interface AlbumOnDisk {
+  title: string;
+  artist: string;
+  profile: string;
+  minFormatScore: number;
+  names: string[];
+  tracks: {
+    id: number;
+    number?: number;
+    title: string;
+    state: 'missing' | 'onDisk';
+    quality?: string;
+  }[];
+}
+
+/** An album's tracks as Lidarr has them, for its page. */
+const albumOnDisk = async (row: BackfillSeries): Promise<AlbumOnDisk> => {
+  const ctx = await backfill.albumContext(row);
+  const files = new Map(ctx.files.map((f) => [f.id, f]));
+  return {
+    title: ctx.album.title,
+    artist: ctx.artist.artistName,
+    profile: ctx.profile.name,
+    minFormatScore: ctx.profile.minFormatScore,
+    names: ctx.names,
+    tracks: ctx.tracks
+      .sort(
+        (a, b) =>
+          (a.mediumNumber ?? 1) - (b.mediumNumber ?? 1) ||
+          (a.absoluteTrackNumber ?? 0) - (b.absoluteTrackNumber ?? 0)
+      )
+      .map((track) => ({
+        id: track.id,
+        number: track.absoluteTrackNumber,
+        title: track.title,
+        state: track.hasFile ? ('onDisk' as const) : ('missing' as const),
+        quality: track.trackFileId
+          ? files.get(track.trackFileId)?.quality.quality.name
+          : undefined,
+      })),
+  };
+};
+
 /** A series' episodes as Sonarr has them, for its page. */
 const seriesOnDisk = async (row: BackfillSeries): Promise<SeriesOnDisk> => {
   const ctx = await backfill.context(row);
@@ -584,9 +630,12 @@ backfillRoutes.get('/series/:id', async (req, res, next) => {
     );
     let sonarr: SeriesOnDisk | undefined;
     let movie: MovieOnDisk | undefined;
+    let album: AlbumOnDisk | undefined;
     let arrError: string | undefined;
     try {
-      if (row.kind === 'movie') {
+      if (row.kind === 'album') {
+        album = await albumOnDisk(row);
+      } else if (row.kind === 'movie') {
         movie = await movieOnDisk(row);
       } else {
         sonarr = await seriesOnDisk(row);
@@ -599,6 +648,7 @@ backfillRoutes.get('/series/:id', async (req, res, next) => {
       readiness: backfill.readiness(),
       sonarr,
       movie,
+      album,
       arrError,
       candidates: candidates.map((c) => candidateView(c, true)),
       jobs: jobs.map((j) => jobView(j)),

@@ -9,11 +9,14 @@ import {
 } from '@server/api/downloadclients';
 import type { FetchedRelease, ProwlarrRelease } from '@server/api/prowlarr';
 import ProwlarrAPI, {
+  AUDIO_CATEGORIES,
   MOVIE_CATEGORIES,
   TV_CATEGORIES,
 } from '@server/api/prowlarr';
+import type { LidarrAlbum } from '@server/api/servarr/lidarr';
 import { MediaRequestStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import AlbumRequest from '@server/entity/AlbumRequest';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import type {
   BackfillJobFile,
@@ -31,6 +34,8 @@ import {
   ownTitle,
   sceneDiffers,
 } from '@server/lib/agent/numbering';
+import type { AlbumContext } from '@server/lib/backfill/albums';
+import { judgeAlbumPack } from '@server/lib/backfill/albums';
 import { magnetHash, parseTorrent } from '@server/lib/backfill/bencode';
 import {
   IndexerLimitReached,
@@ -39,6 +44,8 @@ import {
   limitMessage,
   limitOf,
 } from '@server/lib/backfill/indexerLimit';
+import type { AlbumTrack } from '@server/lib/backfill/lidarr';
+import BackfillLidarr from '@server/lib/backfill/lidarr';
 import type { PackFile, SeriesContext } from '@server/lib/backfill/matcher';
 import {
   judgePack,
@@ -70,9 +77,12 @@ import type {
   DownloadStage,
 } from '@server/lib/downloadtracker';
 import downloadTracker from '@server/lib/downloadtracker';
+import { musicReady } from '@server/lib/music/access';
+import { namesAlbum } from '@server/lib/music/albumRelease';
 import { owner } from '@server/lib/owner';
 import type {
   DownloadClientSettings,
+  LidarrSettings,
   RadarrSettings,
   SonarrSettings,
 } from '@server/lib/settings';
@@ -133,6 +143,30 @@ const downloadsOf = (
     title: `Backfill: ${job.title}`,
     downloadId: job.downloadId ?? `backfill-${job.id}`,
   };
+  if (row.kind === 'album') {
+    if (imported && !(job.status === 'done' && job.imported > 0)) return [];
+    // Music is followed by its artist, each download naming its album.
+    if (!row.artistArrId) return [];
+    return [
+      {
+        kind: 'album',
+        serverId: row.serverId,
+        jobId: job.id,
+        item: {
+          ...base,
+          mediaType: MediaType.MUSIC,
+          externalId: row.artistArrId,
+          size: job.size,
+          sizeLeft: job.sizeLeft,
+          album: {
+            id: row.arrId,
+            title: row.title,
+            foreignAlbumId: row.foreignId ?? '',
+          },
+        },
+      },
+    ];
+  }
   if (row.kind === 'movie') {
     if (imported && !(job.status === 'done' && job.imported > 0)) return [];
     return [
@@ -433,7 +467,15 @@ const titleWithoutYear = (title: string) =>
 export const posterOf = (
   images?: { coverType: string; remoteUrl?: string }[]
 ): string | null =>
-  images?.find((i) => i.coverType === 'poster')?.remoteUrl ?? null;
+  images?.find((i) => i.coverType === 'poster' || i.coverType === 'cover')
+    ?.remoteUrl ?? null;
+
+/** Tracks an album is missing, as Lidarr counts them; one when unknown. */
+const tracksMissing = (album: LidarrAlbum): number => {
+  const stats = album.statistics;
+  if (!stats) return 1;
+  return Math.max(0, (stats.trackCount ?? 0) - (stats.trackFileCount ?? 0));
+};
 
 const aired = (ep: { airDateUtc?: string }) =>
   !!ep.airDateUtc && new Date(ep.airDateUtc).getTime() < Date.now();
@@ -453,8 +495,8 @@ export interface BackfillReadiness {
   problem?: string;
 }
 
-/** What Sonarr and Radarr both answer, for downloads and imports. */
-type Arr = BackfillSonarr | BackfillRadarr;
+/** What Sonarr, Radarr and Lidarr all answer, for downloads and imports. */
+type Arr = BackfillSonarr | BackfillRadarr | BackfillLidarr;
 
 /** One title, ready to search for: its names and how to judge a pack. */
 interface Target {
@@ -480,11 +522,16 @@ interface Target {
   ): Promise<{ plan: PlanEntry[]; summary: PlanSummary }>;
 }
 
-const appOf = (kind: BackfillKind) => (kind === 'movie' ? 'Radarr' : 'Sonarr');
+const appOf = (kind: BackfillKind) =>
+  kind === 'album' ? 'Lidarr' : kind === 'movie' ? 'Radarr' : 'Sonarr';
 
 /** What a download was for, as a notice names it: "S17E02, S17E03". */
 const jobWhat = (row: BackfillSeries, job: BackfillJob): string => {
   if (row.kind === 'movie') return 'the movie';
+  if (row.kind === 'album') {
+    const tracks = job.files.filter((f) => f.episodeIds.length).length;
+    return `${tracks} track${tracks === 1 ? '' : 's'} of ${row.title}`;
+  }
   const labels = [
     ...new Set(
       job.files
@@ -710,6 +757,34 @@ const before = (date: string | undefined, when: number) =>
 const RETRY_FAILED_AFTER_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * When each album was first asked for, by MusicBrainz id: its oldest
+ * approved request still open. Albums nobody asked for are absent.
+ */
+const albumsAskedSince = async (
+  mbids: string[]
+): Promise<Map<string, Date>> => {
+  const first = new Map<string, Date>();
+  const ids = [...new Set(mbids.filter(Boolean))];
+  for (let i = 0; i < ids.length; i += 400) {
+    const asked = await getRepository(AlbumRequest)
+      .createQueryBuilder('album')
+      .innerJoin('album.request', 'request')
+      .select('album.albumMbid', 'mbid')
+      .addSelect('MIN(request.createdAt)', 'first')
+      .where('request.status = :status', {
+        status: MediaRequestStatus.APPROVED,
+      })
+      .andWhere('album.albumMbid IN (:...mbids)', {
+        mbids: ids.slice(i, i + 400),
+      })
+      .groupBy('album.albumMbid')
+      .getRawMany<{ mbid: string; first: string | Date }>();
+    for (const a of asked) first.set(a.mbid, utcDate(a.first));
+  }
+  return first;
+};
+
+/**
  * When each title someone asked for was first asked for: the oldest request
  * approved and still open, by TMDB id. Titles nobody asked for are absent.
  */
@@ -721,6 +796,15 @@ export const requestedSince = async (
     rows
       .filter((row) => row.kind === kind && row.tmdbId)
       .map((row) => row.tmdbId!);
+  // Albums asked for, by their MusicBrainz ids.
+  const albums = rows.filter((row) => row.kind === 'album' && row.foreignId);
+  const firstByMbid = await albumsAskedSince(
+    albums.map((row) => row.foreignId!)
+  );
+  for (const row of albums) {
+    const first = firstByMbid.get(row.foreignId!);
+    if (first) since.set(row.id, first);
+  }
   for (const kind of ['series', 'movie'] as const) {
     const tmdbIds = byKind(kind);
     if (!tmdbIds.length) continue;
@@ -1072,9 +1156,11 @@ class Backfill {
       await this.scan({ everything: true, searches: false });
       const settings = getSettings().backfill;
       const repo = getRepository(BackfillSeries);
-      const kinds: BackfillKind[] = settings.includeMovies
-        ? ['series', 'movie']
-        : ['series'];
+      const kinds: BackfillKind[] = [
+        'series',
+        ...(settings.includeMovies ? (['movie'] as const) : []),
+        ...(settings.includeMusic && musicReady() ? (['album'] as const) : []),
+      ];
       const due = await repo.find({
         where: [
           { status: 'stuck', kind: In(kinds) },
@@ -1219,8 +1305,9 @@ class Backfill {
         : !torrent && !usenet
           ? 'No download client is chosen in Settings → Backfill.'
           : !settings.sonarr.length &&
-              !(backfill.includeMovies && settings.radarr.length)
-            ? 'No Sonarr or Radarr server is set up.'
+              !(backfill.includeMovies && settings.radarr.length) &&
+              !(backfill.includeMusic && musicReady())
+            ? 'No Sonarr, Radarr or Lidarr server is set up.'
             : undefined;
     return {
       ready: !problem,
@@ -1273,14 +1360,22 @@ class Backfill {
     return BackfillRadarr.forServer(server);
   }
 
+  public lidarrFor(serverId: number): BackfillLidarr {
+    const server = getSettings().lidarr.find((s) => s.id === serverId);
+    if (!server) throw new Error('That Lidarr server is no longer set up.');
+    return BackfillLidarr.forServer(server);
+  }
+
   public arrFor(row: BackfillSeries): Arr {
-    return row.kind === 'movie'
-      ? this.radarrFor(row.serverId)
-      : this.sonarrFor(row.serverId);
+    return row.kind === 'album'
+      ? this.lidarrFor(row.serverId)
+      : row.kind === 'movie'
+        ? this.radarrFor(row.serverId)
+        : this.sonarrFor(row.serverId);
   }
 
   /** One per instance: two entries for one host (a 4K one) are one app. */
-  private distinct<T extends SonarrSettings | RadarrSettings>(
+  private distinct<T extends SonarrSettings | RadarrSettings | LidarrSettings>(
     servers: T[]
   ): T[] {
     const seen = new Set<string>();
@@ -1442,13 +1537,27 @@ class Backfill {
           );
         }
       }
+      if (settings.includeMusic && musicReady()) {
+        for (const server of this.distinct(getSettings().lidarr)) {
+          if (run.cancelled) return;
+          await this.scanAlbums(server, stuckBefore, run).catch((e) =>
+            logger.error('Backfill could not read Lidarr', {
+              label: LABEL,
+              server: server.name,
+              errorMessage: message(e),
+            })
+          );
+        }
+      }
       await this.dropStaleOffers();
       // A search of everything stuck does the searching while it runs.
       if (!searches || this.searchAllRun) return;
 
-      const kinds: BackfillKind[] = settings.includeMovies
-        ? ['series', 'movie']
-        : ['series'];
+      const kinds: BackfillKind[] = [
+        'series',
+        ...(settings.includeMovies ? (['movie'] as const) : []),
+        ...(settings.includeMusic && musicReady() ? (['album'] as const) : []),
+      ];
       const due = await repo.find({
         where: [
           { status: 'stuck', kind: In(kinds) },
@@ -1635,6 +1744,104 @@ class Backfill {
     }
   }
 
+  /**
+   * Albums Lidarr is missing (or has below the cutoff) and has had its
+   * chance at, with nothing in its queue. Lidarr does not say when it last
+   * searched for an album, so an album is stuck once it has been out, and
+   * its artist in Lidarr, since `stuckBefore`, and, when someone asked for
+   * it here, their request is that old too.
+   */
+  private async scanAlbums(
+    server: LidarrSettings,
+    stuckBefore: number,
+    run: { cancelled: boolean }
+  ) {
+    const settings = getSettings().backfill;
+    const repo = getRepository(BackfillSeries);
+    const lidarr = BackfillLidarr.forServer(server);
+    const missingList = await lidarr.getWanted('missing');
+    const cutoffList = settings.includeCutoffUnmet
+      ? await lidarr.getWanted('cutoff')
+      : { records: [], complete: true };
+    const wanted = new Map<number, { album: LidarrAlbum; missing: boolean }>();
+    for (const album of cutoffList.records) {
+      wanted.set(album.id, { album, missing: false });
+    }
+    for (const album of missingList.records) {
+      wanted.set(album.id, { album, missing: true });
+    }
+
+    const asked = await albumsAskedSince(
+      [...wanted.values()].map((w) => w.album.foreignAlbumId)
+    );
+    const known = await repo.find({
+      where: { kind: 'album', serverId: server.id },
+    });
+    const byId = new Map(known.map((row) => [row.arrId, row]));
+    for (const [albumId, entry] of wanted) {
+      if (run.cancelled) return;
+      const { album } = entry;
+      const row = byId.get(albumId);
+      const askedAt = asked.get(album.foreignAlbumId);
+      const stuck =
+        entry.missing &&
+        before(album.releaseDate, stuckBefore) &&
+        before(album.artist?.added, stuckBefore) &&
+        (!askedAt || askedAt.getTime() < stuckBefore);
+      if (!row && !stuck && entry.missing) continue;
+      if (!row && (await lidarr.getAlbumQueueCount(albumId)) > 0) continue;
+      const read = {
+        title: album.title,
+        year: album.releaseDate
+          ? new Date(album.releaseDate).getUTCFullYear()
+          : null,
+        poster: posterOf(album.images) ?? row?.poster ?? null,
+        missing: entry.missing ? Math.max(1, tracksMissing(album)) : 0,
+        belowCutoff: entry.missing ? 0 : 1,
+        artistName: album.artist?.artistName ?? row?.artistName ?? null,
+        artistArrId: album.artistId,
+        foreignId: album.foreignAlbumId,
+      };
+      if (!row) {
+        await repo.save(
+          new BackfillSeries({ ...this.albumRow(server.id, album), ...read })
+        );
+      } else {
+        await this.refresh(row.id, read);
+      }
+    }
+    if (missingList.complete && cutoffList.complete) {
+      await this.markDone(known.filter((row) => !wanted.has(row.arrId)));
+    } else {
+      logger.warn(
+        `Lidarr's wanted list is too long to read whole; albums not in the part read are left as they are`,
+        { label: LABEL, server: server.name }
+      );
+    }
+  }
+
+  private albumRow(serverId: number, album: LidarrAlbum) {
+    return new BackfillSeries({
+      kind: 'album',
+      serverId,
+      arrId: album.id,
+      title: album.title,
+      year: album.releaseDate
+        ? new Date(album.releaseDate).getUTCFullYear()
+        : null,
+      tvdbId: null,
+      tmdbId: null,
+      foreignId: album.foreignAlbumId,
+      artistName: album.artist?.artistName ?? null,
+      artistArrId: album.artistId,
+      seriesType: 'standard',
+      poster: posterOf(album.images),
+      status: 'stuck',
+      missing: Math.max(1, tracksMissing(album)),
+      searchTerms: [],
+    });
+  }
+
   private movieRow(serverId: number, movie: RadarrMovieDetail) {
     return new BackfillSeries({
       kind: 'movie',
@@ -1661,6 +1868,13 @@ class Backfill {
     const repo = getRepository(BackfillSeries);
     const existing = await repo.findOne({ where: { kind, serverId, arrId } });
     if (existing) return existing;
+    if (kind === 'album') {
+      const lidarr = this.lidarrFor(serverId);
+      const album = await lidarr.getAlbumDetail(arrId);
+      const artist =
+        album.artist ?? (await lidarr.getArtistDetail(album.artistId));
+      return repo.save(this.albumRow(serverId, { ...album, artist }));
+    }
     if (kind === 'movie') {
       const movie = await this.radarrFor(serverId).getMovieDetail(arrId);
       return repo.save(this.movieRow(serverId, movie));
@@ -1741,8 +1955,72 @@ class Backfill {
     return { movie, file, profile, names, radarr };
   }
 
-  /** What a search needs to know about a series or a movie. */
+  public async albumContext(row: BackfillSeries): Promise<AlbumContext> {
+    const lidarr = this.lidarrFor(row.serverId);
+    const album = await lidarr.getAlbumDetail(row.arrId);
+    const artist = await lidarr.getArtistDetail(album.artistId);
+    const [tracks, files, profile] = await Promise.all([
+      lidarr.getAlbumTracks(album.id),
+      lidarr.getAlbumTrackFiles(album.id),
+      lidarr.getQualityProfile(artist.qualityProfileId),
+    ]);
+    const editions = new Map<number, Promise<AlbumTrack[]>>();
+    const names = [
+      ...new Set(
+        [
+          `${artist.artistName} ${album.title}`,
+          album.title,
+          ...(row.searchTerms ?? []),
+        ]
+          .map((n) => n.trim())
+          .filter(Boolean)
+      ),
+    ];
+    return {
+      album,
+      artist,
+      tracks,
+      files,
+      profile,
+      names,
+      lidarr,
+      editionTracks: (releaseId) => {
+        if (!editions.has(releaseId)) {
+          editions.set(releaseId, lidarr.getEditionTracks(releaseId));
+        }
+        return editions.get(releaseId)!;
+      },
+    };
+  }
+
+  /** What a search needs to know about a series, a movie or an album. */
   private async target(row: BackfillSeries): Promise<Target> {
+    if (row.kind === 'album') {
+      const ctx = await this.albumContext(row);
+      const named = (title: string) =>
+        namesAlbum(title, ctx.album.title, ctx.artist.artistName);
+      return {
+        title: `${ctx.artist.artistName}: ${ctx.album.title}`,
+        poster: posterOf(ctx.album.images),
+        names: ctx.names,
+        missing: ctx.tracks.filter((t) => !t.hasFile).length,
+        categories: AUDIO_CATEGORIES,
+        extraTerms: [],
+        wants: (title) => Number(named(title)),
+        // Another album of Lidarr's, or one whose name is not this album
+        // by this artist (someone else's "Greatest Hits"), is not opened.
+        readTitle: async (title) => {
+          const parsed = await ctx.lidarr.parse(title).catch(() => null);
+          const albums = parsed?.albums ?? [];
+          const sees = albums.some((a) => a.id === ctx.album.id);
+          return {
+            other: !named(title) || (!!albums.length && !sees),
+            sees,
+          };
+        },
+        judge: (files, packTitle) => judgeAlbumPack(files, packTitle, ctx),
+      };
+    }
     if (row.kind === 'movie') {
       const ctx = await this.movieContext(row);
       return {
@@ -2016,11 +2294,13 @@ class Backfill {
             candidate.reason = useful
               ? null
               : (mainReason(plan) ??
-                (row.kind === 'movie'
-                  ? 'The movie is not in it'
-                  : plan.length
-                    ? 'Nothing in it the series needs'
-                    : 'No episodes in it'));
+                (row.kind === 'album'
+                  ? 'No track the album needs is in it'
+                  : row.kind === 'movie'
+                    ? 'The movie is not in it'
+                    : plan.length
+                      ? 'Nothing in it the series needs'
+                      : 'No episodes in it'));
           } catch (e) {
             candidate.status = 'failed';
             candidate.reason = plainProblem(e, release.indexer).slice(0, 250);
@@ -2507,7 +2787,8 @@ class Backfill {
         status: In([...ACTIVE, 'paused']),
       },
     });
-    if (running.length && row.kind === 'movie') {
+    // An album too: two at once could go into different editions of it.
+    if (running.length && (row.kind === 'movie' || row.kind === 'album')) {
       throw new Error('This title already has a backfill running.');
     }
     const taken = new Map<number, BackfillJob>();
@@ -2669,6 +2950,11 @@ class Backfill {
 
   /** Where the title's files go, for the free-space check. */
   private async pathOf(row: BackfillSeries): Promise<string> {
+    if (row.kind === 'album') {
+      const lidarr = this.lidarrFor(row.serverId);
+      const album = await lidarr.getAlbumDetail(row.arrId);
+      return (await lidarr.getArtistDetail(album.artistId)).path ?? '';
+    }
     return row.kind === 'movie'
       ? (await this.radarrFor(row.serverId).getMovieDetail(row.arrId)).path
       : (await this.sonarrFor(row.serverId).getSeriesDetail(row.arrId)).path;
@@ -2681,6 +2967,19 @@ class Backfill {
   private async onDisk(
     row: BackfillSeries
   ): Promise<{ files: Map<number, number>; missing: number }> {
+    if (row.kind === 'album') {
+      // The tracks of the edition Lidarr monitors, which an import into
+      // another edition makes the one monitored.
+      const tracks = await this.lidarrFor(row.serverId).getAlbumTracks(
+        row.arrId
+      );
+      return {
+        files: new Map(
+          tracks.map((t) => [t.id, t.hasFile ? (t.trackFileId ?? 0) : 0])
+        ),
+        missing: tracks.filter((t) => !t.hasFile).length,
+      };
+    }
     if (row.kind === 'movie') {
       const movie = await this.radarrFor(row.serverId).getMovieDetail(
         row.arrId
@@ -3278,9 +3577,11 @@ class Backfill {
         }
       }
     } else {
-      const seen = await arr.getFolderFiles(
-        await this.arrPath(arr, client, folder)
-      );
+      const there = await this.arrPath(arr, client, folder);
+      const seen =
+        arr instanceof BackfillLidarr
+          ? await arr.getFolderFiles(there, row.artistArrId ?? undefined)
+          : await arr.getFolderFiles(there);
       for (const file of job.files) {
         if (file.whole) {
           // Grabbed whole (packed in archives, or with scrambled names):
@@ -3318,26 +3619,37 @@ class Backfill {
     for (let i = 0; i < ready.length; i += IMPORT_BATCH) {
       const batch = ready.slice(i, i + IMPORT_BATCH);
       commandIds.push(
-        arr instanceof BackfillRadarr
-          ? await arr.manualImport(
+        arr instanceof BackfillLidarr
+          ? await arr.importAlbumFiles(
               batch.map((file) => ({
                 path: file.path,
-                movieId: row.arrId,
+                artistId: row.artistArrId!,
+                albumId: row.arrId,
+                albumReleaseId: file.releaseId!,
+                trackIds: file.episodeIds,
                 quality: file.quality!,
-                languages: file.languages ?? [],
-                releaseGroup: file.releaseGroup,
               }))
             )
-          : await arr.manualImport(
-              batch.map((file) => ({
-                path: file.path,
-                seriesId: row.arrId,
-                episodeIds: file.episodeIds,
-                quality: file.quality!,
-                languages: file.languages ?? [],
-                releaseGroup: file.releaseGroup,
-              }))
-            )
+          : arr instanceof BackfillRadarr
+            ? await arr.manualImport(
+                batch.map((file) => ({
+                  path: file.path,
+                  movieId: row.arrId,
+                  quality: file.quality!,
+                  languages: file.languages ?? [],
+                  releaseGroup: file.releaseGroup,
+                }))
+              )
+            : await arr.manualImport(
+                batch.map((file) => ({
+                  path: file.path,
+                  seriesId: row.arrId,
+                  episodeIds: file.episodeIds,
+                  quality: file.quality!,
+                  languages: file.languages ?? [],
+                  releaseGroup: file.releaseGroup,
+                }))
+              )
       );
     }
     job.status = 'importing';
@@ -3981,14 +4293,21 @@ class Backfill {
     if (candidate.notifiedAt || !candidate.summary) return;
     const s = candidate.summary;
     const parts =
-      row.kind === 'movie'
-        ? [s.fill ? 'has the movie' : 'upgrades the movie']
-        : [
+      row.kind === 'album'
+        ? [
             s.fill
-              ? `fills ${s.fill} missing episode${s.fill === 1 ? '' : 's'}`
+              ? `fills ${s.fill} missing track${s.fill === 1 ? '' : 's'}`
               : '',
             s.upgrade ? `upgrades ${s.upgrade}` : '',
-          ].filter(Boolean);
+          ].filter(Boolean)
+        : row.kind === 'movie'
+          ? [s.fill ? 'has the movie' : 'upgrades the movie']
+          : [
+              s.fill
+                ? `fills ${s.fill} missing episode${s.fill === 1 ? '' : 's'}`
+                : '',
+              s.upgrade ? `upgrades ${s.upgrade}` : '',
+            ].filter(Boolean);
     backfillNotices.add({
       kind: 'found',
       seriesId: row.id,

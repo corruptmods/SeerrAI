@@ -12,7 +12,7 @@ import {
 import BackfillCandidate from './BackfillCandidate';
 import BackfillJob from './BackfillJob';
 
-export type BackfillKind = 'series' | 'movie';
+export type BackfillKind = 'series' | 'movie' | 'album';
 
 export type BackfillSeriesStatus =
   /** Sonarr or Radarr searched and grabbed nothing; not searched here yet. */
@@ -42,7 +42,7 @@ export interface AgentNote {
   results?: number;
 }
 
-/** A Sonarr series or a Radarr movie Backfill is following. */
+/** A Sonarr series, a Radarr movie or a Lidarr album Backfill follows. */
 @Entity()
 @Unique(['kind', 'serverId', 'arrId'])
 export class BackfillSeries {
@@ -52,11 +52,11 @@ export class BackfillSeries {
   @Column({ type: 'varchar', default: 'series' })
   public kind: BackfillKind;
 
-  /** The Sonarr or Radarr server's id in Seerr's settings. */
+  /** The Sonarr, Radarr or Lidarr server's id in Seerr's settings. */
   @Column()
   public serverId: number;
 
-  /** The series' id in Sonarr, or the movie's in Radarr. */
+  /** The series' id in Sonarr, the movie's in Radarr, the album's in Lidarr. */
   @Index()
   @Column()
   public arrId: number;
@@ -69,6 +69,18 @@ export class BackfillSeries {
 
   @Column({ type: 'varchar' })
   public title: string;
+
+  /** An album's MusicBrainz id (its release group), for its page. */
+  @Column({ type: 'varchar', nullable: true })
+  public foreignId: string | null;
+
+  /** An album's artist, as Lidarr names them. */
+  @Column({ type: 'varchar', nullable: true })
+  public artistName: string | null;
+
+  /** An album's artist's id in Lidarr. */
+  @Column({ type: 'integer', nullable: true })
+  public artistArrId: number | null;
 
   @Column({ type: 'integer', nullable: true })
   public year: number | null;

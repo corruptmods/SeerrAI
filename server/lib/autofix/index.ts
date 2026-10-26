@@ -886,7 +886,7 @@ class AutoFix {
    */
   private async handOn(
     req: FixRequest,
-    kind: BackfillKind,
+    kind: 'series' | 'movie',
     serverId: number,
     arrId: number,
     replace?: boolean

@@ -208,6 +208,9 @@ components:
           type: string
         includeMovies:
           type: boolean
+        includeMusic:
+          type: boolean
+          description: Albums Lidarr cannot find are followed too, once music is set up.
         stuckAfterHours:
           type: number
         includeCutoffUnmet:
@@ -5913,7 +5916,7 @@ paths:
                 $ref: '#/components/schemas/BackfillAnswer'
   /backfill/series:
     post:
-      summary: 'Follow a Sonarr series or a Radarr movie'
+      summary: 'Follow a Sonarr series, a Radarr movie or a Lidarr album'
       tags:
         - backfill
       requestBody:
@@ -5925,7 +5928,7 @@ paths:
               properties:
                 kind:
                   type: string
-                  enum: [series, movie]
+                  enum: [series, movie, album]
                 serverId:
                   type: number
                 arrId:

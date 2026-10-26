@@ -344,10 +344,17 @@ const describe = (input: Record<string, unknown>) =>
     .join(', ')
     .slice(0, 300);
 
-const sameTitle = (row: BackfillSeries) => ({
-  kind: row.kind,
-  serverId: row.serverId,
-  arrId: row.arrId,
+/** A series or movie (the agent's titles) as its runs are kept by. */
+interface AgentTitle {
+  kind: 'series' | 'movie';
+  serverId: number;
+  arrId: number;
+}
+
+const sameTitle = (title: AgentTitle): AgentTitle => ({
+  kind: title.kind,
+  serverId: title.serverId,
+  arrId: title.arrId,
 });
 
 /** A conversation that isn't there (deleted, or never was). */
@@ -1264,18 +1271,25 @@ class Agent {
     const user = await owner();
     if (this.problem(user)) return null;
     if (row.agentAutoRunAt) return null;
+    // The agent's tools are Sonarr's and Radarr's: albums are Backfill's.
+    if (row.kind === 'album') return null;
+    const title: AgentTitle = {
+      kind: row.kind,
+      serverId: row.serverId,
+      arrId: row.arrId,
+    };
     if (!(await requestedSince([row])).has(row.id)) return null;
     const runs = getRepository(AgentRun);
     const lately = new Date(Date.now() - settings.researchAfterDays * DAY);
     const recent = await runs.count({
       where: [
         {
-          ...sameTitle(row),
+          ...sameTitle(title),
           createdAt: MoreThan(lately),
           purpose: In(COUNTED),
         },
         {
-          ...sameTitle(row),
+          ...sameTitle(title),
           status: In(UNFINISHED),
           purpose: 'work',
         },
@@ -1289,9 +1303,7 @@ class Agent {
       new AgentRun({
         trigger: 'auto',
         status: 'queued',
-        kind: row.kind,
-        serverId: row.serverId,
-        arrId: row.arrId,
+        ...title,
         title: row.title,
         steps: [],
         actions: [],
@@ -1922,8 +1934,9 @@ class Agent {
         select: { id: true, kind: true, serverId: true, arrId: true },
         where: { id: job.seriesId },
       });
-      if (!row) return;
-      await addNotes(row, [
+      // Notes are the agent's, for the titles it works on.
+      if (!row || row.kind === 'album') return;
+      await addNotes({ ...row, kind: row.kind }, [
         {
           at: new Date().toISOString(),
           kind: 'failed',

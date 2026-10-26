@@ -23,7 +23,7 @@ export type { DownloadStage, DownloadStep } from '@server/constants/downloads';
  * Radarr's and Sonarr's queues, for the title it is for.
  */
 export interface BackfillDownload {
-  kind: 'movie' | 'series';
+  kind: 'movie' | 'series' | 'album';
   serverId: number;
   /** The Backfill job it is part of. */
   jobId: number;
@@ -573,7 +573,14 @@ class DownloadTracker {
     const held: ImportedDownload[] = [];
     for (const done of imported) {
       if (!shown.has(backfillKey(done))) continue;
-      held.push(this.hold(done.kind, done.serverId, done.item, now));
+      held.push(
+        this.hold(
+          done.kind === 'album' ? 'music' : done.kind,
+          done.serverId,
+          done.item,
+          now
+        )
+      );
     }
     this.backfill = downloads;
     if (held.length) this.importedNow(held);
@@ -648,6 +655,9 @@ class DownloadTracker {
               forAlbum(d.item)
           )
           .map((d) => d.item),
+        this.backfillFor('album', serverId, artistId)
+          .filter(forAlbum)
+          .map(this.withLive),
         this.importedOrWaiting('music', serverId, artistId).filter(forAlbum)
       );
   }

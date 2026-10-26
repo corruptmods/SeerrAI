@@ -217,6 +217,8 @@ export interface BackfillSettings {
   category: string;
   /** Movies Radarr cannot find are followed too, not only series. */
   includeMovies: boolean;
+  /** Albums Lidarr cannot find are followed too, once music is set up. */
+  includeMusic: boolean;
   /** Hours since Sonarr's or Radarr's last search before a title is stuck. */
   stuckAfterHours: number;
   /** Treat episodes below the profile's cutoff as gaps too. */
@@ -307,6 +309,7 @@ export const BACKFILL_DEFAULTS: BackfillSettings = {
   usenetClientId: null,
   category: 'backfill',
   includeMovies: true,
+  includeMusic: true,
   stuckAfterHours: 24,
   includeCutoffUnmet: false,
   includeSpecials: false,

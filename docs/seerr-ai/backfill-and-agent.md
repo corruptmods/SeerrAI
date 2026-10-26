@@ -16,9 +16,9 @@ Approval can be **Missing episodes only** (recommended), or **Missing and upgrad
 
 ### Music
 
-With music set up, Backfill follows albums too: those Lidarr lists as missing (**Music too** in Settings → Backfill turns this off).
+With music set up, Backfill follows albums too: those someone requested that Lidarr lists as missing (**Music too** in Settings → Backfill turns this off). Lidarr lists an artist's other albums as missing too, so those are left alone, unless you start a search for one yourself.
 
-- Lidarr doesn't say when it last searched for an album, so an album counts as stuck once its release date, the day its artist was added, and any approved request for it are all older than **Stuck after**, and nothing for it is in Lidarr's queue.
+- Lidarr doesn't say when it last searched for an album, so an album counts as stuck once its release date, the day its artist was added, and its approved request are all older than **Stuck after**, and nothing for it is in Lidarr's queue.
 - Prowlarr is searched under "Artist Album" and the album's name, in its audio categories.
 - Each file of a release is matched to a track by its title, or by its number when the release has one file per track. Lidarr imports into one edition of an album: the one already on disk, or, for an album with nothing yet, the edition most of the files are from.
 - Approval is **Missing tracks only** or **Missing and upgrades**, as for series.

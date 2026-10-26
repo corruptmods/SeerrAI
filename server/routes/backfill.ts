@@ -465,7 +465,8 @@ backfillRoutes.post('/series', async (req, res, next) => {
     const row = await backfill.track(
       parsed.data.kind,
       parsed.data.serverId,
-      parsed.data.arrId
+      parsed.data.arrId,
+      true
     );
     if (row.status === 'ignored' || row.status === 'done') {
       await getRepository(BackfillSeries).update(row.id, { status: 'stuck' });
@@ -779,6 +780,8 @@ backfillRoutes.post('/series/:id/search', async (req, res, next) => {
     if (row.status === 'ignored') {
       await repo.update(id, { status: 'stuck' });
     }
+    // Searched by hand: an album stays followed, requested or not.
+    if (!row.byHand) await repo.update(id, { byHand: true });
     backfill.startSearch(id, req.user, { ai: true });
     return res.status(202).json({ started: true });
   } catch (e) {

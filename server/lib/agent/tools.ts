@@ -1856,7 +1856,13 @@ const prepareGrab = async (
     );
   }
   const files = await filesOf(state, known);
-  const row = await backfill.track(title.kind, title.serverId, title.arrId);
+  // What an admin asked for is theirs to keep in Backfill.
+  const row = await backfill.track(
+    title.kind,
+    title.serverId,
+    title.arrId,
+    adminPresent(state.run)
+  );
   // Downloads already under way for the title: another can run beside
   // them, for other episodes.
   const running = await getRepository(BackfillJob).find({

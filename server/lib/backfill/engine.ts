@@ -1770,11 +1770,13 @@ class Backfill {
   }
 
   /**
-   * Albums Lidarr is missing (or has below the cutoff) and has had its
-   * chance at, with nothing in its queue. Lidarr does not say when it last
-   * searched for an album, so an album is stuck once it has been out, and
-   * its artist in Lidarr, since `stuckBefore`, and, when someone asked for
-   * it here, their request is that old too.
+   * Albums someone requested here that Lidarr is missing (or has below the
+   * cutoff) and has had its chance at, with nothing in its queue. Lidarr
+   * lists every album of an artist it adds as wanted, asked for or not, so
+   * only requested albums are followed, besides those an admin chose to.
+   * Lidarr does not say when it last searched for an album, so an album is
+   * stuck once it has been out, its artist in Lidarr, and its request
+   * approved, since `stuckBefore`.
    */
   private async scanAlbums(
     server: LidarrSettings,
@@ -1808,11 +1810,13 @@ class Backfill {
       const { album } = entry;
       const row = byId.get(albumId);
       const askedAt = asked.get(album.foreignAlbumId);
+      if (!askedAt && !row?.byHand) continue;
       const stuck =
         entry.missing &&
         before(album.releaseDate, stuckBefore) &&
         before(album.artist?.added, stuckBefore) &&
-        (!askedAt || askedAt.getTime() < stuckBefore);
+        !!askedAt &&
+        askedAt.getTime() < stuckBefore;
       if (!row && !stuck && entry.missing) continue;
       if (!row && (await lidarr.getAlbumQueueCount(albumId)) > 0) continue;
       const read = {
@@ -1835,6 +1839,17 @@ class Backfill {
         await this.refresh(row.id, read);
       }
     }
+    // Albums no one requested (any longer) that an admin didn't choose
+    // are let go, waiting packs and all, unless Backfill has downloaded
+    // for them, whose history stays.
+    await this.letGo(
+      known.filter(
+        (row) =>
+          !row.byHand &&
+          !(row.foreignId && asked.has(row.foreignId)) &&
+          wanted.has(row.arrId)
+      )
+    );
     if (missingList.complete && cutoffList.complete) {
       await this.markDone(known.filter((row) => !wanted.has(row.arrId)));
     } else {
@@ -1843,6 +1858,29 @@ class Backfill {
         { label: LABEL, server: server.name }
       );
     }
+  }
+
+  /**
+   * Stops following titles a scan should not have: each goes, with the
+   * packs found for it, unless Backfill has downloaded anything for it.
+   */
+  private async letGo(rows: BackfillSeries[]): Promise<void> {
+    if (!rows.length) return;
+    const withJobs = new Set(
+      (
+        await getRepository(BackfillJob).find({
+          select: { seriesId: true },
+          where: { seriesId: In(rows.map((r) => r.id)) },
+        })
+      ).map((job) => job.seriesId)
+    );
+    const gone = rows.filter((row) => !withJobs.has(row.id));
+    if (!gone.length) return;
+    await getRepository(BackfillSeries).delete(gone.map((row) => row.id));
+    logger.info(
+      `Backfill no longer follows ${gone.length} album${gone.length === 1 ? '' : 's'} nobody requested`,
+      { label: LABEL }
+    );
   }
 
   private albumRow(serverId: number, album: LidarrAlbum) {
@@ -1888,17 +1926,30 @@ class Backfill {
   public async track(
     kind: BackfillKind,
     serverId: number,
-    arrId: number
+    arrId: number,
+    /** An admin chose it: kept whether or not anyone requested it. */
+    byHand = false
   ): Promise<BackfillSeries> {
     const repo = getRepository(BackfillSeries);
     const existing = await repo.findOne({ where: { kind, serverId, arrId } });
-    if (existing) return existing;
+    if (existing) {
+      if (byHand && !existing.byHand) {
+        await repo.update(existing.id, { byHand: true });
+        existing.byHand = true;
+      }
+      return existing;
+    }
     if (kind === 'album') {
       const lidarr = this.lidarrFor(serverId);
       const album = await lidarr.getAlbumDetail(arrId);
       const artist =
         album.artist ?? (await lidarr.getArtistDetail(album.artistId));
-      return repo.save(this.albumRow(serverId, { ...album, artist }));
+      return repo.save(
+        new BackfillSeries({
+          ...this.albumRow(serverId, { ...album, artist }),
+          byHand,
+        })
+      );
     }
     if (kind === 'movie') {
       const movie = await this.radarrFor(serverId).getMovieDetail(arrId);

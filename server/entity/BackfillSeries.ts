@@ -82,6 +82,14 @@ export class BackfillSeries {
   @Column({ type: 'integer', nullable: true })
   public artistArrId: number | null;
 
+  /**
+   * An admin chose to follow it (from its page, Start search, or the admin
+   * agent), rather than a scan finding it. An album nobody requested is
+   * only followed when an admin chose to.
+   */
+  @Column({ default: false })
+  public byHand: boolean;
+
   @Column({ type: 'integer', nullable: true })
   public year: number | null;
 

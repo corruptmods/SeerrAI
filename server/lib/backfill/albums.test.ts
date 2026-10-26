@@ -2,10 +2,19 @@ import QBittorrentAPI from '@server/api/downloadclients/qbittorrent';
 import type { ProwlarrRelease } from '@server/api/prowlarr';
 import ProwlarrAPI from '@server/api/prowlarr';
 import type { LidarrAlbum, LidarrArtist } from '@server/api/servarr/lidarr';
-import { getRepository } from '@server/datasource';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
+import dataSource, { getRepository } from '@server/datasource';
+import AlbumRequest from '@server/entity/AlbumRequest';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
+import Media from '@server/entity/Media';
+import { MediaRequest } from '@server/entity/MediaRequest';
+import { User } from '@server/entity/User';
 import type { AlbumContext } from '@server/lib/backfill/albums';
 import { judgeAlbumPack } from '@server/lib/backfill/albums';
 import backfill from '@server/lib/backfill/engine';
@@ -529,7 +538,46 @@ afterEach(() => {
   mock.restoreAll();
 });
 
+/** Someone's approved request for the album, made `daysAgo`. */
+const requestAlbum = async (daysAgo = 2) => {
+  const media = await dataSource.manager.save(
+    new Media({
+      mediaType: MediaType.MUSIC,
+      tmdbId: 0,
+      foreignId: ARTIST.foreignArtistId,
+      foreignTitle: 'Glasswing',
+      status: MediaStatus.PROCESSING,
+    }),
+    { listeners: false }
+  );
+  const request = await dataSource.manager.save(
+    new MediaRequest({
+      type: MediaType.MUSIC,
+      status: MediaRequestStatus.APPROVED,
+      media,
+      requestedBy: await getRepository(User).findOneByOrFail({ id: 1 }),
+      is4k: false,
+      albums: [
+        new AlbumRequest({
+          albumMbid: ALBUM_MBID,
+          title: 'Static Garden',
+          status: 2,
+        }),
+      ],
+    }),
+    { listeners: false }
+  );
+  await getRepository(MediaRequest).update(request.id, {
+    createdAt: new Date(Date.now() - daysAgo * 86_400_000),
+  });
+  return request;
+};
+
 describe('Backfill for albums: from Lidarr’s wanted list to the library', () => {
+  beforeEach(async () => {
+    await requestAlbum();
+  });
+
   it('finds a stuck album, downloads only its missing track, and has Lidarr import it', async () => {
     await backfill.scan();
     const row = await getRepository(BackfillSeries).findOneOrFail({
@@ -601,7 +649,7 @@ describe('Backfill for albums: from Lidarr’s wanted list to the library', () =
     );
 
     // Out an hour.
-    await getRepository(BackfillSeries).clear();
+    await getRepository(BackfillSeries).createQueryBuilder().delete().execute();
     wanted = [
       { ...ALBUM, releaseDate: new Date(Date.now() - 3_600_000).toISOString() },
     ];
@@ -610,6 +658,56 @@ describe('Backfill for albums: from Lidarr’s wanted list to the library', () =
       await getRepository(BackfillSeries).count({ where: { kind: 'album' } }),
       0
     );
+  });
+
+  it('follows only albums someone requested, besides those an admin chose', async () => {
+    await getRepository(MediaRequest).createQueryBuilder().delete().execute();
+    // Lidarr lists the artist's whole discography as wanted: none of it
+    // was asked for.
+    await backfill.scan();
+    assert.equal(
+      await getRepository(BackfillSeries).count({ where: { kind: 'album' } }),
+      0
+    );
+
+    // Followed before this rule, with a pack waiting: let go, pack and all.
+    const old = await getRepository(BackfillSeries).save(
+      new BackfillSeries({
+        kind: 'album',
+        serverId: 0,
+        arrId: 70,
+        title: 'Static Garden',
+        foreignId: ALBUM_MBID,
+        status: 'found',
+        missing: 1,
+        searchTerms: [],
+      })
+    );
+    await getRepository(BackfillCandidate).save(
+      new BackfillCandidate({
+        seriesId: old.id,
+        guid: 'https://indexer/1',
+        title: 'Glasswing - Static Garden (2001) [FLAC]',
+        indexer: 'Uindex',
+        indexerId: 3,
+        protocol: 'torrent',
+        size: 90 * MB,
+        status: 'ready',
+        plan: [],
+      })
+    );
+    await backfill.scan();
+    assert.equal(await getRepository(BackfillSeries).count(), 0);
+    assert.equal(await getRepository(BackfillCandidate).count(), 0);
+
+    // An admin chose it: kept, and searched, requested or not.
+    const chosen = await backfill.track('album', 0, 70, true);
+    assert.equal(chosen.byHand, true);
+    await backfill.scan();
+    const kept = await getRepository(BackfillSeries).findOneOrFail({
+      where: { id: chosen.id },
+    });
+    assert.equal(kept.status, 'found');
   });
 
   it('leaves albums alone with music turned off for Backfill', async () => {

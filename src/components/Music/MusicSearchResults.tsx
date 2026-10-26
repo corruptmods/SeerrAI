@@ -30,14 +30,17 @@ const messages = defineMessages('components.Music.MusicSearchResults', {
 const MusicSearchResults = ({
   query,
   rows = false,
+  nothingAbove = false,
 }: {
   query: string;
   rows?: boolean;
+  /** In rows: no films or series were found either. */
+  nothingAbove?: boolean;
 }) => {
   const intl = useIntl();
   const musicOn = useFeature('music');
   const { currentSettings } = useSettings();
-  const [, settled, setQuery] = useDebouncedState(query.trim(), 700);
+  const [, settled, setQuery] = useDebouncedState(query.trim(), 500);
 
   useEffect(() => {
     setQuery(query.trim());
@@ -59,7 +62,11 @@ const MusicSearchResults = ({
     return null;
   }
 
-  if (error) {
+  // Replaced by a newer search of this person's (another tab): asked
+  // again, and meanwhile waited on.
+  const replaced = error?.response?.status === 409;
+
+  if (error && !replaced) {
     return (
       <p className="mt-8 text-center text-muted">
         {error.response?.status === 503
@@ -69,17 +76,28 @@ const MusicSearchResults = ({
     );
   }
 
-  const waiting = !data && (isLoading || settled !== query.trim());
-  // Asked for once the artists and albums are in: the same search, then
-  // one more, as MusicBrainz takes one request a second.
-  const songs = currentSettings.musicSongs && data && !waiting && (
-    <SongResults query={settled} />
-  );
+  const waiting = !data && (isLoading || replaced || settled !== query.trim());
+  // Asked for alongside the artists and albums: the server shares their
+  // search, and asks MusicBrainz for the songs right after it.
+  const songs = currentSettings.musicSongs &&
+    settled &&
+    settled === query.trim() && <SongResults query={settled} />;
 
   if (rows) {
-    // Below the films and series: a row with nothing in it is left out, and
-    // nothing found says nothing, as the films and series above have
-    // already answered the search.
+    // Below the films and series: a row with nothing in it is left out.
+    // Nothing found says so only when there were no films or series either.
+    if (
+      nothingAbove &&
+      !waiting &&
+      !data?.artists?.length &&
+      !data?.albums?.length
+    ) {
+      return (
+        <div className="mt-64 w-full text-center text-2xl text-muted">
+          {intl.formatMessage(globalMessages.noresults)}
+        </div>
+      );
+    }
     return (
       <div className="mt-8 space-y-6">
         <MusicSlider
@@ -101,13 +119,16 @@ const MusicSearchResults = ({
 
   if (waiting) {
     return (
-      <ul className="cards-vertical" aria-busy="true">
-        {[...Array(10)].map((_, i) => (
-          <li key={`placeholder-${i}`}>
-            <MusicCard.Placeholder canExpand />
-          </li>
-        ))}
-      </ul>
+      <div className="space-y-6">
+        <ul className="cards-vertical" aria-busy="true">
+          {[...Array(10)].map((_, i) => (
+            <li key={`placeholder-${i}`}>
+              <MusicCard.Placeholder canExpand />
+            </li>
+          ))}
+        </ul>
+        {songs}
+      </div>
     );
   }
 

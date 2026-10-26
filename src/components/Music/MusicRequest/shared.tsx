@@ -67,19 +67,19 @@ const onlyOne = (request: Request) => {
 };
 
 /** "Artist — Album", "Artist — Song", or "Artist — 3 albums, 2 songs". */
-export const musicRequestTitle = (
-  request: Request,
-  intl: IntlShape
-): string => {
-  const artist =
-    request.media?.foreignTitle || intl.formatMessage(messages.unknownArtist);
+/** Whom a music request is for. */
+export const musicRequestArtist = (request: Request, intl: IntlShape): string =>
+  request.media?.foreignTitle || intl.formatMessage(messages.unknownArtist);
+
+/** What a music request asks for: the one album or song, or how many. */
+export const musicRequestName = (request: Request, intl: IntlShape): string => {
   const one = onlyOne(request);
   if (one) {
-    return `${artist} — ${one.title}`;
+    return one.title;
   }
   const albums = albumsOf(request).length;
   const songs = songsOf(request).length;
-  return `${artist} — ${[
+  return [
     albums || !songs
       ? intl.formatMessage(messages.albumCount, { count: albums })
       : undefined,
@@ -88,8 +88,11 @@ export const musicRequestTitle = (
       : undefined,
   ]
     .filter(Boolean)
-    .join(', ')}`;
+    .join(', ');
 };
+
+export const musicRequestTitle = (request: Request, intl: IntlShape): string =>
+  `${musicRequestArtist(request, intl)} — ${musicRequestName(request, intl)}`;
 
 /**
  * The album's page for one album (or the one a song is from), the

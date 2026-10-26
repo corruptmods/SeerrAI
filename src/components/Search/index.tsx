@@ -68,19 +68,22 @@ const TitleResults = ({
     return <ErrorPage statusCode={500} />;
   }
 
+  const music = musicBelowTitles(type, inAll, !isLoadingInitialData);
+
   return (
     <>
       <ListView
         items={titles}
-        isEmpty={isEmpty}
+        // With music below, it says when nothing at all was found.
+        isEmpty={isEmpty && !music}
         isLoading={
           isLoadingInitialData || (isLoadingMore && (titles?.length ?? 0) > 0)
         }
         isReachingEnd={isReachingEnd}
         onScrollBottom={fetchMore}
       />
-      {musicBelowTitles(type, inAll, !isLoadingInitialData) && (
-        <MusicSearchResults query={query} rows />
+      {music && (
+        <MusicSearchResults query={query} rows nothingAbove={!!isEmpty} />
       )}
     </>
   );

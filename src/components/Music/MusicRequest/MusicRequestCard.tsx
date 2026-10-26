@@ -9,9 +9,11 @@ import {
   AlbumsField,
   MusicRequestBadge,
   SongsField,
+  musicRequestArtist,
   musicRequestFallback,
   musicRequestHref,
   musicRequestImage,
+  musicRequestName,
   musicRequestTitle,
   useMusicRequest,
 } from '@app/components/Music/MusicRequest/shared';
@@ -102,23 +104,46 @@ const MusicRequestCard = ({
           revalidate();
         }}
       />
+      {/* As tall as a film's or a series' card, whose poster is 2:3. */}
       <div
-        className="relative flex w-72 overflow-hidden rounded-xl bg-surface p-4 text-muted shadow ring-1 ring-subtle sm:w-96"
+        className="relative flex min-h-[9.5rem] w-72 overflow-hidden rounded-xl bg-surface p-4 text-muted shadow ring-1 ring-subtle sm:min-h-[12.5rem] sm:w-96"
         data-testid="request-card"
         ref={ref}
       >
+        {/* The cover behind it, as a film's backdrop is, faded the same. */}
+        {musicRequestImage(requestData) && (
+          <div className="absolute inset-0 z-0" aria-hidden>
+            <div className="absolute inset-0 scale-110 blur-md">
+              <NearScreen.Provider value={nearness}>
+                <MusicImage
+                  src={musicRequestImage(requestData)}
+                  fallback="none"
+                  sizes="384px"
+                />
+              </NearScreen.Provider>
+            </div>
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundImage:
+                  'linear-gradient(135deg, rgb(var(--page) / var(--title-fade)) 0%, rgb(var(--page)) 75%)',
+              }}
+            />
+          </div>
+        )}
         <div
           className="relative z-10 flex min-w-0 flex-1 flex-col pr-4"
           data-testid="request-card-title"
         >
-          <div className="hidden text-xs font-medium text-strong sm:flex">
-            {intl.formatMessage(globalMessages.music)}
+          <div className="hidden truncate text-xs font-medium text-strong sm:block">
+            {musicRequestArtist(requestData, intl)}
           </div>
           <Link
             href={href}
+            title={title}
             className="overflow-hidden overflow-ellipsis whitespace-nowrap text-base font-bold text-strong hover:underline sm:text-lg"
           >
-            {title}
+            {musicRequestName(requestData, intl)}
           </Link>
           {hasPermission(
             [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
@@ -251,7 +276,7 @@ const MusicRequestCard = ({
         </div>
         <Link
           href={href}
-          className="w-20 flex-shrink-0 self-start overflow-hidden rounded-md shadow-sm sm:w-28"
+          className="relative z-10 w-20 flex-shrink-0 scale-100 transform-gpu self-center overflow-hidden rounded-md shadow-sm transition duration-300 hover:scale-105 hover:shadow-md sm:w-28"
           // The title on the card is the same link.
           tabIndex={-1}
           aria-hidden

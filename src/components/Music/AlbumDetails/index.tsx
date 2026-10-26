@@ -18,6 +18,7 @@ import useMediaQuery from '@app/hooks/useMediaQuery';
 import usePlayLinks from '@app/hooks/usePlayLinks';
 import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
+import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import {
@@ -139,39 +140,40 @@ const TrackList = ({
                         <span className="shrink-0 tabular-nums text-muted">
                           {trackLength(track.length)}
                         </span>
+                        {/* One width for every row, so the lengths line
+                            up whatever each track's state. */}
                         {!requestable(track.status) ? (
-                          <span className="shrink-0">
+                          <span className="flex w-28 shrink-0 justify-center">
                             <MusicStatusBadge status={track.status} plain />
                           </span>
+                        ) : songsOf && track.recordingId ? (
+                          <Button
+                            buttonType="primary"
+                            buttonSize="sm"
+                            className="h-7 w-28 shrink-0"
+                            disabled={busy === track.recordingId}
+                            aria-label={`${intl.formatMessage(
+                              messages.requestSong
+                            )}: ${track.title}`}
+                            onClick={async () => {
+                              if (
+                                await requestSong({
+                                  artistMbid: songsOf,
+                                  recordingMbid: track.recordingId as string,
+                                  name: track.title,
+                                })
+                              ) {
+                                mutate();
+                              }
+                            }}
+                          >
+                            <ArrowDownTrayIcon />
+                            <span>
+                              {intl.formatMessage(globalMessages.request)}
+                            </span>
+                          </Button>
                         ) : (
-                          songsOf &&
-                          track.recordingId && (
-                            <Button
-                              buttonType="ghost"
-                              buttonSize="sm"
-                              className="shrink-0"
-                              disabled={busy === track.recordingId}
-                              aria-label={`${intl.formatMessage(
-                                messages.requestSong
-                              )}: ${track.title}`}
-                              onClick={async () => {
-                                if (
-                                  await requestSong({
-                                    artistMbid: songsOf,
-                                    recordingMbid: track.recordingId as string,
-                                    name: track.title,
-                                  })
-                                ) {
-                                  mutate();
-                                }
-                              }}
-                            >
-                              <ArrowDownTrayIcon />
-                              <span className="hidden sm:inline">
-                                {intl.formatMessage(messages.requestSong)}
-                              </span>
-                            </Button>
-                          )
+                          songsOf && <span className="w-28 shrink-0" />
                         )}
                       </li>
                     ))}

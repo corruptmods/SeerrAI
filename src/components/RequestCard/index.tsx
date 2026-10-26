@@ -392,7 +392,8 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
           className="relative z-10 flex min-w-0 flex-1 flex-col pr-4"
           data-testid="request-card-title"
         >
-          <div className="hidden text-xs font-medium text-strong sm:flex">
+          {/* The year on a phone too, as a music card has its artist. */}
+          <div className="flex text-xs font-medium text-strong">
             {(isMovie(title) ? title.releaseDate : title.firstAirDate)?.slice(
               0,
               4
@@ -404,7 +405,9 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                 ? `/movie/${requestData.media.tmdbId}`
                 : `/tv/${requestData.media.tmdbId}`
             }
-            className="overflow-hidden overflow-ellipsis whitespace-nowrap text-base font-bold text-strong hover:underline sm:text-lg"
+            title={isMovie(title) ? title.title : title.name}
+            // A long name takes a second line rather than being cut short.
+            className="line-clamp-2 break-words text-base font-bold leading-tight text-strong hover:underline sm:text-lg sm:leading-snug"
           >
             {isMovie(title) ? title.title : title.name}
           </Link>

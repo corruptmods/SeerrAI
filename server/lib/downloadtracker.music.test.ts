@@ -70,7 +70,10 @@ beforeEach(async () => {
   settings.lidarr = [LIDARR];
   settings.main.disabledFeatures = [];
   const fake = {
-    interceptors: { request: { use: () => 0 } },
+    interceptors: {
+      request: { use: () => 0 },
+      response: { use: () => 0 },
+    },
     get: async (url: string) => {
       asked.push(url);
       return { data: { records: queue, totalRecords: queue.length } };

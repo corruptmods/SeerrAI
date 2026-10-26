@@ -8,6 +8,7 @@ import MusicUnavailable from '@app/components/Music/MusicUnavailable';
 import {
   albumDownloads,
   requestable,
+  songDownloads,
   trackLength,
   yearOf,
 } from '@app/components/Music/musicHelpers';
@@ -28,6 +29,7 @@ import {
   PlayIcon,
 } from '@heroicons/react/24/outline';
 import { MediaStatus, VARIOUS_ARTISTS_MBID } from '@server/constants/media';
+import type { DownloadingItem } from '@server/lib/downloadtracker';
 import type { MusicAlbumDetails, MusicTrack } from '@server/models/Music';
 import Link from 'next/link';
 import { Fragment, useMemo, useState } from 'react';
@@ -61,9 +63,12 @@ const messages = defineMessages('components.Music.AlbumDetails', {
 const TrackList = ({
   albumId,
   songsOf,
+  downloads,
 }: {
   albumId: string;
   songsOf?: string;
+  /** The artist's downloads: each song's own shows on its row. */
+  downloads?: DownloadingItem[];
 }) => {
   const intl = useIntl();
   const { requestSong, busy } = useRequestSong();
@@ -145,7 +150,17 @@ const TrackList = ({
                             up whatever each track's state. */}
                         {!requestable(track.status) ? (
                           <span className="flex w-28 shrink-0 justify-center">
-                            <MusicStatusBadge status={track.status} plain />
+                            <MusicStatusBadge
+                              status={track.status}
+                              downloads={
+                                track.recordingId
+                                  ? songDownloads(downloads, [
+                                      track.recordingId,
+                                    ])
+                                  : []
+                              }
+                              plain
+                            />
                           </span>
                         ) : songsOf && track.recordingId ? (
                           <Button
@@ -343,6 +358,7 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
         <div className="media-overview-left">
           <TrackList
             albumId={data.id}
+            downloads={data.mediaInfo?.downloadStatus}
             songsOf={
               canRequest && currentSettings.musicSongs
                 ? data.artistId

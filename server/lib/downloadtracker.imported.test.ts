@@ -67,7 +67,10 @@ beforeEach(async () => {
     } as unknown as SonarrSettings,
   ];
   const fake = {
-    interceptors: { request: { use: () => 0 } },
+    interceptors: {
+      request: { use: () => 0 },
+      response: { use: () => 0 },
+    },
     get: async () => ({
       data: { records: queue, totalRecords: queue.length },
     }),

@@ -52,6 +52,11 @@ export interface DownloadingItem {
   /** Music: the album it is for. `externalId` is then Lidarr's artist. */
   album?: { id: number; title: string; foreignAlbumId: string };
   /**
+   * Songs taken from an album (Song Fetch): the recordings it brings, by
+   * MusicBrainz id. Only those songs come; the rest of the album does not.
+   */
+  songs?: string[];
+  /**
    * Imported, but this media server matched it to another title (or none)
    * and has yet to be put right: the title waits for it (lib/matchWatch).
    */
@@ -539,6 +544,20 @@ class DownloadTracker {
   /** Backfill's own downloads, as Backfill last told. */
   private backfill: BackfillDownload[] = [];
 
+  /** Song Fetch's downloads, each for a Lidarr's artist, as it last told. */
+  private songs: { serverId: number; item: DownloadingItem }[] = [];
+
+  /**
+   * What Song Fetch is downloading or importing: songs taken from albums,
+   * downloaded outside Lidarr's queue. Their progress is Song Fetch's own,
+   * from the songs' files rather than the whole release.
+   */
+  public setSongDownloads(
+    downloads: { serverId: number; item: DownloadingItem }[]
+  ) {
+    this.songs = downloads;
+  }
+
   /**
    * What Backfill is downloading, and what it has imported of late. What
    * was shown downloading and is now imported is shown as being added to
@@ -621,6 +640,14 @@ class DownloadTracker {
       .filter((item) => item.externalId === artistId && forAlbum(item))
       .map(this.withLive)
       .concat(
+        this.songs
+          .filter(
+            (d) =>
+              d.serverId === serverId &&
+              d.item.externalId === artistId &&
+              forAlbum(d.item)
+          )
+          .map((d) => d.item),
         this.importedOrWaiting('music', serverId, artistId).filter(forAlbum)
       );
   }
@@ -631,6 +658,7 @@ class DownloadTracker {
     this.lidarrServers = {};
     this.live = new Map();
     this.backfill = [];
+    this.songs = [];
     this.imported = new Map();
     this.queueDown = new Set();
   }

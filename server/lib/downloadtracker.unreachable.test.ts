@@ -60,7 +60,10 @@ beforeEach(async () => {
       return { data: { records: [], totalRecords: 0 } };
     };
     return {
-      interceptors: { request: { use: () => 0 } },
+      interceptors: {
+        request: { use: () => 0 },
+        response: { use: () => 0 },
+      },
       get: answer,
       post: answer,
     };

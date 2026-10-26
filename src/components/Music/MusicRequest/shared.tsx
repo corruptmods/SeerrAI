@@ -5,6 +5,7 @@ import {
   albumDownloads,
   artistImageUrl,
   musicRequestStatus,
+  songDownloads,
   songName,
 } from '@app/components/Music/musicHelpers';
 import useRequestAction from '@app/hooks/useRequestAction';
@@ -171,7 +172,9 @@ export const SongsField = ({
                           request.media?.downloadStatus,
                           song.singleMbid
                         )
-                      : []
+                      : songDownloads(request.media?.downloadStatus, [
+                          song.recordingMbid,
+                        ])
                   }
                   plain
                 />
@@ -256,13 +259,20 @@ export const MusicRequestBadge = ({ request }: { request: Request }) => {
   return status === MediaStatus.UNKNOWN ? null : (
     <MusicStatusBadge
       status={status}
-      downloads={albumDownloads(request.media?.downloadStatus, [
-        ...albums.map((album) => album.albumMbid),
-        // The singles its songs come on.
-        ...songsOf(request).flatMap((song) =>
-          song.singleMbid ? [song.singleMbid] : []
+      downloads={[
+        ...albumDownloads(request.media?.downloadStatus, [
+          ...albums.map((album) => album.albumMbid),
+          // The singles its songs come on.
+          ...songsOf(request).flatMap((song) =>
+            song.singleMbid ? [song.singleMbid] : []
+          ),
+        ]),
+        // Its songs taken from albums.
+        ...songDownloads(
+          request.media?.downloadStatus,
+          songsOf(request).map((song) => song.recordingMbid)
         ),
-      ])}
+      ]}
       addingToLibrary={albums.some((album) => album.addingToLibrary)}
       artistId={request.media?.foreignId ?? undefined}
       title={musicRequestTitle(request, intl)}

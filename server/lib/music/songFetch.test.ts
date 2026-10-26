@@ -20,6 +20,7 @@ import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
 import backfill from '@server/lib/backfill/engine';
 import cacheManager from '@server/lib/cache';
+import downloadTracker from '@server/lib/downloadtracker';
 import {
   fileForTrack,
   namesAlbum,
@@ -389,7 +390,10 @@ describe('taking a song from its album', () => {
     fetch = await fetchOf();
     assert.equal(fetch.status, 'importing');
     const imported = lidarr.calls.find(
-      (c) => c.method === 'POST' && c.path === '/api/v1/command'
+      (c) =>
+        c.method === 'POST' &&
+        c.path === '/api/v1/command' &&
+        c.body?.name === 'ManualImport'
     );
     const files = imported?.body?.files as {
       path: string;
@@ -442,6 +446,40 @@ describe('taking a song from its album', () => {
       },
     ]);
     assert.equal(standing.get(LANTERN)?.status, MediaStatus.AVAILABLE);
+  });
+
+  it('shows its download on the album and the song, as Lidarr’s are', async () => {
+    await requestSongs([LANTERN]);
+    await startFetching();
+    await songFetcher.tick();
+    const fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+
+    const shown = downloadTracker.getMusicProgress(
+      fetch.lidarrId,
+      fetch.lidarrArtistId!
+    );
+    assert.deepEqual(
+      shown.map((item) => [
+        item.stage,
+        item.album?.foreignAlbumId,
+        item.songs,
+        item.downloadId,
+      ]),
+      [['downloading', STATIC_GARDEN, [LANTERN], HASH]]
+    );
+    // Only the song's file counts, none of it in yet.
+    const song = fetch.files.reduce((n, file) => n + file.size, 0);
+    assert.deepEqual([shown[0].size, shown[0].sizeLeft], [song, song]);
+
+    done = true;
+    await songFetcher.tick();
+    await songFetcher.tick();
+    assert.equal((await fetchOf()).status, 'done');
+    assert.deepEqual(
+      downloadTracker.getMusicProgress(fetch.lidarrId, fetch.lidarrArtistId!),
+      []
+    );
   });
 
   it('links the artist of a song taken before artists were linked', async () => {

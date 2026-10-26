@@ -8,7 +8,11 @@ import type {
   LidarrQualityModel,
   LidarrTrack,
 } from '@server/api/servarr/lidarr';
-import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
@@ -23,6 +27,7 @@ import {
   PROWLARR,
   indexerLimits,
 } from '@server/lib/backfill/indexerLimit';
+import downloadTracker from '@server/lib/downloadtracker';
 import { lidarrApi, musicReady } from '@server/lib/music/access';
 import {
   fileForTrack,
@@ -140,6 +145,7 @@ class SongFetcher {
           await this.stumbled(fetch, e);
         }
       }
+      this.showDownloads(fetches);
     } finally {
       this.ticking = false;
     }
@@ -817,6 +823,7 @@ class SongFetcher {
         const have = chosen.reduce((n, f) => n + f.size * f.progress, 0);
         const all = chosen.reduce((n, f) => n + f.size, 0) || 1;
         fetch.stage = `Downloading, ${Math.floor((have / all) * 100)}%`;
+        this.sizes.set(fetch.id, { size: all, left: all - have });
         await this.stalled(fetch, have);
         return;
       }
@@ -837,6 +844,11 @@ class SongFetcher {
       }
       if (job.place !== 'history') {
         fetch.stage = `Downloading, ${Math.floor(job.percentage)}%`;
+        const size = fetch.release?.size || 1;
+        this.sizes.set(fetch.id, {
+          size,
+          left: size * (1 - Math.min(100, job.percentage) / 100),
+        });
         await getRepository(SongFetch).save(fetch);
         return;
       }
@@ -886,6 +898,52 @@ class SongFetcher {
   }
 
   private gains = new Map<number, { have: number; at: number }>();
+
+  /** Each download's size and what is left of it, as last read. */
+  private sizes = new Map<number, { size: number; left: number }>();
+
+  /**
+   * What is downloading or importing, for the downloading pills on the
+   * album, its songs and their requests, as Lidarr's own downloads have.
+   */
+  private showDownloads(fetches: SongFetch[]): void {
+    const shown = fetches.filter(
+      (fetch) =>
+        (fetch.status === 'downloading' || fetch.status === 'importing') &&
+        fetch.lidarrArtistId != null &&
+        fetch.lidarrAlbumId != null
+    );
+    for (const id of this.sizes.keys()) {
+      if (!shown.some((fetch) => fetch.id === id)) this.sizes.delete(id);
+    }
+    downloadTracker.setSongDownloads(
+      shown.map((fetch) => {
+        const importing = fetch.status === 'importing';
+        const known = this.sizes.get(fetch.id);
+        const size = known?.size ?? fetch.release?.size ?? 0;
+        return {
+          serverId: fetch.lidarrId,
+          item: {
+            mediaType: MediaType.MUSIC,
+            externalId: fetch.lidarrArtistId!,
+            size,
+            sizeLeft: importing ? 0 : (known?.left ?? size),
+            status: fetch.stage ?? '',
+            stage: importing ? 'importing' : 'downloading',
+            timeLeft: '',
+            title: fetch.release?.title ?? fetch.albumTitle,
+            downloadId: fetch.downloadId ?? `song-fetch-${fetch.id}`,
+            album: {
+              id: fetch.lidarrAlbumId!,
+              title: fetch.albumTitle,
+              foreignAlbumId: fetch.albumMbid,
+            },
+            songs: fetch.recordings,
+          },
+        };
+      })
+    );
+  }
 
   /** Hands the songs' files to Lidarr's manual import, track by track. */
   private async importFiles(

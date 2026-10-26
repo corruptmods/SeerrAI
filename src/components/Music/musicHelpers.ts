@@ -201,6 +201,17 @@ export const albumDownloads = (
   );
 };
 
+/** Downloads bringing any of these songs, taken from their albums. */
+export const songDownloads = (
+  downloads: DownloadingItem[] | undefined,
+  recordingMbids: string[]
+): DownloadingItem[] => {
+  const wanted = new Set(recordingMbids);
+  return (downloads ?? []).filter((item) =>
+    (item.songs ?? []).some((id) => wanted.has(id))
+  );
+};
+
 /** A song as it is named: "Song (radio edit)", or just "Song". */
 export const songName = (title: string, version?: string | null): string =>
   version ? `${title} (${version})` : title;

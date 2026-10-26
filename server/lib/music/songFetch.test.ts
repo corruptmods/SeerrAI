@@ -478,6 +478,71 @@ describe('taking a song from its album', () => {
     );
   });
 
+  it('corrects an album songs were taken from that was marked available', async () => {
+    await requestSongs([LANTERN]);
+    await startFetching();
+    done = true;
+    await songFetcher.tick();
+    await songFetcher.tick();
+    assert.equal((await fetchOf()).status, 'done');
+    // As an older Seerr AI left it: the whole album taken as here.
+    await getRepository(MusicAlbum).update(
+      { mbId: STATIC_GARDEN },
+      { status: MediaStatus.AVAILABLE }
+    );
+    const album = lidarr.albums.find((a) => a.foreignAlbumId === STATIC_GARDEN);
+    assert.ok(album);
+    // Lidarr has the song's file only, as it says of an unmonitored album.
+    album.statistics = {
+      trackCount: 1,
+      trackFileCount: 1,
+      totalTrackCount: 3,
+      sizeOnDisk: 30_000_000,
+      percentOfTracks: 33,
+    };
+
+    await songFetcher.tick();
+
+    const row = await getRepository(MusicAlbum).findOneByOrFail({
+      mbId: STATIC_GARDEN,
+    });
+    assert.equal(row.status, MediaStatus.PARTIALLY_AVAILABLE);
+    const artist = await getRepository(Media).findOneByOrFail({
+      id: row.mediaId,
+    });
+    assert.equal(artist.status, MediaStatus.PARTIALLY_AVAILABLE);
+  });
+
+  it('leaves an album songs were taken from available once Lidarr has all of it', async () => {
+    await requestSongs([LANTERN]);
+    await startFetching();
+    done = true;
+    await songFetcher.tick();
+    await songFetcher.tick();
+    await getRepository(MusicAlbum).update(
+      { mbId: STATIC_GARDEN },
+      { status: MediaStatus.AVAILABLE }
+    );
+    const album = lidarr.albums.find((a) => a.foreignAlbumId === STATIC_GARDEN);
+    assert.ok(album);
+    album.monitored = true;
+    album.statistics = {
+      trackCount: 3,
+      trackFileCount: 3,
+      totalTrackCount: 3,
+      sizeOnDisk: 90_000_000,
+      percentOfTracks: 100,
+    };
+
+    await songFetcher.tick();
+
+    assert.equal(
+      (await getRepository(MusicAlbum).findOneByOrFail({ mbId: STATIC_GARDEN }))
+        .status,
+      MediaStatus.AVAILABLE
+    );
+  });
+
   it('takes another song from an album one was already taken from', async () => {
     await requestSongs([LANTERN]);
     await startFetching();

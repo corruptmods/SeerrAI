@@ -29,6 +29,7 @@ import {
   isAudio,
   namesAlbum,
 } from '@server/lib/music/albumRelease';
+import { refreshArtists } from '@server/lib/music/availability';
 import { clientFor, songFetchProblem } from '@server/lib/music/songFetchReady';
 import { releaseForSongs } from '@server/lib/music/songRelease';
 import { normalizeTitle } from '@server/lib/music/songs';
@@ -127,6 +128,7 @@ class SongFetcher {
     try {
       await this.plan();
       await this.linkFinished();
+      await this.correctFinished();
       const fetches = await getRepository(SongFetch).find({
         where: { status: In(ACTIVE) },
         order: { id: 'ASC' },
@@ -404,7 +406,8 @@ class SongFetcher {
   /**
    * Songs taken before the artist was linked to their Lidarr (fixed since)
    * wait for scans that never looked at their album: linked now, their
-   * requests finish with the next scan.
+   * requests finish with the next scan. Those already finished are linked
+   * too, for the artist's page to reach Lidarr.
    */
   private async linkFinished(): Promise<void> {
     const finished = await getRepository(SongFetch).find({
@@ -413,8 +416,16 @@ class SongFetcher {
       take: 50,
     });
     for (const fetch of finished) {
-      const [song] = await this.songsOf(fetch);
-      if (song) {
+      if (!fetch.recordings.length) continue;
+      const song = await getRepository(SongRequest).findOne({
+        where: {
+          recordingMbid: In(fetch.recordings),
+          sourceAlbumMbid: fetch.albumMbid,
+          request: { status: Not(MediaRequestStatus.DECLINED) },
+        },
+        relations: { request: { media: true } },
+      });
+      if (song?.request) {
         await this.linkArtist(
           song.request,
           { id: fetch.lidarrId },
@@ -422,6 +433,66 @@ class SongFetcher {
         );
       }
     }
+  }
+
+  /**
+   * An album songs were taken from is only partly here until Lidarr has
+   * every track of it, whatever the server listing it shows: before this
+   * was fixed, such albums were taken as wholly here. Lidarr is asked only
+   * while the counts it last gave say the album is not all there.
+   */
+  private async correctFinished(): Promise<void> {
+    const finished = await getRepository(SongFetch).find({
+      where: { status: 'done', lidarrAlbumId: Not(IsNull()) },
+      order: { id: 'DESC' },
+      take: 50,
+    });
+    const artists = new Set<number>();
+    for (const fetch of finished) {
+      const row = await getRepository(MusicAlbum).findOne({
+        select: {
+          id: true,
+          mediaId: true,
+          status: true,
+          trackCount: true,
+          trackFileCount: true,
+        },
+        where: { mbId: fetch.albumMbid },
+      });
+      if (
+        row?.status !== MediaStatus.AVAILABLE ||
+        (row.trackCount != null &&
+          row.trackFileCount != null &&
+          row.trackFileCount >= row.trackCount)
+      ) {
+        continue;
+      }
+      try {
+        const album = await this.lidarr(fetch).getAlbum(fetch.lidarrAlbumId!);
+        const files = album.statistics?.trackFileCount ?? 0;
+        const tracks = Math.max(
+          album.statistics?.trackCount ?? 0,
+          album.statistics?.totalTrackCount ?? 0
+        );
+        const changes: Partial<MusicAlbum> = {
+          trackCount: tracks,
+          trackFileCount: files,
+        };
+        if (files > 0 && files < tracks) {
+          changes.status = MediaStatus.PARTIALLY_AVAILABLE;
+          artists.add(row.mediaId);
+        }
+        await getRepository(MusicAlbum).update(row.id, changes);
+      } catch (e) {
+        // Lidarr not answering: the next run asks again.
+        logger.debug('Could not check an album songs were taken from', {
+          label: LABEL,
+          album: fetch.albumTitle,
+          errorMessage: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+    if (artists.size) await refreshArtists(artists);
   }
 
   /**

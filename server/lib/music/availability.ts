@@ -8,6 +8,7 @@ import dataSource, { getRepository } from '@server/datasource';
 import AlbumRequest from '@server/entity/AlbumRequest';
 import Media from '@server/entity/Media';
 import MusicAlbum from '@server/entity/MusicAlbum';
+import SongFetch from '@server/entity/SongFetch';
 import { MediaEventType, recordMediaEvent } from '@server/lib/mediaHistory';
 import {
   MEDIA_ID,
@@ -241,6 +242,20 @@ export const recordServerAlbums = async (
   const idColumn = MUSIC_ALBUM_ID[kind];
   const artistColumn = MEDIA_ID[kind][0];
 
+  // Albums songs were taken from: Lidarr may monitor the release it took
+  // them into, and they stay partly here until every track is.
+  const placed = [
+    ...new Set(matches.map((m) => m.albumMbid).filter((id) => !!id)),
+  ] as string[];
+  const takenFrom = new Set<string>();
+  for (let i = 0; i < placed.length; i += 400) {
+    const fetches = await getRepository(SongFetch).find({
+      select: { albumMbid: true },
+      where: { albumMbid: In(placed.slice(i, i + 400)), status: 'done' },
+    });
+    fetches.forEach((fetch) => takenFrom.add(fetch.albumMbid));
+  }
+
   const byArtist = new Map<string, AlbumMatch[]>();
   for (const match of matches) {
     byArtist.set(match.artistMbid, [
@@ -277,12 +292,13 @@ export const recordServerAlbums = async (
       for (const match of group) {
         const { album, albumMbid, lidarr } = match;
         // An album Lidarr has only some of the files of and is not
-        // fetching the rest of (songs taken from it, say) is only partly
-        // here, unless the server lists all of it. One Lidarr has no files
-        // of is the server's own.
+        // fetching the rest of, or that songs were taken from, is only
+        // partly here, unless the server lists all of it. One Lidarr has no
+        // files of is the server's own.
+        const taken = !!albumMbid && takenFrom.has(albumMbid);
         const partly =
           !!lidarr &&
-          !lidarr.monitored &&
+          (!lidarr.monitored || taken) &&
           lidarr.trackFileCount > 0 &&
           lidarr.trackFileCount < lidarr.trackCount &&
           !((album.trackCount ?? 0) >= lidarr.trackCount);
@@ -347,8 +363,9 @@ export const recordServerAlbums = async (
         if (
           partly &&
           row.status === MediaStatus.AVAILABLE &&
-          album.trackCount !== undefined &&
-          album.trackCount < (lidarr?.trackCount ?? 0)
+          (taken ||
+            (album.trackCount !== undefined &&
+              album.trackCount < (lidarr?.trackCount ?? 0)))
         ) {
           changes.status = here;
         } else if (

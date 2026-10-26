@@ -14,6 +14,7 @@ import MediaEvent from '@server/entity/MediaEvent';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import MusicMetadata from '@server/entity/MusicMetadata';
+import SongFetch from '@server/entity/SongFetch';
 import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
@@ -635,6 +636,54 @@ describe('music scans', () => {
       ];
       await musicFullScan.run();
       assert.equal((await albumOf(SING)).status, MediaStatus.AVAILABLE);
+    });
+
+    it('keeps an album songs were taken from partly here, though Lidarr monitors it', async () => {
+      state.lidarr.artists = [lidarrArtist()];
+      // Lidarr monitors the edition it imported the song into.
+      state.lidarr.albums = [
+        lidarrAlbum({
+          monitored: true,
+          statistics: {
+            trackCount: 14,
+            trackFileCount: 1,
+            totalTrackCount: 14,
+            sizeOnDisk: 40_000_000,
+            percentOfTracks: 7,
+          },
+        }),
+      ];
+      state.plex.artists = [plexArtist('500', 'Glasswing', ARTIST)];
+      // A listing without its track count.
+      state.plex.albums = [plexAlbum('600', 'Sing', { guid: SING })];
+      await getRepository(SongFetch).insert(
+        new SongFetch({
+          albumMbid: SING,
+          albumTitle: 'Sing to the Ferryman',
+          artistMbid: ARTIST,
+          artistName: 'Glasswing',
+          recordings: [],
+          status: 'done',
+          lidarrId: 0,
+          lidarrAlbumId: 70,
+        })
+      );
+      await musicFullScan.run();
+      assert.equal(
+        (await albumOf(SING)).status,
+        MediaStatus.PARTIALLY_AVAILABLE
+      );
+
+      // Marked available by an earlier version: lowered.
+      await getRepository(MusicAlbum).update(
+        { mbId: SING },
+        { status: MediaStatus.AVAILABLE }
+      );
+      await musicFullScan.run();
+      assert.equal(
+        (await albumOf(SING)).status,
+        MediaStatus.PARTIALLY_AVAILABLE
+      );
     });
 
     it('asks MusicBrainz about an id Lidarr does not know, as a release then as an album', async () => {

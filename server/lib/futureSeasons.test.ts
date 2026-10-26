@@ -29,7 +29,9 @@ import { after, before, beforeEach, describe, it } from 'node:test';
  * button, through the real API validator.
  */
 
-const NOW = Date.parse('2026-09-26T12:00:00Z');
+// The real time: following a series goes by the clock, so the seasons'
+// dates are set from today, not from a fixed day that would pass.
+const NOW = Date.now();
 const DAY = 24 * 60 * 60 * 1000;
 const date = (offsetDays: number) =>
   new Date(NOW + offsetDays * DAY).toISOString().slice(0, 10);

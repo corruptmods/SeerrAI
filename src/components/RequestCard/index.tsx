@@ -407,7 +407,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
             }
             title={isMovie(title) ? title.title : title.name}
             // A long name takes a second line rather than being cut short.
-            className="line-clamp-2 break-words text-base font-bold leading-tight text-strong hover:underline sm:text-lg sm:leading-snug"
+            className="line-clamp-2 whitespace-normal break-words text-base font-bold leading-tight text-strong hover:underline sm:text-lg sm:leading-snug"
           >
             {isMovie(title) ? title.title : title.name}
           </Link>

@@ -143,7 +143,7 @@ const MusicRequestCard = ({
           <Link
             href={href}
             title={title}
-            className="line-clamp-2 break-words text-base font-bold leading-tight text-strong hover:underline sm:text-lg sm:leading-snug"
+            className="line-clamp-2 whitespace-normal break-words text-base font-bold leading-tight text-strong hover:underline sm:text-lg sm:leading-snug"
           >
             {musicRequestName(requestData, intl)}
           </Link>

@@ -394,9 +394,20 @@ before(async () => {
       }
       const job = {
         job_id: nextJob++,
-        job_name: p.startsWith('/providers')
-          ? 'Manually downloading Subtitles'
-          : 'Downloading missing subtitles for BRIXO Shurikan: Wyverns Waking',
+        // Named as Bazarr names them, for the title (and episode).
+        job_name:
+          p === '/providers/movies'
+            ? `Manually downloading Subtitles for ${movie.title}`
+            : p === '/providers/episodes'
+              ? `Manually downloading Subtitles for BRIXO Shurikan: Wyverns Waking - S04E${String(
+                  Number(fields.episodeid) - 139840
+                ).padStart(
+                  2,
+                  '0'
+                )} - Episode ${Number(fields.episodeid) - 139840}`
+              : p === '/movies'
+                ? `Downloading missing subtitles for ${movie.title}`
+                : 'Downloading missing subtitles for BRIXO Shurikan: Wyverns Waking',
         status: 'pending',
       };
       jobs.push(job);
@@ -810,6 +821,20 @@ describe('searching, downloading and deleting', () => {
     });
     assert.equal(res.status, 502);
     assert.equal(res.body.code, 'bazarrFailed');
+  });
+
+  it('sends a Whisper result to transcription, not to a plain download', async () => {
+    actingAs = manager;
+    const res = await call('POST', '/movie/471906/download', {
+      provider: 'whisperai',
+      subtitle: 'f5039fa8',
+    });
+    assert.equal(res.status, 400);
+    assert.equal(
+      writes.filter((w) => w.path === '/providers/movies').length,
+      0,
+      'nothing asked of Bazarr'
+    );
   });
 
   it('deletes only files, and only for admins', async () => {

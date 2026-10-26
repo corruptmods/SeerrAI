@@ -1,4 +1,5 @@
 import type { BazarrSearchResult } from '@server/api/bazarr';
+import { WHISPER_PROVIDER } from '@server/api/bazarr';
 import { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
@@ -282,8 +283,13 @@ subtitleRoutes.get<EpisodeParams>(
   }
 );
 
+// A Whisper transcription goes through the transcription route, one at a
+// time, never held open here for the hours it can take.
 const choiceBody = z.object({
-  provider: z.string().min(1),
+  provider: z
+    .string()
+    .min(1)
+    .refine((provider) => provider !== WHISPER_PROVIDER),
   subtitle: z.string().min(1),
   hi: z.boolean().default(false),
   forced: z.boolean().default(false),

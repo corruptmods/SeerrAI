@@ -9,7 +9,6 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import RemovedPlexAccount from '@server/entity/RemovedPlexAccount';
 import { User } from '@server/entity/User';
 import { UserPushSubscription } from '@server/entity/UserPushSubscription';
-import { Watchlist } from '@server/entity/Watchlist';
 import type { WatchlistResponse } from '@server/interfaces/api/discoverInterfaces';
 import type {
   QuotaResponse,
@@ -40,6 +39,7 @@ import { attachAlbumStatuses } from '@server/lib/music/albumStatuses';
 import { withNewUserDefaults } from '@server/lib/newUserDefaults';
 import { Permission, hasPermission } from '@server/lib/permissions';
 import { isPushServiceEndpoint } from '@server/lib/pushEndpoint';
+import { savedWatchlistPage } from '@server/lib/savedWatchlist';
 import { getSettings } from '@server/lib/settings';
 import {
   attachRequestCount,
@@ -1212,15 +1212,12 @@ router.get<{ id: string }, WatchlistResponse>(
     });
 
     if (user) {
-      const [result, total] = await getRepository(Watchlist).findAndCount({
-        where: { requestedBy: { id: user?.id } },
-        relations: {
-          /*requestedBy: true,media:true*/
-        },
-        // loadRelationIds: true,
-        take: itemsPerPage,
-        skip: offset,
-      });
+      const [result, total] = await savedWatchlistPage(
+        user.id,
+        offset,
+        itemsPerPage,
+        shuffleSeed(req.query.shuffle)
+      );
       if (total) {
         return res.json({
           page: page,

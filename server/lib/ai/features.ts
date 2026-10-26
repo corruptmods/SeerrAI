@@ -444,7 +444,7 @@ export const chat = async (
   // answers with its own results, each requested from its own.
   const action =
     (answer.do === 'list' || answer.do === 'request') &&
-    !(answer.music.length && !answer.titles.length)
+    !(music && answer.music.length && !answer.titles.length)
       ? answer.do
       : undefined;
   // Asked to list or request, with no titles, no set and nothing offered

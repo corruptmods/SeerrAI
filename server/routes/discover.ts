@@ -13,12 +13,12 @@ import { leftOutServices } from '@server/constants/streamingServices';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { User } from '@server/entity/User';
-import { Watchlist } from '@server/entity/Watchlist';
 import type {
   GenreSliderItem,
   WatchlistResponse,
 } from '@server/interfaces/api/discoverInterfaces';
 import { featureEnabled } from '@server/lib/features';
+import { savedWatchlistPage } from '@server/lib/savedWatchlist';
 import type { SearchKey } from '@server/lib/searchText';
 import { getSearchText } from '@server/lib/searchText';
 import { getSettings } from '@server/lib/settings';
@@ -39,7 +39,7 @@ import {
 } from '@server/utils/animeSeason';
 import type { AnimeSignals } from '@server/utils/isAnime';
 import { leftOutAsAnime } from '@server/utils/isAnime';
-import { seededShuffle, shuffleSeed } from '@server/utils/shuffle';
+import { shuffleSeed } from '@server/utils/shuffle';
 import { isCollection, isMovie, isPerson } from '@server/utils/typeHelpers';
 import { Router } from 'express';
 import { sortBy } from 'lodash';
@@ -1149,26 +1149,12 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
 
     if (activeUser && !activeUser?.plexToken) {
       // Non-Plex users can only see their own watchlist
-      const where = { requestedBy: { id: activeUser?.id } };
-      const [result, total] =
-        shuffle === undefined
-          ? await getRepository(Watchlist).findAndCount({
-              where,
-              take: itemsPerPage,
-              skip: offset,
-            })
-          : await getRepository(Watchlist)
-              .find({ where, order: { id: 'ASC' } })
-              .then(
-                (all) =>
-                  [
-                    seededShuffle(all, shuffle).slice(
-                      offset,
-                      offset + itemsPerPage
-                    ),
-                    all.length,
-                  ] as const
-              );
+      const [result, total] = await savedWatchlistPage(
+        activeUser.id,
+        offset,
+        itemsPerPage,
+        shuffle
+      );
       if (total) {
         return res.json({
           page: page,

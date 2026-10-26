@@ -392,6 +392,36 @@ class BazarrAPI {
   private static manualDownload = (name: string) =>
     name.startsWith('Manually download');
 
+  /**
+   * One title's job: of the kind `kind` accepts, and named for the title
+   * (and episode) as Bazarr names it — "… for Show - S01E02 - Title", so
+   * another title's job running alongside is never taken for this one.
+   * The title unknown (Bazarr not answering), the kind alone.
+   */
+  private static jobFor(
+    kind: (name: string) => boolean,
+    title: string | undefined,
+    episode?: { season: number; episode: number }
+  ): (name: string) => boolean {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const words = [
+      ...(title ? [title.toLowerCase()] : []),
+      ...(episode ? [`s${pad(episode.season)}e${pad(episode.episode)}`] : []),
+    ];
+    return (name) =>
+      kind(name) && words.every((w) => name.toLowerCase().includes(w));
+  }
+
+  private async movieTitle(radarrId: number): Promise<string | undefined> {
+    return (await this.getMovie(radarrId).catch(() => undefined))?.title;
+  }
+
+  private async seriesTitle(
+    sonarrSeriesId: number
+  ): Promise<string | undefined> {
+    return (await this.getSeries(sonarrSeriesId).catch(() => undefined))?.title;
+  }
+
   /** A manual download, followed until Bazarr is done with it. */
   public async downloadMovie(
     radarrId: number,
@@ -406,7 +436,10 @@ class BazarrAPI {
           { radarrid: radarrId, ...this.downloadFields(choice) },
           timeout
         ),
-      BazarrAPI.manualDownload,
+      BazarrAPI.jobFor(
+        BazarrAPI.manualDownload,
+        await this.movieTitle(radarrId)
+      ),
       choice.provider === WHISPER_PROVIDER
         ? TRANSCRIBE_TIMEOUT_MS
         : DOWNLOAD_TIMEOUT_MS,
@@ -433,7 +466,13 @@ class BazarrAPI {
           },
           timeout
         ),
-      BazarrAPI.manualDownload,
+      BazarrAPI.jobFor(
+        BazarrAPI.manualDownload,
+        await this.seriesTitle(sonarrSeriesId),
+        (await this.getEpisodes(sonarrSeriesId).catch(() => [])).find(
+          (ep) => ep.sonarrEpisodeId === sonarrEpisodeId
+        )
+      ),
       choice.provider === WHISPER_PROVIDER
         ? TRANSCRIBE_TIMEOUT_MS
         : DOWNLOAD_TIMEOUT_MS,
@@ -486,7 +525,10 @@ class BazarrAPI {
           { radarrid: radarrId, action: 'search-missing' },
           timeout
         ),
-      BazarrAPI.missingSearch,
+      BazarrAPI.jobFor(
+        BazarrAPI.missingSearch,
+        await this.movieTitle(radarrId)
+      ),
       SEARCH_MISSING_TIMEOUT_MS
     );
   }
@@ -503,7 +545,10 @@ class BazarrAPI {
           { seriesid: sonarrSeriesId, action: 'search-missing' },
           timeout
         ),
-      BazarrAPI.missingSearch,
+      BazarrAPI.jobFor(
+        BazarrAPI.missingSearch,
+        await this.seriesTitle(sonarrSeriesId)
+      ),
       SEARCH_MISSING_TIMEOUT_MS
     );
   }

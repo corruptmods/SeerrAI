@@ -21,10 +21,14 @@ import type {
   MbReleaseSummary,
   MbWikipediaExtractResponse,
 } from './interfaces';
-import type { MbPriority } from './queue';
-import { MusicBrainzBusyError, RequestQueue } from './queue';
+import type { MbPriority, StillWanted } from './queue';
+import {
+  MusicBrainzBusyError,
+  MusicBrainzUnwantedError,
+  RequestQueue,
+} from './queue';
 
-export { MusicBrainzBusyError };
+export { MusicBrainzBusyError, MusicBrainzUnwantedError };
 export type { MbPriority };
 
 /*
@@ -205,17 +209,23 @@ export class MusicBrainz extends ExternalAPI {
   private request<T>(
     priority: MbPriority,
     path: string,
-    params: Record<string, string | number> = {}
+    params: Record<string, string | number> = {},
+    wanted?: StillWanted
   ): Promise<T> {
     const query = new URLSearchParams(
       Object.entries(params).map(([k, v]) => [k, String(v)])
     );
-    return queue.add(`${this.base}${path}?${query}`, priority, async () => {
-      const response = await this.axios.get<T>(path, {
-        params: { ...params, fmt: 'json' },
-      });
-      return response.data;
-    });
+    return queue.add(
+      `${this.base}${path}?${query}`,
+      priority,
+      async () => {
+        const response = await this.axios.get<T>(path, {
+          params: { ...params, fmt: 'json' },
+        });
+        return response.data;
+      },
+      wanted
+    );
   }
 
   /** The same work asked for again while under way is shared. */
@@ -332,24 +342,37 @@ export class MusicBrainz extends ExternalAPI {
     return data;
   }
 
+  /**
+   * Searches take `wanted`: asked before each request starts, and a search
+   * no one wants any more (typed past) is dropped while it waits.
+   */
   public searchArtists(
     query: string,
-    { limit = 8, offset = 0 }: { limit?: number; offset?: number } = {},
+    {
+      limit = 8,
+      offset = 0,
+      wanted,
+    }: { limit?: number; offset?: number; wanted?: StillWanted } = {},
     priority: MbPriority = 'interactive'
   ): Promise<MbArtistSearchResponse> {
     const key = `search-artist:${limit}:${offset}:${query.trim().toLowerCase()}`;
     return this.searched(key, () =>
-      this.request<MbArtistSearchResponse>(priority, '/ws/2/artist', {
-        query: searchText(query),
-        limit,
-        offset,
-      })
+      this.request<MbArtistSearchResponse>(
+        priority,
+        '/ws/2/artist',
+        { query: searchText(query), limit, offset },
+        wanted
+      )
     );
   }
 
   public searchReleaseGroups(
     query: string,
-    { limit = 12, offset = 0 }: { limit?: number; offset?: number } = {},
+    {
+      limit = 12,
+      offset = 0,
+      wanted,
+    }: { limit?: number; offset?: number; wanted?: StillWanted } = {},
     priority: MbPriority = 'interactive'
   ): Promise<MbReleaseGroupSearchResponse> {
     const key = `search-rg:${limit}:${offset}:${query.trim().toLowerCase()}`;
@@ -357,7 +380,8 @@ export class MusicBrainz extends ExternalAPI {
       this.request<MbReleaseGroupSearchResponse>(
         priority,
         '/ws/2/release-group',
-        { query: searchText(query), limit, offset }
+        { query: searchText(query), limit, offset },
+        wanted
       )
     );
   }
@@ -371,19 +395,24 @@ export class MusicBrainz extends ExternalAPI {
   public searchRecordings(
     query: string,
     artistIds: string[],
-    { limit = 100 }: { limit?: number } = {},
+    { limit = 100, wanted }: { limit?: number; wanted?: StillWanted } = {},
     priority: MbPriority = 'interactive'
   ): Promise<MbRecordingSearchResponse> {
     const artists = [...new Set(artistIds.map(requireMbid))].sort();
     const phrase = query.trim().replace(/["\\]/g, '\\$&');
     const key = `search-rec:${limit}:${artists.join(',')}:${query.trim().toLowerCase()}`;
     return this.searched(key, () =>
-      this.request<MbRecordingSearchResponse>(priority, '/ws/2/recording', {
-        query: `recording:"${phrase}" AND (${artists
-          .map((id) => `arid:${id}`)
-          .join(' OR ')})`,
-        limit,
-      })
+      this.request<MbRecordingSearchResponse>(
+        priority,
+        '/ws/2/recording',
+        {
+          query: `recording:"${phrase}" AND (${artists
+            .map((id) => `arid:${id}`)
+            .join(' OR ')})`,
+          limit,
+        },
+        wanted
+      )
     );
   }
 

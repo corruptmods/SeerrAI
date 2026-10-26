@@ -7,10 +7,23 @@
  *
  * Someone who would wait more than a few seconds is told MusicBrainz is busy
  * instead of being left looking at a spinner; background work just waits.
+ * A request no one wants any more (a search typed past) is dropped before
+ * it starts, so it takes no place ahead of the one that is wanted.
  */
 
 /** Who is waiting: a person on a page, or a scan. */
 export type MbPriority = 'interactive' | 'background';
+
+/** A request dropped before it started: no one wanted it any more. */
+export class MusicBrainzUnwantedError extends Error {
+  constructor() {
+    super('No longer wanted.');
+    this.name = 'MusicBrainzUnwantedError';
+  }
+}
+
+/** Whether someone still wants a request; asked just before it starts. */
+export type StillWanted = () => boolean;
 
 /** Answered at once when a person would otherwise wait too long. */
 export class MusicBrainzBusyError extends Error {
@@ -27,6 +40,11 @@ interface Job {
   priority: MbPriority;
   run: () => Promise<unknown>;
   retried: boolean;
+  /**
+   * Whether anyone still wants it. Undefined: someone always does (a
+   * page, a scan); otherwise it is dropped once none of these does.
+   */
+  wanted?: StillWanted[];
   promise: Promise<unknown>;
   resolve: (value: unknown) => void;
   reject: (reason: unknown) => void;
@@ -139,6 +157,20 @@ export class RequestQueue {
       : new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  /** Drops what is waiting that no one wants any more. */
+  private prune() {
+    for (const priority of ['interactive', 'background'] as const) {
+      this.waiting[priority] = this.waiting[priority].filter((job) => {
+        if (!job.wanted || job.wanted.some((wanted) => wanted())) {
+          return true;
+        }
+        this.jobs.delete(job.key);
+        job.reject(new MusicBrainzUnwantedError());
+        return false;
+      });
+    }
+  }
+
   /** How long a request from a person, added now, would wait to start. */
   public expectedWait(): number {
     return (
@@ -155,10 +187,14 @@ export class RequestQueue {
   public add<T>(
     key: string,
     priority: MbPriority,
-    run: () => Promise<T>
+    run: () => Promise<T>,
+    wanted?: StillWanted
   ): Promise<T> {
     const existing = this.jobs.get(key);
     if (existing) {
+      // Wanted by one more, or (with no test) by someone for good.
+      existing.wanted =
+        existing.wanted && wanted ? [...existing.wanted, wanted] : undefined;
       // A person now waits on what a scan asked for: it moves up.
       if (priority === 'interactive' && existing.priority === 'background') {
         const index = this.waiting.background.indexOf(existing);
@@ -171,6 +207,8 @@ export class RequestQueue {
       return existing.promise as Promise<T>;
     }
 
+    // What no one wants any more is not counted in the wait.
+    this.prune();
     if (
       priority === 'interactive' &&
       this.expectedWait() > this.options.maxWaitMs
@@ -190,6 +228,7 @@ export class RequestQueue {
       priority,
       run,
       retried: false,
+      ...(wanted ? { wanted: [wanted] } : {}),
       promise,
       resolve,
       reject,
@@ -221,6 +260,7 @@ export class RequestQueue {
           await this.sleep(wait);
           continue;
         }
+        this.prune();
         const job = this.next();
         if (!job) {
           break;

@@ -521,10 +521,11 @@ describe('search', () => {
       albums[0].coverUrl,
       `https://coverartarchive.org/release-group/${IDS.album}/front-500`
     );
-    assert.deepEqual(searchArtists.mock.calls[0].arguments.slice(0, 2), [
-      'glasswing',
-      { limit: 25, offset: 0 },
-    ]);
+    const [query, { wanted, ...page }] = searchArtists.mock.calls[0]
+      .arguments as [string, { wanted?: () => boolean }];
+    assert.deepEqual([query, page], ['glasswing', { limit: 25, offset: 0 }]);
+    // Each person's newest search is the one wanted.
+    assert.equal(wanted?.(), true);
   });
 
   it('shows 8 artists and 12 albums, whatever an older version saved', async () => {
@@ -549,11 +550,18 @@ describe('search', () => {
     );
     assert.equal((await get('/music/search?query=glasswing')).status, 200);
     // More are asked for than shown, so the best can be picked from them.
-    assert.deepEqual(searchArtists.mock.calls[0].arguments[1], {
+    const pageOf = (call: { arguments: unknown[] }) => {
+      const { limit, offset } = call.arguments[1] as {
+        limit: number;
+        offset: number;
+      };
+      return { limit, offset };
+    };
+    assert.deepEqual(pageOf(searchArtists.mock.calls[0]), {
       limit: 25,
       offset: 0,
     });
-    assert.deepEqual(searchAlbums.mock.calls[0].arguments[1], {
+    assert.deepEqual(pageOf(searchAlbums.mock.calls[0]), {
       limit: 100,
       offset: 0,
     });

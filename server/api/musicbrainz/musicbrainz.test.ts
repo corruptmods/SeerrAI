@@ -10,6 +10,7 @@ import MusicBrainz, {
 } from '@server/api/musicbrainz';
 import {
   MusicBrainzBusyError,
+  MusicBrainzUnwantedError,
   RequestQueue,
 } from '@server/api/musicbrainz/queue';
 import { getRepository } from '@server/datasource';
@@ -89,6 +90,67 @@ describe('the MusicBrainz queue', () => {
     ]);
     assert.deepEqual(answers, ['answer', 'answer', 'answer']);
     assert.equal(calls, 1);
+  });
+
+  it('drops a search typed past before it starts, not one still wanted', async () => {
+    const clock = fakeClock();
+    const queue = new RequestQueue({
+      spacingMs: () => MB_SPACING_MS,
+      maxWaitMs: 60_000,
+      ...clock,
+    });
+    let newest = 'trea';
+    const asked: string[] = [];
+    const search = (query: string, key = query) =>
+      queue.add(
+        key,
+        'interactive',
+        async () => {
+          asked.push(key);
+          return key;
+        },
+        () => newest === query
+      );
+    const first = search('trea');
+    const typedPast = search('treaty', 'treaty-albums').catch((e) => e);
+    // Wanted by the newer search too, so it is kept.
+    const shared = search('treaty', 'shared');
+    newest = 'treaty oak';
+    queue.add(
+      'shared',
+      'interactive',
+      async () => 'shared',
+      () => true
+    );
+    const now = search('treaty oak');
+
+    assert.equal(await first, 'trea', 'already under way: it finishes');
+    assert.ok((await typedPast) instanceof MusicBrainzUnwantedError);
+    assert.equal(await shared, 'shared');
+    assert.equal(await now, 'treaty oak');
+    assert.deepEqual(asked, ['trea', 'shared', 'treaty oak']);
+  });
+
+  it('keeps a request someone always wants, whoever else asked', async () => {
+    const clock = fakeClock();
+    const queue = new RequestQueue({
+      spacingMs: () => MB_SPACING_MS,
+      maxWaitMs: 60_000,
+      ...clock,
+    });
+    const run = async () => 'kept';
+    // Something ahead, so it waits.
+    const ahead = queue.add('ahead', 'interactive', run);
+    let typedPast = false;
+    const searched = queue.add('a', 'interactive', run, () => !typedPast);
+    // A page asks for the same, with no test: it is kept for good.
+    const page = queue.add('a', 'interactive', run);
+    typedPast = true;
+    assert.deepEqual(await Promise.all([ahead, searched, page]), [
+      'kept',
+      'kept',
+      'kept',
+    ]);
   });
 
   it('serves people before background work', async () => {

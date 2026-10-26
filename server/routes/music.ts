@@ -1,5 +1,6 @@
 import {
   MusicBrainzBusyError,
+  MusicBrainzUnwantedError,
   isMbid,
   musicBrainz,
 } from '@server/api/musicbrainz';
@@ -86,6 +87,10 @@ const statusOf = (e: unknown): number | undefined =>
 
 /** A MusicBrainz failure, in words for the page and in the log. */
 const mbFailed = (next: NextFunction, e: unknown, what: string) => {
+  if (e instanceof MusicBrainzUnwantedError) {
+    // Typed past: the page has already asked for the newer search.
+    return next({ status: 409, message: 'A newer search replaced this one.' });
+  }
   if (e instanceof MusicBrainzBusyError) {
     return next({ status: 503, message: e.message });
   }
@@ -99,12 +104,30 @@ const mbFailed = (next: NextFunction, e: unknown, what: string) => {
   return next({ status: 502, message: 'MusicBrainz did not answer.' });
 };
 
+/*
+ * Each person's newest search. MusicBrainz answers one request a second
+ * for the whole server, so a search typed past is dropped while it waits,
+ * rather than holding up the one now wanted. The songs below the same
+ * search are part of it.
+ */
+const newestSearch = new Map<number, string>();
+
+const wantedSearch = (userId: number | undefined, query: string) => {
+  if (userId === undefined) return undefined;
+  const key = query.trim().toLowerCase();
+  newestSearch.set(userId, key);
+  return () => newestSearch.get(userId) === key;
+};
+
 /**
  * The artists and albums a search shows, best first. The same search asked
  * again within the hour (as the songs below ask it) is answered from
  * memory.
  */
-const searchArtistsAndAlbums = async (query: string) => {
+const searchArtistsAndAlbums = async (
+  query: string,
+  wanted?: () => boolean
+) => {
   const mb = musicBrainz();
   const [artists, albums] = await Promise.all([
     searchWhileTied(
@@ -112,6 +135,7 @@ const searchArtistsAndAlbums = async (query: string) => {
         const page = await mb.searchArtists(query, {
           limit: ARTIST_PAGE,
           offset,
+          wanted,
         });
         return { count: page.count, items: page.artists ?? [] };
       },
@@ -122,6 +146,7 @@ const searchArtistsAndAlbums = async (query: string) => {
         const page = await mb.searchReleaseGroups(query, {
           limit: ALBUM_PAGE,
           offset,
+          wanted,
         });
         return { count: page.count, items: page['release-groups'] ?? [] };
       },
@@ -141,7 +166,10 @@ musicRoutes.get('/search', async (req, res, next) => {
       .json({ artists: [], albums: [] } satisfies MusicSearchResponse);
   }
   try {
-    const { artistList, albumList } = await searchArtistsAndAlbums(query);
+    const { artistList, albumList } = await searchArtistsAndAlbums(
+      query,
+      wantedSearch(req.user?.id, query)
+    );
     const [knownArtists, knownAlbums] = await Promise.all([
       artistStatuses(artistList.map((a) => a.id)),
       albumStatuses(albumList.map((a) => a.id)),
@@ -173,7 +201,11 @@ musicRoutes.get('/search/songs', async (req, res, next) => {
       .json({ songs: [] } satisfies MusicSongSearchResponse);
   }
   try {
-    const { artistList, albumList } = await searchArtistsAndAlbums(query);
+    const wanted = wantedSearch(req.user?.id, query);
+    const { artistList, albumList } = await searchArtistsAndAlbums(
+      query,
+      wanted
+    );
     const artistOrder = [
       ...new Set([
         ...albumList
@@ -189,7 +221,9 @@ musicRoutes.get('/search/songs', async (req, res, next) => {
         .status(200)
         .json({ songs: [] } satisfies MusicSongSearchResponse);
     }
-    const found = await musicBrainz().searchRecordings(query, artistOrder);
+    const found = await musicBrainz().searchRecordings(query, artistOrder, {
+      wanted,
+    });
     const songs = groupSongs(found.recordings ?? [], query, artistOrder, {
       songs: SEARCH_SONGS,
     });

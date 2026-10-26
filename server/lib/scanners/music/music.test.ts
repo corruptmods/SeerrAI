@@ -565,11 +565,12 @@ describe('music scans', () => {
 
     it('places an album songs were taken from as only partly here', async () => {
       state.lidarr.artists = [lidarrArtist()];
-      // Unmonitored, with one of its 14 tracks on file.
+      // Unmonitored, with one of its 14 tracks on file: as real Lidarr
+      // says, its track count is then only the one with a file.
       state.lidarr.albums = [
         lidarrAlbum({
           statistics: {
-            trackCount: 14,
+            trackCount: 1,
             trackFileCount: 1,
             totalTrackCount: 14,
             sizeOnDisk: 40_000_000,
@@ -1042,6 +1043,34 @@ describe('music scans', () => {
       state.lidarr.albums[0].statistics = stats(0);
       await musicFullScan.run();
       assert.equal((await albumOf(SING)).status, MediaStatus.DELETED);
+    });
+
+    it('counts one song taken from an album as only part of it, with no music library', async () => {
+      const media = await seedArtist([
+        { mbId: SING, title: 'Sing to the Ferryman' },
+      ]);
+      await seedRequest(media, [{ mbid: SING, title: 'Sing to the Ferryman' }]);
+      state.lidarr.artists = [lidarrArtist()];
+      // Unmonitored, one of its ten on file: Lidarr says 1 track, 1 file.
+      state.lidarr.albums = [
+        lidarrAlbum({
+          monitored: false,
+          statistics: {
+            trackCount: 1,
+            trackFileCount: 1,
+            totalTrackCount: 10,
+            sizeOnDisk: 1,
+            percentOfTracks: 100,
+          },
+        }),
+      ];
+
+      await musicSync.run();
+
+      assert.equal(
+        (await albumOf(SING)).status,
+        MediaStatus.PARTIALLY_AVAILABLE
+      );
     });
 
     it('leaves an album Lidarr has files for processing while a server has music on', async () => {

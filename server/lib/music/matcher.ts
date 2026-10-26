@@ -104,7 +104,14 @@ const toIndexAlbum = (
   secondaryTypes: album.secondaryTypes ?? [],
   releaseDate: album.releaseDate ? album.releaseDate.slice(0, 10) : undefined,
   monitored: !!album.monitored,
-  trackCount: album.statistics?.trackCount ?? 0,
+  // Lidarr counts an unmonitored album's tracks as only those with a file
+  // (a song taken from it would make it whole): its total is the album's.
+  trackCount: album.monitored
+    ? (album.statistics?.trackCount ?? 0)
+    : Math.max(
+        album.statistics?.trackCount ?? 0,
+        album.statistics?.totalTrackCount ?? 0
+      ),
   trackFileCount: album.statistics?.trackFileCount ?? 0,
   releaseIds: (album.releases ?? [])
     .map((release) => release.foreignReleaseId)

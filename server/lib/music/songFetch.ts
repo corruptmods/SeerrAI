@@ -4,11 +4,13 @@ import ProwlarrAPI, { AUDIO_CATEGORIES } from '@server/api/prowlarr';
 import type LidarrAPI from '@server/api/servarr/lidarr';
 import type {
   LidarrAlbum,
+  LidarrArtist,
   LidarrQualityModel,
   LidarrTrack,
 } from '@server/api/servarr/lidarr';
 import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import type { SongFetchFile } from '@server/entity/SongFetch';
@@ -315,6 +317,7 @@ class SongFetcher {
       return;
     }
     fetch.lidarrArtistId = artist.id;
+    await this.linkArtist(songs[0].request, server, artist);
 
     let album: LidarrAlbum | undefined = (
       await lidarr.getAlbums({ artistId: artist.id })
@@ -374,6 +377,27 @@ class SongFetcher {
     fetch.stage = 'Searching for the album';
     await getRepository(SongFetch).save(fetch);
     await this.search(fetch, wanted);
+  }
+
+  /**
+   * The artist's media row knows which Lidarr has them, as sending an
+   * album there records, so the music scans follow the album the songs go
+   * into. An artist already on another Lidarr keeps it.
+   */
+  private async linkArtist(
+    request: MediaRequest,
+    server: LidarrSettings,
+    artist: LidarrArtist
+  ): Promise<void> {
+    const media = request.media;
+    if (!media?.id || media.externalServiceId != null) return;
+    await getRepository(Media).update(media.id, {
+      serviceId: server.id,
+      externalServiceId: artist.id,
+      externalServiceSlug: artist.foreignArtistId || media.foreignId,
+    });
+    media.serviceId = server.id;
+    media.externalServiceId = artist.id;
   }
 
   /**

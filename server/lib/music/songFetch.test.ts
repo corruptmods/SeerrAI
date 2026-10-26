@@ -415,11 +415,16 @@ describe('taking a song from its album', () => {
     await getRepository(MusicAlbum).update(row.id, {
       status: MediaStatus.PARTIALLY_AVAILABLE,
     });
+    // The fetch told Seerr which Lidarr has the artist, so the music
+    // scans follow the album.
     const media = await getRepository(Media).findOneByOrFail({
       mediaType: MediaType.MUSIC,
       foreignId: ARTIST,
     });
-    await getRepository(Media).update(media.id, { serviceId: 0 });
+    assert.deepEqual(
+      [media.serviceId, media.externalServiceId],
+      [0, lidarr.artists[0].id]
+    );
     await completeMusicRequests([media.id]);
     const after = await getRepository(MediaRequest).findOneByOrFail({
       id: request.id,

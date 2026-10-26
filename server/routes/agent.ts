@@ -43,7 +43,7 @@ const summaryOf = (run: AgentRun): AgentRunSummary => ({
 });
 
 const titleSchema = z.object({
-  kind: z.enum(['series', 'movie']),
+  kind: z.enum(['series', 'movie', 'album']),
   serverId: z.coerce.number().int().min(0),
   arrId: z.coerce.number().int().min(1),
 });
@@ -107,11 +107,21 @@ agentRoutes.get<{ id: string }>('/:id', async (req, res, next) => {
   return res.status(200).json(body);
 });
 
-/** A title in Sonarr or Radarr, by its name there, or null if it is not. */
+/**
+ * A title in Sonarr, Radarr or Lidarr, by its name there, or null if it is
+ * not.
+ */
 const nameOf = async (
   title: z.infer<typeof titleSchema>
 ): Promise<string | null> => {
   try {
+    if (title.kind === 'album') {
+      if (!backfill.readiness().music) return null;
+      const lidarr = backfill.lidarrFor(title.serverId);
+      const album = await lidarr.getAlbumDetail(title.arrId);
+      const artist = await lidarr.getArtistDetail(album.artistId);
+      return `${album.title} by ${artist.artistName}`;
+    }
     if (title.kind === 'series') {
       return (
         await backfill.sonarrFor(title.serverId).getSeriesDetail(title.arrId)
@@ -145,7 +155,7 @@ agentRoutes.post('/ask', async (req, res, next) => {
     if (!name) {
       return next({
         status: 400,
-        message: 'That title is not in Sonarr or Radarr.',
+        message: 'That title is not in Sonarr, Radarr or Lidarr.',
       });
     }
     about = { title: body.data.title, name };

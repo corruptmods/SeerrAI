@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# indirme başlatıldı} other {# indirme başlatıldı}}",
   "components.Backfill.Agent.earlier": "Önceki konuşmalar",
   "components.Backfill.Agent.failed": "Başarısız",
+  "components.Backfill.Agent.forAlbumTip": "Lidarr’dan daha ileri arar. Boş bırakılırsa eksik olan her şeyi getirir.",
   "components.Backfill.Agent.forTitle": "Yönetici ajanına sor",
   "components.Backfill.Agent.forTitleTip": "Sonarr ve Radarr’dan daha ileri arar. Boş bırakılırsa eksik olan her şeyi getirir.",
   "components.Backfill.Agent.held": "Aramanın bitmesi bekleniyor",

@@ -104,9 +104,9 @@ export class AgentRun {
   @Column({ type: 'text', nullable: true })
   public ask: string | null;
 
-  /** The title it was about, once known: series or movie, and where. */
+  /** The title it was about, once known: series, movie or album, and where. */
   @Column({ type: 'varchar', nullable: true })
-  public kind: 'series' | 'movie' | null;
+  public kind: 'series' | 'movie' | 'album' | null;
 
   @Column({ type: 'integer', nullable: true })
   public serverId: number | null;

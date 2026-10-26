@@ -1902,6 +1902,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# baixada iniciada} other {# baixades iniciades}}",
   "components.Backfill.Agent.earlier": "Converses anteriors",
   "components.Backfill.Agent.failed": "Ha fallat",
+  "components.Backfill.Agent.forAlbumTip": "Busca més enllà de Lidarr. Si es deixa buit, obté tot el que falta.",
   "components.Backfill.Agent.forTitle": "Pregunta a l'agent d'administració",
   "components.Backfill.Agent.forTitleTip": "Busca més enllà de Sonarr i Radarr. Si es deixa buit, obté tot el que falta.",
   "components.Backfill.Agent.held": "Esperant la cerca",

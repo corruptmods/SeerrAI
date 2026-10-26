@@ -1917,6 +1917,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# letöltés elindítva} other {# letöltés elindítva}}",
   "components.Backfill.Agent.earlier": "Korábbi beszélgetések",
   "components.Backfill.Agent.failed": "Sikertelen",
+  "components.Backfill.Agent.forAlbumTip": "A Lidarr után tovább keres. Üresen hagyva mindent beszerez, ami hiányzik.",
   "components.Backfill.Agent.forTitle": "Kérdezze az adminügynököt",
   "components.Backfill.Agent.forTitleTip": "A Sonarr és a Radarr után tovább keres. Üresen hagyva mindent beszerez, ami hiányzik.",
   "components.Backfill.Agent.held": "A keresésre vár",

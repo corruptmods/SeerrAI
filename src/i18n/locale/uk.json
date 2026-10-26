@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {Розпочато # завантаження} few {Розпочато # завантаження} many {Розпочато # завантажень} other {Розпочато # завантаження}}",
   "components.Backfill.Agent.earlier": "Попередні розмови",
   "components.Backfill.Agent.failed": "Помилка",
+  "components.Backfill.Agent.forAlbumTip": "Шукає далі, ніж Lidarr. Якщо залишити порожнім, знайде все, чого бракує.",
   "components.Backfill.Agent.forTitle": "Запитати агента адміністратора",
   "components.Backfill.Agent.forTitleTip": "Шукає далі, ніж Sonarr і Radarr. Якщо залишити порожнім, знайде все, чого бракує.",
   "components.Backfill.Agent.held": "Очікує на пошук",

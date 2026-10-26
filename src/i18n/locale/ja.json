@@ -1883,6 +1883,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, other {#件のダウンロードを開始}}",
   "components.Backfill.Agent.earlier": "以前の会話",
   "components.Backfill.Agent.failed": "失敗",
+  "components.Backfill.Agent.forAlbumTip": "Lidarr より広く探します。空欄なら足りないものをすべて取得します。",
   "components.Backfill.Agent.forTitle": "管理エージェントに依頼",
   "components.Backfill.Agent.forTitleTip": "Sonarr や Radarr より広く探します。空欄なら足りないものをすべて取得します。",
   "components.Backfill.Agent.held": "検索の完了待ち",

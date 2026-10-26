@@ -161,20 +161,27 @@ interface FollowUpMemory {
 const lookingForOf = (run: AgentRun): number[] =>
   (run.memory as FollowUpMemory | null)?.lookingFor ?? [];
 
-/** "S06E03", "S06E01-E02, S06E05", or "the movie": what a download was for. */
+/**
+ * "S06E03", "S06E01-E02, S06E05", "the movie" or "4 tracks": what a
+ * download was for.
+ */
 const jobWhat = (job: BackfillJob, kind: AgentRun['kind']): string =>
   kind === 'movie'
     ? 'the movie'
-    : [
-        ...new Set(
-          job.files.map((f) =>
-            rangeLabel(
-              f.season ?? 0,
-              f.episodeIds.map((_, i) => (f.episode ?? 0) + i)
+    : kind === 'album'
+      ? job.files.length === 1
+        ? '1 track'
+        : `${job.files.length} tracks`
+      : [
+          ...new Set(
+            job.files.map((f) =>
+              rangeLabel(
+                f.season ?? 0,
+                f.episodeIds.map((_, i) => (f.episode ?? 0) + i)
+              )
             )
-          )
-        ),
-      ].join(', ');
+          ),
+        ].join(', ');
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -231,7 +238,7 @@ const stopLooking = (runIds: number[]) =>
 
 /** Whether it has already looked for this title on its own. */
 const triedOn = async (title: {
-  kind: 'series' | 'movie';
+  kind: 'series' | 'movie' | 'album';
   serverId: number;
   arrId: number;
 }): Promise<boolean> =>
@@ -247,7 +254,7 @@ const reportOf = (run: AgentRun): ReportMemory =>
 /** Room for its thinking out loud and a tool call or two. */
 const TURN_TOKENS = 1500;
 
-const SYSTEM = `You are the admin agent of a home media server run with Seerr, Sonarr, Radarr, Prowlarr and Backfill. You work like a careful admin by hand: get missing episodes and movies downloaded when the automatic searches could not. An admin talks with you in a chat; do what they ask, including extra checks or changes of plan, and keep to it for the rest of the conversation.
+const SYSTEM = `You are the admin agent of a home media server run with Seerr, Sonarr, Radarr, Lidarr, Prowlarr and Backfill. You work like a careful admin by hand: get missing episodes, movies and albums downloaded when the automatic searches could not. An admin talks with you in a chat; do what they ask, including extra checks or changes of plan, and keep to it for the rest of the conversation.
 
 How to work:
 1. Find the title (find_title) and read what it lacks (title_status).
@@ -257,6 +264,7 @@ How to work:
 5. Turn down dubs in other languages (TRUEFRENCH, iTALiAN, GERMAN and so on, unless that is the original language), fakes (sizes far too small, torrents of archives or executables only), samples, and other shows. A Usenet post packed in archives, or with scrambled file names (only its PAR2 repair files named), is normal but cannot be opened: when its name is exactly one missing episode, or the movie, grab it whole (whole: true); a season pack like that cannot be used.
 6. If the admin says something you started is wrong, stop it with stop_download and fix it. A file already imported that holds several episodes but is linked to only one (title_status shows the others missing, the file's name or length says it holds them) is fixed with relink_file, when an admin is in the conversation; nothing is downloaded. If nothing usable exists, say so and what you tried. Only ask the admin (ask_admin) when you truly cannot decide yourself.
 7. When the admin asks you to change what is already there, propose it; the admin approves or declines, and nothing happens before that. A bad or wrong file: find a good release and grab it with replace: true (the old file goes only once the new one has imported), or search_upgrade to let Radarr or Sonarr find something better by its profile. A whole season that is bad, or that they want replaced or downloaded again: replace_season (it grabs a new release first and removes the old files only after). A release group they do not want: propose_change blockGroup. A download that is wrong or broken: propose_change markFailed. Files to remove, only when removing them is what they asked for: propose_change deleteFiles; never delete files to replace them, which would leave nothing to play until something is found. Another quality profile: propose_change changeProfile. Propose only what was asked for, then stop and wait; the next message says what was decided and what came of it.
+8. Albums (album: references, in Lidarr): title_status lists the tracks of the edition Lidarr imports into, on disk or missing. search_releases is Lidarr's own search; search_indexers with kind music searches Prowlarr's music categories ("Artist Album", the album's name, with the year or FLAC). Grab a release of the album without giving files: Backfill matches its files to the tracks and takes what fills missing ones, or says why nothing does. Prefer the whole album to a few tracks, then the quality Lidarr's profile prefers (lossless before MP3), then a well-seeded torrent or usenet. Turn down compilations and "best of" releases by others, other albums of the artist, and singles when the album is wanted. There is no language to check for music.
 
 Reply in short plain text, no headings or markdown: what was missing, what you found, what you started downloading (with its Backfill job number), and what is still missing and why.`;
 
@@ -344,9 +352,9 @@ const describe = (input: Record<string, unknown>) =>
     .join(', ')
     .slice(0, 300);
 
-/** A series or movie (the agent's titles) as its runs are kept by. */
+/** A series, movie or album (the agent's titles) as its runs are kept by. */
 interface AgentTitle {
-  kind: 'series' | 'movie';
+  kind: 'series' | 'movie' | 'album';
   serverId: number;
   arrId: number;
 }
@@ -1271,8 +1279,6 @@ class Agent {
     const user = await owner();
     if (this.problem(user)) return null;
     if (row.agentAutoRunAt) return null;
-    // The agent's tools are Sonarr's and Radarr's: albums are Backfill's.
-    if (row.kind === 'album') return null;
     const title: AgentTitle = {
       kind: row.kind,
       serverId: row.serverId,
@@ -1304,7 +1310,10 @@ class Agent {
         trigger: 'auto',
         status: 'queued',
         ...title,
-        title: row.title,
+        title:
+          row.kind === 'album' && row.artistName
+            ? `${row.title} by ${row.artistName}`
+            : row.title,
         steps: [],
         actions: [],
       })
@@ -1413,7 +1422,9 @@ class Agent {
         run.kind === 'movie' ? 'Radarr' : 'Sonarr'
       } searched again and found nothing usable, and neither did Backfill's search of Prowlarr. Find out what is missing and get it if you can.`;
     }
-    return `Someone requested ${run.title} (${ref}). Sonarr or Radarr has not found it for a day or more, and Backfill's search of Prowlarr found nothing it could use on its own. Find out what is missing and get it if you can.`;
+    return `Someone requested ${run.title} (${ref}). ${
+      run.kind === 'album' ? 'Lidarr' : 'Sonarr or Radarr'
+    } has not found it for a day or more, and Backfill's search of Prowlarr found nothing it could use on its own. Find out what is missing and get it if you can.`;
   }
 
   private async execute(id: number): Promise<void> {
@@ -1934,9 +1945,8 @@ class Agent {
         select: { id: true, kind: true, serverId: true, arrId: true },
         where: { id: job.seriesId },
       });
-      // Notes are the agent's, for the titles it works on.
-      if (!row || row.kind === 'album') return;
-      await addNotes({ ...row, kind: row.kind }, [
+      if (!row) return;
+      await addNotes(row, [
         {
           at: new Date().toISOString(),
           kind: 'failed',

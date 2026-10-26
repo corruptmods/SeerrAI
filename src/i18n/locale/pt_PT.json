@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# transferência iniciada} other {# transferências iniciadas}}",
   "components.Backfill.Agent.earlier": "Conversas anteriores",
   "components.Backfill.Agent.failed": "Falhou",
+  "components.Backfill.Agent.forAlbumTip": "Procura além do Lidarr. Se ficar vazio, obtém tudo o que falta.",
   "components.Backfill.Agent.forTitle": "Perguntar ao agente de administração",
   "components.Backfill.Agent.forTitleTip": "Procura além do Sonarr e do Radarr. Se ficar vazio, obtém tudo o que falta.",
   "components.Backfill.Agent.held": "À espera da pesquisa",

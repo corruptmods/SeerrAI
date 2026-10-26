@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# стартирано изтегляне} other {# стартирани изтегляния}}",
   "components.Backfill.Agent.earlier": "По-стари разговори",
   "components.Backfill.Agent.failed": "Неуспешно",
+  "components.Backfill.Agent.forAlbumTip": "Търси по-далеч от Lidarr. Оставено празно, взима всичко липсващо.",
   "components.Backfill.Agent.forTitle": "Попитайте администраторския агент",
   "components.Backfill.Agent.forTitleTip": "Търси по-далеч от Sonarr и Radarr. Оставено празно, взима всичко липсващо.",
   "components.Backfill.Agent.held": "Изчаква търсенето",

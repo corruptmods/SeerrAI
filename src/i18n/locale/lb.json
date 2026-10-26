@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# Download gestart} other {# Downloads gestart}}",
   "components.Backfill.Agent.earlier": "Méi fréi Gespréicher",
   "components.Backfill.Agent.failed": "Feelgeschloen",
+  "components.Backfill.Agent.forAlbumTip": "Et sicht méi wäit wéi Lidarr. Eidel gelooss, hëlt et alles, wat feelt.",
   "components.Backfill.Agent.forTitle": "Den Admin-Agent froen",
   "components.Backfill.Agent.forTitleTip": "Et sicht méi wäit wéi Sonarr a Radarr. Eidel gelooss, hëlt et alles, wat feelt.",
   "components.Backfill.Agent.held": "Waart op d’Sich",

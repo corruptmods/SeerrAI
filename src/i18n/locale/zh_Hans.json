@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, other {已开始 # 个下载}}",
   "components.Backfill.Agent.earlier": "更早的对话",
   "components.Backfill.Agent.failed": "失败",
+  "components.Backfill.Agent.forAlbumTip": "比 Lidarr 查找得更远。留空则获取所有缺少的内容。",
   "components.Backfill.Agent.forTitle": "询问管理员助手",
   "components.Backfill.Agent.forTitleTip": "比 Sonarr 和 Radarr 查找得更远。留空则获取所有缺少的内容。",
   "components.Backfill.Agent.held": "等待搜索完成",

@@ -6041,7 +6041,7 @@ paths:
           description: With serverId and arrId, only that title's runs
           schema:
             type: string
-            enum: [series, movie]
+            enum: [series, movie, album]
         - in: query
           name: serverId
           required: false
@@ -6075,7 +6075,7 @@ paths:
                   type: string
                 title:
                   type: object
-                  description: The title in Sonarr or Radarr it is about; text may then be left out
+                  description: The title in Sonarr, Radarr or Lidarr it is about; text may then be left out
                   required:
                     - kind
                     - serverId
@@ -6083,7 +6083,7 @@ paths:
                   properties:
                     kind:
                       type: string
-                      enum: [series, movie]
+                      enum: [series, movie, album]
                     serverId:
                       type: number
                     arrId:

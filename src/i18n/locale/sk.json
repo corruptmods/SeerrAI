@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {Spustené # sťahovanie} few {Spustené # sťahovania} other {Spustených # sťahovaní}}",
   "components.Backfill.Agent.earlier": "Staršie konverzácie",
   "components.Backfill.Agent.failed": "Zlyhalo",
+  "components.Backfill.Agent.forAlbumTip": "Hľadá ďalej než Lidarr. Ak zostane prázdne, získa všetko, čo chýba.",
   "components.Backfill.Agent.forTitle": "Opýtať sa agenta správcu",
   "components.Backfill.Agent.forTitleTip": "Hľadá ďalej než Sonarr a Radarr. Ak zostane prázdne, získa všetko, čo chýba.",
   "components.Backfill.Agent.held": "Čaká na vyhľadávanie",

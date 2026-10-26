@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# n usider yebda} other {# n yisidar bdan}}",
   "components.Backfill.Agent.earlier": "Idiwenniyen iqburen",
   "components.Backfill.Agent.failed": "Yecceḍ",
+  "components.Backfill.Agent.forAlbumTip": "Ad inadi sdat Lidarr. Ma yeqqim d ilem, ad d-yawi akk ayen ixuṣṣen.",
   "components.Backfill.Agent.forTitle": "Steqsi amɛiwen n unedbal",
   "components.Backfill.Agent.forTitleTip": "Ad inadi sdat Sonarr d Radarr. Ma yeqqim d ilem, ad d-yawi akk ayen ixuṣṣen.",
   "components.Backfill.Agent.held": "Yettraǧu anadi",

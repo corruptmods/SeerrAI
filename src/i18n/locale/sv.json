@@ -1920,6 +1920,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# nedladdning startad} other {# nedladdningar startade}}",
   "components.Backfill.Agent.earlier": "Tidigare konversationer",
   "components.Backfill.Agent.failed": "Misslyckades",
+  "components.Backfill.Agent.forAlbumTip": "Den letar längre än Lidarr. Lämnas tomt hämtar den allt som saknas.",
   "components.Backfill.Agent.forTitle": "Fråga adminagenten",
   "components.Backfill.Agent.forTitleTip": "Den letar längre än Sonarr och Radarr. Lämnas tomt hämtar den allt som saknas.",
   "components.Backfill.Agent.held": "Väntar på sökningen",

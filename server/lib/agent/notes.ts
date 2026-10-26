@@ -26,7 +26,7 @@ const MOST_TOLD = 50;
 const MOST_CHARS = 300;
 
 interface TitleKey {
-  kind: 'series' | 'movie';
+  kind: 'series' | 'movie' | 'album';
   serverId: number;
   arrId: number;
 }

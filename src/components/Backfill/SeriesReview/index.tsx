@@ -315,8 +315,7 @@ const SeriesReview = () => {
                   </Button>
                 </Link>
               )}
-              {/* The agent works on series and movies. */}
-              {agentOn && series.kind !== 'album' && (
+              {agentOn && (
                 <Button
                   buttonType="primary"
                   disabled={asking}
@@ -715,17 +714,15 @@ const SeriesReview = () => {
         </section>
       </div>
 
-      {series.kind !== 'album' && (
-        <AgentForTitle
-          card
-          autoRanAt={series.agentAutoRunAt}
-          title={{
-            kind: series.kind,
-            serverId: series.serverId,
-            arrId: series.arrId,
-          }}
-        />
-      )}
+      <AgentForTitle
+        card
+        autoRanAt={series.agentAutoRunAt}
+        title={{
+          kind: series.kind,
+          serverId: series.serverId,
+          arrId: series.arrId,
+        }}
+      />
 
       <section className="mt-4 rounded-lg bg-gray-800 ring-1 ring-gray-700">
         <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-strong">

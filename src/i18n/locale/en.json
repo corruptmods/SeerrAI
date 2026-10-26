@@ -201,6 +201,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# download started} other {# downloads started}}",
   "components.Backfill.Agent.earlier": "Earlier conversations",
   "components.Backfill.Agent.failed": "Failed",
+  "components.Backfill.Agent.forAlbumTip": "It looks further than Lidarr. Left empty, it gets whatever is missing.",
   "components.Backfill.Agent.forTitle": "Ask the admin agent",
   "components.Backfill.Agent.forTitleTip": "It looks further than Sonarr and Radarr. Left empty, it gets whatever is missing.",
   "components.Backfill.Agent.held": "Waiting on the search",

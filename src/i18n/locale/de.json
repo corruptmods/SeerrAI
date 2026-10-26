@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# Download gestartet} other {# Downloads gestartet}}",
   "components.Backfill.Agent.earlier": "Frühere Unterhaltungen",
   "components.Backfill.Agent.failed": "Fehlgeschlagen",
+  "components.Backfill.Agent.forAlbumTip": "Er sucht weiter als Lidarr. Leer gelassen holt er alles, was fehlt.",
   "components.Backfill.Agent.forTitle": "Den Admin-Agenten fragen",
   "components.Backfill.Agent.forTitleTip": "Er sucht weiter als Sonarr und Radarr. Leer gelassen holt er alles, was fehlt.",
   "components.Backfill.Agent.held": "Wartet auf die Suche",

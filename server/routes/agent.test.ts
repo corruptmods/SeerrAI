@@ -243,7 +243,7 @@ describe('the admin agent’s routes', () => {
       title: { ...title, arrId: 9 },
     });
     assert.equal(unknown.status, 400);
-    assert.match(unknown.body.message, /not in Sonarr or Radarr/);
+    assert.match(unknown.body.message, /not in Sonarr, Radarr or Lidarr/);
 
     await getRepository(AgentRun).save(
       new AgentRun({

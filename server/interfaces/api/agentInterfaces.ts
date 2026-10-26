@@ -23,7 +23,7 @@ export interface AgentRunSummary {
   status: AgentRunStatus;
   ask: string | null;
   title: string | null;
-  kind: 'series' | 'movie' | null;
+  kind: 'series' | 'movie' | 'album' | null;
   summary: string | null;
   error: string | null;
   /** What it asked an admin, while it waits. */

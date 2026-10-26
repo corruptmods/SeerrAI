@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "다운로드 {count, plural, other {#개}} 시작됨",
   "components.Backfill.Agent.earlier": "이전 대화",
   "components.Backfill.Agent.failed": "실패",
+  "components.Backfill.Agent.forAlbumTip": "Lidarr보다 더 넓게 찾습니다. 비워 두면 빠진 것을 모두 가져옵니다.",
   "components.Backfill.Agent.forTitle": "관리자 에이전트에게 요청",
   "components.Backfill.Agent.forTitleTip": "Sonarr와 Radarr보다 더 넓게 찾습니다. 비워 두면 빠진 것을 모두 가져옵니다.",
   "components.Backfill.Agent.held": "검색 대기 중",

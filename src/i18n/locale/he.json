@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {הורדה אחת התחילה} other {# הורדות התחילו}}",
   "components.Backfill.Agent.earlier": "שיחות קודמות",
   "components.Backfill.Agent.failed": "נכשל",
+  "components.Backfill.Agent.forAlbumTip": "מחפש רחוק יותר מ-Lidarr. אם נשאר ריק, מביא כל מה שחסר.",
   "components.Backfill.Agent.forTitle": "שאל את סוכן הניהול",
   "components.Backfill.Agent.forTitleTip": "מחפש רחוק יותר מ-Sonarr ו-Radarr. אם נשאר ריק, מביא כל מה שחסר.",
   "components.Backfill.Agent.held": "ממתין לחיפוש",

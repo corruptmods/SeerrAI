@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# shkarkim u nis} other {# shkarkime u nisën}}",
   "components.Backfill.Agent.earlier": "Biseda të mëparshme",
   "components.Backfill.Agent.failed": "Dështoi",
+  "components.Backfill.Agent.forAlbumTip": "Kërkon më tej se Lidarr. Bosh, merr gjithçka që mungon.",
   "components.Backfill.Agent.forTitle": "Pyet agjentin e administratorit",
   "components.Backfill.Agent.forTitleTip": "Kërkon më tej se Sonarr dhe Radarr. Bosh, merr gjithçka që mungon.",
   "components.Backfill.Agent.held": "Në pritje të kërkimit",

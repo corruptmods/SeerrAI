@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# lataus aloitettu} other {# latausta aloitettu}}",
   "components.Backfill.Agent.earlier": "Aiemmat keskustelut",
   "components.Backfill.Agent.failed": "Epäonnistui",
+  "components.Backfill.Agent.forAlbumTip": "Se etsii pidemmälle kuin Lidarr. Tyhjänä se hakee kaiken puuttuvan.",
   "components.Backfill.Agent.forTitle": "Kysy ylläpitoagentilta",
   "components.Backfill.Agent.forTitleTip": "Se etsii pidemmälle kuin Sonarr ja Radarr. Tyhjänä se hakee kaiken puuttuvan.",
   "components.Backfill.Agent.held": "Odottaa hakua",

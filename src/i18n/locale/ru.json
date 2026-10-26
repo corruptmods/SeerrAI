@@ -1914,6 +1914,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {Начата # загрузка} few {Начаты # загрузки} many {Начато # загрузок} other {Начато # загрузки}}",
   "components.Backfill.Agent.earlier": "Предыдущие диалоги",
   "components.Backfill.Agent.failed": "Ошибка",
+  "components.Backfill.Agent.forAlbumTip": "Ищет дальше, чем Lidarr. Если оставить пустым, найдёт всё недостающее.",
   "components.Backfill.Agent.forTitle": "Спросить агента администратора",
   "components.Backfill.Agent.forTitleTip": "Ищет дальше, чем Sonarr и Radarr. Если оставить пустым, найдёт всё недостающее.",
   "components.Backfill.Agent.held": "Ожидает поиска",

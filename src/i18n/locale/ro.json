@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# descărcare pornită} few {# descărcări pornite} other {# de descărcări pornite}}",
   "components.Backfill.Agent.earlier": "Conversații anterioare",
   "components.Backfill.Agent.failed": "Eșuat",
+  "components.Backfill.Agent.forAlbumTip": "Caută mai departe decât Lidarr. Lăsat gol, aduce tot ce lipsește.",
   "components.Backfill.Agent.forTitle": "Întrebați agentul de administrare",
   "components.Backfill.Agent.forTitleTip": "Caută mai departe decât Sonarr și Radarr. Lăsat gol, aduce tot ce lipsește.",
   "components.Backfill.Agent.held": "Așteaptă căutarea",

@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# allalaadimine alustatud} other {# allalaadimist alustatud}}",
   "components.Backfill.Agent.earlier": "Varasemad vestlused",
   "components.Backfill.Agent.failed": "Ebaõnnestus",
+  "components.Backfill.Agent.forAlbumTip": "See otsib kaugemalt kui Lidarr. Tühjaks jäetuna hangib see kõik puuduva.",
   "components.Backfill.Agent.forTitle": "Küsi haldusagendilt",
   "components.Backfill.Agent.forTitleTip": "See otsib kaugemalt kui Sonarr ja Radarr. Tühjaks jäetuna hangib see kõik puuduva.",
   "components.Backfill.Agent.held": "Ootab otsingut",

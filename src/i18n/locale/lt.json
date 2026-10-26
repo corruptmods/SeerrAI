@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {Pradėtas # atsisiuntimas} few {Pradėti # atsisiuntimai} many {Pradėta # atsisiuntimo} other {Pradėta # atsisiuntimų}}",
   "components.Backfill.Agent.earlier": "Ankstesni pokalbiai",
   "components.Backfill.Agent.failed": "Nepavyko",
+  "components.Backfill.Agent.forAlbumTip": "Jis ieško toliau nei Lidarr. Palikus tuščią, gauna viską, ko trūksta.",
   "components.Backfill.Agent.forTitle": "Klausti administratoriaus agento",
   "components.Backfill.Agent.forTitleTip": "Jis ieško toliau nei Sonarr ir Radarr. Palikus tuščią, gauna viską, ko trūksta.",
   "components.Backfill.Agent.held": "Laukiama paieškos",

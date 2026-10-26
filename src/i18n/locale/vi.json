@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "Đã bắt đầu {count, plural, other {# lượt tải}}",
   "components.Backfill.Agent.earlier": "Các cuộc trò chuyện trước",
   "components.Backfill.Agent.failed": "Thất bại",
+  "components.Backfill.Agent.forAlbumTip": "Tìm xa hơn Lidarr. Để trống thì lấy mọi thứ còn thiếu.",
   "components.Backfill.Agent.forTitle": "Hỏi trợ lý quản trị",
   "components.Backfill.Agent.forTitleTip": "Tìm xa hơn Sonarr và Radarr. Để trống thì lấy mọi thứ còn thiếu.",
   "components.Backfill.Agent.held": "Đang chờ tìm kiếm",

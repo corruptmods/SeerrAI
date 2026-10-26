@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {Začet # prenos} two {Začeta # prenosa} few {Začeti # prenosi} other {Začetih # prenosov}}",
   "components.Backfill.Agent.earlier": "Prejšnji pogovori",
   "components.Backfill.Agent.failed": "Ni uspelo",
+  "components.Backfill.Agent.forAlbumTip": "Išče dlje kot Lidarr. Če je prazno, pridobi vse, kar manjka.",
   "components.Backfill.Agent.forTitle": "Vprašajte skrbniškega agenta",
   "components.Backfill.Agent.forTitleTip": "Išče dlje kot Sonarr in Radarr. Če je prazno, pridobi vse, kar manjka.",
   "components.Backfill.Agent.held": "Čaka na iskanje",

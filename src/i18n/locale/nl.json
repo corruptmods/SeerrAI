@@ -1917,6 +1917,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# download gestart} other {# downloads gestart}}",
   "components.Backfill.Agent.earlier": "Eerdere gesprekken",
   "components.Backfill.Agent.failed": "Mislukt",
+  "components.Backfill.Agent.forAlbumTip": "Hij zoekt verder dan Lidarr. Leeg gelaten haalt hij alles op wat ontbreekt.",
   "components.Backfill.Agent.forTitle": "Vraag het de beheeragent",
   "components.Backfill.Agent.forTitleTip": "Hij zoekt verder dan Sonarr en Radarr. Leeg gelaten haalt hij alles op wat ontbreekt.",
   "components.Backfill.Agent.held": "Wacht op de zoekopdracht",

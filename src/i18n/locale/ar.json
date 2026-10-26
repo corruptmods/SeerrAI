@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, zero {لم يبدأ أي تنزيل} one {بدأ تنزيل واحد} two {بدأ تنزيلان} few {بدأت # تنزيلات} many {بدأ # تنزيلًا} other {بدأ # تنزيل}}",
   "components.Backfill.Agent.earlier": "المحادثات السابقة",
   "components.Backfill.Agent.failed": "فشل",
+  "components.Backfill.Agent.forAlbumTip": "يبحث أبعد من Lidarr. إن تُرك فارغًا، يجلب كل ما هو ناقص.",
   "components.Backfill.Agent.forTitle": "اسأل وكيل المشرف",
   "components.Backfill.Agent.forTitleTip": "يبحث أبعد من Sonarr وRadarr. إن تُرك فارغًا، يجلب كل ما هو ناقص.",
   "components.Backfill.Agent.held": "بانتظار انتهاء البحث",

@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# डाउनलोड शुरू हुआ} other {# डाउनलोड शुरू हुए}}",
   "components.Backfill.Agent.earlier": "पिछली बातचीत",
   "components.Backfill.Agent.failed": "विफल",
+  "components.Backfill.Agent.forAlbumTip": "यह Lidarr से आगे खोजता है। खाली छोड़ने पर, जो भी गायब है वह लाता है।",
   "components.Backfill.Agent.forTitle": "एडमिन एजेंट से पूछें",
   "components.Backfill.Agent.forTitleTip": "यह Sonarr और Radarr से आगे खोजता है। खाली छोड़ने पर, जो भी गायब है वह लाता है।",
   "components.Backfill.Agent.held": "खोज का इंतज़ार",

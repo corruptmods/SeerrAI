@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {Ξεκίνησε # λήψη} other {Ξεκίνησαν # λήψεις}}",
   "components.Backfill.Agent.earlier": "Παλαιότερες συνομιλίες",
   "components.Backfill.Agent.failed": "Απέτυχε",
+  "components.Backfill.Agent.forAlbumTip": "Ψάχνει πιο μακριά από Lidarr. Αν μείνει κενό, φέρνει ό,τι λείπει.",
   "components.Backfill.Agent.forTitle": "Ρωτήστε τον agent διαχειριστή",
   "components.Backfill.Agent.forTitleTip": "Ψάχνει πιο μακριά από Sonarr και Radarr. Αν μείνει κενό, φέρνει ό,τι λείπει.",
   "components.Backfill.Agent.held": "Αναμονή για την αναζήτηση",

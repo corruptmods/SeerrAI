@@ -1906,6 +1906,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# descarga iniciada} other {# descargas iniciadas}}",
   "components.Backfill.Agent.earlier": "Conversaciones anteriores",
   "components.Backfill.Agent.failed": "Fallido",
+  "components.Backfill.Agent.forAlbumTip": "Busca más allá que Lidarr. Si lo dejas vacío, consigue todo lo que falta.",
   "components.Backfill.Agent.forTitle": "Preguntar al agente de administración",
   "components.Backfill.Agent.forTitleTip": "Busca más allá que Sonarr y Radarr. Si lo dejas vacío, consigue todo lo que falta.",
   "components.Backfill.Agent.held": "Esperando a la búsqueda",

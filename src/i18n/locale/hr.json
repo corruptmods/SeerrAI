@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {Pokrenuto # preuzimanje} few {Pokrenuta # preuzimanja} other {Pokrenuto # preuzimanja}}",
   "components.Backfill.Agent.earlier": "Raniji razgovori",
   "components.Backfill.Agent.failed": "Neuspjelo",
+  "components.Backfill.Agent.forAlbumTip": "Traži dalje od Lidarra. Ako ostane prazno, dohvaća sve što nedostaje.",
   "components.Backfill.Agent.forTitle": "Pitaj administratorskog agenta",
   "components.Backfill.Agent.forTitleTip": "Traži dalje od Sonarra i Radarra. Ako ostane prazno, dohvaća sve što nedostaje.",
   "components.Backfill.Agent.held": "Čeka pretragu",

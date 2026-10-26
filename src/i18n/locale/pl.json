@@ -1917,6 +1917,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {Rozpoczęto # pobieranie} few {Rozpoczęto # pobierania} many {Rozpoczęto # pobierań} other {Rozpoczęto # pobierania}}",
   "components.Backfill.Agent.earlier": "Wcześniejsze rozmowy",
   "components.Backfill.Agent.failed": "Niepowodzenie",
+  "components.Backfill.Agent.forAlbumTip": "Szuka dalej niż Lidarr. Pozostawione puste, pobiera wszystko, czego brakuje.",
   "components.Backfill.Agent.forTitle": "Zapytaj agenta administratora",
   "components.Backfill.Agent.forTitleTip": "Szuka dalej niż Sonarr i Radarr. Pozostawione puste, pobiera wszystko, czego brakuje.",
   "components.Backfill.Agent.held": "Czeka na wyszukiwanie",

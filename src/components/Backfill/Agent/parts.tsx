@@ -59,6 +59,8 @@ export const messages = defineMessages('components.Backfill.Agent', {
     'It looked for this on its own on {date}, which it does once per title. Now it looks only when asked.',
   forTitleTip:
     'It looks further than Sonarr and Radarr. Left empty, it gets whatever is missing.',
+  forAlbumTip:
+    'It looks further than Lidarr. Left empty, it gets whatever is missing.',
   titlePlaceholder: 'What to do (optional)',
   earlier: 'Earlier conversations',
   allConversations: 'All conversations',
@@ -238,7 +240,7 @@ export const useAgent = (page = 0) =>
   });
 
 export interface AgentTitle {
-  kind: 'series' | 'movie';
+  kind: 'series' | 'movie' | 'album';
   serverId: number;
   arrId: number;
 }
@@ -409,7 +411,9 @@ export const AgentForTitle = ({
       </h3>
       <div className="space-y-3">
         <p className="text-sm text-gray-400">
-          {intl.formatMessage(messages.forTitleTip)}
+          {intl.formatMessage(
+            title.kind === 'album' ? messages.forAlbumTip : messages.forTitleTip
+          )}
         </p>
         {autoRanAt && (
           <p className="text-sm text-yellow-200/90 light:text-warning-text">

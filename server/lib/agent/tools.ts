@@ -1,8 +1,10 @@
 import type { ProwlarrRelease } from '@server/api/prowlarr';
 import ProwlarrAPI, {
+  AUDIO_CATEGORIES,
   MOVIE_CATEGORIES,
   TV_CATEGORIES,
 } from '@server/api/prowlarr';
+import type { LidarrAlbum } from '@server/api/servarr/lidarr';
 import TheMovieDb from '@server/api/themoviedb';
 import {
   MediaStatus,
@@ -45,6 +47,7 @@ import {
   sizeOf,
 } from '@server/lib/agent/rules';
 import type { ConverseTool } from '@server/lib/ai/providers';
+import { judgeAlbumPack } from '@server/lib/backfill/albums';
 import backfill from '@server/lib/backfill/engine';
 import {
   IndexerLimitReached,
@@ -66,6 +69,7 @@ import type {
   SonarrSeriesDetail,
 } from '@server/lib/backfill/sonarr';
 import { blockedGroupOf } from '@server/lib/blockedGroups';
+import { isAudio } from '@server/lib/music/albumRelease';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { In, MoreThan } from 'typeorm';
@@ -73,12 +77,13 @@ import { z } from 'zod';
 
 /*
  * What the admin agent can do: look titles up, read what they lack, search
- * the way Sonarr and Radarr do (with their reasons for turning results
- * down) and the way Prowlarr does, open a release to see its files, and
- * start a download of exactly the files it chose, mapped to the episodes
- * they are. Downloads go through Backfill, which waits for disk space,
- * fetches only those files and has Sonarr or Radarr import each one as the
- * episode it was mapped to.
+ * the way Sonarr, Radarr and Lidarr do (with their reasons for turning
+ * results down) and the way Prowlarr does, open a release to see its files,
+ * and start a download of exactly the files it chose, mapped to the
+ * episodes they are (an album's files are matched to its tracks by
+ * Backfill). Downloads go through Backfill, which waits for disk space,
+ * fetches only those files and has Sonarr, Radarr or Lidarr import each one
+ * as what it was mapped to.
  *
  * Releases and titles are named by short references ("r3",
  * "series:1:1283"); links, keys and paths on the server never reach the
@@ -88,7 +93,7 @@ import { z } from 'zod';
 /** A release found during a run, named by its reference. */
 export interface KnownRelease extends ProwlarrRelease {
   ref: string;
-  source: 'sonarr' | 'radarr' | 'prowlarr';
+  source: 'sonarr' | 'radarr' | 'lidarr' | 'prowlarr';
   /**
    * A Usenet post in archives, or with scrambled file names, found when it
    * was opened: its files can't be listed before it is downloaded.
@@ -97,7 +102,7 @@ export interface KnownRelease extends ProwlarrRelease {
 }
 
 export interface TitleRef {
-  kind: 'series' | 'movie';
+  kind: 'series' | 'movie' | 'album';
   serverId: number;
   arrId: number;
 }
@@ -111,6 +116,8 @@ export interface AgentState {
   files: Map<string, PackFile[]>;
   series: Map<number, SonarrSeriesDetail[]>;
   movies: Map<number, RadarrMovieDetail[]>;
+  /** Each Lidarr's albums, with its artists' names, read once a run. */
+  albums?: Map<number, LibraryAlbums>;
   /** Downloads started in the last day, this run's included. */
   grabsToday: number;
   /** Ties the run to the first library title it works on. */
@@ -123,6 +130,12 @@ export interface AgentState {
    * this turn's tools are done, with every change proposed in it.
    */
   propose(change: ProposedChange): void;
+}
+
+/** A Lidarr's albums, and the names of their artists by id. */
+interface LibraryAlbums {
+  albums: LidarrAlbum[];
+  artists: Map<number, string>;
 }
 
 /** A refusal the model is told about, to try something else. */
@@ -168,7 +181,7 @@ export const titleRef = (title: TitleRef) =>
   `${title.kind}:${title.serverId}:${title.arrId}`;
 
 export const readTitleRef = (value: unknown): TitleRef => {
-  const match = /^(series|movie):(\d+):(\d+)$/.exec(String(value ?? ''));
+  const match = /^(series|movie|album):(\d+):(\d+)$/.exec(String(value ?? ''));
   if (!match) {
     throw new ToolError(
       'That is not a title reference. Use one find_title gave, like series:1:1283.'
@@ -228,6 +241,40 @@ const libraryMovies = async (state: AgentState, serverId: number) => {
   return list;
 };
 
+const libraryAlbums = async (
+  state: AgentState,
+  serverId: number
+): Promise<LibraryAlbums> => {
+  state.albums ??= new Map();
+  let library = state.albums.get(serverId);
+  if (!library) {
+    const lidarr = backfill.lidarrFor(serverId);
+    const [albums, artists] = await Promise.all([
+      lidarr.getAlbums(),
+      lidarr.getArtists(),
+    ]);
+    library = {
+      albums,
+      artists: new Map(artists.map((a) => [a.id, a.artistName])),
+    };
+    state.albums.set(serverId, library);
+  }
+  return library;
+};
+
+/** "Album by Artist", as Lidarr has it. */
+const albumName = async (title: TitleRef): Promise<string> => {
+  const lidarr = backfill.lidarrFor(title.serverId);
+  const album = await lidarr.getAlbumDetail(title.arrId);
+  const artist = await lidarr
+    .getArtistDetail(album.artistId)
+    .catch(() => undefined);
+  return artist ? `${album.title} by ${artist.artistName}` : album.title;
+};
+
+/** Albums are for Backfill only while it does music. */
+const musicOn = () => backfill.readiness().music;
+
 /** Outside lookups, as a seam for tests. */
 export const lookups = {
   tmdb: (query: string) => new TheMovieDb().searchMulti({ query }),
@@ -247,7 +294,7 @@ const findTitle: AgentTool = {
   name: 'find_title',
   readOnly: true,
   description:
-    'Finds a series or movie by name in the Sonarr and Radarr libraries (giving a title reference to use with the other tools), and on TMDB for titles not in the library yet.',
+    'Finds a series or movie by name in the Sonarr and Radarr libraries, or an album by its name or its artist in Lidarr (giving a title reference to use with the other tools), and on TMDB for films and series not in the library yet.',
   parameters: {
     type: 'object',
     properties: {
@@ -304,6 +351,34 @@ const findTitle: AgentTool = {
       }
     }
 
+    if (musicOn()) {
+      for (const server of settings.lidarr) {
+        const library = await libraryAlbums(state, server.id).catch(
+          () => undefined
+        );
+        if (!library) continue;
+        const matches = library.albums
+          .filter((album) => {
+            const artist = library.artists.get(album.artistId) ?? '';
+            return titleMatches(query, album.title, `${artist} ${album.title}`);
+          })
+          .slice(0, 8);
+        for (const album of matches) {
+          const stats = album.statistics;
+          const year = album.releaseDate?.slice(0, 4);
+          lines.push(
+            `${titleRef({ kind: 'album', serverId: server.id, arrId: album.id })}  ${album.title} by ${
+              library.artists.get(album.artistId) ?? 'an unknown artist'
+            }${year && year !== '0001' ? ` (${year})` : ''} — album in Lidarr${
+              stats
+                ? `, ${stats.trackFileCount} of ${stats.trackCount} tracks on disk`
+                : ''
+            }${album.monitored ? '' : ', not monitored'}`
+          );
+        }
+      }
+    }
+
     const tmdb = await lookups.tmdb(query).catch(() => null);
     const found = (tmdb?.results ?? [])
       .filter(
@@ -340,7 +415,11 @@ const findTitle: AgentTool = {
     }
     return lines.length
       ? lines.join('\n')
-      : `Nothing called "${query}" in the libraries or on TMDB.`;
+      : `Nothing called "${query}" in the libraries or on TMDB.${
+          musicOn()
+            ? ' An album not in Lidarr is requested from its page in Seerr.'
+            : ''
+        }`;
   },
 };
 
@@ -447,7 +526,7 @@ const titleStatus: AgentTool = {
   name: 'title_status',
   readOnly: true,
   description:
-    'What a library title has and lacks: episodes on disk per season, every missing episode with its title and air date, what is already downloading, and what Backfill is doing.',
+    "What a library title has and lacks: episodes on disk per season, every missing episode with its title and air date (or an album's tracks, on disk or missing), what is already downloading, and what Backfill is doing.",
   parameters: {
     type: 'object',
     properties: {
@@ -460,6 +539,70 @@ const titleStatus: AgentTool = {
   },
   async run(state, input) {
     const title = readTitleRef(input.title);
+    if (title.kind === 'album') {
+      const lidarr = backfill.lidarrFor(title.serverId);
+      const album = await lidarr.getAlbumDetail(title.arrId);
+      const artist = await lidarr.getArtistDetail(album.artistId);
+      const name = `${album.title} by ${artist.artistName}`;
+      state.bind(title, name);
+      const [tracks, files, queued, profile] = await Promise.all([
+        lidarr.getAlbumTracks(album.id),
+        lidarr.getAlbumTrackFiles(album.id),
+        lidarr.getAlbumQueueCount(album.id).catch(() => 0),
+        lidarr.getQualityProfile(artist.qualityProfileId).catch(() => null),
+      ]);
+      const quality = new Map(
+        files.map((f) => [f.id, f.quality?.quality.name ?? 'Unknown'])
+      );
+      const backfilling = new Map<number, number>();
+      for (const job of (await backfillOf(title)).jobs) {
+        for (const file of job.files) {
+          for (const id of file.episodeIds) backfilling.set(id, job.id);
+        }
+      }
+      const edition = album.releases?.find((r) => r.monitored);
+      const missing = tracks.filter((t) => !t.hasFile);
+      const year = album.releaseDate?.slice(0, 4);
+      return [
+        `${name}${year && year !== '0001' ? ` (${year})` : ''} — ${titleRef(title)}, Lidarr${
+          album.albumType ? `, ${album.albumType}` : ''
+        }; ${album.monitored ? 'monitored' : 'not monitored'}${
+          profile ? `; quality profile ${profile.name}` : ''
+        }.`,
+        edition
+          ? `Edition Lidarr imports into: ${edition.title}${
+              edition.format ? `, ${edition.format}` : ''
+            }, ${edition.trackCount ?? tracks.length} tracks${
+              (album.releases?.length ?? 0) > 1
+                ? ` (one of ${album.releases!.length} editions)`
+                : ''
+            }.`
+          : '',
+        `${tracks.length - missing.length} of ${tracks.length} tracks on disk.`,
+        ...tracks
+          .slice()
+          .sort(
+            (a, b) =>
+              (a.mediumNumber ?? 1) - (b.mediumNumber ?? 1) ||
+              (a.absoluteTrackNumber ?? 0) - (b.absoluteTrackNumber ?? 0)
+          )
+          .slice(0, MAX_LISTED_MISSING)
+          .map(
+            (t) =>
+              `${t.absoluteTrackNumber ?? t.trackNumber ?? '?'}. "${t.title}" ${
+                t.hasFile
+                  ? `on disk (${quality.get(t.trackFileId ?? 0) ?? 'Unknown'})`
+                  : backfilling.has(t.id)
+                    ? `missing [downloading in Backfill job #${backfilling.get(t.id)}]`
+                    : 'missing'
+              }`
+          ),
+        queued ? `Downloading in Lidarr: ${queued} item(s).` : '',
+        await backfillLine(title),
+      ]
+        .filter(Boolean)
+        .join('\n');
+    }
     if (title.kind === 'movie') {
       const radarr = backfill.radarrFor(title.serverId);
       const movie = await radarr.getMovieDetail(title.arrId);
@@ -830,7 +973,7 @@ const searchReleases: AgentTool = {
   name: 'search_releases',
   readOnly: true,
   description:
-    "Runs Sonarr's or Radarr's own search across their indexers, like an interactive search: every result with what it maps to, its quality and size, and the reasons it was turned down. For a series, give a season (or a season and episode). Slow: a season of an anime can take several minutes, since Sonarr searches it episode by episode. If it is not done within a minute and a half you are told so; it keeps going, and calling it again with the same title and season gives its results. Search Prowlarr with search_indexers meanwhile.",
+    "Runs Sonarr's, Radarr's or Lidarr's own search across their indexers, like an interactive search: every result with what it maps to, its quality and size, and the reasons it was turned down. For a series, give a season (or a season and episode). Slow: a season of an anime can take several minutes, since Sonarr searches it episode by episode. If it is not done within a minute and a half you are told so; it keeps going, and calling it again with the same title and season gives its results. Search Prowlarr with search_indexers meanwhile.",
   parameters: {
     type: 'object',
     properties: {
@@ -856,7 +999,12 @@ const searchReleases: AgentTool = {
     let what: string;
     /** Said when an episode searched by its scene number finds nothing. */
     let sceneHint = '';
-    if (title.kind === 'movie') {
+    if (title.kind === 'album') {
+      const lidarr = backfill.lidarrFor(title.serverId);
+      key = titleRef(title);
+      start = () => lidarr.getReleases(title.arrId);
+      what = 'Lidarr is still searching';
+    } else if (title.kind === 'movie') {
       const radarr = backfill.radarrFor(title.serverId);
       key = titleRef(title);
       start = () => radarr.getReleases(title.arrId);
@@ -894,7 +1042,7 @@ const searchReleases: AgentTool = {
     const found = await arrSearch(key, start);
     if ('pending' in found) {
       return `${what} (${minutes(found.forMs)} min so far). It keeps going: call search_releases again with the same title${
-        title.kind === 'movie' ? '' : ' and season'
+        title.kind === 'series' ? ' and season' : ''
       } for its results, and use search_indexers meanwhile.`;
     }
     // A season's search brings back other seasons too (a long-running show
@@ -979,10 +1127,14 @@ const searchReleases: AgentTool = {
       const known = remember(
         state,
         release,
-        title.kind === 'movie' ? 'radarr' : 'sonarr'
+        title.kind === 'movie'
+          ? 'radarr'
+          : title.kind === 'album'
+            ? 'lidarr'
+            : 'sonarr'
       );
       const what =
-        title.kind === 'movie'
+        title.kind !== 'series'
           ? undefined
           : result.seasonNumbers && result.seasonNumbers.length > 1
             ? `${seasonLabel(Math.min(...result.seasonNumbers))}–${seasonLabel(Math.max(...result.seasonNumbers))} pack`
@@ -1050,12 +1202,12 @@ const searchIndexers: AgentTool = {
   name: 'search_indexers',
   readOnly: true,
   description:
-    'Searches every Prowlarr indexer for any text, without Sonarr or Radarr filtering anything out. Use other names, years, "complete", "collection", a season, or the original title.',
+    'Searches every Prowlarr indexer for any text, without Sonarr, Radarr or Lidarr filtering anything out. Use other names, years, "complete", "collection", a season, or the original title; for music (kind music), "Artist Album" or the album\'s name, with the year or FLAC.',
   parameters: {
     type: 'object',
     properties: {
       query: { type: 'string' },
-      kind: { type: 'string', enum: ['series', 'movie'] },
+      kind: { type: 'string', enum: ['series', 'movie', 'music'] },
     },
     required: ['query', 'kind'],
   },
@@ -1063,15 +1215,19 @@ const searchIndexers: AgentTool = {
     const { query, kind } = z
       .object({
         query: z.string().trim().min(2).max(200),
-        kind: z.enum(['series', 'movie']),
+        kind: z.enum(['series', 'movie', 'music']),
       })
       .parse(input);
     const prowlarr = new ProwlarrAPI(getSettings().backfill.prowlarr);
+    const categories =
+      kind === 'music'
+        ? AUDIO_CATEGORIES
+        : kind === 'movie'
+          ? MOVIE_CATEGORIES
+          : TV_CATEGORIES;
     const results = await atLimit(() =>
       indexerLimits.guard(PROWLARR, 'search', () =>
-        prowlarr.search(query, {
-          categories: kind === 'movie' ? MOVIE_CATEGORIES : TV_CATEGORIES,
-        })
+        prowlarr.search(query, { categories })
       )
     );
     if (!results.length) return `Nothing for "${query}".`;
@@ -1163,12 +1319,20 @@ const releaseFiles: AgentTool = {
       return `${known.ref} "${known.title}" (${sizeOf(known.size)}) is a Usenet post ${what}. If its name is exactly one missing episode (or the movie), grab it whole: grab with whole: true and one file entry with index 0 and the season and episode its name gives. A season pack like this cannot be used.`;
     }
     const sorted = [...files].sort((a, b) => a.index - b.index);
+    // For an album, what is not music is marked; otherwise what is not video.
+    const music = boundTitle(state.run)?.kind === 'album';
     const lines = sorted
       .slice(0, MAX_LISTED_FILES)
       .map(
         (f) =>
           `#${f.index}  ${f.path}  (${sizeOf(f.size)}${
-            isVideo(f.path) && f.size >= MIN_VIDEO_BYTES ? '' : ', not a video'
+            music
+              ? isAudio(f.path)
+                ? ''
+                : ', not audio'
+              : isVideo(f.path) && f.size >= MIN_VIDEO_BYTES
+                ? ''
+                : ', not a video'
           })`
       );
     return `${known.ref} "${known.title}": ${files.length} files\n${lines.join('\n')}${
@@ -1197,8 +1361,8 @@ const grabInput = z.object({
           .optional(),
       })
     )
-    .min(1)
-    .max(500),
+    .max(500)
+    .default([]),
   reason: z.string().trim().min(3).max(600),
   certain: z.boolean().optional(),
   whole: z.boolean().optional(),
@@ -1508,6 +1672,101 @@ const prepareWhole = async (
 };
 
 /**
+ * An album's release: Backfill matches its files to the album's tracks,
+ * in the edition Lidarr imports into, as it does for packs it finds
+ * itself. What fills a missing track is taken (and, when replacing was
+ * asked for, what Lidarr's profile prefers to a track on disk); the files
+ * chosen, when any are given, narrow that.
+ */
+const prepareAlbum = async (
+  state: AgentState,
+  args: GrabInput,
+  ctx: {
+    title: TitleRef;
+    known: KnownRelease;
+    row: BackfillSeries;
+    files: PackFile[];
+    before: Awaited<ReturnType<typeof earlierUse>>;
+  }
+): Promise<PreparedGrab> => {
+  const { title, known, row, files, before } = ctx;
+  if (known.packed) {
+    throw new ToolError(
+      "This Usenet post can't be opened, so its files can't be matched to the album's tracks. Choose a release that can be opened."
+    );
+  }
+  const album = await backfill.albumContext(row);
+  const name = `${album.album.title} by ${album.artist.artistName}`;
+  if (!album.album.monitored && !args.replace) {
+    throw new ToolError(
+      `${name} is not monitored in Lidarr, so it is not wanted.`
+    );
+  }
+  if (await album.lidarr.getAlbumQueueCount(album.album.id).catch(() => 0)) {
+    throw new ToolError('The album is already downloading in Lidarr.');
+  }
+  const { plan: judged } = await judgeAlbumPack(files, known.title, album);
+  const chosen = new Set(args.files.map((f) => f.index));
+  const wanted = judged.filter(
+    (e) =>
+      (e.action === 'fill' || (!!args.replace && e.action === 'upgrade')) &&
+      (!chosen.size || chosen.has(e.index)) &&
+      !e.episodeIds.some((id) => before.importFailed.has(id))
+  );
+  if (!wanted.length) {
+    const reasons = new Map<string, number>();
+    for (const e of judged) {
+      if (e.action === 'fill') continue;
+      const why =
+        e.action === 'upgrade'
+          ? 'would replace a track on disk'
+          : (e.reason ?? e.action);
+      reasons.set(why, (reasons.get(why) ?? 0) + 1);
+    }
+    const failedBefore = judged.filter((e) =>
+      e.episodeIds.some((id) => before.importFailed.has(id))
+    ).length;
+    throw new ToolError(
+      `Nothing was started: nothing in "${known.title}" fills a missing track of ${name}${
+        reasons.size
+          ? ` (${[...reasons]
+              .map(([why, n]) => `${n} ${n === 1 ? 'file' : 'files'}: ${why}`)
+              .slice(0, 6)
+              .join('; ')})`
+          : ''
+      }${
+        failedBefore
+          ? `; ${failedBefore} did not import from this release before`
+          : ''
+      }. Choose another release.`
+    );
+  }
+  const trackOf = new Map([...album.tracks].map((t) => [t.id, t] as const));
+  const plan = wanted.map((e) => ({ ...e, why: args.reason }));
+  const targets = plan.map((e) => {
+    const track = trackOf.get(e.episodeIds[0]);
+    return `Track ${e.episode ?? '?'}${track ? ` "${track.title}"` : ''}`;
+  });
+  const bytes = plan.reduce((n, e) => n + e.size, 0);
+  if (bytes > getSettings().backfill.agent.maxSizeGb * 1024 ** 3) {
+    throw new ToolError(
+      `That is ${sizeOf(bytes)}, over the ${getSettings().backfill.agent.maxSizeGb} GB limit for one download. Choose a smaller release.`
+    );
+  }
+  return {
+    title,
+    known,
+    row,
+    name,
+    plan,
+    bytes,
+    targets,
+    doubts: [],
+    extend: before.running,
+  };
+};
+
+/**
  * Checks a download against every rule and builds what Backfill needs,
  * without starting anything. Throws why it cannot be done at all; lists
  * what makes it doubtful, which only an admin can wave through.
@@ -1523,6 +1782,16 @@ const prepareGrab = async (
   }
   const title = readTitleRef(args.title);
   const known = releaseOf(state, args.release);
+  if (title.kind !== 'album' && !args.files.length) {
+    throw new ToolError(
+      'Give the files to fetch, by their index from release_files.'
+    );
+  }
+  if (title.kind === 'album' && !musicOn()) {
+    throw new ToolError(
+      'Backfill does not do music now (Music too in Settings → Backfill), so albums cannot be downloaded.'
+    );
+  }
   const settings = getSettings().backfill;
   const group = blockedGroupOf(known.title);
   if (group) {
@@ -1547,9 +1816,9 @@ const prepareGrab = async (
       status: In(['queued', 'downloading', 'importing', 'paused']),
     },
   });
-  if (running.length && title.kind === 'movie') {
+  if (running.length && title.kind !== 'series') {
     throw new ToolError(
-      `Backfill job #${running[0].id} is already downloading this movie.`
+      `Backfill job #${running[0].id} is already downloading this ${title.kind}.`
     );
   }
   const backfilling = new Map<number, number>();
@@ -1559,10 +1828,13 @@ const prepareGrab = async (
     }
   }
   const before = await earlierUse(row.id, known);
-  if (title.kind === 'movie' && before.used && !before.running) {
+  if (title.kind !== 'series' && before.used && !before.running) {
     throw new ToolError(
-      'This release was downloaded for this movie before and did not import. Choose another.'
+      `This release was downloaded for this ${title.kind} before and did not import. Choose another.`
     );
+  }
+  if (title.kind === 'album') {
+    return prepareAlbum(state, args, { title, known, row, files, before });
   }
 
   const titleLanguage = async (original?: string) =>
@@ -1811,14 +2083,18 @@ const commitGrab = async (
   const labels =
     title.kind === 'movie'
       ? 'the movie'
-      : plan
-          .map((e) =>
-            rangeLabel(
-              e.season ?? 0,
-              e.episodeIds.map((_, i) => (e.episode ?? 0) + i)
+      : title.kind === 'album'
+        ? plan.length === 1
+          ? '1 track'
+          : `${plan.length} tracks`
+        : plan
+            .map((e) =>
+              rangeLabel(
+                e.season ?? 0,
+                e.episodeIds.map((_, i) => (e.episode ?? 0) + i)
+              )
             )
-          )
-          .join(', ');
+            .join(', ');
   const files = `${plan.length === 1 ? '1 file' : `${plan.length} files`} (${sizeOf(bytes)})`;
   const replaces = plan.some((e) => e.action === 'upgrade');
   if (prepared.extend && replaces) {
@@ -1890,7 +2166,11 @@ const commitGrab = async (
     release: known.title,
   });
   return `Started Backfill job #${job.id}: ${plan.length} files, ${sizeOf(bytes)}, for ${labels}. Backfill downloads only these files and has ${
-    title.kind === 'movie' ? 'Radarr' : 'Sonarr'
+    title.kind === 'movie'
+      ? 'Radarr'
+      : title.kind === 'album'
+        ? 'Lidarr'
+        : 'Sonarr'
   } import each as mapped${
     replaces
       ? '; a file already there is replaced only once its new one has imported'
@@ -1912,13 +2192,20 @@ const replaceProposal = (
 ): ProposedChange => {
   const { title, known, name, plan, targets, bytes } = prepared;
   const replaced = plan.filter((e) => e.action === 'upgrade');
-  const app = title.kind === 'movie' ? 'Radarr' : 'Sonarr';
+  const app =
+    title.kind === 'movie'
+      ? 'Radarr'
+      : title.kind === 'album'
+        ? 'Lidarr'
+        : 'Sonarr';
   return {
     kind: 'replace',
     headline:
       title.kind === 'movie'
         ? `Replace the file of ${name}`
-        : `Replace ${replaced.length === 1 ? 'a file' : `${replaced.length} files`} of ${name}`,
+        : title.kind === 'album'
+          ? `Replace ${replaced.length === 1 ? 'a track' : `${replaced.length} tracks`} of ${name}`
+          : `Replace ${replaced.length === 1 ? 'a file' : `${replaced.length} files`} of ${name}`,
     title,
     details: [
       `Downloads "${known.title}" (${sizeOf(bytes)}, ${known.indexer}) through Backfill, only the files chosen.`,
@@ -1936,7 +2223,7 @@ const replaceProposal = (
 const grab: AgentTool = {
   name: 'grab',
   description:
-    'Downloads chosen files of a release through Backfill and imports each as the episode you map it to (or as the movie). It only fills episodes with no file and never replaces one. One file per episode is preferred: take a release whose files each hold several episodes only when none has them one per file, and then give each such file all its episodes. Map files by comparing file titles with episode titles: a collection may number files its own way. If a file names neither its episode title nor its number, you are asked to look again; call it again with certain: true only once you are sure. A pack used before for other episodes (one season of a full-series pack) can be taken again for the rest; while it is still downloading, the new files join that download.',
+    "Downloads chosen files of a release through Backfill and imports each as the episode you map it to (or as the movie). It only fills episodes with no file and never replaces one. One file per episode is preferred: take a release whose files each hold several episodes only when none has them one per file, and then give each such file all its episodes. Map files by comparing file titles with episode titles: a collection may number files its own way. If a file names neither its episode title nor its number, you are asked to look again; call it again with certain: true only once you are sure. A pack used before for other episodes (one season of a full-series pack) can be taken again for the rest; while it is still downloading, the new files join that download. For an album, give no files: Backfill matches the release's files to the album's tracks itself and takes those that fill missing tracks, or says why none do.",
   parameters: {
     type: 'object',
     properties: {
@@ -1945,7 +2232,7 @@ const grab: AgentTool = {
       files: {
         type: 'array',
         description:
-          'Each file to fetch, by index from release_files, with the season and episode it is. A file holding several episodes (S06E01-02, "Title A + Title B") gets every one of them in episodes instead, like episodes: [1, 2]; Sonarr then names it S06E01-E02. For a movie, one file and no season or episode.',
+          'Each file to fetch, by index from release_files, with the season and episode it is. A file holding several episodes (S06E01-02, "Title A + Title B") gets every one of them in episodes instead, like episodes: [1, 2]; Sonarr then names it S06E01-E02. For a movie, one file and no season or episode. For an album, leave it out (or give only indexes, to take just those files).',
         items: {
           type: 'object',
           properties: {
@@ -1982,7 +2269,7 @@ const grab: AgentTool = {
           'Only when the admin (or the report) asked for a file to be replaced: lets episodes (or a movie) that have a file be mapped. Nothing starts until the admin approves; the old file goes only once the new one has imported.',
       },
     },
-    required: ['title', 'release', 'files', 'reason'],
+    required: ['title', 'release', 'reason'],
   },
   async run(state, input) {
     const args = grabInput.parse(input);
@@ -2097,6 +2384,11 @@ const checkLanguage: AgentTool = {
   },
   async run(state, input) {
     const title = readTitleRef(input.title);
+    if (title.kind === 'album') {
+      throw new ToolError(
+        "Music has no audio language to check: an album is the artist's own recording."
+      );
+    }
     const known = releaseOf(state, input.release);
     const parse = (name: string) =>
       (title.kind === 'movie'
@@ -2213,13 +2505,15 @@ const relinkFile: AgentTool = {
 
 // ---- an admin's changes --------------------------------------------------------
 
-/** A library title's name, as Sonarr or Radarr has it. */
+/** A library title's name, as Sonarr, Radarr or Lidarr has it. */
 const nameOf = async (title: TitleRef): Promise<string> =>
-  title.kind === 'movie'
-    ? (await backfill.radarrFor(title.serverId).getMovieDetail(title.arrId))
-        .title
-    : (await backfill.sonarrFor(title.serverId).getSeriesDetail(title.arrId))
-        .title;
+  title.kind === 'album'
+    ? albumName(title)
+    : title.kind === 'movie'
+      ? (await backfill.radarrFor(title.serverId).getMovieDetail(title.arrId))
+          .title
+      : (await backfill.sonarrFor(title.serverId).getSeriesDetail(title.arrId))
+          .title;
 
 const CHANGE_KINDS = [
   'blockGroup',
@@ -2275,6 +2569,11 @@ const proposeChange: AgentTool = {
     let name: string | undefined;
     if (!groupChange) {
       title = readTitleRef(args.title);
+      if (title.kind === 'album') {
+        throw new ToolError(
+          'For an album only blockGroup and unblockGroup can be proposed. A bad track is replaced with grab and replace: true; Lidarr does the rest.'
+        );
+      }
       name = await nameOf(title);
     }
     if (args.kind === 'deleteFiles') {
@@ -2347,7 +2646,7 @@ const searchUpgrade: AgentTool = {
   name: 'search_upgrade',
   askOnly: true,
   description:
-    "Has Radarr or Sonarr search for a better release of a movie, or of a series' episodes (all, a season, or some episodes), and take one its quality profile prefers to what is there; the file is replaced only once the new one has imported. For when the admin asks for something better and the profile would prefer it. To take one particular release instead, grab it with replace: true.",
+    "Has Radarr, Sonarr or Lidarr search for a better release of a movie, of a series' episodes (all, a season, or some episodes) or of an album, and take one its quality profile prefers to what is there; the file is replaced only once the new one has imported. For when the admin asks for something better and the profile would prefer it. To take one particular release instead, grab it with replace: true.",
   parameters: {
     type: 'object',
     properties: {
@@ -2368,6 +2667,11 @@ const searchUpgrade: AgentTool = {
       .parse(input);
     const title = readTitleRef(input.title);
     const name = await nameOf(title);
+    if (title.kind === 'album') {
+      await backfill.lidarrFor(title.serverId).searchAlbums([title.arrId]);
+      state.bind(title, name);
+      return `Lidarr is searching for ${name}. It takes a release only if its profile prefers it to what is there; title_status shows what is downloading in a few minutes.`;
+    }
     if (title.kind === 'movie') {
       await backfill.radarrFor(title.serverId).searchMovie(title.arrId);
       state.bind(title, name);

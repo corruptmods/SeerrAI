@@ -49,7 +49,7 @@ Don't want music? Turn it off for yourself in **Profile → Settings → Feature
 
 In Lidarr, turn on **Settings → Metadata → Write Audio Tags**: Jellyfin and Emby match albums by the MusicBrainz ids in the tags; without them, by folder name and then title and year.
 
-With Backfill set up, it also follows albums Lidarr couldn't find ([how](./backfill-and-agent.md#music)).
+With Backfill set up, it also follows albums Lidarr couldn't find, and the admin agent can look for them too ([how](./backfill-and-agent.md#music)).
 
 ### Who can ask, and how much
 
@@ -78,4 +78,4 @@ Switch **Music** off for everyone in **Settings → Music**: the Music page, mus
 
 ## Not for music yet
 
-The admin agent, Pick for the Room, watch lists, Suggested for You, Who Watched, the blocklist, issues, the calendar, override rules and following an artist's new releases are for films and series only.
+Pick for the Room, watch lists, Suggested for You, Who Watched, the blocklist, issues, the calendar, override rules and following an artist's new releases are for films and series only.

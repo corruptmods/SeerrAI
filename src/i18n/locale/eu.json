@@ -1906,6 +1906,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {# deskarga hasi da} other {# deskarga hasi dira}}",
   "components.Backfill.Agent.earlier": "Aurreko elkarrizketak",
   "components.Backfill.Agent.failed": "Huts egin du",
+  "components.Backfill.Agent.forAlbumTip": "Lidarr baino urrunago bilatzen du. Hutsik utziz gero, falta den guztia ekartzen du.",
   "components.Backfill.Agent.forTitle": "Galdetu administratzaile-agenteari",
   "components.Backfill.Agent.forTitleTip": "Sonarr eta Radarr baino urrunago bilatzen du. Hutsik utziz gero, falta den guztia ekartzen du.",
   "components.Backfill.Agent.held": "Bilaketaren zain",

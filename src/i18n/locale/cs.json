@@ -1879,6 +1879,7 @@
   "components.Backfill.Agent.downloads": "{count, plural, one {Spuštěno # stahování} few {Spuštěna # stahování} many {Spuštěno # stahování} other {Spuštěno # stahování}}",
   "components.Backfill.Agent.earlier": "Dřívější konverzace",
   "components.Backfill.Agent.failed": "Selhalo",
+  "components.Backfill.Agent.forAlbumTip": "Hledá dál než Lidarr. Když zůstane prázdné, získá vše, co chybí.",
   "components.Backfill.Agent.forTitle": "Zeptat se agenta správce",
   "components.Backfill.Agent.forTitleTip": "Hledá dál než Sonarr a Radarr. Když zůstane prázdné, získá vše, co chybí.",
   "components.Backfill.Agent.held": "Čeká na hledání",

@@ -7,11 +7,14 @@
 /** The largest seed taken; a page picks one below it. */
 export const SHUFFLE_SEED_LIMIT = 2 ** 32;
 
-/** A seed from a query value, or undefined when it is not one. */
+/**
+ * A seed from a query value, or undefined when it is not one. The API's
+ * validator hands it over as a number; read straight from a URL it is text.
+ */
 export const shuffleSeed = (value: unknown): number | undefined => {
   const seed = Number(value);
-  return typeof value === 'string' &&
-    value !== '' &&
+  return ((typeof value === 'string' && value !== '') ||
+    typeof value === 'number') &&
     Number.isInteger(seed) &&
     seed >= 0 &&
     seed < SHUFFLE_SEED_LIMIT

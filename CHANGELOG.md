@@ -15,7 +15,7 @@ Seerr AI can now fetch one song instead of a whole album, and Backfill and the a
 - **Backfill and the admin agent find music**: requested albums Lidarr couldn't find are followed and filled like series, matched track by track. Start search… lists albums too, and the admin agent can look for them, or request one that isn't in Lidarr. Turn it off with Music too in Settings → Backfill. ([guide](./docs/seerr-ai/backfill-and-agent.md#music))
 - **Music in AI Search**: with music on, AI Search finds albums and artists too, from a description or a photo of an album cover.
 - **Radarr 7**: works as before. If Radarr's Allowed Hosts (which Radarr 7 asks for) leaves out the name Seerr AI uses for it, the connection test, Health and errors say what to add, instead of "Failed to connect". Sonarr and Lidarr too.
-- **Your Watchlist** shows your titles in a new order each time you open it.
+- **Your Watchlist** shows your titles in a new order each visit: its row on the home page and your profile, and its own page, which starts with the titles the row showed.
 - **Subtitle searches and transcriptions show what Bazarr is doing**: how long they've waited or run, how many jobs are ahead of them in Bazarr, its count of what it has checked, and when Bazarr has been busy with other jobs for hours.
 - **The installed app opens where you left it**: when iOS closes Seerr AI in the background, opening it again goes back to the page you were on, not the home page.
 - **Music request cards** match films' and series': the cover behind them, the artist above, the album or song as the title.

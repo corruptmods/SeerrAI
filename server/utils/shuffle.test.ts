@@ -28,7 +28,20 @@ describe('a seeded shuffle', () => {
   it('takes only a whole number in range as a seed', () => {
     assert.equal(shuffleSeed('42'), 42);
     assert.equal(shuffleSeed('0'), 0);
-    for (const bad of ['', '-1', '1.5', 'x', String(2 ** 32), undefined, 7]) {
+    // As the API's validator passes it on.
+    assert.equal(shuffleSeed(7), 7);
+    for (const bad of [
+      '',
+      '-1',
+      '1.5',
+      'x',
+      String(2 ** 32),
+      undefined,
+      -1,
+      1.5,
+      2 ** 32,
+      Number.NaN,
+    ]) {
       assert.equal(shuffleSeed(bad), undefined, String(bad));
     }
   });

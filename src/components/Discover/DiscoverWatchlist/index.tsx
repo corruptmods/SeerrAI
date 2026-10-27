@@ -5,6 +5,7 @@ import useDiscover from '@app/hooks/useDiscover';
 import { useUser } from '@app/hooks/useUser';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
+import { watchlistSeed } from '@app/utils/watchlistOrder';
 import type { WatchlistItem } from '@server/interfaces/api/discoverInterfaces';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -24,7 +25,7 @@ const DiscoverWatchlist = () => {
   });
   const { user: currentUser } = useUser();
   // A new order each visit; the same one while scrolling through it.
-  const [shuffle] = useState(() => Math.floor(Math.random() * 2 ** 32));
+  const [shuffle] = useState(watchlistSeed);
 
   const {
     isLoadingInitialData,

@@ -1,4 +1,6 @@
 import BazarrAPI from '@server/api/bazarr';
+import { MusicBrainz } from '@server/api/musicbrainz';
+import LidarrAPI from '@server/api/servarr/lidarr';
 import TheMovieDb from '@server/api/themoviedb';
 import { IssueType } from '@server/constants/issue';
 import { MediaStatus, MediaType } from '@server/constants/media';
@@ -8,6 +10,7 @@ import type BackfillSeries from '@server/entity/BackfillSeries';
 import Issue from '@server/entity/Issue';
 import IssueComment from '@server/entity/IssueComment';
 import Media from '@server/entity/Media';
+import MusicAlbum from '@server/entity/MusicAlbum';
 import { User } from '@server/entity/User';
 import agent from '@server/lib/agent';
 import { clearAiCache } from '@server/lib/ai';
@@ -1957,5 +1960,145 @@ describe('Auto-fix: a season from AI Search and issues', () => {
     });
     assert.equal(issue.problemSeason, 6);
     assert.deepEqual(grabbed, ['good']);
+  });
+});
+
+// ---- music --------------------------------------------------------------------
+
+describe('Auto-fix: music from AI Search', () => {
+  const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
+  const GROUP = '7e41c0d8-5b29-3f6c-b8a4-91d6e2f07a35';
+  let commands: { name: string; options: Record<string, unknown> }[];
+
+  beforeEach(async () => {
+    commands = [];
+    getSettings().lidarr = [
+      {
+        id: 0,
+        name: 'Lidarr',
+        hostname: '127.0.0.1',
+        port: 1,
+        apiKey: 'k',
+        useSsl: false,
+        baseUrl: '',
+        isDefault: true,
+      } as never,
+    ];
+    mock.method(
+      LidarrAPI.prototype as unknown as {
+        runCommand: (name: string, options: object) => Promise<void>;
+      },
+      'runCommand',
+      async (name: string, options: Record<string, unknown>) => {
+        commands.push({ name, options });
+      }
+    );
+    const credit = [
+      { name: 'Glasswing', artist: { id: ARTIST, name: 'Glasswing' } },
+    ];
+    mock.method(MusicBrainz.prototype, 'searchReleaseGroups', async () => ({
+      count: 1,
+      offset: 0,
+      'release-groups': [
+        {
+          id: GROUP,
+          title: 'Static Garden',
+          'primary-type': 'Album',
+          score: 100,
+          'artist-credit': credit,
+        },
+      ],
+    }));
+    mock.method(MusicBrainz.prototype, 'searchArtists', async () => ({
+      count: 1,
+      offset: 0,
+      artists: [{ id: ARTIST, name: 'Glasswing', score: 100 }],
+    }));
+    const artist = await getRepository(Media).save(
+      new Media({
+        mediaType: MediaType.MUSIC,
+        tmdbId: 0,
+        foreignId: ARTIST,
+        foreignTitle: 'Glasswing',
+        status: MediaStatus.PARTIALLY_AVAILABLE,
+        serviceId: 0,
+        externalServiceId: 31,
+      })
+    );
+    await getRepository(MusicAlbum).save(
+      Object.assign(new MusicAlbum(), {
+        media: artist,
+        mbId: GROUP,
+        title: 'Static Garden',
+        secondaryTypes: [],
+        status: MediaStatus.PARTIALLY_AVAILABLE,
+        lidarrAlbumId: 42,
+        trackCount: 10,
+        trackFileCount: 6,
+      })
+    );
+  });
+
+  afterEach(() => {
+    getSettings().lidarr = [];
+  });
+
+  it('searches again for an album’s missing tracks', async () => {
+    modelAnswer = JSON.stringify({
+      r: 'Looking for the missing tracks.',
+      titles: [],
+      music: [{ t: 'Static Garden', a: 'Glasswing', k: 'album' }],
+      do: 'fix',
+      fx: 'missing',
+    });
+    const res = await call('POST', '/api/v1/ai/chat', {
+      message: 'static garden by glasswing is missing songs',
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.match(res.body.reply, /Static Garden/);
+    assert.equal(res.body.fix.ok, true);
+    assert.equal(res.body.fix.link, `/music/album/${GROUP}`);
+    assert.deepEqual(
+      res.body.music.albums.map((a: { id: string }) => a.id),
+      [GROUP]
+    );
+    assert.deepEqual(commands, [
+      { name: 'AlbumSearch', options: { albumIds: [42] } },
+    ]);
+  });
+
+  it('searches for an artist’s missing albums', async () => {
+    modelAnswer = JSON.stringify({
+      r: '',
+      titles: [],
+      music: [{ t: 'Glasswing', k: 'artist' }],
+      do: 'fix',
+      fx: 'missing',
+    });
+    const res = await call('POST', '/api/v1/ai/chat', {
+      message: 'glasswing albums are missing',
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.match(res.body.reply, /every missing album of Glasswing/);
+    assert.deepEqual(commands, [
+      { name: 'ArtistSearch', options: { artistId: 31 } },
+    ]);
+  });
+
+  it('fixes nothing else for music', async () => {
+    modelAnswer = JSON.stringify({
+      r: '',
+      titles: [],
+      music: [{ t: 'Static Garden', a: 'Glasswing', k: 'album' }],
+      do: 'fix',
+      fx: 'broken',
+    });
+    const res = await call('POST', '/api/v1/ai/chat', {
+      message: 'static garden skips',
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.match(res.body.reply, /missing tracks/);
+    assert.equal(res.body.fix, undefined);
+    assert.deepEqual(commands, []);
   });
 });

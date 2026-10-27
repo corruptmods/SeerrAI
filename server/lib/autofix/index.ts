@@ -5,12 +5,13 @@ import type {
 } from '@server/api/bazarr';
 import { WHISPER_PROVIDER } from '@server/api/bazarr';
 import { IssueType } from '@server/constants/issue';
-import { MediaType } from '@server/constants/media';
+import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import type { BackfillKind } from '@server/entity/BackfillSeries';
 import Issue from '@server/entity/Issue';
 import IssueComment from '@server/entity/IssueComment';
 import type Media from '@server/entity/Media';
+import type MusicAlbum from '@server/entity/MusicAlbum';
 import type { User } from '@server/entity/User';
 import agent from '@server/lib/agent';
 import type { ArrEpisode, ArrRelease } from '@server/lib/autofix/arr';
@@ -30,6 +31,7 @@ import type { ReadReport } from '@server/lib/autofix/understand';
 import { REPLACES_FILES, askAboutReport } from '@server/lib/autofix/understand';
 import backfill from '@server/lib/backfill/engine';
 import { featureEnabled } from '@server/lib/features';
+import { lidarrApi, musicReady } from '@server/lib/music/access';
 import { owner } from '@server/lib/owner';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
@@ -99,7 +101,10 @@ export const FIX_KINDS: FixKind[] = [
 
 export interface FixRequest {
   kind: FixKind;
+  /** A film's or series' record; for music, the artist's. */
   media: Media;
+  /** For music, the album it is about; none for the artist's every album. */
+  album?: MusicAlbum;
   seasonNumber?: number;
   episodeNumber?: number;
   /** Two-letter language code, for subtitles. */
@@ -786,6 +791,9 @@ class AutoFix {
   }
 
   private async missing(req: FixRequest): Promise<Outcome> {
+    if (req.media.mediaType === MediaType.MUSIC) {
+      return this.missingMusic(req);
+    }
     if (req.media.mediaType === MediaType.MOVIE) {
       const radarr = radarrFor(req.media);
       if (!radarr) return NOT_ON_SERVER;
@@ -825,6 +833,83 @@ class AutoFix {
       HOUR,
       'Missing episodes were searched for in the last hour.',
       () => this.searchMissing(req, sonarr)
+    );
+  }
+
+  /**
+   * An album's missing tracks, or one that never came: Lidarr searches for
+   * it again, and Backfill (with Music too on) looks for releases Lidarr
+   * can't see. Without an album, Lidarr searches for every missing album of
+   * the artist's.
+   */
+  private async missingMusic(req: FixRequest): Promise<Outcome> {
+    const lidarrs = getSettings().lidarr;
+    const server =
+      lidarrs.find((s) => s.id === req.media.serviceId) ??
+      lidarrs.find((s) => s.isDefault);
+    if (!server) return NOT_ON_SERVER;
+    const api = lidarrApi(server);
+    const album = req.album;
+    if (!album) {
+      const artistId = req.media.externalServiceId;
+      if (!artistId) return NOT_ON_SERVER;
+      return this.holding(
+        `missing:artist:${req.media.id}`,
+        HOUR,
+        'Their missing albums were searched for in the last hour.',
+        async () => {
+          await api.searchArtist(artistId);
+          return {
+            ok: true,
+            message: `Asked Lidarr to search for every missing album of ${
+              req.media.foreignTitle ?? 'theirs'
+            }.`,
+          };
+        }
+      );
+    }
+    const link = album.mbId ? `/music/album/${album.mbId}` : undefined;
+    if (!album.lidarrAlbumId) {
+      return {
+        ok: false,
+        message: `${album.title} isn’t in Lidarr, so there is nothing to search for. It can be requested instead.`,
+        ...(link && { link }),
+      };
+    }
+    if (
+      album.status === MediaStatus.AVAILABLE &&
+      !!album.trackCount &&
+      (album.trackFileCount ?? 0) >= album.trackCount
+    ) {
+      return {
+        ok: false,
+        message: `Lidarr has every track of ${album.title}, so nothing is missing. If some won't play, ask an admin.`,
+        ...(link && { link }),
+      };
+    }
+    const lidarrAlbumId = album.lidarrAlbumId;
+    return this.holding(
+      `missing:album:${album.id}`,
+      HOUR,
+      'This album was searched for in the last hour.',
+      async () => {
+        await api.searchAlbums([lidarrAlbumId]);
+        const looking =
+          getSettings().backfill.includeMusic && musicReady()
+            ? await this.backfillSearch(req, 'album', server.id, lidarrAlbumId)
+            : undefined;
+        return looking
+          ? {
+              ok: true,
+              link: looking.link ?? link,
+              message: `Searching for ${album.title}: Lidarr is looking, and Backfill is checking indexers for releases Lidarr cannot see. An admin approves anything it finds.`,
+            }
+          : {
+              ok: true,
+              ...(link && { link }),
+              message: `Asked Lidarr to search for ${album.title} again.`,
+            };
+      }
     );
   }
 

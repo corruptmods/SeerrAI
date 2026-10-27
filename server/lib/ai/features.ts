@@ -246,7 +246,8 @@ const ADMIN_NOTE =
 const MUSIC_NOTE =
   'They also have music. Albums and artists they ask for, or that fit what they want, go in "music": [{"t":"album or artist name","a":"the album\'s artist","y":the album\'s year or null,"k":"album" or "artist"}], up to 6, best first; never in "titles". ' +
   'An album cover in a picture is that album, in "music". ' +
-  'Lists, sets, "do":"request" and fixes are for films and series only; music is requested from its own result. ';
+  'Lists, sets and "do":"request" are for films and series only; music is requested from its own result. ' +
+  'A fix can be for music too, only for what is missing: an album with missing tracks, an album that never came, or an artist\'s missing albums is "do":"fix" with "fx":"missing" and the album or artist as the one item in "music", "titles" empty. ';
 
 /** An admin's change, handed to the admin agent; where to follow it. */
 const toAgent = async (
@@ -400,6 +401,7 @@ export const chat = async (
       {
         kind: answer.fx,
         title: (answer.titles as NamedTitle[])[0],
+        ...(music && answer.music[0] && { music: answer.music[0] }),
         seasonNumber: answer.se ?? undefined,
         episodeNumber: answer.ep ?? undefined,
         language: answer.lang,

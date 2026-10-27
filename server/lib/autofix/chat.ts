@@ -9,12 +9,16 @@ import { getRepository } from '@server/datasource';
 import Issue from '@server/entity/Issue';
 import IssueComment from '@server/entity/IssueComment';
 import Media from '@server/entity/Media';
+import MusicAlbum from '@server/entity/MusicAlbum';
 import type { User } from '@server/entity/User';
 import type { NamedTitle } from '@server/lib/ai/context';
 import { label, withLibraryStatus } from '@server/lib/ai/context';
+import type { NamedMusic } from '@server/lib/ai/music';
+import { musicFor, resolveMusic } from '@server/lib/ai/music';
 import type { FixKind, FixResult } from '@server/lib/autofix';
 import autofix, { classify, seasonEpisodeIn } from '@server/lib/autofix';
 import { Permission } from '@server/lib/permissions';
+import type { MusicAlbumResult, MusicArtistResult } from '@server/models/Music';
 import { In, MoreThan } from 'typeorm';
 
 /*
@@ -33,6 +37,8 @@ import { In, MoreThan } from 'typeorm';
 interface ChatFix {
   kind: FixKind;
   title?: NamedTitle;
+  /** An album or artist, for a fix to music. */
+  music?: NamedMusic;
   seasonNumber?: number;
   episodeNumber?: number;
   language?: string;
@@ -61,6 +67,8 @@ type ChatResults = Awaited<ReturnType<typeof withLibraryStatus>>;
 interface ChatFixAnswer {
   reply: string;
   results: ChatResults;
+  /** The album or artist a music fix is about, shown as music results are. */
+  music?: { albums: MusicAlbumResult[]; artists: MusicArtistResult[] };
   fix?: Pick<FixResult, 'kind' | 'ok' | 'link'>;
   confirm?: FixToConfirm;
 }
@@ -291,6 +299,66 @@ export const readFix = (
   return { ...fix, kind, seasonNumber, episodeNumber };
 };
 
+/**
+ * A fix to music: an album's missing tracks, an album that never came, or
+ * an artist's missing albums, searched for again. The album or artist is
+ * found as AI Search finds music, then on the server; the rest of what
+ * can be fixed (subtitles, a bad file) is for films and series.
+ */
+const fixMusicFromChat = async (
+  user: User,
+  kind: FixKind,
+  named: NamedMusic
+): Promise<ChatFixAnswer> => {
+  const found = await resolveMusic([named]);
+  const shown = found.albums.length + found.artists.length ? found : undefined;
+  if (kind !== 'missing') {
+    return {
+      reply:
+        'For music, I can search again for an album’s missing tracks or an artist’s missing albums. For anything else, ask an admin.',
+      results: [],
+      ...(shown && { music: shown }),
+    };
+  }
+  const albumResult = named.k === 'album' ? found.albums[0] : undefined;
+  const artistId =
+    albumResult?.artistId ??
+    (named.k === 'artist' ? found.artists[0]?.id : undefined);
+  if (!shown || !artistId) {
+    return {
+      reply: `I couldn't find ${named.k === 'album' ? 'that album' : 'that artist'} on MusicBrainz. Try the full name.`,
+      results: [],
+    };
+  }
+  const media = await getRepository(Media).findOne({
+    where: { mediaType: MediaType.MUSIC, foreignId: artistId },
+  });
+  const album = albumResult
+    ? await getRepository(MusicAlbum).findOne({
+        where: { mbId: albumResult.id, mediaId: media?.id ?? -1 },
+      })
+    : undefined;
+  if (!media || (albumResult && !album)) {
+    return {
+      reply: `${albumResult?.title ?? named.t} is not on the server yet, so there is nothing to fix. It can be requested instead.`,
+      results: [],
+      music: shown,
+    };
+  }
+  const result = await autofix.run({
+    kind,
+    media,
+    ...(album && { album }),
+    user,
+  });
+  return {
+    reply: result.message,
+    results: [],
+    music: shown,
+    fix: { kind: result.kind, ok: result.ok, link: result.link },
+  };
+};
+
 export const fixFromChat = async (
   user: User,
   message: string,
@@ -301,6 +369,9 @@ export const fixFromChat = async (
     return { reply: 'Fixing problems from here is turned off.', results: [] };
   }
   const fix = readFix(asked, message, earlier);
+  if (!fix.title && fix.music && musicFor(user)) {
+    return fixMusicFromChat(user, fix.kind, fix.music);
+  }
   const {
     kind: titleKind,
     result,

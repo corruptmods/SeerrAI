@@ -59,9 +59,13 @@ export const useTranscription = (
     {
       ...READ_OPTIONS,
       refreshInterval: (latest) =>
-        latest && (latest.searching || latest.running || latest.queued > 0)
-          ? 10_000
-          : 0,
+        // Every 5 seconds while Bazarr is on it, as often as Seerr AI
+        // looks at Bazarr's queue; queued only, every 10.
+        latest && (latest.searching || latest.running)
+          ? 5_000
+          : latest && latest.queued > 0
+            ? 10_000
+            : 0,
     }
   );
 

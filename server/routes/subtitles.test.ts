@@ -1,4 +1,4 @@
-import { bazarrJobPoll } from '@server/api/bazarr';
+import { bazarrJobPoll, jobLive } from '@server/api/bazarr';
 import PlexTvAPI from '@server/api/plextv';
 import { MediaStatus, MediaType } from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
@@ -190,7 +190,12 @@ let plexGate: Promise<void> | undefined;
 
 /** Off: an older Bazarr, with no job list, that answers once it is done. */
 let jobsApi = true;
-let jobs: { job_id: number; job_name: string; status: string }[] = [];
+let jobs: {
+  job_id: number;
+  job_name: string;
+  status: string;
+  last_run_time?: string;
+}[] = [];
 let nextJob = 1;
 /** Holds every job waiting in the queue until released. */
 let jobGate: Promise<void> | undefined;
@@ -905,6 +910,49 @@ describe('searching, downloading and deleting', () => {
     );
   });
 
+  it('says where the search is in Bazarr’s queue while it waits and runs', async () => {
+    actingAs = manager;
+    const longAgo = new Date(Date.now() - 3 * 60 * 60_000).toISOString();
+    // Two jobs for other titles have kept Bazarr busy for hours.
+    jobs = [901, 902].map((job_id) => ({
+      job_id,
+      job_name: `Manually downloading Subtitles for Other Show - S01E0${job_id - 900} - One`,
+      status: 'running',
+      last_run_time: longAgo,
+    }));
+    let start: () => void = () => undefined;
+    jobGate = new Promise<void>((resolve) => (start = resolve));
+    let finish: () => void = () => undefined;
+    searchGate = new Promise<void>((resolve) => (finish = resolve));
+    await call('POST', '/tv/318472/search-missing');
+
+    await waitFor(() => !!transcriber.status('tv:318472').searchJob);
+    const waiting = await call<TranscriptionStatus>(
+      'GET',
+      '/tv/318472/transcription'
+    );
+    assert.equal(waiting.status, 200, JSON.stringify(waiting.body));
+    const { since, ...queued } = waiting.body.searchJob ?? {};
+    assert.deepEqual(queued, {
+      state: 'waiting',
+      ahead: 2,
+      running: 2,
+      busySince: longAgo,
+    });
+    assert.ok(
+      Date.now() - Date.parse(since ?? '') < 60_000,
+      'waiting since now'
+    );
+
+    start();
+    await waitFor(
+      () => transcriber.status('tv:318472').searchJob?.state === 'running'
+    );
+    finish();
+    await waitFor(() => !transcriber.status('tv:318472').searching);
+    assert.equal(transcriber.status('tv:318472').searchJob, undefined);
+  });
+
   it('transcribes nothing after a search Bazarr did not finish', async () => {
     actingAs = manager;
     jobEnds = ['failed'];
@@ -1339,6 +1387,29 @@ describe('the subtitle your own Plex player starts with', () => {
       '/movie/471906/plex-default'
     );
     assert.equal(body.available, false);
+  });
+});
+
+describe('a job’s place in Bazarr’s queue', () => {
+  it('gives Bazarr’s own count for a job that keeps one', () => {
+    const job = {
+      job_id: 7,
+      job_name: 'Downloading missing subtitles for Show',
+      status: 'running',
+      is_progress: true,
+      progress_value: 12,
+      progress_max: 40,
+    };
+    assert.deepEqual(jobLive(job, [job], 0), {
+      state: 'running',
+      since: new Date(0).toISOString(),
+      progress: { value: 12, max: 40 },
+    });
+    assert.equal(
+      jobLive({ ...job, progress_max: 0 }, [job], 0).progress,
+      undefined,
+      'no count kept'
+    );
   });
 });
 

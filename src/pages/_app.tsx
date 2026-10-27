@@ -1,4 +1,3 @@
-import { dismissBootScreen } from '@app/components/BootScreen';
 import Layout from '@app/components/Layout';
 import LoadingBar from '@app/components/LoadingBar';
 import PWAHeader, { ThemeColour } from '@app/components/PWAHeader';
@@ -12,6 +11,7 @@ import { SettingsProvider } from '@app/context/SettingsContext';
 import { deviceAppearanceFrom, ThemeProvider } from '@app/context/ThemeContext';
 import { UserContext } from '@app/context/UserContext';
 import { PushDeviceProvider } from '@app/hooks/usePushDeviceState';
+import useResumePage from '@app/hooks/useResumePage';
 import type { User } from '@app/hooks/useUser';
 import { Permission, useUser } from '@app/hooks/useUser';
 import '@app/styles/globals.css';
@@ -171,8 +171,9 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
   const [loadedMessages, setMessages] = useState<MessagesType>(messages);
   const [currentLocale, setLocale] = useState<AvailableLocale>(locale);
 
-  // The app is up: fade out the startup screen shown by the installed app.
-  useEffect(() => dismissBootScreen(), []);
+  // The app is up: back to the page the installed app was on, if iOS
+  // restarted it, then the startup screen fades out.
+  useResumePage(router);
 
   // The page arrives with the strings for its locale already in it; load
   // others only when the locale actually changes. Loading them again on

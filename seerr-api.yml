@@ -1668,6 +1668,39 @@ components:
         waitingInBazarr:
           type: boolean
           description: The one under way is waiting its turn in Bazarr's own job queue.
+        searchJob:
+          $ref: '#/components/schemas/BazarrJobLive'
+        transcribeJob:
+          $ref: '#/components/schemas/BazarrJobLive'
+    BazarrJobLive:
+      type: object
+      description: Where a job asked of Bazarr is, as its queue was last read.
+      properties:
+        state:
+          type: string
+          enum: [waiting, running]
+        since:
+          type: string
+          format: date-time
+          description: When it began waiting, or running.
+        ahead:
+          type: number
+          description: Waiting, the jobs before it, those running included.
+        running:
+          type: number
+          description: Waiting, how many jobs Bazarr is running.
+        busySince:
+          type: string
+          format: date-time
+          description: Waiting, when the longest running of them started.
+        progress:
+          type: object
+          description: Running, Bazarr's count for a job that keeps one.
+          properties:
+            value:
+              type: number
+            max:
+              type: number
     PlexSubtitleDefault:
       type: object
       properties:

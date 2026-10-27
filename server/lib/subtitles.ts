@@ -843,8 +843,8 @@ export const searchMissingMovieOrTranscribe = async (
   owner: string,
   radarrId: number
 ): Promise<number> => {
-  const searched = await transcriber.searching(owner, () =>
-    bazarr().searchMissingMovie(radarrId)
+  const searched = await transcriber.searching(owner, (watch) =>
+    bazarr().searchMissingMovie(radarrId, watch)
   );
   // What a search Bazarr did not finish would have found is not known.
   if (searched !== 'finished' || !(await whisperOn())) {
@@ -861,8 +861,8 @@ export const searchMissingSeriesOrTranscribe = async (
   owner: string,
   seriesId: number
 ): Promise<number> => {
-  const searched = await transcriber.searching(owner, () =>
-    bazarr().searchMissingSeries(seriesId)
+  const searched = await transcriber.searching(owner, (watch) =>
+    bazarr().searchMissingSeries(seriesId, watch)
   );
   const episodes = await bazarr().getEpisodes(seriesId);
   // What the search downloaded changes where their subtitles came from.

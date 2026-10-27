@@ -1,3 +1,4 @@
+import type { BazarrJobLive } from '@server/interfaces/api/subtitlesInterfaces';
 import type { BazarrSettings } from '@server/lib/settings';
 import type { AxiosInstance } from 'axios';
 import axios from 'axios';
@@ -115,6 +116,12 @@ export interface BazarrJob {
   /** "Manually downloading Subtitles for …", once it runs. */
   job_name: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'canceled' | string;
+  /** When it was queued, or started once running. */
+  last_run_time?: string;
+  /** Whether it keeps a count of its progress below. */
+  is_progress?: boolean;
+  progress_value?: number;
+  progress_max?: number;
 }
 
 /**
@@ -130,7 +137,54 @@ export interface JobWatch {
   onWaiting?: () => void;
   /** Bazarr has started it. */
   onRunning?: () => void;
+  /** Where the job is now, each time Bazarr's queue is read. */
+  onUpdate?: (live: BazarrJobLive) => void;
 }
+
+/** A job's place in Bazarr's queue, for a title page to show. */
+export const jobLive = (
+  job: BazarrJob,
+  jobs: BazarrJob[],
+  since: number
+): BazarrJobLive => {
+  const others = jobs.filter((other) => other.job_id !== job.job_id);
+  const running = others.filter((other) => other.status === 'running');
+  const at = (other: BazarrJob) => {
+    const time = Date.parse(other.last_run_time ?? '');
+    return Number.isFinite(time) ? time : undefined;
+  };
+  if (job.status === 'pending') {
+    const started = running
+      .map(at)
+      .filter((time): time is number => time !== undefined);
+    return {
+      state: 'waiting',
+      since: new Date(since).toISOString(),
+      ahead:
+        running.length +
+        others.filter(
+          (other) => other.status === 'pending' && other.job_id < job.job_id
+        ).length,
+      running: running.length,
+      ...(started.length
+        ? { busySince: new Date(Math.min(...started)).toISOString() }
+        : {}),
+    };
+  }
+  const max = Number(job.progress_max) || 0;
+  return {
+    state: 'running',
+    since: new Date(since).toISOString(),
+    ...(job.is_progress && max > 0
+      ? {
+          progress: {
+            value: Math.min(Number(job.progress_value) || 0, max),
+            max,
+          },
+        }
+      : {}),
+  };
+};
 
 /** The provider Bazarr uses to transcribe audio with Whisper. */
 export const WHISPER_PROVIDER = 'whisperai';
@@ -229,6 +283,7 @@ class BazarrAPI {
     const deadline = Date.now() + timeout;
     let id: number | undefined;
     let told: string | undefined;
+    let since = Date.now();
     for (;;) {
       const jobs = await this.getJobs().catch(() => undefined);
       if (jobs) {
@@ -257,6 +312,12 @@ class BazarrAPI {
         if (job.status === 'failed' || job.status === 'canceled') {
           return 'failed';
         }
+        if (job.status !== told) {
+          // Bazarr's own time for it when it has one; otherwise now.
+          const at = Date.parse(job.last_run_time ?? '');
+          since = Number.isFinite(at) && at <= Date.now() ? at : Date.now();
+        }
+        watch.onUpdate?.(jobLive(job, jobs, since));
         if (job.status !== told) {
           told = job.status;
           if (job.status === 'pending') watch.onWaiting?.();
@@ -516,7 +577,10 @@ class BazarrAPI {
     name.startsWith('Downloading missing subtitles');
 
   /** Bazarr's own search for whatever the movie is missing, to its end. */
-  public async searchMissingMovie(radarrId: number): Promise<BazarrJobEnd> {
+  public async searchMissingMovie(
+    radarrId: number,
+    watch?: JobWatch
+  ): Promise<BazarrJobEnd> {
     return this.asJob(
       (timeout) =>
         this.form(
@@ -529,13 +593,15 @@ class BazarrAPI {
         BazarrAPI.missingSearch,
         await this.movieTitle(radarrId)
       ),
-      SEARCH_MISSING_TIMEOUT_MS
+      SEARCH_MISSING_TIMEOUT_MS,
+      watch
     );
   }
 
   /** Bazarr's own search for whatever the series is missing, to its end. */
   public async searchMissingSeries(
-    sonarrSeriesId: number
+    sonarrSeriesId: number,
+    watch?: JobWatch
   ): Promise<BazarrJobEnd> {
     return this.asJob(
       (timeout) =>
@@ -549,7 +615,8 @@ class BazarrAPI {
         BazarrAPI.missingSearch,
         await this.seriesTitle(sonarrSeriesId)
       ),
-      SEARCH_MISSING_TIMEOUT_MS
+      SEARCH_MISSING_TIMEOUT_MS,
+      watch
     );
   }
 }

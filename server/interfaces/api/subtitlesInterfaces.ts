@@ -111,6 +111,21 @@ export interface SubtitleSearchResponse {
 }
 
 /** Transcriptions asked for a title: queued, under way and finished. */
+/** Where a job asked of Bazarr is, as it last read its queue. */
+export interface BazarrJobLive {
+  state: 'waiting' | 'running';
+  /** When it began waiting, or running. */
+  since: string;
+  /** Waiting: the jobs before it, those running included. */
+  ahead?: number;
+  /** Waiting: how many jobs Bazarr is running. */
+  running?: number;
+  /** Waiting: when the longest running of them started. */
+  busySince?: string;
+  /** Running: Bazarr's count, for a job that keeps one. */
+  progress?: { value: number; max: number };
+}
+
 export interface TranscriptionStatus {
   queued: number;
   running: boolean;
@@ -127,6 +142,10 @@ export interface TranscriptionStatus {
   current?: { seasonNumber: number; episodeNumber: number };
   /** The one under way is waiting its turn in Bazarr's own queue. */
   waitingInBazarr?: boolean;
+  /** The search, in Bazarr's queue. */
+  searchJob?: BazarrJobLive;
+  /** The transcription under way, in Bazarr's queue. */
+  transcribeJob?: BazarrJobLive;
   /** Why the last one that failed did. */
   error?: SubtitleError;
 }

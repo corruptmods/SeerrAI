@@ -1,5 +1,6 @@
 import type { JobWatch } from '@server/api/bazarr';
 import type {
+  BazarrJobLive,
   SubtitleError,
   TranscriptionStatus,
 } from '@server/interfaces/api/subtitlesInterfaces';
@@ -57,6 +58,10 @@ export class Transcriber {
   private current?: TranscriptionTask;
   /** The one under way is waiting in Bazarr's own queue. */
   private waiting = false;
+  /** Where the one under way is in Bazarr's queue. */
+  private live?: BazarrJobLive;
+  /** Where each title's search is in Bazarr's queue. */
+  private searchLive = new Map<string, BazarrJobLive>();
   private tallies = new Map<string, Tally>();
   /** Titles Bazarr is searching for, and how many searches each. */
   private searches = new Map<string, number>();
@@ -89,16 +94,24 @@ export class Transcriber {
    * Bazarr's own search for what a title is missing, which can run for many
    * minutes: the title's status says it is searching meanwhile.
    */
-  public async searching<T>(owner: string, work: () => Promise<T>): Promise<T> {
+  public async searching<T>(
+    owner: string,
+    work: (watch: JobWatch) => Promise<T>
+  ): Promise<T> {
     this.searches.set(owner, (this.searches.get(owner) ?? 0) + 1);
     try {
-      return await work();
+      return await work({
+        onUpdate: (live) => {
+          if (this.searches.has(owner)) this.searchLive.set(owner, live);
+        },
+      });
     } finally {
       const left = (this.searches.get(owner) ?? 1) - 1;
       if (left > 0) {
         this.searches.set(owner, left);
       } else {
         this.searches.delete(owner);
+        this.searchLive.delete(owner);
       }
     }
   }
@@ -131,6 +144,10 @@ export class Transcriber {
       searching: this.searches.has(owner),
       auto: mine.filter((task) => task.auto).length,
       ...(running && this.waiting ? { waitingInBazarr: true } : {}),
+      ...(this.searchLive.has(owner)
+        ? { searchJob: this.searchLive.get(owner) }
+        : {}),
+      ...(running && this.live ? { transcribeJob: this.live } : {}),
       ...(tally.error ? { error: tally.error } : {}),
       ...(running &&
       this.current?.seasonNumber !== undefined &&
@@ -155,6 +172,7 @@ export class Transcriber {
     }
     this.current = task;
     this.waiting = false;
+    this.live = undefined;
     const tally = this.tallies.get(task.owner) ?? { done: 0, failed: 0 };
     try {
       await task.run({
@@ -163,6 +181,9 @@ export class Transcriber {
         },
         onRunning: () => {
           if (this.current === task) this.waiting = false;
+        },
+        onUpdate: (live) => {
+          if (this.current === task) this.live = live;
         },
       });
       tally.done++;
@@ -179,6 +200,7 @@ export class Transcriber {
       this.tallies.set(task.owner, tally);
       this.current = undefined;
       this.waiting = false;
+      this.live = undefined;
       void this.pump();
     }
   }

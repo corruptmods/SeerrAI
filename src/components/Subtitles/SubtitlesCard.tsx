@@ -13,6 +13,7 @@ import {
   useMediaServerName,
   useSubtitleReasons,
 } from '@app/components/Subtitles/parts';
+import useNow, { elapsed } from '@app/hooks/useNow';
 import type { SubtitlesKind } from '@app/hooks/useSubtitles';
 import {
   subtitlesKey,
@@ -43,6 +44,7 @@ import {
   SpeakerWaveIcon,
 } from '@heroicons/react/24/outline';
 import type {
+  BazarrJobLive,
   EpisodeSubtitles,
   MovieSubtitles,
   SeriesSubtitles,
@@ -89,6 +91,10 @@ const messages = defineMessages('components.Subtitles.SubtitlesCard', {
   waitingInBazarrEpisode: 'S{season} E{episode} waiting its turn in Bazarr…',
   transcribingQueued: '{count} more queued',
   searchingNow: 'Searching for the missing subtitles…',
+  searchWaiting: 'The search is waiting its turn in Bazarr…',
+  jobsAhead: '{count, plural, one {# job} other {# jobs}} ahead of it',
+  bazarrBusy: 'Bazarr has been busy with other jobs for {time}',
+  jobProgress: '{value} of {max}',
   noneFoundMovie: 'no provider had one',
   noneFoundEpisodes:
     '{count, plural, one {# episode} other {# episodes}} no provider had',
@@ -117,6 +123,8 @@ const messages = defineMessages('components.Subtitles.SubtitlesCard', {
 });
 
 const OPEN_KEY = 'subtitles-card-open';
+/** Bazarr busy this long with other jobs is worth saying. */
+const BUSY_MS = 2 * 60 * 60_000;
 
 /** The card stays open or closed as its viewer last left it. */
 const useRememberedOpen = (): [boolean, (open: boolean) => void] => {
@@ -202,6 +210,10 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
   const current = kind === 'movie' ? movie : series;
   const loaded = !!current.data;
   const transcription = useTranscription(kind, tmdbId, on && loaded);
+  // The time a search or transcription has taken, counting up.
+  const now = useNow(
+    !!(transcription.data?.searchJob || transcription.data?.transcribeJob)
+  );
   const plex = usePlexDefault(kind, tmdbId, on && loaded);
 
   const [search, setSearch] = useState<{
@@ -408,9 +420,42 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
     ? !movieData.tracks.some((t) => t.ai)
     : toTranscribe > 0;
   const status = transcription.data;
+  // Where a job is in Bazarr: how long it has waited or run, what is ahead
+  // of it, and Bazarr's own count when it keeps one.
+  const jobNotes = (job?: BazarrJobLive): string[] => {
+    if (!job) {
+      return [];
+    }
+    if (job.state === 'running') {
+      return [
+        elapsed(job.since, now),
+        job.progress
+          ? intl.formatMessage(messages.jobProgress, job.progress)
+          : '',
+      ];
+    }
+    const busyFor = job.busySince ? now - Date.parse(job.busySince) : 0;
+    return [
+      job.ahead
+        ? intl.formatMessage(messages.jobsAhead, { count: job.ahead })
+        : '',
+      busyFor > BUSY_MS
+        ? intl.formatMessage(messages.bazarrBusy, {
+            time: elapsed(job.busySince, now),
+          })
+        : elapsed(job.since, now),
+    ];
+  };
   const statusLine =
     [
-      status?.searching ? intl.formatMessage(messages.searchingNow) : '',
+      status?.searching
+        ? intl.formatMessage(
+            status.searchJob?.state === 'waiting'
+              ? messages.searchWaiting
+              : messages.searchingNow
+          )
+        : '',
+      ...(status?.searching ? jobNotes(status.searchJob) : []),
       status?.running
         ? status.current
           ? intl.formatMessage(
@@ -428,6 +473,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
                 : messages.transcribingNow
             )
         : '',
+      ...(status?.running ? jobNotes(status.transcribeJob) : []),
       status?.running && status.queued
         ? intl.formatMessage(messages.transcribingQueued, {
             count: status.queued,

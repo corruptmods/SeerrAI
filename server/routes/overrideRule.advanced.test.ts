@@ -1,8 +1,11 @@
 import TheMovieDb from '@server/api/themoviedb';
+import { ANIME_KEYWORD_ID } from '@server/api/themoviedb/constants';
 import { getRepository } from '@server/datasource';
 import OverrideRule from '@server/entity/OverrideRule';
 import { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
+import type { RadarrSettings } from '@server/lib/settings';
+import { getSettings } from '@server/lib/settings';
 import overrideRuleRoutes from '@server/routes/overrideRule';
 import { setupTestDb } from '@server/test/db';
 import express from 'express';
@@ -11,7 +14,7 @@ import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import http from 'node:http';
 import path from 'node:path';
-import { after, beforeEach, describe, it } from 'node:test';
+import { after, afterEach, beforeEach, describe, it } from 'node:test';
 
 /*
  * Upstream's override-rules preview (seerr-team/seerr#2164) needed the
@@ -214,5 +217,70 @@ describe('an override rule on age ratings', () => {
       rootFolder: '/kids',
     });
     assert.equal((await stored()).certification, null);
+  });
+});
+
+describe('the request window’s rule preview', () => {
+  const previewBody = async (body: object) => {
+    const res = await fetch(
+      `http://127.0.0.1:${port}/api/v1/overrideRule/advancedRequest`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mediaType: 'movie',
+          tmdbId: 550,
+          is4k: false,
+          ...body,
+        }),
+      }
+    );
+    assert.equal(res.status, 200);
+    return (await res.json()) as { rootFolder?: string | null };
+  };
+
+  beforeEach(() => {
+    getSettings().radarr = [
+      { id: 1, isDefault: true, is4k: false } as RadarrSettings,
+      { id: 2, isDefault: false, is4k: false } as RadarrSettings,
+    ];
+  });
+
+  afterEach(() => {
+    getSettings().radarr = [];
+  });
+
+  it('matches the default server’s rules for a server that isn’t one, as the request does', async () => {
+    await getRepository(OverrideRule).save(
+      new OverrideRule({ radarrServiceId: 1, rootFolder: '/default/movies' })
+    );
+    assert.equal(
+      (await previewBody({ serviceId: 7 })).rootFolder,
+      '/default/movies'
+    );
+    assert.equal(
+      (await previewBody({ serviceId: 2 })).rootFolder ?? null,
+      null
+    );
+  });
+
+  it('matches as anime when the request is ticked as anime', async () => {
+    await getRepository(OverrideRule).save(
+      new OverrideRule({
+        radarrServiceId: 1,
+        keywords: String(ANIME_KEYWORD_ID),
+        rootFolder: '/anime/movies',
+      })
+    );
+    // Not anime by detection: the anime rule doesn't apply...
+    assert.equal(
+      (await previewBody({ serviceId: 1 })).rootFolder ?? null,
+      null
+    );
+    // ...until the request is ticked as anime, as it will be sent.
+    assert.equal(
+      (await previewBody({ serviceId: 1, seriesType: 'anime' })).rootFolder,
+      '/anime/movies'
+    );
   });
 });

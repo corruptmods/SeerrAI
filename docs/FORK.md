@@ -10,12 +10,26 @@ merged back in.
 there, or to cherry-pick a fix worth having. Nothing is expected to merge
 cleanly, and nothing has to.
 
-Upstream `develop` has been read through `62ed636b0` (21 October 2026).
+Upstream `develop` has been read through `84eae6727` (27 October 2026).
 Its two security advisories there are covered: GHSA-xc6j-6p6h-p799 (other
 people's details and issues in a title's media info) by `mediaForViewer`,
 done here before upstream's fix; GHSA-8j73-j6rc-q8xh (notification
 credentials in every embedded user) by `User.toJSON`. Start the next read
 from that commit.
+
+From `62ed636b0` to `84eae6727`: #3652 is taken, reworked for several
+media servers: the owner signing in with Plex before any media server is
+set up makes Plex the primary one (`connectAsPrimary`) and starts the jobs,
+and the owner's email counts for that first Plex sign-in while none is set
+up. `startJobs` replaces the jobs it already scheduled rather than adding
+them again, which also fixes Jellyfin or Emby set up over an existing
+database scheduling every job twice. #3573 (a series edit or request that
+leaves no season to ask for answers 202), #3538 (rules matched against the
+server the request goes to) and #3608 (Trending's filters kept in the
+address) were already here. Beyond #3538, the request window's rule
+preview now matches as the request will be sent: against the default
+server for one that isn't among them, and as anime or not as ticked. The
+rest was CI, Cypress, docs and devenv.
 
 From `31b100dde` to `62ed636b0`: #3639 (Node.js 22.23.4) was done here
 as 2.0.1, with the same image digest; #3425 is taken (the watchlist POST

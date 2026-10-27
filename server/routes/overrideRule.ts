@@ -15,6 +15,7 @@ import overrideRules, {
   type OverrideRulesResult,
 } from '@server/lib/overrideRules';
 import { Permission } from '@server/lib/permissions';
+import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import {
@@ -116,6 +117,8 @@ overrideRuleRoutes.post<
     requestId: number | null;
     tags?: number[] | null;
     serviceId?: number;
+    /** The request's Anime tick, as it will be sent. */
+    seriesType?: string | null;
   }
 >(
   '/advancedRequest',
@@ -209,14 +212,29 @@ overrideRuleRoutes.post<
         where: { tmdbId: req.body.tmdbId, mediaType: req.body.mediaType },
       });
 
+      // Matched as the request itself will be (MediaRequest.request): on
+      // the server chosen, or the default one when it isn't one of them,
+      // and as anime or not as the dialog's tick says.
+      const settings = getSettings();
+      const serviceId = (
+        req.body.mediaType === MediaType.MOVIE
+          ? settings.radarr
+          : settings.sonarr
+      ).find((server) => server.id === req.body.serviceId)?.id;
+      const chosenSeriesType =
+        req.body.seriesType == null
+          ? null
+          : toSeriesTypeFor(req.body.mediaType, req.body.seriesType);
       const overrideRulesResult: OverrideRulesResult = await overrideRules({
         mediaType: req.body.mediaType,
         is4k: req.body.is4k,
         tmdbMedia,
         requestUser: ruleUser,
         tags: req.body.tags,
-        serviceId: req.body.serviceId,
-        animeSetting: media?.animeSetting,
+        serviceId,
+        animeSetting: chosenSeriesType
+          ? chosenSeriesType === 'anime'
+          : media?.animeSetting,
       });
 
       res.status(200).json(overrideRulesResult);

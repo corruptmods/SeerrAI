@@ -307,6 +307,13 @@ export const refreshMusicJobs = (): void => {
 
 export const startJobs = (): void => {
   const jobs = getSettings().jobs;
+  // Started again (a media server set up after Seerr AI started): the jobs
+  // already scheduled are replaced, not scheduled a second time. A job
+  // under way finishes; only its next runs are cancelled.
+  if (started) {
+    scheduledJobs.forEach((scheduledJob) => scheduledJob.job.cancel());
+    scheduledJobs.length = 0;
+  }
   started = true;
 
   // Each connected media server's scans, the primary one's first.

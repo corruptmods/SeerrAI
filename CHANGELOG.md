@@ -2,6 +2,14 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
+## Coming next
+
+### Fixed
+
+- With settings started afresh over an existing database, the owner signing in with Plex left Seerr AI with no media server set up. Plex is now set up as the media server, and the scheduled jobs start. (Upstream #3652)
+- Setting up Jellyfin or Emby on a Seerr AI that already had people scheduled every job twice.
+- The request window's override rule preview didn't match as the request would be sent: ticking **Anime** didn't bring in a rule for anime, and a server that isn't one of yours didn't fall back to the default server's rules.
+
 ## 2.2.0 (27 October 2026)
 
 Seerr AI can now fetch one song instead of a whole album, and Backfill and the admin agent go after music Lidarr couldn't find. Music gets real charts: top songs, trending songs, top albums and top artists. AI Search finds music too, subtitle searches and transcriptions show what Bazarr is doing, the installed app comes back where you left it, and Seerr AI is ready for Radarr 7.

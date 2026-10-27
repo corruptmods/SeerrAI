@@ -16769,6 +16769,12 @@ paths:
                 serviceId:
                   type: number
                   nullable: true
+                  description: The server the request goes to; the default one when it isn't one of them.
+                seriesType:
+                  type: string
+                  nullable: true
+                  enum: [standard, anime, daily, null]
+                  description: The request's Anime choice, as it will be sent; rules are matched as the request will be.
       responses:
         '200':
           description: Advanced override rule request processed

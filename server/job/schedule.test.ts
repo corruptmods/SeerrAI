@@ -154,6 +154,21 @@ describe('scheduled jobs', () => {
   // The interval decides which choices the schedule editor offers. Watchlist
   // Sync runs every few minutes, so offering only seconds left admins no way
   // to keep its schedule, or to set a sensible one.
+  it('replaces its jobs when started again, rather than scheduling them twice', () => {
+    connect('plex');
+    stubEveryJob();
+    startJobs();
+    const first = [...scheduledJobs];
+    // A media server set up after Seerr AI started starts the jobs again.
+    startJobs();
+    assert.equal(new Set(ids()).size, ids().length, 'each job once');
+    assert.equal(scheduledJobs.length, first.length);
+    assert.ok(
+      first.every((job) => job.job.nextInvocation() === null),
+      'the jobs scheduled first no longer run'
+    );
+  });
+
   it('edits Watchlist Sync in minutes', () => {
     getSettings().main.mediaServerType = MediaServerType.PLEX;
     stubEveryJob();

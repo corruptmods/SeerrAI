@@ -429,6 +429,14 @@ const AdvancedRequester = ({
               tags: selectedTags.length > 0 ? selectedTags : undefined,
               serviceId: selectedServer ?? undefined,
               requestId: requestId ?? undefined,
+              // Rules match as the request will be sent: as anime or not
+              // as ticked.
+              seriesType:
+                animeChoice === null
+                  ? (requestSeriesType ?? undefined)
+                  : animeChoice
+                    ? 'anime'
+                    : 'standard',
             }
           );
           if (cancelled) {
@@ -487,6 +495,10 @@ const AdvancedRequester = ({
     defaultOverrides?.folder,
     defaultOverrides?.profile,
     defaultOverrides?.tags,
+    // Ticked or unticked, a rule for anime (or not) may now apply, on top
+    // of the kind's own folder, profile and tags.
+    animeChoice,
+    requestSeriesType,
   ]);
 
   if (!data && !error) {

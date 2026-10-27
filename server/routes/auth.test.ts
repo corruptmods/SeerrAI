@@ -14,6 +14,7 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
+import { scheduledJobs } from '@server/job/schedule';
 import PreparedEmail from '@server/lib/email';
 import ImageProxy from '@server/lib/imageproxy';
 import { applyMediaServerLogin } from '@server/lib/mediaServerAdmin';
@@ -26,6 +27,7 @@ import axios from 'axios';
 import type { Express } from 'express';
 import express from 'express';
 import session from 'express-session';
+import schedule from 'node-schedule';
 import request from 'supertest';
 import authRoutes from './auth';
 
@@ -1062,6 +1064,35 @@ describe('signing in with Plex', () => {
 
   const plexSignIn = () =>
     request(app).post('/auth/plex').send({ authToken: 'plex-token' });
+
+  it('makes Plex the primary server when the owner signs in before one is set', async () => {
+    // Settings started afresh over a database that has its people.
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+    settings.plex.connected = false;
+    plexAccount = { id: 1, email: 'admin@seerr.dev' };
+    try {
+      const res = await plexSignIn();
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(settings.main.mediaServerType, MediaServerType.PLEX);
+      assert.strictEqual(settings.plex.connected, true);
+      assert.ok(scheduledJobs.length > 0, 'the jobs started');
+    } finally {
+      await schedule.gracefulShutdown();
+      scheduledJobs.length = 0;
+    }
+  });
+
+  it('leaves the primary server alone when someone else signs in first', async () => {
+    const settings = getSettings();
+    settings.main.mediaServerType = MediaServerType.NOT_CONFIGURED;
+    const res = await plexSignIn();
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(
+      settings.main.mediaServerType,
+      MediaServerType.NOT_CONFIGURED
+    );
+  });
 
   it('never hands a password account to a Plex account with its email', async () => {
     // Anyone can type a Plex friend's email into their own profile.

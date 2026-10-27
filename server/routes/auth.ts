@@ -208,9 +208,10 @@ authRoutes.post('/plex', async (req, res, next) => {
       if (
         account.id === mainUser.plexId ||
         // The owner signing in with Plex for the first time, on a server
-        // set up with Plex. With another server primary, the owner's email
-        // says nothing about who holds this Plex account.
-        (primaryServer() === 'plex' &&
+        // set up with Plex, or with none set up yet. With another server
+        // primary, the owner's email says nothing about who holds this Plex
+        // account.
+        ((primaryServer() ?? 'plex') === 'plex' &&
           account.email === mainUser.email &&
           !mainUser.plexId) ||
         (await mainPlexTv.checkUserAccess(account.id))
@@ -324,6 +325,15 @@ authRoutes.post('/plex', async (req, res, next) => {
           message: 'Access denied.',
         });
       }
+    }
+
+    // The owner signing in with Plex before any media server is set up
+    // (settings started afresh over an existing database): Plex becomes the
+    // primary server and the jobs start, as at a first sign-in.
+    if (primaryServer() === undefined && user.id === 1) {
+      connectAsPrimary('plex');
+      await settings.save();
+      startJobs();
     }
 
     // Set logged in session

@@ -115,7 +115,7 @@ export const musicDefaults = (): MusicSettings => ({
   songRequests: true,
   songsFromAlbums: true,
   songQuota: { quotaLimit: 0, quotaDays: 7 },
-  search: { inAll: false },
+  search: {},
 });
 
 /** A Jellyfin or Emby server that has not been set up. */
@@ -518,9 +518,22 @@ export interface MusicSettings {
  * music off for everyone, or for themselves, wins over this too.
  */
 export interface MusicSearchSettings {
-  /** Artists and albums below the films and series in All. */
-  inAll: boolean;
+  /**
+   * Artists and albums below the films and series in All. Left unset, on
+   * once Lidarr is set up (see musicInAllSearch); an admin's own choice
+   * stands either way.
+   */
+  inAll?: boolean;
 }
+
+/**
+ * Whether All search results include music: as an admin chose, else on
+ * once a default Lidarr is set up and off without one.
+ */
+export const musicInAllSearch = (
+  search: MusicSearchSettings,
+  lidarrReady: boolean
+): boolean => search.inAll ?? lidarrReady;
 
 export const MUSICBRAINZ_URL = 'https://musicbrainz.org';
 
@@ -1659,7 +1672,12 @@ class Settings {
       musicReady:
         (this.data.lidarr ?? []).some((lidarr) => lidarr.isDefault) &&
         !(this.data.main.disabledFeatures ?? []).includes('music'),
-      musicSearch: { inAll: this.music.search.inAll },
+      musicSearch: {
+        inAll: musicInAllSearch(
+          this.music.search,
+          (this.data.lidarr ?? []).some((lidarr) => lidarr.isDefault)
+        ),
+      },
       musicSongs: !!this.music.songRequests,
       // Checked again here: settings.json can be edited by hand.
       themeDefault:

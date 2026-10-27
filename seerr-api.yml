@@ -2265,8 +2265,8 @@ components:
       properties:
         inAll:
           type: boolean
-          description: Artists and albums below the films and series when searching for All.
-          example: false
+          description: Artists and albums below the films and series when searching for All. As an admin set it, else on while a default Lidarr is set up and off without one.
+          example: true
     MovieResult:
       type: object
       required:
@@ -8143,7 +8143,7 @@ paths:
                   properties:
                     inAll:
                       type: boolean
-                      description: Artists and albums below the films and series in All.
+                      description: Artists and albums below the films and series in All. Sent only to change it; left unset, it is on while a default Lidarr is set up.
       responses:
         '200':
           description: Music settings saved
@@ -12949,6 +12949,12 @@ paths:
                         status:
                           type: number
                           description: Its song's request's status, when asked for.
+                        onlyOnAlbums:
+                          type: boolean
+                          description: On no single or EP of the artist's while songs aren't taken from albums, so only its album can be asked for.
+                        checking:
+                          type: boolean
+                          description: Whether it is on a single is still being looked up; ask again shortly.
   /discover/music/new-releases:
     get:
       summary: New music

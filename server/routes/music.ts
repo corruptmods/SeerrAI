@@ -22,7 +22,7 @@ import {
   searchWhileTied,
 } from '@server/lib/music/searchRank';
 import { songFetchProblem } from '@server/lib/music/songFetchReady';
-import { groupSongs } from '@server/lib/music/songs';
+import { groupSongs, singleFor, toVersion } from '@server/lib/music/songs';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -42,7 +42,7 @@ import {
   mapSongResult,
   mapTracks,
 } from '@server/models/Music';
-import type { NextFunction } from 'express';
+import type { NextFunction, Request } from 'express';
 import { Router } from 'express';
 
 /*
@@ -105,18 +105,32 @@ const mbFailed = (next: NextFunction, e: unknown, what: string) => {
 };
 
 /*
- * Each person's newest search. MusicBrainz answers one request a second
- * for the whole server, so a search typed past is dropped while it waits,
- * rather than holding up the one now wanted. The songs below the same
- * search are part of it.
+ * Each page's newest search: each person's in each tab or window (the
+ * X-Seerr-Tab header the app sends), else each person's. MusicBrainz
+ * answers one request a second for the whole server, so a search typed
+ * past is dropped while it waits, rather than holding up the one now
+ * wanted; a search in another tab is not typed past, and is left alone.
+ * The songs below the same search are part of it.
  */
-const newestSearch = new Map<number, string>();
+const newestSearch = new Map<string, string>();
 
-const wantedSearch = (userId: number | undefined, query: string) => {
+/** Most tabs followed at once; the oldest are forgotten first. */
+const MOST_TABS = 1000;
+
+const TAB = /^[\w-]{1,64}$/;
+
+const wantedSearch = (req: Request, query: string) => {
+  const userId = req.user?.id;
   if (userId === undefined) return undefined;
+  const tab = req.get('X-Seerr-Tab');
+  const page = `${userId}:${tab && TAB.test(tab) ? tab : ''}`;
   const key = query.trim().toLowerCase();
-  newestSearch.set(userId, key);
-  return () => newestSearch.get(userId) === key;
+  newestSearch.delete(page);
+  newestSearch.set(page, key);
+  if (newestSearch.size > MOST_TABS) {
+    newestSearch.delete(newestSearch.keys().next().value as string);
+  }
+  return () => newestSearch.get(page) === key;
 };
 
 /**
@@ -168,7 +182,7 @@ musicRoutes.get('/search', async (req, res, next) => {
   try {
     const { artistList, albumList } = await searchArtistsAndAlbums(
       query,
-      wantedSearch(req.user?.id, query)
+      wantedSearch(req, query)
     );
     const [knownArtists, knownAlbums] = await Promise.all([
       artistStatuses(artistList.map((a) => a.id)),
@@ -201,7 +215,7 @@ musicRoutes.get('/search/songs', async (req, res, next) => {
       .json({ songs: [] } satisfies MusicSongSearchResponse);
   }
   try {
-    const wanted = wantedSearch(req.user?.id, query);
+    const wanted = wantedSearch(req, query);
     const { artistList, albumList } = await searchArtistsAndAlbums(
       query,
       wanted
@@ -380,6 +394,29 @@ musicRoutes.get<{ mbid: string }>(
       );
       for (const track of tracks) {
         Object.assign(track, standing.get(track.recordingId ?? ''));
+      }
+      // Without taking songs from albums, a song on no single can't be
+      // asked for by itself. Whether each is on one is known from its
+      // recording, kept from before; those not kept yet are looked up
+      // behind the scenes, and the page asks again.
+      if (songFetchProblem()) {
+        await Promise.all(
+          tracks.map(async (track) => {
+            if (!isMbid(track.recordingId)) return;
+            const recording = await mb.keptRecording(track.recordingId);
+            if (recording === undefined) {
+              track.checking = true;
+              mb.getRecording(track.recordingId, 'background').catch(
+                () => undefined
+              );
+              return;
+            }
+            const version = recording && toVersion(recording);
+            if (!version || !singleFor(version)) {
+              track.onlyOnAlbums = true;
+            }
+          })
+        );
       }
       return res.status(200).json({ tracks });
     } catch (e) {

@@ -444,6 +444,21 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
+   * A recording as kept from an earlier lookup, without asking MusicBrainz:
+   * undefined when none is kept (or it is past its time).
+   */
+  public async keptRecording(
+    id: string
+  ): Promise<MbRecording | null | undefined> {
+    requireMbid(id);
+    const key = `recording:${id}`;
+    const kept =
+      this.memory.get<Kept<{ recording: MbRecording | null }>>(key) ??
+      (await this.readStored<{ recording: MbRecording | null }>(key));
+    return kept && !isStale(kept) ? kept.data.recording : undefined;
+  }
+
+  /**
    * One recording, with every release it is on and their albums. Asked as
    * a search by id: a lookup lists only the first 25 releases, and a hit
    * song is on far more.

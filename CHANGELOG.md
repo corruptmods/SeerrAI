@@ -19,10 +19,13 @@ Seerr AI can now fetch one song instead of a whole album, and Backfill and the a
 - **Subtitle searches and transcriptions show what Bazarr is doing**: how long they've waited or run, how many jobs are ahead of them in Bazarr, its count of what it has checked, and when Bazarr has been busy with other jobs for hours.
 - **The installed app comes back where you left it**: when iOS closes Seerr AI while it's in the background, switching back goes to the page you were on, not the home page. Closed for good (swiped away), it starts fresh.
 - **Shared lists** open their cards' moving posters somewhere new each visit, rather than on the same ones every time.
+- **Music in All search results** is on to start once Lidarr is set up, and off without it. Your own choice in Settings → Music stays put.
 - **Music request cards** match films' and series': the cover behind them, the artist above, the album or song as the title.
 
 ### Fixed
 
+- With Take Songs from Albums off, an album's songs that are only on albums showed **Request**, which then failed. They now say **Only on albums**.
+- Searching music in two tabs at once made each drop the other's search.
 - On Postgres, Backfill couldn't save a SABnzbd download's progress while it downloaded.
 - AI Search couldn't fix a title newer than the AI: it renamed it or said it didn't exist. It now finds the title on the server from your own words.
 - Search's All said "No results." above the music it found.

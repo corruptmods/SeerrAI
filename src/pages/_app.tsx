@@ -155,6 +155,13 @@ interface ExtendedAppProps extends AppProps {
 // can recognise a client stranded on an old build (see /api/v1/status).
 axios.defaults.headers.common['X-Seerr-Build'] =
   process.env.commitTag ?? 'local';
+// And which tab or window it is, so one tab's music search never drops
+// another's as typed past.
+if (typeof window !== 'undefined') {
+  axios.defaults.headers.common['X-Seerr-Tab'] = Math.random()
+    .toString(36)
+    .slice(2, 12);
+}
 
 const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
   Component,

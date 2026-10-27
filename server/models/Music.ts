@@ -162,6 +162,13 @@ export interface MusicTrack extends MusicSongStatus {
   length?: number | null;
   /** The recording on this track: the version asked for when it is. */
   recordingId?: string;
+  /**
+   * It is on no single or EP of the artist's, and songs aren't taken from
+   * albums here, so it can't be asked for by itself: its album can.
+   */
+  onlyOnAlbums?: boolean;
+  /** Whether it is on a single is still being looked up. */
+  checking?: boolean;
 }
 
 export interface MusicPage<T> {

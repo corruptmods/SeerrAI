@@ -531,6 +531,36 @@ describe('search', () => {
     assert.equal(wanted?.(), true);
   });
 
+  it('drops a search typed past in the same tab, not one in another tab', async () => {
+    const searchArtists = mock.method(
+      MusicBrainz.prototype,
+      'searchArtists',
+      async () => ({ count: 0, offset: 0, artists: [] })
+    );
+    mock.method(MusicBrainz.prototype, 'searchReleaseGroups', async () => ({
+      count: 0,
+      offset: 0,
+      'release-groups': [],
+    }));
+    const search = async (query: string, tab: string) => {
+      const res = await fetch(
+        `http://127.0.0.1:${port}/api/v1/music/search?query=${query}`,
+        { headers: { 'X-Seerr-Tab': tab } }
+      );
+      assert.equal(res.status, 200);
+      const calls = searchArtists.mock.calls;
+      return (calls[calls.length - 1].arguments[1] as { wanted: () => boolean })
+        .wanted;
+    };
+    const first = await search('harbour', 'tab-one');
+    const other = await search('ferryman', 'tab-two');
+    assert.equal(first(), true, 'another tab’s search leaves it wanted');
+    assert.equal(other(), true);
+    await search('harbour lights', 'tab-one');
+    assert.equal(first(), false, 'typed past in its own tab');
+    assert.equal(other(), true);
+  });
+
   it('shows 8 artists and 12 albums, whatever an older version saved', async () => {
     // Before Settings → Music was trimmed, how many a search showed, and
     // where music could be searched, were settings.
@@ -1140,6 +1170,85 @@ describe('an album', () => {
     assert.equal(
       (partly.body as { tracks: { status?: number }[] }).tracks[1].status,
       undefined
+    );
+  });
+});
+
+describe('an album’s tracks without taking songs from albums', () => {
+  it('say which are only on albums, and look up the rest', async () => {
+    getSettings().music = { ...musicDefaults(), songsFromAlbums: false };
+    mock.method(MusicBrainz.prototype, 'getReleaseGroup', async () =>
+      album(IDS.album, 'Sing to the Ferryman', '2003-06-09')
+    );
+    const rec = (n: number) => `0a1b2c3d-0000-4000-8000-00000000000${n}`;
+    mock.method(MusicBrainz.prototype, 'getTracks', async () => [
+      {
+        position: 1,
+        tracks: [1, 2, 3].map((n) => ({
+          id: `t${n}`,
+          position: n,
+          number: String(n),
+          title: `Song ${n}`,
+          recording: { id: rec(n), title: `Song ${n}`, length: 200000 },
+        })),
+      },
+    ]);
+    const release = (type: string) => ({
+      id: '0a1b2c3d-0000-4000-8000-0000000000aa',
+      title: 'x',
+      status: 'Official',
+      date: '2003-06-09',
+      'release-group': {
+        id: type === 'Single' ? IDS.otherAlbum : IDS.album,
+        title: 'x',
+        'primary-type': type,
+        'secondary-types': [],
+      },
+    });
+    const recording = (n: number, types: string[]) => ({
+      id: rec(n),
+      title: `Song ${n}`,
+      length: 200000,
+      'artist-credit': [
+        { name: 'Glasswing', artist: { id: IDS.artist, name: 'Glasswing' } },
+      ],
+      releases: types.map(release),
+    });
+    // Song 1 has a single; song 2 is only on the album; song 3 isn't known.
+    mock.method(MusicBrainz.prototype, 'keptRecording', async (id: string) =>
+      id === rec(1)
+        ? recording(1, ['Single', 'Album'])
+        : id === rec(2)
+          ? recording(2, ['Album'])
+          : undefined
+    );
+    const lookedUp = mock.method(
+      MusicBrainz.prototype,
+      'getRecording',
+      async () => null
+    );
+
+    const { status, body } = await get(`/music/album/${IDS.album}/tracks`);
+    assert.equal(status, 200);
+    assert.deepEqual(
+      (
+        body as {
+          tracks: {
+            title: string;
+            onlyOnAlbums?: boolean;
+            checking?: boolean;
+          }[];
+        }
+      ).tracks.map((t) => [t.title, !!t.onlyOnAlbums, !!t.checking]),
+      [
+        ['Song 1', false, false],
+        ['Song 2', true, false],
+        ['Song 3', false, true],
+      ]
+    );
+    assert.deepEqual(
+      lookedUp.mock.calls.map((c) => c.arguments),
+      [[rec(3), 'background']]
     );
   });
 });

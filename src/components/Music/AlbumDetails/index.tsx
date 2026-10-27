@@ -52,6 +52,9 @@ const messages = defineMessages('components.Music.AlbumDetails', {
   requestAlbum: 'Request Album',
   requestMore: 'Request More',
   requestSong: 'Request Song',
+  onlyOnAlbums: 'Only on albums',
+  onlyOnAlbumsTip:
+    'Not released on its own, so it can’t be requested by itself. Request its album instead.',
   variousArtists:
     'Lidarr cannot add Various Artists, so this compilation cannot be requested.',
   playOn: 'Play on {server}',
@@ -81,7 +84,12 @@ const TrackList = ({
   const [chosen, setChosen] = useState<boolean>();
   const open = chosen ?? wide;
   const { data, error, mutate } = useSWR<{ tracks: MusicTrack[] }>(
-    `/api/v1/music/album/${albumId}/tracks`
+    `/api/v1/music/album/${albumId}/tracks`,
+    {
+      // Asked again while some are still being looked up.
+      refreshInterval: (latest) =>
+        latest?.tracks.some((track) => track.checking) ? 5000 : 0,
+    }
   );
 
   if (error && !data) {
@@ -165,6 +173,17 @@ const TrackList = ({
                               }
                               plain
                             />
+                          </span>
+                        ) : songsOf && track.checking ? (
+                          // Its Request shows once it is known to be on a
+                          // single.
+                          <span className="w-28 shrink-0" />
+                        ) : songsOf && track.onlyOnAlbums ? (
+                          <span
+                            className="w-28 shrink-0 text-center text-xs text-muted"
+                            title={intl.formatMessage(messages.onlyOnAlbumsTip)}
+                          >
+                            {intl.formatMessage(messages.onlyOnAlbums)}
                           </span>
                         ) : songsOf && track.recordingId ? (
                           <Button

@@ -400,6 +400,28 @@ describe('how music is searched', () => {
     assert.deepEqual(getSettings().music.search, { inAll: true });
   });
 
+  it('is on to start once Lidarr is set up, unless an admin chose', async () => {
+    const search = async () =>
+      ((await call('GET', '/settings/music')).body as { search: unknown })
+        .search;
+    // Nothing chosen: off without Lidarr, on with one.
+    assert.deepEqual(getSettings().music.search, {});
+    assert.deepEqual(await search(), { inAll: false });
+    assert.equal(getSettings().fullPublicSettings.musicSearch.inAll, false);
+    getSettings().lidarr = [{ ...server(), id: 0 }];
+    assert.deepEqual(await search(), { inAll: true });
+    assert.equal(getSettings().fullPublicSettings.musicSearch.inAll, true);
+
+    // Saving the rest leaves it to follow Lidarr.
+    await call('POST', '/settings/music', { listenBrainz: true });
+    assert.deepEqual(getSettings().music.search, {});
+
+    // Turned off by an admin, it stays off with Lidarr there.
+    await call('POST', '/settings/music', { search: { inAll: false } });
+    assert.deepEqual(await search(), { inAll: false });
+    assert.equal(getSettings().fullPublicSettings.musicSearch.inAll, false);
+  });
+
   it('keeps nothing but whether music is in All', async () => {
     // A page from before the trim may still send the settings that went.
     const saved = await call('POST', '/settings/music', {
@@ -421,7 +443,7 @@ describe('how music is searched', () => {
         .status,
       400
     );
-    assert.deepEqual(getSettings().music.search, { inAll: false });
+    assert.deepEqual(getSettings().music.search, {});
   });
 
   it('tells everyone only whether music is in All', async () => {
@@ -438,7 +460,7 @@ describe('how music is searched', () => {
         .status,
       403
     );
-    assert.equal(getSettings().music.search.inAll, false);
+    assert.equal(getSettings().music.search.inAll, undefined);
   });
 
   it('is there before a Lidarr is added, since music starts here', async () => {

@@ -1,5 +1,9 @@
 import type { MusicSettings } from '@server/lib/settings';
-import { MUSICBRAINZ_URL, getSettings } from '@server/lib/settings';
+import {
+  MUSICBRAINZ_URL,
+  getSettings,
+  musicInAllSearch,
+} from '@server/lib/settings';
 import { requireMusicSettings } from '@server/middleware/music';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -40,7 +44,8 @@ const musicBody = z.object({
       quotaDays: z.coerce.number().int().min(0).max(100),
     })
     .optional(),
-  // Anything else an older page sends with it is left out.
+  // Sent only when the admin changes it; anything else an older page
+  // sends with it is left out.
   search: z.object({ inAll: z.boolean() }).optional(),
 });
 
@@ -54,7 +59,12 @@ const shown = (music: MusicSettings) => ({
   songsFromAlbums: !!music.songsFromAlbums,
   songQuota: music.songQuota,
   hasTheAudioDbApiKey: !!music.theAudioDbApiKey,
-  search: { inAll: music.search.inAll },
+  search: {
+    inAll: musicInAllSearch(
+      music.search,
+      getSettings().lidarr.some((lidarr) => lidarr.isDefault)
+    ),
+  },
 });
 
 musicSettingsRoutes.get('/', (_req, res) => {
@@ -80,7 +90,7 @@ musicSettingsRoutes.post('/', async (req, res, next) => {
     theAudioDbApiKey: body.removeTheAudioDbApiKey
       ? ''
       : body.theAudioDbApiKey || saved.theAudioDbApiKey,
-    search: { inAll: (body.search ?? saved.search).inAll },
+    search: body.search ? { inAll: body.search.inAll } : saved.search,
   };
   await settings.save();
   return res.status(200).json(shown(settings.music));

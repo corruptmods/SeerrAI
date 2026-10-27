@@ -42,7 +42,7 @@ const messages = defineMessages('components.Settings.SettingsMusicTab', {
     'Search gets a Music tab, and the Music page its own search box. Hidden for anyone who turned music off.',
   inAll: 'Include Music in All Search Results',
   inAllTip:
-    'Artist and album rows below the other results, loaded last so they never slow them down',
+    'Artist and album rows below the other results, loaded last so they never slow them down. On to start once Lidarr is set up.',
   offForEveryone: 'Music is off for everyone. Turn it on to set it up.',
   metadata: 'Where Music Comes From',
   whereItLives: 'Where It Lives',
@@ -127,9 +127,14 @@ const MusicSettingsForm = () => {
       enableReinitialize
       onSubmit={async ({ inAll, ...sources }) => {
         try {
+          // Sent only when changed: left alone, it stays on while Lidarr
+          // is set up and off while it isn't.
           const response = await axios.post<ShownMusicSettings>(
             '/api/v1/settings/music',
-            { ...musicSourceBody(sources), search: { inAll } }
+            {
+              ...musicSourceBody(sources),
+              ...(inAll !== data.search.inAll ? { search: { inAll } } : {}),
+            }
           );
           await mutate(response.data, { revalidate: false });
           // The search page reads whether music is in All from the public

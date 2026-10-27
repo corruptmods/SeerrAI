@@ -11624,12 +11624,6 @@ paths:
             type: number
             example: 1
             default: 1
-        - in: query
-          name: shuffle
-          description: A seed from 0 to 2^32 − 1. The watchlist comes in an order it sets, the same for the same seed, so one visit's pages follow on. Up to 300 titles are shuffled.
-          schema:
-            type: integer
-            example: 2718281828
       responses:
         '200':
           description: Watchlist data returned
@@ -14134,12 +14128,6 @@ paths:
             type: number
             example: 1
             default: 1
-        - in: query
-          name: shuffle
-          description: A seed from 0 to 2^32 − 1. The watchlist comes in an order it sets, the same for the same seed, so one visit's pages follow on. Up to 300 titles are shuffled.
-          schema:
-            type: integer
-            example: 2718281828
       responses:
         '200':
           description: Watchlist data returned

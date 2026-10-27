@@ -5,11 +5,9 @@ import useDiscover from '@app/hooks/useDiscover';
 import { useUser } from '@app/hooks/useUser';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
-import { watchlistSeed } from '@app/utils/watchlistOrder';
 import type { WatchlistItem } from '@server/interfaces/api/discoverInterfaces';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useState } from 'react';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Discover.DiscoverWatchlist', {
@@ -24,8 +22,6 @@ const DiscoverWatchlist = () => {
     id: Number(router.query.userId),
   });
   const { user: currentUser } = useUser();
-  // A new order each visit; the same one while scrolling through it.
-  const [shuffle] = useState(watchlistSeed);
 
   const {
     isLoadingInitialData,
@@ -43,8 +39,7 @@ const DiscoverWatchlist = () => {
         : router.query.userId
           ? `user/${router.query.userId}`
           : 'discover'
-    }/watchlist`,
-    { shuffle }
+    }/watchlist`
   );
 
   if (error) {

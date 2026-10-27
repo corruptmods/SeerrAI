@@ -3,11 +3,9 @@ import TmdbTitleCard from '@app/components/TitleCard/TmdbTitleCard';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { hasAccountOn } from '@app/utils/mediaServerAccounts';
-import { HOME_WATCHLIST, watchlistSeed } from '@app/utils/watchlistOrder';
 import { ArrowRightCircleIcon } from '@heroicons/react/24/outline';
 import type { WatchlistItem } from '@server/interfaces/api/discoverInterfaces';
 import Link from 'next/link';
-import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -21,15 +19,13 @@ const messages = defineMessages('components.Discover.PlexWatchlistSlider', {
 const PlexWatchlistSlider = () => {
   const intl = useIntl();
   const { user } = useUser();
-  // A new order each visit, so the row doesn't always start the same.
-  const [shuffle] = useState(watchlistSeed);
 
   const { data: watchlistItems, error: watchlistError } = useSWR<{
     page: number;
     totalPages: number;
     totalResults: number;
     results: WatchlistItem[];
-  }>(`${HOME_WATCHLIST}?shuffle=${shuffle}`, {
+  }>('/api/v1/discover/watchlist', {
     revalidateOnMount: true,
   });
 

@@ -16,9 +16,9 @@ Seerr AI can now fetch one song instead of a whole album, and Backfill and the a
 - **Music charts**: Music and Discover get **Top Songs**, **Trending Songs** (the chart's songs out in the last month), **Top Albums** and **Top Artists**, from Apple Music's charts for your Discover region. Top Albums and Top Artists take over from Popular Albums and Popular Artists, which only counted ListenBrainz's own listeners. Songs can be requested from their cards. A chart fills in over a few minutes the first time, as each entry is matched to MusicBrainz. ([guide](./docs/seerr-ai/music.md))
 - **Music in AI Search**: with music on, AI Search finds albums and artists too, from a description or a photo of an album cover.
 - **Radarr 7**: works as before. If Radarr's Allowed Hosts (which Radarr 7 asks for) leaves out the name Seerr AI uses for it, the connection test, Health and errors say what to add, instead of "Failed to connect". Sonarr and Lidarr too.
-- **Your Watchlist** shows your titles in a new order each visit: its row on the home page and your profile, and its own page, which starts with the titles the row showed.
 - **Subtitle searches and transcriptions show what Bazarr is doing**: how long they've waited or run, how many jobs are ahead of them in Bazarr, its count of what it has checked, and when Bazarr has been busy with other jobs for hours.
 - **The installed app opens where you left it**: when iOS closes Seerr AI in the background, opening it again goes back to the page you were on, not the home page.
+- **Shared lists** open their cards' moving posters somewhere new each visit, rather than on the same ones every time.
 - **Music request cards** match films' and series': the cover behind them, the artist above, the album or song as the title.
 
 ### Fixed

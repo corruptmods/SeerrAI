@@ -2,7 +2,6 @@ import Button from '@app/components/Common/Button';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import { refreshHomeWatchlist } from '@app/utils/watchlistOrder';
 import { CheckIcon, TrashIcon } from '@heroicons/react/24/solid';
 import axios from 'axios';
 import { useIntl } from 'react-intl';
@@ -47,7 +46,7 @@ const ErrorCard = ({ id, tmdbId, tvdbId, type, canExpand }: ErrorCardProps) => {
         autoDismiss: true,
       });
     });
-    refreshHomeWatchlist();
+    globalMutate('/api/v1/discover/watchlist');
     globalMutate('/api/v1/media?filter=allavailable&take=20&sort=mediaAdded');
     globalMutate('/api/v1/request?filter=all&take=10&sort=modified&skip=0');
   };

@@ -1,4 +1,4 @@
-import PlexTvAPI, { WATCHLIST_SHUFFLE_MAX } from '@server/api/plextv';
+import PlexTvAPI from '@server/api/plextv';
 import cacheManager from '@server/lib/cache';
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
@@ -76,65 +76,6 @@ beforeEach(() => {
 });
 
 describe('PlexTvAPI.getWatchlist', () => {
-  it('shuffles the whole watchlist by a seed, looking up only a page of it', async () => {
-    const keys = Array.from({ length: 30 }, (_, i) => `k${i}`);
-    const details = Object.fromEntries(
-      keys.map((key, i) => [key, metadata(key, 1000 + i)])
-    );
-    const { api } = apiWith(
-      [
-        { status: 200, etag: '"v1"', data: watchlist(...keys) },
-        { status: 304 },
-        { status: 304 },
-      ],
-      details
-    );
-    const internals = api as unknown as {
-      axios: { get: (...args: unknown[]) => Promise<unknown> };
-      getRolling: (url: string) => Promise<unknown>;
-    };
-    const asked: unknown[] = [];
-    const listing = internals.axios.get;
-    internals.axios.get = async (url, config) => {
-      asked.push((config as { params: unknown }).params);
-      return listing(url, config);
-    };
-    let lookups = 0;
-    const lookup = internals.getRolling;
-    internals.getRolling = async (url) => {
-      lookups++;
-      return lookup(url);
-    };
-
-    const first = await api.getWatchlist({ offset: 0, shuffle: 7 });
-    const second = await api.getWatchlist({ offset: 20, shuffle: 7 });
-
-    // The whole of it asked for each time, and only each page looked up.
-    assert.deepEqual(asked[0], {
-      'X-Plex-Container-Start': 0,
-      'X-Plex-Container-Size': WATCHLIST_SHUFFLE_MAX,
-    });
-    assert.equal(lookups, 30);
-    assert.deepEqual(
-      [first.items.length, second.items.length, first.totalSize],
-      [20, 10, 30]
-    );
-    const shown = [...first.items, ...second.items].map((i) => i.tmdbId);
-    assert.equal(new Set(shown).size, 30, 'every title once over the pages');
-    assert.notDeepEqual(
-      shown,
-      keys.map((_, i) => 1000 + i),
-      'not in the watchlist’s own order'
-    );
-
-    // The same seed, the same order.
-    const again = await api.getWatchlist({ offset: 0, shuffle: 7 });
-    assert.deepEqual(
-      again.items.map((i) => i.tmdbId),
-      first.items.map((i) => i.tmdbId)
-    );
-  });
-
   it('keeps a watchlist with its ETag and asks with it next time', async () => {
     const { api, sent } = apiWith(
       [{ status: 200, etag: '"v1"', data: watchlist('a') }, { status: 304 }],
@@ -148,6 +89,27 @@ describe('PlexTvAPI.getWatchlist', () => {
       [[603], [603]]
     );
     assert.equal(second.totalSize, 1);
+  });
+
+  it('keeps each page of a watchlist apart, with its own ETag', async () => {
+    const { api, sent } = apiWith(
+      [
+        { status: 200, etag: '"p1"', data: watchlist('a') },
+        { status: 200, etag: '"p2"', data: watchlist('b') },
+        { status: 304 },
+      ],
+      { a: metadata('a', 603), b: metadata('b', 604) }
+    );
+    await api.getWatchlist({ offset: 0 });
+    await api.getWatchlist({ offset: 20 });
+    const again = await api.getWatchlist({ offset: 20 });
+    // The second page is asked for without the first's tag, and a 304 for
+    // it answers with its own titles.
+    assert.deepEqual(sent, [undefined, undefined, '"p2"']);
+    assert.deepEqual(
+      again.items.map((i) => i.tmdbId),
+      [604]
+    );
   });
 
   it('never keeps a reply that is not a watchlist, so it cannot be pinned', async () => {

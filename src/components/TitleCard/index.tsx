@@ -24,7 +24,6 @@ import {
 } from '@app/utils/imageSources';
 import { hasAccountOn } from '@app/utils/mediaServerAccounts';
 import { withProperties } from '@app/utils/typeHelpers';
-import { refreshHomeWatchlist } from '@app/utils/watchlistOrder';
 import {
   ArrowDownTrayIcon,
   EyeIcon,
@@ -177,7 +176,7 @@ const TitleCard = ({
         mediaType,
         title,
       });
-      refreshHomeWatchlist();
+      globalMutate('/api/v1/discover/watchlist');
       if (response.data) {
         addToast(
           <span>
@@ -225,7 +224,7 @@ const TitleCard = ({
       });
     } finally {
       setIsUpdating(false);
-      refreshHomeWatchlist();
+      globalMutate('/api/v1/discover/watchlist');
       if (mutateParent) {
         mutateParent();
       }

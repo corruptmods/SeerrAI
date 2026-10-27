@@ -39,7 +39,6 @@ import {
 } from '@server/utils/animeSeason';
 import type { AnimeSignals } from '@server/utils/isAnime';
 import { leftOutAsAnime } from '@server/utils/isAnime';
-import { shuffleSeed } from '@server/utils/shuffle';
 import { isCollection, isMovie, isPerson } from '@server/utils/typeHelpers';
 import { Router } from 'express';
 import { sortBy } from 'lodash';
@@ -1139,9 +1138,6 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
     const page = req.query.page ? Number(req.query.page) : 1;
     const offset = (page - 1) * itemsPerPage;
 
-    // A seed from the page: the watchlist mixed anew for each visit.
-    const shuffle = shuffleSeed(req.query.shuffle);
-
     const activeUser = await userRepository.findOne({
       where: { id: req.user?.id },
       select: ['id', 'plexToken'],
@@ -1152,8 +1148,7 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
       const [result, total] = await savedWatchlistPage(
         activeUser.id,
         offset,
-        itemsPerPage,
-        shuffle
+        itemsPerPage
       );
       if (total) {
         return res.json({
@@ -1177,7 +1172,7 @@ discoverRoutes.get<Record<string, unknown>, WatchlistResponse>(
     // List watchlist from Plex
     const plexTV = new PlexTvAPI(activeUser.plexToken);
 
-    const watchlist = await plexTV.getWatchlist({ offset, shuffle });
+    const watchlist = await plexTV.getWatchlist({ offset });
 
     return res.json({
       page,

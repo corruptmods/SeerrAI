@@ -12,7 +12,6 @@ import { Permission, useUser } from '@app/hooks/useUser';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import { connectedAccountServers } from '@app/utils/mediaServerAccounts';
-import { watchlistSeed } from '@app/utils/watchlistOrder';
 import { ArrowRightCircleIcon } from '@heroicons/react/24/outline';
 import type { VideoMediaType } from '@server/constants/media';
 import type { WatchlistResponse } from '@server/interfaces/api/discoverInterfaces';
@@ -50,8 +49,6 @@ type MediaTitle = MovieDetails | TvDetails;
 
 const UserProfile = () => {
   const intl = useIntl();
-  // The watchlist row in a new order each visit.
-  const [shuffle] = useState(watchlistSeed);
   const router = useRouter();
   const settings = useSettings();
   // Albums have a quota of their own once there is music to request.
@@ -110,7 +107,7 @@ const UserProfile = () => {
             type: 'or',
           }
         )
-        ? `/api/v1/user/${user?.id}/watchlist?shuffle=${shuffle}`
+        ? `/api/v1/user/${user?.id}/watchlist`
         : null,
       {
         revalidateOnMount: true,

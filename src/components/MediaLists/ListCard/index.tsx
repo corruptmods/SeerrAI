@@ -45,6 +45,16 @@ const fraction = (seed: number) => {
   return x - Math.floor(x);
 };
 
+/** The posters in an order the seed sets, the same on every render. */
+const mixed = <T,>(items: T[], seed: number): T[] => {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(fraction(seed + i * 0.618) * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+};
+
 /**
  * One tile of a card's mosaic. It opens on a poster already in place, part
  * way through its time, so a page of cards looks as if it had been running
@@ -138,7 +148,13 @@ const ListCard = ({
   index,
 }: ListCardProps) => {
   const intl = useIntl();
-  const posters = previews.filter((p) => p.posterPath);
+  // A new start each visit: which posters each tile shows, and where in
+  // them it begins. The same while the page stays open.
+  const [visit] = useState(() => Math.floor(Math.random() * 1_000_000));
+  const posters = mixed(
+    previews.filter((p) => p.posterPath),
+    visit + index
+  );
 
   const tileCount = Math.min(posters.length, TILE_COUNT);
   // Each tile walks its own share of the posters, so no two tiles show the
@@ -161,7 +177,7 @@ const ListCard = ({
             <RotatingTile
               key={`tile-${tileIndex}`}
               posters={tilePosters}
-              seed={index * TILE_COUNT + tileIndex}
+              seed={visit + index * TILE_COUNT + tileIndex}
             />
           ))}
         </div>

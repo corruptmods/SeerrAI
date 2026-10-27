@@ -210,7 +210,9 @@
   "pnpm": {
     "auditConfig": {
       "ignoreGhsas": [
-        "GHSA-ch52-4w7c-c8xp"
+        "GHSA-ch52-4w7c-c8xp",
+        "GHSA-jmr9-qjv8-65gv",
+        "GHSA-7pqw-9j4j-h8q3"
       ]
     },
     "onlyBuiltDependencies": [
@@ -238,7 +240,9 @@
       "body-parser": ">=2.4.0",
       "multer": ">=2.5.0",
       "fast-uri": ">=3.1.9 <4",
-      "cheerio>undici": ">=6.29.1 <7"
+      "cheerio>undici": ">=6.29.1 <7",
+      "postcss-selector-parser": ">=6.1.5 <7",
+      "@cypress/request>uuid": ">=11.1.1"
     }
   },
   "scarfSettings": {

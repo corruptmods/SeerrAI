@@ -2,7 +2,9 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
-## Coming next
+## 2.2.1 (27 October 2026)
+
+Fixes from Seerr for Plex sign-in, scheduled jobs and override rules.
 
 ### Fixed
 

@@ -5,13 +5,15 @@ import { useEffect } from 'react';
 
 /*
  * iOS throws an installed app out of memory while it is in the background,
- * and opening it again starts it afresh, on the home page. The page it was
- * on is kept here, so a fresh start of the installed app goes back to it,
- * behind the startup screen. Only in the installed app, and only for a page
- * left in the last 12 hours.
+ * and switching back to it starts it afresh, on the home page. The page it
+ * was on is kept for the session, so that restart goes back to it, behind
+ * the startup screen. Kept in session storage, which a full close of the
+ * app (swiped away in the app switcher) clears: opened again after that,
+ * it starts fresh on the home page. Only in the installed app.
  */
 
 const KEY = 'seerr-last-page';
+/** A page left this long ago is not gone back to. */
 const FRESH_MS = 12 * 60 * 60_000;
 /** Pages not to come back to. */
 const SKIP = /^\/(login|setup|resetpassword)(\/|\?|$)/;
@@ -28,7 +30,7 @@ const remember = (path: string) => {
     return;
   }
   try {
-    localStorage.setItem(KEY, JSON.stringify({ path, at: Date.now() }));
+    sessionStorage.setItem(KEY, JSON.stringify({ path, at: Date.now() }));
   } catch {
     // Storage refused: the app just starts on the home page.
   }
@@ -36,7 +38,7 @@ const remember = (path: string) => {
 
 const lastPage = (): string | undefined => {
   try {
-    const saved = JSON.parse(localStorage.getItem(KEY) ?? 'null') as {
+    const saved = JSON.parse(sessionStorage.getItem(KEY) ?? 'null') as {
       path?: unknown;
       at?: unknown;
     } | null;

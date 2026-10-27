@@ -65,62 +65,143 @@ interface ChatFixAnswer {
   confirm?: FixToConfirm;
 }
 
+type Hit = TmdbMovieResult | TmdbTvResult;
+
+const search = async (
+  kind: 'movie' | 'tv',
+  query: string,
+  year?: number
+): Promise<Hit[]> => {
+  const tmdb = new TheMovieDb();
+  try {
+    return kind === 'movie'
+      ? (await tmdb.searchMovies({ query, year })).results
+      : (await tmdb.searchTvShows({ query, year })).results;
+  } catch {
+    return [];
+  }
+};
+
+/** Of TMDB's matches, the ones on the server, with their media. */
+const onServer = async (kind: 'movie' | 'tv', hits: Hit[]) => {
+  if (!hits.length) {
+    return [];
+  }
+  const media = await getRepository(Media).find({
+    where: {
+      tmdbId: In(hits.map((hit) => hit.id)),
+      mediaType: kind === 'movie' ? MediaType.MOVIE : MediaType.TV,
+    },
+  });
+  return hits
+    .map((result) => ({
+      kind,
+      result,
+      media: media.find((m) => m.tmdbId === result.id),
+    }))
+    .filter((f): f is typeof f & { media: Media } => !!f.media);
+};
+
+/** One with files before one without. */
+const best = <T extends { media: Media }>(found: T[]): T | undefined =>
+  found.find((f) =>
+    [MediaStatus.AVAILABLE, MediaStatus.PARTIALLY_AVAILABLE].includes(
+      f.media.status
+    )
+  ) ?? found[0];
+
+const plain = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/^the /, '');
+
+/** What a report says around the title, never part of one. */
+const NOT_TITLE = new RegExp(
+  [
+    String.raw`\bs\d{1,2}\s*e\d{1,3}\b`,
+    String.raw`\b\d{1,2}x\d{2,3}\b`,
+    String.raw`\b(?:season|episode|ep)\.?\s*\w+\b`,
+    String.raw`\b(?:please|pls|can you|could you|would you|i want to|i need to|i need|help me|fix(?:es|ing|ed)?|repair|sort out|look at|replace|re-?download|re-?grab|get|find|download|search for|subtitles?|subs|captions?|transcribe|audio|sound|video|picture|file|is|are|was|were|has|have|had|keeps?|won'?t|wont|doesn'?t|does not|isn'?t|is not|not|no|never|playing|plays?|broken|corrupt\w*|missing|wrong|bad|messed up|out of sync|stutter\w*|buffer\w*|freez\w*)\b`,
+    String.raw`[,.!?;"“”]`,
+  ].join('|'),
+  'gi'
+);
+const LEADING = /^(?:(?:on|in|for|with|of|to|at|from|the|a|an|my|this)\s+)+/i;
+
+/**
+ * The title in their own words, for a title the model does not know (one
+ * newer than it, or one it renamed): the longest stretch left once the
+ * words of the report are taken out.
+ */
+export const titleInTheirWords = (message: string): string | undefined =>
+  message
+    .split(NOT_TITLE)
+    .map((part) => part?.trim().replace(LEADING, '').trim())
+    .filter((part): part is string => !!part && part.length >= 3)
+    .sort((a, b) => b.length - a.length)[0];
+
 /**
  * Which title the person means: of TMDB's matches for the name, the first
  * on the server, one with files before one without. TMDB's first match can
  * be a newer film or series of the same name, and a fix must never act on
- * the wrong one. Without any on the server, TMDB's first match, to show.
+ * the wrong one. The model's name for it is tried first, then their own
+ * words: the model can rename, or not know, a title newer than it. Their
+ * words only count for a title on the server that they name in full, or
+ * the only one there they could mean. Without any on the server, TMDB's
+ * first match, to show.
  */
 const findOnServer = async (
-  title: NamedTitle
+  title: NamedTitle | undefined,
+  message: string
 ): Promise<{
-  result?: TmdbMovieResult | TmdbTvResult;
+  kind?: 'movie' | 'tv';
+  result?: Hit;
   media?: Media;
 }> => {
-  const tmdb = new TheMovieDb();
-  const mediaType = title.k === 'movie' ? MediaType.MOVIE : MediaType.TV;
-  const search = async (
-    year?: number
-  ): Promise<(TmdbMovieResult | TmdbTvResult)[]> => {
-    try {
-      return title.k === 'movie'
-        ? (await tmdb.searchMovies({ query: title.t, year })).results
-        : (await tmdb.searchTvShows({ query: title.t, year })).results;
-    } catch {
-      return [];
+  let shown: { kind: 'movie' | 'tv'; result: Hit } | undefined;
+  if (title) {
+    // The year narrows it when the model gave one; a wrong year should not
+    // lose a title that is there.
+    const dated = title.y ? await search(title.k, title.t, title.y) : [];
+    const found = best(await onServer(title.k, dated));
+    if (found) {
+      return found;
     }
-  };
-  const onServer = async (hits: (TmdbMovieResult | TmdbTvResult)[]) => {
-    if (!hits.length) {
-      return undefined;
+    const any = await search(title.k, title.t);
+    const again = best(await onServer(title.k, any));
+    if (again) {
+      return again;
     }
-    const media = await getRepository(Media).find({
-      where: { tmdbId: In(hits.map((hit) => hit.id)), mediaType },
-    });
-    const found = hits
-      .map((result) => ({
-        result,
-        media: media.find((m) => m.tmdbId === result.id),
-      }))
-      .filter((f): f is { result: typeof f.result; media: Media } => !!f.media);
-    return (
-      found.find((f) =>
-        [MediaStatus.AVAILABLE, MediaStatus.PARTIALLY_AVAILABLE].includes(
-          f.media.status
-        )
-      ) ?? found[0]
-    );
-  };
-
-  // The year narrows it when the model gave one; a wrong year should not
-  // lose a title that is there.
-  const dated = title.y ? await search(title.y) : [];
-  const found = await onServer(dated);
-  if (found) {
-    return found;
+    const first = dated[0] ?? any[0];
+    shown = first && { kind: title.k, result: first };
   }
-  const any = await search();
-  return (await onServer(any)) ?? { result: dated[0] ?? any[0] };
+
+  const words = titleInTheirWords(message);
+  if (words && plain(words) !== plain(title?.t ?? '')) {
+    const wanted = plain(words).split(' ');
+    const kinds: ('movie' | 'tv')[] = title ? [title.k] : ['movie', 'tv'];
+    const found = (
+      await Promise.all(
+        kinds.map(async (kind) => onServer(kind, await search(kind, words)))
+      )
+    )
+      .flat()
+      .map((f) => ({
+        ...f,
+        name: plain('title' in f.result ? f.result.title : f.result.name),
+      }));
+    const exact = found.filter((f) => f.name === plain(words));
+    const named = found.filter((f) =>
+      wanted.every((word) => f.name.split(' ').includes(word))
+    );
+    const match = best(exact) ?? (named.length === 1 ? named[0] : undefined);
+    if (match) {
+      return match;
+    }
+  }
+  return shown ?? {};
 };
 
 /**
@@ -220,26 +301,24 @@ export const fixFromChat = async (
     return { reply: 'Fixing problems from here is turned off.', results: [] };
   }
   const fix = readFix(asked, message, earlier);
-  if (!fix.title) {
+  const {
+    kind: titleKind,
+    result,
+    media,
+  } = await findOnServer(fix.title, message);
+  if (!titleKind || !result) {
     return {
-      reply: 'Which title is it? Name the movie or series (and the episode).',
+      reply: fix.title
+        ? `Nothing on TMDB or the server matches “${fix.title.t}”. Try the full title.`
+        : 'Which title is it? Name the movie or series (and the episode).',
       results: [],
     };
   }
-  const { result, media } = await findOnServer(fix.title);
-  if (!result) {
-    return {
-      reply: `TMDB has nothing called “${fix.title.t}”. Try the full title.`,
-      results: [],
-    };
-  }
-  const results = await withLibraryStatus(user, [
-    { kind: fix.title.k, result },
-  ]);
-  const mediaType = fix.title.k === 'movie' ? MediaType.MOVIE : MediaType.TV;
+  const results = await withLibraryStatus(user, [{ kind: titleKind, result }]);
+  const mediaType = titleKind === 'movie' ? MediaType.MOVIE : MediaType.TV;
   if (!media) {
     return {
-      reply: `${fix.title.t} is not on the server yet, so there is nothing to fix. It can be requested instead.`,
+      reply: `${'title' in result ? result.title : result.name} is not on the server yet, so there is nothing to fix. It can be requested instead.`,
       results,
     };
   }

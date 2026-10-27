@@ -25,6 +25,7 @@ import type {
   ArrRelease,
 } from '@server/lib/autofix/arr';
 import { FixRadarr, FixSonarr } from '@server/lib/autofix/arr';
+import { titleInTheirWords } from '@server/lib/autofix/chat';
 import backfill from '@server/lib/backfill/engine';
 import BackfillSonarr from '@server/lib/backfill/sonarr';
 import notificationManager from '@server/lib/notifications';
@@ -1141,6 +1142,114 @@ describe('Auto-fix: from AI Search', () => {
     assert.equal(await getRepository(Issue).count(), 1);
   });
 
+  describe('a title newer than the model', () => {
+    // A sequel on the server, which TMDB finds by its own name only.
+    const film = (id: number, title: string, date: string) => ({
+      id,
+      title,
+      release_date: date,
+      media_type: 'movie',
+      genre_ids: [],
+      overview: '',
+      popularity: 1,
+      vote_average: 8,
+      vote_count: 1,
+      adult: false,
+      original_language: 'en',
+      original_title: title,
+      video: false,
+    });
+    beforeEach(async () => {
+      await getRepository(Media).save(
+        new Media({
+          tmdbId: 4242,
+          mediaType: MediaType.MOVIE,
+          status: MediaStatus.AVAILABLE,
+          serviceId: 0,
+          externalServiceId: 10,
+        })
+      );
+      Object.defineProperty(TheMovieDb.prototype, 'searchMovies', {
+        configurable: true,
+        set() {},
+        get:
+          () =>
+          async ({ query }: { query: string }) => {
+            const results =
+              /hedgehog/i.test(query) && !/:/.test(query)
+                ? [
+                    film(137, 'Hedgehog Morning', '1993-02-11'),
+                    film(
+                      4242,
+                      'Hedgehog Morning: Beyond the Hedge',
+                      '2031-05-02'
+                    ),
+                  ]
+                : [];
+            return {
+              page: 1,
+              total_pages: 1,
+              total_results: results.length,
+              results,
+            };
+          },
+      });
+    });
+
+    it('finds it by their words when the model renames it', async () => {
+      modelAnswer = JSON.stringify({
+        r: '',
+        titles: [{ t: 'Hedgehog Morning: The Hedge', k: 'movie' }],
+        do: 'fix',
+        fx: 'subtitles',
+        lang: 'es',
+      });
+      const res = await call('POST', '/api/v1/ai/chat', {
+        message: 'Fix spanish subtitles for hedgehog morning beyond the hedge',
+      });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.match(res.body.reply, /Downloaded es subtitles/);
+      assert.deepEqual(
+        res.body.results.map((r: { id: number }) => r.id),
+        [4242]
+      );
+    });
+
+    it('finds it by their words when the model names no title', async () => {
+      modelAnswer = JSON.stringify({
+        r: '',
+        titles: [],
+        do: 'fix',
+        fx: 'subtitles',
+        lang: 'es',
+      });
+      const res = await call('POST', '/api/v1/ai/chat', {
+        message: 'get spanish subtitles for Hedgehog Morning Beyond the Hedge',
+      });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.deepEqual(
+        res.body.results.map((r: { id: number }) => r.id),
+        [4242]
+      );
+    });
+
+    it('asks which one when their words could mean either', async () => {
+      modelAnswer = JSON.stringify({
+        r: '',
+        titles: [],
+        do: 'fix',
+        fx: 'subtitles',
+        lang: 'es',
+      });
+      const res = await call('POST', '/api/v1/ai/chat', {
+        message: 'fix the subtitles on hedgehog',
+      });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+      assert.match(res.body.reply, /^Which title is it/);
+      assert.deepEqual(downloads, []);
+    });
+  });
+
   it('says so when the title is not on the server', async () => {
     await getRepository(Media).delete({ id: movie.id });
     modelAnswer = JSON.stringify({
@@ -1268,6 +1377,33 @@ const filesBack = () =>
   mock.method(BackfillSonarr.prototype, 'getSeriesEpisodes', async () =>
     episodes.map((ep) => ({ ...ep, hasFile: true }))
   );
+
+describe('Auto-fix: the title in their words', () => {
+  it('takes the words of the report out', () => {
+    for (const [said, title] of [
+      [
+        'Fix hedgehog morning beyond the hedge',
+        'hedgehog morning beyond the hedge',
+      ],
+      ['Quiet Ravens S02E04 has no sound', 'Quiet Ravens'],
+      [
+        'the subtitles on Quiet Ravens season 2 are out of sync',
+        'Quiet Ravens',
+      ],
+      [
+        'can you replace episode 3 of Quiet Ravens, it is broken',
+        'Quiet Ravens',
+      ],
+      [
+        "Once Upon a Morning in the Hedge won't play",
+        'Once Upon a Morning in the Hedge',
+      ],
+    ]) {
+      assert.equal(titleInTheirWords(said), title, said);
+    }
+    assert.equal(titleInTheirWords('fix it'), undefined);
+  });
+});
 
 describe('Auto-fix: reading which season and episode', () => {
   it('reads the season and episode however they are said', () => {

@@ -350,6 +350,7 @@ export const chat = async (
       (image ? PICTURE_NOTE : '') +
       (music ? MUSIC_NOTE : '') +
       'The watch history is theirs, newest first: its first entry is what they "just watched" or "last watched". Use it to answer questions about what they watched and to understand "like what I watched". It is not a list of suggestions. ' +
+      'Titles come out after what you know: never say one does not exist or is not out. Give a title you do not know as they wrote it, spelled properly; TMDB and the server decide what there is. ' +
       'Answer, do not ask: always give your best titles, and if a request could mean more than one thing, go with the likeliest and say in "r" what you went with, e.g. "Lighter shows in the spirit of Survivor:". ' +
       'When they say yes, more, or agree, give new titles that fit what was discussed, never one already offered. ' +
       'A question that is not a search, such as what they last watched, is answered in "r", with no titles unless they help. ' +

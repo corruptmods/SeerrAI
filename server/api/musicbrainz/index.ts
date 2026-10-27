@@ -387,6 +387,33 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
+   * Albums (release groups) by one of these artists whose title holds this
+   * one, as a phrase: a chart's album found among its artist's.
+   */
+  public searchReleaseGroupsBy(
+    title: string,
+    artistIds: string[],
+    { limit = 25 }: { limit?: number } = {},
+    priority: MbPriority = 'background'
+  ): Promise<MbReleaseGroupSearchResponse> {
+    const artists = [...new Set(artistIds.map(requireMbid))].sort();
+    const phrase = title.trim().replace(/["\\]/g, '\\$&');
+    const key = `search-rg-by:${limit}:${artists.join(',')}:${title.trim().toLowerCase()}`;
+    return this.searched(key, () =>
+      this.request<MbReleaseGroupSearchResponse>(
+        priority,
+        '/ws/2/release-group',
+        {
+          query: `releasegroup:"${phrase}" AND (${artists
+            .map((id) => `arid:${id}`)
+            .join(' OR ')})`,
+          limit,
+        }
+      )
+    );
+  }
+
+  /**
    * Recordings whose title holds what was typed, as a phrase, by any of
    * these artists. MusicBrainz scores every exact title the same, and a
    * well-known song has hundreds of covers, so a search by title alone

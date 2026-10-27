@@ -177,10 +177,14 @@ const DiscoverSliderEdit = ({
         return intl.formatMessage(sliderTitles.musicRecentlyAdded);
       case DiscoverSliderType.MUSIC_NEW_RELEASES:
         return intl.formatMessage(sliderTitles.musicNewReleases);
+      case DiscoverSliderType.MUSIC_TOP_SONGS:
+        return intl.formatMessage(sliderTitles.musicTopSongs);
+      case DiscoverSliderType.MUSIC_TRENDING:
+        return intl.formatMessage(sliderTitles.musicTrending);
       case DiscoverSliderType.MUSIC_POPULAR_ALBUMS:
-        return intl.formatMessage(sliderTitles.musicPopularAlbums);
+        return intl.formatMessage(sliderTitles.musicTopAlbums);
       case DiscoverSliderType.MUSIC_POPULAR_ARTISTS:
-        return intl.formatMessage(sliderTitles.musicPopularArtists);
+        return intl.formatMessage(sliderTitles.musicTopArtists);
       case DiscoverSliderType.TMDB_MOVIE_KEYWORD:
         return intl.formatMessage(sliderTitles.tmdbmoviekeyword);
       case DiscoverSliderType.TMDB_TV_KEYWORD:

@@ -1,3 +1,4 @@
+import AppleChartsAPI from '@server/api/applecharts';
 import ListenBrainzAPI from '@server/api/listenbrainz';
 import {
   MusicBrainz,
@@ -24,6 +25,7 @@ import MusicMetadata from '@server/entity/MusicMetadata';
 import { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
 import { musicImageProxy } from '@server/lib/imageproxy';
+import { chartsMatched, forgetChartMatches } from '@server/lib/music/charts';
 import type { LidarrSettings, MusicSettings } from '@server/lib/settings';
 import { getSettings, musicDefaults } from '@server/lib/settings';
 import discoverMusicRoutes from '@server/routes/discoverMusic';
@@ -1181,65 +1183,219 @@ describe('Discover’s music rows', () => {
     );
   });
 
-  it('lists popular albums and artists, with what Seerr has', async () => {
+  it('lists the charts’ songs, trending songs, albums and artists, as they are matched', async () => {
     await seedMusicFixtures();
-    mock.method(ListenBrainzAPI.prototype, 'getTopReleaseGroups', async () => ({
-      payload: {
-        count: 2,
-        offset: 0,
-        range: 'week',
-        last_updated: 0,
-        release_groups: [
-          {
-            artist_mbids: [IDS.artist],
-            artist_name: 'Glasswing',
-            listen_count: 10,
-            release_group_mbid: IDS.album,
-            release_group_name: 'Sing to the Ferryman',
-          },
-          {
-            artist_mbids: [],
-            artist_name: 'Nobody',
-            listen_count: 5,
-            release_group_mbid: null,
-            release_group_name: 'Unknown',
-          },
-        ],
-      },
-    }));
-    mock.method(ListenBrainzAPI.prototype, 'getTopArtists', async () => ({
-      payload: {
+    forgetChartMatches();
+    const recent = new Date(Date.now() - 5 * 24 * 3600_000)
+      .toISOString()
+      .slice(0, 10);
+    const charts = mock.method(
+      AppleChartsAPI.prototype,
+      'mostPlayed',
+      async (_country: string, kind: string) =>
+        kind === 'songs'
+          ? [
+              {
+                id: '9001',
+                name: 'Ferryman Lights (feat. Somebody)',
+                artistName: 'Glasswing & Somebody',
+                releaseDate: recent,
+              },
+              {
+                id: '9002',
+                name: 'Old Harbour',
+                artistName: 'Glasswing',
+                releaseDate: '2019-04-01',
+              },
+              // Nobody MusicBrainz knows: left out.
+              { id: '9003', name: 'Unheard', artistName: 'Nobody At All' },
+            ]
+          : [
+              {
+                id: '9101',
+                name: 'Sing to the Ferryman (Deluxe Edition)',
+                artistName: 'Glasswing',
+              },
+            ]
+    );
+    const searchArtists = mock.method(
+      MusicBrainz.prototype,
+      'searchArtists',
+      async (name: string) => ({
         count: 1,
         offset: 0,
-        range: 'week',
-        last_updated: 0,
-        artists: [
+        artists: /glasswing/i.test(name)
+          ? [{ id: IDS.artist, name: 'Glasswing', score: 100 }]
+          : [],
+      })
+    );
+    const release = (id: string, title: string, type: string) => ({
+      id: `${id.slice(0, -1)}9`,
+      title,
+      status: 'Official',
+      date: '2026-01-01',
+      'release-group': {
+        id,
+        title,
+        'primary-type': type,
+        'secondary-types': [],
+      },
+    });
+    const SINGLE = '6a0e3f1c-2d4b-4c8e-9a7f-1b2c3d4e5f60';
+    mock.method(
+      MusicBrainz.prototype,
+      'searchRecordings',
+      async (title: string) => ({
+        count: 1,
+        offset: 0,
+        recordings: [
           {
-            artist_mbid: IDS.artist,
-            artist_name: 'Glasswing',
-            listen_count: 9,
+            id: title.startsWith('Ferryman')
+              ? '0a1b2c3d-0000-4000-8000-000000000001'
+              : '0a1b2c3d-0000-4000-8000-000000000002',
+            title,
+            length: 200_000,
+            'artist-credit': [
+              {
+                name: 'Glasswing',
+                artist: { id: IDS.artist, name: 'Glasswing' },
+              },
+            ],
+            releases: [
+              release(SINGLE, title, 'Single'),
+              release(IDS.album, 'Sing to the Ferryman', 'Album'),
+            ],
           },
         ],
-      },
+      })
+    );
+    mock.method(MusicBrainz.prototype, 'searchReleaseGroupsBy', async () => ({
+      count: 2,
+      offset: 0,
+      'release-groups': [
+        {
+          id: IDS.otherAlbum,
+          title: 'Sing to the Ferryman',
+          'primary-type': 'Album',
+          'secondary-types': ['Live'],
+        },
+        {
+          id: IDS.album,
+          title: 'Sing to the Ferryman',
+          'primary-type': 'Album',
+          'secondary-types': [],
+          'first-release-date': '2024-05-01',
+          'artist-credit': [
+            {
+              name: 'Glasswing',
+              artist: { id: IDS.artist, name: 'Glasswing' },
+            },
+          ],
+        },
+      ],
     }));
-    const albums = (await get('/discover/music/popular-albums')).body as {
-      results: { id: string; status: number; artistId: string }[];
-    };
+
+    type Songs = { results: { title: string; artistId: string }[] };
+    // Nothing is matched yet: the rows fill once it is, behind the scenes.
+    const first = (await get('/discover/music/top-songs')).body as Songs;
+    assert.deepEqual(first.results, []);
+    let songs: Songs = first;
+    for (let i = 0; i < 100 && songs.results.length < 2; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      songs = (await get('/discover/music/top-songs')).body as Songs;
+    }
     assert.deepEqual(
-      albums.results.map((a) => [a.id, a.status, a.artistId]),
-      [[IDS.album, MediaStatus.AVAILABLE, IDS.artist]]
+      songs.results.map((s) => [s.title, s.artistId]),
+      [
+        ['Ferryman Lights', IDS.artist],
+        ['Old Harbour', IDS.artist],
+      ]
+    );
+    const trending = (await get('/discover/music/trending')).body as Songs;
+    assert.deepEqual(
+      trending.results.map((s) => s.title),
+      ['Ferryman Lights'],
+      'out in the last month'
+    );
+    let albums = { results: [] as { id: string; status: number }[] };
+    for (let i = 0; i < 100 && !albums.results.length; i++) {
+      albums = (await get('/discover/music/popular-albums'))
+        .body as typeof albums;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    // The artist's own album, not its live one.
+    assert.deepEqual(
+      albums.results.map((a) => [a.id, a.status]),
+      [[IDS.album, MediaStatus.AVAILABLE]]
     );
     const artists = (await get('/discover/music/popular-artists')).body as {
-      results: { mediaType: string; id: string; status: number }[];
+      results: { id: string; name: string; status: number }[];
     };
-    assert.deepEqual(artists.results, [
-      {
-        mediaType: 'artist',
-        id: IDS.artist,
-        name: 'Glasswing',
-        status: MediaStatus.PARTIALLY_AVAILABLE,
-      },
-    ]);
+    assert.deepEqual(
+      artists.results.map((a) => [a.id, a.name, a.status]),
+      [[IDS.artist, 'Glasswing', MediaStatus.PARTIALLY_AVAILABLE]]
+    );
+
+    // Matched once, and kept: asked again, MusicBrainz isn't.
+    await chartsMatched();
+    const asked = searchArtists.mock.callCount();
+    forgetChartMatches();
+    await get('/discover/music/top-songs');
+    await get('/discover/music/popular-albums');
+    await chartsMatched();
+    assert.equal(searchArtists.mock.callCount(), asked);
+    assert.equal(charts.mock.calls[0].arguments[0], 'us');
+  });
+
+  it('give the songs without Request when song requests are off', async () => {
+    getSettings().music = { ...musicDefaults(), songRequests: false };
+    forgetChartMatches();
+    mock.method(
+      AppleChartsAPI.prototype,
+      'mostPlayed',
+      async (_country: string, kind: string) =>
+        kind === 'songs'
+          ? [{ id: '9002', name: 'Old Harbour', artistName: 'Glasswing' }]
+          : []
+    );
+    // Matched on an earlier visit.
+    await getRepository(MusicMetadata).save({
+      key: 'chart-song:us:9002',
+      data: JSON.stringify({
+        key: `${IDS.artist}:old harbour`,
+        title: 'Old Harbour',
+        artistMbid: IDS.artist,
+        artistName: 'Glasswing',
+        versions: [
+          {
+            mbId: '0a1b2c3d-0000-4000-8000-000000000002',
+            title: 'Old Harbour',
+            songTitle: 'Old Harbour',
+            version: null,
+            length: 200_000,
+            artistMbid: IDS.artist,
+            artistName: 'Glasswing',
+            from: null,
+            releaseGroups: [],
+            releaseCount: 1,
+          },
+        ],
+      }),
+      fetchedAt: new Date(),
+      expiresAt: new Date(Date.now() + 3600_000),
+    });
+    const { status, body } = await get('/discover/music/top-songs');
+    assert.equal(status, 200);
+    assert.deepEqual(
+      (body as { results: { title: string; canRequest?: boolean }[] }).results,
+      [
+        {
+          ...(body as { results: object[] }).results[0],
+          title: 'Old Harbour',
+          canRequest: false,
+        },
+      ]
+    );
   });
 
   it('are empty with ListenBrainz switched off, without asking it', async () => {
@@ -1274,7 +1430,7 @@ describe('Discover’s music rows', () => {
   });
 
   it('have numbers of their own and are added after the others, on', async () => {
-    assert.deepEqual(MUSIC_SLIDERS, [25, 26, 27, 28]);
+    assert.deepEqual(MUSIC_SLIDERS, [25, 26, 27, 28, 29, 30]);
     assert.equal(DiscoverSliderType.MUSIC_RECENTLY_ADDED, 25);
 
     // A home page from before music.
@@ -1290,11 +1446,17 @@ describe('Discover’s music rows', () => {
     }
     await DiscoverSlider.bootstrapSliders();
     const sliders = await repository.find({ order: { order: 'ASC' } });
+    // The charts' songs before their albums and artists.
     assert.deepEqual(
-      sliders.slice(-5).map((s) => [s.type, s.enabled]),
+      sliders.slice(-7).map((s) => [s.type, s.enabled]),
       [
         [DiscoverSliderType.NETWORKS, true],
-        ...MUSIC_SLIDERS.map((type) => [type, true]),
+        [DiscoverSliderType.MUSIC_RECENTLY_ADDED, true],
+        [DiscoverSliderType.MUSIC_NEW_RELEASES, true],
+        [DiscoverSliderType.MUSIC_TOP_SONGS, true],
+        [DiscoverSliderType.MUSIC_TRENDING, true],
+        [DiscoverSliderType.MUSIC_POPULAR_ALBUMS, true],
+        [DiscoverSliderType.MUSIC_POPULAR_ARTISTS, true],
       ]
     );
     assert.equal(new Set(sliders.map((s) => s.order)).size, sliders.length);

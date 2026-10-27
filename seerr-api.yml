@@ -2221,6 +2221,7 @@ components:
             oneOf:
               - $ref: '#/components/schemas/MusicAlbumResult'
               - $ref: '#/components/schemas/MusicArtistResult'
+              - $ref: '#/components/schemas/MusicSongResult'
     MusicSettings:
       type: object
       properties:
@@ -3010,6 +3011,10 @@ components:
           description: The first credited artist, whom the song belongs to here.
         artistName:
           type: string
+        canRequest:
+          type: boolean
+          enum: [false]
+          description: Present when song requests are switched off; only its album can be asked for.
         versions:
           type: array
           description: Best known first.
@@ -12972,8 +12977,8 @@ paths:
                 $ref: '#/components/schemas/MusicPage'
   /discover/music/popular-albums:
     get:
-      summary: Popular albums
-      description: The albums ListenBrainz's listeners played most this week. Empty with ListenBrainz switched off. Twenty a page. Refused while music is off for the person (403) or before Lidarr is set up (404).
+      summary: Top albums
+      description: The albums played most on Apple Music's chart for Discover's region (the United States when none is set), each matched to MusicBrainz; those not matched yet are matched behind the scenes and show on a later visit. Empty with New and Popular Music switched off. Twenty a page. Refused while music is off for the person (403) or before Lidarr is set up (404).
       tags:
         - music
       parameters:
@@ -12992,8 +12997,48 @@ paths:
                 $ref: '#/components/schemas/MusicPage'
   /discover/music/popular-artists:
     get:
-      summary: Popular artists
-      description: The artists ListenBrainz's listeners played most this week. Empty with ListenBrainz switched off. Twenty a page. Refused while music is off for the person (403) or before Lidarr is set up (404).
+      summary: Top artists
+      description: The artists of Apple Music's song and album charts, in the order they first appear. Empty with New and Popular Music switched off. Twenty a page. Refused while music is off for the person (403) or before Lidarr is set up (404).
+      tags:
+        - music
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: number
+            example: 1
+            default: 1
+      responses:
+        '200':
+          description: One page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicPage'
+  /discover/music/top-songs:
+    get:
+      summary: Top songs
+      description: The songs played most on Apple Music's chart for Discover's region (the United States when none is set), each matched to MusicBrainz; those not matched yet are matched behind the scenes and show on a later visit. Empty with New and Popular Music switched off. Twenty a page. Refused while music is off for the person (403) or before Lidarr is set up (404).
+      tags:
+        - music
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: number
+            example: 1
+            default: 1
+      responses:
+        '200':
+          description: One page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicPage'
+  /discover/music/trending:
+    get:
+      summary: Trending songs
+      description: The songs on Apple Music's chart that came out in the last 30 days, highest first. Empty with New and Popular Music switched off. Twenty a page. Refused while music is off for the person (403) or before Lidarr is set up (404).
       tags:
         - music
       parameters:

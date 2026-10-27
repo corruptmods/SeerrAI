@@ -59,7 +59,7 @@ interface MusicCardProps {
  * badges, so they never sit on the cover itself. Both are the one picture,
  * fetched once.
  */
-const CoverArt = ({
+export const CoverArt = ({
   src,
   onMissing,
 }: {

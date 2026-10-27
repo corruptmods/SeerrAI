@@ -20,42 +20,6 @@ export interface LbFreshReleasesResponse {
   };
 }
 
-export interface LbTopReleaseGroup {
-  artist_mbids: string[];
-  artist_name: string;
-  caa_id?: number | null;
-  caa_release_mbid?: string | null;
-  listen_count: number;
-  release_group_mbid?: string | null;
-  release_group_name: string;
-}
-
-export interface LbTopReleaseGroupsResponse {
-  payload: {
-    count: number;
-    offset: number;
-    range: string;
-    last_updated: number;
-    release_groups: LbTopReleaseGroup[];
-  };
-}
-
-export interface LbTopArtist {
-  artist_mbid?: string | null;
-  artist_name: string;
-  listen_count: number;
-}
-
-export interface LbTopArtistsResponse {
-  payload: {
-    count: number;
-    offset: number;
-    range: string;
-    last_updated: number;
-    artists: LbTopArtist[];
-  };
-}
-
 /** An artist ListenBrainz finds people listen to alongside another. */
 export interface LbSimilarArtist {
   artist_mbid: string;

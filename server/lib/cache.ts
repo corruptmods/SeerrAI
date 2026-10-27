@@ -8,6 +8,7 @@ export type AvailableCacheIds =
   | 'lidarr'
   | 'musicbrainz'
   | 'listenbrainz'
+  | 'applecharts'
   | 'rt'
   | 'imdb'
   | 'github'
@@ -39,6 +40,8 @@ const MUSICBRAINZ_MAX_KEYS = 2000;
 
 // A few Discover rows, the same for everyone.
 const LISTENBRAINZ_MAX_KEYS = 32;
+/** Two charts (songs, albums) for a country or two. */
+const APPLE_CHARTS_MAX_KEYS = 8;
 
 // One key per searched title, each holding twenty search hits.
 const RT_MAX_KEYS = 500;
@@ -246,6 +249,10 @@ class CacheManager {
     listenbrainz: new Cache('listenbrainz', 'ListenBrainz API', {
       stdTtl: 21600,
       max: LISTENBRAINZ_MAX_KEYS,
+    }),
+    applecharts: new Cache('applecharts', 'Apple Music Charts', {
+      stdTtl: 21600,
+      max: APPLE_CHARTS_MAX_KEYS,
     }),
     rt: new Cache('rt', 'Rotten Tomatoes API', {
       stdTtl: 43200,

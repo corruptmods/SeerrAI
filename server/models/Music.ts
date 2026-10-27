@@ -3,11 +3,7 @@ import {
   albumCoverUrl,
   releaseCoverPath,
 } from '@server/api/coverartarchive';
-import type {
-  LbFreshRelease,
-  LbTopArtist,
-  LbTopReleaseGroup,
-} from '@server/api/listenbrainz/interfaces';
+import type { LbFreshRelease } from '@server/api/listenbrainz/interfaces';
 import { isMbid } from '@server/api/musicbrainz';
 import type {
   MbArtist,
@@ -146,6 +142,8 @@ export interface MusicSongResult {
   artistName: string;
   /** Best known first. */
   versions: MusicSongVersion[];
+  /** Song requests are switched off: only its album can be asked for. */
+  canRequest?: false;
 }
 
 export interface MusicSongSearchResponse {
@@ -363,28 +361,4 @@ export const mapFreshRelease = (
     release.caa_release_mbid
   ),
   status: statuses?.get(release.release_group_mbid),
-});
-
-export const mapTopReleaseGroup = (
-  group: LbTopReleaseGroup & { release_group_mbid: string },
-  statuses?: Statuses
-): MusicAlbumResult => ({
-  mediaType: 'album',
-  id: group.release_group_mbid,
-  title: group.release_group_name,
-  secondaryTypes: [],
-  artistId: group.artist_mbids?.[0],
-  artistName: group.artist_name,
-  coverUrl: listenBrainzCover(group.release_group_mbid, group.caa_release_mbid),
-  status: statuses?.get(group.release_group_mbid),
-});
-
-export const mapTopArtist = (
-  artist: LbTopArtist & { artist_mbid: string },
-  statuses?: Statuses
-): MusicArtistResult => ({
-  mediaType: 'artist',
-  id: artist.artist_mbid,
-  name: artist.artist_name,
-  status: statuses?.get(artist.artist_mbid),
 });

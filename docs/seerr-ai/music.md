@@ -8,10 +8,10 @@ Music appears once an admin adds Lidarr. Anyone who can request films and series
 
 ## Finding music
 
-- **Music** in the sidebar: new music, popular albums and artists, and a search box for artists and albums. Above them, rows of your own, from the music you've asked for: **Your Music Requests**, **More from Your Artists** (their other albums and EPs) and **Artists Like Yours** (from ListenBrainz). Only your own requests count, and each row shows once there's something in it.
+- **Music** in the sidebar: new music, the charts (top songs, trending songs, top albums and top artists), and a search box for artists and albums. Above them, rows of your own, from the music you've asked for: **Your Music Requests**, **More from Your Artists** (their other albums and EPs) and **Artists Like Yours** (from ListenBrainz). Only your own requests count, and each row shows once there's something in it.
 - **Search**: pick **Music** above the results for artists and albums. **All** keeps to films, series, collections and people, unless an admin adds music below them.
 - **AI Search** finds albums and artists too: describe them, or send a photo of an album cover. Each is requested from its own tile.
-- **Discover** gains **Recently Added Music**, **New Music**, **Popular Albums** and **Popular Artists** rows.
+- **Discover** gains **Recently Added Music**, **New Music**, **Top Songs**, **Trending Songs**, **Top Albums** and **Top Artists** rows. New Music comes from ListenBrainz; the rest from Apple Music's charts for your Discover region (the United States when none is set). Trending Songs are the chart's songs out in the last 30 days. Each chart entry is matched to MusicBrainz once, behind the scenes, so a chart fills in over a few minutes the first time.
 
 Album and artist tiles say what they are (Album, EP, Single, Artist) and their status; hover or tap for the name, year and **Request**.
 
@@ -45,7 +45,7 @@ Don't want music? Turn it off for yourself in **Profile → Settings → Feature
 
 1. **Settings → Services → Lidarr**: add Lidarr with its address and API key, then the quality profile, metadata profile (which kinds of release Lidarr lists: albums, EPs, singles, live albums), root folder and tags new artists get. Make it the default; you can add more than one Lidarr. **Enable Scan** brings in what Lidarr already has, so those albums show as here.
 2. **Music libraries**: tick them when connecting a server, or later under **Settings → Media Servers → Edit → Music Libraries** (press **Sync Libraries** if the list is empty). An album counts as here once any server's music library lists it. With none switched on anywhere, Lidarr's files decide.
-3. **Settings → Music** (optional): **Include Music in All Search Results**, and under **Where Music Comes From**: a **MusicBrainz Address** (your own mirror has no limit), a **Contact Email** (so MusicBrainz can reach you instead of slowing every Seerr AI down), **New and Popular Music** (the ListenBrainz rows), a **TheAudioDB API Key** for artist pictures, **Most Albums in One Request** (100 to start), and **Song Requests** (on to start) with **Take Songs from Albums** (on; does nothing until Backfill's Prowlarr and download client are set up) and a **Song Limit**. The page links to the rest of music's settings.
+3. **Settings → Music** (optional): **Include Music in All Search Results**, and under **Where Music Comes From**: a **MusicBrainz Address** (your own mirror has no limit), a **Contact Email** (so MusicBrainz can reach you instead of slowing every Seerr AI down), **New and Popular Music** (the New Music and chart rows), a **TheAudioDB API Key** for artist pictures, **Most Albums in One Request** (100 to start), and **Song Requests** (on to start) with **Take Songs from Albums** (on; does nothing until Backfill's Prowlarr and download client are set up) and a **Song Limit**. The page links to the rest of music's settings.
 
 In Lidarr, turn on **Settings → Metadata → Write Audio Tags**: Jellyfin and Emby match albums by the MusicBrainz ids in the tags; without them, by folder name and then title and year.
 

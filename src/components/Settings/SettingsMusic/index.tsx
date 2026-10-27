@@ -17,7 +17,7 @@ export const messages = defineMessages('components.Settings.SettingsMusic', {
     'Optional. Sent with each MusicBrainz request so they can contact you.',
   listenBrainz: 'New and Popular Music',
   listenBrainzTip:
-    'The New Music, Popular Albums and Popular Artists rows on Discover, from ListenBrainz.',
+    'The New Music row on Discover, from ListenBrainz, and the Top Songs, Trending Songs, Top Albums and Top Artists rows, from Apple Music’s charts.',
   theAudioDbApiKey: 'TheAudioDB API Key',
   theAudioDbApiKeyTip:
     'Optional: pictures of artists Lidarr has none of. A key comes with a TheAudioDB supporter account.',

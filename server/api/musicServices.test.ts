@@ -49,31 +49,6 @@ describe('ListenBrainz', () => {
     );
   });
 
-  it('asks for the most listened albums and artists over a range', async () => {
-    const lb = new ListenBrainzAPI();
-    const get = mock.method(getAxios(lb), 'get', async (path: string) => ({
-      data: {
-        payload: path.endsWith('artists')
-          ? { artists: [{ artist_mbid: ARTIST }] }
-          : { release_groups: [{ release_group_mbid: ALBUM }] },
-      },
-    }));
-    const albums = await lb.getTopReleaseGroups({ range: 'month' });
-    const artists = await lb.getTopArtists();
-    assert.equal(albums.payload.release_groups[0].release_group_mbid, ALBUM);
-    assert.equal(artists.payload.artists[0].artist_mbid, ARTIST);
-    assert.deepEqual(
-      get.mock.calls.map((c) => [
-        c.arguments[0],
-        (c.arguments[1] as { params: { range: string } }).params.range,
-      ]),
-      [
-        ['/stats/sitewide/release-groups', 'month'],
-        ['/stats/sitewide/artists', 'week'],
-      ]
-    );
-  });
-
   it('asks again after an empty answer, rather than keep it', async () => {
     const lb = new ListenBrainzAPI();
     let releases: { release_group_mbid: string }[] = [];

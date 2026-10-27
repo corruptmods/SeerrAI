@@ -8,6 +8,7 @@ import { emptyMusicPage } from '@app/components/Music/DiscoverMusic/emptyPage';
 import MusicCard from '@app/components/Music/MusicCard';
 import MusicSearchResults from '@app/components/Music/MusicSearchResults';
 import MusicSlider from '@app/components/Music/MusicSlider';
+import SongCard from '@app/components/Music/SongCard';
 import {
   MUSIC_ROWS,
   PERSONAL_MUSIC_ROWS,
@@ -24,6 +25,7 @@ import type {
   MusicAlbumResult,
   MusicArtistResult,
   MusicPage,
+  MusicSongResult,
 } from '@server/models/Music';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -80,12 +82,12 @@ const useMusicSearch = (): [string, (value: string) => void] => {
   return [search, update];
 };
 
-type Item = MusicAlbumResult | MusicArtistResult;
+type Item = MusicAlbumResult | MusicArtistResult | MusicSongResult;
 
 /** One row's whole list, a page at a time as the page is scrolled. */
 const MusicGrid = ({ url }: { url: string }) => {
   const intl = useIntl();
-  const { data, error, size, setSize, isValidating } = useSWRInfinite<
+  const { data, error, size, setSize, isValidating, mutate } = useSWRInfinite<
     MusicPage<Item>
   >((index, previous: MusicPage<Item> | null) =>
     previous && index + 1 > previous.totalPages
@@ -111,6 +113,8 @@ const MusicGrid = ({ url }: { url: string }) => {
           <li key={`${item.mediaType}-${item.id}`}>
             {item.mediaType === 'artist' ? (
               <ArtistCard artist={item} canExpand />
+            ) : item.mediaType === 'song' ? (
+              <SongCard song={item} canExpand onRequested={() => mutate()} />
             ) : (
               <MusicCard album={item} canExpand />
             )}

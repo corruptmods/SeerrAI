@@ -1,11 +1,6 @@
 import ExternalAPI from '@server/api/externalapi';
 import cacheManager from '@server/lib/cache';
-import type {
-  LbFreshReleasesResponse,
-  LbSimilarArtist,
-  LbTopArtistsResponse,
-  LbTopReleaseGroupsResponse,
-} from './interfaces';
+import type { LbFreshReleasesResponse, LbSimilarArtist } from './interfaces';
 
 /*
  * ListenBrainz, for music's Discover rows: new releases and what people
@@ -31,8 +26,6 @@ const SIMILAR_ARTISTS_ALGORITHM =
 const TTL_SECONDS = 6 * 3600;
 
 const TIMEOUT_MS = 15_000;
-
-export type LbRange = 'week' | 'month' | 'quarter' | 'year' | 'all_time';
 
 /**
  * Kept only with something in it: an empty answer kept would leave its row
@@ -73,24 +66,6 @@ class ListenBrainzAPI extends ExternalAPI {
     );
   }
 
-  /** The albums listened to most over the range. */
-  public getTopReleaseGroups({
-    range = 'week',
-    count = 50,
-    offset = 0,
-  }: {
-    range?: LbRange;
-    count?: number;
-    offset?: number;
-  } = {}): Promise<LbTopReleaseGroupsResponse> {
-    return this.get<LbTopReleaseGroupsResponse>(
-      '/stats/sitewide/release-groups',
-      { params: { range, count, offset } },
-      TTL_SECONDS,
-      { keep: (data) => listed(data?.payload?.release_groups) }
-    );
-  }
-
   /**
    * Artists listened to alongside this one, most alike first; none for an
    * artist too little listened to. Asked of the labs address
@@ -106,24 +81,6 @@ class ListenBrainzAPI extends ExternalAPI {
         },
       },
       24 * 3600
-    );
-  }
-
-  /** The artists listened to most over the range. */
-  public getTopArtists({
-    range = 'week',
-    count = 50,
-    offset = 0,
-  }: {
-    range?: LbRange;
-    count?: number;
-    offset?: number;
-  } = {}): Promise<LbTopArtistsResponse> {
-    return this.get<LbTopArtistsResponse>(
-      '/stats/sitewide/artists',
-      { params: { range, count, offset } },
-      TTL_SECONDS,
-      { keep: (data) => listed(data?.payload?.artists) }
     );
   }
 }

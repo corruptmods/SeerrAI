@@ -25,14 +25,24 @@ export const MUSIC_ROWS = [
     title: sliderTitles.musicNewReleases,
   },
   {
+    type: DiscoverSliderType.MUSIC_TOP_SONGS,
+    show: 'top-songs',
+    title: sliderTitles.musicTopSongs,
+  },
+  {
+    type: DiscoverSliderType.MUSIC_TRENDING,
+    show: 'trending',
+    title: sliderTitles.musicTrending,
+  },
+  {
     type: DiscoverSliderType.MUSIC_POPULAR_ALBUMS,
     show: 'popular-albums',
-    title: sliderTitles.musicPopularAlbums,
+    title: sliderTitles.musicTopAlbums,
   },
   {
     type: DiscoverSliderType.MUSIC_POPULAR_ARTISTS,
     show: 'popular-artists',
-    title: sliderTitles.musicPopularArtists,
+    title: sliderTitles.musicTopArtists,
   },
 ] as const;
 

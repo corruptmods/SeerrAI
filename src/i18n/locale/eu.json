@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Aukeratutako edozein sailkapenekin bat dator Aurkitu eskualderako ({region}), bestela AEBkoarekin. Sailkapenik gabeko tituluak ez datoz inoiz bat.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Aukeratutako edozein sailkapenekin bat dator Aurkitu eskualderako ({region}). Sailkapenik gabeko tituluak ez datoz inoiz bat.",
   "components.Settings.OverrideRuleTile.certification": "Adin-sailkapenak",
-  "components.Settings.SettingsGuide.music1": "Lidarr lehenetsi batekin (Zerbitzuak), album bat, batzuk edo diskografia osoa eska daiteke, eskaera bakar gisa. Lidarr-ek album horiek bakarrik bilatzen ditu gero.",
+  "components.Settings.SettingsGuide.music1": "Lidarr lehenetsi batekin (Zerbitzuak), albumak, diskografia osoa edo abesti solteak eska daitezke. Lidarr-ek horiek bakarrik bilatzen ditu. Musika-zerrendak Apple Music-etik datoz.",
   "components.Settings.SettingsGuide.music2": "Musika-sinkronizazioa 5 minuturo exekutatzen da. Albuma Eskuragarri dago musika-liburutegi batek zerrendatzen duenean, edo bat ere aktibatuta ez badago, Lidarr-ek pista guztiak dituenean.",
   "components.Settings.SettingsGuide.music3": "Osasunak egun baten ondoren multimedia-zerbitzarian falta diren albumak, aste baten ondoren aurkitu gabeko eskatutako albumak eta MusicBrainz arazoak zerrendatzen ditu.",
   "components.Settings.SettingsGuide.music4": "Musika denentzat desaktiba daiteke Eginbideak atalean, edo bakoitzak beretzat.",

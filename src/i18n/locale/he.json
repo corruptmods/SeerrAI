@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "תואם כל סיווג שנבחר לאזור לגלות ({region}), אחרת הסיווג האמריקאי. כותרים ללא סיווג לעולם לא תואמים.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "תואם כל סיווג שנבחר לאזור לגלות ({region}). כותרים ללא סיווג לעולם לא תואמים.",
   "components.Settings.OverrideRuleTile.certification": "סיווגי גיל",
-  "components.Settings.SettingsGuide.music1": "עם Lidarr ברירת מחדל (שירותים), אפשר לבקש אלבום אחד, כמה, או דיסקוגרפיה שלמה, כבקשה אחת. Lidarr מחפש אז רק את האלבומים האלה.",
+  "components.Settings.SettingsGuide.music1": "עם Lidarr ברירת מחדל (שירותים) אפשר לבקש אלבומים, דיסקוגרפיה שלמה או שירים בודדים. Lidarr מחפש רק אותם. מצעדי המוזיקה מגיעים מ-Apple Music.",
   "components.Settings.SettingsGuide.music2": "סנכרון מוזיקה רץ כל 5 דקות. אלבום הוא זמין כשספריית מוזיקה מציגה אותו, או בלי ספרייה פעילה, כשיש ל-Lidarr את כל הרצועות.",
   "components.Settings.SettingsGuide.music3": "תקינות מציגה אלבומים שחסרים בשרת המדיה אחרי יום, אלבומים שהתבקשו ולא נמצאו אחרי שבוע, ובעיות MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "אפשר לכבות מוזיקה לכולם בתכונות, או לכל אדם לעצמו.",

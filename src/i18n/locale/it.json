@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Corrisponde a qualsiasi classificazione scelta, per la regione di Esplora ({region}), altrimenti quella USA. I titoli senza classificazione non corrispondono mai.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Corrisponde a qualsiasi classificazione scelta, per la regione di Esplora ({region}). I titoli senza classificazione non corrispondono mai.",
   "components.Settings.OverrideRuleTile.certification": "Classificazioni per età",
-  "components.Settings.SettingsGuide.music1": "Con un Lidarr predefinito (Servizi), si può richiedere un album, diversi o un’intera discografia, in un’unica richiesta. Lidarr cerca poi solo quegli album.",
+  "components.Settings.SettingsGuide.music1": "Con un Lidarr predefinito (Servizi) si possono richiedere album, un’intera discografia o singoli brani. Lidarr cerca solo quelli. Le classifiche musicali arrivano da Apple Music.",
   "components.Settings.SettingsGuide.music2": "La sincronizzazione musicale gira ogni 5 minuti. Un album è Disponibile quando una libreria musicale lo elenca o, senza librerie attive, quando Lidarr ha tutte le tracce.",
   "components.Settings.SettingsGuide.music3": "Stato dei servizi elenca gli album assenti dal media server dopo un giorno, gli album richiesti non trovati dopo una settimana e i problemi di MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "La musica si può disattivare per tutti in Funzioni, o da ognuno per sé.",

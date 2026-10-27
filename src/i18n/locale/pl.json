@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Pasuje do każdej wybranej kategorii wiekowej dla regionu Odkryj ({region}), a w innym razie amerykańskiej. Tytuły bez kategorii nigdy nie pasują.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Pasuje do każdej wybranej kategorii wiekowej dla regionu Odkryj ({region}). Tytuły bez kategorii nigdy nie pasują.",
   "components.Settings.OverrideRuleTile.certification": "Klasyfikacje wiekowe",
-  "components.Settings.SettingsGuide.music1": "Z domyślnym Lidarr (Usługi) można poprosić o jeden album, kilka lub całą dyskografię w jednej prośbie. Lidarr szuka wtedy tylko tych albumów.",
+  "components.Settings.SettingsGuide.music1": "Z domyślnym Lidarrem (Usługi) można prosić o albumy, całą dyskografię lub pojedyncze utwory. Lidarr szuka wtedy tylko ich. Listy przebojów pochodzą z Apple Music.",
   "components.Settings.SettingsGuide.music2": "Synchronizacja muzyki działa co 5 minut. Album jest Dostępny, gdy wyświetli go biblioteka muzyczna, a gdy żadna nie jest włączona — gdy Lidarr ma wszystkie utwory.",
   "components.Settings.SettingsGuide.music3": "Stan usług pokazuje albumy, których po dniu nie ma na serwerze multimediów, zamówione albumy nieznalezione przez tydzień i problemy z MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "Muzykę można wyłączyć wszystkim w Funkcjach albo każdy u siebie.",

@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Збігається з будь-яким вибраним віковим рейтингом для регіону «Знайти щось нове» ({region}), інакше з рейтингом США. Тайтли без рейтингу не збігаються ніколи.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Збігається з будь-яким вибраним віковим рейтингом для регіону «Знайти щось нове» ({region}). Тайтли без рейтингу не збігаються ніколи.",
   "components.Settings.OverrideRuleTile.certification": "Вікові рейтинги",
-  "components.Settings.SettingsGuide.music1": "З типовим Lidarr («Служби») можна запитати один альбом, кілька або всю дискографію одним запитом. Потім Lidarr шукає лише ці альбоми.",
+  "components.Settings.SettingsGuide.music1": "З Lidarr за замовчуванням (Сервіси) можна запитувати альбоми, всю дискографію чи окремі пісні. Lidarr шукає лише їх. Музичні чарти беруться з Apple Music.",
   "components.Settings.SettingsGuide.music2": "Синхронізація музики йде кожні 5 хвилин. Альбом «Доступний», коли його показує музична бібліотека, а без увімкнених бібліотек — коли в Lidarr є всі треки.",
   "components.Settings.SettingsGuide.music3": "«Стан системи» показує альбоми, яких через день немає на медіасервері, запитані альбоми, не знайдені за тиждень, і проблеми MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "Музику можна вимкнути для всіх у «Функціях» або кожному для себе.",

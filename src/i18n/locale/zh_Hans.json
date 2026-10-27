@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "匹配“探索”地区（{region}）中所选的任一分级，否则匹配美国分级。无分级的作品永不匹配。",
   "components.Settings.OverrideRuleModal.certificationTipUs": "匹配“探索”地区（{region}）中所选的任一分级。无分级的作品永不匹配。",
   "components.Settings.OverrideRuleTile.certification": "年龄分级",
-  "components.Settings.SettingsGuide.music1": "设置默认 Lidarr（服务器）后，可将一张、多张专辑或整个作品集作为一次请求。之后 Lidarr 只搜索这些专辑。",
+  "components.Settings.SettingsGuide.music1": "有默认 Lidarr（服务）时，可以请求专辑、整个作品集或单曲。Lidarr 只搜索这些。音乐榜单来自 Apple Music。",
   "components.Settings.SettingsGuide.music2": "音乐同步每 5 分钟运行一次。音乐库列出专辑后即为“可观看”；若未开启任何音乐库，则在 Lidarr 拥有全部曲目时可观看。",
   "components.Settings.SettingsGuide.music3": "健康状况会列出一天后仍不在媒体服务器上的专辑、一周后仍未找到的已请求专辑，以及 MusicBrainz 问题。",
   "components.Settings.SettingsGuide.music4": "可在“功能”中为所有人关闭音乐，或由每个人为自己关闭。",

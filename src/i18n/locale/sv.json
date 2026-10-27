@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Matchar valfri vald åldersgräns, för Upptäck-regionen ({region}), annars den amerikanska. Titlar utan åldersgräns matchar aldrig.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Matchar valfri vald åldersgräns, för Upptäck-regionen ({region}). Titlar utan åldersgräns matchar aldrig.",
   "components.Settings.OverrideRuleTile.certification": "Åldersgränser",
-  "components.Settings.SettingsGuide.music1": "Med en standard-Lidarr (Tjänster) kan man begära ett album, flera eller en hel diskografi som en enda förfrågan. Lidarr söker sedan bara efter de albumen.",
+  "components.Settings.SettingsGuide.music1": "Med en standard-Lidarr (Tjänster) kan man begära album, en hel diskografi eller enstaka låtar. Lidarr söker då bara efter dem. Topplistorna kommer från Apple Music.",
   "components.Settings.SettingsGuide.music2": "Musiksynk körs var 5:e minut. Ett album är Tillgängligt när ett musikbibliotek listar det eller, utan något påslaget, när Lidarr har alla spår.",
   "components.Settings.SettingsGuide.music3": "Hälsa listar album som saknas på mediaservern efter en dag, begärda album som inte hittats efter en vecka och problem med MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "Musik kan stängas av för alla under Funktioner, eller av var och en för egen del.",

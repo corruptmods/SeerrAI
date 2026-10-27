@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "खोज क्षेत्र ({region}) के लिए किसी भी चुनी रेटिंग से मेल खाता है, वरना अमेरिकी रेटिंग से। बिना रेटिंग वाले टाइटल कभी मेल नहीं खाते।",
   "components.Settings.OverrideRuleModal.certificationTipUs": "खोज क्षेत्र ({region}) के लिए किसी भी चुनी रेटिंग से मेल खाता है। बिना रेटिंग वाले टाइटल कभी मेल नहीं खाते।",
   "components.Settings.OverrideRuleTile.certification": "आयु रेटिंग",
-  "components.Settings.SettingsGuide.music1": "डिफ़ॉल्ट Lidarr (सेवाएँ) के साथ, लोग एक एल्बम, कई या पूरी डिस्कोग्राफ़ी एक अनुरोध के रूप में माँग सकते हैं। फिर Lidarr सिर्फ़ वही एल्बम खोजता है।",
+  "components.Settings.SettingsGuide.music1": "डिफ़ॉल्ट Lidarr (सेवाएँ) के साथ लोग एल्बम, पूरी डिस्कोग्राफ़ी या अकेले गाने माँग सकते हैं। Lidarr सिर्फ़ उन्हीं को खोजता है। संगीत चार्ट Apple Music से आते हैं।",
   "components.Settings.SettingsGuide.music2": "म्यूज़िक सिंक हर 5 मिनट चलता है। एल्बम तब उपलब्ध होता है जब कोई संगीत लाइब्रेरी उसे दिखाए, या कोई चालू न हो तो जब Lidarr के पास उसके सारे ट्रैक हों।",
   "components.Settings.SettingsGuide.music3": "सेहत में एक दिन बाद मीडिया सर्वर से गायब एल्बम, एक हफ़्ते बाद भी न मिले माँगे गए एल्बम, और MusicBrainz की समस्याएँ दिखती हैं।",
   "components.Settings.SettingsGuide.music4": "संगीत सुविधाएँ में सबके लिए, या हर व्यक्ति अपने लिए बंद कर सकता है।",

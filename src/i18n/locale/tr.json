@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Keşfet bölgesi ({region}) için seçilen herhangi bir yaş sınırıyla, yoksa ABD sınırıyla eşleşir. Sınırı olmayan yapımlar asla eşleşmez.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Keşfet bölgesi ({region}) için seçilen herhangi bir yaş sınırıyla eşleşir. Sınırı olmayan yapımlar asla eşleşmez.",
   "components.Settings.OverrideRuleTile.certification": "Yaş Sınırları",
-  "components.Settings.SettingsGuide.music1": "Varsayılan bir Lidarr ile (Hizmetler) bir albüm, birkaç albüm veya tüm diskografi tek talep olarak istenebilir. Lidarr sonra yalnızca o albümleri arar.",
+  "components.Settings.SettingsGuide.music1": "Varsayılan bir Lidarr ile (Hizmetler) albüm, tüm diskografi veya tek tek şarkı istenebilir. Lidarr yalnızca bunları arar. Müzik listeleri Apple Music'ten gelir.",
   "components.Settings.SettingsGuide.music2": "Müzik Eşitleme 5 dakikada bir çalışır. Bir albüm, bir müzik kütüphanesi listeleyince ya da hiçbiri açık değilse Lidarr tüm parçalarına sahip olunca Kullanılabilir olur.",
   "components.Settings.SettingsGuide.music3": "Sağlık, bir gün sonra medya sunucusunda olmayan albümleri, bir hafta sonra bulunamayan talep edilmiş albümleri ve MusicBrainz sorunlarını listeler.",
   "components.Settings.SettingsGuide.music4": "Müzik, Özellikler’den herkes için ya da her kişi tarafından kendisi için kapatılabilir.",

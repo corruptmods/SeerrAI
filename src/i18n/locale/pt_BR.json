@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Corresponde a qualquer classificação escolhida, para a região do Explorar ({region}), senão a dos EUA. Títulos sem classificação nunca correspondem.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Corresponde a qualquer classificação escolhida, para a região do Explorar ({region}). Títulos sem classificação nunca correspondem.",
   "components.Settings.OverrideRuleTile.certification": "Classificações indicativas",
-  "components.Settings.SettingsGuide.music1": "Com um Lidarr padrão (Serviços), dá para solicitar um álbum, vários ou uma discografia inteira numa só solicitação. O Lidarr então busca só esses álbuns.",
+  "components.Settings.SettingsGuide.music1": "Com um Lidarr padrão (Serviços), dá para pedir álbuns, uma discografia inteira ou músicas avulsas. O Lidarr busca só isso. As paradas de música vêm do Apple Music.",
   "components.Settings.SettingsGuide.music2": "A sincronização de música roda a cada 5 minutos. Um álbum fica Disponível quando uma biblioteca de música o lista ou, sem nenhuma ativa, quando o Lidarr tem todas as faixas.",
   "components.Settings.SettingsGuide.music3": "Saúde lista álbuns ausentes do seu servidor de mídia após um dia, álbuns solicitados não encontrados após uma semana e problemas do MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "A música pode ser desativada para todos em Recursos, ou por cada pessoa para si.",

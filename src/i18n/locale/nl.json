@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Past bij elke gekozen leeftijdsclassificatie, voor de Ontdekken-regio ({region}), anders de Amerikaanse. Titels zonder classificatie passen nooit.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Past bij elke gekozen leeftijdsclassificatie, voor de Ontdekken-regio ({region}). Titels zonder classificatie passen nooit.",
   "components.Settings.OverrideRuleTile.certification": "Leeftijdsclassificaties",
-  "components.Settings.SettingsGuide.music1": "Met een standaard-Lidarr (Diensten) kun je één album, meerdere of een hele discografie aanvragen in één aanvraag. Lidarr zoekt dan precies die albums.",
+  "components.Settings.SettingsGuide.music1": "Met een standaard-Lidarr (Diensten) kunnen mensen albums, een hele discografie of losse nummers aanvragen. Lidarr zoekt dan alleen die. De muziekhitlijsten komen van Apple Music.",
   "components.Settings.SettingsGuide.music2": "Muzieksync loopt elke 5 minuten. Een album is Beschikbaar zodra een muziekbibliotheek het toont, of zonder actieve bibliotheek zodra Lidarr alle nummers heeft.",
   "components.Settings.SettingsGuide.music3": "Gezondheid toont albums die na een dag niet op je mediaserver staan, aangevraagde albums die na een week niet gevonden zijn, en MusicBrainz-problemen.",
   "components.Settings.SettingsGuide.music4": "Muziek kan voor iedereen uit bij Functies, of door ieder voor zichzelf.",

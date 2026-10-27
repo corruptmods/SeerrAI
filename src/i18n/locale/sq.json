@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Përputhet me çdo klasifikim të zgjedhur për rajonin e Zbulo ({region}), përndryshe me atë të SHBA-së. Titujt pa klasifikim nuk përputhen kurrë.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Përputhet me çdo klasifikim të zgjedhur për rajonin e Zbulo ({region}). Titujt pa klasifikim nuk përputhen kurrë.",
   "components.Settings.OverrideRuleTile.certification": "Kufizimet e moshës",
-  "components.Settings.SettingsGuide.music1": "Me një Lidarr të parazgjedhur (Shërbime), mund të kërkohet një album, disa ose një diskografi e tërë, si një kërkesë. Lidarr pastaj kërkon vetëm ato albume.",
+  "components.Settings.SettingsGuide.music1": "Me një Lidarr të paracaktuar (Shërbimet), mund të kërkohen albume, një diskografi e plotë ose këngë më vete. Lidarr kërkon vetëm ato. Listat e muzikës vijnë nga Apple Music.",
   "components.Settings.SettingsGuide.music2": "Sinkronizimi i muzikës ekzekutohet çdo 5 minuta. Një album është Në dispozicion kur e liston një bibliotekë muzikore, ose pa asnjë aktive, kur Lidarr ka të gjitha këngët.",
   "components.Settings.SettingsGuide.music3": "Shëndeti liston albumet që mungojnë në serverin e medias pas një dite, albumet e kërkuara të pagjetura pas një jave dhe problemet e MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "Muzika mund të fiket për të gjithë te Veçoritë, ose nga secili për vete.",

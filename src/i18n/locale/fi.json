@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Vastaa mitä tahansa valittua ikärajaa Tutustu-alueella ({region}), muuten Yhdysvaltain ikärajaa. Ikärajattomat nimikkeet eivät vastaa koskaan.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Vastaa mitä tahansa valittua ikärajaa Tutustu-alueella ({region}). Ikärajattomat nimikkeet eivät vastaa koskaan.",
   "components.Settings.OverrideRuleTile.certification": "Ikärajat",
-  "components.Settings.SettingsGuide.music1": "Oletus-Lidarrin (Palvelut) kanssa voi pyytää yhden albumin, useita tai koko diskografian yhtenä pyyntönä. Lidarr hakee sitten vain ne albumit.",
+  "components.Settings.SettingsGuide.music1": "Oletus-Lidarrilla (Palvelut) voi pyytää albumeja, koko diskografian tai yksittäisiä kappaleita. Lidarr etsii vain ne. Musiikkilistat tulevat Apple Musicista.",
   "components.Settings.SettingsGuide.music2": "Musiikkisynkronointi ajetaan 5 minuutin välein. Albumi on Saatavilla, kun musiikkikirjasto listaa sen, tai ilman päällä olevaa kirjastoa, kun Lidarrilla on kaikki raidat.",
   "components.Settings.SettingsGuide.music3": "Kunto listaa albumit, jotka puuttuvat mediapalvelimelta päivän jälkeen, pyydetyt albumit, joita ei löytynyt viikossa, ja MusicBrainzin ongelmat.",
   "components.Settings.SettingsGuide.music4": "Musiikin voi poistaa käytöstä kaikilta kohdassa Ominaisuudet tai kukin itseltään.",

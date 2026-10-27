@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Matcher enhver valgt aldersgrænse for Udforsk-regionen ({region}), ellers den amerikanske. Titler uden aldersgrænse matcher aldrig.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Matcher enhver valgt aldersgrænse for Udforsk-regionen ({region}). Titler uden aldersgrænse matcher aldrig.",
   "components.Settings.OverrideRuleTile.certification": "Aldersgrænser",
-  "components.Settings.SettingsGuide.music1": "Med en standard-Lidarr (Tjenester) kan man anmode om ét album, flere eller en hel diskografi som én anmodning. Lidarr søger så kun efter de album.",
+  "components.Settings.SettingsGuide.music1": "Med en standard-Lidarr (Tjenester) kan folk anmode om album, en hel diskografi eller enkelte sange. Lidarr søger så kun efter dem. Musikhitlisterne kommer fra Apple Music.",
   "components.Settings.SettingsGuide.music2": "Musiksynkronisering kører hvert 5. minut. Et album er Tilgængeligt, når et musikbibliotek viser det, eller uden nogen slået til, når Lidarr har alle numre.",
   "components.Settings.SettingsGuide.music3": "Tilstand viser album, der mangler på din medieserver efter en dag, anmodede album, der ikke er fundet efter en uge, og problemer med MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "Musik kan slås fra for alle under Funktioner, eller af hver enkelt for sig selv.",

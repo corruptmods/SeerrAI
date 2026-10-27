@@ -20,19 +20,28 @@
 - Match Check finds titles a server matched wrongly, nightly and as requests arrive.
 
 **Music**
-- Request albums or a whole discography through Lidarr, as one request.
+- Request albums, a whole discography, or just one song (the radio edit or the club mix) through Lidarr.
+- Top Songs, Trending Songs, Top Albums and Top Artists from Apple Music's charts, and rows of your own from the music you ask for.
+- Backfill and the admin agent go after albums Lidarr couldn't find.
 
 **Sign-in**
 - Plex, Jellyfin, Emby, a password, passkeys, or single sign-on (Authentik, Authelia, Keycloak, Pocket ID, Google).
 - Personal API keys for apps and scripts.
 
 **AI** (optional: Claude, OpenAI or a model on your own hardware)
-- AI Search from a description or a photo, Pick for the Room, spoiler-free Catch Me Up.
-- An admin agent that finds what Sonarr and Radarr can't, and changes nothing without approval.
+- AI Search for films, series and music, from a description or a photo; Pick for the Room; spoiler-free Catch Me Up.
+- Tell it what's wrong ("missing episodes", "no subtitles", "this album is missing songs") and it sets about fixing it. Siri can report what's playing.
+- An admin agent that finds what Sonarr, Radarr and Lidarr can't, and changes nothing without approval.
 
 **Admin tools**
-- Backfill: searches Prowlarr for stuck titles and imports only what's missing.
-- A Health page with alerts, live progress from six download clients, subtitles through Bazarr.
+- Backfill: searches Prowlarr for stuck titles and albums, and imports only what's missing.
+- Download Check: catches fake and wrong downloads and stuck imports.
+- A Health page with alerts, and live progress from six download clients.
+- Subtitles through Bazarr, transcribed with Whisper when none can be found, showing what Bazarr is doing as it works.
+- Works with Radarr 7.
+
+**Everywhere**
+- Installs as an app on a phone, and comes back to the page you were on.
 - Light and dark themes, accent colours and custom CSS; 40 languages.
 
 Every extra can be turned off for everyone, or by each person for themselves.

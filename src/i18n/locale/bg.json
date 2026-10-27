@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Съвпада с всяка избрана възрастова категория за региона на Откриване ({region}), иначе с американската. Заглавия без категория никога не съвпадат.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Съвпада с всяка избрана възрастова категория за региона на Откриване ({region}). Заглавия без категория никога не съвпадат.",
   "components.Settings.OverrideRuleTile.certification": "Възрастови рейтинги",
-  "components.Settings.SettingsGuide.music1": "С Lidarr по подразбиране (Услуги) може да се заяви един албум, няколко или цяла дискография с една заявка. Lidarr търси само тези албуми.",
+  "components.Settings.SettingsGuide.music1": "С Lidarr по подразбиране (Услуги) хората могат да заявяват албуми, цяла дискография или отделни песни. Lidarr търси само тях. Класациите идват от Apple Music.",
   "components.Settings.SettingsGuide.music2": "Музикалната синхронизация тече на всеки 5 минути. Албумът е Наличен, щом музикална библиотека го покаже, или без включена библиотека — щом Lidarr има всички песни.",
   "components.Settings.SettingsGuide.music3": "Състояние показва албуми, които след ден ги няма в медийния сървър, заявени албуми, ненамерени за седмица, и проблеми с MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "Музиката може да се изключи за всички в Функции или всеки за себе си.",

@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Se potrivește cu orice clasificare aleasă pentru regiunea Descoperă ({region}), altfel cu cea din SUA. Titlurile neclasificate nu se potrivesc niciodată.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Se potrivește cu orice clasificare aleasă pentru regiunea Descoperă ({region}). Titlurile neclasificate nu se potrivesc niciodată.",
   "components.Settings.OverrideRuleTile.certification": "Clasificări de vârstă",
-  "components.Settings.SettingsGuide.music1": "Cu un Lidarr implicit (Servicii), se poate cere un album, mai multe sau o discografie întreagă, ca o singură solicitare. Lidarr caută apoi doar acele albume.",
+  "components.Settings.SettingsGuide.music1": "Cu un Lidarr implicit (Servicii), se pot cere albume, o discografie întreagă sau melodii separate. Lidarr caută doar acestea. Topurile muzicale vin de la Apple Music.",
   "components.Settings.SettingsGuide.music2": "Sincronizarea muzicii rulează la 5 minute. Un album e Disponibil când îl listează o bibliotecă muzicală sau, fără niciuna activă, când Lidarr are toate piesele.",
   "components.Settings.SettingsGuide.music3": "Sănătate listează albumele lipsă de pe serverul media după o zi, albumele cerute negăsite după o săptămână și problemele MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "Muzica poate fi dezactivată pentru toți în Funcții sau de fiecare pentru sine.",

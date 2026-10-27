@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Vastab igale valitud vanusepiirangule Avasta piirkonna ({region}) järgi, muidu USA piirangule. Piiranguta pealkirjad ei vasta kunagi.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Vastab igale valitud vanusepiirangule Avasta piirkonna ({region}) järgi. Piiranguta pealkirjad ei vasta kunagi.",
   "components.Settings.OverrideRuleTile.certification": "Vanusepiirangud",
-  "components.Settings.SettingsGuide.music1": "Vaikimisi Lidarriga (Teenused) saab taotleda ühe albumi, mitu või kogu diskograafia ühe taotlusena. Lidarr otsib siis ainult neid albumeid.",
+  "components.Settings.SettingsGuide.music1": "Vaike-Lidarriga (Teenused) saab soovida albumeid, terve diskograafia või üksikuid lugusid. Lidarr otsib siis ainult neid. Muusika edetabelid tulevad Apple Musicust.",
   "components.Settings.SettingsGuide.music2": "Muusika sünkroon käib iga 5 minuti järel. Album on Saadaval, kui muusikakogu selle loetleb, või kui ükski pole sees, siis kui Lidarril on kõik lood.",
   "components.Settings.SettingsGuide.music3": "Seisund loetleb albumid, mida pole päeva pärast meediaserveris, taotletud albumid, mida pole nädalaga leitud, ja MusicBrainzi probleemid.",
   "components.Settings.SettingsGuide.music4": "Muusika saab kõigile välja lülitada jaotises Funktsioonid või igaüks enda jaoks.",

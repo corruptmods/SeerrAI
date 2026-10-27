@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Odpovídá kterékoli zvolené věkové klasifikaci pro region Objevte ({region}), jinak americké. Tituly bez klasifikace nikdy neodpovídají.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Odpovídá kterékoli zvolené věkové klasifikaci pro region Objevte ({region}). Tituly bez klasifikace nikdy neodpovídají.",
   "components.Settings.OverrideRuleTile.certification": "Věková hodnocení",
-  "components.Settings.SettingsGuide.music1": "S výchozím Lidarrem (Služby) lze vyžádat jedno album, několik nebo celou diskografii jako jednu žádost. Lidarr pak hledá jen ta alba.",
+  "components.Settings.SettingsGuide.music1": "S výchozím Lidarrem (Služby) lze žádat o alba, celou diskografii nebo jednotlivé skladby. Lidarr pak hledá jen je. Hudební žebříčky pocházejí z Apple Music.",
   "components.Settings.SettingsGuide.music2": "Synchronizace hudby běží každých 5 minut. Album je Dostupné, jakmile ho uvádí hudební knihovna, nebo bez zapnuté knihovny, jakmile má Lidarr všechny skladby.",
   "components.Settings.SettingsGuide.music3": "Stav služeb uvádí alba, která po dni chybí na mediálním serveru, vyžádaná alba nenalezená do týdne a problémy s MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "Hudbu lze vypnout všem ve Funkcích, nebo každý sám sobě.",

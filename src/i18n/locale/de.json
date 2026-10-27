@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Trifft jede gewählte Altersfreigabe für die Entdecken-Region ({region}), sonst die US-Freigabe. Titel ohne Freigabe treffen nie.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Trifft jede gewählte Altersfreigabe für die Entdecken-Region ({region}). Titel ohne Freigabe treffen nie.",
   "components.Settings.OverrideRuleTile.certification": "Altersfreigaben",
-  "components.Settings.SettingsGuide.music1": "Mit einem Standard-Lidarr (Dienste) kann man ein Album, mehrere oder eine ganze Diskografie als eine Anfrage anfragen. Lidarr sucht dann genau diese Alben.",
+  "components.Settings.SettingsGuide.music1": "Mit einem Standard-Lidarr (Dienste) lassen sich Alben, eine ganze Diskografie oder einzelne Songs anfragen. Lidarr sucht dann nur danach. Die Musik-Charts kommen von Apple Music.",
   "components.Settings.SettingsGuide.music2": "Der Musikabgleich läuft alle 5 Minuten. Ein Album ist Verfügbar, sobald eine Musikbibliothek es listet, oder ohne aktive Bibliothek, sobald Lidarr alle Titel hat.",
   "components.Settings.SettingsGuide.music3": "Zustand listet Alben, die nach einem Tag nicht auf deinem Medienserver sind, angefragte Alben, die nach einer Woche nicht gefunden wurden, und MusicBrainz-Probleme.",
   "components.Settings.SettingsGuide.music4": "Musik lässt sich unter Funktionen für alle abschalten oder von jedem für sich.",

@@ -19,6 +19,7 @@ When someone reports a problem, as an issue, in AI Search or [with Siri](./siri.
 
 - **Subtitles** missing or wrong: searched for, or transcribed.
 - **Episodes or a movie missing**: searched for by Sonarr or Radarr, then Backfill, then the admin agent if it steps in on its own.
+- **Music missing** (from AI Search): an album's missing songs, or one that never came, searched for again by Lidarr, and by Backfill with **Music too** on; an artist's missing albums, searched for by Lidarr. Only what's missing can be fixed for music.
 - **A broken file or the wrong episode**: a replacement is looked for, and the file is removed only once one is found. The same title is replaced at most once a day. From AI Search, these are filed as an issue and need permission to report issues.
 - **A whole season that is bad** ("the whole of season 6 is messed up", "redownload season 2"): Sonarr searches for the season and takes a release none of the current files came from, a season pack your quality profile accepts first, otherwise one release per episode, in English or the series' own language, never from a blocked group. Only once it has been grabbed are the old releases marked failed in Sonarr (so they are never taken again) and the old files removed, so the new ones can import. If nothing else is found, nothing is removed and the admin agent looks further. Whoever reported it is told on the issue when the season is back.
   - **Admins** get it straight away, and can replace a season again the same day.

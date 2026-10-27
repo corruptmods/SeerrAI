@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "ホームの地域 ({region}) で選んだレーティングのいずれかに一致、なければ米国のレーティング。レーティングなしのタイトルは一致しません。",
   "components.Settings.OverrideRuleModal.certificationTipUs": "ホームの地域 ({region}) で選んだレーティングのいずれかに一致。レーティングなしのタイトルは一致しません。",
   "components.Settings.OverrideRuleTile.certification": "年齢レーティング",
-  "components.Settings.SettingsGuide.music1": "デフォルトの Lidarr (サービス) があれば、アルバム1枚、複数、ディスコグラフィ全体を1件のリクエストにできます。Lidarr はそのアルバムだけを検索します。",
+  "components.Settings.SettingsGuide.music1": "既定のLidarr（サービス）があれば、アルバム、ディスコグラフィ全体、または単曲をリクエストできます。Lidarrはそれだけを検索します。音楽チャートはApple Musicから取得します。",
   "components.Settings.SettingsGuide.music2": "音楽の同期は5分ごとに実行されます。アルバムは音楽ライブラリに表示されたとき、またはライブラリがオフなら Lidarr が全トラックを持ったときに視聴可能になります。",
   "components.Settings.SettingsGuide.music3": "ヘルスチェックには、1日たってもメディアサーバーにないアルバム、1週間たっても見つからないリクエスト済みアルバム、MusicBrainz の問題が表示されます。",
   "components.Settings.SettingsGuide.music4": "音楽は「機能」で全員分、または各自でオフにできます。",

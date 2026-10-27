@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "يطابق أي تصنيف مختار لمنطقة إكتشف ({region})، وإلا التصنيف الأمريكي. العناوين غير المصنفة لا تطابق أبدًا.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "يطابق أي تصنيف مختار لمنطقة إكتشف ({region}). العناوين غير المصنفة لا تطابق أبدًا.",
   "components.Settings.OverrideRuleTile.certification": "التصنيفات العمرية",
-  "components.Settings.SettingsGuide.music1": "مع Lidarr افتراضي (الخدمات)، يمكن طلب ألبوم أو عدة ألبومات أو ديسكوغرافيا كاملة كطلب واحد. يبحث Lidarr بعدها عن تلك الألبومات فقط.",
+  "components.Settings.SettingsGuide.music1": "مع Lidarr افتراضي (الخدمات)، يمكن طلب ألبومات أو كامل أعمال فنان أو أغانٍ منفردة. ثم يبحث Lidarr عنها فقط. تأتي قوائم الموسيقى من Apple Music.",
   "components.Settings.SettingsGuide.music2": "تعمل مزامنة الموسيقى كل 5 دقائق. يصبح الألبوم متوفر عندما تدرجه مكتبة موسيقى، أو دون مكتبة مفعّلة، عندما يملك Lidarr كل مقاطعه.",
   "components.Settings.SettingsGuide.music3": "تدرج سلامة النظام الألبومات الغائبة عن خادم الوسائط بعد يوم، والألبومات المطلوبة غير الموجودة بعد أسبوع، ومشاكل MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "يمكن إيقاف الموسيقى للجميع في الميزات، أو لكل شخص بنفسه.",

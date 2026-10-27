@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Odgovara bilo kojoj izabranoj starosnoj oznaci za region Pronađi novo ({region}), inače američkoj. Naslovi bez oznake nikad ne odgovaraju.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Odgovara bilo kojoj izabranoj starosnoj oznaci za region Pronađi novo ({region}). Naslovi bez oznake nikad ne odgovaraju.",
   "components.Settings.OverrideRuleTile.certification": "Uzrasne oznake",
-  "components.Settings.SettingsGuide.music1": "Sa podrazumevanim Lidarr-om (Servisi) može se zatražiti jedan album, nekoliko ili cela diskografija kao jedan zahtev. Lidarr zatim traži samo te albume.",
+  "components.Settings.SettingsGuide.music1": "Sa podrazumevanim Lidarrom (Usluge) mogu se tražiti albumi, cela diskografija ili pojedinačne pesme. Lidarr tada traži samo njih. Muzičke top-liste dolaze sa Apple Musica.",
   "components.Settings.SettingsGuide.music2": "Sinhronizacija muzike radi na svakih 5 minuta. Album je Dostupno kada ga navede muzička biblioteka ili, bez uključene, kada Lidarr ima sve pesme.",
   "components.Settings.SettingsGuide.music3": "Stanje sistema navodi albume kojih posle dan nema na medija serveru, zatražene albume koji nisu pronađeni za nedelju dana i probleme sa MusicBrainz-om.",
   "components.Settings.SettingsGuide.music4": "Muzika se može isključiti za sve u Funkcijama ili svako za sebe.",

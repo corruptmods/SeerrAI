@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Ujema se s katero koli izbrano starostno oznako za regijo Odkrivanja ({region}), sicer z ameriško. Naslovi brez oznake se nikoli ne ujemajo.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Ujema se s katero koli izbrano starostno oznako za regijo Odkrivanja ({region}). Naslovi brez oznake se nikoli ne ujemajo.",
   "components.Settings.OverrideRuleTile.certification": "Starostne oznake",
-  "components.Settings.SettingsGuide.music1": "S privzetim Lidarr (Storitve) lahko ljudje zahtevajo en album, več albumov ali celotno diskografijo kot eno zahtevo. Lidarr nato išče le te albume.",
+  "components.Settings.SettingsGuide.music1": "S privzetim Lidarrom (Storitve) lahko zahtevate albume, celotno diskografijo ali posamezne skladbe. Lidarr nato išče le te. Glasbene lestvice prihajajo iz Apple Music.",
   "components.Settings.SettingsGuide.music2": "Sinhronizacija glasbe teče vsakih 5 minut. Album je Na voljo, ko ga navede glasbena knjižnica ali, brez vklopljene, ko ima Lidarr vse skladbe.",
   "components.Settings.SettingsGuide.music3": "Zdravje navaja albume, ki po enem dnevu manjkajo na predstavnostnem strežniku, zahtevane albume, ki po tednu niso najdeni, in težave z MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "Glasbo je mogoče izklopiti za vse v Funkcijah ali vsak zase.",

@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Atitinka bet kurį pasirinktą amžiaus cenzą Naršyti regionui ({region}), kitaip JAV cenzą. Be cenzo pavadinimai niekada neatitinka.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Atitinka bet kurį pasirinktą amžiaus cenzą Naršyti regionui ({region}). Be cenzo pavadinimai niekada neatitinka.",
   "components.Settings.OverrideRuleTile.certification": "Amžiaus cenzai",
-  "components.Settings.SettingsGuide.music1": "Su numatytuoju Lidarr (Paslaugos) galima rezervuoti vieną albumą, kelis ar visą diskografiją viena rezervacija. Lidarr tada ieško tik tų albumų.",
+  "components.Settings.SettingsGuide.music1": "Su numatytuoju Lidarr (Paslaugos) galima prašyti albumų, visos diskografijos ar pavienių dainų. Lidarr ieško tik jų. Muzikos topai gaunami iš Apple Music.",
   "components.Settings.SettingsGuide.music2": "Muzikos sinchronizacija vyksta kas 5 minutes. Albumas Paruoštas, kai jį išvardija muzikos biblioteka arba, kai nė viena neįjungta, kai Lidarr turi visus takelius.",
   "components.Settings.SettingsGuide.music3": "Būklė rodo albumus, kurių po dienos nėra medijos serveryje, rezervuotus albumus, nerastus per savaitę, ir MusicBrainz problemas.",
   "components.Settings.SettingsGuide.music4": "Muziką galima išjungti visiems skiltyje Funkcijos arba kiekvienam sau.",

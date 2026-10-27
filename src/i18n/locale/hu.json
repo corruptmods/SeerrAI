@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Bármely kiválasztott korhatár-besorolással egyezik a Felfedezés régiójában ({region}), egyébként az amerikaival. A besorolás nélküli címek sosem egyeznek.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Bármely kiválasztott korhatár-besorolással egyezik a Felfedezés régiójában ({region}). A besorolás nélküli címek sosem egyeznek.",
   "components.Settings.OverrideRuleTile.certification": "Korhatár-besorolások",
-  "components.Settings.SettingsGuide.music1": "Alapértelmezett Lidarrral (Szolgáltatások) kérhető egy album, több album vagy egy teljes diszkográfia, egy kérésként. A Lidarr ezután csak azokat az albumokat keresi.",
+  "components.Settings.SettingsGuide.music1": "Alapértelmezett Lidarrral (Szolgáltatások) albumokat, teljes diszkográfiát vagy egyes dalokat lehet kérni. A Lidarr csak ezeket keresi. A zenei listák az Apple Musicból jönnek.",
   "components.Settings.SettingsGuide.music2": "A zeneszinkronizálás 5 percenként fut. Egy album akkor Elérhető, ha egy zenekönyvtár listázza, vagy ha egy sincs bekapcsolva, ha a Lidarrnak megvan minden száma.",
   "components.Settings.SettingsGuide.music3": "A Rendszerállapot listázza a médiaszerverről egy nap után is hiányzó albumokat, a hét után sem talált kért albumokat és a MusicBrainz-problémákat.",
   "components.Settings.SettingsGuide.music4": "A zene mindenkinek kikapcsolható a Funkciók alatt, vagy bárki által magának.",

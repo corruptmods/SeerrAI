@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Khớp với mọi phân loại độ tuổi đã chọn cho vùng Khám phá ({region}), nếu không thì phân loại của Mỹ. Tựa chưa phân loại không bao giờ khớp.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Khớp với mọi phân loại độ tuổi đã chọn cho vùng Khám phá ({region}). Tựa chưa phân loại không bao giờ khớp.",
   "components.Settings.OverrideRuleTile.certification": "Xếp hạng độ tuổi",
-  "components.Settings.SettingsGuide.music1": "Với một Lidarr mặc định (Dịch vụ), có thể yêu cầu một album, vài album hoặc cả discography trong một yêu cầu. Lidarr sau đó chỉ tìm các album đó.",
+  "components.Settings.SettingsGuide.music1": "Với Lidarr mặc định (Dịch vụ), mọi người có thể yêu cầu album, toàn bộ đĩa nhạc hoặc từng bài hát. Lidarr chỉ tìm những thứ đó. Bảng xếp hạng nhạc lấy từ Apple Music.",
   "components.Settings.SettingsGuide.music2": "Đồng bộ nhạc chạy mỗi 5 phút. Album thành Có sẵn khi một thư viện nhạc liệt kê nó, hoặc khi không bật thư viện nào, khi Lidarr có đủ mọi bài.",
   "components.Settings.SettingsGuide.music3": "Tình trạng liệt kê album vẫn thiếu trên máy chủ media sau một ngày, album đã yêu cầu chưa tìm thấy sau một tuần, và sự cố MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "Có thể tắt nhạc cho mọi người trong Tính năng, hoặc mỗi người tự tắt.",

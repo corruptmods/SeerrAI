@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "디스커버 지역 ({region})에서 고른 등급 중 하나와 일치, 없으면 미국 등급. 등급 없는 작품은 일치하지 않습니다.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "디스커버 지역 ({region})에서 고른 등급 중 하나와 일치. 등급 없는 작품은 일치하지 않습니다.",
   "components.Settings.OverrideRuleTile.certification": "연령 등급",
-  "components.Settings.SettingsGuide.music1": "기본 Lidarr (서비스)가 있으면 앨범 하나, 여러 개, 전체 디스코그래피를 요청 하나로 할 수 있습니다. Lidarr는 그 앨범만 검색합니다.",
+  "components.Settings.SettingsGuide.music1": "기본 Lidarr(서비스)가 있으면 앨범, 전체 디스코그래피 또는 단일 곡을 요청할 수 있습니다. Lidarr는 그것만 검색합니다. 음악 차트는 Apple Music에서 가져옵니다.",
   "components.Settings.SettingsGuide.music2": "음악 동기화는 5분마다 실행됩니다. 앨범은 음악 라이브러리에 표시되거나, 켜진 라이브러리가 없으면 Lidarr에 모든 트랙이 있을 때 사용 가능이 됩니다.",
   "components.Settings.SettingsGuide.music3": "상태 점검에는 하루가 지나도 미디어 서버에 없는 앨범, 일주일이 지나도 못 찾은 요청 앨범, MusicBrainz 문제가 표시됩니다.",
   "components.Settings.SettingsGuide.music4": "음악은 기능에서 모두에게, 또는 각자 자신에게서 끌 수 있습니다.",

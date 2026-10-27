@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Odgovara bilo kojoj odabranoj dobnoj oznaci za regiju Otkrivanja ({region}), inače američkoj. Naslovi bez oznake nikad ne odgovaraju.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Odgovara bilo kojoj odabranoj dobnoj oznaci za regiju Otkrivanja ({region}). Naslovi bez oznake nikad ne odgovaraju.",
   "components.Settings.OverrideRuleTile.certification": "Dobne oznake",
-  "components.Settings.SettingsGuide.music1": "Sa zadanim Lidarrom (Usluge) može se zatražiti jedan album, nekoliko ili cijela diskografija kao jedan zahtjev. Lidarr zatim traži samo te albume.",
+  "components.Settings.SettingsGuide.music1": "Sa zadanim Lidarrom (Usluge) mogu se tražiti albumi, cijela diskografija ili pojedinačne pjesme. Lidarr tada traži samo njih. Glazbene ljestvice dolaze s Apple Musica.",
   "components.Settings.SettingsGuide.music2": "Sinkronizacija glazbe radi svakih 5 minuta. Album je Dostupno kada ga navede glazbena biblioteka ili, bez uključene, kada Lidarr ima sve pjesme.",
   "components.Settings.SettingsGuide.music3": "Stanje navodi albume kojih nakon dan nema na medijskom poslužitelju, zatražene albume koji nisu pronađeni u tjedan dana i probleme s MusicBrainzom.",
   "components.Settings.SettingsGuide.music4": "Glazbu je moguće isključiti za sve u Značajkama ili svatko za sebe.",

@@ -68,7 +68,7 @@ const messages = defineMessages('components.Settings.SettingsGuide', {
 
   musicTitle: 'Music',
   music1:
-    'With a default Lidarr (Services), people can request one album, several or a whole discography, as one request. Lidarr then searches for just those albums.',
+    'With a default Lidarr (Services), people can request albums, a whole discography or single songs. Lidarr then searches for just those. Music’s charts come from Apple Music.',
   music2:
     'Music Sync runs every 5 minutes. An album is Available once a music library lists it, or with none on, once Lidarr has all its tracks.',
   music3:

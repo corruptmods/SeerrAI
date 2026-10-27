@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Passt op all gewielt Altersfräigab fir d’Entdecken-Regioun ({region}), soss déi US-amerikanesch. Titelen ouni Fräigab passen ni.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Passt op all gewielt Altersfräigab fir d’Entdecken-Regioun ({region}). Titelen ouni Fräigab passen ni.",
   "components.Settings.OverrideRuleTile.certification": "Altersfräigaben",
-  "components.Settings.SettingsGuide.music1": "Mat engem Standard-Lidarr (Servicer) kann een een Album, e puer oder eng ganz Diskographie als eng Ufro ufroen. Lidarr sicht dann just no dësen Alben.",
+  "components.Settings.SettingsGuide.music1": "Mat engem Standard-Lidarr (Servicer) kann een Alben, eng ganz Diskografie oder eenzel Lidder ufroen. Lidarr sicht dann nëmmen déi. D’Musekscharts kommen vun Apple Music.",
   "components.Settings.SettingsGuide.music2": "De Musek-Sync leeft all 5 Minutten. En Album ass Disponibel, soubal eng Musekbibliothéik en oplëscht, oder ouni aktiv, wann Lidarr all seng Tracks huet.",
   "components.Settings.SettingsGuide.music3": "Zoustand lëscht Alben op, déi no engem Dag um Medieserver feelen, ugefrot Alben, déi no enger Woch net fonnt goufen, a MusicBrainz-Problemer.",
   "components.Settings.SettingsGuide.music4": "Musek ka fir jiddereen ënner Funktiounen ausgeschalt ginn, oder vun all Persoun fir sech.",

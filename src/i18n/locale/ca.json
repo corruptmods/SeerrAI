@@ -3780,7 +3780,7 @@
   "components.Settings.OverrideRuleModal.certificationTip": "Coincideix amb qualsevol qualificació triada per a la regió de Descobriu ({region}), o si no, la dels EUA. Els títols sense qualificació no coincideixen mai.",
   "components.Settings.OverrideRuleModal.certificationTipUs": "Coincideix amb qualsevol qualificació triada per a la regió de Descobriu ({region}). Els títols sense qualificació no coincideixen mai.",
   "components.Settings.OverrideRuleTile.certification": "Qualificacions per edats",
-  "components.Settings.SettingsGuide.music1": "Amb un Lidarr predeterminat (Serveis), es pot sol·licitar un àlbum, diversos o tota una discografia en una sola sol·licitud. Després Lidarr només cerca aquells àlbums.",
+  "components.Settings.SettingsGuide.music1": "Amb un Lidarr per defecte (Serveis), es poden demanar àlbums, una discografia sencera o cançons soltes. Lidarr només cerca això. Les llistes de música vénen d’Apple Music.",
   "components.Settings.SettingsGuide.music2": "La sincronització de música s’executa cada 5 minuts. Un àlbum és Disponible quan una biblioteca de música el llista, o sense cap d’activada, quan Lidarr en té totes les pistes.",
   "components.Settings.SettingsGuide.music3": "Salut llista els àlbums que falten al servidor multimèdia al cap d’un dia, els sol·licitats no trobats al cap d’una setmana i els problemes de MusicBrainz.",
   "components.Settings.SettingsGuide.music4": "La música es pot desactivar per a tothom a Funcions, o cadascú per a si mateix.",

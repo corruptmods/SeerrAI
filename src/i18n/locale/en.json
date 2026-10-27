@@ -2741,7 +2741,7 @@
   "components.Settings.SettingsGuide.lookLogs": "Logs: everything Seerr AI did, newest first.",
   "components.Settings.SettingsGuide.lookMatch": "Match Check (on Health): folders your media server matched to the wrong title. Fix with Fix Match in Plex or Identify in Jellyfin and Emby.",
   "components.Settings.SettingsGuide.lookTitle": "Where to look when something is wrong",
-  "components.Settings.SettingsGuide.music1": "With a default Lidarr (Services), people can request one album, several or a whole discography, as one request. Lidarr then searches for just those albums.",
+  "components.Settings.SettingsGuide.music1": "With a default Lidarr (Services), people can request albums, a whole discography or single songs. Lidarr then searches for just those. Music’s charts come from Apple Music.",
   "components.Settings.SettingsGuide.music2": "Music Sync runs every 5 minutes. An album is Available once a music library lists it, or with none on, once Lidarr has all its tracks.",
   "components.Settings.SettingsGuide.music3": "Health lists albums missing from your media server after a day, requested albums not found after a week, and MusicBrainz problems.",
   "components.Settings.SettingsGuide.music4": "Music can be turned off for everyone under Features, or by each person for themselves.",

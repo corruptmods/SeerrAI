@@ -2,13 +2,13 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
-## Unreleased
+## 2.2.0 (27 October 2026)
 
 Seerr AI can now fetch one song instead of a whole album, and Backfill and the admin agent go after music Lidarr couldn't find. Music gets real charts: top songs, trending songs, top albums and top artists. AI Search finds music too, subtitle searches and transcriptions show what Bazarr is doing, the installed app comes back where you left it, and Seerr AI is ready for Radarr 7.
 
 ### New
 
-- **Song requests**: ask for one song, not the whole album, from music search or an album's track list. Each version (radio edit, club mix) is asked for on its own. Lidarr fetches the single that has it; with Take Songs from Albums on, a song only on albums is taken from its album through Backfill. On to start; turn it off in Settings → Music. ([guide](./docs/seerr-ai/music.md))
+- **Song requests**: ask for one song, not the whole album, from music search, an album's track list or the charts. Each version (radio edit, club mix) is asked for on its own. Lidarr fetches the single that has it; with Take Songs from Albums on, a song only on albums is taken from its album through Backfill, and with it off, such a song says **Only on albums**. On to start; turn it off in Settings → Music. ([guide](./docs/seerr-ai/music.md))
 - **Your own Music page**: rows from the music you've asked for: your requests, more from your artists, and artists like yours. Only your own requests count.
 - **Faster music search**: a search you've typed past no longer holds up the one you want, and songs are looked up alongside artists and albums.
 - **Song downloads show their progress**: a song taken from an album shows **Downloading** on its track, its request and its album while it comes, as Lidarr's downloads do.
@@ -24,12 +24,10 @@ Seerr AI can now fetch one song instead of a whole album, and Backfill and the a
 
 ### Fixed
 
-- With Take Songs from Albums off, an album's songs that are only on albums showed **Request**, which then failed. They now say **Only on albums**.
-- Searching music in two tabs at once made each drop the other's search.
 - On Postgres, Backfill couldn't save a SABnzbd download's progress while it downloaded.
+- A Plex watchlist longer than one page could show a page's titles again in place of the next page's.
 - AI Search couldn't fix a title newer than the AI: it renamed it or said it didn't exist. It now finds the title on the server from your own words.
 - Search's All said "No results." above the music it found.
-- An album you'd taken one song from said **Available**, so the rest of it couldn't be requested. It now says **Partially Available**, with **Request More**, and the song you asked for says Available.
 - Music arriving together was announced as "ready to watch"; it's now ready to listen to.
 - An album's tracks now show **Available** when the whole album is here.
 - Long titles on request cards were cut short; they now take a second line, and the year (or a song's artist) shows on phones too.

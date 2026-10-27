@@ -4,7 +4,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ## Unreleased
 
-Seerr AI can now fetch one song instead of a whole album, and Backfill and the admin agent go after music Lidarr couldn't find. AI Search finds music too, and Seerr AI is ready for Radarr 7.
+Seerr AI can now fetch one song instead of a whole album, and Backfill and the admin agent go after music Lidarr couldn't find. Music gets real charts: top songs, trending songs, top albums and top artists. AI Search finds music too, subtitle searches and transcriptions show what Bazarr is doing, the installed app comes back where you left it, and Seerr AI is ready for Radarr 7.
 
 ### New
 

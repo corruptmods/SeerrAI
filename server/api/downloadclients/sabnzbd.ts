@@ -189,8 +189,8 @@ class SabnzbdAPI implements UsenetClient {
         place: 'queue',
         status: String(queued.status ?? ''),
         percentage: Number(queued.percentage) || 0,
-        size: Number(queued.mb) * MB || 0,
-        sizeLeft: Number(queued.mbleft) * MB || 0,
+        size: Math.round(Number(queued.mb) * MB) || 0,
+        sizeLeft: Math.round(Number(queued.mbleft) * MB) || 0,
         secondsLeft: sabSecondsLeft(queued.timeleft),
         // SABnzbd reports one speed, for its whole queue. It is this job's
         // only while this is the one job downloading; with several at once

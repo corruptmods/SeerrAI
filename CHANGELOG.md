@@ -20,6 +20,7 @@ Seerr AI can now fetch one song instead of a whole album, and Backfill and the a
 
 ### Fixed
 
+- On Postgres, Backfill couldn't save a SABnzbd download's progress while it downloaded.
 - AI Search couldn't fix a title newer than the AI: it renamed it or said it didn't exist. It now finds the title on the server from your own words.
 - Search's All said "No results." above the music it found.
 - An album you'd taken one song from said **Available**, so the rest of it couldn't be requested. It now says **Partially Available**, with **Request More**, and the song you asked for says Available.

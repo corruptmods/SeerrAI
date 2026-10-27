@@ -309,6 +309,27 @@ describe('talking to them', () => {
     );
   });
 
+  it('gives a queued SABnzbd job its size in whole bytes', async () => {
+    // SABnzbd gives megabytes with decimals; Postgres keeps whole bytes.
+    wholeQueue = {
+      kbpersec: '0',
+      slots: [
+        {
+          nzo_id: 'one',
+          status: 'Downloading',
+          mb: '19510.95',
+          mbleft: '2525.67',
+          percentage: '87',
+          timeleft: '0:05:00',
+        },
+      ],
+    };
+    const job = await sab('right').getJob('one');
+    assert.equal(job?.size, Math.round(19510.95 * 1024 * 1024));
+    assert.equal(job?.sizeLeft, Math.round(2525.67 * 1024 * 1024));
+    assert.ok(Number.isInteger(job?.size) && Number.isInteger(job?.sizeLeft));
+  });
+
   it("gives a SABnzbd job the queue's speed only when it is the one downloading", async () => {
     const slot = (nzo_id: string, status: string) => ({
       nzo_id,

@@ -155,6 +155,12 @@ interface CardShellProps {
   /** Whether the actions take a row beneath the text, which leaves room. */
   roomForActions: boolean;
   actions?: ReactNode;
+  /**
+   * Its name always shows along the bottom of the picture, not only with
+   * the details: for music, whose covers and photos seldom carry a name the
+   * way a film's poster does.
+   */
+  captioned?: boolean;
 }
 
 const CardShell = ({
@@ -177,6 +183,7 @@ const CardShell = ({
   summary,
   roomForActions,
   actions,
+  captioned = false,
 }: CardShellProps) => (
   <NearCard
     className={cardWidth(canExpand)}
@@ -229,6 +236,22 @@ const CardShell = ({
             {controls}
           </div>
         </div>
+        {captioned && !showOverlay && (
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-2 pb-2 pt-8 text-on-media"
+            style={{
+              background:
+                'linear-gradient(180deg, rgb(var(--card-scrim) / 0) 0%, rgb(var(--card-scrim) / 0.85) 70%)',
+            }}
+          >
+            <div className="truncate text-sm font-semibold leading-tight">
+              {title}
+            </div>
+            {summary && (
+              <div className="truncate text-xs opacity-80">{summary}</div>
+            )}
+          </div>
+        )}
         <Transition
           as={Fragment}
           show={updating}

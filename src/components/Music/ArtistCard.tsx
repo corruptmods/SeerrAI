@@ -64,6 +64,7 @@ const ArtistCard = ({ artist, canExpand }: ArtistCardProps) => {
 
   return (
     <CardShell
+      captioned
       detail={detail}
       canExpand={canExpand}
       testId="artist-card"

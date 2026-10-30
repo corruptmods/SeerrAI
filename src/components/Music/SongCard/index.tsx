@@ -70,6 +70,7 @@ const SongCard = ({ song, canExpand, onRequested }: SongCardProps) => {
 
   return (
     <CardShell
+      captioned
       detail={detail}
       canExpand={canExpand}
       testId="song-card"

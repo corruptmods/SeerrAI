@@ -116,6 +116,7 @@ const MusicCard = ({
 
   return (
     <CardShell
+      captioned
       detail={detail}
       canExpand={canExpand}
       testId="music-card"

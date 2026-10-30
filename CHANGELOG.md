@@ -15,6 +15,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - **Prowlarr moved to Settings → Services**, beside the other services. Backfill's settings say whether it is set up, and Backfill can't be turned on without it. Nothing needs setting up again.
 - **Lists and playlists**: Watch Lists are now **Lists**, and a list can be a playlist. Paste a Spotify or Apple Music playlist's share link and its songs come in, now and daily after, each requested for you as a song within your song limit. What's over the limit is requested as it frees up, or, if you choose in Settings → Music, a big import waits for an admin as one batch. Songs MusicBrainz doesn't know (often music only on Spotify or YouTube) are listed apart and looked for again each week. ([guide](./docs/seerr-ai/discover-and-lists.md#playlists))
 - An album's tracks show open on a phone too; they can still be folded away.
+- Album, song and artist cards show their name along the bottom of the artwork, since covers seldom carry it.
 - Backfill shows a long wait in days: "31 d 2 h", not "746 h 0 min".
 
 ## 2.2.1 (27 October 2026)

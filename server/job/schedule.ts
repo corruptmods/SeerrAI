@@ -15,6 +15,7 @@ import { connectedServers, serverName } from '@server/lib/mediaServers';
 import { musicReady } from '@server/lib/music/access';
 import songFetcher from '@server/lib/music/songFetch';
 import notificationReconciler from '@server/lib/notificationReconciler';
+import playlists from '@server/lib/playlists';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import plexUserImport from '@server/lib/plexUserImport';
 import refreshToken from '@server/lib/refreshToken';
@@ -253,6 +254,24 @@ const musicJobs = (): ScheduledJob[] => {
       ),
       running: () => musicFullScan.status().running,
       cancelFn: () => musicFullScan.cancel(),
+    },
+    {
+      id: 'playlist-sync',
+      music: true,
+      name: 'Playlist Sync',
+      type: 'process',
+      interval: 'hours',
+      cronSchedule: jobs['playlist-sync'].schedule,
+      job: schedule.scheduleJob(
+        jobs['playlist-sync'].schedule,
+        runJob('Playlist Sync', () => {
+          logger.debug('Starting scheduled job: Playlist Sync', {
+            label: 'Jobs',
+          });
+          return playlists.sync();
+        })
+      ),
+      running: () => playlists.isRunning(),
     },
   ];
 };

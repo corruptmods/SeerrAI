@@ -78,4 +78,4 @@ Switch **Music** off for everyone in **Settings → Music**: the Music page, mus
 
 ## Not for music yet
 
-Pick for the Room, watch lists, Suggested for You, Who Watched, the blocklist, issues, the calendar, override rules and following an artist's new releases are for films and series only.
+Pick for the Room, watch lists (music has playlists), Suggested for You, Who Watched, the blocklist, issues, the calendar, override rules and following an artist's new releases are for films and series only.

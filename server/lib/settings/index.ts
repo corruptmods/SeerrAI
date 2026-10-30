@@ -115,6 +115,7 @@ export const musicDefaults = (): MusicSettings => ({
   songRequests: true,
   songsFromAlbums: true,
   songQuota: { quotaLimit: 0, quotaDays: 7 },
+  playlists: { overLimit: 'wait', approveOver: 25 },
   search: {},
 });
 
@@ -515,8 +516,21 @@ export interface MusicSettings {
    * song as one item of their music limit instead.
    */
   songQuota: { quotaLimit: number; quotaDays: number };
+  /** Songs a linked playlist brings in (Lists). */
+  playlists: PlaylistImportSettings;
   /** How music is searched (Settings → Music). */
   search: MusicSearchSettings;
+}
+
+/**
+ * What happens when a playlist brings in more songs than its person may
+ * request: the rest waits for their limit to free up (`wait`), or, past
+ * `approveOver` songs at once, they wait for an admin's approval instead
+ * (`approve`), as requests that don't count against the limit.
+ */
+export interface PlaylistImportSettings {
+  overLimit: 'wait' | 'approve';
+  approveOver: number;
 }
 
 /**
@@ -995,6 +1009,7 @@ export type JobId =
   | 'plex-match-check'
   | 'music-sync'
   | 'music-full-scan'
+  | 'playlist-sync'
   | 'database-maintenance';
 
 export interface AllSettings {
@@ -1361,6 +1376,11 @@ class Settings {
         'music-full-scan': {
           schedule: '0 40 3 * * *',
         },
+        // Linked playlists read again once a day, and their songs requested
+        // as their people's limits free up, each hour.
+        'playlist-sync': {
+          schedule: '0 25 * * * *',
+        },
         // Clears out rows nothing reads any more, then vacuums.
         'database-maintenance': {
           schedule: '0 45 3 * * *',
@@ -1567,6 +1587,9 @@ class Settings {
     }
     if (!this.data.music.songQuota) {
       this.data.music.songQuota = musicDefaults().songQuota;
+    }
+    if (!this.data.music.playlists) {
+      this.data.music.playlists = musicDefaults().playlists;
     }
     // Saved before song requests existed: they start on there too.
     if (this.data.music.songRequests === undefined) {

@@ -41,6 +41,13 @@ export const musicImageSrc = (url: string, cacheImages: boolean): string => {
   return url;
 };
 
+/** An album's cover, small, by its release-group id. */
+export const albumCoverUrl = (albumMbid: string, cacheImages: boolean) =>
+  musicImageSrc(
+    `https://coverartarchive.org/release-group/${albumMbid}/front-250`,
+    cacheImages
+  );
+
 /** A picture of an artist: the server finds one, or answers 404. */
 export const artistImageUrl = (
   artistId: string,

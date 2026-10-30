@@ -2245,10 +2245,24 @@ components:
           description: A song on no single is taken from its album, through Backfill's indexers and download client, with only the song imported by Lidarr.
         songQuota:
           $ref: '#/components/schemas/SongQuota'
+        playlists:
+          $ref: '#/components/schemas/PlaylistImports'
         hasTheAudioDbApiKey:
           type: boolean
         search:
           $ref: '#/components/schemas/MusicSearchSettings'
+    PlaylistImports:
+      type: object
+      description: What happens when a playlist brings in more songs than its person may request.
+      properties:
+        overLimit:
+          type: string
+          enum: [wait, approve]
+          description: wait, the rest is requested as their limit frees up; approve, an import of more than approveOver songs waits for an admin.
+        approveOver:
+          type: number
+          minimum: 1
+          maximum: 1000
     SongQuota:
       type: object
       description: Songs a person may ask for in so many days. No limit (0) counts each song as one item of their music limit instead.
@@ -8184,6 +8198,8 @@ paths:
                   description: Songs on no single are taken from their album through Backfill. Left as it is when not sent.
                 songQuota:
                   $ref: '#/components/schemas/SongQuota'
+                playlists:
+                  $ref: '#/components/schemas/PlaylistImports'
                 search:
                   type: object
                   properties:
@@ -10784,6 +10800,10 @@ paths:
                 name:
                   type: string
                   example: Date Night
+                kind:
+                  type: string
+                  enum: [watch, music]
+                  description: A watch list (films and series, the default) or a playlist (songs), while music is set up.
                 watchedSync:
                   type: boolean
       responses:
@@ -11185,6 +11205,90 @@ paths:
             application/json:
               schema:
                 type: object
+  /list/{listId}/link:
+    post:
+      summary: Link a playlist to a Spotify or Apple Music playlist
+      description: Its public page is read now and daily after; its songs are matched on MusicBrainz and requested as songs for whoever linked it. Only the owner.
+      tags:
+        - list
+      parameters:
+        - in: path
+          name: listId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  description: The playlist's share link
+      responses:
+        '200':
+          description: The playlist's link and songs
+          content:
+            application/json:
+              schema:
+                type: object
+    delete:
+      summary: Unlink a playlist; its songs stay
+      tags:
+        - list
+      parameters:
+        - in: path
+          name: listId
+          required: true
+          schema:
+            type: number
+      responses:
+        '204':
+          description: Unlinked
+  /list/{listId}/song/{songId}:
+    delete:
+      summary: Take a song off a playlist
+      description: A request already made for it stands. On a linked playlist it is kept out of sight, so it isn't read back in.
+      tags:
+        - list
+      parameters:
+        - in: path
+          name: listId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: songId
+          required: true
+          schema:
+            type: number
+      responses:
+        '204':
+          description: Taken off
+  /list/{listId}/song/{songId}/retry:
+    post:
+      summary: Look for a playlist song again
+      description: For one MusicBrainz didn't know, or that couldn't be requested. Unfound songs are also looked for again weekly.
+      tags:
+        - list
+      parameters:
+        - in: path
+          name: listId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: songId
+          required: true
+          schema:
+            type: number
+      responses:
+        '204':
+          description: Being looked for
   /list/{listId}/item:
     post:
       summary: Add a title to a list

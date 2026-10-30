@@ -284,6 +284,13 @@ listRoutes.post<{ listId: string }>(
       if (!access) {
         return next({ status: 404, message: 'List not found.' });
       }
+      // A playlist holds songs; films and series go on a watch list.
+      if (access.list.kind === 'music') {
+        return next({
+          status: 400,
+          message: 'Films and series go on a watch list, not a playlist.',
+        });
+      }
 
       type ImportEntry = {
         tmdbId?: number | string;

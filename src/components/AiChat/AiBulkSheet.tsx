@@ -49,6 +49,7 @@ const messages = defineMessages('components.AiChat.AiBulkSheet', {
 });
 
 interface ListSummary {
+  kind?: 'watch' | 'music';
   id: number;
   name: string;
 }
@@ -124,9 +125,11 @@ const AiBulkSheet = ({
     [Permission.REQUEST, Permission.REQUEST_MOVIE, Permission.REQUEST_TV],
     { type: 'or' }
   );
-  const { data: lists } = useSWR<ListSummary[]>(
+  const { data: allLists } = useSWR<ListSummary[]>(
     mode === 'list' ? '/api/v1/list' : null
   );
+  // Films and series go on watch lists, not playlists.
+  const lists = allLists?.filter((list) => list.kind !== 'music');
 
   // Requesting: only what is not here or asked for yet is ticked.
   const [chosen, setChosen] = useState<Set<string>>(

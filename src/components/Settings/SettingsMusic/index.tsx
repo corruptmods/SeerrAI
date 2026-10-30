@@ -35,6 +35,14 @@ export const messages = defineMessages('components.Settings.SettingsMusic', {
   songQuota: 'Song Limit',
   songQuotaTip:
     'Songs each person may ask for. Unlimited counts each song as one album against their music limit instead.',
+  playlistOverLimit: 'Big Playlist Imports',
+  playlistOverLimitTip:
+    'When a playlist brings in more songs than its person may request.',
+  playlistWait: 'Request the rest as their limit frees up',
+  playlistApprove: 'Send imports over a size to an admin to approve',
+  playlistApproveOver: 'Imports of more than this many songs need approval',
+  playlistApproveOverTip:
+    'They wait for an admin as one batch, and don’t count against the person’s limit.',
   validationUrl: 'You must provide a valid URL',
   validationEmail: 'You must provide a valid email address',
   validationMaxAlbums: 'A number from 1 to 1000',
@@ -51,6 +59,7 @@ export interface ShownMusicSettings {
   songRequests: boolean;
   songsFromAlbums: boolean;
   songQuota: { quotaLimit: number; quotaDays: number };
+  playlists: { overLimit: 'wait' | 'approve'; approveOver: number };
   hasTheAudioDbApiKey: boolean;
   search: { inAll: boolean };
 }
@@ -66,6 +75,8 @@ export interface MusicSourceValues {
   songsFromAlbums: boolean;
   songQuotaLimit: number;
   songQuotaDays: number;
+  playlistOverLimit: 'wait' | 'approve';
+  playlistApproveOver: number | string;
 }
 
 /** The fields as the form starts: the public MusicBrainz shows as blank. */
@@ -85,17 +96,25 @@ export const musicSourceValues = (
   songsFromAlbums: data.songsFromAlbums,
   songQuotaLimit: data.songQuota.quotaLimit,
   songQuotaDays: data.songQuota.quotaDays,
+  playlistOverLimit: data.playlists?.overLimit ?? 'wait',
+  playlistApproveOver: data.playlists?.approveOver ?? 25,
 });
 
 /** The fields as the server takes them. */
 export const musicSourceBody = ({
   songQuotaLimit,
   songQuotaDays,
+  playlistOverLimit,
+  playlistApproveOver,
   ...sources
 }: MusicSourceValues) => ({
   ...sources,
   maxAlbumsPerRequest: Number(sources.maxAlbumsPerRequest),
   songQuota: { quotaLimit: songQuotaLimit, quotaDays: songQuotaDays },
+  playlists: {
+    overLimit: playlistOverLimit,
+    approveOver: Math.max(1, Number(playlistApproveOver) || 25),
+  },
 });
 
 /** What the fields must be before they are saved. */
@@ -280,6 +299,45 @@ const MusicSources = ({
               defaultLimit={Number(values.songQuotaLimit)}
               defaultDays={Number(values.songQuotaDays)}
               onChange={setFieldValue}
+            />
+          </div>
+        </div>
+      )}
+      {values.songRequests && (
+        <div className="form-row">
+          <label htmlFor="playlistOverLimit" className="text-label">
+            {intl.formatMessage(messages.playlistOverLimit)}
+            <span className="label-tip">
+              {intl.formatMessage(messages.playlistOverLimitTip)}
+            </span>
+          </label>
+          <div className="form-input-area">
+            <Field as="select" id="playlistOverLimit" name="playlistOverLimit">
+              <option value="wait">
+                {intl.formatMessage(messages.playlistWait)}
+              </option>
+              <option value="approve">
+                {intl.formatMessage(messages.playlistApprove)}
+              </option>
+            </Field>
+          </div>
+        </div>
+      )}
+      {values.songRequests && values.playlistOverLimit === 'approve' && (
+        <div className="form-row">
+          <label htmlFor="playlistApproveOver" className="text-label">
+            {intl.formatMessage(messages.playlistApproveOver)}
+            <span className="label-tip">
+              {intl.formatMessage(messages.playlistApproveOverTip)}
+            </span>
+          </label>
+          <div className="form-input-area">
+            <Field
+              id="playlistApproveOver"
+              name="playlistApproveOver"
+              type="text"
+              inputMode="numeric"
+              className="short"
             />
           </div>
         </div>

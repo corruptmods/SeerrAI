@@ -4,6 +4,7 @@ import { ListCardsSkeleton } from '@app/components/Common/PageSkeleton';
 import PageTitle from '@app/components/Common/PageTitle';
 import ListCard from '@app/components/MediaLists/ListCard';
 import ShareListModal from '@app/components/MediaLists/ShareListModal';
+import useFeature from '@app/hooks/useFeature';
 import useToasts from '@app/hooks/useToasts';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
@@ -14,16 +15,24 @@ import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
 const messages = defineMessages('components.MediaLists', {
-  watchlists: 'Watch Lists',
+  lists: 'Lists',
   createlist: 'Create List',
   newlist: 'New list name',
-  empty: 'You have no lists yet. Create one to start collecting titles.',
+  kindWatch: 'Watch list',
+  kindMusic: 'Playlist',
+  kindLabel: 'What it holds',
+  empty:
+    'You have no lists yet. Create a watch list for films and series, or a playlist for songs.',
+  emptyWatch: 'You have no lists yet. Create one to start collecting titles.',
   createfailed: 'Could not create the list: {detail}',
 });
 
 interface ListSummary {
   id: number;
   name: string;
+  kind?: 'watch' | 'music';
+  /** A playlist's album covers. */
+  covers?: string[];
   owner: { id: number; displayName: string };
   isOwner: boolean;
   itemCount: number;
@@ -37,6 +46,9 @@ const MediaLists = () => {
   const { addToast } = useToasts();
   const { user } = useUser();
   const [newName, setNewName] = useState('');
+  // Playlists while music is set up and on for this person.
+  const musicOn = useFeature('music');
+  const [kind, setKind] = useState<'watch' | 'music'>('watch');
   const [isCreating, setCreating] = useState(false);
   const [sharing, setSharing] = useState<{ id: number; name: string } | null>(
     null
@@ -55,7 +67,7 @@ const MediaLists = () => {
     try {
       const { data } = await axios.post<{ id: number; name: string }>(
         '/api/v1/list',
-        { name }
+        { name, kind: musicOn ? kind : 'watch' }
       );
       setNewName('');
       // Show the list straight away rather than waiting on a refetch, then
@@ -99,9 +111,9 @@ const MediaLists = () => {
           }}
         />
       )}
-      <PageTitle title={intl.formatMessage(messages.watchlists)} />
+      <PageTitle title={intl.formatMessage(messages.lists)} />
       <div className="mb-6">
-        <Header>{intl.formatMessage(messages.watchlists)}</Header>
+        <Header>{intl.formatMessage(messages.lists)}</Header>
       </div>
 
       <div className="mb-6 flex max-w-lg items-center space-x-2">
@@ -117,6 +129,23 @@ const MediaLists = () => {
           type="text"
           value={newName}
         />
+        {musicOn && (
+          <select
+            aria-label={intl.formatMessage(messages.kindLabel)}
+            className="w-auto flex-none"
+            onChange={(e) =>
+              setKind(e.target.value === 'music' ? 'music' : 'watch')
+            }
+            value={kind}
+          >
+            <option value="watch">
+              {intl.formatMessage(messages.kindWatch)}
+            </option>
+            <option value="music">
+              {intl.formatMessage(messages.kindMusic)}
+            </option>
+          </select>
+        )}
         <Button
           buttonType="primary"
           disabled={!newName.trim() || isCreating}
@@ -141,12 +170,16 @@ const MediaLists = () => {
                 name={list.name}
                 owner={list.owner}
                 previews={list.previews ?? []}
+                kind={list.kind ?? 'watch'}
+                covers={list.covers ?? []}
               />
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-muted">{intl.formatMessage(messages.empty)}</p>
+        <p className="text-muted">
+          {intl.formatMessage(musicOn ? messages.empty : messages.emptyWatch)}
+        </p>
       )}
     </>
   );

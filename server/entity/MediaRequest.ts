@@ -75,8 +75,17 @@ export class NoAlbumsAvailableError extends Error {}
 /** A music request that cannot be made as asked: no albums, too many. */
 export class InvalidMusicRequestError extends Error {}
 
+/** How a music request is made, beyond what was asked for. */
+export interface MusicRequestOptions {
+  /**
+   * Waits for an admin, whatever the requester may do on their own, and
+   * so isn't counted against their limit: a big playlist import.
+   */
+  needsApproval?: boolean;
+}
+
 /** The most songs one request may ask for. */
-const MAX_SONGS_PER_REQUEST = 50;
+export const MAX_SONGS_PER_REQUEST = 50;
 
 /** Why the songs asked for are not requested: each is here or coming. */
 const coveredMessage = (
@@ -237,7 +246,8 @@ export class MediaRequest {
    */
   public static async requestMusic(
     requestBody: MusicRequestBody,
-    user: User
+    user: User,
+    options: MusicRequestOptions = {}
   ): Promise<MediaRequest> {
     const lockUserId =
       requestBody.userId &&
@@ -248,14 +258,15 @@ export class MediaRequest {
     return requestLock.dispatch(userKey(lockUserId), () =>
       mediaLock.dispatch(
         mediaKey(MediaType.MUSIC, requestBody.artistMbid),
-        () => MediaRequest.createMusicRequest(requestBody, user)
+        () => MediaRequest.createMusicRequest(requestBody, user, options)
       )
     );
   }
 
   private static async createMusicRequest(
     requestBody: MusicRequestBody,
-    user: User
+    user: User,
+    { needsApproval = false }: MusicRequestOptions
   ): Promise<MediaRequest> {
     const mediaRepository = getRepository(Media);
     const requestRepository = getRepository(MediaRequest);
@@ -329,10 +340,12 @@ export class MediaRequest {
     // Songs count against a limit of their own when they have one.
     const songQuota = quotas.song ?? quotas.music;
     const canBypassQuota = user.hasPermission(Permission.MANAGE_REQUESTS);
+    // One an admin must approve is not counted: their approval is the check.
     const ignoreQuota =
-      requestBody.ignoreQuota === true &&
-      canBypassQuota &&
-      ((quotas.music.limit ?? 0) > 0 || (songQuota.limit ?? 0) > 0);
+      needsApproval ||
+      (requestBody.ignoreQuota === true &&
+        canBypassQuota &&
+        ((quotas.music.limit ?? 0) > 0 || (songQuota.limit ?? 0) > 0));
 
     if (!ignoreQuota) {
       if (requestBody.ignoreQuota && !canBypassQuota) {
@@ -542,14 +555,16 @@ export class MediaRequest {
       }
     }
 
-    const autoApproved = user.hasPermission(
-      [
-        Permission.AUTO_APPROVE,
-        Permission.AUTO_APPROVE_MUSIC,
-        Permission.MANAGE_REQUESTS,
-      ],
-      { type: 'or' }
-    );
+    const autoApproved =
+      !needsApproval &&
+      user.hasPermission(
+        [
+          Permission.AUTO_APPROVE,
+          Permission.AUTO_APPROVE_MUSIC,
+          Permission.MANAGE_REQUESTS,
+        ],
+        { type: 'or' }
+      );
     const status = autoApproved
       ? MediaRequestStatus.APPROVED
       : MediaRequestStatus.PENDING;

@@ -5,6 +5,8 @@ import { PosterGridSkeleton } from '@app/components/Common/PageSkeleton';
 import PageTitle from '@app/components/Common/PageTitle';
 import ImportListModal from '@app/components/MediaLists/ImportListModal';
 import ListItemCard from '@app/components/MediaLists/ListItemCard';
+import PlaylistLinkModal from '@app/components/MediaLists/PlaylistLinkModal';
+import PlaylistSongs from '@app/components/MediaLists/PlaylistSongs';
 import Roulette from '@app/components/MediaLists/Roulette';
 import ShareListModal from '@app/components/MediaLists/ShareListModal';
 import type { ListItem, SeriesProgress } from '@app/hooks/useListDetail';
@@ -28,6 +30,7 @@ import {
   TrashIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
+import type { PlaylistSongView } from '@server/lib/playlists/view';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
@@ -51,6 +54,8 @@ const messages = defineMessages('components.MediaLists.ListDetail', {
   sharedby: 'Shared by {name}',
   leavelist: 'Leave List',
   confirmleave: 'Leave this list? It will no longer appear in your lists.',
+  confirmunlink:
+    'Unlink this playlist? Its songs stay, but songs added to it from now on won’t come in.',
   markwatched: 'Mark as watched',
   unwatch: 'Mark as unwatched',
   towatch: 'To watch',
@@ -91,7 +96,9 @@ const ListDetail = () => {
   // history (Tautulli for Plex, Jellyfin or Emby themselves). Absent
   // entries simply show nothing, so a slow or missing answer costs nothing.
   const { data: progress } = useSWR<Record<number, SeriesProgress>>(
-    router.query.listId ? `/api/v1/list/${router.query.listId}/progress` : null
+    router.query.listId && data?.kind !== 'music'
+      ? `/api/v1/list/${router.query.listId}/progress`
+      : null
   );
 
   const [isSharing, setSharing] = useState(false);
@@ -176,6 +183,38 @@ const ListDetail = () => {
       await axios.delete(
         `/api/v1/list/${data.id}/item?tmdbId=${item.tmdbId}&mediaType=${item.mediaType}`
       );
+      mutate();
+    } catch (e) {
+      showFailure(e);
+    }
+  };
+
+  const isPlaylist = data.kind === 'music';
+
+  const unlinkPlaylist = async () => {
+    if (!window.confirm(intl.formatMessage(messages.confirmunlink))) {
+      return;
+    }
+    try {
+      await axios.delete(`/api/v1/list/${data.id}/link`);
+      mutate();
+    } catch (e) {
+      showFailure(e);
+    }
+  };
+
+  const removeSong = async (song: PlaylistSongView) => {
+    try {
+      await axios.delete(`/api/v1/list/${data.id}/song/${song.id}`);
+      mutate();
+    } catch (e) {
+      showFailure(e);
+    }
+  };
+
+  const retrySong = async (song: PlaylistSongView) => {
+    try {
+      await axios.post(`/api/v1/list/${data.id}/song/${song.id}/retry`);
       mutate();
     } catch (e) {
       showFailure(e);
@@ -295,7 +334,14 @@ const ListDetail = () => {
           }}
         />
       )}
-      {isImporting && (
+      {isImporting && isPlaylist && (
+        <PlaylistLinkModal
+          listId={data.id}
+          onClose={() => setImporting(false)}
+          onLinked={() => mutate()}
+        />
+      )}
+      {isImporting && !isPlaylist && (
         <ImportListModal
           listId={data.id}
           onClose={() => setImporting(false)}
@@ -411,7 +457,17 @@ const ListDetail = () => {
         </Alert>
       )}
 
-      {data.items.length > 1 && (
+      {isPlaylist && data.playlist && (
+        <PlaylistSongs
+          playlist={data.playlist}
+          isOwner={data.isOwner}
+          onUnlink={unlinkPlaylist}
+          onRemove={removeSong}
+          onRetry={retrySong}
+        />
+      )}
+
+      {!isPlaylist && data.items.length > 1 && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">
             {(
@@ -458,7 +514,7 @@ const ListDetail = () => {
         </div>
       )}
 
-      {data.isOwner && (
+      {!isPlaylist && data.isOwner && (
         <label className="mb-4 flex items-center space-x-2 text-xs text-muted sm:text-sm">
           <input
             checked={!!data.watchedSync}
@@ -472,18 +528,21 @@ const ListDetail = () => {
           </span>
         </label>
       )}
-      {data.isOwner && data.watchedSync && !!data.cannotCheck?.length && (
-        <p className="-mt-2 mb-4 text-xs text-yellow-400 light:text-warning-text sm:text-sm">
-          {intl.formatMessage(messages.cannotcheck, {
-            names: intl.formatList(
-              data.cannotCheck.map((person) => person.displayName),
-              { type: 'conjunction' }
-            ),
-          })}
-        </p>
-      )}
+      {!isPlaylist &&
+        data.isOwner &&
+        data.watchedSync &&
+        !!data.cannotCheck?.length && (
+          <p className="-mt-2 mb-4 text-xs text-yellow-400 light:text-warning-text sm:text-sm">
+            {intl.formatMessage(messages.cannotcheck, {
+              names: intl.formatList(
+                data.cannotCheck.map((person) => person.displayName),
+                { type: 'conjunction' }
+              ),
+            })}
+          </p>
+        )}
 
-      {data.items.length ? (
+      {isPlaylist ? null : data.items.length ? (
         <>
           {unwatched.length > 0 && (
             <>

@@ -40,7 +40,7 @@ export const menuMessages = defineMessages('components.Layout.Sidebar', {
   requests: 'Requests',
   calendar: 'Calendar',
   blocklist: 'Blocklist',
-  watchlists: 'Watch Lists',
+  watchlists: 'Lists',
   issues: 'Issues',
   users: 'Users',
   backfill: 'Backfill',

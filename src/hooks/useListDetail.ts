@@ -1,4 +1,5 @@
 import { MediaStatus } from '@server/constants/media';
+import type { PlaylistView } from '@server/lib/playlists/view';
 import useSWR from 'swr';
 
 export interface ListItem {
@@ -26,6 +27,10 @@ export interface SeriesProgress {
 export interface ListDetailData {
   id: number;
   name: string;
+  /** A watch list (films and series) or a playlist (songs). */
+  kind?: 'watch' | 'music';
+  /** A playlist's link and songs. */
+  playlist?: PlaylistView;
   isOwner: boolean;
   /** Whether the viewer has accepted the list; the owner always has. */
   accepted: boolean;
@@ -53,7 +58,17 @@ export const isWatchable = (item: ListItem): boolean =>
  */
 export const useListDetail = (listId: number | string | undefined) => {
   const { data, error, mutate } = useSWR<ListDetailData>(
-    listId ? `/api/v1/list/${listId}` : null
+    listId ? `/api/v1/list/${listId}` : null,
+    {
+      // A playlist's songs are matched and requested in the background:
+      // followed while any are still on their way to being requested.
+      refreshInterval: (latest) =>
+        latest?.playlist?.songs.some(
+          (song) => song.state === 'matching' || song.state === 'queued'
+        )
+          ? 4000
+          : 0,
+    }
   );
 
   const items = data?.items ?? [];

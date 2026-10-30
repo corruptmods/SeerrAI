@@ -44,9 +44,13 @@ Every grid of posters (Discover pages, search, watchlists, recommendations, Sugg
 
 **Select** on a poster grid or a person's page lets you tick titles (or **Select all shown**), then **Request N**. After you confirm, they are requested one at a time; series with every season. Titles you can't request are dimmed. 4K isn't offered this way.
 
-## Watch lists
+## Lists
 
-**Watch Lists** in the sidebar. Anyone signed in can make lists of movies and series and add to them from **Add to List** on posters and title pages, or from **Also add to** when requesting.
+**Lists** in the sidebar holds watch lists and, while music is set up, playlists. A new list is one or the other.
+
+### Watch lists
+
+Anyone signed in can make lists of movies and series and add to them from **Add to List** on posters and title pages, or from **Also add to** when requesting.
 
 - **Sharing:** the owner shares a list with people (and can change who later). Each is invited first: **Accept** lets the list tell when everyone has finished a title and include them in Pick for the Room; **Leave List** turns it down. People on a list can add, remove and mark watched, or leave it. Only the owner renames, shares, deletes or imports. A list is seen only by its owner and the people it is shared with.
 - **Sections:** **To watch** (here now), **Not Available Yet**, and **Watched**.
@@ -56,6 +60,17 @@ Every grid of posters (Discover pages, search, watchlists, recommendations, Sugg
 - **Import:** the owner can paste a list of titles, one per line (bullets, numbers and years are fine). Each line is matched to TMDB and **you review every match** before anything is added; nothing is added on a guess. A collection adds all its films. Optionally, anything not already in the library is requested (at most 20 per import, with your usual permissions).
 - **Import from Trakt:** paste the link to a public Trakt list, or to someone's public Trakt watchlist, instead (once an admin has set up Trakt in Settings → Services). Its titles come matched by their ids, up to 500, for you to review the same way.
 - **Finished watching?** If the owner ticks the option on a list, Seerr AI notices when everyone on the list has watched a title, and offers to remove it. Nothing is removed on its own, and **Keep** stops it asking about that title. Switch: `watchSuggestions`.
+
+### Playlists
+
+A playlist holds songs. Its owner imports a Spotify or Apple Music playlist by pasting its share link. No account or key is needed: Seerr AI reads the playlist's public page.
+
+- **What comes in:** the songs on it now, and each day, songs added to it since (**Playlist Sync**, hourly, reads each linked playlist once a day). Spotify links bring in up to 100 songs. A private playlist has to be shared or made public first.
+- **Requested for you:** each song is found on MusicBrainz (the version nearest its length) and requested as a song in the owner's name, one request per artist, with their usual permissions and song limit. Songs already here or on their way are skipped.
+- **Over the limit:** by default, what the limit can't take waits and is requested as it frees up, the next day and after. Or, under Settings → Music → **Big Playlist Imports**, an import of more songs than you set waits for an admin to approve, as one batch that doesn't count against the limit.
+- **Not found:** a song MusicBrainz doesn't know can't be requested. Music that's only on Spotify or YouTube often isn't there. These are listed apart, looked for again each week, or now with **Try again**.
+- **Each song says where it is:** finding it, about to be requested, waiting for your limit, waiting for approval, requested, here or on its way, declined, can't be requested, or not found.
+- **Unlink** stops new songs coming in; the songs stay. A song taken off a linked playlist isn't read back in.
 
 ### Roulette
 

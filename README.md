@@ -13,7 +13,7 @@
 - Request films, series, single seasons or single episodes; get new seasons as they premiere.
 - Status that says what a download is doing and when it should arrive.
 - Discover rows each person arranges, Suggested for You, an Anime page, filters that can leave out streaming services.
-- Shared watch lists with "up next" for each series, a release calendar, Roulette.
+- Shared watch lists with "up next" for each series, a release calendar, Roulette; playlists that bring in a Spotify or Apple Music playlist and request its songs.
 
 **Media servers**
 - Plex, Jellyfin and Emby, one or all three at once. Available on any counts; Play on each.

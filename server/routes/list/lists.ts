@@ -7,22 +7,25 @@ import { MediaStatus, MediaType } from '@server/constants/media';
 import dataSource, { getRepository } from '@server/datasource';
 import Episode from '@server/entity/Episode';
 import Media from '@server/entity/Media';
+import type { MediaListKind } from '@server/entity/MediaList';
 import {
   MediaList,
   MediaListItem,
   MediaListMember,
+  MediaListSong,
 } from '@server/entity/MediaList';
 import { User } from '@server/entity/User';
 import { warmTmdbImages } from '@server/lib/imageproxy';
 import { loadAccessibleList } from '@server/lib/listAccess';
 import { notifyListShared } from '@server/lib/listActivity';
+import { musicAllowed, playlistView } from '@server/lib/playlists/view';
 import { getSettings } from '@server/lib/settings';
 import { watchSource } from '@server/lib/watchHistory';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
 import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 import { Router } from 'express';
-import { In, IsNull } from 'typeorm';
+import { In, IsNull, Not } from 'typeorm';
 
 const listRoutes = Router();
 
@@ -168,13 +171,37 @@ listRoutes.get('/', isAuthenticated(), async (req, res, next) => {
       setImmediate(() => warmTmdbImages(paths));
     }
 
+    // A playlist's card shows its songs' album covers.
+    const playlistIds = all.filter((l) => l.kind === 'music').map((l) => l.id);
+    const playlistSongs = playlistIds.length
+      ? await getRepository(MediaListSong).find({
+          select: { listId: true, albumMbid: true, state: true },
+          where: { listId: In(playlistIds), state: Not('removed') },
+          order: { position: 'ASC' },
+        })
+      : [];
+
     return res.status(200).json(
       all.map((list) => ({
         id: list.id,
         name: list.name,
+        kind: list.kind ?? 'watch',
         owner: { id: list.owner.id, displayName: list.owner.displayName },
         isOwner: list.ownerId === userId,
-        itemCount: (list.items ?? []).length,
+        itemCount:
+          list.kind === 'music'
+            ? playlistSongs.filter((s) => s.listId === list.id).length
+            : (list.items ?? []).length,
+        covers:
+          list.kind === 'music'
+            ? [
+                ...new Set(
+                  playlistSongs
+                    .filter((s) => s.listId === list.id && s.albumMbid)
+                    .map((s) => s.albumMbid as string)
+                ),
+              ].slice(0, PREVIEWS_PER_LIST)
+            : undefined,
         watchedCount: (list.items ?? []).filter((item) => !!item.watchedAt)
           .length,
         memberCount: (list.members ?? []).length,
@@ -199,17 +226,27 @@ listRoutes.post('/', isAuthenticated(), async (req, res, next) => {
       return next({ status: 400, message: 'A list name is required.' });
     }
 
+    // A playlist only while music is set up and on for this person.
+    const kind: MediaListKind = req.body.kind === 'music' ? 'music' : 'watch';
+    if (kind === 'music' && !musicAllowed(req.user)) {
+      return next({ status: 400, message: 'Music is not set up here.' });
+    }
+
     const list = await getRepository(MediaList).save(
       new MediaList({
         name,
+        kind,
         ownerId: req.user?.id as number,
-        watchedSync: req.body.watchedSync === true,
+        watchedSync: kind === 'watch' && req.body.watchedSync === true,
       })
     );
 
-    return res
-      .status(201)
-      .json({ id: list.id, name: list.name, watchedSync: list.watchedSync });
+    return res.status(201).json({
+      id: list.id,
+      name: list.name,
+      kind: list.kind,
+      watchedSync: list.watchedSync,
+    });
   } catch (e) {
     logger.error('Failed to create list', {
       label: 'API',
@@ -396,6 +433,11 @@ listRoutes.get<{ listId: string }>(
       return res.status(200).json({
         id: access.list.id,
         name: access.list.name,
+        kind: access.list.kind ?? 'watch',
+        playlist:
+          access.list.kind === 'music'
+            ? await playlistView(access.list)
+            : undefined,
         isOwner: access.isOwner,
         // Whether the viewer has accepted the list. The owner always has.
         accepted:

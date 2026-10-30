@@ -1,18 +1,26 @@
 import PosterBackground from '@app/components/Common/PosterBackground';
+import MusicImage from '@app/components/Music/MusicImage';
+import { albumCoverUrl } from '@app/components/Music/musicHelpers';
 import {
   CROSSFADE_SECONDS,
   LIST_POSTER_SIZE,
   SECONDS_PER_POSTER,
   TILE_COUNT,
 } from '@app/constants/lists';
+import useSettings from '@app/hooks/useSettings';
 import defineMessages from '@app/utils/defineMessages';
-import { BookmarkIcon, UsersIcon } from '@heroicons/react/24/outline';
+import {
+  BookmarkIcon,
+  MusicalNoteIcon,
+  UsersIcon,
+} from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.MediaLists.ListCard', {
   itemcount: '{count} {count, plural, one {title} other {titles}}',
+  songcount: '{count} {count, plural, one {song} other {songs}}',
   sharedby: 'Shared by {name}',
   sharedwith:
     'Shared with {count} {count, plural, one {person} other {people}}',
@@ -35,6 +43,10 @@ interface ListCardProps {
   itemCount: number;
   memberCount: number;
   previews: Preview[];
+  /** A watch list, or a playlist (shown by its album covers). */
+  kind?: 'watch' | 'music';
+  /** A playlist's album covers, by release-group id. */
+  covers?: string[];
   /** Offsets this card's animation so a grid of cards is not in lockstep. */
   index: number;
 }
@@ -145,9 +157,15 @@ const ListCard = ({
   watchedCount = 0,
   memberCount,
   previews,
+  kind = 'watch',
+  covers = [],
   index,
 }: ListCardProps) => {
   const intl = useIntl();
+  const { currentSettings } = useSettings();
+  const playlist = kind === 'music';
+  // A playlist's covers, as a still grid: up to as many tiles as posters.
+  const coverTiles = covers.slice(0, TILE_COUNT);
   // A new start each visit: which posters each tile shows, and where in
   // them it begins. The same while the page stays open.
   const [visit] = useState(() => Math.floor(Math.random() * 1_000_000));
@@ -168,7 +186,26 @@ const ListCard = ({
       className="group relative block aspect-[16/10] overflow-hidden rounded-xl border border-subtle bg-surface shadow transition duration-200 hover:border-gray-500 hover:shadow-lg"
       href={`/lists/${id}`}
     >
-      {posters.length > 0 ? (
+      {playlist && coverTiles.length > 0 ? (
+        <div
+          className="list-mosaic"
+          style={{ '--list-tiles': coverTiles.length } as React.CSSProperties}
+        >
+          {coverTiles.map((albumMbid) => (
+            <div key={albumMbid} className="list-mosaic-tile">
+              <MusicImage
+                src={albumCoverUrl(albumMbid, !!currentSettings.cacheImages)}
+                fallback="album"
+                sizes="12rem"
+              />
+            </div>
+          ))}
+        </div>
+      ) : playlist ? (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <MusicalNoteIcon className="h-10 w-10 text-gray-600" />
+        </div>
+      ) : posters.length > 0 ? (
         <div
           className="list-mosaic"
           style={{ '--list-tiles': tileCount } as React.CSSProperties}
@@ -197,12 +234,16 @@ const ListCard = ({
           <span>
             {!itemCount
               ? intl.formatMessage(messages.emptylist)
-              : watchedCount
-                ? intl.formatMessage(messages.watchedcount, {
-                    watched: watchedCount,
-                    count: itemCount,
-                  })
-                : intl.formatMessage(messages.itemcount, { count: itemCount })}
+              : playlist
+                ? intl.formatMessage(messages.songcount, { count: itemCount })
+                : watchedCount
+                  ? intl.formatMessage(messages.watchedcount, {
+                      watched: watchedCount,
+                      count: itemCount,
+                    })
+                  : intl.formatMessage(messages.itemcount, {
+                      count: itemCount,
+                    })}
           </span>
           <span className="flex items-center space-x-1">
             <UsersIcon className="h-3.5 w-3.5" />

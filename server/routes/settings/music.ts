@@ -44,6 +44,12 @@ const musicBody = z.object({
       quotaDays: z.coerce.number().int().min(0).max(100),
     })
     .optional(),
+  playlists: z
+    .object({
+      overLimit: z.enum(['wait', 'approve']),
+      approveOver: z.coerce.number().int().min(1).max(1000),
+    })
+    .optional(),
   // Sent only when the admin changes it; anything else an older page
   // sends with it is left out.
   search: z.object({ inAll: z.boolean() }).optional(),
@@ -58,6 +64,7 @@ const shown = (music: MusicSettings) => ({
   songRequests: !!music.songRequests,
   songsFromAlbums: !!music.songsFromAlbums,
   songQuota: music.songQuota,
+  playlists: music.playlists,
   hasTheAudioDbApiKey: !!music.theAudioDbApiKey,
   search: {
     inAll: musicInAllSearch(
@@ -87,6 +94,7 @@ musicSettingsRoutes.post('/', async (req, res, next) => {
     songRequests: body.songRequests ?? !!saved.songRequests,
     songsFromAlbums: body.songsFromAlbums ?? !!saved.songsFromAlbums,
     songQuota: body.songQuota ?? saved.songQuota,
+    playlists: body.playlists ?? saved.playlists,
     theAudioDbApiKey: body.removeTheAudioDbApiKey
       ? ''
       : body.theAudioDbApiKey || saved.theAudioDbApiKey,

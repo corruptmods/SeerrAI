@@ -110,6 +110,7 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     'plex-match-check': 'Match Check',
     'music-sync': 'Music Sync',
     'music-full-scan': 'Music Full Scan',
+    'playlist-sync': 'Playlist Sync',
     'database-maintenance': 'Database Maintenance',
     editJobSchedule: 'Modify Job',
     jobScheduleEditSaved: 'Job edited successfully!',

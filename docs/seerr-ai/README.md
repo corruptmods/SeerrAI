@@ -7,7 +7,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 - **[Your account](./account.md)**: passkeys, linked accounts, API keys, notifications, turning features off for yourself.
 - **[Themes](./themes.md)**: light or dark, accent colours, seasonal themes, theme files.
 - **[Requests and downloads](./requests-and-downloads.md)**: when a request should arrive, what each status means, failed requests, single episodes, anime.
-- **[Discover and lists](./discover-and-lists.md)**: your home page and menu, the Anime page, leaving out streaming services, watch lists, the calendar.
+- **[Discover and lists](./discover-and-lists.md)**: your home page and menu, the Anime page, leaving out streaming services, watch lists and playlists, the calendar.
 - **[Music](./music.md)**: finding and requesting albums and songs, and the charts.
 - **[Plex, Jellyfin and Emby together](./media-servers.md)**: Play on each server, linking your accounts.
 - **[Single sign-on](./single-sign-on.md)**: signing in with Authentik, Google and the like.
@@ -49,7 +49,7 @@ Almost everything here is optional. Admins turn a feature off for everyone in **
 | **Health and Match Check** | Every service checked, alerts when something breaks, wrong matches caught. |
 | **AI** | Claude, OpenAI or your own model: search for films, series and music, group picks, recaps, fixes for problems you describe, log explanations. |
 | **Your home page** | Hide rows, arrange your menu, Suggested for You, Anime, leave out streaming services. |
-| **Watch lists** | Shared lists with "up next" per series, activity, import, Roulette. |
+| **Lists** | Shared watch lists with "up next" per series, activity, import, Roulette; playlists from a Spotify or Apple Music link, their songs requested within each person's limit. |
 | **Series and anime** | Request one episode; get new seasons as they premiere; one rule for what's anime. |
 | **Subtitles** | See, replace or transcribe subtitles through Bazarr, with what Bazarr is doing shown as it works. |
 | **Maintainerr** | "Deleting in N days" badges, a Deleting Soon row and Keep. |

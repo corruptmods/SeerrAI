@@ -286,6 +286,7 @@ describe('music settings', () => {
       songRequests: true,
       songsFromAlbums: true,
       songQuota: { quotaLimit: 0, quotaDays: 7 },
+      playlists: { overLimit: 'wait', approveOver: 25 },
       hasTheAudioDbApiKey: true,
       search: { inAll: false },
     });

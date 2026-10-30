@@ -18,7 +18,6 @@ import {
 import useRequestSong from '@app/components/Music/useRequestSong';
 import RequestModal from '@app/components/RequestModal';
 import useFeature from '@app/hooks/useFeature';
-import useMediaQuery from '@app/hooks/useMediaQuery';
 import usePlayLinks from '@app/hooks/usePlayLinks';
 import useSettings from '@app/hooks/useSettings';
 import { Permission, useUser } from '@app/hooks/useUser';
@@ -61,7 +60,8 @@ const messages = defineMessages('components.Music.AlbumDetails', {
 });
 
 /**
- * The album's tracks, disc by disc; folded away on a phone at first. Once
+ * The album's tracks, disc by disc, shown at first (on a phone they can be
+ * folded away). Once
  * songs can be asked for one at a time, each track that can be has its
  * own Request (`songsOf`: the artist they are asked for under), and each
  * asked for says where it stands.
@@ -79,10 +79,8 @@ const TrackList = ({
   const intl = useIntl();
   const { requestSong, isBusy } = useRequestSong();
   const { mutate: mutateAlbum } = useSWRConfig();
-  const wide = useMediaQuery('(min-width: 640px)');
-  // Until someone opens or closes it, it follows the screen.
-  const [chosen, setChosen] = useState<boolean>();
-  const open = chosen ?? wide;
+  // Open to start, on a phone too; there it can be folded away.
+  const [open, setChosen] = useState(true);
   const { data, error, mutate } = useSWR<{ tracks: MusicTrack[] }>(
     `/api/v1/music/album/${albumId}/tracks`,
     {

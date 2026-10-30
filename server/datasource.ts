@@ -20,6 +20,7 @@ import MediaEvent from '@server/entity/MediaEvent';
 import {
   MediaList,
   MediaListItem,
+  MediaListSong,
   MediaListMember,
   MediaListWatchSuggestion,
 } from '@server/entity/MediaList';
@@ -79,6 +80,7 @@ const entities = [
   MediaEvent,
   MediaList,
   MediaListItem,
+  MediaListSong,
   MediaListMember,
   MediaListWatchSuggestion,
   MediaRequest,

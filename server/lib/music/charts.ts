@@ -177,11 +177,18 @@ const artistFor = async (artistName: string): Promise<ChartArtist | null> => {
   return null;
 };
 
-/** The song on a chart, among its artist's recordings. */
-const matchSong = async (entry: AppleChartEntry): Promise<Song | null> => {
-  const artist = await artistFor(entry.artistName);
+/**
+ * A song named by its title and artist (as a chart or a playlist names
+ * it), among the artist's recordings on MusicBrainz, or null. Background
+ * work: it waits its turn behind what people are looking at.
+ */
+export const songNamed = async (
+  name: string,
+  artistName: string
+): Promise<Song | null> => {
+  const artist = await artistFor(artistName);
   if (!artist) return null;
-  const title = chartSongTitle(entry.name);
+  const title = chartSongTitle(name);
   const found = await musicBrainz().searchRecordings(
     title,
     [artist.id],
@@ -195,6 +202,10 @@ const matchSong = async (entry: AppleChartEntry): Promise<Song | null> => {
   const wanted = plainName(title);
   return songs.find((song) => plainName(song.title) === wanted) ?? null;
 };
+
+/** The song on a chart, among its artist's recordings. */
+const matchSong = (entry: AppleChartEntry): Promise<Song | null> =>
+  songNamed(entry.name, entry.artistName);
 
 /** Which of an artist's albums is a chart's: its own albums before others. */
 const rank = (group: MbReleaseGroup): number =>

@@ -10,6 +10,7 @@ const messages = defineMessages('components.RequestModal.RequestListPicker', {
 });
 
 interface ListSummary {
+  kind?: 'watch' | 'music';
   id: number;
   name: string;
 }
@@ -35,7 +36,9 @@ const RequestListPicker = ({
   onChange,
 }: RequestListPickerProps) => {
   const intl = useIntl();
-  const { data: lists } = useSWR<ListSummary[]>('/api/v1/list');
+  const { data: allLists } = useSWR<ListSummary[]>('/api/v1/list');
+  // Films and series go on watch lists, not playlists.
+  const lists = allLists?.filter((list) => list.kind !== 'music');
 
   // Lists the title is already on, so those come up ticked rather than
   // looking as though it is on none of them.

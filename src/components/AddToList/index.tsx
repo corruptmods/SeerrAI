@@ -24,6 +24,7 @@ const messages = defineMessages('components.AddToList', {
 });
 
 interface ListSummary {
+  kind?: 'watch' | 'music';
   id: number;
   name: string;
 }
@@ -55,9 +56,11 @@ const AddToList = ({ tmdbId, mediaType, compact }: AddToListProps) => {
   });
 
   // Shared key: SWR de-duplicates this across every card on the page.
-  const { data: lists, mutate: revalidateLists } = useSWR<ListSummary[]>(
+  const { data: allLists, mutate: revalidateLists } = useSWR<ListSummary[]>(
     !compact || isOpen ? '/api/v1/list' : null
   );
+  // Films and series go on watch lists, not playlists.
+  const lists = allLists?.filter((list) => list.kind !== 'music');
 
   const { data: membership, mutate: revalidateMembership } = useSWR<
     { listId: number; listName: string }[]

@@ -20,8 +20,8 @@ import MediaEvent from '@server/entity/MediaEvent';
 import {
   MediaList,
   MediaListItem,
-  MediaListSong,
   MediaListMember,
+  MediaListSong,
   MediaListWatchSuggestion,
 } from '@server/entity/MediaList';
 import { MediaRequest } from '@server/entity/MediaRequest';

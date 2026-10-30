@@ -6342,6 +6342,9 @@ paths:
                       enum: [looking, downloading]
                     progress:
                       type: integer
+                    agent:
+                      type: boolean
+                      description: The admin agent (an AI) is looking for it right now
   /backfill/series/{id}:
     parameters:
       - in: path

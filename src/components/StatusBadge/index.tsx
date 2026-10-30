@@ -194,6 +194,20 @@ const StatusBadge = ({
     }
   }
 
+  // A pill showing downloads opens where they are listed (the title's page,
+  // with its downloads for those who manage requests), not where it plays:
+  // that link is in its details.
+  const downloadsLink =
+    mediaType === 'music'
+      ? artistId && hasPermission(Permission.MANAGE_REQUESTS)
+        ? `/music/artist/${artistId}?manage=1`
+        : undefined
+      : mediaType && tmdbId
+        ? `/${mediaType}/${tmdbId}${
+            hasPermission(Permission.MANAGE_REQUESTS) ? '?manage=1' : ''
+          }`
+        : undefined;
+
   const tooltipContent =
     mediaType === 'tv' &&
     downloadItem.length > 1 &&
@@ -273,25 +287,31 @@ const StatusBadge = ({
     const badge = (
       <Badge
         badgeType={badgeType}
-        href={tapForDetails ? undefined : mediaLink}
+        href={
+          tapForDetails
+            ? undefined
+            : inProgress
+              ? (downloadsLink ?? mediaLink)
+              : mediaLink
+        }
+        // Never wider than where it is shown: its words are cut short, and
+        // the spinner stays.
         className={`${
           inProgress && 'relative !bg-gray-700/80 !px-0 hover:!bg-gray-700'
-        } overflow-hidden`}
+        } min-w-0 max-w-full overflow-hidden`}
       >
         {inProgress && badgeDownloadProgress}
         <div
-          className={`relative z-20 flex items-center ${inProgress && 'px-2'}`}
+          className={`relative z-20 flex min-w-0 items-center ${inProgress && 'px-2'}`}
         >
-          <span>
+          <span className="truncate">
             {intl.formatMessage(is4k ? messages.status4k : messages.status, {
               status: inProgress ? downloadLabel : idleLabel,
             })}
+            {inProgress && episodeLabel && ` ${episodeLabel}`}
           </span>
-          {inProgress && (
-            <>
-              {episodeLabel && <span className="ml-1">{episodeLabel}</span>}
-              {downloadBusy && <Spinner className="ml-1 h-3 w-3" />}
-            </>
+          {inProgress && downloadBusy && (
+            <Spinner className="ml-1 h-3 w-3 flex-none" />
           )}
         </div>
       </Badge>
@@ -302,7 +322,7 @@ const StatusBadge = ({
           inProgress ? (
             <>
               {tooltipContent}
-              {tapForDetails && detailsLink}
+              {(tapForDetails || mediaLink !== downloadsLink) && detailsLink}
             </>
           ) : (
             mediaLinkDescription

@@ -9,7 +9,7 @@ import type {
 import Badge from '@app/components/Common/Badge';
 import CachedImage from '@app/components/Common/CachedImage';
 import defineMessages from '@app/utils/defineMessages';
-import { FilmIcon } from '@heroicons/react/24/outline';
+import { FilmIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import type { IntlShape } from 'react-intl';
 import { useIntl } from 'react-intl';
@@ -42,6 +42,8 @@ const messages = defineMessages('components.Backfill', {
   hasMovie: 'has the movie',
   upgradesMovie: 'upgrades the movie',
   daysHours: '{days} d {hours} h',
+  aiSearching: 'AI searching',
+  aiSearchingTip: 'The admin agent is looking for what’s missing',
   hoursMinutes: '{hours} h {minutes} min',
   minutes: '{minutes} min',
   tryingAgainAt: '{stage}; trying again at {time}',
@@ -133,6 +135,35 @@ export const episodeLabel = (e: {
       ? `${e.absolute} · ${se}`
       : String(e.absolute)
     : se;
+};
+
+/**
+ * The admin agent (an AI) is looking for a title right now: opens its
+ * conversation, for admins (with `runId`).
+ */
+export const AiSearchingBadge = ({
+  runId,
+  className,
+}: {
+  runId?: number | null;
+  className?: string;
+}) => {
+  const intl = useIntl();
+  return (
+    <Badge
+      badgeType="primary"
+      href={runId ? `/backfill/agent/${runId}` : undefined}
+      className={`items-center gap-1 ${className ?? ''}`}
+    >
+      <SparklesIcon
+        className="h-3 w-3 flex-none"
+        aria-label={intl.formatMessage(messages.aiSearchingTip)}
+      />
+      <span className="truncate">
+        {intl.formatMessage(messages.aiSearching)}
+      </span>
+    </Badge>
+  );
 };
 
 export const SeriesStatusBadge = ({ status }: { status: SeriesStatus }) => {

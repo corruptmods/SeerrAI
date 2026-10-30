@@ -1,4 +1,5 @@
 import Spinner from '@app/assets/spinner.svg';
+import { AiSearchingBadge } from '@app/components/Backfill/shared';
 import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
@@ -41,6 +42,7 @@ import {
   MediaType,
 } from '@server/constants/media';
 import type { MediaRequest } from '@server/entity/MediaRequest';
+import type { BackfillStatus } from '@server/interfaces/api/backfillStatus';
 import type { NonFunctionProperties } from '@server/interfaces/api/common';
 import type { MovieDetails } from '@server/models/Movie';
 import type { TvDetails } from '@server/models/Tv';
@@ -276,6 +278,26 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
 
   const { playLink, playLink4k } = usePlayLinks(requestData?.media);
 
+  // Whether the admin agent (an AI) is looking for it: only while the card
+  // can be seen and the request is approved and not yet all here.
+  const shown = requestData ?? request;
+  const mayBeLooked =
+    inView &&
+    shown.status === MediaRequestStatus.APPROVED &&
+    shown.media[shown.is4k ? 'status4k' : 'status'] !== MediaStatus.AVAILABLE;
+  const { data: backfillStatus } = useSWR<BackfillStatus[]>(
+    mayBeLooked
+      ? `/api/v1/backfill-status?tmdbIds=${shown.media.tmdbId}`
+      : null,
+    {
+      refreshInterval: (latest) =>
+        latest?.some((s) => s.agent || s.state === 'downloading') ? 15000 : 0,
+    }
+  );
+  const aiSearching = !!backfillStatus?.some(
+    (s) => s.agent && s.mediaType === shown.type
+  );
+
   const approveRequest = async () => {
     setIsApproving(true);
     try {
@@ -456,8 +478,8 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
               </div>
             </div>
           )}
-          <div className="mt-2 flex items-center text-sm sm:mt-1">
-            <span className="mr-2 hidden font-bold sm:block">
+          <div className="mt-2 flex min-w-0 items-center text-sm sm:mt-1">
+            <span className="mr-2 hidden flex-none font-bold sm:block">
               {intl.formatMessage(globalMessages.status)}
             </span>
             {requestData.status === MediaRequestStatus.DECLINED ? (
@@ -499,6 +521,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                 }
               />
             )}
+            {aiSearching && <AiSearchingBadge className="ml-1 flex-none" />}
           </div>
           {requestData.status === MediaRequestStatus.DECLINED &&
             requestData.declineReason && (

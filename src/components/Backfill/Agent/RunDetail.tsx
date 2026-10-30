@@ -59,6 +59,7 @@ const runMessages = defineMessages('components.Backfill.Agent.Run', {
   changes: 'What it changed',
   openDownload: 'Open download',
   openTitle: 'Open in Backfill',
+  openPage: 'Open its page',
   worked: 'Worked: {count, plural, one {# step} other {# steps}} · {tools}',
   showResult: 'What it saw',
   tokens: '{input} tokens read, {output} written',
@@ -554,6 +555,17 @@ const RunDetail = () => {
           </div>
         </div>
         <div className="flex flex-none gap-2">
+          {data.titlePage && (
+            <Link href={data.titlePage} passHref legacyBehavior>
+              <Button
+                as="a"
+                buttonType="default"
+                className="flex-1 sm:flex-none"
+              >
+                {intl.formatMessage(runMessages.openPage)}
+              </Button>
+            </Link>
+          )}
           {data.backfillId && (
             <Link
               href={`/backfill/series/${data.backfillId}`}

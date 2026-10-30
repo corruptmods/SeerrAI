@@ -3,6 +3,7 @@ import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
 import type { BackfillKind } from '@server/entity/BackfillSeries';
 import BackfillSeries from '@server/entity/BackfillSeries';
+import { agentWorkingOn, workedKey } from '@server/lib/agent/working';
 import backfill, { isMissing } from '@server/lib/backfill/engine';
 import type { PlanEntry } from '@server/lib/backfill/plan';
 import { selectEntries } from '@server/lib/backfill/plan';
@@ -521,6 +522,7 @@ backfillRoutes.get('/lookup', async (req, res, next) => {
     const ready = await getRepository(BackfillCandidate).find({
       where: { seriesId: In(rows.map((r) => r.id)), status: 'ready' },
     });
+    const agent = await agentWorkingOn(rows);
     return res.status(200).json(
       rows.map((row) => {
         const own = jobs
@@ -531,6 +533,7 @@ backfillRoutes.get('/lookup', async (req, res, next) => {
           readyCount: ready.filter((c) => c.seriesId === row.id).length,
           job: own[0],
           jobs: own,
+          workingRunId: agent.get(workedKey(row)) ?? null,
         };
       })
     );

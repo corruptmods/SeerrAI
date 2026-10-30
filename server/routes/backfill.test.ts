@@ -1,6 +1,7 @@
 import QBittorrentAPI from '@server/api/downloadclients/qbittorrent';
 import ProwlarrAPI from '@server/api/prowlarr';
 import { getRepository } from '@server/datasource';
+import AgentRun from '@server/entity/AgentRun';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
@@ -723,6 +724,22 @@ describe('Backfill routes', () => {
     assert.equal(res.body[0].kind, 'series');
     assert.equal(res.body[0].readyCount, 1);
     assert.deepEqual(res.body[0].jobs, []);
+    assert.equal(res.body[0].workingRunId, null);
+
+    // The admin agent at work on it: its conversation, for the page.
+    const run = await getRepository(AgentRun).save(
+      new AgentRun({
+        trigger: 'auto',
+        status: 'running',
+        kind: 'series',
+        serverId: series.serverId,
+        arrId: series.arrId,
+        steps: [],
+        actions: [],
+      })
+    );
+    const working = await call('GET', '/api/v1/backfill/lookup?tmdbIds=58371');
+    assert.equal(working.body[0].workingRunId, run.id);
   });
 
   it('link a complete title from its page only when asked to', async () => {

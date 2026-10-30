@@ -5,4 +5,6 @@ export interface BackfillStatus {
   /** Looking beyond the usual search, or downloading what it found. */
   state: 'looking' | 'downloading';
   progress?: number;
+  /** The admin agent (an AI) is looking for it right now. */
+  agent?: boolean;
 }

@@ -101,6 +101,15 @@ agentRoutes.get<{ id: string }>('/:id', async (req, res, next) => {
         : null;
     })(),
     backfillId: row?.id ?? null,
+    titlePage: !row
+      ? null
+      : row.kind === 'album'
+        ? row.foreignId
+          ? `/music/album/${row.foreignId}`
+          : null
+        : row.tmdbId
+          ? `/${row.kind === 'movie' ? 'movie' : 'tv'}/${row.tmdbId}`
+          : null,
     inputTokens: run.inputTokens,
     outputTokens: run.outputTokens,
   };

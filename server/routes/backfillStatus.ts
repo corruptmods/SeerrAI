@@ -4,7 +4,9 @@ import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import type { BackfillStatus } from '@server/interfaces/api/backfillStatus';
+import { agentWorkingOn, workedKey } from '@server/lib/agent/working';
 import backfill from '@server/lib/backfill/engine';
+import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { Router } from 'express';
@@ -12,9 +14,10 @@ import { In, Not } from 'typeorm';
 
 /*
  * For the person who asked for a title: whether Backfill is looking beyond
- * Sonarr's and Radarr's own search for it, or downloading what it found.
- * Only their own requests, and only that much: what was found, from where,
- * and waiting on whom is for admins.
+ * Sonarr's and Radarr's own search for it, or downloading what it found,
+ * and whether the admin agent (an AI) is looking for it. Only their own
+ * requests (an admin's covers everyone's), and only that much: what was
+ * found, from where, and waiting on whom is for admins.
  */
 
 const backfillStatusRoutes = Router();
@@ -30,13 +33,18 @@ backfillStatusRoutes.get('/', async (req, res, next) => {
       return res.status(200).json([]);
     }
 
-    // The titles among these that this person has an open request for.
-    const own = await getRepository(MediaRequest)
+    // The titles among these that this person has an open request for;
+    // anyone's, for an admin.
+    const everyone = req.user!.hasPermission(Permission.ADMIN);
+    const query = getRepository(MediaRequest)
       .createQueryBuilder('request')
       .innerJoin('request.media', 'media')
       .select('media.tmdbId', 'tmdbId')
-      .addSelect('media.mediaType', 'mediaType')
-      .where('request.requestedBy = :userId', { userId: req.user!.id })
+      .addSelect('media.mediaType', 'mediaType');
+    if (!everyone) {
+      query.where('request.requestedBy = :userId', { userId: req.user!.id });
+    }
+    const own = await query
       .andWhere('request.status = :status', {
         status: MediaRequestStatus.APPROVED,
       })
@@ -69,6 +77,7 @@ backfillStatusRoutes.get('/', async (req, res, next) => {
       })
     );
 
+    const agent = await agentWorkingOn(rows);
     const statuses: BackfillStatus[] = rows.map((row) => {
       const job = jobs.find((j) => j.seriesId === row.id);
       return {
@@ -77,6 +86,7 @@ backfillStatusRoutes.get('/', async (req, res, next) => {
         ...(job
           ? { state: 'downloading' as const, progress: job.progress }
           : { state: 'looking' as const }),
+        agent: agent.has(workedKey(row)),
       };
     });
     return res.status(200).json(statuses);

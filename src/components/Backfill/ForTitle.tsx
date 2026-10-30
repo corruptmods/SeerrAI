@@ -1,4 +1,5 @@
 import {
+  AiSearchingBadge,
   JobStatusBadge,
   ProgressBar,
   SeriesStatusBadge,
@@ -57,7 +58,10 @@ export const useBackfillForTitle = (
         )
           ? 3000
           : latest?.some(
-                (row) => row.jobs?.length || row.status === 'searching'
+                (row) =>
+                  row.jobs?.length ||
+                  row.status === 'searching' ||
+                  row.workingRunId
               )
             ? 8000
             : 0,
@@ -88,7 +92,12 @@ const BackfillForTitle = ({
   const intl = useIntl();
   const tracked = useBackfillForTitle(id, target);
   const jobs = tracked?.jobs ?? [];
-  if (!tracked || (tracked.status === 'done' && !jobs.length)) return null;
+  if (
+    !tracked ||
+    (tracked.status === 'done' && !jobs.length && !tracked.workingRunId)
+  ) {
+    return null;
+  }
 
   const gap =
     tracked.kind === 'movie'
@@ -119,7 +128,13 @@ const BackfillForTitle = ({
           <DocumentMagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
           {intl.formatMessage(messages.backfill)}
         </h3>
-        <SeriesStatusBadge status={tracked.status} />
+        {/* While the admin agent looks, that is what's happening, not
+            what Backfill's own search last found. */}
+        {tracked.workingRunId ? (
+          <AiSearchingBadge runId={tracked.workingRunId} />
+        ) : (
+          <SeriesStatusBadge status={tracked.status} />
+        )}
       </div>
       <div className="space-y-3 p-4">
         <div className="text-sm text-gray-300">

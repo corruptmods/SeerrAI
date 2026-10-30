@@ -10,6 +10,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - **Backfill trusts seeders less**: a torrent whose swarm never had all of it is given up within its first hour, since an indexer's count of seeders is often old. A torrent its indexer says nobody seeds is never taken by itself, and is offered after ones that are seeded.
 - **Artist pictures from TheAudioDB without a key**: its free key is used for artists Lidarr has no picture of. A supporter's key still takes its place when entered.
 - The list Import says when a Trakt link can be pasted, and Settings → Services says what Trakt's Client ID is for.
+- **"AI searching"**: while the admin agent looks for a title, its request card, the requests list and the title page's Backfill box say so, instead of "Nothing found". For admins it opens the agent's conversation, which now has a link back to the title's page.
+- A downloading pill opens the title's downloads, not Plex (Play is in its details), and fits on a request card, cutting its words short rather than running off the edge.
 - Backfill shows a long wait in days: "31 d 2 h", not "746 h 0 min".
 
 ## 2.2.1 (27 October 2026)

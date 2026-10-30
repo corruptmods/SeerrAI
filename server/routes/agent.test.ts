@@ -125,7 +125,35 @@ describe('the admin agent’s routes', () => {
     assert.deepEqual(detail.body.steps, [
       { at: '2026-10-07T20:00:00.000Z', kind: 'say', text: 'Looking.' },
     ]);
+    assert.equal(detail.body.titlePage, null, 'its title is not known yet');
     assert.equal((await call('GET', '/api/v1/agent/9999')).status, 404);
+  });
+
+  it('link a run to its title’s page here, once its title is known', async () => {
+    await getRepository(BackfillSeries).save(
+      new BackfillSeries({
+        kind: 'series',
+        serverId: 0,
+        arrId: 77,
+        tmdbId: 4242,
+        title: 'Wendle the Gentle Lantern',
+        status: 'stuck',
+      })
+    );
+    const run = await getRepository(AgentRun).save(
+      new AgentRun({
+        trigger: 'auto',
+        status: 'done',
+        kind: 'series',
+        serverId: 0,
+        arrId: 77,
+        title: 'Wendle the Gentle Lantern',
+        steps: [],
+        actions: [],
+      })
+    );
+    const detail = await call('GET', `/api/v1/agent/${run.id}`);
+    assert.equal(detail.body.titlePage, '/tv/4242');
   });
 
   it('take a request only when the agent can run', async () => {

@@ -4,6 +4,7 @@ import {
   MediaType,
 } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import AgentRun from '@server/entity/AgentRun';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
 import Media from '@server/entity/Media';
@@ -140,13 +141,69 @@ describe('Backfill on someone’s own requests', () => {
         (a: { tmdbId: number }, b: { tmdbId: number }) => a.tmdbId - b.tmdbId
       ),
       [
-        { tmdbId: 10, mediaType: 'tv', state: 'looking' },
-        { tmdbId: 20, mediaType: 'movie', state: 'downloading', progress: 42 },
+        { tmdbId: 10, mediaType: 'tv', state: 'looking', agent: false },
+        {
+          tmdbId: 20,
+          mediaType: 'movie',
+          state: 'downloading',
+          progress: 42,
+          agent: false,
+        },
       ]
     );
 
     actingAs = other;
     assert.deepEqual(await statusFor([10, 20]), []);
+  });
+
+  it('says when the admin agent is looking, and shows an admin everyone’s', async () => {
+    const asker = await user('asker3');
+    const admin = await getRepository(User).save(
+      new User({
+        email: 'admin3@test.local',
+        plexUsername: 'admin3',
+        permissions: Permission.ADMIN,
+        avatar: '',
+      })
+    );
+    await requested(asker, 50, MediaType.TV);
+    await requested(asker, 60, MediaType.TV);
+    await tracked(50, 'series', 50);
+    await tracked(60, 'series', 60);
+    await getRepository(AgentRun).save([
+      new AgentRun({
+        trigger: 'auto',
+        status: 'running',
+        kind: 'series',
+        serverId: 0,
+        arrId: 50,
+        steps: [],
+        actions: [],
+      }),
+      // Finished, or waiting for an answer: not looking.
+      new AgentRun({
+        trigger: 'auto',
+        status: 'done',
+        kind: 'series',
+        serverId: 0,
+        arrId: 60,
+        steps: [],
+        actions: [],
+      }),
+    ]);
+    const agentOf = (rows: { tmdbId: number; agent: boolean }[]) =>
+      Object.fromEntries(rows.map((r) => [r.tmdbId, r.agent]));
+
+    actingAs = asker;
+    assert.deepEqual(agentOf(await statusFor([50, 60])), {
+      50: true,
+      60: false,
+    });
+    actingAs = admin;
+    assert.deepEqual(agentOf(await statusFor([50, 60])), {
+      50: true,
+      60: false,
+    });
   });
 
   it('says nothing while Backfill is off', async () => {

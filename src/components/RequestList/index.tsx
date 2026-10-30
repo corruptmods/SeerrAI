@@ -142,7 +142,12 @@ const RequestList = () => {
       ? `/api/v1/backfill/lookup?tmdbIds=${tmdbIds.join(',')}`
       : null,
     {
-      refreshInterval: (latest) => (latest?.some((row) => row.job) ? 5000 : 0),
+      refreshInterval: (latest) =>
+        latest?.some((row) => row.job)
+          ? 5000
+          : latest?.some((row) => row.workingRunId)
+            ? 10000
+            : 0,
     }
   );
 
@@ -153,7 +158,7 @@ const RequestList = () => {
       : null,
     {
       refreshInterval: (latest) =>
-        latest?.some((s) => s.state === 'downloading') ? 10000 : 0,
+        latest?.some((s) => s.state === 'downloading' || s.agent) ? 10000 : 0,
     }
   );
 

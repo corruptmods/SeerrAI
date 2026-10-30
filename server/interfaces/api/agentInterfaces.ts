@@ -41,6 +41,8 @@ export interface AgentRunDetail extends Omit<AgentRunSummary, 'steps'> {
   proposal: AgentProposal | null;
   /** The Backfill row for its title, for a link, once known. */
   backfillId: number | null;
+  /** The title's own page here, once known. */
+  titlePage: string | null;
   inputTokens: number;
   outputTokens: number;
 }

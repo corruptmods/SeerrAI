@@ -1,3 +1,4 @@
+import { AiSearchingBadge } from '@app/components/Backfill/shared';
 import type { SeriesView } from '@app/components/Backfill/types';
 import Badge from '@app/components/Common/Badge';
 import defineMessages from '@app/utils/defineMessages';
@@ -19,6 +20,7 @@ const messages = defineMessages('components.Backfill.RequestChip', {
 
 export type BackfillLookup = SeriesView & {
   readyCount: number;
+  workingRunId?: number | null;
   job?: { id: number; progress: number };
   jobs?: { id: number; progress: number }[];
 };
@@ -58,9 +60,14 @@ const BackfillRequestChip = ({ backfill }: { backfill: BackfillLookup }) => {
       <span className="card-field-name">
         {intl.formatMessage(messages.backfill)}
       </span>
-      <Badge badgeType={type} href={href}>
-        {text}
-      </Badge>
+      <div className="flex min-w-0 flex-wrap gap-1">
+        {backfill.workingRunId && (
+          <AiSearchingBadge runId={backfill.workingRunId} />
+        )}
+        <Badge badgeType={type} href={href}>
+          {text}
+        </Badge>
+      </div>
     </div>
   );
 };
@@ -76,13 +83,18 @@ export const BackfillStatusLine = ({ status }: { status: BackfillStatus }) => {
       <span className="card-field-name">
         {intl.formatMessage(messages.lookingLabel)}
       </span>
-      <Badge badgeType={status.state === 'downloading' ? 'primary' : 'default'}>
-        {status.state === 'downloading'
-          ? intl.formatMessage(messages.foundElsewhere, {
-              progress: status.progress ?? 0,
-            })
-          : intl.formatMessage(messages.looking)}
-      </Badge>
+      <div className="flex min-w-0 flex-wrap gap-1">
+        {status.agent && <AiSearchingBadge />}
+        <Badge
+          badgeType={status.state === 'downloading' ? 'primary' : 'default'}
+        >
+          {status.state === 'downloading'
+            ? intl.formatMessage(messages.foundElsewhere, {
+                progress: status.progress ?? 0,
+              })
+            : intl.formatMessage(messages.looking)}
+        </Badge>
+      </div>
     </div>
   );
 };

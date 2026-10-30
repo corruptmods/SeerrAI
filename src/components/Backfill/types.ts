@@ -201,6 +201,8 @@ export interface Overview {
 /** What Backfill has for one title, as its media page asks. */
 export type TitleLookup = SeriesView & {
   readyCount: number;
+  /** The admin agent's run working on it right now, if one is. */
+  workingRunId?: number | null;
   /** The first of `jobs`. */
   job?: JobView;
   /** Every download running for it, oldest first. */

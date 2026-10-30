@@ -70,7 +70,11 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
   maxActiveJobsTip:
     'Counted for torrents and Usenet apart. A download being imported does not count.',
   stallHours: 'Give up on a torrent after this many hours without progress',
-  stallHoursTip: 'Paused or queued time doesn’t count. 0 waits forever.',
+  stallHoursTip:
+    'Also when part of it is on no one’s computer for that long, so it can’t finish. Paused or queued time doesn’t count. 0 waits forever.',
+  slowHours: 'Give up on a torrent that would take longer than this many hours',
+  slowHoursTip:
+    'Judged by its speed over the last four hours. Paused or queued time doesn’t count. 0 never gives up.',
   minFreeSpaceGb: 'Keep free on the series’ disk (GB)',
   historyDays: 'Days to keep finished downloads',
   historyDaysTip:
@@ -189,6 +193,7 @@ const SettingsBackfill = () => {
               maxActiveJobs: Number(values.maxActiveJobs),
               minFreeSpaceGb: Number(values.minFreeSpaceGb),
               stallHours: Number(values.stallHours),
+              slowHours: Number(values.slowHours),
               replaceFailed: values.replaceFailed,
               historyDays: Number(values.historyDays),
               agent: {
@@ -639,6 +644,7 @@ const SettingsBackfill = () => {
                     ],
                     ['minFreeSpaceGb', messages.minFreeSpaceGb, undefined],
                     ['stallHours', messages.stallHours, messages.stallHoursTip],
+                    ['slowHours', messages.slowHours, messages.slowHoursTip],
                     [
                       'historyDays',
                       messages.historyDays,

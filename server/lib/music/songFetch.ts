@@ -21,12 +21,17 @@ import type { SongFetchFile } from '@server/entity/SongFetch';
 import SongFetch from '@server/entity/SongFetch';
 import SongRequest from '@server/entity/SongRequest';
 import { magnetHash, parseTorrent } from '@server/lib/backfill/bencode';
-import backfill, { mapRemotePath } from '@server/lib/backfill/engine';
+import backfill, {
+  mapRemotePath,
+  torrentStage,
+} from '@server/lib/backfill/engine';
 import {
   IndexerLimitReached,
   PROWLARR,
   indexerLimits,
 } from '@server/lib/backfill/indexerLimit';
+import type { TorrentReading } from '@server/lib/backfill/watchdog';
+import { TorrentWatch, swarmLacks } from '@server/lib/backfill/watchdog';
 import downloadTracker from '@server/lib/downloadtracker';
 import { lidarrApi, musicReady } from '@server/lib/music/access';
 import {
@@ -877,7 +882,12 @@ class SongFetcher {
         const all = chosen.reduce((n, f) => n + f.size, 0) || 1;
         fetch.stage = `Downloading, ${Math.floor((have / all) * 100)}%`;
         this.sizes.set(fetch.id, { size: all, left: all - have });
-        await this.stalled(fetch, have);
+        await this.stalled(fetch, {
+          have,
+          left: all - have,
+          held: torrentStage(torrent, torrents.product).held,
+          incomplete: swarmLacks(torrent, chosen),
+        });
         return;
       }
       await torrents.stopTorrent(fetch.downloadId).catch(() => undefined);
@@ -933,24 +943,23 @@ class SongFetcher {
   }
 
   /**
-   * A torrent that gains nothing for Backfill's stall time is given up,
-   * and the next release tried.
+   * A torrent that stalls, can't finish or crawls, by Backfill's limits, is
+   * given up, and the next release tried.
    */
-  private async stalled(fetch: SongFetch, have: number): Promise<void> {
-    const hours = getSettings().backfill.stallHours;
-    const seen = this.gains.get(fetch.id);
-    if (!seen || have > seen.have) {
-      this.gains.set(fetch.id, { have, at: Date.now() });
-    } else if (hours > 0 && Date.now() - seen.at > hours * 60 * 60_000) {
-      this.gains.delete(fetch.id);
-      throw new ReleaseProblem(
-        `Nothing downloaded for ${hours} hour${hours === 1 ? '' : 's'}.`
-      );
-    }
+  private async stalled(
+    fetch: SongFetch,
+    reading: TorrentReading
+  ): Promise<void> {
+    const { stallHours, slowHours } = getSettings().backfill;
+    const giveUp = this.watch.check(fetch.id, reading, {
+      stallHours,
+      slowHours,
+    });
+    if (giveUp) throw new ReleaseProblem(giveUp);
     await getRepository(SongFetch).save(fetch);
   }
 
-  private gains = new Map<number, { have: number; at: number }>();
+  private watch = new TorrentWatch();
 
   /** Each download's size and what is left of it, as last read. */
   private sizes = new Map<number, { size: number; left: number }>();
@@ -1159,7 +1168,7 @@ class SongFetcher {
   private async stumbled(fetch: SongFetch, e: unknown): Promise<void> {
     if (e instanceof ReleaseProblem) {
       // The next release's progress starts afresh.
-      this.gains.delete(fetch.id);
+      this.watch.forget(fetch.id);
       this.troubleSince.delete(fetch.id);
       await this.removeDownload(fetch).catch(() => undefined);
       if (fetch.release) {
@@ -1241,7 +1250,7 @@ class SongFetcher {
     status: 'done' | 'failed',
     error: string | null
   ): Promise<void> {
-    this.gains.delete(fetch.id);
+    this.watch.forget(fetch.id);
     this.troubleSince.delete(fetch.id);
     fetch.status = status;
     fetch.error = error?.slice(0, 250) ?? null;

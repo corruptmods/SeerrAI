@@ -41,6 +41,7 @@ const messages = defineMessages('components.Backfill', {
   upgrades: 'upgrades {count}',
   hasMovie: 'has the movie',
   upgradesMovie: 'upgrades the movie',
+  daysHours: '{days} d {hours} h',
   hoursMinutes: '{hours} h {minutes} min',
   minutes: '{minutes} min',
   tryingAgainAt: '{stage}; trying again at {time}',
@@ -90,6 +91,13 @@ export const formatDuration = (
 ): string => {
   if (!seconds || seconds <= 0) return '';
   const { hours, minutes } = durationParts(seconds);
+  // Days once it's over two: "31 d 2 h", not "746 h 0 min".
+  if (hours >= 48) {
+    return intl.formatMessage(messages.daysHours, {
+      days: Math.floor(hours / 24),
+      hours: hours % 24,
+    });
+  }
   return hours
     ? intl.formatMessage(messages.hoursMinutes, { hours, minutes })
     : intl.formatMessage(messages.minutes, { minutes });

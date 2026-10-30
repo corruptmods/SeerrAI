@@ -236,6 +236,8 @@ components:
           type: number
         stallHours:
           type: number
+        slowHours:
+          type: number
         replaceFailed:
           type: boolean
         historyDays:

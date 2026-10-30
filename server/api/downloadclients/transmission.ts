@@ -120,6 +120,10 @@ export interface TransmissionTorrentInfo {
   addedDate?: number;
   sizeWhenDone: number;
   leftUntilDone: number;
+  /** Bytes still wanted that some peer connected has. */
+  desiredAvailable?: number;
+  /** Web seeds have everything, though they aren't counted as peers. */
+  webseedsSendingToUs?: number;
   metadataPercentComplete?: number;
   labels?: string[];
 }
@@ -137,6 +141,8 @@ const INFO_FIELDS = [
   'addedDate',
   'sizeWhenDone',
   'leftUntilDone',
+  'desiredAvailable',
+  'webseedsSendingToUs',
   'metadataPercentComplete',
   'labels',
 ];
@@ -152,6 +158,14 @@ export const transmissionTorrent = (
     secondsLeft: torrent.eta > 0 ? torrent.eta : undefined,
     savePath: torrent.downloadDir ?? '',
     addedAt: torrent.addedDate ? torrent.addedDate * 1000 : undefined,
+    unavailable:
+      typeof torrent.desiredAvailable === 'number' &&
+      !torrent.webseedsSendingToUs
+        ? Math.max(
+            0,
+            (Number(torrent.leftUntilDone) || 0) - torrent.desiredAvailable
+          )
+        : undefined,
   };
   if (torrent.error === 3) {
     return {

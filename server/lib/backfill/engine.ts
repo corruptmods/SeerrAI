@@ -71,6 +71,7 @@ import type { OpinionRequest } from '@server/lib/backfill/secondOpinion';
 import { aiSecondOpinion } from '@server/lib/backfill/secondOpinion';
 import type { SonarrCommand, SonarrEpisode } from '@server/lib/backfill/sonarr';
 import BackfillSonarr, { commandFinished } from '@server/lib/backfill/sonarr';
+import { TorrentWatch, swarmLacks } from '@server/lib/backfill/watchdog';
 import { blockedGroupOf, blockedGroups } from '@server/lib/blockedGroups';
 import type {
   BackfillDownload,
@@ -946,11 +947,8 @@ class Backfill {
   private sweptAt = Date.now();
   /** Settles when the tick under way, if any, is over. */
   private ticked: Promise<void> = Promise.resolve();
-  /**
-   * The bytes each torrent had when it last gained any, and when. Kept in
-   * memory: a restart gives a stalled torrent a fresh allowance.
-   */
-  private lastGain = new Map<number, { have: number; at: number }>();
+  /** Torrents that stall, can't finish or crawl, to give up on. */
+  private watch = new TorrentWatch();
   /** When a page last had a tick run early. */
   private kickedAt = 0;
   /**
@@ -3499,7 +3497,7 @@ class Backfill {
         this.note(job, 'warn', waiting);
       }
       // Time out of reach is not time without progress.
-      this.lastGain.delete(job.id);
+      this.watch.forget(job.id);
       await getRepository(BackfillJob).save(job);
       return;
     }
@@ -3599,11 +3597,8 @@ class Backfill {
         `${torrents.product} reports a problem with the torrent: ${torrent.error ?? 'an error'}.`
       );
     }
-    const { have, complete, ...measured } = measureTorrent(
-      job,
-      torrent,
-      await torrents.getFiles(job.downloadId!)
-    );
+    const files = await torrents.getFiles(job.downloadId!);
+    const { have, complete, ...measured } = measureTorrent(job, torrent, files);
     Object.assign(job, measured, { size: measured.size || job.size });
     if (complete && torrent.state === 'moving') {
       // Moved from an "incomplete" folder once done: imported after.
@@ -3615,25 +3610,28 @@ class Backfill {
       await torrents.stopTorrent(job.downloadId!).catch(() => undefined);
       job.progress = 100;
       job.sizeLeft = 0;
-      this.lastGain.delete(job.id);
+      this.watch.forget(job.id);
     } else {
       const { stage, held } = torrentStage(torrent, torrents.product);
       job.stage = stage;
-      const seen = this.lastGain.get(job.id);
-      // Paused, queued or being checked in the client is not stalling:
-      // the clock only runs while it is meant to be downloading.
-      if (!seen || have > seen.have || held) {
-        this.lastGain.set(job.id, { have, at: Date.now() });
-      } else {
-        const hours = getSettings().backfill.stallHours;
-        if (hours > 0 && Date.now() - seen.at > hours * 60 * 60_000) {
-          this.lastGain.delete(job.id);
-          await this.fail(
-            job,
-            `Nothing downloaded for ${hours} hour${hours === 1 ? '' : 's'}: nobody seems to be sharing it.`
-          );
-          return false;
-        }
+      const wanted = new Set(job.files.map((f) => f.index));
+      const { stallHours, slowHours } = getSettings().backfill;
+      const giveUp = this.watch.check(
+        job.id,
+        {
+          have,
+          left: measured.sizeLeft,
+          held,
+          incomplete: swarmLacks(
+            torrent,
+            files.filter((f) => wanted.has(f.index))
+          ),
+        },
+        { stallHours, slowHours }
+      );
+      if (giveUp) {
+        await this.fail(job, giveUp);
+        return false;
       }
     }
     await getRepository(BackfillJob).save(job);
@@ -4348,7 +4346,7 @@ class Backfill {
         throw new Error('Only a download can be paused.');
       }
       await this.stopDownload(job);
-      this.lastGain.delete(job.id);
+      this.watch.forget(job.id);
       this.note(job, 'info', 'Paused');
       return this.moveJob(job, ['downloading'], { status: 'paused', speed: 0 });
     });
@@ -4366,7 +4364,7 @@ class Backfill {
       } else {
         await usenetClientFor(client).resumeJob(job.downloadId!);
       }
-      this.lastGain.delete(job.id);
+      this.watch.forget(job.id);
       this.note(job, 'info', 'Resumed');
       return this.moveJob(job, ['paused'], { status: 'downloading' });
     });

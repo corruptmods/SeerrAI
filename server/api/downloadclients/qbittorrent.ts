@@ -52,6 +52,8 @@ export interface QbitFile {
   size: number;
   progress: number;
   priority: number;
+  /** -1 when qBittorrent doesn't know. */
+  availability?: number;
 }
 
 /** qBittorrent's "no estimate". */
@@ -398,6 +400,10 @@ class QBittorrentAPI implements TorrentClient {
     return (Array.isArray(data) ? data : []).map((file, position) => ({
       ...file,
       index: Number.isInteger(file.index) ? file.index : position,
+      availability:
+        typeof file.availability === 'number' && file.availability >= 0
+          ? Math.min(1, file.availability)
+          : undefined,
     }));
   }
 

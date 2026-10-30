@@ -651,6 +651,77 @@ describe('Backfill for movies: from Radarr’s wanted list to the library', () =
     );
   });
 
+  it('gives up on a download part of which no peer has, though the rest trickles in, or one far too slow', async () => {
+    getSettings().backfill = {
+      ...getSettings().backfill,
+      autoApprove: { enabled: false, minScore: -10_000, maxSizeGb: 100 },
+      replaceFailed: false,
+    };
+    mock.method(ProwlarrAPI.prototype, 'search', async () => [RELEASE]);
+    let now = Date.now();
+    mock.timers.enable({ apis: ['Date'], now });
+    let progress = 0;
+    let availability = 0.9;
+    mock.method(QBittorrentAPI.prototype, 'getFiles', async () =>
+      INFO.files.map((f, index) => ({
+        index,
+        name: [INFO.name, ...f.path].join('/'),
+        size: f.length,
+        progress: index === 1 ? progress : 0,
+        priority: index === 1 ? 1 : 0,
+        // Only the file not wanted is whole somewhere for the second run.
+        availability: index === 1 ? availability : 0.5,
+      }))
+    );
+    const jobs = getRepository(BackfillJob);
+    const candidates = getRepository(BackfillCandidate);
+    const run = async (hours: number[]) => {
+      for (const hour of hours) {
+        now += hour * 60 * 60_000;
+        mock.timers.setTime(now);
+        progress += 0.001;
+        await backfill.tick();
+      }
+    };
+
+    await backfill.scan();
+    const row = await getRepository(BackfillSeries).findOneOrFail({
+      where: { kind: 'movie', arrId: 55 },
+    });
+    const candidate = await candidates.findOneOrFail({
+      where: { seriesId: row.id },
+    });
+    const first = await backfill.approve(candidate.id, { mode: 'missing' });
+    await run([0, 6, 7]);
+    const gone = await jobs.findOneOrFail({ where: { id: first.id } });
+    assert.equal(gone.status, 'failed');
+    assert.match(gone.error ?? '', /could never finish/);
+
+    // Whole in the swarm, but at about 1 KB/s.
+    availability = 1;
+    progress = 0;
+    const again = await candidates.save(
+      new BackfillCandidate({
+        ...candidate,
+        id: undefined,
+        guid: 'https://indexer/hp-4',
+        status: 'ready',
+      })
+    );
+    const second = await backfill.approve(again.id, { mode: 'missing' });
+    progress = -0.001;
+    await run([0, 2, 1]);
+    assert.equal(
+      (await jobs.findOneOrFail({ where: { id: second.id } })).status,
+      'downloading',
+      'not judged before two whole windows'
+    );
+    await run([1, 2]);
+    const slow = await jobs.findOneOrFail({ where: { id: second.id } });
+    assert.equal(slow.status, 'failed');
+    assert.match(slow.error ?? '', /^Too slow: at 1 KB\/s, the 2\.0 GB left/);
+  });
+
   it('leaves a failed download for an admin when replacing is off, or after too many fail', async () => {
     getSettings().backfill = {
       ...getSettings().backfill,

@@ -242,6 +242,12 @@ export interface BackfillSettings {
    */
   stallHours: number;
   /**
+   * A torrent whose pace (measured over two windows of two hours in a row)
+   * would take longer than this to finish is given up on and the next pack
+   * offered. 0 never gives up on a slow one.
+   */
+  slowHours: number;
+  /**
    * A download that fails or stalls is replaced on its own by the next
    * good pack for the same episodes (auto-approve's score and size), until
    * none is left.
@@ -319,6 +325,7 @@ export const BACKFILL_DEFAULTS: BackfillSettings = {
   maxActiveJobs: 2,
   minFreeSpaceGb: 200,
   stallHours: 12,
+  slowHours: 72,
   replaceFailed: true,
   historyDays: 90,
   blockedGroups: [],

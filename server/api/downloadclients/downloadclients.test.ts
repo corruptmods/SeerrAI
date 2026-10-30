@@ -448,4 +448,58 @@ describe('adding a torrent to qBittorrent for Backfill', () => {
     assert.equal(form?.get('seedingTimeLimit'), '-1');
     assert.equal(form?.get('inactiveSeedingTimeLimit'), '-1');
   });
+  it('reads how much of each file the swarm has, unknown as unknown', async () => {
+    mock.method(
+      QBittorrentAPI.prototype as unknown as {
+        get: (path: string) => Promise<unknown>;
+      },
+      'get',
+      async () => ({
+        data: [
+          {
+            index: 0,
+            name: 'a.mkv',
+            size: 10,
+            progress: 0,
+            priority: 1,
+            availability: 0.98,
+          },
+          {
+            index: 1,
+            name: 'b.mkv',
+            size: 10,
+            progress: 0,
+            priority: 1,
+            availability: -1,
+          },
+          {
+            index: 2,
+            name: 'c.mkv',
+            size: 10,
+            progress: 0,
+            priority: 1,
+            availability: 3,
+          },
+          { name: 'd.mkv', size: 10, progress: 0, priority: 0 },
+        ],
+      })
+    );
+    const files = await new QBittorrentAPI({
+      hostname: '127.0.0.1',
+      port: 1,
+      useSsl: false,
+      urlBase: '',
+      username: '',
+      password: '',
+    }).getFiles('ABC');
+    assert.deepEqual(
+      files.map((f) => [f.index, f.availability]),
+      [
+        [0, 0.98],
+        [1, undefined],
+        [2, 1],
+        [3, undefined],
+      ]
+    );
+  });
 });

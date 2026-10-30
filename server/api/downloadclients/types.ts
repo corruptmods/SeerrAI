@@ -64,6 +64,11 @@ export interface ClientTorrent {
   savePath: string;
   /** When it was added (ms); undefined when the client cannot say. */
   addedAt?: number;
+  /**
+   * Bytes of what is wanted and not yet in that no peer connected has;
+   * undefined when the client cannot say.
+   */
+  unavailable?: number;
 }
 
 export interface ClientTorrentFile {
@@ -74,6 +79,11 @@ export interface ClientTorrentFile {
   size: number;
   /** 0 to 1. */
   progress: number;
+  /**
+   * 0 to 1: the share of its pieces some peer connected has (or that are
+   * in); undefined when the client cannot say.
+   */
+  availability?: number;
 }
 
 export interface TorrentClient extends DownloadClient {

@@ -11,6 +11,7 @@ import RtorrentAPI, {
 } from '@server/api/downloadclients/rtorrent';
 import TransmissionAPI, {
   transmissionDownload,
+  transmissionTorrent,
 } from '@server/api/downloadclients/transmission';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -60,6 +61,28 @@ describe('reading each client’s states', () => {
     assert.equal(t(4, { metadataPercentComplete: 0.5 }).step, 'metadata');
     assert.equal(t(4, { error: 3 }).stage, 'stalled');
     assert.equal(t(4, { eta: -1 }).secondsLeft, undefined);
+  });
+
+  it('Transmission: what the swarm lacks of what is wanted', () => {
+    const t = (extra = {}) =>
+      transmissionTorrent({
+        hashString: HASH,
+        name: 'pack',
+        status: 4,
+        error: 0,
+        percentDone: 0.4,
+        rateDownload: 10,
+        eta: 30,
+        downloadDir: '/downloads',
+        sizeWhenDone: 100,
+        leftUntilDone: 60,
+        ...extra,
+      }).unavailable;
+    assert.equal(t({ desiredAvailable: 45 }), 15);
+    assert.equal(t({ desiredAvailable: 60 }), 0);
+    assert.equal(t(), undefined);
+    // Web seeds have it all, though they aren't peers.
+    assert.equal(t({ desiredAvailable: 0, webseedsSendingToUs: 1 }), undefined);
   });
 
   it('Deluge', () => {

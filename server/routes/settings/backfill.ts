@@ -55,6 +55,7 @@ const body = z.object({
   maxActiveJobs: z.coerce.number().int().min(1).max(10),
   minFreeSpaceGb: z.coerce.number().min(0).max(100000),
   stallHours: z.coerce.number().int().min(0).max(720),
+  slowHours: z.coerce.number().int().min(0).max(2160).default(72),
   replaceFailed: z.boolean().default(true),
   historyDays: z.coerce.number().int().min(0).max(3650).default(90),
   agent: z

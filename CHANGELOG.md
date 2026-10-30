@@ -2,6 +2,13 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
+## Coming next
+
+### New
+
+- **Backfill gives up on torrents that won't finish**: when part of what's wanted is on no one's computer, after the stall time, even while the rest trickles in; and when one is so slow it would take over 3 days, after four hours at that pace. Either is replaced like a stalled one. Change the 3 days, or turn it off, in Settings → Backfill. Songs taken from albums too.
+- Backfill shows a long wait in days: "31 d 2 h", not "746 h 0 min".
+
 ## 2.2.1 (27 October 2026)
 
 Fixes from Seerr for Plex sign-in, scheduled jobs and override rules.

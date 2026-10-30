@@ -17,6 +17,17 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - An album's tracks show open on a phone too; they can still be folded away.
 - Album, song and artist cards show their name along the bottom of the artwork, since covers seldom carry it.
 - Backfill shows a long wait in days: "31 d 2 h", not "746 h 0 min".
+- **The admin agent rides out an AI outage**: when OpenAI, Claude or your own AI server can't be reached or is busy, it tries again for about 8 minutes, then picks the conversation up by itself once the service answers, for up to a day.
+- **Foldable phones**: checked on the iPhone Duo and Galaxy Folds, folded and unfolded, upright and on their side, and folding or unfolding mid-page. A title page's buttons now wrap their words on a narrow screen instead of running past the edge, and the top bar keeps clear of the Dynamic Island when a phone is turned on its side.
+- **Get New Seasons shows on for everyone** once anyone follows a series, such as whoever requested all of it, and the request window stops offering it there. Admins see who follows in its tip and can stop it for everyone.
+
+### Changed
+
+- sqlite3 6.0.1 (SQLite 3.52), from Seerr. Nothing to do: databases open as before.
+
+### Security
+
+- [CVE-2026-93753](https://github.com/advisories/GHSA-gcqx-w48m-w2h4): deepmerge, which email templates use, has no fixed release yet, so Seerr AI carries its own fix.
 
 ## 2.2.1 (27 October 2026)
 

@@ -36,8 +36,13 @@ import {
 } from '@server/lib/agent/tools';
 import { aiFeatureOn, modelFor } from '@server/lib/ai';
 import { countAnswer, noteFailure } from '@server/lib/ai/credit';
-import type { ConverseMessage, ToolResult } from '@server/lib/ai/providers';
-import { converse } from '@server/lib/ai/providers';
+import type {
+  ConverseMessage,
+  ConverseRequest,
+  ConverseTurn,
+  ToolResult,
+} from '@server/lib/ai/providers';
+import { converse, isOutage, listModels } from '@server/lib/ai/providers';
 import type { AgentHandBack } from '@server/lib/backfill/engine';
 import backfill, {
   jobEpisodes,
@@ -51,10 +56,12 @@ import notificationManager, { Notification } from '@server/lib/notifications';
 import { adminAgentEvent } from '@server/lib/notifications/eventTitles';
 import { owner } from '@server/lib/owner';
 import { Permission } from '@server/lib/permissions';
+import type { AiSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAxiosError } from 'axios';
 import { randomUUID } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { FindOptionsWhere } from 'typeorm';
 import { In, LessThan, MoreThan } from 'typeorm';
 
@@ -88,6 +95,17 @@ const FINISHED: AgentRun['status'][] = ['done', 'failed'];
 const HOLD_CHECK_MS = 60 * 1000;
 /** A report is held no longer than this for searches still going. */
 const HOLD_LONGEST_MS = 6 * 60 * 60 * 1000;
+/**
+ * Waits before each new try while the AI service can't be reached, is busy
+ * or too slow, all within the run: about eight minutes in all.
+ */
+const OUTAGE_WAITS_MS = [15_000, 30_000, 60_000, 120_000, 240_000];
+/**
+ * A run that failed so is picked up again once the service answers: asked
+ * this often, for up to a day after the run first lost it.
+ */
+const OUTAGE_CHECK_MS = 5 * 60 * 1000;
+const OUTAGE_LONGEST_MS = DAY;
 /** A replaced season is followed this long for its new files to import. */
 const FOLLOW_LONGEST_MS = 2 * 24 * 60 * 60 * 1000;
 const UNFINISHED: AgentRun['status'][] = [
@@ -96,6 +114,27 @@ const UNFINISHED: AgentRun['status'][] = [
   'running',
   'waiting',
 ];
+/**
+ * A run that failed for want of the AI service, waiting for it to answer:
+ * since when it first lost it. `lostSince` stays on a run picked up again,
+ * so losing it again doesn't start its day afresh.
+ */
+const outageOf = (run: AgentRun) =>
+  (run.memory as { outage?: { since: string } } | null)?.outage;
+const lostSince = (run: AgentRun): string | undefined =>
+  outageOf(run)?.since ??
+  (run.memory as { lostSince?: string } | null)?.lostSince;
+const withoutOutage = (run: AgentRun): AgentRun['memory'] => {
+  const {
+    outage: _outage,
+    lostSince: _since,
+    ...rest
+  } = (run.memory ?? {}) as { outage?: unknown; lostSince?: unknown };
+  void _outage;
+  void _since;
+  return rest;
+};
+
 /**
  * Replacements of a failed download (for the same episodes) that may fail
  * in a day before the agent stops looking for more and tells admins.
@@ -393,6 +432,10 @@ class Agent {
   private purgeTimer?: NodeJS.Timeout;
   private holdTimer?: NodeJS.Timeout;
   private checkingHeld = false;
+  /** When the AI service was last asked whether it answers again. */
+  private outageCheckedAt = 0;
+  /** Changed only by tests, which can't wait minutes. */
+  public outageWaitsMs = OUTAGE_WAITS_MS;
 
   /** Picks up after a restart, and hears of Backfill's empty searches. */
   public async init(): Promise<void> {
@@ -432,7 +475,10 @@ class Agent {
     void purge();
     this.purgeTimer = setInterval(purge, PURGE_EVERY_MS);
     this.purgeTimer.unref();
-    this.holdTimer = setInterval(() => void this.checkHeld(), HOLD_CHECK_MS);
+    this.holdTimer = setInterval(() => {
+      void this.checkHeld();
+      void this.checkOutages();
+    }, HOLD_CHECK_MS);
     this.holdTimer.unref();
   }
 
@@ -598,6 +644,96 @@ class Agent {
         actions: [],
       })
     );
+  }
+
+  /**
+   * Runs that failed because the AI service couldn't be reached carry on
+   * once it answers again: asked every few minutes, without spending
+   * anything, for a day after each first lost it.
+   */
+  public async checkOutages(now = Date.now()): Promise<void> {
+    if (now - this.outageCheckedAt < OUTAGE_CHECK_MS) return;
+    this.outageCheckedAt = now;
+    const runs = getRepository(AgentRun);
+    const lost = (
+      await runs.find({
+        where: {
+          status: 'failed',
+          finishedAt: MoreThan(new Date(now - OUTAGE_LONGEST_MS)),
+        },
+      })
+    ).filter((run) => outageOf(run));
+    if (!lost.length) return;
+    const ai = getSettings().ai;
+    if (!ai.enabled) return;
+    try {
+      await listModels(ai);
+    } catch (e) {
+      logger.debug('The AI service still does not answer', {
+        label: LABEL,
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+      return;
+    }
+    for (const run of lost) {
+      const since = outageOf(run)!.since;
+      if (now - new Date(since).getTime() > OUTAGE_LONGEST_MS) {
+        run.memory = withoutOutage(run);
+        await runs.save(run);
+        continue;
+      }
+      run.steps.push({
+        at: new Date(now).toISOString(),
+        kind: 'error',
+        text: 'The AI service answers again, so it carries on.',
+      });
+      // Only while it is still as it was: an admin may have replied.
+      const queued = await runs.update(
+        { id: run.id, status: 'failed' },
+        { status: 'queued', error: null }
+      );
+      if (!queued.affected) continue;
+      run.memory = { ...withoutOutage(run), lostSince: since };
+      run.status = 'queued';
+      run.error = null;
+      await runs.save(run);
+      this.queue.push(run.id);
+    }
+    void this.pump();
+  }
+
+  /**
+   * One turn of the model, tried again while its service can't be reached,
+   * is busy or too slow. Null when an admin stopped the run meanwhile.
+   */
+  private async turnOf(
+    runId: number,
+    ai: AiSettings,
+    req: ConverseRequest,
+    note: (text: string) => Promise<void>
+  ): Promise<ConverseTurn | null> {
+    for (let tries = 0; ; tries++) {
+      try {
+        return await converse(ai, req);
+      } catch (e) {
+        const wait = this.outageWaitsMs[tries];
+        if (!isOutage(e) || wait === undefined) throw e;
+        const seconds = Math.round(wait / 1000);
+        await note(
+          `${e.message.replace(/\.$/, '')}. Trying again in ${
+            seconds < 60
+              ? `${seconds} seconds`
+              : `${Math.round(seconds / 60)} minute${seconds >= 120 ? 's' : ''}`
+          }.`
+        );
+        const until = Date.now() + wait;
+        while (Date.now() < until) {
+          if (this.live.get(runId)?.stopBy) return null;
+          await sleep(Math.min(1000, until - Date.now()));
+        }
+        if (this.live.get(runId)?.stopBy) return null;
+      }
+    }
   }
 
   /** Looks at every held report; one at a time. */
@@ -1660,13 +1796,19 @@ class Agent {
           }
           await runs.save(run);
         }
-        const turn = await converse(ai, {
-          model,
-          system,
-          messages,
-          tools,
-          maxTokens: TURN_TOKENS,
-        });
+        const turn = await this.turnOf(
+          run.id,
+          ai,
+          { model, system, messages, tools, maxTokens: TURN_TOKENS },
+          async (text) => {
+            step('error', text);
+            await runs.save(run);
+          }
+        );
+        if (!turn) {
+          stoppedBy = this.live.get(run.id)?.stopBy;
+          break;
+        }
         await countAnswer(model, turn);
         run.inputTokens += turn.inputTokens;
         run.outputTokens += turn.outputTokens;
@@ -1903,6 +2045,14 @@ class Agent {
       noteFailure(e);
       run.status = 'failed';
       run.error = (e instanceof Error ? e.message : String(e)).slice(0, 500);
+      if (isOutage(e)) {
+        // Picked up again by itself once the service answers.
+        const since = lostSince(run) ?? new Date().toISOString();
+        run.memory = { ...withoutOutage(run), outage: { since } };
+        run.error = `${run.error} It carries on by itself once the AI service answers again, for up to a day; or reply to have it try now.`;
+      } else {
+        run.memory = withoutOutage(run);
+      }
       step('error', run.error);
       // An approval it never got to is dropped, not left to be carried out
       // whenever the run is next replied to; the admin is told.

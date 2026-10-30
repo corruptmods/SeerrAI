@@ -247,6 +247,9 @@
   .searchbar {
     padding-top: max(env(safe-area-inset-top), 0.75rem);
     height: calc(4rem + max(env(safe-area-inset-top), 0.75rem));
+    /* Clear of the Dynamic Island when a phone is turned on its side. */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   @media all and (display-mode: standalone) {
@@ -594,19 +597,28 @@
       justify-content: center;
     }
 
+    /* A button that is itself one of the row's, as well as one inside. */
+    .media-actions > a:not(.media-action-icon),
+    .media-actions > button:not(.media-action-icon),
     .media-actions > :not(.media-action-icon) a,
     .media-actions > :not(.media-action-icon) button {
       white-space: normal;
       text-align: center;
+      /* A little narrower, so "Get New Seasons" still fits on one line on
+         most phones; a narrower screen wraps it. */
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
     }
 
     .media-actions svg {
       flex-shrink: 0;
     }
 
+    /* Over the rule that keeps every button's label on one line. */
     .media-actions a > span,
     .media-actions button > span {
       justify-content: center;
+      white-space: normal;
     }
   }
 

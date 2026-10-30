@@ -21,6 +21,7 @@ const messages = defineMessages('utils.aiErrorMessage', {
     'The AI account is out of credit. AI features work again once more is added.',
   busy: 'The AI service is busy right now. Try again shortly.',
   timeout: 'The AI service took too long to answer. Try again.',
+  unreachable: 'The AI service couldn’t be reached. Try again shortly.',
   noHistory: 'There is no watch history to explain these by.',
   nobodyHistory: 'Nobody chosen has any watch history to pick from yet.',
   nothingInLibrary:

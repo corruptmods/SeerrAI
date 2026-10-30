@@ -19,10 +19,13 @@ import {
   SeriesFinishedError,
   canSubscribe,
   getSubscription,
+  otherFollowers,
   subscribe,
   unsubscribe,
+  unsubscribeEveryone,
 } from '@server/lib/futureSeasons';
 import mediaForViewer from '@server/lib/mediaForViewer';
+import { Permission } from '@server/lib/permissions';
 import logger from '@server/logger';
 import { mapTvResult } from '@server/models/Search';
 import type { SeasonRequestCoverage } from '@server/models/Tv';
@@ -381,17 +384,26 @@ tvRoutes.get('/:id/ratingscombined', async (req, res, next) => {
  */
 tvRoutes.get<{ id: string }>('/:id/future-seasons', async (req, res, next) => {
   try {
-    const subscription = await getSubscription(
-      req.user?.id as number,
-      Number(req.params.id)
-    );
-    return res
-      .status(200)
-      .json(
-        subscription
-          ? { following: true, fromSeason: subscription.fromSeason }
-          : { following: false }
-      );
+    const userId = req.user?.id as number;
+    const tmdbId = Number(req.params.id);
+    const subscription = await getSubscription(userId, tmdbId);
+    // Others following show the series as followed for everyone; only those
+    // who look after requests see who they are.
+    const others = await otherFollowers(userId, tmdbId);
+    return res.status(200).json({
+      ...(subscription
+        ? { following: true, fromSeason: subscription.fromSeason }
+        : { following: false }),
+      ...(others.names.length
+        ? {
+            othersFollow: true,
+            othersFrom: others.fromSeason,
+            ...(req.user?.hasPermission(Permission.MANAGE_REQUESTS)
+              ? { others: others.names }
+              : {}),
+          }
+        : {}),
+    });
   } catch (e) {
     return next({ status: 500, message: e.message });
   }
@@ -430,7 +442,17 @@ tvRoutes.delete<{ id: string }>(
   '/:id/future-seasons',
   async (req, res, next) => {
     try {
-      await unsubscribe(req.user?.id as number, Number(req.params.id));
+      if (String(req.query.everyone) === 'true') {
+        if (!req.user?.hasPermission(Permission.MANAGE_REQUESTS)) {
+          return next({
+            status: 403,
+            message: 'Only those who manage requests can stop it for everyone.',
+          });
+        }
+        await unsubscribeEveryone(Number(req.params.id));
+      } else {
+        await unsubscribe(req.user?.id as number, Number(req.params.id));
+      }
       return res.status(204).send();
     } catch (e) {
       return next({ status: 500, message: e.message });

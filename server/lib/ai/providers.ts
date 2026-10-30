@@ -256,7 +256,12 @@ const explain = (
     );
   }
   if (!e.response) {
-    return new AiProviderError(`Could not reach ${provider}.`);
+    return new AiProviderError(
+      `Could not reach ${provider}.`,
+      502,
+      false,
+      'unreachable'
+    );
   }
   return new AiProviderError(
     `${provider} refused the request${detail ? `: ${detail}` : '.'}`
@@ -794,6 +799,14 @@ const converseOpenAi = async (
     outputTokens: data.usage?.completion_tokens ?? 0,
   };
 };
+
+/**
+ * The service can't be reached, is busy or answered too slowly: it may well
+ * answer a moment later, and a try that failed costs nothing.
+ */
+export const isOutage = (e: unknown): e is AiProviderError =>
+  e instanceof AiProviderError &&
+  (e.code === 'unreachable' || e.code === 'busy' || e.code === 'timeout');
 
 /** One turn of a conversation in which the model may call tools. */
 export const converse = (

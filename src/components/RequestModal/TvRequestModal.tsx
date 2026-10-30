@@ -15,6 +15,7 @@ import followByDefault from '@app/components/RequestModal/FollowNewSeasons/follo
 import QuotaDisplay from '@app/components/RequestModal/QuotaDisplay';
 import RequestListPicker from '@app/components/RequestModal/RequestListPicker';
 import SearchByNameModal from '@app/components/RequestModal/SearchByNameModal';
+import type { FutureSeasonsState } from '@app/components/TvDetails/FutureSeasonsButton';
 import useFeature from '@app/hooks/useFeature';
 import useIsAnime from '@app/hooks/useIsAnime';
 import useSettings from '@app/hooks/useSettings';
@@ -154,7 +155,7 @@ const TvRequestModal = ({
   );
   // Following the series from here on, offered alongside a new request.
   const followFeature = useFeature('newSeasons');
-  const { data: followState } = useSWR<{ following: boolean }>(
+  const { data: followState } = useSWR<FutureSeasonsState>(
     followFeature && !editRequest && !is4k
       ? `/api/v1/tv/${tmdbId}/future-seasons`
       : null
@@ -191,6 +192,8 @@ const TvRequestModal = ({
   const offerFollow =
     !!data &&
     followState?.following === false &&
+    // Someone else already gets its new seasons, so they come anyway.
+    !followState.othersFollow &&
     !FINISHED.includes(data.status) &&
     (!requestOverrides?.user || requestOverrides.user.id === user?.id);
 

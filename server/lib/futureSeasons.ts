@@ -88,6 +88,30 @@ export const getSubscription = (userId: number, tmdbId: number) =>
     where: { user: { id: userId }, tmdbId },
   });
 
+/**
+ * Who else gets new seasons of a series, and the next season due for any of
+ * them. Following is shown on the series for everyone, since each new season
+ * comes whoever asked for it.
+ */
+export const otherFollowers = async (
+  userId: number,
+  tmdbId: number
+): Promise<{ names: string[]; fromSeason?: number }> => {
+  const others = (
+    await getRepository(FutureSeasonSubscription).find({
+      where: { tmdbId },
+      relations: { user: true },
+      order: { createdAt: 'ASC' },
+    })
+  ).filter((s) => s.user.id !== userId);
+  return {
+    names: others.map((s) => s.user.displayName),
+    fromSeason: others.length
+      ? Math.min(...others.map((s) => s.fromSeason))
+      : undefined,
+  };
+};
+
 /** Start getting new seasons of a series. Returns the first one to come. */
 export const subscribe = async (
   user: User,
@@ -117,6 +141,11 @@ export const unsubscribe = async (userId: number, tmdbId: number) => {
     user: { id: userId },
     tmdbId,
   });
+};
+
+/** Stop new seasons of a series coming for anyone. */
+export const unsubscribeEveryone = async (tmdbId: number) => {
+  await getRepository(FutureSeasonSubscription).delete({ tmdbId });
 };
 
 type Outcome = 'requested' | 'already' | 'retry' | 'drop';

@@ -17,12 +17,22 @@ const messages = defineMessages('components.TvDetails.FutureSeasonsButton', {
     'Request each new season as it premieres, without the seasons already out.',
   explainOn:
     'Season {season} and every one after it are requested as each premieres. Tap to stop.',
+  explainOnFor:
+    'Season {season} and every one after it are requested as each premieres. {names} {count, plural, one {follows} other {follow}} this series. Tap to stop it for everyone.',
+  explainOnShared:
+    'Season {season} and every one after it are requested as each premieres. Others follow this series too. Tap to stop yours.',
+  explainShared:
+    'Season {season} and every one after it are already requested as each premieres, for someone who follows this series.',
   started:
     'Season {season} of {title} and every season after it will be requested as each premieres.',
   paused: 'New Seasons Paused',
   explainPaused:
     'Paused, so nothing is being requested. Tap to stop following this series.',
   stopped: 'You will no longer get new seasons of {title}.',
+  stoppedShared:
+    'You no longer follow {title}. Its new seasons still come for the others who do.',
+  stoppedEveryone:
+    'New seasons of {title} will no longer be requested for anyone.',
   failed: 'Something went wrong. Try again.',
 });
 
@@ -36,14 +46,21 @@ interface FutureSeasonsButtonProps {
   seriesStatus?: string;
 }
 
-interface FutureSeasonsState {
+export interface FutureSeasonsState {
   following: boolean;
   fromSeason?: number;
+  /** Someone else follows the series, so its new seasons come anyway. */
+  othersFollow?: boolean;
+  othersFrom?: number;
+  /** Who they are; only told to those who manage requests. */
+  others?: string[];
 }
 
 /**
  * Get a series from here on: every season that has not premiered yet is
- * requested for you as it premieres, and nothing already out.
+ * requested as it premieres, and nothing already out. Shown on for everyone
+ * once anyone follows it, since the seasons come for all; people who manage
+ * requests can stop it for everyone.
  */
 const FutureSeasonsButton = ({
   tmdbId,
@@ -62,6 +79,7 @@ const FutureSeasonsButton = ({
       type: 'or',
     }
   );
+  const manager = hasPermission(Permission.MANAGE_REQUESTS);
   const allowed = on && canRequest;
   const finished = !!seriesStatus && FINISHED.includes(seriesStatus);
 
@@ -71,26 +89,57 @@ const FutureSeasonsButton = ({
     `/api/v1/tv/${tmdbId}/future-seasons`
   );
 
-  if (!data || (!data.following && (!allowed || finished))) {
+  if (
+    !data ||
+    (!data.following && !(on && data.othersFollow) && (!allowed || finished))
+  ) {
     return null;
   }
-  const paused = data.following && !allowed;
+  const mine = data.following;
+  const shared = !!data.othersFollow;
+  const followed = mine || shared;
+  const paused = mine && !allowed && !shared;
+  // Someone else's follow is theirs to stop, or a manager's.
+  const canToggle = !followed || mine || manager;
+  const season = Math.min(
+    ...[data.fromSeason, data.othersFrom].filter(
+      (n): n is number => n !== undefined
+    )
+  );
+  const others = data.others ?? [];
 
   const toggle = async () => {
     setBusy(true);
     try {
-      if (data.following) {
-        await axios.delete(`/api/v1/tv/${tmdbId}/future-seasons`);
+      if (followed && manager) {
+        await axios.delete(`/api/v1/tv/${tmdbId}/future-seasons`, {
+          params: { everyone: true },
+        });
         await mutate({ following: false }, { revalidate: false });
-        addToast(intl.formatMessage(messages.stopped, { title }), {
+        addToast(intl.formatMessage(messages.stoppedEveryone, { title }), {
           appearance: 'info',
           autoDismiss: true,
         });
+      } else if (mine) {
+        await axios.delete(`/api/v1/tv/${tmdbId}/future-seasons`);
+        await mutate(
+          { ...data, following: false, fromSeason: undefined },
+          { revalidate: false }
+        );
+        addToast(
+          intl.formatMessage(
+            shared ? messages.stoppedShared : messages.stopped,
+            {
+              title,
+            }
+          ),
+          { appearance: 'info', autoDismiss: true }
+        );
       } else {
         const response = await axios.post<FutureSeasonsState>(
           `/api/v1/tv/${tmdbId}/future-seasons`
         );
-        await mutate(response.data, { revalidate: false });
+        await mutate({ ...data, ...response.data }, { revalidate: false });
         addToast(
           intl.formatMessage(messages.started, {
             season: response.data.fromSeason,
@@ -109,31 +158,38 @@ const FutureSeasonsButton = ({
     }
   };
 
+  const tip = paused
+    ? intl.formatMessage(messages.explainPaused)
+    : !followed
+      ? intl.formatMessage(messages.explain)
+      : manager && others.length
+        ? intl.formatMessage(messages.explainOnFor, {
+            season,
+            names: intl.formatList(others, { type: 'conjunction' }),
+            count: others.length,
+          })
+        : !mine
+          ? intl.formatMessage(messages.explainShared, { season })
+          : shared
+            ? intl.formatMessage(messages.explainOnShared, { season })
+            : intl.formatMessage(messages.explainOn, { season });
+
   return (
-    <Tooltip
-      content={
-        paused
-          ? intl.formatMessage(messages.explainPaused)
-          : data.following
-            ? intl.formatMessage(messages.explainOn, {
-                season: data.fromSeason,
-              })
-            : intl.formatMessage(messages.explain)
-      }
-    >
+    <Tooltip content={tip}>
       <Button
-        buttonType={data.following && !paused ? 'success' : 'default'}
-        className="z-20"
+        buttonType={followed && !paused ? 'success' : 'default'}
+        className={`z-20${canToggle ? '' : 'cursor-default'}`}
         disabled={busy}
-        onClick={toggle}
-        aria-pressed={data.following}
+        onClick={canToggle ? toggle : undefined}
+        aria-pressed={followed}
+        aria-disabled={!canToggle || undefined}
       >
-        {data.following ? <CheckIcon /> : <CalendarDaysIcon />}
+        {followed ? <CheckIcon /> : <CalendarDaysIcon />}
         <span>
           {intl.formatMessage(
             paused
               ? messages.paused
-              : data.following
+              : followed
                 ? messages.getting
                 : messages.get
           )}

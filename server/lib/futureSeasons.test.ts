@@ -329,6 +329,60 @@ describe('/tv/{tvId}/future-seasons', () => {
     assert.deepEqual((await call('GET')).body, { following: false });
   });
 
+  it('shows the series followed to everyone, and who only to managers', async () => {
+    assert.equal((await call('POST')).status, 201);
+    const friend = await user('friend@seerr.dev');
+    assert.deepEqual(
+      (await call('GET')).body,
+      { following: true, fromSeason: 3 },
+      'their own follow, and nobody else'
+    );
+
+    signedIn = 'admin@seerr.dev';
+    assert.deepEqual((await call('GET')).body, {
+      following: false,
+      othersFollow: true,
+      othersFrom: 3,
+      others: [friend.displayName],
+    });
+    assert.deepEqual(
+      (await call('GET', 200)).body,
+      { following: false },
+      'nobody follows another series'
+    );
+
+    // Someone who doesn't manage requests is told it comes, not by whom.
+    await subscribe(await user('admin@seerr.dev'), 100);
+    signedIn = 'friend@seerr.dev';
+    await getRepository(FutureSeasonSubscription).delete({
+      user: { id: friend.id },
+    });
+    assert.deepEqual((await call('GET')).body, {
+      following: false,
+      othersFollow: true,
+      othersFrom: 3,
+    });
+  });
+
+  it('stops it for everyone only for a manager', async () => {
+    await subscribe(await user('friend@seerr.dev'), 100);
+    await subscribe(await user('admin@seerr.dev'), 100);
+
+    const everyone = async () => {
+      const res = await fetch(
+        `http://127.0.0.1:${port}/api/v1/tv/100/future-seasons?everyone=true`,
+        { method: 'DELETE' }
+      );
+      return res.status;
+    };
+    assert.equal(await everyone(), 403);
+    assert.equal((await subscriptions()).length, 2);
+
+    signedIn = 'admin@seerr.dev';
+    assert.equal(await everyone(), 204);
+    assert.equal((await subscriptions()).length, 0);
+  });
+
   it('refuses a series that has ended', async () => {
     shows.get(100)!.status = 'Ended';
     const res = await call('POST');

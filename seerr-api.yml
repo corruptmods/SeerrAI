@@ -531,6 +531,20 @@ components:
         fromSeason:
           type: number
           example: 4
+        othersFollow:
+          type: boolean
+          description: Someone else gets new seasons of this series, so they come whoever is looking. Left out when nobody else does.
+          example: true
+        othersFrom:
+          type: number
+          description: The next season due for the others.
+          example: 4
+        others:
+          type: array
+          description: Who the others are. Only for those who can manage requests.
+          items:
+            type: string
+          example: ['Jo']
       required:
         - following
     AiSettingsInput:
@@ -15288,7 +15302,7 @@ paths:
           example: 76479
     get:
       summary: Whether the current user gets new seasons of a series
-      description: Returns whether each new season of this series is requested for the current user as it premieres, and which season is next.
+      description: Returns whether each new season of this series is requested for the current user as it premieres, and which season is next. Also whether anyone else gets them; someone who can manage requests sees who.
       tags:
         - tv
       responses:
@@ -15316,11 +15330,20 @@ paths:
           description: The user cannot request series
     delete:
       summary: Stop getting new seasons of a series
+      description: Stops it for the current user, or with everyone=true, for everyone who follows the series (for those who can manage requests).
       tags:
         - tv
+      parameters:
+        - in: query
+          name: everyone
+          required: false
+          schema:
+            type: boolean
       responses:
         '204':
           description: No longer following
+        '403':
+          description: Stopping it for everyone needs the Manage Requests permission
   /tv/{tvId}/ratings:
     get:
       summary: Get TV ratings

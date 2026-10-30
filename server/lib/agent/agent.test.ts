@@ -2930,6 +2930,100 @@ describe('the admin agent keeping its conversations whole', () => {
     assert.equal((await waitForRun(run.id)).status, 'done');
   });
 
+  it('tries again while the AI service cannot be reached, and carries on once it answers', async () => {
+    const waits = agent.outageWaitsMs;
+    agent.outageWaitsMs = [0, 0];
+    const unreachable = () => {
+      throw new axios.AxiosError('connect ECONNREFUSED', 'ECONNREFUSED');
+    };
+    try {
+      // Twice it can't be reached; the third try answers.
+      script = [
+        unreachable,
+        unreachable,
+        () => toolUse('find_title', { query: 'wendle' }, 'o1'),
+        () => say('Found it.'),
+      ];
+      const run = await agent.ask('Find Wendle', await admin());
+      const done = await waitForRun(run.id);
+      assert.equal(done.status, 'done', done.error ?? '');
+      assert.equal(
+        done.steps.filter((s) => /Trying again in 0 seconds/.test(s.text))
+          .length,
+        2
+      );
+
+      // Down for longer than it waits: it fails, to be picked up later.
+      script = [unreachable, unreachable, unreachable];
+      const lost = await agent.ask('Find Wendle again', await admin());
+      const failed = await waitForRun(lost.id);
+      assert.equal(failed.status, 'failed');
+      assert.match(failed.error ?? '', /carries on by itself/);
+
+      // Still down: nothing happens.
+      const models: string[] = [];
+      let up = false;
+      mock.method(axios, 'get', async (url: string) => {
+        models.push(url);
+        if (!up) unreachable();
+        return { data: { data: [] } };
+      });
+      const now = Date.now();
+      await agent.checkOutages(now);
+      assert.deepEqual(models, [`${ANTHROPIC_URL}/models`]);
+      assert.equal(
+        (await getRepository(AgentRun).findOneByOrFail({ id: lost.id })).status,
+        'failed'
+      );
+      await agent.checkOutages(now + 60_000);
+      assert.equal(models.length, 1, 'asked again only after a while');
+
+      // It answers again: the run carries on from where it was.
+      up = true;
+      script = [
+        (body) => {
+          const messages = body.messages as { role: string }[];
+          assert.equal(messages[messages.length - 1].role, 'user');
+          return say('Found it this time.');
+        },
+      ];
+      await agent.checkOutages(now + 10 * 60_000);
+      const resumed = await waitForRun(lost.id);
+      assert.equal(resumed.status, 'done', resumed.error ?? '');
+      assert.equal(resumed.summary, 'Found it this time.');
+      assert.ok(
+        resumed.steps.some((s) => /answers again/.test(s.text)),
+        'says why it carried on'
+      );
+    } finally {
+      agent.outageWaitsMs = waits;
+    }
+  });
+
+  it('gives up waiting for the AI service after a day', async () => {
+    const run = await getRepository(AgentRun).save(
+      new AgentRun({
+        trigger: 'ask',
+        status: 'failed',
+        ask: 'Find Wendle',
+        finishedAt: new Date(),
+        memory: {
+          outage: {
+            since: new Date(Date.now() - 25 * 60 * 60_000).toISOString(),
+          },
+        },
+        steps: [],
+        actions: [],
+        conversation: [{ role: 'user', text: 'Find Wendle' }],
+      })
+    );
+    mock.method(axios, 'get', async () => ({ data: { data: [] } }));
+    await agent.checkOutages(Date.now() + 60 * 60_000);
+    const after = await getRepository(AgentRun).findOneByOrFail({ id: run.id });
+    assert.equal(after.status, 'failed');
+    assert.equal((after.memory as { outage?: unknown }).outage, undefined);
+  });
+
   it('mends a conversation saved with a call left unanswered', async () => {
     const run = await getRepository(AgentRun).save(
       new AgentRun({

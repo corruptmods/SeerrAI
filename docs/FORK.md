@@ -10,12 +10,19 @@ merged back in.
 there, or to cherry-pick a fix worth having. Nothing is expected to merge
 cleanly, and nothing has to.
 
-Upstream `develop` has been read through `84eae6727` (27 October 2026).
+Upstream `develop` has been read through `c0759ce07` (29 October 2026).
 Its two security advisories there are covered: GHSA-xc6j-6p6h-p799 (other
 people's details and issues in a title's media info) by `mediaForViewer`,
 done here before upstream's fix; GHSA-8j73-j6rc-q8xh (notification
 credentials in every embedded user) by `User.toJSON`. Start the next read
 from that commit.
+
+From `84eae6727` to `c0759ce07`: dependency updates only. Taken: axios
+1.21.0, express-rate-limit 8.7.1, nodemailer 10.2.1 and Cypress 16.2.0
+(Next.js was already 16.4.2). Cypress pins a vulnerable systeminformation
+and supertest an old qs, so both are overridden past their advisories.
+Not taken yet: sqlite3 v6 (#3662), and the slimmer Docker image (#3615),
+whose Dockerfile and next.config differ here; each needs its own look.
 
 From `62ed636b0` to `84eae6727`: #3652 is taken, reworked for several
 media servers: the owner signing in with Plex before any media server is

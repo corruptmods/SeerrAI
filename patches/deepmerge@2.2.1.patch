@@ -1,0 +1,108 @@
+diff --git a/dist/cjs.js b/dist/cjs.js
+index 537777ae2763a66d61854abb7a4753bb3899c26a..4a93b55607b4109b91116cbdf0e68f8fdcb5b396 100644
+--- a/dist/cjs.js
++++ b/dist/cjs.js
+@@ -52,14 +52,22 @@ function defaultArrayMerge(target, source, optionsArgument) {
+ 	return destination
+ }
+ 
++// A __proto__ key, which an object parsed from JSON can carry as its own,
++// is skipped: written to a plain object it changes its prototype.
+ function mergeObject(target, source, optionsArgument) {
+ 	var destination = {};
+ 	if (isMergeableObject(target)) {
+ 		Object.keys(target).forEach(function(key) {
++		if (key === '__proto__') {
++			return
++		}
+ 			destination[key] = cloneUnlessOtherwiseSpecified(target[key], optionsArgument);
+ 		});
+ 	}
+ 	Object.keys(source).forEach(function(key) {
++		if (key === '__proto__') {
++			return
++		}
+ 		if (!isMergeableObject(source[key]) || !target[key]) {
+ 			destination[key] = cloneUnlessOtherwiseSpecified(source[key], optionsArgument);
+ 		} else {
+diff --git a/dist/es.js b/dist/es.js
+index c7c62253d21876e1390c3bf07cad23950d17ef07..a719e16007f2e9bdbfcf3a5f61febebb1242ea4c 100644
+--- a/dist/es.js
++++ b/dist/es.js
+@@ -39,14 +39,22 @@ function defaultArrayMerge(target, source, options) {
+ 	})
+ }
+ 
++// A __proto__ key, which an object parsed from JSON can carry as its own,
++// is skipped: written to a plain object it changes its prototype.
+ function mergeObject(target, source, options) {
+ 	var destination = {};
+ 	if (options.isMergeableObject(target)) {
+ 		Object.keys(target).forEach(function(key) {
++		if (key === '__proto__') {
++			return
++		}
+ 			destination[key] = cloneUnlessOtherwiseSpecified(target[key], options);
+ 		});
+ 	}
+ 	Object.keys(source).forEach(function(key) {
++		if (key === '__proto__') {
++			return
++		}
+ 		if (!options.isMergeableObject(source[key]) || !target[key]) {
+ 			destination[key] = cloneUnlessOtherwiseSpecified(source[key], options);
+ 		} else {
+diff --git a/dist/umd.js b/dist/umd.js
+index 172344d709c32f01315cd5640de2caaa1b874338..27890b87e3dc544c48d0be604502c2ccc6659f56 100644
+--- a/dist/umd.js
++++ b/dist/umd.js
+@@ -45,14 +45,22 @@ function defaultArrayMerge(target, source, options) {
+ 	})
+ }
+ 
++// A __proto__ key, which an object parsed from JSON can carry as its own,
++// is skipped: written to a plain object it changes its prototype.
+ function mergeObject(target, source, options) {
+ 	var destination = {};
+ 	if (options.isMergeableObject(target)) {
+ 		Object.keys(target).forEach(function(key) {
++		if (key === '__proto__') {
++			return
++		}
+ 			destination[key] = cloneUnlessOtherwiseSpecified(target[key], options);
+ 		});
+ 	}
+ 	Object.keys(source).forEach(function(key) {
++		if (key === '__proto__') {
++			return
++		}
+ 		if (!options.isMergeableObject(source[key]) || !target[key]) {
+ 			destination[key] = cloneUnlessOtherwiseSpecified(source[key], options);
+ 		} else {
+diff --git a/index.js b/index.js
+index e4e6c5d2a9f34485fca7878a5a25d30165b6d15b..f5a73105902e8c5923cd1fdb2a23ca6214c05bd8 100644
+--- a/index.js
++++ b/index.js
+@@ -16,14 +16,22 @@ function defaultArrayMerge(target, source, options) {
+ 	})
+ }
+ 
++// A __proto__ key, which an object parsed from JSON can carry as its own,
++// is skipped: written to a plain object it changes its prototype.
+ function mergeObject(target, source, options) {
+ 	var destination = {}
+ 	if (options.isMergeableObject(target)) {
+ 		Object.keys(target).forEach(function(key) {
++		if (key === '__proto__') {
++			return
++		}
+ 			destination[key] = cloneUnlessOtherwiseSpecified(target[key], options)
+ 		})
+ 	}
+ 	Object.keys(source).forEach(function(key) {
++		if (key === '__proto__') {
++			return
++		}
+ 		if (!options.isMergeableObject(source[key]) || !target[key]) {
+ 			destination[key] = cloneUnlessOtherwiseSpecified(source[key], options)
+ 		} else {

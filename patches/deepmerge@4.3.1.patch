@@ -1,0 +1,90 @@
+diff --git a/dist/cjs.js b/dist/cjs.js
+index 7c36cbdd06cc22c92d590be3f87a08a91ca06b40..186f26d8d321c2e9a88bc6461c27f60fd0664ede 100644
+--- a/dist/cjs.js
++++ b/dist/cjs.js
+@@ -76,15 +76,24 @@ function propertyIsUnsafe(target, key) {
+ 			&& Object.propertyIsEnumerable.call(target, key)) // and also unsafe if they're nonenumerable.
+ }
+ 
++// A key that, written to a plain object, changes its prototype instead of
++// adding a property: an object parsed from JSON can carry one as its own.
++function keyIsPrototype(key) {
++	return key === '__proto__'
++}
++
+ function mergeObject(target, source, options) {
+ 	var destination = {};
+ 	if (options.isMergeableObject(target)) {
+ 		getKeys(target).forEach(function(key) {
++			if (keyIsPrototype(key)) {
++				return
++			}
+ 			destination[key] = cloneUnlessOtherwiseSpecified(target[key], options);
+ 		});
+ 	}
+ 	getKeys(source).forEach(function(key) {
+-		if (propertyIsUnsafe(target, key)) {
++		if (keyIsPrototype(key) || propertyIsUnsafe(target, key)) {
+ 			return
+ 		}
+ 
+diff --git a/dist/umd.js b/dist/umd.js
+index 4071e7c56ec8e5273fe166f6e723ac460fab8b72..25b786f1992143a593869f001588e2670e0dd9c4 100644
+--- a/dist/umd.js
++++ b/dist/umd.js
+@@ -80,15 +80,24 @@
+ 				&& Object.propertyIsEnumerable.call(target, key)) // and also unsafe if they're nonenumerable.
+ 	}
+ 
++	// A key that, written to a plain object, changes its prototype instead of
++	// adding a property: an object parsed from JSON can carry one as its own.
++	function keyIsPrototype(key) {
++		return key === '__proto__'
++	}
++
+ 	function mergeObject(target, source, options) {
+ 		var destination = {};
+ 		if (options.isMergeableObject(target)) {
+ 			getKeys(target).forEach(function(key) {
++				if (keyIsPrototype(key)) {
++					return
++				}
+ 				destination[key] = cloneUnlessOtherwiseSpecified(target[key], options);
+ 			});
+ 		}
+ 		getKeys(source).forEach(function(key) {
+-			if (propertyIsUnsafe(target, key)) {
++			if (keyIsPrototype(key) || propertyIsUnsafe(target, key)) {
+ 				return
+ 			}
+ 
+diff --git a/index.js b/index.js
+index 77968aed5d456cccc294f60912ef381fa1e52a7b..a3dd120b161fac90b0eff992e3219a55c35e1b42 100644
+--- a/index.js
++++ b/index.js
+@@ -51,15 +51,24 @@ function propertyIsUnsafe(target, key) {
+ 			&& Object.propertyIsEnumerable.call(target, key)) // and also unsafe if they're nonenumerable.
+ }
+ 
++// A key that, written to a plain object, changes its prototype instead of
++// adding a property: an object parsed from JSON can carry one as its own.
++function keyIsPrototype(key) {
++	return key === '__proto__'
++}
++
+ function mergeObject(target, source, options) {
+ 	var destination = {}
+ 	if (options.isMergeableObject(target)) {
+ 		getKeys(target).forEach(function(key) {
++			if (keyIsPrototype(key)) {
++				return
++			}
+ 			destination[key] = cloneUnlessOtherwiseSpecified(target[key], options)
+ 		})
+ 	}
+ 	getKeys(source).forEach(function(key) {
+-		if (propertyIsUnsafe(target, key)) {
++		if (keyIsPrototype(key) || propertyIsUnsafe(target, key)) {
+ 			return
+ 		}
+ 

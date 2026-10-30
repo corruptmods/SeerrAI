@@ -21,8 +21,10 @@ From `84eae6727` to `c0759ce07`: dependency updates only. Taken: axios
 1.21.0, express-rate-limit 8.7.1, nodemailer 10.2.1 and Cypress 16.2.0
 (Next.js was already 16.4.2). Cypress pins a vulnerable systeminformation
 and supertest an old qs, so both are overridden past their advisories.
-Not taken yet: sqlite3 v6 (#3662), and the slimmer Docker image (#3615),
-whose Dockerfile and next.config differ here; each needs its own look.
+sqlite3 v6 (#3662) is taken: it comes as a ready-built binary for Alpine
+on x64 and arm64, and builds with node-gyp 12 where it doesn't, so the old
+node-gyp 8 and its @tootallnate/once override are gone. Not taken yet: the
+slimmer Docker image (#3615), whose Dockerfile and next.config differ here.
 
 From `62ed636b0` to `84eae6727`: #3652 is taken, reworked for several
 media servers: the owner signing in with Plex before any media server is
@@ -276,11 +278,18 @@ below it on its own (`pnpm why <package>`).
 | `ip-address >=10.7.3` | The ip-address advisories up to 10.7.0 (subnet checks across address families, leading-zero octets) | Only through node-gyp's proxy support, while sqlite3 is built |
 
 `compression` is a direct dependency, held at 1.8.2 for
-[CVE-2026-87776](https://github.com/advisories/GHSA-vc2v-76pw-4v95). Two advisories are knowingly
+[CVE-2026-87776](https://github.com/advisories/GHSA-vc2v-76pw-4v95). One advisory is knowingly
 left: [CVE-2026-93748](https://github.com/advisories/GHSA-ch52-4w7c-c8xp) (http-cache-semantics, no
-fixed version) and [CVE-2026-3449](https://github.com/advisories/GHSA-vpq2-c234-7xj6)
-(@tootallnate/once), both inside node-gyp, which only runs while sqlite3
-is built. The Node.js version is pinned by digest in the Dockerfiles;
+fixed version), inside node-gyp, which only runs if sqlite3 has to be
+built.
+
+deepmerge has no fixed release for
+[CVE-2026-93753](https://github.com/advisories/GHSA-gcqx-w48m-w2h4) (a `__proto__` key in what is
+merged sets the result's prototype). Seerr AI patches it instead
+(`patches/`, applied by pnpm on install): 4.3.1, which email templates use
+through html-to-text, and 2.2.1, which Formik uses, both skip that key. The
+audit can't see a patch, so the advisory is listed in `auditConfig` as
+handled. Drop the patch and that line once deepmerge releases a fix. The Node.js version is pinned by digest in the Dockerfiles;
 2.0.1 moved it to 22.23.4 for the October 2026 security release.
 
 ## Layout of the fork's own code

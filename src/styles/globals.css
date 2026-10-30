@@ -243,6 +243,27 @@
   }
 }
 
+/*
+ * A phone or tablet zooms the page in on a field whose text is smaller than
+ * 16px as soon as it's tapped, and leaves it zoomed. On a touch screen every
+ * field's text is at least that size, so it doesn't; pinching to zoom still
+ * works. Outside the layers, to win over any smaller text size a field is
+ * given. The search-as-you-type pickers are sized whole, so what's typed
+ * matches what's chosen.
+ */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not(
+      [type='button']
+    ):not([type='submit']):not([type='reset']):not([type='file']):not(
+      [type='color']
+    ):not([type='image']),
+  select,
+  textarea,
+  .react-select__control {
+    font-size: max(1rem, 16px) !important;
+  }
+}
+
 @layer components {
   .searchbar {
     padding-top: max(env(safe-area-inset-top), 0.75rem);

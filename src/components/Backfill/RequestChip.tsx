@@ -61,12 +61,15 @@ const BackfillRequestChip = ({ backfill }: { backfill: BackfillLookup }) => {
         {intl.formatMessage(messages.backfill)}
       </span>
       <div className="flex min-w-0 flex-wrap gap-1">
-        {backfill.workingRunId && (
+        {/* The admin agent looking is what's happening, in place of what
+            Backfill's own search last found. */}
+        {backfill.workingRunId ? (
           <AiSearchingBadge runId={backfill.workingRunId} />
+        ) : (
+          <Badge badgeType={type} href={href}>
+            {text}
+          </Badge>
         )}
-        <Badge badgeType={type} href={href}>
-          {text}
-        </Badge>
       </div>
     </div>
   );
@@ -84,16 +87,19 @@ export const BackfillStatusLine = ({ status }: { status: BackfillStatus }) => {
         {intl.formatMessage(messages.lookingLabel)}
       </span>
       <div className="flex min-w-0 flex-wrap gap-1">
-        {status.agent && <AiSearchingBadge />}
-        <Badge
-          badgeType={status.state === 'downloading' ? 'primary' : 'default'}
-        >
-          {status.state === 'downloading'
-            ? intl.formatMessage(messages.foundElsewhere, {
-                progress: status.progress ?? 0,
-              })
-            : intl.formatMessage(messages.looking)}
-        </Badge>
+        {status.agent ? (
+          <AiSearchingBadge />
+        ) : (
+          <Badge
+            badgeType={status.state === 'downloading' ? 'primary' : 'default'}
+          >
+            {status.state === 'downloading'
+              ? intl.formatMessage(messages.foundElsewhere, {
+                  progress: status.progress ?? 0,
+                })
+              : intl.formatMessage(messages.looking)}
+          </Badge>
+        )}
       </div>
     </div>
   );

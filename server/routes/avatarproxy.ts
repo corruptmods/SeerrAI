@@ -14,6 +14,7 @@ import {
 } from '@server/lib/mediaServers';
 import logger from '@server/logger';
 import axios from 'axios';
+import type { Request, Response } from 'express';
 import { Router } from 'express';
 import gravatarUrl from 'gravatar-url';
 import { createHash } from 'node:crypto';
@@ -124,6 +125,103 @@ export async function checkAvatarChanged(
   }
 }
 
+/** Sends a picture from the avatar cache, or tells the browser its copy is still good. */
+const sendPicture = (
+  req: Request,
+  res: Response,
+  imageData: Awaited<ReturnType<ImageProxy['getImage']>>
+) => {
+  // A host that sends no ETag of its own (Jellyfin) would leave every
+  // avatar with the same empty one, and a browser asking whether its old
+  // picture is still good would always be told yes: the picture's own
+  // fingerprint stands in.
+  const etag = `"${
+    imageData.meta.etag || computeImageHash(imageData.imageBuffer)
+  }"`;
+  const headers = {
+    'Cache-Control': `public, max-age=${imageData.meta.curRevalidate}`,
+    ETag: etag,
+  };
+
+  if (etagMatches(req.headers['if-none-match'], etag) && !req.query.v) {
+    res.writeHead(304, headers);
+    return res.end();
+  }
+
+  res.writeHead(200, {
+    ...headers,
+    ...PICTURE_HEADERS,
+    'Content-Type': imageData.meta.contentType,
+    'Content-Length': imageData.imageBuffer.length,
+    'OS-Cache-Key': imageData.meta.cacheKey,
+    'OS-Cache-Status': imageData.meta.cacheMiss ? 'MISS' : 'HIT',
+  });
+  res.end(imageData.imageBuffer);
+};
+
+/**
+ * Sent when neither the picture nor the stand-in could be fetched: a plain
+ * silhouette, kept by the browser only a few minutes so the real picture is
+ * tried again soon.
+ */
+const SILHOUETTE = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#4b5563"/><circle cx="32" cy="25" r="11" fill="#9ca3af"/><path d="M12 56c2-11 10-17 20-17s18 6 20 17z" fill="#9ca3af"/></svg>'
+);
+const sendSilhouette = (res: Response) => {
+  res.writeHead(200, {
+    ...PICTURE_HEADERS,
+    'Cache-Control': 'public, max-age=300',
+    'Content-Type': 'image/svg+xml',
+    'Content-Length': SILHOUETTE.length,
+  });
+  res.end(SILHOUETTE);
+};
+
+/** The address of a Plex account's picture, by the id in it. */
+export const PLEX_AVATAR =
+  /^https:\/\/plex\.tv\/users\/([0-9a-f]{8,64})\/avatar(?:\?.*)?$/;
+
+/**
+ * A Plex account's picture, kept here: pages load it from Seerr AI, not each
+ * time from plex.tv, which doesn't always answer. Only the pictures of
+ * people with an account here, at the address Plex gave for them, are
+ * fetched; when plex.tv can't be reached, a stand-in picture is sent.
+ */
+router.get('/plex/:plexAvatarId', async (req, res, next) => {
+  const avatarId = req.params.plexAvatarId;
+  if (!/^[0-9a-f]{8,64}$/.test(avatarId)) {
+    return next({ status: 400, message: 'Provided URL is not a Plex avatar.' });
+  }
+  try {
+    const user = await getRepository(User)
+      .createQueryBuilder('user')
+      .select(['user.id', 'user.email', 'user.avatar'])
+      .where('user.avatar LIKE :address', {
+        address: `https://plex.tv/users/${avatarId}/avatar%`,
+      })
+      .getOne();
+    if (!user || !PLEX_AVATAR.test(user.avatar)) {
+      return next({ status: 404, message: 'No such avatar.' });
+    }
+    const avatarImageCache = initAvatarImageProxy();
+    const fallbackUrl = gravatarUrl(user.email || 'none', {
+      default: 'mm',
+      size: 200,
+    });
+    let imageData = await avatarImageCache.getImage(user.avatar, fallbackUrl);
+    if (imageData.meta.extension === 'json') {
+      imageData = await avatarImageCache.getImage(fallbackUrl);
+    }
+    return sendPicture(req, res, imageData);
+  } catch (e) {
+    logger.warn('Could not fetch a Plex avatar', { errorMessage: e.message });
+    if (!res.headersSent) {
+      return sendSilhouette(res);
+    }
+    next(e);
+  }
+});
+
 /**
  * A Jellyfin or Emby account's picture, by the account's id. The server is
  * the one whose column holds the id (people's stored avatar URLs carry only
@@ -146,9 +244,6 @@ router.get('/:jellyfinUserId', async (req, res, next) => {
   try {
     const avatarImageCache = initAvatarImageProxy();
 
-    const userEtag = req.headers['if-none-match'];
-
-    const versionParam = req.query.v;
     const accountId = req.params.jellyfinUserId;
 
     const users = await getRepository(User).find({
@@ -185,33 +280,7 @@ router.get('/:jellyfinUserId', async (req, res, next) => {
       imageData = await avatarImageCache.getImage(fallbackUrl);
     }
 
-    // A host that sends no ETag of its own (Jellyfin) would leave every
-    // avatar with the same empty one, and a browser asking whether its old
-    // picture is still good would always be told yes: the picture's own
-    // fingerprint stands in.
-    const etag = `"${
-      imageData.meta.etag || computeImageHash(imageData.imageBuffer)
-    }"`;
-    const headers = {
-      'Cache-Control': `public, max-age=${imageData.meta.curRevalidate}`,
-      ETag: etag,
-    };
-
-    if (etagMatches(userEtag, etag) && !versionParam) {
-      res.writeHead(304, headers);
-      return res.end();
-    }
-
-    res.writeHead(200, {
-      ...headers,
-      ...PICTURE_HEADERS,
-      'Content-Type': imageData.meta.contentType,
-      'Content-Length': imageData.imageBuffer.length,
-      'OS-Cache-Key': imageData.meta.cacheKey,
-      'OS-Cache-Status': imageData.meta.cacheMiss ? 'MISS' : 'HIT',
-    });
-
-    res.end(imageData.imageBuffer);
+    return sendPicture(req, res, imageData);
   } catch (e) {
     logger.error('Failed to proxy avatar image', { errorMessage: e.message });
     if (!res.headersSent) {

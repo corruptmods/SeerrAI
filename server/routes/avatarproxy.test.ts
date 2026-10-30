@@ -185,3 +185,51 @@ describe('avatars from Jellyfin and Emby', () => {
     assert.equal(saved.avatarVersion, 'emby-tag');
   });
 });
+
+describe('avatars from Plex', () => {
+  const PLEX = 'https://plex.tv/users/0a1b2c3d4e5f6071/avatar?c=1700000000';
+
+  it("serves someone's Plex picture from here, fetched from the address Plex gave", async () => {
+    await person({ email: 'plex@example.com', avatar: PLEX });
+    const res = await request(app).get(
+      '/avatarproxy/plex/0a1b2c3d4e5f6071?c=1700000000'
+    );
+    assert.equal(res.status, 200);
+    assert.equal(res.headers['content-type'], 'image/jpeg');
+    assert.deepEqual(asked, [PLEX]);
+  });
+
+  it('sends a plain silhouette, briefly, when neither plex.tv nor the stand-in answers', async (t) => {
+    await person({ email: 'plex@example.com', avatar: PLEX });
+    t.mock.method(ImageProxy.prototype, 'getImage', async () => {
+      throw new Error('Failed to load image');
+    });
+    const res = await request(app).get('/avatarproxy/plex/0a1b2c3d4e5f6071');
+    assert.equal(res.status, 200);
+    assert.equal(res.headers['content-type'], 'image/svg+xml');
+    assert.equal(res.headers['cache-control'], 'public, max-age=300');
+  });
+
+  it('fetches nothing for a Plex account no one here has', async () => {
+    const res = await request(app).get('/avatarproxy/plex/ffffffffffffffff');
+    assert.equal(res.status, 404);
+    assert.deepEqual(asked, []);
+  });
+
+  it('refuses anything that is not a Plex picture id', async () => {
+    const res = await request(app).get(
+      '/avatarproxy/plex/..%2F..%2Fetc%2Fpasswd'
+    );
+    assert.equal(res.status, 400);
+    assert.deepEqual(asked, []);
+  });
+
+  it('only matches the account whose id it is, not one that merely starts with it', async () => {
+    await person({
+      email: 'other@example.com',
+      avatar: 'https://plex.tv/users/0a1b2c3d4e5f6071ff/avatar?c=1',
+    });
+    const res = await request(app).get('/avatarproxy/plex/0a1b2c3d4e5f6071');
+    assert.equal(res.status, 404);
+  });
+});

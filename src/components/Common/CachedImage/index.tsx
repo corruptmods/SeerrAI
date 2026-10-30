@@ -9,6 +9,22 @@ import { useContext } from 'react';
 
 const imageLoader: ImageLoader = ({ src }) => src;
 
+const PLEX_AVATAR =
+  /^https:\/\/plex\.tv\/users\/([0-9a-f]{8,64})\/avatar(?:\?c=([0-9]+))?/;
+
+/**
+ * A Plex account's picture comes through Seerr AI, which keeps it, rather
+ * than from plex.tv each time, which doesn't always answer; Plex's version
+ * number stays on, so a new picture is fetched when it changes. Jellyfin and
+ * Emby pictures already come through it.
+ */
+export const avatarSrc = (src: string): string => {
+  const plex = PLEX_AVATAR.exec(src);
+  return plex
+    ? `/avatarproxy/plex/${plex[1]}${plex[2] ? `?c=${plex[2]}` : ''}`
+    : src;
+};
+
 export type CachedImageProps = ImageProps & {
   src: string;
   /**
@@ -42,8 +58,7 @@ const CachedImage = ({ src, type, ...props }: CachedImageProps) => {
   } else if (type === 'music') {
     imageUrl = musicImageSrc(src, currentSettings.cacheImages);
   } else if (type === 'avatar') {
-    // jellyfin avatar (if any)
-    imageUrl = src;
+    imageUrl = avatarSrc(src);
   } else {
     return null;
   }

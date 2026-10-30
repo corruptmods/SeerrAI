@@ -482,7 +482,11 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
             <span className="mr-2 hidden flex-none font-bold sm:block">
               {intl.formatMessage(globalMessages.status)}
             </span>
-            {requestData.status === MediaRequestStatus.DECLINED ? (
+            {/* While the admin agent looks for it, that is what's
+                happening, in place of the request's own status. */}
+            {aiSearching ? (
+              <AiSearchingBadge className="flex-none" />
+            ) : requestData.status === MediaRequestStatus.DECLINED ? (
               <Badge badgeType="danger">
                 {intl.formatMessage(globalMessages.declined)}
               </Badge>
@@ -521,7 +525,6 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
                 }
               />
             )}
-            {aiSearching && <AiSearchingBadge className="ml-1 flex-none" />}
           </div>
           {requestData.status === MediaRequestStatus.DECLINED &&
             requestData.declineReason && (

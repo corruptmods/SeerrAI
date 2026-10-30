@@ -116,9 +116,14 @@ const MediaLists = () => {
         <Header>{intl.formatMessage(messages.lists)}</Header>
       </div>
 
-      <div className="mb-6 flex max-w-lg items-center space-x-2">
+      {/*
+        On a phone the name gets a line of its own, so a long one can be
+        read as it's typed, with what the list holds and Create sharing the
+        next; on a wider screen, one line. Everything the same height.
+      */}
+      <div className="mb-6 grid max-w-2xl gap-2 sm:flex">
         <input
-          className="min-w-0 flex-1 rounded border-strong bg-field px-3 py-2 text-strong"
+          className="h-11 w-full min-w-0 rounded border-strong bg-field px-3 text-strong"
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -129,31 +134,34 @@ const MediaLists = () => {
           type="text"
           value={newName}
         />
-        {musicOn && (
-          <select
-            aria-label={intl.formatMessage(messages.kindLabel)}
-            className="w-auto flex-none"
-            onChange={(e) =>
-              setKind(e.target.value === 'music' ? 'music' : 'watch')
-            }
-            value={kind}
+        <div className="flex gap-2">
+          {musicOn && (
+            <select
+              aria-label={intl.formatMessage(messages.kindLabel)}
+              className="h-11 flex-1 py-0 sm:w-auto sm:flex-none"
+              onChange={(e) =>
+                setKind(e.target.value === 'music' ? 'music' : 'watch')
+              }
+              value={kind}
+            >
+              <option value="watch">
+                {intl.formatMessage(messages.kindWatch)}
+              </option>
+              <option value="music">
+                {intl.formatMessage(messages.kindMusic)}
+              </option>
+            </select>
+          )}
+          <Button
+            buttonType="primary"
+            className="h-11 flex-1 sm:flex-none"
+            disabled={!newName.trim() || isCreating}
+            onClick={create}
           >
-            <option value="watch">
-              {intl.formatMessage(messages.kindWatch)}
-            </option>
-            <option value="music">
-              {intl.formatMessage(messages.kindMusic)}
-            </option>
-          </select>
-        )}
-        <Button
-          buttonType="primary"
-          disabled={!newName.trim() || isCreating}
-          onClick={create}
-        >
-          <PlusIcon />
-          <span>{intl.formatMessage(messages.createlist)}</span>
-        </Button>
+            <PlusIcon />
+            <span>{intl.formatMessage(messages.createlist)}</span>
+          </Button>
+        </div>
       </div>
 
       {lists?.length ? (

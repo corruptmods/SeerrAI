@@ -5769,6 +5769,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BackfillAnswer'
+  /settings/backfill/prowlarr:
+    get:
+      summary: "Prowlarr's connection, without its API key"
+      tags:
+        - settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+    put:
+      summary: "Save Prowlarr's connection"
+      description: 'Tested first. A blank API key keeps the saved one; a blank address removes it, unless Backfill is on.'
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hostname:
+                  type: string
+                port:
+                  type: number
+                useSsl:
+                  type: boolean
+                urlBase:
+                  type: string
+                apiKey:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
   /settings/backfill/blocked-groups:
     post:
       summary: 'Block or unblock a release group'

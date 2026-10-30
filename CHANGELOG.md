@@ -12,6 +12,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - The list Import says when a Trakt link can be pasted, and Settings → Services says what Trakt's Client ID is for.
 - **"AI searching"**: while the admin agent looks for a title, its request card, the requests list and the title page's Backfill box say so, instead of "Nothing found". For admins it opens the agent's conversation, which now has a link back to the title's page.
 - A downloading pill opens the title's downloads, not Plex (Play is in its details), and fits on a request card, cutting its words short rather than running off the edge.
+- **Prowlarr moved to Settings → Services**, beside the other services. Backfill's settings say whether it is set up, and Backfill can't be turned on without it. Nothing needs setting up again.
 - Backfill shows a long wait in days: "31 d 2 h", not "746 h 0 min".
 
 ## 2.2.1 (27 October 2026)

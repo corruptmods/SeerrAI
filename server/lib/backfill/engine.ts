@@ -1311,7 +1311,7 @@ class Backfill {
     const problem = !backfill.enabled
       ? 'Backfill is turned off in Settings → Backfill.'
       : !prowlarr
-        ? 'Prowlarr is not set up in Settings → Backfill.'
+        ? 'Prowlarr is not set up in Settings → Services.'
         : !torrent && !usenet
           ? 'No download client is chosen in Settings → Backfill.'
           : !settings.sonarr.length &&

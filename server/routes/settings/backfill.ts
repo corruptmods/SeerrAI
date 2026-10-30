@@ -10,24 +10,29 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 /*
- * Backfill's settings. Prowlarr's API key is never sent back; a blank one
- * keeps the saved key, but only for the same address, so the key can't be
- * sent somewhere new. With Backfill on, Prowlarr is tested before saving.
+ * Backfill's settings. Prowlarr's connection is kept with them, and set
+ * apart from them in Settings → Services (/prowlarr); the Backfill form
+ * leaves it out, and the saved one stays. Prowlarr's API key is never sent
+ * back; a blank one keeps the saved key, but only for the same address, so
+ * the key can't be sent somewhere new. With Backfill on, Prowlarr is tested
+ * before saving.
  */
 const backfillSettingsRoutes = Router();
 
+const prowlarrBody = z.object({
+  hostname: z
+    .string()
+    .trim()
+    .regex(/^[^\s/:]*$/),
+  port: z.coerce.number().int().min(1).max(65535),
+  useSsl: z.boolean().default(false),
+  urlBase: z.string().trim().default(''),
+  apiKey: z.string().default(''),
+});
+
 const body = z.object({
   enabled: z.boolean(),
-  prowlarr: z.object({
-    hostname: z
-      .string()
-      .trim()
-      .regex(/^[^\s/:]*$/),
-    port: z.coerce.number().int().min(1).max(65535),
-    useSsl: z.boolean().default(false),
-    urlBase: z.string().trim().default(''),
-    apiKey: z.string().default(''),
-  }),
+  prowlarr: prowlarrBody.optional(),
   torrentClientId: z.number().int().nullable(),
   usenetClientId: z.number().int().nullable(),
   category: z
@@ -83,25 +88,29 @@ const body = z.object({
 
 const shown = (settings: BackfillSettings) => ({
   ...settings,
-  prowlarr: {
-    ...settings.prowlarr,
-    apiKey: '',
-    hasApiKey: !!settings.prowlarr.apiKey,
-  },
+  prowlarr: prowlarrShown(settings.prowlarr),
   torrentClients: backfill.clientsFor('torrent'),
   usenetClients: backfill.clientsFor('usenet'),
 });
 
-type ProwlarrBody = z.infer<typeof body>['prowlarr'];
+type ProwlarrBody = z.infer<typeof prowlarrBody>;
 
 const keyFor = (prowlarr: ProwlarrBody): string => {
   const saved = getSettings().backfill.prowlarr;
   return keptSecret(prowlarr.apiKey, prowlarr, saved, saved.apiKey);
 };
 
+const prowlarrShown = (prowlarr: BackfillSettings['prowlarr']) => ({
+  ...prowlarr,
+  apiKey: '',
+  hasApiKey: !!prowlarr.apiKey,
+});
+
 const withKey = (data: z.infer<typeof body>): BackfillSettings => ({
   ...data,
-  prowlarr: { ...data.prowlarr, apiKey: keyFor(data.prowlarr) },
+  prowlarr: data.prowlarr
+    ? { ...data.prowlarr, apiKey: keyFor(data.prowlarr) }
+    : getSettings().backfill.prowlarr,
   // Changed only through /blocked-groups and /download-check.
   blockedGroups: getSettings().backfill.blockedGroups,
   downloadCheck: getSettings().backfill.downloadCheck,
@@ -130,7 +139,7 @@ backfillSettingsRoutes.get('/', (_req, res) => {
 });
 
 backfillSettingsRoutes.post('/test', async (req, res, next) => {
-  const parsed = body.shape.prowlarr.safeParse(req.body);
+  const parsed = prowlarrBody.safeParse(req.body);
   if (!parsed.success || !parsed.data.hostname) {
     return next({ status: 400, message: 'Check the Prowlarr details.' });
   }
@@ -176,7 +185,8 @@ backfillSettingsRoutes.put('/', async (req, res, next) => {
     if (!next_.prowlarr.hostname || !next_.prowlarr.apiKey) {
       return next({
         status: 400,
-        message: 'Backfill needs Prowlarr’s address and API key.',
+        message:
+          'Backfill needs Prowlarr. Set it up in Settings → Services first.',
       });
     }
     try {
@@ -189,6 +199,49 @@ backfillSettingsRoutes.put('/', async (req, res, next) => {
   settings.backfill = next_;
   await settings.save();
   return res.status(200).json(shown(next_));
+});
+
+/** Prowlarr's connection, for Settings → Services, without its API key. */
+backfillSettingsRoutes.get('/prowlarr', (_req, res) => {
+  res.status(200).json(prowlarrShown(getSettings().backfill.prowlarr));
+});
+
+/**
+ * Saves Prowlarr's connection, once Prowlarr answers. A blank address
+ * removes it, unless Backfill is on, which can't run without it.
+ */
+backfillSettingsRoutes.put('/prowlarr', async (req, res, next) => {
+  const parsed = prowlarrBody.safeParse(req.body);
+  if (!parsed.success) {
+    return next({ status: 400, message: 'Check the Prowlarr details.' });
+  }
+  const settings = getSettings();
+  if (!parsed.data.hostname) {
+    if (settings.backfill.enabled) {
+      return next({
+        status: 400,
+        message: 'Backfill is on and needs Prowlarr. Turn Backfill off first.',
+      });
+    }
+    settings.backfill = {
+      ...settings.backfill,
+      prowlarr: { ...parsed.data, apiKey: '' },
+    };
+    await settings.save();
+    return res.status(200).json(prowlarrShown(settings.backfill.prowlarr));
+  }
+  const prowlarr = { ...parsed.data, apiKey: keyFor(parsed.data) };
+  if (!prowlarr.apiKey) {
+    return next({ status: 400, message: 'Enter Prowlarr’s API key.' });
+  }
+  try {
+    await new ProwlarrAPI(prowlarr).getVersion();
+  } catch (e) {
+    return next(prowlarrFailed(e));
+  }
+  settings.backfill = { ...settings.backfill, prowlarr };
+  await settings.save();
+  return res.status(200).json(prowlarrShown(prowlarr));
 });
 
 /**

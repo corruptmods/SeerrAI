@@ -139,7 +139,7 @@ None of these is required; each feature finds what it needs once it's connected.
 | **Tautulli** (Settings → Services, Plex only) | Suggested for You, "up next", Who Watched, Pick for the Room, Catch Me Up. Jellyfin and Emby need nothing |
 | **Lidarr** (Settings → Services) | [Music](./music.md) |
 | **Download clients** (Settings → Services → Download Clients) | Live progress, and Backfill |
-| **Prowlarr** (Settings → Backfill) | Backfill |
+| **Prowlarr** (Settings → Services) | Backfill, and songs taken from albums |
 | **Bazarr** (Settings → Services) | Subtitles and transcription |
 | **Maintainerr** (Settings → Services) | Deleting Soon and Keep |
 | **An AI provider** (Settings → AI) | The AI features and the admin agent |

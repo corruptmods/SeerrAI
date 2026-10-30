@@ -94,9 +94,9 @@ const messages = defineMessages('components.Settings.SettingsGuide', {
   settingsUsers:
     'Users: who may request, and whose requests are approved on their own.',
   settingsServices:
-    'Services: Radarr, Sonarr, Lidarr, Bazarr, Tautulli, Maintainerr and the download clients.',
+    'Services: Radarr, Sonarr, Lidarr, Prowlarr, Bazarr, Tautulli, Maintainerr and the download clients.',
   settingsBackfill:
-    'Backfill: Prowlarr, the download client, when a title counts as stuck, and what’s approved automatically.',
+    'Backfill: the download client, when a title counts as stuck, and what’s approved automatically. Prowlarr is in Services.',
   settingsAi:
     'AI: the provider and model behind the AI features, and a daily limit per person.',
   settingsNotifications:

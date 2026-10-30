@@ -13,6 +13,7 @@ import SettingsBazarr from '@app/components/Settings/SettingsBazarr';
 import SettingsDownloadClients from '@app/components/Settings/SettingsDownloadClients';
 import SettingsLidarr from '@app/components/Settings/SettingsLidarr';
 import SettingsMaintainerr from '@app/components/Settings/SettingsMaintainerr';
+import SettingsProwlarr from '@app/components/Settings/SettingsProwlarr';
 import SettingsTautulli from '@app/components/Settings/SettingsTautulli';
 import SettingsTrakt from '@app/components/Settings/SettingsTrakt';
 import SonarrModal from '@app/components/Settings/SonarrModal';
@@ -441,6 +442,7 @@ const SettingsServices = () => {
         />
       )}
       <SettingsMaintainerr />
+      <SettingsProwlarr />
       <SettingsDownloadClients />
       <SettingsBazarr />
       <SettingsTrakt />

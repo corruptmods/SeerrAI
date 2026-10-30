@@ -1,7 +1,6 @@
 import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
-import SensitiveInput from '@app/components/Common/SensitiveInput';
 import AdvancedSection from '@app/components/Settings/AdvancedSection';
 import BlockedGroups from '@app/components/Settings/SettingsBackfill/BlockedGroups';
 import DownloadCheck from '@app/components/Settings/SettingsBackfill/DownloadCheck';
@@ -9,12 +8,11 @@ import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import { ArrowDownOnSquareIcon, BeakerIcon } from '@heroicons/react/24/outline';
+import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
 import type { BackfillSettings } from '@server/lib/settings';
 import axios from 'axios';
 import { Field, Form, Formik } from 'formik';
 import Link from 'next/link';
-import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
@@ -25,16 +23,10 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
   enabled: 'Enable Backfill',
   enabledTip: 'Scans run on a schedule (Settings → Jobs & Cache).',
   prowlarr: 'Prowlarr',
-  hostname: 'Hostname or IP address',
-  port: 'Port',
-  ssl: 'Use SSL',
-  urlBase: 'URL base',
-  apiKey: 'API key',
-  apiKeySaved: 'Saved; leave blank to keep it',
-  test: 'Test',
-  testing: 'Testing…',
-  testOk: 'Prowlarr {version} answered.',
-  testFailed: 'Could not reach Prowlarr.',
+  prowlarrAt:
+    'Searches Prowlarr at {address}. <ServicesLink>Change it in Services</ServicesLink>.',
+  prowlarrMissing:
+    'Backfill needs Prowlarr. <ServicesLink>Set it up in Settings → Services</ServicesLink> first.',
   downloads: 'Downloads',
   torrentClient: 'Torrent packs go to',
   usenetClient: 'Usenet packs go to',
@@ -125,8 +117,6 @@ const SettingsBackfill = () => {
   const musicReady = !!currentSettings.musicReady;
   const { addToast } = useToasts();
   const { data, error, mutate } = useSWR<Shown>('/api/v1/settings/backfill');
-  const [test, setTest] = useState<{ ok: boolean; text: string }>();
-  const [testing, setTesting] = useState(false);
 
   if (!data && !error) return <LoadingSpinner />;
   if (!data) {
@@ -136,6 +126,11 @@ const SettingsBackfill = () => {
   }
 
   const noClients = !data.torrentClients.length && !data.usenetClients.length;
+  // Prowlarr is set up in Services; here, only whether it is.
+  const prowlarrReady = !!data.prowlarr.hostname && data.prowlarr.hasApiKey;
+  const prowlarrAddress = `${data.prowlarr.useSsl ? 'https' : 'http'}://${
+    data.prowlarr.hostname
+  }:${data.prowlarr.port}${data.prowlarr.urlBase}`;
 
   return (
     <>
@@ -162,13 +157,6 @@ const SettingsBackfill = () => {
           try {
             await axios.put('/api/v1/settings/backfill', {
               enabled: values.enabled,
-              prowlarr: {
-                hostname: values.prowlarr.hostname,
-                port: Number(values.prowlarr.port),
-                useSsl: values.prowlarr.useSsl,
-                urlBase: values.prowlarr.urlBase,
-                apiKey: values.prowlarr.apiKey,
-              },
               torrentClientId:
                 values.torrentClientId === ''
                   ? null
@@ -232,38 +220,6 @@ const SettingsBackfill = () => {
               onChange={() => setFieldValue(name, !value)}
             />
           );
-          const runTest = async () => {
-            setTesting(true);
-            setTest(undefined);
-            try {
-              const { data: answer } = await axios.post<{ version: string }>(
-                '/api/v1/settings/backfill/test',
-                {
-                  hostname: values.prowlarr.hostname,
-                  port: Number(values.prowlarr.port),
-                  useSsl: values.prowlarr.useSsl,
-                  urlBase: values.prowlarr.urlBase,
-                  apiKey: values.prowlarr.apiKey,
-                }
-              );
-              setTest({
-                ok: true,
-                text: intl.formatMessage(messages.testOk, {
-                  version: answer.version,
-                }),
-              });
-            } catch (e) {
-              setTest({
-                ok: false,
-                text:
-                  axios.isAxiosError(e) && e.response?.data?.message
-                    ? String(e.response.data.message)
-                    : intl.formatMessage(messages.testFailed),
-              });
-            } finally {
-              setTesting(false);
-            }
-          };
           return (
             <Form className="section">
               <div className="form-row">
@@ -281,100 +237,30 @@ const SettingsBackfill = () => {
               <h4 className="mt-8 text-lg font-semibold text-gray-200">
                 {intl.formatMessage(messages.prowlarr)}
               </h4>
-              <div className="form-row">
-                <label htmlFor="prowlarr.hostname" className="text-label">
-                  {intl.formatMessage(messages.hostname)}
-                </label>
-                <div className="form-input-area">
-                  <div className="form-input-field">
-                    <Field
-                      id="prowlarr.hostname"
-                      name="prowlarr.hostname"
-                      type="text"
-                      placeholder="prowlarr"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="form-row">
-                <label htmlFor="prowlarr.port" className="text-label">
-                  {intl.formatMessage(messages.port)}
-                </label>
-                <div className="form-input-area">
-                  <Field
-                    id="prowlarr.port"
-                    name="prowlarr.port"
-                    type="text"
-                    inputMode="numeric"
-                    className="short"
-                  />
-                </div>
-              </div>
-              <div className="form-row">
-                <label htmlFor="prowlarr.useSsl" className="checkbox-label">
-                  {intl.formatMessage(messages.ssl)}
-                </label>
-                <div className="form-input-area">
-                  {checkbox('prowlarr.useSsl', values.prowlarr.useSsl)}
-                </div>
-              </div>
-              <div className="form-row">
-                <label htmlFor="prowlarr.urlBase" className="text-label">
-                  {intl.formatMessage(messages.urlBase)}
-                </label>
-                <div className="form-input-area">
-                  <div className="form-input-field">
-                    <Field
-                      id="prowlarr.urlBase"
-                      name="prowlarr.urlBase"
-                      type="text"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="form-row">
-                <label htmlFor="prowlarr.apiKey" className="text-label">
-                  {intl.formatMessage(messages.apiKey)}
-                  {data.prowlarr.hasApiKey && (
-                    <span className="label-tip">
-                      {intl.formatMessage(messages.apiKeySaved)}
-                    </span>
-                  )}
-                </label>
-                <div className="form-input-area">
-                  <div className="form-input-field">
-                    <SensitiveInput
-                      as="field"
-                      id="prowlarr.apiKey"
-                      name="prowlarr.apiKey"
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <Button
-                      buttonType="warning"
-                      buttonSize="sm"
-                      type="button"
-                      disabled={testing || !values.prowlarr.hostname}
-                      onClick={runTest}
-                    >
-                      <BeakerIcon />
-                      <span>
-                        {intl.formatMessage(
-                          testing ? messages.testing : messages.test
-                        )}
-                      </span>
-                    </Button>
-                    {test && (
-                      <span
-                        className={`text-sm ${test.ok ? 'text-green-400' : 'text-red-400'}`}
+              <p
+                className={`mt-2 text-sm ${
+                  prowlarrReady
+                    ? 'text-gray-400'
+                    : 'text-yellow-300 light:text-warning-text'
+                }`}
+              >
+                {intl.formatMessage(
+                  prowlarrReady
+                    ? messages.prowlarrAt
+                    : messages.prowlarrMissing,
+                  {
+                    address: prowlarrAddress,
+                    ServicesLink: (msg: React.ReactNode) => (
+                      <Link
+                        href="/settings/services"
+                        className="text-indigo-400 hover:underline light:text-accent-text"
                       >
-                        {test.text}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
+                        {msg}
+                      </Link>
+                    ),
+                  }
+                )}
+              </p>
 
               <h4 className="mt-8 text-lg font-semibold text-gray-200">
                 {intl.formatMessage(messages.downloads)}

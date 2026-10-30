@@ -28,7 +28,7 @@ With music set up, Backfill follows albums too: those someone requested that Lid
 
 **Settings → Backfill**:
 
-- **Prowlarr**: address and API key.
+- **Prowlarr**: its address and API key are set in **Settings → Services**; Backfill's settings say whether it is set up. Backfill can't run without it.
 - **Downloads**: the client for torrent packs (qBittorrent, Transmission, Deluge or rTorrent) and for Usenet packs (SABnzbd or NZBGet), from **Settings → Services → Download Clients**, and the **category** Backfill uses, kept apart so Sonarr, Radarr and Lidarr don't import on their own.
 - **When a title is stuck**: hours since the last search, movies too, music too, and whether files below the cutoff count as gaps (packs that fill gaps still show their upgrades either way).
 - **Approval**: approve some packs automatically (only ones that fill what is missing and replace nothing on disk, score at least 700 and are at most 25 GB, by default), and **Replace failed downloads** (on by default): when a download fails or stalls, the next good pack is taken, searching again if need be until none is left; anything outside the limits waits for you.

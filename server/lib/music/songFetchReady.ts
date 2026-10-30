@@ -19,7 +19,7 @@ export const songFetchProblem = (): string | undefined => {
     !backfillSettings.prowlarr.hostname ||
     !backfillSettings.prowlarr.apiKey
   ) {
-    return 'Prowlarr is not set up in Settings → Backfill.';
+    return 'Prowlarr is not set up in Settings → Services.';
   }
   if (!clientFor('torrent') && !clientFor('usenet')) {
     return 'No download client is chosen in Settings → Backfill.';

@@ -5,7 +5,7 @@ import {
   releaseCoverPath,
 } from '@server/api/coverartarchive';
 import ListenBrainzAPI from '@server/api/listenbrainz';
-import TheAudioDb from '@server/api/theaudiodb';
+import TheAudioDb, { THE_AUDIO_DB_FREE_KEY } from '@server/api/theaudiodb';
 import cacheManager from '@server/lib/cache';
 import type { AxiosInstance } from 'axios';
 import assert from 'node:assert/strict';
@@ -120,6 +120,26 @@ describe('TheAudioDB', () => {
       '/key/artist-mb.php',
       { params: { i: ARTIST } },
     ]);
+  });
+
+  it('asks with the free key no more than 20 times a minute', async () => {
+    const tadb = new TheAudioDb(THE_AUDIO_DB_FREE_KEY);
+    const get = mock.method(getAxios(tadb), 'get', async () => ({
+      data: { artists: null },
+    }));
+    mock.timers.enable({ apis: ['Date'], now: Date.now() });
+    const answers = [];
+    for (let i = 0; i < 21; i++) {
+      answers.push(await tadb.getArtistPictures(ARTIST));
+    }
+    assert.equal(get.mock.callCount(), 20);
+    assert.equal(answers.at(-1), null, 'could not be asked, so not kept');
+    mock.timers.tick(60_000);
+    assert.deepEqual(await tadb.getArtistPictures(ARTIST), {
+      thumb: null,
+      fanart: null,
+    });
+    mock.timers.reset();
   });
 
   it('has no pictures for an artist it does not know, and cannot say when down', async () => {

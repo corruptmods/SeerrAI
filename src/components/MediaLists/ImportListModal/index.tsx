@@ -3,6 +3,7 @@ import PosterBackground from '@app/components/Common/PosterBackground';
 import { RESOLVE_BATCH_SIZE, SEARCH_BATCH_SIZE } from '@app/constants/lists';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
+import { Permission, useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
@@ -12,9 +13,14 @@ import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.MediaLists.ImportListModal', {
   title: 'Import a written list',
+  titleTrakt: 'Import titles or a Trakt list',
   instructions:
     'Paste your list below — one title per line. Bullets, numbering and years are fine.',
   placeholder: 'The Matrix (1999)\nPractical Magic\nPerson of Interest',
+  placeholderTrakt:
+    'The Matrix (1999)\nPractical Magic\nPerson of Interest\n\nor a Trakt link, like\nhttps://trakt.tv/users/name/lists/favorites',
+  traktAdminHint:
+    'Trakt links work here once Trakt has a Client ID in Settings → Services.',
   find: 'Find matches',
   review: 'Check these matches before adding them.',
   nomatch: 'No match found',
@@ -84,6 +90,8 @@ const ImportListModal = ({
   const intl = useIntl();
   const { addToast } = useToasts();
   const { currentSettings } = useSettings();
+  const { hasPermission } = useUser();
+  const trakt = !!currentSettings.traktReady;
   const [text, setText] = useState('');
   const [fromTrakt, setFromTrakt] = useState(false);
   const [results, setResults] = useState<LineResult[] | null>(null);
@@ -343,7 +351,7 @@ const ImportListModal = ({
         onSecondary={results ? () => setResults(null) : undefined}
         secondaryButtonType="default"
         secondaryText={results ? intl.formatMessage(messages.back) : undefined}
-        title={intl.formatMessage(messages.title)}
+        title={intl.formatMessage(trakt ? messages.titleTrakt : messages.title)}
       >
         {error && (
           <p className="mb-3 rounded bg-red-900/40 px-3 py-2 text-sm text-red-200">
@@ -355,15 +363,20 @@ const ImportListModal = ({
           <>
             <p className="mb-2 text-sm text-gray-300">
               {intl.formatMessage(
-                currentSettings.traktReady
-                  ? messages.instructionsTrakt
-                  : messages.instructions
+                trakt ? messages.instructionsTrakt : messages.instructions
               )}
             </p>
+            {!trakt && hasPermission(Permission.ADMIN) && (
+              <p className="mb-2 text-xs text-gray-400">
+                {intl.formatMessage(messages.traktAdminHint)}
+              </p>
+            )}
             <textarea
               className="h-48 w-full rounded border-gray-600 bg-gray-700 p-3 font-mono text-sm text-white"
               onChange={(e) => setText(e.target.value)}
-              placeholder={intl.formatMessage(messages.placeholder)}
+              placeholder={intl.formatMessage(
+                trakt ? messages.placeholderTrakt : messages.placeholder
+              )}
               value={text}
             />
 

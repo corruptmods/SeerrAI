@@ -20,7 +20,7 @@ export const messages = defineMessages('components.Settings.SettingsMusic', {
     'The New Music row on Discover, from ListenBrainz, and the Top Songs, Trending Songs, Top Albums and Top Artists rows, from Apple Music’s charts.',
   theAudioDbApiKey: 'TheAudioDB API Key',
   theAudioDbApiKeyTip:
-    'Optional: pictures of artists Lidarr has none of. A key comes with a TheAudioDB supporter account.',
+    'Optional. Pictures of artists Lidarr has none of come from TheAudioDB’s free key; a supporter account’s key is used instead when entered.',
   theAudioDbSaved: 'A key is saved. Leave blank to keep it.',
   removeKey: 'Remove the saved key',
   maxAlbumsPerRequest: 'Most Albums in One Request',

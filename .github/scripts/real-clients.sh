@@ -69,8 +69,14 @@ run transmission lscr.io/linuxserver/transmission:latest -e USER=transuser -e PA
 run sabnzbd lscr.io/linuxserver/sabnzbd:latest
 run nzbget lscr.io/linuxserver/nzbget:latest -e NZBGET_USER=nzbuser -e NZBGET_PASS=nzbpass
 
-# rTorrent, from Ubuntu, with nginx giving its XML-RPC basic auth.
-sudo apt-get install -y -qq rtorrent nginx-light apache2-utils >/dev/null
+# rTorrent, from Ubuntu, with nginx giving its XML-RPC basic auth. The
+# runner's package lists can be older than the mirror, whose old versions
+# are gone by then: refreshed first, and tried again once on a bad mirror.
+apt_install() {
+  sudo apt-get update -qq >/dev/null &&
+    sudo apt-get install -y -qq rtorrent nginx-light apache2-utils >/dev/null
+}
+apt_install || { sleep 20; apt_install; }
 cat >"$ROOT/rtorrent/rtorrent.rc" <<RC
 directory.default.set = $ROOT/rtorrent/downloads
 session.path.set = $ROOT/rtorrent/session

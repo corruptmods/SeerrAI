@@ -338,14 +338,29 @@ export const multiMustWait = (
   !!pack.summary.multi &&
   others.some((o) => o !== pack && o.summary.fill > 0 && !o.summary.multi);
 
+/**
+ * A torrent its indexer says nobody seeds. Such counts are often old, but
+ * one at 0 is the likeliest to never finish.
+ */
+export const unseeded = (pack: {
+  protocol?: string;
+  seeders?: number | null;
+}): boolean => pack.protocol === 'torrent' && pack.seeders === 0;
+
 export const rankCandidates = <
-  T extends { summary: PlanSummary; seeders?: number | null },
+  T extends {
+    summary: PlanSummary;
+    seeders?: number | null;
+    protocol?: string;
+  },
 >(
   candidates: T[]
 ): T[] =>
   [...candidates].sort(
     (a, b) =>
       Number(b.summary.fill > 0) - Number(a.summary.fill > 0) ||
+      // One somebody seeds before one nobody does.
+      Number(unseeded(a)) - Number(unseeded(b)) ||
       // Files holding several episodes are the last resort.
       Number(!!a.summary.multi) - Number(!!b.summary.multi) ||
       b.summary.fill - a.summary.fill ||

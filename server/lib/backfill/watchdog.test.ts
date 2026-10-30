@@ -47,15 +47,32 @@ describe('TorrentWatch', () => {
     );
   });
 
-  it('gives up on one that can never finish, though the rest trickles in', () => {
+  it('gives up within the hour on one whose swarm never had all of it', () => {
     const watch = new TorrentWatch();
     const t = Date.now();
     const short = (have: number) => ({ ...reading(have), incomplete: true });
     assert.equal(watch.check(1, short(GB), LIMITS, t), null);
-    assert.equal(watch.check(1, short(2 * GB), LIMITS, t + 6 * HOUR), null);
+    assert.equal(watch.check(1, short(2 * GB), LIMITS, t + 50 * 60_000), null);
     assert.match(
-      watch.check(1, short(3 * GB), LIMITS, t + 13 * HOUR) ?? '',
-      /could never finish/
+      watch.check(1, short(3 * GB), LIMITS, t + 61 * 60_000) ?? '',
+      /from the start, so it could never finish/
+    );
+    // Waiting forever means forever.
+    const patient = { stallHours: 0, slowHours: 0 };
+    watch.check(2, short(GB), patient, t);
+    assert.equal(watch.check(2, short(2 * GB), patient, t + 30 * HOUR), null);
+  });
+
+  it('gives up after the stall time on one whose swarm lost part of it, though the rest trickles in', () => {
+    const watch = new TorrentWatch();
+    const t = Date.now();
+    const short = (have: number) => ({ ...reading(have), incomplete: true });
+    assert.equal(watch.check(1, reading(GB), LIMITS, t), null);
+    assert.equal(watch.check(1, short(2 * GB), LIMITS, t + HOUR), null);
+    assert.equal(watch.check(1, short(3 * GB), LIMITS, t + 6 * HOUR), null);
+    assert.match(
+      watch.check(1, short(4 * GB), LIMITS, t + 14 * HOUR) ?? '',
+      /on no one’s computer for 12 hours, so it could never finish/
     );
   });
 
@@ -63,7 +80,8 @@ describe('TorrentWatch', () => {
     const watch = new TorrentWatch();
     const t = Date.now();
     const short = (have: number) => ({ ...reading(have), incomplete: true });
-    watch.check(1, short(GB), LIMITS, t);
+    watch.check(1, reading(GB), LIMITS, t);
+    watch.check(1, short(GB), LIMITS, t + HOUR);
     watch.check(1, reading(2 * GB, 5 * GB), LIMITS, t + 10 * HOUR);
     assert.equal(
       watch.check(1, reading(3 * GB, 4 * GB), LIMITS, t + 13 * HOUR),

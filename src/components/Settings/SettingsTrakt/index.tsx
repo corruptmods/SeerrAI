@@ -15,7 +15,7 @@ import useSWR, { mutate as globalMutate } from 'swr';
 const messages = defineMessages('components.Settings.SettingsTrakt', {
   title: 'Trakt',
   description:
-    'Lets people import public Trakt lists and have their public watchlist requested. Nobody signs in to Trakt.',
+    'The key Seerr AI reads Trakt with. With it, people can paste a public Trakt list or watchlist link into Import on any of their lists, and have their public Trakt watchlist requested (in their profile). Nobody signs in to Trakt.',
   clientId: 'Client ID',
   clientIdTip:
     'Make an app at <TraktAppsLink>developer.trakt.tv/apps</TraktAppsLink> and paste its Client ID. Unused apps are deleted after 30 days.',

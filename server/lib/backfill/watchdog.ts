@@ -7,7 +7,9 @@ import { sizeOf } from '@server/lib/agent/rules';
  * - stalled: nothing gained for the stall time;
  * - incomplete: part of what is wanted is on no peer connected, so it can't
  *   finish however long it runs. The stall clock runs on while that lasts,
- *   even as the rest trickles in;
+ *   even as the rest trickles in; and one whose swarm never had all of it
+ *   is given up within its first hour (an indexer's count of seeders is
+ *   often old, and no seeder has turned up since);
  * - too slow: at the pace of the last two windows in a row, what is left
  *   would take longer than allowed.
  * Paused, queued or checking time counts for none of them. Kept in memory:
@@ -20,6 +22,8 @@ const HOUR = 60 * 60_000;
 export const PACE_WINDOW_MS = 2 * HOUR;
 /** Windows in a row too slow before it is given up. */
 const SLOW_WINDOWS = 2;
+/** How long a swarm that never had all of it gets. */
+export const NEVER_WHOLE_MS = HOUR;
 
 export interface TorrentReading {
   /** Bytes of what is wanted that are in. */
@@ -76,10 +80,16 @@ export class TorrentWatch {
   private gains = new Map<number, { have: number; at: number }>();
   /** Where each pace window began, and how many in a row were too slow. */
   private paces = new Map<number, { have: number; at: number; slow: number }>();
+  /**
+   * Since when each has been meant to download (null while held), and
+   * whether its swarm has had all of it at any point.
+   */
+  private starts = new Map<number, { at: number | null; whole: boolean }>();
 
   public forget(id: number): void {
     this.gains.delete(id);
     this.paces.delete(id);
+    this.starts.delete(id);
   }
 
   /** Why to give it up now, or null to let it run on. */
@@ -90,10 +100,25 @@ export class TorrentWatch {
     now = Date.now()
   ): string | null {
     const { have, left, held, incomplete } = reading;
+    const start = this.starts.get(id) ?? { at: null, whole: false };
+    this.starts.set(id, start);
     if (held) {
       this.gains.set(id, { have, at: now });
       this.paces.delete(id);
+      start.at = null;
       return null;
+    }
+    start.at ??= now;
+    if (!incomplete) start.whole = true;
+    const firstLook = Math.min(NEVER_WHOLE_MS, limits.stallHours * HOUR);
+    if (
+      incomplete &&
+      !start.whole &&
+      firstLook > 0 &&
+      now - start.at > firstLook
+    ) {
+      this.forget(id);
+      return 'No one sharing it has all of it: part of it was on no one’s computer from the start, so it could never finish.';
     }
 
     const seen = this.gains.get(id);

@@ -64,6 +64,7 @@ import {
   multiMustWait,
   rankCandidates,
   selectEntries,
+  unseeded,
 } from '@server/lib/backfill/plan';
 import type { RadarrMovieDetail } from '@server/lib/backfill/radarr';
 import BackfillRadarr from '@server/lib/backfill/radarr';
@@ -3935,17 +3936,24 @@ class Backfill {
   /**
    * Whether Backfill may take a pack without an admin: it fills something
    * missing, replaces nothing on disk, nothing in it was placed by the AI
-   * alone, and it meets auto-approve's score and size. With `wanted` (a
-   * failed download's episodes), it must fill at least one of them.
+   * alone, it is not a torrent nobody seeds, and it meets auto-approve's
+   * score and size. With `wanted` (a failed download's episodes), it must
+   * fill at least one of them.
    */
   private takesItself(
-    pack: { plan: PlanEntry[]; summary: PlanSummary },
+    pack: {
+      plan: PlanEntry[];
+      summary: PlanSummary;
+      protocol?: string;
+      seeders?: number | null;
+    },
     wanted?: Set<number>
   ): boolean {
     const auto = getSettings().backfill.autoApprove;
     const fills = pack.plan.filter((e) => e.action === 'fill');
     return (
       pack.summary.fill > 0 &&
+      !unseeded(pack) &&
       pack.summary.replaces === 0 &&
       pack.summary.score >= auto.minScore &&
       pack.summary.fillBytes <= auto.maxSizeGb * 1024 ** 3 &&

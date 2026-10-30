@@ -544,6 +544,25 @@ describe('Backfill: what Sonarr would take', () => {
     assert.equal(multiMustWait(single, [doubles, single]), false);
   });
 
+  it('ranks a torrent nobody seeds after one somebody does, whatever else it fills', () => {
+    const fill = (index: number, ids: number[]): PlanEntry => ({
+      ...entry(index, ids),
+      action: 'fill',
+      replaces: 0,
+    });
+    const whole = summarize([fill(0, [1]), fill(1, [2]), fill(2, [3])]);
+    const one = summarize([fill(0, [1])]);
+    const packs = [
+      { title: 'unseeded', protocol: 'torrent', seeders: 0, summary: whole },
+      { title: 'seeded', protocol: 'torrent', seeders: 3, summary: one },
+      { title: 'usenet', protocol: 'usenet', seeders: null, summary: one },
+    ];
+    assert.deepEqual(
+      rankCandidates(packs).map((c) => c.title),
+      ['seeded', 'usenet', 'unseeded']
+    );
+  });
+
   it('rejects what the profile does not allow, or scores too low', () => {
     assert.equal(
       decide(

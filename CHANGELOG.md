@@ -7,6 +7,9 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 ### New
 
 - **Backfill gives up on torrents that won't finish**: when part of what's wanted is on no one's computer, after the stall time, even while the rest trickles in; and when one is so slow it would take over 3 days, after four hours at that pace. Either is replaced like a stalled one. Change the 3 days, or turn it off, in Settings → Backfill. Songs taken from albums too.
+- **Backfill trusts seeders less**: a torrent whose swarm never had all of it is given up within its first hour, since an indexer's count of seeders is often old. A torrent its indexer says nobody seeds is never taken by itself, and is offered after ones that are seeded.
+- **Artist pictures from TheAudioDB without a key**: its free key is used for artists Lidarr has no picture of. A supporter's key still takes its place when entered.
+- The list Import says when a Trakt link can be pasted, and Settings → Services says what Trakt's Client ID is for.
 - Backfill shows a long wait in days: "31 d 2 h", not "746 h 0 min".
 
 ## 2.2.1 (27 October 2026)

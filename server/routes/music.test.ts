@@ -9,7 +9,7 @@ import type {
   MbArtist,
   MbReleaseGroup,
 } from '@server/api/musicbrainz/interfaces';
-import TheAudioDb from '@server/api/theaudiodb';
+import TheAudioDb, { THE_AUDIO_DB_FREE_KEY } from '@server/api/theaudiodb';
 import {
   DiscoverSliderType,
   MUSIC_SLIDERS,
@@ -835,6 +835,15 @@ describe('an artist', () => {
 });
 
 describe('an artist’s picture', () => {
+  // TheAudioDB (asked with its free key when no key is set) knows nothing,
+  // unless a test says otherwise.
+  beforeEach(() => {
+    mock.method(TheAudioDb.prototype, 'getArtistPictures', async () => ({
+      thumb: null,
+      fanart: null,
+    }));
+  });
+
   it('comes from Lidarr’s lookup, through the image proxy, and is kept', async () => {
     const first = await get(`/music/artist/${IDS.artist}/image`);
     assert.equal(first.status, 302);
@@ -856,6 +865,30 @@ describe('an artist’s picture', () => {
     getSettings().main.cacheImages = false;
     const { res } = await get(`/music/artist/${IDS.artist}/image`);
     assert.equal(res.headers.get('location'), FANART);
+  });
+
+  it('comes from TheAudioDB with its free key when Lidarr has none and no key is set', async () => {
+    lookupImages = [];
+    const asked = mock.method(
+      TheAudioDb.prototype,
+      'getArtistPictures',
+      async function (this: TheAudioDb) {
+        return {
+          thumb:
+            'https://www.theaudiodb.com/images/media/artist/thumb/free.jpg',
+          fanart: null,
+        };
+      }
+    );
+    const { res } = await get(`/music/artist/${IDS.artist}/image`);
+    assert.equal(
+      res.headers.get('location'),
+      '/imageproxy/tadb/images/media/artist/thumb/free.jpg'
+    );
+    assert.equal(
+      (asked.mock.calls[0].this as unknown as { apiKey: string }).apiKey,
+      THE_AUDIO_DB_FREE_KEY
+    );
   });
 
   it('comes from TheAudioDB when Lidarr has none and a key is set', async () => {

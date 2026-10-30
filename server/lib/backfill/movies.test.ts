@@ -548,6 +548,35 @@ describe('Backfill for movies: from Radarr’s wanted list to the library', () =
     );
   });
 
+  it('never takes a torrent nobody seeds by itself, but takes it when it is seeded', async () => {
+    getSettings().backfill = {
+      ...getSettings().backfill,
+      autoApprove: { enabled: true, minScore: -10_000, maxSizeGb: 100 },
+    };
+    let seeders = 0;
+    mock.method(ProwlarrAPI.prototype, 'search', async () => [
+      { ...RELEASE, seeders },
+    ]);
+    await backfill.scan();
+    const row = await getRepository(BackfillSeries).findOneOrFail({
+      where: { kind: 'movie', arrId: 55 },
+    });
+    while (backfill.isSearching(row.id)) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal(await getRepository(BackfillJob).count(), 0);
+    assert.equal(
+      (await getRepository(BackfillCandidate).findOneOrFail({ where: {} }))
+        .status,
+      'ready',
+      'still offered to an admin'
+    );
+
+    seeders = 5;
+    await backfill.search(row.id);
+    assert.equal(await getRepository(BackfillJob).count(), 1);
+  });
+
   it('replaces a stalled download with the next good pack, searching again, until none is left', async () => {
     getSettings().backfill = {
       ...getSettings().backfill,

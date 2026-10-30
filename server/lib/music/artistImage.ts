@@ -1,7 +1,7 @@
 import { albumCoverPath } from '@server/api/coverartarchive';
 import { musicBrainz } from '@server/api/musicbrainz';
 import type { LidarrImage } from '@server/api/servarr/lidarr';
-import TheAudioDb from '@server/api/theaudiodb';
+import TheAudioDb, { THE_AUDIO_DB_FREE_KEY } from '@server/api/theaudiodb';
 import { getRepository } from '@server/datasource';
 import MusicMetadata from '@server/entity/MusicMetadata';
 import { defaultLidarr, lidarrApi } from '@server/lib/music/access';
@@ -15,8 +15,9 @@ import logger from '@server/logger';
 
 /*
  * Pictures of an artist, in this order: what Lidarr's lookup has (from
- * fanart.tv and TheAudioDB, no key needed), then TheAudioDB with an admin's
- * key, then the cover of the artist's newest album. Each is served through
+ * fanart.tv and TheAudioDB, no key needed), then TheAudioDB itself (with
+ * an admin's supporter key, or its free one), then the cover of the
+ * artist's newest album. Each is served through
  * the image proxy, from the hosts and paths in ./imageSources only.
  */
 
@@ -123,8 +124,9 @@ export const artistImages = async (
       }
     }
 
-    const apiKey = getSettings().music.theAudioDbApiKey;
-    if (apiKey && (!images.photo || !images.backdrop)) {
+    const apiKey =
+      getSettings().music.theAudioDbApiKey || THE_AUDIO_DB_FREE_KEY;
+    if (!images.photo || !images.backdrop) {
       const tadb = await new TheAudioDb(apiKey).getArtistPictures(artistMbid);
       if (tadb) {
         images = {

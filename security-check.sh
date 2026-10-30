@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Security advisories, checked before every build (build.sh runs this):
 #  - every package that goes in the image, against npm's advisories (pnpm
-#    audit of the lockfile). An advisory with no fix, for a package the
-#    server never loads, is listed in package.json under
-#    pnpm.auditConfig.ignoreGhsas, and still shown here;
+#    audit of the lockfile). An advisory with no fixed release, for a
+#    package patched in patches/ or one the server never loads, is listed in
+#    package.json under pnpm.auditConfig.ignoreGhsas, and still shown here;
 #  - a Node.js 22 release with security fixes newer than the image's.
 # It runs in the image's own Node.js, so the host needs only Docker. It
 # stops the build when it finds anything, or can't check.
@@ -24,7 +24,7 @@ if ! pnpm audit --prod; then
 fi
 node -e "
 const ignored = require(\"./package.json\").pnpm?.auditConfig?.ignoreGhsas ?? [];
-if (ignored.length) console.log(\"Not counted, as package.json says (no fix yet, and never loaded by the server): \" + ignored.join(\", \"));
+if (ignored.length) console.log(\"Not counted, as package.json says (no fixed release yet: patched in patches/, or never loaded by the server): \" + ignored.join(\", \"));
 "
 
 echo

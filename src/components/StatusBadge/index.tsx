@@ -295,9 +295,12 @@ const StatusBadge = ({
               : mediaLink
         }
         // Never wider than where it is shown: its words are cut short, and
-        // the spinner stays.
+        // the spinner stays. On the grey it has while in progress, its words
+        // are the page's own colour: a pill's are meant for its fill, and an
+        // accent's (dark on orange, say) can't be read on grey.
         className={`${
-          inProgress && 'relative !bg-gray-700/80 !px-0 hover:!bg-gray-700'
+          inProgress &&
+          'relative !bg-gray-700/80 !px-0 !text-strong hover:!bg-gray-700'
         } min-w-0 max-w-full overflow-hidden`}
       >
         {inProgress && badgeDownloadProgress}

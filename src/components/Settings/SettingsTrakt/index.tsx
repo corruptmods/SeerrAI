@@ -1,6 +1,7 @@
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
+import SaveBar from '@app/components/Common/SaveBar';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
@@ -176,7 +177,7 @@ const SettingsTrakt = () => {
                 )}
               </div>
             </div>
-            <div className="actions">
+            <SaveBar>
               <div className="flex justify-end gap-3">
                 {data.hasClientId && (
                   <Button
@@ -202,7 +203,7 @@ const SettingsTrakt = () => {
                   </span>
                 </Button>
               </div>
-            </div>
+            </SaveBar>
           </form>
         )}
       </div>

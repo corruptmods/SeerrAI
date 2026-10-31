@@ -1,6 +1,7 @@
 import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
+import SaveBar from '@app/components/Common/SaveBar';
 import AdvancedSection from '@app/components/Settings/AdvancedSection';
 import BlockedGroups from '@app/components/Settings/SettingsBackfill/BlockedGroups';
 import DownloadCheck from '@app/components/Settings/SettingsBackfill/DownloadCheck';
@@ -648,7 +649,7 @@ const SettingsBackfill = () => {
                 ))}
               </AdvancedSection>
 
-              <div className="actions">
+              <SaveBar>
                 <div className="flex justify-end">
                   <span className="ml-3 inline-flex rounded-md shadow-sm">
                     <Button
@@ -667,7 +668,7 @@ const SettingsBackfill = () => {
                     </Button>
                   </span>
                 </div>
-              </div>
+              </SaveBar>
             </Form>
           );
         }}

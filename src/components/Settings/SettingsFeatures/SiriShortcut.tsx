@@ -1,4 +1,5 @@
 import Button from '@app/components/Common/Button';
+import SaveBar from '@app/components/Common/SaveBar';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -107,7 +108,7 @@ const SiriShortcut = () => {
             </div>
           </div>
         </div>
-        <div className="actions">
+        <SaveBar>
           <div className="flex justify-end">
             <Button
               buttonType="primary"
@@ -122,7 +123,7 @@ const SiriShortcut = () => {
               </span>
             </Button>
           </div>
-        </div>
+        </SaveBar>
       </form>
     </section>
   );

@@ -1,5 +1,6 @@
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
+import SaveBar from '@app/components/Common/SaveBar';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import SettingsBadge from '@app/components/Settings/SettingsBadge';
 import useToasts from '@app/hooks/useToasts';
@@ -518,7 +519,7 @@ const NotificationsEmail = () => {
                   )}
               </div>
             </div>
-            <div className="actions">
+            <SaveBar>
               <div className="flex justify-end">
                 <span className="ml-3 inline-flex rounded-md shadow-sm">
                   <Button
@@ -552,7 +553,7 @@ const NotificationsEmail = () => {
                   </Button>
                 </span>
               </div>
-            </div>
+            </SaveBar>
           </Form>
         );
       }}

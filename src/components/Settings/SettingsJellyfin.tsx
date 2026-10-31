@@ -2,6 +2,7 @@ import Alert from '@app/components/Common/Alert';
 import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
+import SaveBar from '@app/components/Common/SaveBar';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import LibraryItem from '@app/components/Settings/LibraryItem';
 import MusicLibraries, {
@@ -700,9 +701,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
                     )}
                 </div>
               </div>
-              <div
-                className={`actions ${isSetupSettings ? 'mt-0 border-0' : ''}`}
-              >
+              <SaveBar className={isSetupSettings ? 'mt-0 border-0' : ''}>
                 <div className="flex justify-end">
                   <span className="ml-3 inline-flex rounded-md shadow-sm">
                     <Button
@@ -719,7 +718,7 @@ const SettingsJellyfin: React.FC<SettingsJellyfinProps> = ({
                     </Button>
                   </span>
                 </div>
-              </div>
+              </SaveBar>
             </form>
           );
         }}

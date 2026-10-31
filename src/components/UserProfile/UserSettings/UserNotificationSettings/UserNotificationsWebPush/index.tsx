@@ -1,6 +1,7 @@
 import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
+import SaveBar from '@app/components/Common/SaveBar';
 import NotificationTypeSelector, {
   ALL_NOTIFICATIONS,
   Notification,
@@ -308,7 +309,7 @@ const UserWebPushSettings = () => {
                     : undefined
                 }
               />
-              <div className="actions">
+              <SaveBar>
                 <div className="flex justify-end">
                   <span className="ml-3 inline-flex rounded-md shadow-sm">
                     <Button
@@ -347,7 +348,7 @@ const UserWebPushSettings = () => {
                     </Button>
                   </span>
                 </div>
-              </div>
+              </SaveBar>
             </Form>
           );
         }}

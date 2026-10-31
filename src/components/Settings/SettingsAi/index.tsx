@@ -2,6 +2,7 @@ import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
+import SaveBar from '@app/components/Common/SaveBar';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import AdvancedSection from '@app/components/Settings/AdvancedSection';
 import CreditPanel from '@app/components/Settings/SettingsAi/CreditPanel';
@@ -570,7 +571,7 @@ const SettingsAi = () => {
               </div>
             </div>
           </AdvancedSection>
-          <div className="actions">
+          <SaveBar>
             <div className="flex justify-end">
               <span className="ml-3 inline-flex rounded-md shadow-sm">
                 <Button
@@ -596,7 +597,7 @@ const SettingsAi = () => {
                 </Button>
               </span>
             </div>
-          </div>
+          </SaveBar>
         </form>
       </div>
       {data?.hasApiKey && <CreditPanel />}

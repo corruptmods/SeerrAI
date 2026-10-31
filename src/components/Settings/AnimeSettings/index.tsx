@@ -1,6 +1,7 @@
 import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
+import SaveBar from '@app/components/Common/SaveBar';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
@@ -152,7 +153,7 @@ const AnimeSettings = () => {
                 </div>
               </div>
             </div>
-            <div className="actions">
+            <SaveBar>
               <div className="flex justify-end">
                 <Button buttonType="primary" type="submit" disabled={busy}>
                   <ArrowDownOnSquareIcon />
@@ -163,7 +164,7 @@ const AnimeSettings = () => {
                   </span>
                 </Button>
               </div>
-            </div>
+            </SaveBar>
           </form>
         )}
       </div>

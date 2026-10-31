@@ -4,6 +4,7 @@ import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
+import SaveBar from '@app/components/Common/SaveBar';
 import PreviewModal from '@app/components/Settings/SettingsQuality/PreviewModal';
 import WhatItDoes from '@app/components/Settings/SettingsQuality/WhatItDoes';
 import { postAndFollow } from '@app/components/Settings/SettingsQuality/jobs';
@@ -935,7 +936,7 @@ const SettingsQuality = () => {
                 </div>
                 {otherManaged.length > 0 && (
                   <select
-                    className="!w-56 flex-none"
+                    className="!w-full flex-none sm:!w-72"
                     aria-label={intl.formatMessage(messages.copyFrom)}
                     value=""
                     onChange={(e) => {
@@ -1322,7 +1323,7 @@ const SettingsQuality = () => {
         </ul>
       )}
 
-      <div className="actions">
+      <SaveBar dirty={dirty}>
         <div className="flex flex-wrap items-center justify-end gap-3">
           {dirty && (
             <span className="text-sm text-yellow-300 light:text-warning-text">
@@ -1338,7 +1339,7 @@ const SettingsQuality = () => {
             <span>{intl.formatMessage(globalMessages.save)}</span>
           </Button>
         </div>
-      </div>
+      </SaveBar>
 
       {previewing && server && (
         <PreviewModal

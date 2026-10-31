@@ -1,4 +1,5 @@
 import Button from '@app/components/Common/Button';
+import SaveBar from '@app/components/Common/SaveBar';
 import SlideCheckbox from '@app/components/Common/SlideCheckbox';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
@@ -180,7 +181,7 @@ const ServerCss = () => {
           label={intl.formatMessage(messages.personalCss)}
         />
       </div>
-      <div className="actions">
+      <SaveBar>
         <div className="flex justify-end">
           <Button
             type="button"
@@ -196,7 +197,7 @@ const ServerCss = () => {
             </span>
           </Button>
         </div>
-      </div>
+      </SaveBar>
     </section>
   );
 };

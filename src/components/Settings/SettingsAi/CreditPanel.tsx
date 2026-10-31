@@ -1,5 +1,6 @@
 import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
+import SaveBar from '@app/components/Common/SaveBar';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import { aiErrorMessage } from '@app/hooks/useAi';
 import useToasts from '@app/hooks/useToasts';
@@ -456,7 +457,7 @@ const CreditPanel = () => {
             </div>
           )}
 
-          <div className="actions">
+          <SaveBar>
             <div className="flex justify-end">
               <span className="ml-3 inline-flex rounded-md shadow-sm">
                 <Button buttonType="primary" type="submit" disabled={busy}>
@@ -469,7 +470,7 @@ const CreditPanel = () => {
                 </Button>
               </span>
             </div>
-          </div>
+          </SaveBar>
         </form>
       </div>
     </div>

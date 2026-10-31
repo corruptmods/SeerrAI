@@ -4,6 +4,7 @@ import FeatureSwitches from '@app/components/Common/FeatureSwitches';
 import { NOT_ON_MUSIC_PAGE } from '@app/components/Common/FeatureSwitches/shown';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
+import SaveBar from '@app/components/Common/SaveBar';
 import { useFeaturesForEveryone } from '@app/components/Settings/SettingsFeatures';
 import type {
   MusicSourceValues,
@@ -176,7 +177,7 @@ const MusicSettingsForm = () => {
           </div>
           <div className="section">
             <MusicSources hasTheAudioDbApiKey={data.hasTheAudioDbApiKey} />
-            <div className="actions">
+            <SaveBar>
               <div className="flex justify-end">
                 <span className="ml-3 inline-flex rounded-md shadow-sm">
                   <Button
@@ -193,7 +194,7 @@ const MusicSettingsForm = () => {
                   </Button>
                 </span>
               </div>
-            </div>
+            </SaveBar>
           </div>
         </Form>
       )}

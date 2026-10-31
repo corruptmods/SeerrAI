@@ -764,6 +764,23 @@
     @apply mt-8 border-t border-subtle pt-5 text-strong;
   }
 
+  /*
+   * The Save area while there are unsaved changes (SaveBar): it stays in
+   * view at the bottom of the screen, above the phone's tab bar, wherever
+   * the page is scrolled to.
+   */
+  .actions.actions-unsaved {
+    @apply sticky z-40 -mx-4 border-t border-subtle bg-surface/90 px-4 pb-4 backdrop-blur sm:mx-0 sm:rounded-t-xl sm:border-x;
+    bottom: calc(54px + env(safe-area-inset-bottom));
+    box-shadow: 0 -10px 24px -12px rgb(0 0 0 / 0.45);
+  }
+
+  @media (min-width: 640px) {
+    .actions.actions-unsaved {
+      bottom: 0;
+    }
+  }
+
   label,
   .group-label {
     @apply mb-1 block text-sm font-bold leading-5 text-muted;

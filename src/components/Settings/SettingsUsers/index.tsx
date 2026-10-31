@@ -3,6 +3,7 @@ import Button from '@app/components/Common/Button';
 import LabeledCheckbox from '@app/components/Common/LabeledCheckbox';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
+import SaveBar from '@app/components/Common/SaveBar';
 import PermissionEdit from '@app/components/PermissionEdit';
 import QuotaSelector from '@app/components/QuotaSelector';
 import { SERVER_NAMES } from '@app/components/Settings/SettingsMediaServers/names';
@@ -523,7 +524,7 @@ const SettingsUsers = () => {
                     </div>
                   </div>
                 </div>
-                <div className="actions">
+                <SaveBar>
                   <div className="flex justify-end">
                     <span className="ml-3 inline-flex rounded-md shadow-sm">
                       <Button
@@ -540,7 +541,7 @@ const SettingsUsers = () => {
                       </Button>
                     </span>
                   </div>
-                </div>
+                </SaveBar>
               </Form>
             );
           }}

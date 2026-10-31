@@ -1,6 +1,7 @@
 import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
+import SaveBar from '@app/components/Common/SaveBar';
 import SlideCheckbox from '@app/components/Common/SlideCheckbox';
 import {
   formatDates,
@@ -297,7 +298,7 @@ const SettingsSeasons = () => {
               />
             ))}
           </ul>
-          <div className="actions">
+          <SaveBar>
             <div className="flex justify-end">
               <Button
                 buttonType="primary"
@@ -313,7 +314,7 @@ const SettingsSeasons = () => {
                 </span>
               </Button>
             </div>
-          </div>
+          </SaveBar>
         </>
       )}
     </section>

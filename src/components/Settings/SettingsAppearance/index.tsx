@@ -2,6 +2,7 @@ import Alert from '@app/components/Common/Alert';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
+import SaveBar from '@app/components/Common/SaveBar';
 import SettingsSeasons from '@app/components/Seasonal/SettingsSeasons';
 import DefaultThemeFile from '@app/components/Themes/DefaultThemeFile';
 import ServerCss from '@app/components/Themes/ServerCss';
@@ -216,7 +217,7 @@ const SettingsAppearance = () => {
                   </div>
                 </div>
                 <DefaultThemeFile />
-                <div className="actions">
+                <SaveBar>
                   <div className="flex justify-end">
                     <span className="ml-3 inline-flex rounded-md shadow-sm">
                       <Button
@@ -233,7 +234,7 @@ const SettingsAppearance = () => {
                       </Button>
                     </span>
                   </div>
-                </div>
+                </SaveBar>
               </div>
             </Form>
           )}

@@ -2,6 +2,7 @@ import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
+import SaveBar from '@app/components/Common/SaveBar';
 import SlideCheckbox from '@app/components/Common/SlideCheckbox';
 import UserSeasons from '@app/components/Seasonal/UserSeasons';
 import PersonalCss from '@app/components/Themes/PersonalCss';
@@ -601,28 +602,30 @@ const AppearanceFields = ({
 
         <ThemeChoices isOwn={isOwn} />
 
-        <div className="flex flex-wrap justify-end gap-3 border-t border-subtle pt-5">
-          <Button
-            type="button"
-            onClick={onReset}
-            disabled={isSubmitting || resetting}
-          >
-            <ArrowUturnLeftIcon />
-            <span>{intl.formatMessage(messages.useServerDefault)}</span>
-          </Button>
-          <Button
-            buttonType="primary"
-            type="submit"
-            disabled={isSubmitting || resetting}
-          >
-            <ArrowDownOnSquareIcon />
-            <span>
-              {isSubmitting
-                ? intl.formatMessage(globalMessages.saving)
-                : intl.formatMessage(globalMessages.save)}
-            </span>
-          </Button>
-        </div>
+        <SaveBar>
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button
+              type="button"
+              onClick={onReset}
+              disabled={isSubmitting || resetting}
+            >
+              <ArrowUturnLeftIcon />
+              <span>{intl.formatMessage(messages.useServerDefault)}</span>
+            </Button>
+            <Button
+              buttonType="primary"
+              type="submit"
+              disabled={isSubmitting || resetting}
+            >
+              <ArrowDownOnSquareIcon />
+              <span>
+                {isSubmitting
+                  ? intl.formatMessage(globalMessages.saving)
+                  : intl.formatMessage(globalMessages.save)}
+              </span>
+            </Button>
+          </div>
+        </SaveBar>
       </div>
       <div className="xl:w-80">
         <Preview name={user?.displayName ?? ''} />

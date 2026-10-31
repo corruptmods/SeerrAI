@@ -2,6 +2,7 @@ import BlocklistedTagsSelector from '@app/components/BlocklistedTagsSelector';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
+import SaveBar from '@app/components/Common/SaveBar';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import LanguageSelector from '@app/components/LanguageSelector';
 import RegionSelector from '@app/components/RegionSelector';
@@ -702,7 +703,7 @@ const SettingsMain = () => {
                     />
                   </div>
                 </div>
-                <div className="actions">
+                <SaveBar>
                   <div className="flex justify-end">
                     <span className="ml-3 inline-flex rounded-md shadow-sm">
                       <Button
@@ -719,7 +720,7 @@ const SettingsMain = () => {
                       </Button>
                     </span>
                   </div>
-                </div>
+                </SaveBar>
               </Form>
             );
           }}

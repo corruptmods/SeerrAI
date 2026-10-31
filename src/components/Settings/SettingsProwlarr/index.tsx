@@ -1,5 +1,6 @@
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
+import SaveBar from '@app/components/Common/SaveBar';
 import SensitiveInput from '@app/components/Common/SensitiveInput';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
@@ -229,7 +230,7 @@ const SettingsProwlarr = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="actions">
+                  <SaveBar>
                     <div className="flex justify-end">
                       <Button
                         buttonType="primary"
@@ -244,7 +245,7 @@ const SettingsProwlarr = () => {
                         </span>
                       </Button>
                     </div>
-                  </div>
+                  </SaveBar>
                 </Form>
               );
             }}

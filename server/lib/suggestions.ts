@@ -13,6 +13,7 @@ import Media from '@server/entity/Media';
 import type { User } from '@server/entity/User';
 import { watchSource } from '@server/lib/watchHistory';
 import logger from '@server/logger';
+import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 import { In } from 'typeorm';
 
 /*
@@ -53,21 +54,6 @@ const built = new Map<
 
 const keyOf = (mediaType: MediaType, tmdbId: number) =>
   `${mediaType}:${tmdbId}`;
-
-const eachLimited = async <T>(
-  items: T[],
-  run: (item: T, index: number) => Promise<void>
-): Promise<void> => {
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(CONCURRENCY, items.length) }, async () => {
-      while (next < items.length) {
-        const index = next++;
-        await run(items[index], index);
-      }
-    })
-  );
-};
 
 const build = async (user: User): Promise<SuggestionResult[]> => {
   const source = watchSource();
@@ -120,7 +106,7 @@ const build = async (user: User): Promise<SuggestionResult[]> => {
   const tmdb = new TheMovieDb();
   const scores = new Map<string, { score: number; result: SuggestionResult }>();
 
-  await eachLimited(seeds, async (seed, index) => {
+  await mapWithConcurrency(seeds, CONCURRENCY, async (seed, index) => {
     // The most recent watch counts fully, the oldest seed half as much.
     const seedWeight = 1 - index / (2 * seeds.length);
     try {

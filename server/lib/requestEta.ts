@@ -223,10 +223,9 @@ export const typicalDays = async (): Promise<Map<MediaType, number>> => {
       const days = (at - started.get(key)!) / DAY_MS;
       started.delete(key);
       if (days >= 0 && days <= SEARCH_WINDOW_DAYS) {
-        durations.set(event.mediaType, [
-          ...(durations.get(event.mediaType) ?? []),
-          days,
-        ]);
+        const list = durations.get(event.mediaType) ?? [];
+        list.push(days);
+        durations.set(event.mediaType, list);
       }
     }
   }

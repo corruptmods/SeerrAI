@@ -3,6 +3,7 @@ import { MediaStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import logger from '@server/logger';
+import { mapWithConcurrency } from '@server/utils/mapWithConcurrency';
 import { In } from 'typeorm';
 
 /*
@@ -30,20 +31,6 @@ const CONCURRENCY = 4;
 let built: { at: number; gaps: CollectionGap[] } | undefined;
 let building: Promise<void> | undefined;
 
-const eachLimited = async <T>(
-  items: T[],
-  run: (item: T) => Promise<void>
-): Promise<void> => {
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(CONCURRENCY, items.length) }, async () => {
-      while (next < items.length) {
-        await run(items[next++]);
-      }
-    })
-  );
-};
-
 const build = async (): Promise<void> => {
   const tmdb = new TheMovieDb();
   const inLibrary = await getRepository(Media).find({
@@ -54,7 +41,7 @@ const build = async (): Promise<void> => {
   });
 
   const collections = new Map<number, string>();
-  await eachLimited(inLibrary, async (media) => {
+  await mapWithConcurrency(inLibrary, CONCURRENCY, async (media) => {
     try {
       const movie = await tmdb.getMovie({ movieId: media.tmdbId });
       if (movie.belongs_to_collection) {
@@ -70,50 +57,54 @@ const build = async (): Promise<void> => {
 
   const gaps: CollectionGap[] = [];
   const now = Date.now();
-  await eachLimited([...collections.keys()], async (collectionId) => {
-    try {
-      const collection = await tmdb.getCollection({ collectionId });
-      // Only films already out: one not yet released is not missing.
-      const released = collection.parts.filter((part) => {
-        const at = part.release_date
-          ? new Date(part.release_date).getTime()
-          : NaN;
-        return !Number.isNaN(at) && at <= now;
-      });
-      if (released.length < 2) {
-        return;
-      }
-      const known = await getRepository(Media).find({
-        where: {
-          mediaType: MediaType.MOVIE,
-          tmdbId: In(released.map((part) => part.id)),
-        },
-      });
-      const statusOf = new Map(known.map((m) => [m.tmdbId, m.status]));
-      const count = (statuses: MediaStatus[]) =>
-        released.filter((part) =>
-          statuses.includes(statusOf.get(part.id) ?? MediaStatus.UNKNOWN)
-        ).length;
-      const have = count([
-        MediaStatus.AVAILABLE,
-        MediaStatus.PARTIALLY_AVAILABLE,
-      ]);
-      const requested = count([MediaStatus.PENDING, MediaStatus.PROCESSING]);
-      const missing = count([MediaStatus.UNKNOWN, MediaStatus.DELETED]);
-      if (have > 0 && missing > 0) {
-        gaps.push({
-          id: collectionId,
-          name: collection.name ?? collections.get(collectionId) ?? '',
-          total: released.length,
-          inLibrary: have,
-          requested,
-          missing,
+  await mapWithConcurrency(
+    [...collections.keys()],
+    CONCURRENCY,
+    async (collectionId) => {
+      try {
+        const collection = await tmdb.getCollection({ collectionId });
+        // Only films already out: one not yet released is not missing.
+        const released = collection.parts.filter((part) => {
+          const at = part.release_date
+            ? new Date(part.release_date).getTime()
+            : NaN;
+          return !Number.isNaN(at) && at <= now;
         });
+        if (released.length < 2) {
+          return;
+        }
+        const known = await getRepository(Media).find({
+          where: {
+            mediaType: MediaType.MOVIE,
+            tmdbId: In(released.map((part) => part.id)),
+          },
+        });
+        const statusOf = new Map(known.map((m) => [m.tmdbId, m.status]));
+        const count = (statuses: MediaStatus[]) =>
+          released.filter((part) =>
+            statuses.includes(statusOf.get(part.id) ?? MediaStatus.UNKNOWN)
+          ).length;
+        const have = count([
+          MediaStatus.AVAILABLE,
+          MediaStatus.PARTIALLY_AVAILABLE,
+        ]);
+        const requested = count([MediaStatus.PENDING, MediaStatus.PROCESSING]);
+        const missing = count([MediaStatus.UNKNOWN, MediaStatus.DELETED]);
+        if (have > 0 && missing > 0) {
+          gaps.push({
+            id: collectionId,
+            name: collection.name ?? collections.get(collectionId) ?? '',
+            total: released.length,
+            inLibrary: have,
+            requested,
+            missing,
+          });
+        }
+      } catch {
+        // As above: skip what TMDB cannot answer.
       }
-    } catch {
-      // As above: skip what TMDB cannot answer.
     }
-  });
+  );
 
   // Nearest to complete first: those are the ones a request finishes.
   gaps.sort(

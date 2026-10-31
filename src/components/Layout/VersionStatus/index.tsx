@@ -67,10 +67,10 @@ const VersionStatus = ({ onClick }: VersionStatusProps) => {
       ) : (
         <ServerIcon className="h-6 w-6" />
       )}
-      <div className="flex min-w-0 flex-1 flex-col truncate px-2 last:pr-0">
+      <div className="flex min-w-0 flex-1 flex-col break-words px-2 last:pr-0">
         <span className="font-bold">{versionStream}</span>
         {data.commitsBehind !== undefined && data.commitsBehind !== -1 && (
-          <span className="truncate">
+          <span className="break-words">
             {data.commitTag === 'local' ? (
               '(⌐■_■)'
             ) : data.commitsBehind > 0 ? (

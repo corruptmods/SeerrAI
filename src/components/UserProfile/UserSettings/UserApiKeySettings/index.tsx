@@ -307,7 +307,7 @@ const UserApiKeySettings = () => {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="truncate text-lg font-semibold text-strong">
+                  <span className="min-w-0 break-words text-lg font-semibold text-strong">
                     {key.name}
                   </span>
                   <Prefix prefix={key.prefix} />

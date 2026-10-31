@@ -338,7 +338,7 @@ const UserLinkedAccountsSettings = () => {
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-bold text-gray-300">
+                  <div className="break-words text-sm font-bold text-gray-300">
                     {SERVER_NAMES[acct.kind]}
                     {!acct.connected && (
                       <span className="ml-2 font-normal text-gray-400">
@@ -346,7 +346,7 @@ const UserLinkedAccountsSettings = () => {
                       </span>
                     )}
                   </div>
-                  <div className="truncate text-xl font-semibold text-strong">
+                  <div className="break-words text-xl font-semibold text-strong">
                     {acct.username}
                   </div>
                 </div>
@@ -388,7 +388,7 @@ const UserLinkedAccountsSettings = () => {
                 )}
               </div>
               <div className="min-w-0">
-                <div className="truncate text-sm font-bold text-gray-300">
+                <div className="break-words text-sm font-bold text-gray-300">
                   {link.name}
                   {!link.available && (
                     <span className="ml-2 font-normal text-gray-400">
@@ -396,7 +396,7 @@ const UserLinkedAccountsSettings = () => {
                     </span>
                   )}
                 </div>
-                <div className="truncate text-xl font-semibold text-strong">
+                <div className="break-words text-xl font-semibold text-strong">
                   {link.username}
                 </div>
               </div>

@@ -173,7 +173,7 @@ const UserProfile = () => {
               }`}
             >
               <div className="overflow-hidden rounded-lg bg-gray-800/50 px-4 py-5 shadow ring-1 ring-gray-700 light:bg-surface/90 sm:p-6">
-                <dt className="truncate text-sm font-bold text-gray-300">
+                <dt className="break-words text-sm font-bold text-gray-300">
                   {intl.formatMessage(messages.totalrequests)}
                 </dt>
                 <dd className="mt-1 text-3xl font-semibold text-strong">
@@ -199,7 +199,7 @@ const UserProfile = () => {
                 } sm:p-6`}
               >
                 <dt
-                  className={`truncate text-sm font-bold ${
+                  className={`break-words text-sm font-bold ${
                     quota.movie.restricted ? 'text-red-500' : 'text-gray-300'
                   }`}
                 >
@@ -254,7 +254,7 @@ const UserProfile = () => {
                 } sm:p-6`}
               >
                 <dt
-                  className={`truncate text-sm font-bold ${
+                  className={`break-words text-sm font-bold ${
                     quota.tv.restricted ? 'text-red-500' : 'text-gray-300'
                   }`}
                 >
@@ -310,7 +310,7 @@ const UserProfile = () => {
                   } sm:p-6`}
                 >
                   <dt
-                    className={`truncate text-sm font-bold ${
+                    className={`break-words text-sm font-bold ${
                       quota.music.restricted ? 'text-red-500' : 'text-gray-300'
                     }`}
                   >

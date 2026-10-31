@@ -93,11 +93,11 @@ const UserDropdown = () => {
                   height={40}
                 />
                 <div className="flex min-w-0 flex-col">
-                  <span className="truncate text-xl font-semibold text-gray-200">
+                  <span className="break-words text-xl font-semibold text-gray-200">
                     {user?.displayName}
                   </span>
                   {shownEmail(user?.displayName, user?.email) && (
-                    <span className="truncate text-sm text-muted">
+                    <span className="text-sm text-muted [overflow-wrap:anywhere]">
                       {user?.email}
                     </span>
                   )}

@@ -272,7 +272,7 @@ const PlexImportModal = ({ onCancel, onComplete }: PlexImportProps) => {
                               />
                             </span>
                           </td>
-                          <td className="whitespace-nowrap px-1 py-4 text-sm font-medium leading-5 text-gray-100 md:px-6">
+                          <td className="px-1 py-4 text-sm font-medium leading-5 text-gray-100 [overflow-wrap:anywhere] md:px-6">
                             <div className="flex items-center">
                               <Image
                                 className="h-10 w-10 flex-shrink-0 rounded-full"
@@ -281,7 +281,7 @@ const PlexImportModal = ({ onCancel, onComplete }: PlexImportProps) => {
                                 width={40}
                                 height={40}
                               />
-                              <div className="ml-4">
+                              <div className="ml-4 min-w-0">
                                 <div className="text-base font-bold leading-5">
                                   {user.username}
                                 </div>

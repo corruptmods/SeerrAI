@@ -291,7 +291,7 @@ const Preview = ({ name }: { name: string }) => {
         <div className="absolute inset-x-0 bottom-0 flex items-end gap-3 bg-media-scrim/80 p-4">
           <div className="h-24 w-16 flex-none rounded-md bg-[#5b6f99]" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-lg font-bold text-on-media">
+            <div className="break-words text-lg font-bold text-on-media">
               {intl.formatMessage(messages.previewTitle)}
             </div>
             <div className="mb-2 text-sm text-on-media/80">

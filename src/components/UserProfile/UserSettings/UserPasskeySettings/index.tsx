@@ -212,7 +212,7 @@ const UserPasskeySettings = () => {
                   />
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-lg font-semibold text-strong">
+                    <span className="min-w-0 break-words text-lg font-semibold text-strong">
                       {passkey.name}
                     </span>
                     {passkey.backedUp && (

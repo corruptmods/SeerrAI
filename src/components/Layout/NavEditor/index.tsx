@@ -137,7 +137,7 @@ const Row = ({
         }`,
       })}
       <span
-        className={`min-w-0 flex-1 truncate text-sm font-medium ${
+        className={`min-w-0 flex-1 break-words text-sm font-medium ${
           hidden ? 'text-gray-500 line-through' : 'text-strong'
         }`}
       >

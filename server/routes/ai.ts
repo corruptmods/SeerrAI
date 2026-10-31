@@ -60,7 +60,8 @@ const handle =
       }
       if (e instanceof z.ZodError) {
         const issue = e.issues[0];
-        // The only checks a person can trip are on the picture they sent.
+        // The only checks the app's own requests can trip are on the
+        // picture someone sent.
         return refuse(
           res,
           400,
@@ -218,11 +219,14 @@ aiRoutes.post(
   handle(async (req) => pickForRoom(req.user!, pickBody.parse(req.body)))
 );
 
+/** An id in the path: anything else is refused, not looked up. */
+const pathId = z.coerce.number().int().positive();
+
 aiRoutes.get<{ tvId: string }>(
   '/recap/:tvId/position',
   need('aiRecap'),
   handle(async (req) => ({
-    position: await recapPosition(req.user!, Number(req.params.tvId)),
+    position: await recapPosition(req.user!, pathId.parse(req.params.tvId)),
   }))
 );
 
@@ -235,7 +239,7 @@ aiRoutes.get<{ tvId: string }>(
   '/recap/:tvId',
   need('aiRecap'),
   handle(async (req) =>
-    recap(req.user!, Number(req.params.tvId), recapQuery.parse(req.query))
+    recap(req.user!, pathId.parse(req.params.tvId), recapQuery.parse(req.query))
   )
 );
 
@@ -254,7 +258,9 @@ aiRoutes.get<{ issueId: string }>(
     type: 'or',
   }),
   need('aiIssueTriage'),
-  handle(async (req) => triageIssue(req.user!, Number(req.params.issueId)))
+  handle(async (req) =>
+    triageIssue(req.user!, pathId.parse(req.params.issueId))
+  )
 );
 
 const logBody = z.object({

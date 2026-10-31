@@ -1410,6 +1410,17 @@ describe('catching up on a series', () => {
     assert.doesNotMatch(sent, /Season 2 episode 3 events/);
     assert.doesNotMatch(sent, /SECRET FUTURE SEASON/);
   });
+
+  it('refuses a series id that cannot be one, without asking anything', async () => {
+    for (const id of ['0', '-4', '2.5']) {
+      const { status } = await call(
+        'GET',
+        `/api/v1/ai/recap/${id}?season=2&episode=3`
+      );
+      assert.equal(status, 400, id);
+    }
+    assert.equal(calls.length, 0);
+  });
 });
 
 describe('explaining a log entry', () => {

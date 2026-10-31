@@ -286,6 +286,13 @@ describe('Backfill: torrents and NZBs', () => {
     assert.ok(Date.now() - started < 1000);
   });
 
+  it('reads an NZB whose subject has a character number no character has', () => {
+    const files = parseNzb(
+      '<nzb><file subject="&#99999999; &#x41;&quot;show.s01e01.mkv&quot;"><segment bytes="5">a@b</segment></file></nzb>'
+    );
+    assert.deepEqual(files, [{ index: 0, name: 'show.s01e01.mkv', size: 5 }]);
+  });
+
   it('reads a magnet link’s hash, hex or base32', () => {
     assert.equal(
       magnetHash(

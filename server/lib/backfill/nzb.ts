@@ -20,13 +20,19 @@ const ENTITIES: Record<string, string> = {
   apos: "'",
 };
 
+/** A character by its number; none for a number no character has. */
+const character = (code: number): string | undefined =>
+  Number.isInteger(code) && code >= 0 && code <= 0x10ffff
+    ? String.fromCodePoint(code)
+    : undefined;
+
 const decode = (value: string): string =>
   value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (whole, entity: string) => {
     if (entity.startsWith('#x') || entity.startsWith('#X')) {
-      return String.fromCodePoint(parseInt(entity.slice(2), 16));
+      return character(parseInt(entity.slice(2), 16)) ?? whole;
     }
     if (entity.startsWith('#')) {
-      return String.fromCodePoint(parseInt(entity.slice(1), 10));
+      return character(parseInt(entity.slice(1), 10)) ?? whole;
     }
     return ENTITIES[entity.toLowerCase()] ?? whole;
   });

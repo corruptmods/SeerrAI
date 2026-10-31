@@ -116,8 +116,8 @@ const Row = ({ item }: { item: CalendarItem }) => {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate font-semibold text-gray-100">{item.title}</p>
-        <p className="truncate text-sm text-gray-400">
+        <p className="break-words font-semibold text-gray-100">{item.title}</p>
+        <p className="break-words text-sm text-gray-400">
           {whatIsDue(intl, item)}
         </p>
       </div>

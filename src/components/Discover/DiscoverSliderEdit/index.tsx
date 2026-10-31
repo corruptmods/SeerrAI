@@ -234,7 +234,7 @@ const DiscoverSliderEdit = ({
           className={`${slider.data ? 'mb-4' : 'mb-0'} flex space-x-2 md:mb-0`}
         >
           {!personalOnly && <Bars3Icon className="h-6 w-6" />}
-          <div className="w-7/12 truncate md:w-full">
+          <div className="w-7/12 min-w-0 break-words md:w-full">
             {getSliderTitle(slider)}
           </div>
         </div>

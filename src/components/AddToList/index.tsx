@@ -164,7 +164,9 @@ const AddToList = ({ tmdbId, mediaType, compact }: AddToListProps) => {
                   readOnly
                   type="checkbox"
                 />
-                <span className="flex-1 truncate">{list.name}</span>
+                <span className="min-w-0 flex-1 whitespace-normal break-words">
+                  {list.name}
+                </span>
               </button>
             </li>
           ))}

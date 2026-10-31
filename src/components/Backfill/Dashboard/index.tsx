@@ -513,7 +513,9 @@ const BackfillDashboard = () => {
                       : 'border-transparent text-gray-400 hover:text-gray-200'
                   }`}
                 >
-                  <span className="text-center">{tab.label}</span>
+                  <span className="whitespace-normal text-center">
+                    {tab.label}
+                  </span>
                   {tab.count !== undefined && (
                     <span className="rounded-full bg-gray-700 px-2 py-0.5 text-xs tabular-nums text-gray-200">
                       {tab.count}

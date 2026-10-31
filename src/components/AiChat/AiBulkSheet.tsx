@@ -494,11 +494,11 @@ const AiBulkSheet = ({
                       size="w92"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-gray-100">
+                      <span className="block break-words text-gray-100">
                         {resultLabel(title)}
                       </span>
                       <span
-                        className={`block truncate text-xs ${
+                        className={`block break-words text-xs ${
                           failed ? 'text-red-300' : 'text-gray-400'
                         }`}
                       >

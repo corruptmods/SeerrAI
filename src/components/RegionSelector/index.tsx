@@ -164,7 +164,7 @@ const RegionSelector = ({
                         <span
                           className={`${
                             selected ? 'font-semibold' : 'font-normal'
-                          } block truncate`}
+                          } block break-words`}
                         >
                           {intl.formatMessage(messages.regionServerDefault, {
                             region: regionValue
@@ -196,7 +196,7 @@ const RegionSelector = ({
                         <span
                           className={`${
                             selected ? 'font-semibold' : 'font-normal'
-                          } block truncate pl-8`}
+                          } block break-words pl-8`}
                         >
                           {intl.formatMessage(messages.regionDefault)}
                         </span>
@@ -231,7 +231,7 @@ const RegionSelector = ({
                         <span
                           className={`${
                             selected ? 'font-semibold' : 'font-normal'
-                          } block truncate`}
+                          } block break-words`}
                         >
                           {regionName(region.iso_3166_1)}
                         </span>

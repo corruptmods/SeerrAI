@@ -10,7 +10,7 @@ import type { AxiosInstance } from 'axios';
  * are for it, and grabbing one of them. Both apps answer these the same way.
  */
 
-/** Searching every indexer can take a while; a minute and a half is ample. */
+/** Searching every indexer can take a while; 2½ minutes is ample. */
 const RELEASE_SEARCH_TIMEOUT_MS = 150_000;
 
 export interface ArrRelease {

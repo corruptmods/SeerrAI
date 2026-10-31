@@ -392,7 +392,6 @@ class BazarrAPI {
     return data ?? [];
   }
 
-  /** The providers Bazarr has turned on, by name ("whisperai"). */
   /** What Bazarr's own System → Status page lists as wrong. */
   public async getHealth(): Promise<{ object?: string; issue?: string }[]> {
     const { data } = await this.read<{
@@ -401,6 +400,7 @@ class BazarrAPI {
     return Array.isArray(data) ? data : [];
   }
 
+  /** The providers Bazarr has turned on, by name ("whisperai"). */
   public async getProviders(): Promise<string[]> {
     return (await this.getProviderStatus()).map((provider) => provider.name);
   }

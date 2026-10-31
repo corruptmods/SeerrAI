@@ -186,15 +186,7 @@ const serviceCheck = async (
       items: [],
     };
   } catch (e) {
-    return {
-      id,
-      group: 'services',
-      name,
-      status: 'error',
-      count: 1,
-      detail: e.message,
-      items: [],
-    };
+    return serviceDown(id, name, e);
   }
 };
 
@@ -1899,7 +1891,7 @@ const guarded = async (
         name: 'Could not run these checks',
         status: 'error',
         count: 1,
-        detail: e.message,
+        detail: e instanceof Error ? e.message : String(e),
         items: [],
       },
     ];

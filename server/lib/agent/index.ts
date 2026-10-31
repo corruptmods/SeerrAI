@@ -1692,13 +1692,16 @@ class Agent {
 
       const ai = settings.ai;
       const model = modelFor('aiAgent');
-      const tools = TOOLS.filter(
-        (tool) => !tool.askOnly || adminPresent(run)
-      ).map(({ name, description, parameters }) => ({
-        name,
-        description,
-        parameters,
-      }));
+      // Read again each turn: an admin who replies while it works is in the
+      // conversation from then on.
+      const toolsNow = () =>
+        TOOLS.filter((tool) => !tool.askOnly || adminPresent(run)).map(
+          ({ name, description, parameters }) => ({
+            name,
+            description,
+            parameters,
+          })
+        );
       const standing = settings.backfill.agent.instructions.trim();
       const system = standing
         ? `${SYSTEM}\n\nStanding instructions from the admin, always to be followed:\n${standing}`
@@ -1800,7 +1803,13 @@ class Agent {
         const turn = await this.turnOf(
           run.id,
           ai,
-          { model, system, messages, tools, maxTokens: TURN_TOKENS },
+          {
+            model,
+            system,
+            messages,
+            tools: toolsNow(),
+            maxTokens: TURN_TOKENS,
+          },
           async (text) => {
             step('error', text);
             await runs.save(run);

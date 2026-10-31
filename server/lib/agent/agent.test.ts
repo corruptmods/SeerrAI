@@ -4599,6 +4599,54 @@ describe('stopping and correcting the admin agent while it works', () => {
     );
   });
 
+  it('gives an admin who speaks up while a report run works their tools at once', async () => {
+    const user = await admin();
+    let runId = 0;
+    mock.method(ProwlarrAPI.prototype, 'search', async () => {
+      await agent.reply(runId, 'Block quillowsap too', user);
+      return [];
+    });
+    const toolNames = (body: Record<string, unknown>) =>
+      (body.tools as { name: string }[]).map((tool) => tool.name);
+    script = [
+      (body) => {
+        // Nobody has said anything to it yet.
+        assert.ok(!toolNames(body).includes('propose_change'));
+        return toolUse('search_indexers', {
+          query: 'Wendle S01E01',
+          kind: 'series',
+        });
+      },
+      (body) => {
+        assert.ok(toolNames(body).includes('propose_change'));
+        return say('I will propose blocking it.');
+      },
+    ];
+    const reporter = await getRepository(User).save(
+      new User({
+        email: 'speaking-up@test.local',
+        plexUsername: 'speaking-up',
+        permissions: 0,
+        avatar: '',
+      })
+    );
+    const held = await agent.afterReport({
+      kind: 'series',
+      serverId: 0,
+      arrId: SERIES_ID,
+      title: 'Wendle the Gentle Lantern',
+      reporter,
+      seasonNumber: 1,
+      replace: true,
+    });
+    assert.ok(held);
+    runId = held.id;
+    await agent.checkHeld();
+    const done = await waitForRun(held.id);
+    assert.equal(done.status, 'done', done.error ?? '');
+    assert.equal(script.length, 0);
+  });
+
   it('goes on with what was said as it finished, rather than losing it', async () => {
     const user = await admin();
     let runId = 0;

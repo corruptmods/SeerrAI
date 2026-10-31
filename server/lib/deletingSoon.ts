@@ -18,6 +18,8 @@ import logger from '@server/logger';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REFRESH_AFTER_MS = 15 * 60 * 1000;
+/** How soon a Keep for a title not on the schedule may ask again. */
+const MISS_REFRESH_AFTER_MS = 60 * 1000;
 
 export interface DeletingSoonCollection {
   id: number;
@@ -179,6 +181,16 @@ export const refreshDeletingSoon = async (): Promise<void> => {
   return inFlight;
 };
 
+/**
+ * When the server asked longest ago was last asked, answered or not; 0 for
+ * a server just added, which has not been asked at all.
+ */
+const oldestAttempt = (): number =>
+  Math.min(
+    ...configuredServers().map((server) => attemptedAt.get(server.id) ?? 0),
+    Date.now()
+  );
+
 const ensureFresh = async (): Promise<void> => {
   if (!refreshedOnce) {
     await refreshDeletingSoon();
@@ -187,14 +199,8 @@ const ensureFresh = async (): Promise<void> => {
 
   // By when each server was last asked, not last answered: one that cannot
   // be reached is tried again after the same wait, rather than on every call
-  // (or, if it never answered, never). A server just added has not been
-  // asked at all.
-  const oldest = Math.min(
-    ...configuredServers().map((server) => attemptedAt.get(server.id) ?? 0),
-    Date.now()
-  );
-
-  if (Date.now() - oldest > REFRESH_AFTER_MS) {
+  // (or, if it never answered, never).
+  if (Date.now() - oldestAttempt() > REFRESH_AFTER_MS) {
     // Answer from what we have; refresh in the background.
     void refreshDeletingSoon();
   }
@@ -276,7 +282,9 @@ export const keepTitle = async (
   await ensureFresh();
 
   let item = toItem(key);
-  if (!item) {
+  // It may have joined a rule since: ask again, though not more than once
+  // a minute however often someone asks to keep what isn't there.
+  if (!item && Date.now() - oldestAttempt() > MISS_REFRESH_AFTER_MS) {
     await refreshDeletingSoon();
     item = toItem(key);
   }
@@ -290,11 +298,14 @@ export const keepTitle = async (
   }
 
   const servers = new Map(configuredServers().map((s) => [s.id, s]));
+  const keptOn: string[] = [];
 
   for (const hold of holdsFor(key)) {
     const server = servers.get(hold.serverId);
 
-    if (!server) {
+    // A server that doesn't allow Keep is left alone, even when its own
+    // deletion is too far off to stop Keep being offered.
+    if (!server?.allowKeep) {
       continue;
     }
 
@@ -315,6 +326,7 @@ export const keepTitle = async (
       keptBy,
       rules: hold.collections.map((collection) => collection.title),
     });
+    keptOn.push(server.name);
   }
 
   await recordMediaEvent({
@@ -322,10 +334,7 @@ export const keepTitle = async (
     mediaType,
     type: MediaEventType.KEPT,
     userId: keptById,
-    detail: holdsFor(key)
-      .map((hold) => servers.get(hold.serverId)?.name)
-      .filter(Boolean)
-      .join(', '),
+    detail: keptOn.filter(Boolean).join(', '),
   });
 
   await refreshDeletingSoon();

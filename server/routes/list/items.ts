@@ -8,14 +8,13 @@ import { getRepository } from '@server/datasource';
 import {
   MediaList,
   MediaListItem,
-  MediaListMember,
   MediaListWatchSuggestion,
 } from '@server/entity/MediaList';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { MediaRequestWatcher } from '@server/entity/MediaRequestWatcher';
 import type { User } from '@server/entity/User';
 import { featureEnabled } from '@server/lib/features';
-import { loadAccessibleList } from '@server/lib/listAccess';
+import { accessibleListIds, loadAccessibleList } from '@server/lib/listAccess';
 import { notifyListActivity } from '@server/lib/listActivity';
 import { refreshWatchSuggestions } from '@server/lib/listWatchSync';
 import { getSeriesProgress } from '@server/lib/seriesProgress';
@@ -30,23 +29,7 @@ const listRoutes = Router();
 listRoutes.get('/markers', isAuthenticated(), async (req, res, next) => {
   try {
     const userId = req.user?.id as number;
-
-    const owned = await getRepository(MediaList).find({
-      select: { id: true },
-      where: { ownerId: userId },
-    });
-
-    const memberships = await getRepository(MediaListMember).find({
-      select: { listId: true },
-      where: { userId },
-    });
-
-    const listIds = [
-      ...new Set([
-        ...owned.map((list) => list.id),
-        ...memberships.map((member) => member.listId),
-      ]),
-    ];
+    const listIds = await accessibleListIds(userId);
 
     const onLists = listIds.length
       ? await getRepository(MediaListItem).find({
@@ -104,17 +87,7 @@ listRoutes.get('/contains', isAuthenticated(), async (req, res, next) => {
       return next({ status: 400, message: 'A valid tmdbId is required.' });
     }
 
-    const owned = await getRepository(MediaList).find({
-      where: { ownerId: userId },
-    });
-    const memberships = await getRepository(MediaListMember).find({
-      where: { userId },
-    });
-
-    const accessibleIds = [
-      ...owned.map((l) => l.id),
-      ...memberships.map((m) => m.listId),
-    ];
+    const accessibleIds = await accessibleListIds(userId);
 
     if (!accessibleIds.length) {
       return res.status(200).json([]);

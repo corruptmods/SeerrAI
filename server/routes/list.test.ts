@@ -574,6 +574,48 @@ describe('watch lists', () => {
         [22, 44]
       );
     });
+
+    it('marks titles on lists shared with this user, and says which lists', async () => {
+      const shared = await createList('Shared');
+      await call('POST', `/api/v1/list/${shared}/item`, {
+        tmdbId: 55,
+        mediaType: 'tv',
+      });
+      await call('PUT', `/api/v1/list/${shared}`, { memberIds: [member.id] });
+      const notShared = await createList('Not shared');
+      await call('POST', `/api/v1/list/${notShared}/item`, {
+        tmdbId: 66,
+        mediaType: 'movie',
+      });
+
+      actingAs = member;
+      const markers = await call<{ lists: { tmdbId: number }[] }>(
+        'GET',
+        '/api/v1/list/markers'
+      );
+      assert.deepEqual(
+        markers.body.lists.map((entry) => entry.tmdbId),
+        [55]
+      );
+
+      const contains = await call<{ listId: number; listName: string }[]>(
+        'GET',
+        '/api/v1/list/contains?tmdbId=55&mediaType=tv'
+      );
+      assert.deepEqual(contains.body, [{ listId: shared, listName: 'Shared' }]);
+      const elsewhere = await call<unknown[]>(
+        'GET',
+        '/api/v1/list/contains?tmdbId=66&mediaType=movie'
+      );
+      assert.deepEqual(elsewhere.body, []);
+
+      actingAs = outsider;
+      const stranger = await call<{ lists: unknown[] }>(
+        'GET',
+        '/api/v1/list/markers'
+      );
+      assert.deepEqual(stranger.body.lists, []);
+    });
   });
 
   describe('import', () => {

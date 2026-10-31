@@ -19,6 +19,8 @@ import path from 'path';
 const REPO = 'TRaSH-Guides/Guides';
 const BRANCH = 'master';
 const API = 'https://api.github.com';
+/** A commit, as GitHub names it: never part of a path. */
+const COMMIT = /^[0-9a-z]{1,64}$/i;
 const RAW = 'https://raw.githubusercontent.com';
 const LABEL = 'Quality';
 
@@ -146,7 +148,9 @@ const check = async (): Promise<TrashState> => {
       }
     );
     const commit = head.status === 304 ? state.commit : head.data?.sha;
-    if (!commit) throw new Error('GitHub gave no commit');
+    if (!commit || !COMMIT.test(commit)) {
+      throw new Error('GitHub gave no commit');
+    }
     const etag =
       typeof head.headers.etag === 'string' ? head.headers.etag : state.etag;
     if (kept && commit === state.commit) {
@@ -169,8 +173,12 @@ const check = async (): Promise<TrashState> => {
         headers: { Accept: 'application/vnd.github+json' },
       }
     );
+    const filesDir = path.resolve(trashDir(), 'files');
     const wanted = tree.tree.filter((entry) => {
       if (entry.type !== 'blob') return false;
+      // Kept under files/ by its path, so never one that leaves it.
+      const local = path.resolve(filesDir, entry.path);
+      if (!local.startsWith(`${filesDir}${path.sep}`)) return false;
       return (['radarr', 'sonarr'] as const).some((kind) => {
         const p = metadata.json_paths[kind];
         return (
@@ -183,7 +191,6 @@ const check = async (): Promise<TrashState> => {
       });
     });
 
-    const filesDir = path.join(trashDir(), 'files');
     const files: Record<string, unknown> = {};
     const blobs: Record<string, string> = {};
     await inBatches(wanted, 8, async (entry) => {

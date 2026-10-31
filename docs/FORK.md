@@ -78,6 +78,28 @@ that automatic.
 Then recreate the container. The image is `seerr-custom:latest`; in Compose,
 use `pull_policy: never` so it isn't looked for in a registry.
 
+### Before every build: quality presets
+
+`build.sh` runs `./quality-check.sh` first. It compares Seerr AI's own
+quality presets (`server/lib/quality/presets.ts`) with TRaSH Guides as it
+is now, against the TRaSH Guides commit they were last reviewed with
+(`server/lib/quality/trash-reviewed.json`), and says:
+
+- **Must fix**: a TRaSH Guides profile or format Seerr AI relies on is gone
+  or renamed (`TRASH_PROFILES` in `trashData.ts`, `TRASH_EQUIVALENTS` in
+  `presets.ts`), so TRaSH Guides presets would stop working.
+- **Changed since the last review**: new or removed profiles and qualities,
+  formats TRaSH Guides now refuses, formats Seerr AI mirrors that match
+  differently, and size changes.
+- What TRaSH Guides never takes that Seerr AI's own presets have nothing
+  like.
+
+It is a report and never stops the build. When it lists something, decide
+what Seerr AI's presets should take from it, change them (with tests), and
+record the review with `QUALITY_CHECK_HERE=1 ./quality-check.sh --accept`.
+The app itself checks TRaSH Guides once every 24 hours, so servers on
+TRaSH Guides presets don't wait for a build.
+
 ### Applying patches
 
 Patches exported with `bin/export-patches.sh BASE FIRST_NUMBER OUT_DIR` carry
@@ -313,6 +335,8 @@ handled. Drop the patch and that line once deepmerge releases a fix. The Node.js
 | `server/api/musicbrainz/`, `server/api/servarr/lidarr.ts` | MusicBrainz (its one shared queue) and Lidarr |
 | `server/lib/music/`, `server/lib/scanners/music/` | music: matching albums, availability, completing requests; the music scans |
 | `src/components/Music/` | music pages, cards, request cards and the artist's manage panel |
+| `server/lib/quality/`, `server/routes/settings/quality.ts` | quality profiles: presets, TRaSH Guides, building and applying them, What it does, step-down |
+| `src/components/Settings/SettingsQuality/` | the Quality settings page, its preview and What it does |
 
 ## Deliberate decisions
 
@@ -326,6 +350,12 @@ Do not undo these without reading why first — each was tried the other way.
   default cache and a provider takes the app out of it.
 - **Roulette and list sections only offer watchable titles.** A partially
   available series counts; something still downloading does not.
+- **Quality profiles are never pushed on their own.** A server is Not
+  managed until an admin turns it on, and nothing is sent until they press
+  Apply after a preview; TRaSH Guides updates wait unless Apply updates
+  automatically is on. Only what Seerr AI created (named `Seerr AI · …`)
+  is changed, apart from the default delay profile, which the preview marks
+  as shared. Titles move onto its profiles only when the admin picks it.
 - **Import never adds without review.** Automatic title matching gets things
   wrong, and silently adding the wrong film is worse than no feature.
 - **Passkeys belong to the Application URL.** With it set (Settings →

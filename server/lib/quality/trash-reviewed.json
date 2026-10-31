@@ -1,0 +1,362 @@
+{
+  "commit": "d24f13ceea5e82ccc20d08b7814fca93840e4046",
+  "date": "2026-10-28T04:27:32Z",
+  "facts": {
+    "radarr": {
+      "profiles": {
+        "722b624f9af1e492284c4bc842153a38": "[Anime] Remux-1080p",
+        "500ecc23572575511fd81893777d1e06": "[French MULTi.VF] HD Bluray + WEB",
+        "6b93fe45f357e9a94228e5d4658e9bb5": "[French MULTi.VF] HD Remux (1080p)",
+        "e64b266178c7f70e208f493f00e0e50a": "[French MULTi.VF] UHD Bluray + WEB",
+        "595bb95c6b6970468880069dce23e1d2": "[French MULTi.VF] UHD Remux (2160p)",
+        "2572ce3ea4eef1c19d59e0e20ed1cea7": "[French MULTi.VO] HD Bluray + WEB",
+        "c6460a102b312200c095a2d0982e0461": "[French MULTi.VO] HD Remux (1080p)",
+        "92ead7022d13a7858d54e328e6a2f8f9": "[French MULTi.VO] UHD Bluray + WEB",
+        "1fef28c8c919f31cd86283b1baf527d4": "[French MULTi.VO] UHD Remux (2160p)",
+        "1addc08c4232bc2617684d517df15f75": "[French VOSTFR] HD Bluray + WEB",
+        "d98f20924b001e9f6b9595d5440abc87": "[French VOSTFR] HD Remux (1080p)",
+        "525bf0513e2ac22fe116e8d7bec0a6b5": "[French VOSTFR] UHD Bluray + WEB",
+        "9b32fc61d8ec83ed131f50f1db80505a": "[French VOSTFR] UHD Remux (2160p)",
+        "bf3cc2e99ad9a804a9b0d0e538e1fbba": "[German] Anime HD Bluray + WEB",
+        "2b90e905c99490edc7c7a5787443748b": "[German] HD Bluray + WEB",
+        "c13c33fdd2c306266b34cb9946de5919": "[German] HD Remux + WEB",
+        "79faa9943cef2f510b997b1f2a9f3ea6": "[German] Remux + WEB 2160p",
+        "27cc3d153c0a799fd139ef1ff4c4cc42": "[German] UHD Bluray + WEB",
+        "425da1ba30711b55d2eb371437ec98d7": "[German] UHD Bluray + WEB (Alternative)",
+        "0896c29d74de619df168d23b98104b22": "[SQP] SQP-1 (1080p)",
+        "5128baeb2b081b72126bc8482b2a86a0": "[SQP] SQP-1 (2160p)",
+        "90a3370d2d30cbaf08d9c23b856a12c8": "[SQP] SQP-1 WEB (1080p)",
+        "e91c9adaca0231493f4af0d571b907f9": "[SQP] SQP-1 WEB (2160p)",
+        "c3933358ba2356bafc41524f81471069": "[SQP] SQP-2",
+        "2cf36c1f0106ffac993be003ade51865": "[SQP] SQP-3",
+        "0ada8e60cc3ddf2733b65de10f4a6c72": "[SQP] SQP-3 (Audio)",
+        "013f89e6da27519fe56cf482702a2db9": "[SQP] SQP-4",
+        "7526db7ac0a1f764793fb181864d0222": "[SQP] SQP-4 (MA Hybrid)",
+        "a7bb1539fd147256b21b1098f3dc2016": "[SQP] SQP-5",
+        "92e9a65a52ae48478fb8e9f34238d823": "Base Profile",
+        "d1d67249d3890e49bc12e275d989a7e9": "HD Bluray + WEB",
+        "9ca12ea80aa55ef916e3751f4b874151": "Remux + WEB 1080p",
+        "fd161a61e3ab826d3a22d53f935696dd": "Remux + WEB 2160p",
+        "dd3cd75deb9645bae838d1c5da6388d5": "Remux 2160p (Alternative)",
+        "d1d310673359205736b4b84acd5ea8c8": "Remux 2160p (Combined)",
+        "64fb5f9858489bdac2af690e27c8f42f": "UHD Bluray + WEB",
+        "e8c5acb741363a0dbda67d3978f4912f": "WEB 1080p",
+        "0537bd27bcf8da604f30a862343b1742": "WEB 2160p",
+        "05fbf054ac8ad0303335026cc2632f1a": "WEBDL 2160p (Combined)"
+      },
+      "qualities": [
+        "BR-DISK",
+        "Bluray-1080p",
+        "Bluray-2160p",
+        "Bluray-480p",
+        "Bluray-576p",
+        "Bluray-720p",
+        "Bluray|WEB 1080p",
+        "Bluray|WEB 2160p",
+        "Bluray|WEB-1080p",
+        "Bluray|WEB-2160p",
+        "CAM",
+        "DVD",
+        "DVD-R",
+        "DVDSCR",
+        "HDTV-1080p",
+        "HDTV-2160p",
+        "HDTV-720p",
+        "Merged QPs",
+        "REGIONAL",
+        "Raw-HD",
+        "Remux 1080p",
+        "Remux-1080p",
+        "Remux-2160p",
+        "SDTV",
+        "TELECINE",
+        "TELESYNC",
+        "Unknown",
+        "WEB 1080p",
+        "WEB 2160p",
+        "WEB 480p",
+        "WEB 720p",
+        "WEBDL-1080p",
+        "WEBDL-1080p | WEBRip-1080p",
+        "WEBDL-2160p",
+        "WEBDL-2160p | WEBRip-2160p",
+        "WEBDL-480p",
+        "WEBDL-480p | WEBRip-480p",
+        "WEBDL-720p",
+        "WEBDL-720p | WEBRip-720p",
+        "WEBDL|Bluray|2160p",
+        "WEBRip-1080p",
+        "WEBRip-2160p",
+        "WEBRip-480p",
+        "WEBRip-720p",
+        "WEB|2160p",
+        "WEB|Remux|2160p",
+        "WEB|Remux|Bluray|2160p",
+        "WORKPRINT"
+      ],
+      "never": [
+        "3D",
+        "AV1",
+        "Anime LQ Groups",
+        "Anime Raws",
+        "BR-DISK",
+        "Bad Dual Groups",
+        "Black and White Editions",
+        "Dubs Only",
+        "Extras",
+        "Generated Dynamic HDR",
+        "LQ",
+        "LQ (Release Title)",
+        "Line/Mic Dubbed",
+        "Sing-Along Versions",
+        "Upscaled",
+        "VOSTFR",
+        "x265 (HD)",
+        "x265 (no HDR/DV)"
+      ],
+      "mirrored": {
+        "Repack/Proper": "659626840809f596",
+        "HDR": "dcecc629a4914e96",
+        "x265 (HD)": "5fd56b316fd22aa9",
+        "Upscaled": "626ca9049fcab0eb",
+        "Language: Not English": "9c5f4808cf47931c",
+        "Language: Not Original": "cba4a160632d984d",
+        "Anime Dual Audio": "c126a3af34c11852"
+      },
+      "sizes": {
+        "HDTV-720p": [
+          17.1,
+          1999,
+          2000
+        ],
+        "WEBDL-720p": [
+          12.5,
+          1999,
+          2000
+        ],
+        "WEBRip-720p": [
+          12.5,
+          1999,
+          2000
+        ],
+        "Bluray-720p": [
+          25.7,
+          1999,
+          2000
+        ],
+        "HDTV-1080p": [
+          33.8,
+          1999,
+          2000
+        ],
+        "WEBDL-1080p": [
+          12.5,
+          1999,
+          2000
+        ],
+        "WEBRip-1080p": [
+          12.5,
+          1999,
+          2000
+        ],
+        "Bluray-1080p": [
+          50.8,
+          1999,
+          2000
+        ],
+        "Remux-1080p": [
+          102,
+          1999,
+          2000
+        ],
+        "HDTV-2160p": [
+          85,
+          1999,
+          2000
+        ],
+        "WEBDL-2160p": [
+          34.5,
+          1999,
+          2000
+        ],
+        "WEBRip-2160p": [
+          34.5,
+          1999,
+          2000
+        ],
+        "Bluray-2160p": [
+          102,
+          1999,
+          2000
+        ],
+        "Remux-2160p": [
+          187.4,
+          1999,
+          2000
+        ]
+      }
+    },
+    "sonarr": {
+      "profiles": {
+        "20e0fc959f1f1704bed501f23bdae76f": "[Anime] Remux-1080p",
+        "58e8dc75731040612dd6f4ac0676bfd7": "[French MULTi.VF] HD Bluray + WEB (1080p)",
+        "68c8b82ad2b7ea1941fce71eb56421c3": "[French MULTi.VF] UHD Bluray + WEB (2160p)",
+        "4c48f506c1116a3a57ae33f12346bd15": "[French MULTi.VO] HD Bluray + WEB (1080p)",
+        "6fa7364373e8f06206871d9c20a4fb3e": "[French MULTi.VO] UHD Bluray + WEB (2160p)",
+        "b34c968f58433a38e0e690d42a1dc37e": "[French VOSTFR] HD Bluray + WEB (1080p)",
+        "d6252dce6af535107ed4b03e68052ae8": "[French VOSTFR] UHD Bluray + WEB (2160p)",
+        "6fe5937e1dcc2269e23b49eb46dfe6d6": "[German] Anime HD Bluray + WEB",
+        "dca7e5e9e99c703bcbdaaa471dd40e98": "[German] HD Bluray + WEB",
+        "0dd5f085ed61a1e01f6d347779dfa1bc": "[German] HD Remux + WEB",
+        "3b0fa37fddaaefc931b75f2889d4b4f5": "[German] UHD Bluray + WEB",
+        "7324309a7d1e10dc0dc2cea6c70ed852": "[German] UHD Bluray + WEB (Alternative)",
+        "08cececf1840290f6fd490b7d79e8642": "[German] UHD Remux + WEB",
+        "e58cf4e090184db3b3d7c79c1a9e9b4a": "Base Profile",
+        "fe9470e577c300a5ad9a3274f6d1cdf2": "Remux + WEB 1080p",
+        "76a5053bdb2d1e4a8f16a69a37d46c12": "Remux + WEB 2160p",
+        "361717d531db5a6002e0f547ace46551": "Remux 2160p (Alternative)",
+        "911df0e05a395c19d8b3efc76a7467c1": "Remux 2160p (Combined)",
+        "72dae194fc92bf828f32cde7744e51a1": "WEB-1080p",
+        "9d142234e45d6143785ac55f5a9e8dc9": "WEB-1080p (Alternative)",
+        "d1498e7d189fbe6c7110ceaabb7473e6": "WEB-2160p",
+        "dfa5eaae7894077ad6449169b6eb03e0": "WEB-2160p (Alternative)",
+        "c4cadd6b35b95f62c3d47a408e53e2f7": "WEB-2160p (Combined)"
+      },
+      "qualities": [
+        "Bluray 1080p",
+        "Bluray-1080p",
+        "Bluray-1080p Remux",
+        "Bluray-2160p",
+        "Bluray-2160p Remux",
+        "Bluray-480p",
+        "Bluray-576p",
+        "Bluray-720p",
+        "Bluray|WEB 1080p",
+        "Bluray|WEB 2160p",
+        "Bluray|WEB 720p",
+        "DVD",
+        "HDTV-1080p",
+        "HDTV-2160p",
+        "HDTV-720p",
+        "Merged QPs",
+        "Raw-HD",
+        "SDTV",
+        "Unknown",
+        "WEB 1080p",
+        "WEB 2160p",
+        "WEB 480p",
+        "WEB 720p",
+        "WEBDL-1080p",
+        "WEBDL-1080p | WEBRip-1080p",
+        "WEBDL-2160p",
+        "WEBDL-2160p | WEBRip-2160p",
+        "WEBDL-480p",
+        "WEBDL-480p | WEBRip-480p",
+        "WEBDL-720p",
+        "WEBDL-720p | WEBRip-720p",
+        "WEBRip-1080p",
+        "WEBRip-2160p",
+        "WEBRip-480p",
+        "WEBRip-720p"
+      ],
+      "never": [
+        "AV1",
+        "Anime LQ Groups",
+        "Anime Raws",
+        "BR-DISK",
+        "Bad Dual Groups",
+        "Dubs Only",
+        "Extras",
+        "LQ",
+        "LQ (Release Title)",
+        "Language: Not Original",
+        "Upscaled",
+        "VOSTFR",
+        "x265 (HD)",
+        "x265 (no HDR/DV)"
+      ],
+      "mirrored": {
+        "Repack/Proper": "659626840809f596",
+        "HDR": "dcecc629a4914e96",
+        "x265 (HD)": "5fd56b316fd22aa9",
+        "Upscaled": "864ade7eeeaf6e9d",
+        "Language: Not English": "9c5f4808cf47931c",
+        "Language: Not Original": "cba4a160632d984d",
+        "Anime Dual Audio": "c126a3af34c11852",
+        "Multi-Episode": "cf5b7789110f9b75"
+      },
+      "sizes": {
+        "HDTV-720p": [
+          10,
+          995,
+          1000
+        ],
+        "HDTV-1080p": [
+          15,
+          995,
+          1000
+        ],
+        "WEBRip-720p": [
+          10,
+          995,
+          1000
+        ],
+        "WEBDL-720p": [
+          10,
+          995,
+          1000
+        ],
+        "Bluray-720p": [
+          17.1,
+          995,
+          1000
+        ],
+        "WEBRip-1080p": [
+          15,
+          995,
+          1000
+        ],
+        "WEBDL-1080p": [
+          15,
+          995,
+          1000
+        ],
+        "Bluray-1080p": [
+          50.4,
+          995,
+          1000
+        ],
+        "Bluray-1080p Remux": [
+          69.1,
+          995,
+          1000
+        ],
+        "HDTV-2160p": [
+          25,
+          995,
+          1000
+        ],
+        "WEBRip-2160p": [
+          25,
+          995,
+          1000
+        ],
+        "WEBDL-2160p": [
+          25,
+          995,
+          1000
+        ],
+        "Bluray-2160p": [
+          94.6,
+          995,
+          1000
+        ],
+        "Bluray-2160p Remux": [
+          187.4,
+          995,
+          1000
+        ]
+      }
+    }
+  }
+}

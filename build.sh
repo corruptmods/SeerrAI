@@ -4,6 +4,11 @@ cd "$(dirname "$0")"
 
 git pull
 
+# Seerr AI's own quality presets against TRaSH Guides: what changed since
+# they were last reviewed (quality-check.sh). A report; it never stops it.
+./quality-check.sh
+echo
+
 # Nothing is built while a security advisory stands (security-check.sh).
 if ! ./security-check.sh; then
   echo

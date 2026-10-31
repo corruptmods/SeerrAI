@@ -20,3 +20,7 @@ public/*
 
 # Prettier breaks GitHub alert syntax in markdown
 *.md
+
+# Written by the pre-build quality review (--accept)
+server/lib/quality/trash-reviewed.json
+.cache/

@@ -3,6 +3,7 @@ import { getRepository } from '@server/datasource';
 import type { MediaList, MediaListItem } from '@server/entity/MediaList';
 import { MediaListMember } from '@server/entity/MediaList';
 import type { User } from '@server/entity/User';
+import { listTitle } from '@server/lib/listTitles';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import logger from '@server/logger';
 
@@ -13,6 +14,14 @@ const VERBS: Record<ListActivity, string> = {
   removed: 'removed',
   watched: 'marked as watched',
 };
+
+/**
+ * What to call whoever made a change. displayName is populated when a user
+ * is loaded from the database; the fallbacks keep a notification from
+ * reading "undefined added ...".
+ */
+const nameOf = (actor: User): string =>
+  actor.displayName || actor.plexUsername || actor.username || 'Someone';
 
 /**
  * Tells everyone who shares a list that its contents changed.
@@ -50,29 +59,16 @@ export const notifyListActivity = async (
       return;
     }
 
-    // displayName is populated when a user is loaded from the database; fall
-    // back so a notification never reads "undefined added ...".
-    const actorName =
-      actor.displayName || actor.plexUsername || actor.username || 'Someone';
-
     const tmdb = new TheMovieDb();
     let title = `TMDB ${item.tmdbId}`;
     let image: string | undefined;
 
     try {
-      if (item.mediaType === 'movie') {
-        const movie = await tmdb.getMovie({ movieId: item.tmdbId });
-        title = movie.title;
-        image = movie.poster_path
-          ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${movie.poster_path}`
-          : undefined;
-      } else {
-        const tv = await tmdb.getTvShow({ tvId: item.tmdbId });
-        title = tv.name;
-        image = tv.poster_path
-          ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${tv.poster_path}`
-          : undefined;
-      }
+      const found = await listTitle(tmdb, item.tmdbId, item.mediaType);
+      title = found.title;
+      image = found.posterPath
+        ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${found.posterPath}`
+        : undefined;
     } catch {
       // A title without metadata is still worth announcing.
     }
@@ -84,7 +80,7 @@ export const notifyListActivity = async (
         notifySystem: false,
         notifyUser: recipient,
         subject: list.name,
-        message: `${actorName} ${VERBS[activity]} ${title}.`,
+        message: `${nameOf(actor)} ${VERBS[activity]} ${title}.`,
         image,
       });
     }
@@ -116,9 +112,6 @@ export const notifyListShared = async (
     return;
   }
 
-  const actorName =
-    actor.displayName || actor.plexUsername || actor.username || 'Someone';
-
   try {
     for (const recipient of recipients) {
       notificationManager.sendNotification(Notification.LIST_ACTIVITY, {
@@ -127,7 +120,7 @@ export const notifyListShared = async (
         notifySystem: false,
         notifyUser: recipient,
         subject: list.name,
-        message: `${actorName} shared the list "${list.name}" with you.`,
+        message: `${nameOf(actor)} shared the list "${list.name}" with you.`,
       });
     }
   } catch (e) {

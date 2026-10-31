@@ -15,6 +15,7 @@ import { getRepository } from '@server/datasource';
 import { MediaList, MediaListItem } from '@server/entity/MediaList';
 import type { User } from '@server/entity/User';
 import { loadAccessibleList } from '@server/lib/listAccess';
+import { listTitle } from '@server/lib/listTitles';
 import { requestMissing } from '@server/lib/requestMissing';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -230,26 +231,17 @@ listRoutes.post(
         const tmdbId = Number(entry.tmdbId);
         if (Number.isInteger(tmdbId) && tmdbId > 0) {
           try {
-            const candidate =
-              entry.mediaType === 'tv'
-                ? await tmdb.getTvShow({ tvId: tmdbId }).then((tv) => ({
-                    tmdbId,
-                    mediaType: 'tv' as const,
-                    title: tv.name,
-                    year: tv.first_air_date
-                      ? Number(tv.first_air_date.slice(0, 4))
-                      : undefined,
-                    posterPath: tv.poster_path ?? null,
-                  }))
-                : await tmdb.getMovie({ movieId: tmdbId }).then((movie) => ({
-                    tmdbId,
-                    mediaType: 'movie' as const,
-                    title: movie.title,
-                    year: movie.release_date
-                      ? Number(movie.release_date.slice(0, 4))
-                      : undefined,
-                    posterPath: movie.poster_path ?? null,
-                  }));
+            const mediaType = entry.mediaType === 'tv' ? 'tv' : 'movie';
+            const found = await listTitle(tmdb, tmdbId, mediaType);
+            const candidate = {
+              tmdbId,
+              mediaType,
+              title: found.title,
+              year: found.releaseDate
+                ? Number(found.releaseDate.slice(0, 4))
+                : undefined,
+              posterPath: found.posterPath ?? null,
+            };
             return { raw, query: title, year, candidates: [candidate] };
           } catch (e) {
             logger.debug('A Trakt title is not on TMDB under its id', {

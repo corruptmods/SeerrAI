@@ -18,6 +18,7 @@ import { User } from '@server/entity/User';
 import { warmTmdbImages } from '@server/lib/imageproxy';
 import { loadAccessibleList } from '@server/lib/listAccess';
 import { notifyListShared } from '@server/lib/listActivity';
+import { listTitle } from '@server/lib/listTitles';
 import { musicAllowed, playlistView } from '@server/lib/playlists/view';
 import { getSettings } from '@server/lib/settings';
 import { watchSource } from '@server/lib/watchHistory';
@@ -108,10 +109,11 @@ listRoutes.get('/', isAuthenticated(), async (req, res, next) => {
        */
       const fetched = await mapWithConcurrency(missing, 4, async (item) => {
         try {
-          const posterPath =
-            item.mediaType === 'movie'
-              ? (await tmdb.getMovie({ movieId: item.tmdbId })).poster_path
-              : (await tmdb.getTvShow({ tvId: item.tmdbId })).poster_path;
+          const { posterPath } = await listTitle(
+            tmdb,
+            item.tmdbId,
+            item.mediaType
+          );
 
           return posterPath ? { item, posterPath } : null;
         } catch (e) {
@@ -300,32 +302,14 @@ listRoutes.get<{ listId: string }>(
         };
 
         try {
-          if (item.mediaType === 'movie') {
-            const movie = await tmdb.getMovie({ movieId: item.tmdbId });
-
-            return {
-              ...base,
-              title: movie.title,
-              posterPath: item.posterPath ?? movie.poster_path,
-              releaseDate: movie.release_date,
-            };
-          }
-
-          const tv = await tmdb.getTvShow({ tvId: item.tmdbId });
+          // A series' total episodes let a partially available one say how
+          // much of it is actually here.
+          const found = await listTitle(tmdb, item.tmdbId, item.mediaType);
 
           return {
             ...base,
-            title: tv.name,
-            posterPath: item.posterPath ?? tv.poster_path,
-            releaseDate: tv.first_air_date,
-            // Total real episodes, ignoring specials, so a partially
-            // available show can say how much of it is actually here.
-            totalEpisodes: (tv.seasons ?? [])
-              .filter((season) => season.season_number > 0)
-              .reduce(
-                (total, season) => total + (season.episode_count ?? 0),
-                0
-              ),
+            ...found,
+            posterPath: item.posterPath ?? found.posterPath,
           };
         } catch (e) {
           // A title TMDB no longer serves still belongs on the list, and the

@@ -16,6 +16,7 @@ import type { User } from '@server/entity/User';
 import { featureEnabled } from '@server/lib/features';
 import { accessibleListIds, loadAccessibleList } from '@server/lib/listAccess';
 import { notifyListActivity } from '@server/lib/listActivity';
+import { listTitle } from '@server/lib/listTitles';
 import { refreshWatchSuggestions } from '@server/lib/listWatchSync';
 import { getSeriesProgress } from '@server/lib/seriesProgress';
 import logger from '@server/logger';
@@ -214,17 +215,12 @@ listRoutes.get('/suggestions', isAuthenticated(), async (req, res, next) => {
         };
 
         try {
-          if (suggestion.item?.mediaType === 'movie') {
-            const movie = await tmdb.getMovie({ movieId: base.tmdbId });
-            return {
-              ...base,
-              title: movie.title,
-              posterPath: movie.poster_path,
-            };
-          }
-
-          const tv = await tmdb.getTvShow({ tvId: base.tmdbId });
-          return { ...base, title: tv.name, posterPath: tv.poster_path };
+          const { title, posterPath } = await listTitle(
+            tmdb,
+            base.tmdbId,
+            base.mediaType
+          );
+          return { ...base, title, posterPath };
         } catch (e) {
           logger.debug('Could not hydrate a list preview', {
             label: 'API',
@@ -326,11 +322,8 @@ listRoutes.post<{ listId: string }>(
         let posterPath: string | null = null;
 
         try {
-          const tmdbClient = new TheMovieDb();
           posterPath =
-            (mediaType === 'movie'
-              ? (await tmdbClient.getMovie({ movieId: tmdbId })).poster_path
-              : (await tmdbClient.getTvShow({ tvId: tmdbId })).poster_path) ??
+            (await listTitle(new TheMovieDb(), tmdbId, mediaType)).posterPath ??
             null;
         } catch (e) {
           // Backfilled on the next overview load.

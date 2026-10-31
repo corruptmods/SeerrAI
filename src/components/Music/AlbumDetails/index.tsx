@@ -150,7 +150,7 @@ const TrackList = ({
                         <span className="w-8 shrink-0 text-right tabular-nums text-gray-500">
                           {track.number ?? track.position}
                         </span>
-                        <span className="min-w-0 flex-1 truncate text-gray-200">
+                        <span className="min-w-0 flex-1 break-words text-gray-200">
                           {track.title}
                         </span>
                         <span className="shrink-0 tabular-nums text-muted">

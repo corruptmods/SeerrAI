@@ -203,7 +203,7 @@ const MediaSlider = ({
       <div className="slider-header">
         {linkUrl ? (
           <Link href={linkUrl} className="slider-title min-w-0 pr-16">
-            <span className="truncate">{title}</span>
+            <span className="min-w-0 sm:truncate">{title}</span>
             <ArrowRightCircleIcon />
           </Link>
         ) : (

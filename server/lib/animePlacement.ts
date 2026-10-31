@@ -9,12 +9,16 @@ import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import {
-  hasAnimeProfile,
   judgeMovie,
   judgeSeries,
+  onWrongProfile,
 } from '@server/lib/animeCheck';
 import type { AnimeDecidedBy } from '@server/lib/animeDecision';
-import { decideAnime, detectAnime } from '@server/lib/animeDecision';
+import {
+  decideAnime,
+  detectAnime,
+  requestSeriesType,
+} from '@server/lib/animeDecision';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -99,11 +103,7 @@ export const seriesChanges = (
         ? server.seriesType
         : 'standard';
   }
-  // Other series may sit on any profile but the anime one.
-  if (
-    hasAnimeProfile(server) &&
-    anime !== (series.qualityProfileId === server.activeAnimeProfileId)
-  ) {
+  if (onWrongProfile(series.qualityProfileId, anime, server)) {
     changes.qualityProfileId = anime
       ? server.activeAnimeProfileId
       : server.activeProfileId;
@@ -131,11 +131,8 @@ export const movieChanges = (
 };
 
 /** The series type chosen on the title's newest request that has one. */
-const requestSeriesType = (media: Media, is4k: boolean) => {
-  const seriesType =
-    (media.requests ?? [])
-      .filter((r) => r.is4k === is4k && r.seriesType)
-      .sort((a, b) => b.id - a.id)[0]?.seriesType ?? null;
+const requestTypeOf = (media: Media, is4k: boolean) => {
+  const seriesType = requestSeriesType(media.requests ?? [], is4k);
   // A movie is only ever anime or not.
   return media.mediaType === MediaType.MOVIE &&
     seriesType !== 'anime' &&
@@ -189,7 +186,7 @@ const placeOnServer = async (
   arrId: number,
   is4k: boolean
 ): Promise<AnimePlacementServer & { arrId: number }> => {
-  const requestType = requestSeriesType(media, is4k);
+  const requestType = requestTypeOf(media, is4k);
   const { anime, decidedBy } = decideAnime(
     details,
     requestType,
@@ -261,7 +258,7 @@ const place = async (media: Media) => {
     media.mediaType === MediaType.MOVIE
       ? await tmdb.getMovieForScan({ movieId: media.tmdbId })
       : await tmdb.getTvShowForScan({ tvId: media.tmdbId });
-  const requestType = requestSeriesType(media, false);
+  const requestType = requestTypeOf(media, false);
   const { anime, decidedBy } = decideAnime(
     details,
     requestType,

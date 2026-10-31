@@ -13,6 +13,19 @@ export const detectAnime = (media: AnimeSignals): boolean =>
 /** Who decided whether a title is anime. */
 export type AnimeDecidedBy = 'title' | 'request' | 'detection';
 
+/** The series type chosen on the newest of a title's requests that has one. */
+export const requestSeriesType = (
+  requests: readonly {
+    id: number;
+    is4k: boolean;
+    seriesType?: SeriesType | null;
+  }[],
+  is4k: boolean
+): SeriesType | null =>
+  requests
+    .filter((r) => r.is4k === is4k && r.seriesType)
+    .sort((a, b) => b.id - a.id)[0]?.seriesType ?? null;
+
 /**
  * Whether a title is anime, and who said so: the series type on its request
  * (ticked or unticked as Anime by whoever requested it, or set by an

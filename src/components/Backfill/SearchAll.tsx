@@ -127,7 +127,7 @@ const SearchAllPanel = ({
               done={running.done === running.total}
             />
             {running.current && (
-              <p className="truncate text-xs text-gray-400">
+              <p className="break-words text-xs text-gray-400">
                 {intl.formatMessage(messages.now, { title: running.current })}
               </p>
             )}

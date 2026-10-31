@@ -162,7 +162,7 @@ const BackfillForTitle = ({
                   <div className="flex items-start justify-between gap-2">
                     {/* Two lines, so the episode in the release's name
                         shows on a narrow box. */}
-                    <div className="line-clamp-2 min-w-0 break-words text-sm text-strong">
+                    <div className="min-w-0 text-sm text-strong [overflow-wrap:anywhere] sm:line-clamp-2">
                       {job.title}
                     </div>
                     <span className="flex-shrink-0">

@@ -235,7 +235,7 @@ const WorkStep = ({ step }: { step: AgentStep }) => {
   return (
     <details className="group/result ml-6 rounded-md bg-gray-900/60 ring-1 ring-gray-700">
       <summary className="flex cursor-pointer list-none items-start gap-2 px-3 py-1.5 text-xs text-gray-300 marker:hidden">
-        <span className="min-w-0 flex-1 truncate">{first}</span>
+        <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{first}</span>
         {more && (
           <span className="flex-none text-indigo-300 group-open/result:hidden light:text-accent-text">
             {intl.formatMessage(runMessages.showResult)}

@@ -200,7 +200,7 @@ const StartSearchModal = ({
                           <span className="text-gray-400">({o.year})</span>
                         )}
                         {o.artist && (
-                          <span className="block truncate text-xs text-gray-400">
+                          <span className="block break-words text-xs text-gray-400">
                             {o.artist}
                           </span>
                         )}

@@ -183,7 +183,7 @@ export const RunRow = ({
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-start justify-between gap-2">
-            <span className="truncate font-semibold text-strong">
+            <span className="min-w-0 break-words font-semibold text-strong">
               {heading}
             </span>
             <span className="flex-none">
@@ -191,7 +191,7 @@ export const RunRow = ({
             </span>
           </span>
           {!byAsk && run.title && run.ask && (
-            <span className="block truncate text-sm text-gray-400">
+            <span className="block break-words text-sm text-gray-400">
               “{run.ask}”
             </span>
           )}
@@ -199,13 +199,13 @@ export const RunRow = ({
             <RunMeta run={run} />
           </span>
           {run.status === 'waiting' && run.question ? (
-            <span className="mt-1 line-clamp-2 text-sm text-yellow-200 light:text-warning-text">
+            <span className="mt-1 block break-words text-sm text-yellow-200 light:text-warning-text sm:line-clamp-2">
               {run.question}
             </span>
           ) : (
             (run.summary || run.error) && (
               <span
-                className={`mt-1 line-clamp-2 text-sm ${
+                className={`mt-1 block break-words text-sm sm:line-clamp-2 ${
                   run.error ? 'text-red-300' : 'text-gray-300'
                 }`}
               >

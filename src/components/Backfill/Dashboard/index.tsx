@@ -120,7 +120,7 @@ const Stat = ({
       <div className={`rounded-lg p-2 ${tone}`}>{icon}</div>
     </div>
     <div className="mt-2 text-3xl font-bold text-strong">{value}</div>
-    <div className="mt-auto truncate pt-1 text-sm text-gray-500">{hint}</div>
+    <div className="mt-auto break-words pt-1 text-sm text-gray-500">{hint}</div>
   </div>
 );
 
@@ -376,7 +376,7 @@ const BackfillDashboard = () => {
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="truncate font-semibold text-strong">
+                        <div className="min-w-0 break-words font-semibold text-strong">
                           {job.series?.title}
                         </div>
                         <JobStatusBadge
@@ -385,11 +385,11 @@ const BackfillDashboard = () => {
                           kind={job.series?.kind}
                         />
                       </div>
-                      <div className="mt-0.5 truncate text-xs text-gray-400">
+                      <div className="mt-0.5 text-xs text-gray-400 [overflow-wrap:anywhere]">
                         {job.title}
                       </div>
                       {job.stage && (
-                        <div className="truncate text-xs text-gray-500">
+                        <div className="break-words text-xs text-gray-500">
                           {jobStage(intl, job)}
                         </div>
                       )}
@@ -434,10 +434,10 @@ const BackfillDashboard = () => {
                       title={c.series?.title ?? c.title}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold text-strong">
+                      <div className="break-words font-semibold text-strong">
                         {c.series?.title}
                       </div>
-                      <div className="truncate text-xs text-gray-400">
+                      <div className="break-words text-xs text-gray-400">
                         {[c.summary?.quality, line(c, c.series?.kind)]
                           .filter(Boolean)
                           .join(' · ')}
@@ -513,7 +513,7 @@ const BackfillDashboard = () => {
                       : 'border-transparent text-gray-400 hover:text-gray-200'
                   }`}
                 >
-                  <span className="whitespace-nowrap">{tab.label}</span>
+                  <span className="text-center">{tab.label}</span>
                   {tab.count !== undefined && (
                     <span className="rounded-full bg-gray-700 px-2 py-0.5 text-xs tabular-nums text-gray-200">
                       {tab.count}
@@ -552,11 +552,11 @@ const BackfillDashboard = () => {
                       <div className="min-w-0">
                         <Link
                           href={`/backfill/series/${row.id}`}
-                          className="block truncate font-semibold text-strong hover:underline"
+                          className="block break-words font-semibold text-strong hover:underline"
                         >
                           {row.title}
                         </Link>
-                        <div className="truncate text-xs text-gray-500">
+                        <div className="break-words text-xs text-gray-500">
                           {row.lastArrSearchAt
                             ? intl.formatMessage(messages.lastSearch, {
                                 app: appName(row.kind),
@@ -580,7 +580,7 @@ const BackfillDashboard = () => {
                     </div>
                     <div className="flex flex-wrap items-center gap-2 sm:w-[46%] sm:flex-nowrap">
                       <TypeBadge kind={row.kind} seriesType={row.seriesType} />
-                      <span className="whitespace-nowrap text-sm text-gray-300">
+                      <span className="text-sm text-gray-300">
                         {row.kind === 'movie'
                           ? intl.formatMessage(
                               row.missing

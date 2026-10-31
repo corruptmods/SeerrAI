@@ -495,7 +495,7 @@ const SeriesReview = () => {
                     </span>
                     {/* Green: the chosen pack has it. */}
                     <span
-                      className={`min-w-0 flex-1 truncate ${
+                      className={`min-w-0 flex-1 break-words ${
                         covered.has(track.id)
                           ? 'text-green-300 light:text-success-text'
                           : 'text-gray-200'
@@ -963,7 +963,7 @@ const SeriesReview = () => {
               <div className="min-w-0 flex-1">
                 <Link
                   href={`/backfill/jobs/${job.id}`}
-                  className="block truncate text-gray-200 hover:underline"
+                  className="block text-gray-200 [overflow-wrap:anywhere] hover:underline"
                 >
                   {job.title}
                 </Link>

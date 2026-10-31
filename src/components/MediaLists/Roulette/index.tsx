@@ -233,7 +233,7 @@ const Roulette = ({ items, onClose }: RouletteProps) => {
         </div>
 
         <div className="mt-4 flex items-center justify-between">
-          <p className="min-w-0 truncate text-lg font-bold text-strong">
+          <p className="min-w-0 break-words text-lg font-bold text-strong">
             {isSpinning ? '\u00A0' : (winner.title ?? '')}
           </p>
           <div className="ml-4 flex flex-none space-x-2">

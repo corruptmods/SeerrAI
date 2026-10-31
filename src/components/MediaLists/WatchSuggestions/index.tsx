@@ -146,7 +146,7 @@ const WatchSuggestions = () => {
                     size="w92"
                   />
                 )}
-                <span className="min-w-0 flex-1 truncate">
+                <span className="min-w-0 flex-1 break-words">
                   <span className="font-semibold">
                     {suggestion.title ?? suggestion.tmdbId}
                   </span>{' '}

@@ -122,10 +122,10 @@ const PlaylistSongs = ({
           />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-strong">
+          <div className="break-words text-sm font-semibold text-strong">
             {song.title}
           </div>
-          <div className="truncate text-xs text-muted">
+          <div className="break-words text-xs text-muted">
             {song.artistMbid ? (
               <Link
                 href={`/music/artist/${song.artistMbid}`}

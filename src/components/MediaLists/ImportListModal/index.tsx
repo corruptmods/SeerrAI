@@ -442,7 +442,7 @@ const ImportListModal = ({
                       className="rounded border border-gray-700 bg-gray-900/40 p-2"
                       key={`line-${index}`}
                     >
-                      <p className="mb-1 truncate text-xs text-gray-400">
+                      <p className="mb-1 text-xs text-gray-400 [overflow-wrap:anywhere]">
                         {line.raw}
                       </p>
 

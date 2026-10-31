@@ -227,7 +227,7 @@ const ListCard = ({
       <div className="list-card-gradient absolute inset-0" />
 
       <div className="absolute inset-x-0 bottom-0 p-4">
-        <h3 className="truncate text-lg font-bold text-on-media drop-shadow">
+        <h3 className="break-words text-lg font-bold text-on-media drop-shadow">
           {name}
         </h3>
         <div className="mt-1 flex items-center space-x-3 text-xs text-gray-300 light:text-on-media/80">

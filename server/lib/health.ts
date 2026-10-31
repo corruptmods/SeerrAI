@@ -883,115 +883,127 @@ const fromMedia = async (
   })),
 });
 
-const requestChecks = async (
-  page: Page = FIRST_PAGE
-): Promise<HealthCheck[]> => {
-  const requests = getRepository(MediaRequest);
-  const now = Date.now();
+/** Radarr or Sonarr refused it, or it could not be sent at all. */
+const failedRequests = (page: Page): Promise<HealthCheck> =>
+  getRepository(MediaRequest)
+    .findAndCount({
+      where: {
+        status: MediaRequestStatus.FAILED,
+        type: In(VIDEO_MEDIA_TYPES),
+        media: { id: Not(IsNull()) },
+      },
+      relations: { media: true, requestedBy: true },
+      order: { updatedAt: 'DESC' },
+      skip: page.skip,
+      take: page.take,
+    })
+    .then((found) =>
+      fromRequests('failedRequests', 'error', found, (r) =>
+        [r.requestedBy?.displayName, ago(r.updatedAt)]
+          .filter(Boolean)
+          .join(' · ')
+      )
+    );
 
-  return Promise.all([
-    // Radarr or Sonarr refused it, or it could not be sent at all.
-    requests
-      .findAndCount({
-        where: {
-          status: MediaRequestStatus.FAILED,
+/**
+ * Approved over an hour ago, yet Radarr or Sonarr never gave the title an
+ * id: the request did not reach them. (Approval marks the title Processing
+ * straight away, so its status cannot tell; the id is only stored once it
+ * has actually been added.)
+ */
+const neverSent = (page: Page): Promise<HealthCheck> => {
+  const hourAgo = new Date(Date.now() - HOUR_MS);
+  return getRepository(MediaRequest)
+    .findAndCount({
+      where: [
+        {
+          status: MediaRequestStatus.APPROVED,
           type: In(VIDEO_MEDIA_TYPES),
-          media: { id: Not(IsNull()) },
+          is4k: false,
+          updatedAt: LessThan(hourAgo),
+          media: { id: Not(IsNull()), externalServiceId: IsNull() },
         },
-        relations: { media: true, requestedBy: true },
-        order: { updatedAt: 'DESC' },
-        skip: page.skip,
-        take: page.take,
-      })
-      .then((found) =>
-        fromRequests('failedRequests', 'error', found, (r) =>
-          [r.requestedBy?.displayName, ago(r.updatedAt)]
-            .filter(Boolean)
-            .join(' · ')
-        )
-      ),
-    // Approved over an hour ago, yet Radarr or Sonarr never gave the title
-    // an id: the request did not reach them. (Approval marks the title
-    // Processing straight away, so its status cannot tell; the id is only
-    // stored once it has actually been added.)
-    requests
-      .findAndCount({
-        where: [
-          {
-            status: MediaRequestStatus.APPROVED,
-            type: In(VIDEO_MEDIA_TYPES),
-            is4k: false,
-            updatedAt: LessThan(new Date(now - HOUR_MS)),
-            media: { id: Not(IsNull()), externalServiceId: IsNull() },
-          },
-          {
-            status: MediaRequestStatus.APPROVED,
-            type: In(VIDEO_MEDIA_TYPES),
-            is4k: true,
-            updatedAt: LessThan(new Date(now - HOUR_MS)),
-            media: { id: Not(IsNull()), externalServiceId4k: IsNull() },
-          },
-        ],
-        relations: { media: true, requestedBy: true },
-        order: { updatedAt: 'ASC' },
-        skip: page.skip,
-        take: page.take,
-      })
-      .then((found) =>
-        fromRequests('neverSent', 'error', found, (r) =>
-          [r.requestedBy?.displayName, `approved ${ago(r.updatedAt)}`]
-            .filter(Boolean)
-            .join(' · ')
-        )
-      ),
-    requests
-      .findAndCount({
-        where: {
-          status: MediaRequestStatus.PENDING,
+        {
+          status: MediaRequestStatus.APPROVED,
           type: In(VIDEO_MEDIA_TYPES),
-          createdAt: LessThan(new Date(now - 7 * DAY_MS)),
+          is4k: true,
+          updatedAt: LessThan(hourAgo),
+          media: { id: Not(IsNull()), externalServiceId4k: IsNull() },
         },
-        relations: { media: true, requestedBy: true },
-        order: { createdAt: 'ASC' },
-        skip: page.skip,
-        take: page.take,
-      })
-      .then((found) =>
-        fromRequests('awaitingApproval', 'warning', found, (r) =>
-          [r.requestedBy?.displayName, `requested ${ago(r.createdAt)}`]
-            .filter(Boolean)
-            .join(' · ')
-        )
-      ),
-    // Requests whose title link is gone. They cannot be sent, shown or
-    // fulfilled; listed on their own rather than mixed into the checks
-    // above, where they looked like failed or unsent requests.
-    requests
-      .createQueryBuilder('request')
-      .leftJoinAndSelect('request.requestedBy', 'requestedBy')
-      .where('request.mediaId IS NULL')
-      .orderBy('request.createdAt', 'DESC')
-      .skip(page.skip)
-      .take(page.take)
-      .getManyAndCount()
-      .then(([found, count]) => ({
-        id: 'unlinkedRequests',
-        group: 'requests' as const,
-        status: (count > 0 ? 'warning' : 'ok') as HealthStatus,
-        count,
-        items: found.map((r) => ({
-          title: `Request #${r.id}`,
-          detail: [
-            r.requestedBy?.displayName,
-            STATUS_NAMES[r.status],
-            `made ${ago(r.createdAt)}`,
-          ]
-            .filter(Boolean)
-            .join(' · '),
-        })),
-      })),
-  ]);
+      ],
+      relations: { media: true, requestedBy: true },
+      order: { updatedAt: 'ASC' },
+      skip: page.skip,
+      take: page.take,
+    })
+    .then((found) =>
+      fromRequests('neverSent', 'error', found, (r) =>
+        [r.requestedBy?.displayName, `approved ${ago(r.updatedAt)}`]
+          .filter(Boolean)
+          .join(' · ')
+      )
+    );
 };
+
+const awaitingApproval = (page: Page): Promise<HealthCheck> =>
+  getRepository(MediaRequest)
+    .findAndCount({
+      where: {
+        status: MediaRequestStatus.PENDING,
+        type: In(VIDEO_MEDIA_TYPES),
+        createdAt: LessThan(new Date(Date.now() - 7 * DAY_MS)),
+      },
+      relations: { media: true, requestedBy: true },
+      order: { createdAt: 'ASC' },
+      skip: page.skip,
+      take: page.take,
+    })
+    .then((found) =>
+      fromRequests('awaitingApproval', 'warning', found, (r) =>
+        [r.requestedBy?.displayName, `requested ${ago(r.createdAt)}`]
+          .filter(Boolean)
+          .join(' · ')
+      )
+    );
+
+/**
+ * Requests whose title link is gone. They cannot be sent, shown or
+ * fulfilled; listed on their own rather than mixed into the checks above,
+ * where they looked like failed or unsent requests.
+ */
+const unlinkedRequests = (page: Page): Promise<HealthCheck> =>
+  getRepository(MediaRequest)
+    .createQueryBuilder('request')
+    .leftJoinAndSelect('request.requestedBy', 'requestedBy')
+    .where('request.mediaId IS NULL')
+    .orderBy('request.createdAt', 'DESC')
+    .skip(page.skip)
+    .take(page.take)
+    .getManyAndCount()
+    .then(([found, count]) => ({
+      id: 'unlinkedRequests',
+      group: 'requests' as const,
+      status: (count > 0 ? 'warning' : 'ok') as HealthStatus,
+      count,
+      items: found.map((r) => ({
+        title: `Request #${r.id}`,
+        detail: [
+          r.requestedBy?.displayName,
+          STATUS_NAMES[r.status],
+          `made ${ago(r.createdAt)}`,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      })),
+    }));
+
+const requestChecks = (page: Page = FIRST_PAGE): Promise<HealthCheck[]> =>
+  Promise.all([
+    failedRequests(page),
+    neverSent(page),
+    awaitingApproval(page),
+    unlinkedRequests(page),
+  ]);
 
 const STATUS_NAMES: Record<number, string> = {
   [MediaRequestStatus.PENDING]: 'pending',
@@ -1332,43 +1344,45 @@ const musicNoRelease = async (page: Page): Promise<HealthCheck> => {
   };
 };
 
-/** The music checks, while music is set up and on for everyone. */
+/** Whether music is set up and on for everyone, for its checks. */
+const musicOn = () => featureEnabled('music') && musicReady();
+
+/** The music checks, while music is on. */
 const musicChecks = (page: Page): Promise<HealthCheck>[] =>
-  featureEnabled('music') && musicReady()
-    ? [musicNotOnServer(page), musicNoRelease(page)]
-    : [];
+  musicOn() ? [musicNotOnServer(page), musicNoRelease(page)] : [];
 
-const mediaChecks = async (page: Page = FIRST_PAGE): Promise<HealthCheck[]> => {
-  const media = getRepository(Media);
-  const weekAgo = new Date(Date.now() - 7 * DAY_MS);
+/** Sonarr needs a TVDB id; without one a series request cannot be sent. */
+const missingTvdb = (page: Page): Promise<HealthCheck> =>
+  getRepository(Media)
+    .findAndCount({
+      where: {
+        mediaType: MediaType.TV,
+        tvdbId: IsNull(),
+        requests: { id: Not(IsNull()) },
+      },
+      order: { updatedAt: 'DESC' },
+      skip: page.skip,
+      take: page.take,
+    })
+    .then((found) =>
+      fromMedia(
+        'missingTvdb',
+        'warning',
+        found,
+        () => 'Sonarr cannot add it without one'
+      )
+    );
 
-  return Promise.all([
-    stuckProcessing(weekAgo, page),
+const WEEK_MS = 7 * DAY_MS;
+
+const mediaChecks = (page: Page = FIRST_PAGE): Promise<HealthCheck[]> =>
+  Promise.all([
+    stuckProcessing(new Date(Date.now() - WEEK_MS), page),
     ...musicChecks(page),
-    // Sonarr needs a TVDB id; without one a series request cannot be sent.
-    media
-      .findAndCount({
-        where: {
-          mediaType: MediaType.TV,
-          tvdbId: IsNull(),
-          requests: { id: Not(IsNull()) },
-        },
-        order: { updatedAt: 'DESC' },
-        skip: page.skip,
-        take: page.take,
-      })
-      .then((found) =>
-        fromMedia(
-          'missingTvdb',
-          'warning',
-          found,
-          () => 'Sonarr cannot add it without one'
-        )
-      ),
+    missingTvdb(page),
     Promise.resolve(collectionGapsCheck(page)),
     plexMatchesCheck(page),
   ]);
-};
 
 const titled = (t: { title: string; year?: number }) =>
   t.year ? `${t.title} (${t.year})` : t.title;
@@ -1919,52 +1933,62 @@ export const runHealthChecks = async (): Promise<{
   };
 };
 
-const WEEK_MS = 7 * DAY_MS;
+type OneCheck = (page: Page) => Promise<HealthCheck | undefined>;
+
+/** One check of a group that is only run whole. */
+const oneOf =
+  (group: (page: Page) => Promise<HealthCheck[]>, id: string): OneCheck =>
+  async (page) =>
+    (await group(page)).find((check) => check.id === id);
+
+/** Each check with a list to page through, run on its own. */
+const PAGED = new Map<string, OneCheck>([
+  ['failedRequests', failedRequests],
+  ['neverSent', neverSent],
+  ['awaitingApproval', awaitingApproval],
+  ['unlinkedRequests', unlinkedRequests],
+  [
+    'stuckProcessing',
+    (page) => stuckProcessing(new Date(Date.now() - WEEK_MS), page),
+  ],
+  [
+    'musicNotOnServer',
+    async (page) => (musicOn() ? musicNotOnServer(page) : undefined),
+  ],
+  [
+    'musicNoRelease',
+    async (page) => (musicOn() ? musicNoRelease(page) : undefined),
+  ],
+  ['missingTvdb', missingTvdb],
+  ['collectionGaps', async (page) => collectionGapsCheck(page)],
+  ['plexMatches', plexMatchesCheck],
+  ['plexSignIn', oneOf(userChecks, 'plexSignIn')],
+  ...[
+    'backfillSearchErrors',
+    'backfillAwaiting',
+    'backfillFailed',
+    'downloadCheckWaiting',
+    'agentWaiting',
+  ].map((id): [string, OneCheck] => [id, oneOf(backfillChecks, id)]),
+  ['qualityProfiles', oneOf(qualityChecks, 'qualityProfiles')],
+]);
+
+/** Further than any list goes. */
+const LAST_PAGE = 100_000;
 
 /** One page of one check's list: the page shows ten at a time. */
 export const runHealthCheck = async (
   id: string,
   pageNumber: number
 ): Promise<HealthCheck | undefined> => {
-  const group = {
-    failedRequests: requestChecks,
-    neverSent: requestChecks,
-    awaitingApproval: requestChecks,
-    unlinkedRequests: requestChecks,
-    stuckProcessing: mediaChecks,
-    musicNotOnServer: mediaChecks,
-    musicNoRelease: mediaChecks,
-    missingTvdb: mediaChecks,
-    collectionGaps: mediaChecks,
-    plexMatches: mediaChecks,
-    plexSignIn: userChecks,
-    backfillSearchErrors: backfillChecks,
-    backfillAwaiting: backfillChecks,
-    backfillFailed: backfillChecks,
-    downloadCheckWaiting: backfillChecks,
-    agentWaiting: backfillChecks,
-    qualityProfiles: qualityChecks,
-  }[id];
-
-  if (!group) {
+  const check = PAGED.get(id);
+  if (!check) {
     return undefined;
   }
-
-  const page: Page = {
-    skip: (Math.max(1, Math.floor(pageNumber)) - 1) * ITEM_LIMIT,
-    take: ITEM_LIMIT,
-  };
-
-  if (id === 'stuckProcessing') {
-    return stuckProcessing(new Date(Date.now() - WEEK_MS), page);
-  }
-  if (id === 'musicNotOnServer' || id === 'musicNoRelease') {
-    return featureEnabled('music') && musicReady()
-      ? (id === 'musicNotOnServer' ? musicNotOnServer : musicNoRelease)(page)
-      : undefined;
-  }
-
-  return (await group(page)).find((check) => check.id === id);
+  const page = Number.isFinite(pageNumber)
+    ? Math.min(LAST_PAGE, Math.max(1, Math.floor(pageNumber)))
+    : 1;
+  return check({ skip: (page - 1) * ITEM_LIMIT, take: ITEM_LIMIT });
 };
 
 /** Every title "Search all" would search: stuck, and Radarr or Sonarr has it. */

@@ -47,14 +47,16 @@ const HOUR = 60 * 60 * 1000;
 const GB = 1024 ** 3;
 const DAY = 24 * HOUR;
 
+/** Films looked up on TMDB for their names. */
+let movieLookups = 0;
 Object.defineProperty(TheMovieDb.prototype, 'getMovie', {
   configurable: true,
   set() {},
   get() {
-    return async ({ movieId }: { movieId: number }) => ({
-      id: movieId,
-      title: `Movie ${movieId}`,
-    });
+    return async ({ movieId }: { movieId: number }) => {
+      movieLookups++;
+      return { id: movieId, title: `Movie ${movieId}` };
+    };
   },
 });
 Object.defineProperty(TheMovieDb.prototype, 'getTvShow', {
@@ -1646,10 +1648,22 @@ describe('requests, titles and users', () => {
     );
     assert.deepEqual([failed.body.count, failed.body.items.length], [11, 1]);
 
-    assert.equal(
-      (await get('/api/v1/settings/health/checks/nonsense')).status,
-      404
+    // Another check's page runs that check alone, not the twelve films'.
+    movieLookups = 0;
+    const tvdb = await get('/api/v1/settings/health/checks/missingTvdb?page=2');
+    assert.deepEqual([tvdb.status, movieLookups], [200, 0]);
+
+    for (const id of ['nonsense', 'constructor', 'toString', '__proto__']) {
+      assert.equal(
+        (await get(`/api/v1/settings/health/checks/${id}`)).status,
+        404,
+        id
+      );
+    }
+    const far = await get(
+      '/api/v1/settings/health/checks/failedRequests?page=99999999999999999999999'
     );
+    assert.deepEqual([far.status, far.body.items.length], [200, 0]);
   });
 
   it('lists folders Plex matched to another title, opening the right one', async (t) => {

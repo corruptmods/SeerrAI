@@ -115,11 +115,11 @@ const mbFailed = (next: NextFunction, e: unknown, what: string) => {
 const newestSearch = new Map<string, string>();
 
 /** Most tabs followed at once; the oldest are forgotten first. */
-const MOST_TABS = 1000;
+export const MOST_TABS = 1000;
 
 const TAB = /^[\w-]{1,64}$/;
 
-const wantedSearch = (req: Request, query: string) => {
+export const wantedSearch = (req: Request, query: string) => {
   const userId = req.user?.id;
   if (userId === undefined) return undefined;
   const tab = req.get('X-Seerr-Tab');
@@ -130,7 +130,9 @@ const wantedSearch = (req: Request, query: string) => {
   if (newestSearch.size > MOST_TABS) {
     newestSearch.delete(newestSearch.keys().next().value as string);
   }
-  return () => newestSearch.get(page) === key;
+  // A page forgotten since (another's tabs pushed it out) was not typed
+  // past: its search is still wanted.
+  return () => (newestSearch.get(page) ?? key) === key;
 };
 
 /**

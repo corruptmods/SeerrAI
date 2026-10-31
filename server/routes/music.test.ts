@@ -30,7 +30,7 @@ import type { LidarrSettings, MusicSettings } from '@server/lib/settings';
 import { getSettings, musicDefaults } from '@server/lib/settings';
 import discoverMusicRoutes from '@server/routes/discoverMusic';
 import imageproxy, { useSessionForImages } from '@server/routes/imageproxy';
-import musicRoutes from '@server/routes/music';
+import musicRoutes, { MOST_TABS, wantedSearch } from '@server/routes/music';
 import { setupTestDb } from '@server/test/db';
 import { MUSIC_FIXTURE_IDS, seedMusicFixtures } from '@server/utils/seedTestDb';
 import type { AxiosInstance } from 'axios';
@@ -559,6 +559,20 @@ describe('search', () => {
     await search('harbour lights', 'tab-one');
     assert.equal(first(), false, 'typed past in its own tab');
     assert.equal(other(), true);
+  });
+
+  it('keeps a search wanted once many other tabs push its tab out', () => {
+    const asking = (tab: string) =>
+      ({
+        user: friend,
+        get: (header: string) => (header === 'X-Seerr-Tab' ? tab : undefined),
+      }) as unknown as express.Request;
+    const mine = wantedSearch(asking('mine'), 'lighthouse');
+    // More other tabs than are followed at once.
+    for (let i = 0; i < MOST_TABS; i++) {
+      wantedSearch(asking(`other-${i}`), 'ferryman');
+    }
+    assert.equal(mine?.(), true, 'not typed past, only forgotten');
   });
 
   it('shows 8 artists and 12 albums, whatever an older version saved', async () => {

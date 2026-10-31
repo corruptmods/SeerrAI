@@ -35,7 +35,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - Removing a title's file went to the default Radarr or Sonarr server when the title was on the first one added.
 - **Keep** on Deleting Soon no longer postpones the deletion on a Maintainerr server that doesn't allow Keep.
-- Quality profiles: Undo works after a new format was added, an apply that stopped part way can be undone, and Stop managing during an apply is kept.
+- Quality profiles: Undo works after a new format was added, an apply that stopped part way can be undone, and Stop managing during an apply is kept. An apply no longer stops on a format name Radarr or Sonarr already has.
+- **Download Check no longer rejects the same release over and over**: one numbered another way (S03E02 that's really S03E04) isn't searched for again by its number, which found it again on the next indexer; Backfill looks for the episode by its title. Each reject now says why, and what came after.
 - Match Check on import no longer misses an older import looked at in the same run.
 - Backfill reads an NZB with a bad character in it, names Lidarr when Lidarr doesn't answer, and waits at most a day when an indexer says to wait.
 - Testing a qBittorrent or Deluge password that's wrong says it's wrong, even while the right one is signed in.

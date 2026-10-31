@@ -2,7 +2,11 @@ import { SeriesPoster } from '@app/components/Backfill/shared';
 import Button from '@app/components/Common/Button';
 import defineMessages from '@app/utils/defineMessages';
 import { ShieldCheckIcon } from '@heroicons/react/24/outline';
-import type { CheckAction, CheckStatus } from '@server/entity/DownloadCheck';
+import type {
+  CheckAction,
+  CheckStatus,
+  RejectAfter,
+} from '@server/entity/DownloadCheck';
 import type {
   DownloadCheckOverview,
   DownloadCheckRow,
@@ -53,6 +57,14 @@ const messages = defineMessages('components.Backfill.DownloadCheck', {
   alreadyImported: 'Already imported',
   unknown: 'Stuck for a reason Download Check doesn’t know',
   unmapped: 'Which file is which episode can’t be told',
+  goesInAs: 'Left alone, it would go in as {what}.',
+  afterSearch: '{app} blocklisted it and searched again.',
+  afterByTitle:
+    '{app} blocklisted it. Backfill looks for the episode by its title, as a search by number finds this again.',
+  afterNoSearch:
+    '{app} blocklisted it. Not searched by number, which finds this again.',
+  afterNone:
+    '{app} blocklisted it. Nothing’s missing, so nothing was searched.',
   doneReject: 'Rejected',
   doneDrop: 'Removed',
   doneClear: 'Cleared',
@@ -149,6 +161,41 @@ export const findingText = (
         ? intl.formatMessage(messages[f])
         : intl.formatMessage(messages.unknown);
   }
+};
+
+const AFTER: Record<RejectAfter, keyof typeof messages> = {
+  search: 'afterSearch',
+  byTitle: 'afterByTitle',
+  noSearch: 'afterNoSearch',
+  none: 'afterNone',
+};
+
+/**
+ * Why a reject, where the finding alone doesn't say, and what came of it.
+ * Empty for anything else.
+ */
+const rejectText = (intl: IntlShape, row: DownloadCheckRow): string => {
+  if (row.action !== 'reject') return '';
+  const parts: string[] = [];
+  // Still downloading: Sonarr or Radarr would bring it in as what it was
+  // grabbed for.
+  if (
+    row.stage === 'grab' &&
+    (row.finding === 'renumbered' || row.finding === 'otherTitle')
+  ) {
+    parts.push(
+      intl.formatMessage(messages.goesInAs, {
+        what: row.episodes || row.itemTitle,
+      })
+    );
+  }
+  const after = (row.params as { after?: RejectAfter }).after;
+  if (row.status === 'done' && after && AFTER[after]) {
+    parts.push(
+      intl.formatMessage(messages[AFTER[after]], { app: appName(row.app) })
+    );
+  }
+  return parts.join(' ');
 };
 
 const DONE: Record<CheckAction, keyof typeof messages | undefined> = {
@@ -330,6 +377,7 @@ const DownloadCheckPanel = () => {
         )}
         {data.rows.map((row) => {
           const choices = choicesFor(row);
+          const why = rejectText(intl, row);
           return (
             <li key={row.id} className="flex gap-3 px-5 py-3">
               <SeriesPoster src={row.poster} title={row.itemTitle} />
@@ -356,6 +404,9 @@ const DownloadCheckPanel = () => {
                 <div className="mt-0.5 text-sm text-gray-200">
                   {findingText(intl, row)}
                 </div>
+                {why && (
+                  <div className="mt-0.5 text-sm text-gray-400">{why}</div>
+                )}
                 <div className="mt-0.5 break-all text-xs text-gray-500">
                   {row.title}
                 </div>

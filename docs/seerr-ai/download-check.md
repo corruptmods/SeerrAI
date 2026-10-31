@@ -18,7 +18,7 @@ Checked as soon as Sonarr or Radarr takes it, and while a delay profile still ho
 |---|---|
 | A program in it (`.exe`, `.scr`, `.lnk`, `.bat` and the like), only archives, no video, or only a sample. Torrents, once the client has their file list | Rejected |
 | Grabbed a day or more before the episode aired | Rejected |
-| One episode whose name carries another episode's title (a series Sonarr reads by the scene's numbering, or a group's own numbering): it would go in as the wrong episode | Rejected. When the episode it really is is missing, Backfill looks for it, as it goes by titles |
+| One episode whose name carries another episode's title (a series Sonarr reads by the scene's numbering, or a group's own numbering): it would go in as the wrong episode | Rejected, not searched again by number, which would find it again. Backfill looks for what's still missing instead, as it goes by titles |
 | Another title: another country's version (The.Turnstile.AU for The Turnstile), another year (Gurneys.2026 for the 2001 series), or an episode whose title is another episode's | Rejected |
 | No better than the file you have, compared as the import compares: quality, then revision, then custom format score | Rejected, not searched again |
 | A single episode where your file holds two | Rejected, not searched again |
@@ -32,7 +32,7 @@ It gets two minutes to clear by itself, then Sonarr's or Radarr's own reason dec
 
 | Reason | Done |
 |---|---|
-| Matched to the series or movie by ID | The name decides. The right title under another name (Bramble.&amp;.Finch-Trick.Us): imported. The right show numbered another way, when the episode it really is is missing (Snack.Kingdom.2013.S01E13 is S07E05, "Taco Kingdom 3"): imported as that episode. Another title, or an episode you have: rejected. When the name doesn't say: left for you |
+| Matched to the series or movie by ID | The name decides. The right title under another name (Bramble.&amp;.Finch-Trick.Us): imported. The right show numbered another way, when the episode it really is is missing (Snack.Kingdom.2013.S01E13 is S07E05, "Taco Kingdom 3"): imported as that episode. Another title: rejected. An episode you have: rejected, and left to Backfill as above. When the name doesn't say: left for you |
 | TheXEM hasn't confirmed the numbering, it couldn't tell if it's a sample, or it couldn't read the file name | Imported, each file as the episode Sonarr reads it as; a single episode's one video is that episode |
 | Nothing in it can be imported: a sample, archives, the wrong episodes, no video | Rejected |
 | Not an upgrade, or your file holds more episodes | Rejected, not searched again |
@@ -43,7 +43,7 @@ An import never replaces a better file: such files are left out, and a download 
 
 ## On the Backfill page
 
-Download Check's box lists the newest findings and everything waiting for you, with the week's counts. Each shows what was found, what was done (or, with Report only, would be), the release, and for a stuck import Sonarr's or Radarr's own words under **What Sonarr said**. Use its buttons to do it, import or reject it instead, or **Leave** it.
+Download Check's box lists the newest findings and everything waiting for you, with the week's counts. Each shows what was found, what was done (or, with Report only, would be), the release, and for a stuck import Sonarr's or Radarr's own words under **What Sonarr said**. A reject also says why, where the finding alone doesn't ("Left alone, it would go in as S03E02"), and what came after: searched again, left to Backfill, or nothing to search for. Use its buttons to do it, import or reject it instead, or **Leave** it.
 
 Findings are kept as long as Backfill's history (90 days by default) and removed by the nightly **Database Maintenance** job; ones waiting for you stay until you decide.
 

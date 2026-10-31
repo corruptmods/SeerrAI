@@ -5,6 +5,16 @@ import { Column, Entity, Index, PrimaryGeneratedColumn, Unique } from 'typeorm';
 export type CheckStage = 'grab' | 'import';
 
 /**
+ * What came after a reject (`params.after`), besides the blocklist:
+ * - search: the server searched again for what's missing
+ * - byTitle: Backfill looks by episode title (a search by the release's
+ *   number would find it again)
+ * - noSearch: not searched by that number, and Backfill doesn't look
+ * - none: nothing missing, so nothing searched
+ */
+export type RejectAfter = 'search' | 'byTitle' | 'noSearch' | 'none';
+
+/**
  * What Download Check found:
  * - program, archive, noVideo, sample: the torrent's files
  * - early: grabbed a day or more before the episode aired

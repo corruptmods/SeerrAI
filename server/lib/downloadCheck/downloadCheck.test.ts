@@ -656,6 +656,7 @@ describe('Download Check', () => {
         how: { removeFromClient: true, blocklist: true, skipRedownload: false },
       },
     ]);
+    assert.equal(JSON.parse(row.params).after, 'search');
   });
 
   it('with Report only, says what it would do and does nothing; turned on, it does it', async () => {
@@ -696,6 +697,7 @@ describe('Download Check', () => {
       why: 'score',
       have: 'WEBDL-1080p (860006)',
       offered: 'WEBDL-1080p (-137399)',
+      after: 'none',
     });
     assert.equal(sonarr.removed[0].how.skipRedownload, true);
   });
@@ -719,7 +721,7 @@ describe('Download Check', () => {
     await downloadCheck.run();
     const [row] = await rows();
     assert.equal(row.finding, 'moreEpisodes');
-    assert.deepEqual(JSON.parse(row.params), { also: 'S01E04' });
+    assert.deepEqual(JSON.parse(row.params), { also: 'S01E04', after: 'none' });
   });
 
   it('drops a worse copy while a better one is coming', async () => {
@@ -971,7 +973,35 @@ describe('Download Check', () => {
       assert.equal(params.episode.label, 'S02E05');
       assert.equal(params.episode.hasFile, true);
       assert.equal(sonarr.removed[0].how.blocklist, true);
-      assert.deepEqual(looked, [], 'that episode is in already');
+      // A search by its number would find this release again.
+      assert.equal(sonarr.removed[0].how.skipRedownload, true);
+      assert.equal(params.after, 'noSearch', 'Backfill has no such title');
+      assert.deepEqual(looked, []);
+    });
+
+    it('has Backfill look for the episode it was grabbed as, rather than searching that number again', async () => {
+      // The episode it is is in already; the one it was grabbed as isn't.
+      const title = await getRepository(BackfillSeries).save(
+        new BackfillSeries({
+          kind: 'series',
+          serverId: 0,
+          arrId: 10,
+          tmdbId: 1,
+          title: 'Show',
+          status: 'none',
+          missing: 1,
+          searchTerms: [],
+        })
+      );
+      const wrong = grab({ title: NAME });
+      sonarr.seriesEpisodes.set(10, [wrong.episodes[0], other(true)]);
+      sonarr.queueNow = [wrong];
+      await downloadCheck.run();
+      const [row] = await rows();
+      assert.equal(row.status, 'done');
+      assert.equal(sonarr.removed[0].how.skipRedownload, true);
+      assert.equal(JSON.parse(row.params).after, 'byTitle');
+      assert.deepEqual(looked, [title.id]);
     });
 
     it('has Backfill look for the episode it is, when that one is missing', async () => {
@@ -994,6 +1024,8 @@ describe('Download Check', () => {
       const [row] = await rows();
       assert.equal(row.finding, 'renumbered');
       assert.equal(row.action, 'reject');
+      assert.equal(sonarr.removed[0].how.skipRedownload, true);
+      assert.equal(JSON.parse(row.params).after, 'byTitle');
       assert.deepEqual(looked, [title.id]);
     });
 

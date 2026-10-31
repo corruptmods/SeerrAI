@@ -7,6 +7,7 @@ import type {
   CheckFinding,
   CheckStage,
   CheckStatus,
+  RejectAfter,
 } from '@server/entity/DownloadCheck';
 import DownloadCheck from '@server/entity/DownloadCheck';
 import { episodeTitled, titleFits } from '@server/lib/agent/numbering';
@@ -866,20 +867,40 @@ class DownloadCheckEngine {
     try {
       const pass = new Pass(server);
       if (action === 'reject') {
+        const missing = await this.anyMissing(pass, grab);
+        // A release numbered another way comes back to a search by that
+        // number, from another indexer or another post of it: Backfill,
+        // which reads names by their episode titles, looks instead.
+        const renumbered =
+          server.app === 'sonarr' && row.finding === 'renumbered';
         await server.remove(grab.queueIds, {
           removeFromClient: true,
           blocklist: true,
           // Searched again only for what's still missing: a download that
           // was no better than the file there needs no replacement.
-          skipRedownload: !(await this.anyMissing(pass, grab)),
+          skipRedownload: renumbered || !missing,
         });
         // The reject is done whatever becomes of this.
-        await this.lookByTitle(row).catch((e: unknown) =>
-          logger.warn('Could not start a Backfill search', {
-            label: LABEL,
-            errorMessage: errorText(e),
-          })
-        );
+        const looking =
+          renumbered &&
+          (await this.lookByTitle(row, missing).catch((e: unknown) => {
+            logger.warn('Could not start a Backfill search', {
+              label: LABEL,
+              errorMessage: errorText(e),
+            });
+            return false;
+          }));
+        const after: RejectAfter = looking
+          ? 'byTitle'
+          : !missing
+            ? 'none'
+            : renumbered
+              ? 'noSearch'
+              : 'search';
+        row.params = JSON.stringify({
+          ...(JSON.parse(row.params || '{}') as object),
+          after,
+        });
       } else if (action === 'drop') {
         await server.remove(grab.queueIds, {
           removeFromClient: true,
@@ -945,31 +966,35 @@ class DownloadCheckEngine {
   }
 
   /**
-   * A release turned down for being another episode, one still missing:
-   * Backfill looks for it, as it reads names by their episode titles where
-   * Sonarr can't.
+   * A release turned down for being another episode: Backfill looks for
+   * what's still missing (the episode it was grabbed as, or the one it
+   * is), as it reads names by their episode titles where Sonarr can't.
+   * Answers whether Backfill looks, now or lately.
    */
-  private async lookByTitle(row: DownloadCheck): Promise<void> {
-    if (row.app !== 'sonarr' || row.finding !== 'renumbered') return;
-    if (!getSettings().backfill.enabled) return;
+  private async lookByTitle(
+    row: DownloadCheck,
+    grabbedMissing: boolean
+  ): Promise<boolean> {
+    if (!getSettings().backfill.enabled) return false;
     const params = JSON.parse(row.params || '{}') as {
       episode?: { hasFile?: boolean };
     };
-    if (!params.episode || params.episode.hasFile) return;
+    const itsOwnMissing = !!params.episode && !params.episode.hasFile;
+    if (!grabbedMissing && !itsOwnMissing) return false;
     const title = await getRepository(BackfillSeries).findOne({
       select: { id: true, status: true, lastSearchedAt: true },
       where: { kind: 'series', serverId: row.serverId, arrId: row.itemId },
     });
+    if (!title || title.status === 'ignored') return false;
     // Once in a while, however many such grabs a title gets.
     if (
-      !title ||
-      title.status === 'ignored' ||
-      (title.lastSearchedAt &&
-        Date.now() - title.lastSearchedAt.getTime() < LOOK_AGAIN_MS)
+      title.lastSearchedAt &&
+      Date.now() - title.lastSearchedAt.getTime() < LOOK_AGAIN_MS
     ) {
-      return;
+      return true;
     }
     backfill.startSearch(title.id);
+    return true;
   }
 
   private async follow(server: CheckServer, id: number) {

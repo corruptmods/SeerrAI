@@ -35,6 +35,10 @@ export interface SourcePlaylist {
 export class PlaylistSourceError extends Error {}
 
 const TIMEOUT_MS = 20_000;
+/** A playlist page is well under this; more is not a playlist page. */
+const MAX_PAGE_BYTES = 5 * 1024 * 1024;
+/** Their pages may redirect, but only within Spotify or Apple Music. */
+const PAGE_HOSTS = /(^|\.)(spotify\.com|apple\.com)$/i;
 /** The most songs one playlist brings in. */
 export const MAX_SOURCE_SONGS = 500;
 
@@ -223,6 +227,13 @@ export const readPlaylist = async (
     const res = await axios.get<string>(page, {
       timeout: TIMEOUT_MS,
       responseType: 'text',
+      maxContentLength: MAX_PAGE_BYTES,
+      maxRedirects: 3,
+      beforeRedirect: (options) => {
+        if (!PAGE_HOSTS.test(String(options.hostname ?? ''))) {
+          throw new Error('Redirected away from the playlist service');
+        }
+      },
       headers: {
         // Their pages are made for browsers; a bare client is turned away.
         'User-Agent':

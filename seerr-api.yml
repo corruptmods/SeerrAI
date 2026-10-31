@@ -11609,6 +11609,8 @@ paths:
             application/json:
               schema:
                 type: object
+        '429':
+          description: Too many links lately, or too many of this person's songs still being matched
     delete:
       summary: Unlink a playlist; its songs stay
       tags:

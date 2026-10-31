@@ -15,4 +15,6 @@ export const perUserRateLimit = (options: {
   rateLimit({
     ...options,
     keyGenerator: (req) => `user:${req.user?.id ?? 'none'}`,
+    // As every other error is answered, so the app can show it.
+    message: { message: 'Too many requests. Try again in a few minutes.' },
   });

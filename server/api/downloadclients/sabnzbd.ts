@@ -27,12 +27,16 @@ interface QueueSlot {
   mb?: string;
   mbleft?: string;
   timeleft?: string;
+  percentage?: string;
 }
 
 interface HistorySlot {
   nzo_id: string;
   status: string;
   bytes?: number;
+  /** Where the finished job's files are. */
+  storage?: string;
+  fail_message?: string;
 }
 
 interface Answer {
@@ -173,14 +177,11 @@ class SabnzbdAPI implements UsenetClient {
     // The whole queue, not just this job: whether its speed is its own
     // depends on what else is downloading.
     const [queue, history] = await Promise.all([
-      this.raw({ mode: 'queue' }),
-      this.raw({ mode: 'history', nzo_ids: nzoId }),
+      this.call({ mode: 'queue' }),
+      this.call({ mode: 'history', nzo_ids: nzoId }),
     ]);
-    const slots: { nzo_id: string; status?: string }[] =
-      queue.queue?.slots ?? [];
-    const queued = slots.find((slot) => slot.nzo_id === nzoId) as
-      | (QueueSlot & { percentage?: string })
-      | undefined;
+    const slots = queue.queue?.slots ?? [];
+    const queued = slots.find((slot) => slot.nzo_id === nzoId);
     if (queued) {
       const downloading = (slot: { status?: string }) =>
         /^downloading$/i.test(String(slot.status ?? ''));
@@ -203,7 +204,7 @@ class SabnzbdAPI implements UsenetClient {
       };
     }
     const done = (history.history?.slots ?? []).find(
-      (slot: { nzo_id: string }) => slot.nzo_id === nzoId
+      (slot) => slot.nzo_id === nzoId
     );
     if (!done) {
       return undefined;
@@ -232,7 +233,6 @@ class SabnzbdAPI implements UsenetClient {
     await this.call({ mode: 'queue', name: 'resume', value: nzoId });
   }
 
-  /** Removes the job, from the queue or the history, and its files. */
   /**
    * Removes the job, with its files, from the queue or, once it has left
    * the queue, from the history. SABnzbd answers status false, with no
@@ -254,13 +254,6 @@ class SabnzbdAPI implements UsenetClient {
       if (data?.status !== false) return;
     }
     throw new Error('SABnzbd: the job is in neither its queue nor its history');
-  }
-
-  // The same call, typed loosely: the queue and history slots carry more
-  // than progress needs.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async raw(params: Record<string, string | number>): Promise<any> {
-    return this.call(params);
   }
 
   public async getVersion(): Promise<string> {

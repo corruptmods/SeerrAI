@@ -3,6 +3,7 @@ import SonarrAPI from '@server/api/servarr/sonarr';
 import TheMovieDb from '@server/api/themoviedb';
 import { MediaType, isVideo } from '@server/constants/media';
 import type Media from '@server/entity/Media';
+import type { DVRSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 
@@ -34,34 +35,15 @@ export const removeFromArr = async (
   }
   const settings = getSettings();
   const isMovie = media.mediaType === MediaType.MOVIE;
+  const servers: DVRSettings[] = isMovie ? settings.radarr : settings.sonarr;
 
-  let serviceSettings;
-  if (isMovie) {
-    serviceSettings = settings.radarr.find(
-      (radarr) => radarr.isDefault && radarr.is4k === is4k
-    );
-  } else {
-    serviceSettings = settings.sonarr.find(
-      (sonarr) => sonarr.isDefault && sonarr.is4k === is4k
-    );
-  }
-
+  // The server it was sent to, or else the default one. The first server
+  // added has id 0, a server like any other.
   const specificServiceId = is4k ? media.serviceId4k : media.serviceId;
-  if (
-    specificServiceId &&
-    specificServiceId >= 0 &&
-    serviceSettings?.id !== specificServiceId
-  ) {
-    if (isMovie) {
-      serviceSettings = settings.radarr.find(
-        (radarr) => radarr.id === specificServiceId
-      );
-    } else {
-      serviceSettings = settings.sonarr.find(
-        (sonarr) => sonarr.id === specificServiceId
-      );
-    }
-  }
+  const serviceSettings =
+    specificServiceId != null && specificServiceId >= 0
+      ? servers.find((server) => server.id === specificServiceId)
+      : servers.find((server) => server.isDefault && server.is4k === is4k);
 
   if (!serviceSettings) {
     const arrName = `${is4k ? '4K ' : ''}${isMovie ? 'Radarr' : 'Sonarr'}`;

@@ -5992,7 +5992,16 @@ paths:
                       requestPreset:
                         type: string
                         description: "The preset whose profile this server's new requests use, set on Apply; keep leaves it as it is"
-                        enum: [sd, 720p, 1080p, 1080p-remux, 2160p, 2160p-remux, keep]
+                        enum:
+                          [
+                            sd,
+                            720p,
+                            1080p,
+                            1080p-remux,
+                            2160p,
+                            2160p-remux,
+                            keep,
+                          ]
                       animeRequestPreset:
                         type: string
                         description: 'The same for anime requests'
@@ -6253,7 +6262,7 @@ paths:
               properties:
                 choices:
                   type: object
-                  description: "Choices on the page not saved yet (presets, adjustments, nudges, bandStep), shown as they would be"
+                  description: 'Choices on the page not saved yet (presets, adjustments, nudges, bandStep), shown as they would be'
                   additionalProperties: true
       responses:
         '200':
@@ -6300,7 +6309,7 @@ paths:
                   maxLength: 300
                 choices:
                   type: object
-                  description: "Choices on the page not saved yet (presets, adjustments, nudges, bandStep), shown as they would be"
+                  description: 'Choices on the page not saved yet (presets, adjustments, nudges, bandStep), shown as they would be'
                   additionalProperties: true
       responses:
         '200':
@@ -6346,7 +6355,7 @@ paths:
   /settings/quality/jobs/{jobId}:
     get:
       summary: 'How a slow apply or undo went'
-      description: 'Still going (done false, with the apply''s progress), or done with the status and answer it would have given at once. Kept for 30 minutes.'
+      description: "Still going (done false, with the apply's progress), or done with the status and answer it would have given at once. Kept for 30 minutes."
       tags:
         - settings
       parameters:

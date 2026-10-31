@@ -159,12 +159,16 @@ class ProwlarrAPI {
       return { kind: 'magnet', uri: url };
     }
     const own = new URL(clientBaseUrl(this.settings)).origin;
+    // The key only goes to Prowlarr, never to an indexer it redirects to,
+    // nor back to Prowlarr from one: an indexer must not choose what is
+    // asked of Prowlarr with its key.
+    let keyed = true;
     for (let hop = 0; hop < 4; hop++) {
       const target = new URL(url);
       if (target.protocol !== 'http:' && target.protocol !== 'https:') {
         throw new Error('The download link is not a web address.');
       }
-      // The key only goes to Prowlarr, never to an indexer it redirects to.
+      keyed &&= target.origin === own;
       const response: AxiosResponse<ArrayBuffer> = await axios.get<ArrayBuffer>(
         url,
         {
@@ -172,8 +176,7 @@ class ProwlarrAPI {
           maxRedirects: 0,
           timeout: FETCH_TIMEOUT_MS,
           maxContentLength: MAX_FILE_BYTES,
-          headers:
-            target.origin === own ? { 'X-Api-Key': this.settings.apiKey } : {},
+          headers: keyed ? { 'X-Api-Key': this.settings.apiKey } : {},
           validateStatus: (status) => status >= 200 && status < 400,
         }
       );

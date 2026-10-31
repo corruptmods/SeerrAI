@@ -102,6 +102,29 @@ describe('Fetching a result through Prowlarr', () => {
     assert.equal(fetched.kind, 'torrent');
   });
 
+  it('never sends the key back to Prowlarr from an indexer’s redirect', async () => {
+    // An indexer, at another address, that sends the fetch on to Prowlarr.
+    const indexer = createServer((_req, res) => {
+      res.writeHead(302, { Location: `${base}/2/download?from=indexer` }).end();
+    });
+    await new Promise<void>((resolve) =>
+      indexer.listen(0, '127.0.0.1', resolve)
+    );
+    try {
+      const { port } = indexer.address() as AddressInfo;
+      const fetched = await prowlarr.fetchRelease(
+        release({ downloadUrl: `http://127.0.0.1:${port}/file` })
+      );
+      assert.equal(fetched.kind, 'torrent');
+      const back = seen.at(-1);
+      assert.equal(back?.url, '/2/download?from=indexer');
+      assert.equal(back?.headers['x-api-key'], undefined);
+    } finally {
+      indexer.closeAllConnections();
+      indexer.close();
+    }
+  });
+
   it('says so when a result has no way to get it', async () => {
     await assert.rejects(
       prowlarr.fetchRelease(release({})),

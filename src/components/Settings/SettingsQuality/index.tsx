@@ -137,6 +137,9 @@ const messages = defineMessages('components.Settings.SettingsQuality', {
   singleEpisodesTip: 'Files with more than one episode only as a last resort.',
   burnedIn: 'Burned-in subtitles as a last resort',
   burnedInTip: 'Only when nothing else is out.',
+  av1: 'AV1 as a last resort',
+  av1Tip:
+    'Many TVs and streaming boxes can’t play AV1, so Plex converts it as you watch. Off: taken like any other.',
   advanced: 'Advanced',
   advancedTip: 'The band step, and moving single formats between bands.',
   bandStep: 'Band step',
@@ -1032,6 +1035,7 @@ const SettingsQuality = () => {
                       messages.burnedIn,
                       messages.burnedInTip,
                     ],
+                    ['av1LastResort', messages.av1, messages.av1Tip],
                   ] as const
                 ).map(([field, label, tip]) => (
                   <Row

@@ -575,6 +575,15 @@ const trashFixture = (): TrashData => {
             specifications: [],
           },
           {
+            trash_id:
+              kind === 'radarr'
+                ? 'cae4ca30163749b891686f95532519bd'
+                : '15a05bc7c1a36e2b57fd628f8977e2fc',
+            name: 'AV1',
+            trash_scores: { default: -10000 },
+            specifications: [],
+          },
+          {
             trash_id: 'sdr',
             name: 'SDR',
             trash_scores: { default: 0 },
@@ -609,6 +618,15 @@ const trashFixture = (): TrashData => {
           default: true,
           custom_formats: [
             { name: 'LQ', trash_id: 'lq', required: false, default: true },
+            {
+              name: 'AV1',
+              trash_id:
+                kind === 'radarr'
+                  ? 'cae4ca30163749b891686f95532519bd'
+                  : '15a05bc7c1a36e2b57fd628f8977e2fc',
+              required: false,
+              default: true,
+            },
             { name: 'Scene', trash_id: 'scene', required: false },
           ],
           quality_profiles: { include: { 'HD Bluray + WEB': id1080 } },
@@ -656,6 +674,7 @@ describe('TRaSH Guides presets', () => {
       'tier1',
       'tier2',
       'lq',
+      'cae4ca30163749b891686f95532519bd',
       'dc98083864ea246d05a42df0d05f81cc',
     ]);
   });
@@ -707,6 +726,28 @@ describe('TRaSH Guides presets', () => {
       0
     );
     assert.ok(!p.formats.some((f) => f.key === 'seerr:burned-in'));
+  });
+
+  it('make AV1 a last resort, or take it, as the AV1 adjustment says', () => {
+    const av1 = (lastResort: boolean, source: 'seerr' | 'trash') =>
+      buildDesired(
+        config('radarr', (c) => {
+          c.presets = { '1080p': source };
+          c.adjustments.av1LastResort = lastResort;
+        }),
+        facts('radarr'),
+        trashFixture(),
+        true
+      ).profiles[0].formats.find((f) => /AV1$/.test(f.name));
+    assert.equal(av1(true, 'seerr')?.score, LAST_RESORT);
+    assert.equal(av1(false, 'seerr')?.score, 0);
+    // TRaSH Guides never takes AV1; the adjustment goes on top of it.
+    assert.equal(av1(true, 'trash')?.score, LAST_RESORT);
+    assert.deepEqual(av1(true, 'trash')?.changes, [
+      { kind: 'av1', to: 'last-resort' },
+    ]);
+    assert.equal(av1(false, 'trash')?.score, 0);
+    assert.equal(av1(false, 'trash')?.raw, -10000);
   });
 
   it('wait for TRaSH Guides to be fetched', () => {

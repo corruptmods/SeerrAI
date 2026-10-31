@@ -34,6 +34,7 @@ Each server has its own presets and adjustments, so a 4K server and an anime ser
 | **Dual audio for anime** | On or off | The English dub with the original audio comes first. |
 | **Single episodes first** | On or off | Sonarr: files with more than one episode only as a last resort. |
 | **Burned-in subtitles as a last resort** | On or off | Only when nothing else is out. |
+| **AV1 as a last resort** | On or off | Many TVs and streaming boxes can't play AV1, so Plex converts it as you watch. On: taken only when nothing else is out (TRaSH Guides never takes it; this goes on top). Off: taken like any other. |
 
 Under **Advanced**:
 

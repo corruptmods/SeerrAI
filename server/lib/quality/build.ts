@@ -5,6 +5,7 @@ import type {
 import type { ArrProfileItem } from '@server/lib/quality/arr';
 import type { Ladder, SeerrFormat } from '@server/lib/quality/presets';
 import {
+  AV1,
   BURNED_IN,
   DUAL_AUDIO,
   EPISODE_CAPS_MB_MIN,
@@ -47,6 +48,12 @@ import { PRESET_KEYS } from '@server/lib/quality/types';
  * shown before it is sent. Nothing here talks to a server.
  */
 
+/** TRaSH Guides' AV1 format, which never takes AV1. */
+const TRASH_AV1: Record<ArrKind, string> = {
+  radarr: 'cae4ca30163749b891686f95532519bd',
+  sonarr: '15a05bc7c1a36e2b57fd628f8977e2fc',
+};
+
 /** TRaSH Guides' x265 (HD) format, which never takes x265 at 1080p. */
 const TRASH_X265_HD: Record<ArrKind, string> = {
   radarr: 'dc98083864ea246d05a42df0d05f81cc',
@@ -64,6 +71,7 @@ export type ScoreChange =
   | { kind: 'rounded'; from: number }
   | { kind: 'nudged'; nudge: Nudge }
   | { kind: 'x265-allowed' }
+  | { kind: 'av1'; to: 'last-resort' | 'allowed' }
   | { kind: 'hdr-off' }
   | { kind: 'conflict' };
 
@@ -260,6 +268,7 @@ const seerrProfile = (
     parts.push(seerrScored(X265_HD, adj.x265At1080p ? 0 : NEVER));
   }
   parts.push(seerrScored(UPSCALED, NEVER));
+  parts.push(seerrScored(AV1, adj.av1LastResort ? LAST_RESORT : 0));
   parts.push(...gapRules(config, preset, facts.kind));
   const { rules, sizeCapGb } = adjustmentRules(config, preset, facts);
   parts.push(...rules);
@@ -308,6 +317,16 @@ const trashProfile = (
     if (id === TRASH_X265_HD[facts.kind] && adj.x265At1080p && score < 0) {
       score = 0;
       changes.push({ kind: 'x265-allowed' });
+    }
+    if (id === TRASH_AV1[facts.kind] && score < 0) {
+      const to = adj.av1LastResort ? LAST_RESORT : 0;
+      if (score !== to) {
+        score = to;
+        changes.push({
+          kind: 'av1',
+          to: adj.av1LastResort ? 'last-resort' : 'allowed',
+        });
+      }
     }
     if (!adj.hdr && score > 0 && group?.startsWith('[HDR')) {
       score = 0;

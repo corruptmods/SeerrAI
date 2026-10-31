@@ -51,6 +51,11 @@ export interface QualityAdjustments {
   singleEpisodes: boolean;
   /** Burned-in subtitles taken only when nothing else is out. */
   burnedInLastResort: boolean;
+  /**
+   * AV1 taken only when nothing else is out, since many TVs and boxes
+   * can't play it; taken like any other when off.
+   */
+  av1LastResort: boolean;
 }
 
 /** One Radarr or Sonarr server's choices. */
@@ -97,6 +102,7 @@ export const ADJUSTMENT_DEFAULTS: QualityAdjustments = {
   dualAudioAnime: true,
   singleEpisodes: true,
   burnedInLastResort: true,
+  av1LastResort: true,
 };
 
 export const QUALITY_DEFAULTS: QualitySettings = {

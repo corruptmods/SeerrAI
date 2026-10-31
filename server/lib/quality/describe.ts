@@ -84,7 +84,9 @@ export interface Description {
 }
 
 const originOf = (format: ScoredFormat): DescribedFormat['origin'] =>
-  format.changes.some((c) => c.kind === 'nudged' || c.kind === 'x265-allowed')
+  format.changes.some(
+    (c) => c.kind === 'nudged' || c.kind === 'x265-allowed' || c.kind === 'av1'
+  )
     ? 'you'
     : format.origin;
 

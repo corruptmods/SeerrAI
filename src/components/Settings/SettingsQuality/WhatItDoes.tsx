@@ -56,6 +56,8 @@ const messages = defineMessages(
     nudgedDown: 'You moved it down a band',
     nudgedNever: 'You set it to never',
     x265Allowed: 'You allowed x265 at 1080p',
+    av1LastResort: 'You made AV1 a last resort',
+    av1Allowed: 'You allowed AV1',
     hdrOff: 'You turned HDR off',
     conflict: 'Can’t be used with another format TRaSH Guides lists',
     tie: 'When two releases tie',
@@ -197,6 +199,12 @@ const WhatItDoes = ({
             );
           case 'x265-allowed':
             return intl.formatMessage(messages.x265Allowed);
+          case 'av1':
+            return intl.formatMessage(
+              c.to === 'last-resort'
+                ? messages.av1LastResort
+                : messages.av1Allowed
+            );
           case 'hdr-off':
             return intl.formatMessage(messages.hdrOff);
           case 'conflict':

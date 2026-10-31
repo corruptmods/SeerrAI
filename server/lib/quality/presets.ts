@@ -205,6 +205,9 @@ export const languageFormat = (choice: Languages): SeerrFormat | undefined =>
         language('Language known', 0),
       ]);
 
+/** AV1 video, which many TVs and streaming boxes can't play. */
+export const AV1 = named('av1', 'AV1', [title('AV1', '\\bAV1\\b', true)]);
+
 export const BURNED_IN = named('burned-in', 'Burned-in subtitles', [
   title(
     'Burned-in subtitles',
@@ -316,6 +319,7 @@ export const TRASH_EQUIVALENTS: Record<ArrKind, Record<string, string[]>> = {
     [HDR.key]: ['HDR'],
     [X265_HD.key]: ['x265 (HD)'],
     [UPSCALED.key]: ['Upscaled'],
+    [AV1.key]: ['AV1'],
     'seerr:language': ['Language: Not English', 'Language: Not Original'],
     [DUAL_AUDIO.key]: ['Anime Dual Audio'],
   },
@@ -324,6 +328,7 @@ export const TRASH_EQUIVALENTS: Record<ArrKind, Record<string, string[]>> = {
     [HDR.key]: ['HDR'],
     [X265_HD.key]: ['x265 (HD)'],
     [UPSCALED.key]: ['Upscaled'],
+    [AV1.key]: ['AV1'],
     'seerr:language': ['Language: Not English', 'Language: Not Original'],
     [DUAL_AUDIO.key]: ['Anime Dual Audio'],
     [MULTI_EPISODE.key]: ['Multi-Episode'],

@@ -60,6 +60,7 @@ const serverBody = z.object({
     dualAudioAnime: z.boolean(),
     singleEpisodes: z.boolean(),
     burnedInLastResort: z.boolean(),
+    av1LastResort: z.boolean(),
   }),
   nudges: z.record(
     z.string().regex(/^(seerr|trash):[\w-]{1,64}$/),

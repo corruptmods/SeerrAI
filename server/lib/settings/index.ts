@@ -17,7 +17,10 @@ import {
 import { cssVersion } from '@server/lib/customCss';
 import { Permission } from '@server/lib/permissions';
 import type { QualitySettings } from '@server/lib/quality/types';
-import { QUALITY_DEFAULTS } from '@server/lib/quality/types';
+import {
+  ADJUSTMENT_DEFAULTS,
+  QUALITY_DEFAULTS,
+} from '@server/lib/quality/types';
 import type { SeasonCalendar, SeasonsSettings } from '@server/lib/seasons';
 import { seasonCalendar, seasonSettings } from '@server/lib/seasons';
 import { runMigrations } from '@server/lib/settings/migrator';
@@ -1544,10 +1547,16 @@ class Settings {
   }
 
   get quality(): QualitySettings {
-    return mergeSettings(
+    const quality = mergeSettings(
       structuredClone(QUALITY_DEFAULTS),
       this.data.quality ?? {}
     );
+    // An adjustment added later starts at its default on saved servers.
+    quality.servers = quality.servers.map((server) => ({
+      ...server,
+      adjustments: { ...ADJUSTMENT_DEFAULTS, ...server.adjustments },
+    }));
+    return quality;
   }
 
   set quality(data: QualitySettings) {

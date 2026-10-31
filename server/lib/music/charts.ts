@@ -56,6 +56,20 @@ export const chartCountry = (): string => {
 /** Matches read this run, so a page of rows reads the database once. */
 const memory = new Map<string, { data: unknown; expiresAt: number }>();
 
+/**
+ * The most matches held in memory; the database keeps the rest. Playlists
+ * name artists without end, so the longest held are let go first.
+ */
+export const MOST_HELD = 2000;
+
+const hold = (key: string, data: unknown, expiresAt: number): void => {
+  memory.delete(key);
+  memory.set(key, { data, expiresAt });
+  if (memory.size > MOST_HELD) {
+    memory.delete(memory.keys().next().value as string);
+  }
+};
+
 /** A kept match: the match, null for none found, undefined if not tried. */
 const keptMany = async <T>(keys: string[]): Promise<Map<string, T | null>> => {
   const now = Date.now();
@@ -77,7 +91,7 @@ const keptMany = async <T>(keys: string[]): Promise<Map<string, T | null>> => {
       const expiresAt = row.expiresAt ? new Date(row.expiresAt).getTime() : 0;
       if (expiresAt > now) {
         const data = JSON.parse(row.data) as T | null;
-        memory.set(row.key, { data, expiresAt });
+        hold(row.key, data, expiresAt);
         found.set(row.key, data);
       }
     }
@@ -87,7 +101,7 @@ const keptMany = async <T>(keys: string[]): Promise<Map<string, T | null>> => {
 
 const keep = async (key: string, data: unknown): Promise<void> => {
   const expiresAt = Date.now() + (data === null ? MISS_KEPT : MATCH_KEPT);
-  memory.set(key, { data, expiresAt });
+  hold(key, data, expiresAt);
   await getRepository(MusicMetadata).upsert(
     {
       key,
@@ -378,6 +392,9 @@ export const chartArtists = ({ songs, albums }: Charts): ChartArtist[] => {
 export const forgetChartMatches = () => {
   memory.clear();
 };
+
+/** For tests: how many matches are held in memory. */
+export const chartMatchesHeld = (): number => memory.size;
 
 /** For tests: once matching under way is done. */
 export const chartsMatched = async (): Promise<void> => {

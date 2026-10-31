@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { createHash } from 'node:crypto';
 
 /*
  * How many times someone may get a password wrong, or ask for a password
@@ -32,8 +33,15 @@ const prune = (now: number) => {
   }
 };
 
+/**
+ * The account goes in as a hash: it is whatever was typed, from people not
+ * signed in, and a key as long as the body allows, kept for the whole
+ * window, would let anyone fill the memory.
+ */
 const keyFor = (kind: string, req: Request, account: unknown) =>
-  `${kind}:${String(account).trim().toLowerCase()}:${req.ip ?? ''}`;
+  `${kind}:${createHash('sha256')
+    .update(String(account).trim().toLowerCase())
+    .digest('base64url')}:${req.ip ?? ''}`;
 
 export class SignInLimiter {
   constructor(private readonly kind: string) {}

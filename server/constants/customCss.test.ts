@@ -81,6 +81,51 @@ svg { filter: url(#glow); mask: url("data:image/svg+xml;utf8,<svg/>"); }
     );
   });
 
+  it('reads an unquoted url() as the browser does, comments and quotes in it', () => {
+    // In an unquoted url(), /* and quotes don't start a comment or a
+    // string, so they can't hide the rest of the CSS from the check.
+    for (const [css, address] of [
+      [
+        'a{background:url(/x/*)}b{background:url(https://evil.example/)}c{background:url(/y*/)}',
+        'https://evil.example/',
+      ],
+      [
+        "a{background:url(/x')}b{background:url(https://evil.example/)}c{content:'}",
+        "/x'",
+      ],
+      ['a{background:url(/a b)}', '/a b'],
+      ['a{background:url(  https://evil.example  )}', 'https://evil.example'],
+    ]) {
+      assert.deepEqual(
+        problemOf(css),
+        { problem: 'url', detail: address },
+        css
+      );
+    }
+    // Not url(): a #hash, an @rule or a longer name, so no address at all;
+    // a /* in their brackets is a comment.
+    for (const css of [
+      'a#url(/*)*/{color:red}',
+      '@url(/*)*/;',
+      '-url(/*)*/{color:red}',
+    ]) {
+      assert.ok(!('problem' in checkPersonalCss(css)), css);
+    }
+    assert.equal(
+      problemOf(
+        "\\(url(/x/*)'*/b{background:url(https://evil.example/)}c{content:'}"
+      )?.problem,
+      'url'
+    );
+    assert.deepEqual(checkPersonalCss('a{background:url( /ok.png )}'), {
+      css: 'a{background:url( /ok.png )}',
+    });
+    assert.deepEqual(
+      cssAddresses('a{background:url(https://one.example/a/*b*/)}'),
+      { imports: [], others: ['https://one.example/a/*b*/'] }
+    );
+  });
+
   it('may not run anything', () => {
     for (const [css, detail] of [
       ['a{width:expression(alert(1))}', 'expression()'],

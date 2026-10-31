@@ -78,10 +78,85 @@ const readEscape = (css: string, at: number): [string, number] => {
   return [valid ? String.fromCodePoint(code) : '\ufffd', i];
 };
 
+/** Characters CSS lets a name hold, besides escaped ones. */
+const isNameChar = (char: string) => /[a-zA-Z0-9_\-\u0080-￿]/.test(char);
+
+/** Characters an unquoted url() may not hold. */
+const isNonPrintable = (char: string) => {
+  const code = char.charCodeAt(0);
+  return (
+    code <= 0x08 ||
+    code === 0x0b ||
+    (code >= 0x0e && code <= 0x1f) ||
+    code === 0x7f
+  );
+};
+
+/**
+ * Reads the unquoted address of a url( whose bracket is at css[open], as
+ * the browser does: up to the closing bracket, where comments and quotes
+ * are part of the address rather than starting anything. An address the
+ * browser would refuse (a quote, a bracket or a space inside it) is given
+ * as written, so it is refused here too. Gives the address and where
+ * reading carries on, or nothing when the address is a string.
+ */
+const readUrl = (css: string, open: number): [string, number] | undefined => {
+  let i = open + 1;
+  while (isSpace(css[i])) {
+    i += 1;
+  }
+  if (css[i] === '"' || css[i] === "'") {
+    return undefined;
+  }
+  const start = i;
+  let address = '';
+  let bad = false;
+  while (i < css.length && css[i] !== ')') {
+    const char = css[i];
+    if (isSpace(char)) {
+      while (isSpace(css[i])) {
+        i += 1;
+      }
+      bad = i < css.length && css[i] !== ')';
+      break;
+    }
+    if (
+      char === '"' ||
+      char === "'" ||
+      char === '(' ||
+      isNonPrintable(char) ||
+      (char === '\\' && isNewline(css[i + 1]))
+    ) {
+      bad = true;
+      break;
+    }
+    if (char === '\\') {
+      const [decoded, next] = readEscape(css, i);
+      address += decoded;
+      i = next;
+    } else {
+      address += char;
+      i += 1;
+    }
+  }
+  if (bad) {
+    // The rest of a broken address, up to its closing bracket.
+    while (i < css.length && css[i] !== ')') {
+      i =
+        css[i] === '\\' && !isNewline(css[i + 1])
+          ? readEscape(css, i)[1]
+          : i + 1;
+    }
+    address = css.slice(start, i).trim();
+  }
+  return [address, i < css.length ? i + 1 : i];
+};
+
 interface ReadCss {
   /**
    * The CSS as the browser reads it: comments gone, escapes decoded, and
-   * each string replaced by a placeholder.
+   * each string, and each unquoted url() address, replaced by a
+   * placeholder.
    */
   text: string;
   /** The same with A–Z in lower case, character for character. */
@@ -95,13 +170,36 @@ const readCss = (css: string): ReadCss => {
   const source = css.replaceAll(STRING_MARK, '\ufffd');
   const strings: string[] = [];
   let text = '';
+  // The name being read (escapes decoded), and the character before it:
+  // url( starts an unquoted address only after the name url on its own,
+  // not part of a #hash or @rule.
+  let name = '';
+  let beforeName = '';
+  const endName = (char: string) => {
+    name = '';
+    beforeName = char;
+  };
   let i = 0;
   while (i < source.length) {
     const char = source[i];
+    const url =
+      char === '(' &&
+      name.replace(/[A-Z]/g, (letter) => letter.toLowerCase()) === 'url' &&
+      beforeName !== '#' &&
+      beforeName !== '@'
+        ? readUrl(source, i)
+        : undefined;
     if (char === '/' && source[i + 1] === '*') {
       const end = source.indexOf('*/', i + 2);
       i = end < 0 ? source.length : end + 2;
       text += ' ';
+      endName(' ');
+    } else if (url) {
+      // An unquoted address, kept like a string.
+      text += `(${stringPlaceholder(strings.length)})`;
+      strings.push(url[0]);
+      i = url[1];
+      endName(')');
     } else if (char === '"' || char === "'") {
       let value = '';
       i += 1;
@@ -127,13 +225,21 @@ const readCss = (css: string): ReadCss => {
       }
       text += stringPlaceholder(strings.length);
       strings.push(value);
-    } else if (char === '\\') {
+      endName(STRING_MARK);
+    } else if (char === '\\' && !isNewline(source[i + 1])) {
+      // An escaped character is part of a name, whatever it is.
       const [decoded, next] = readEscape(source, i);
       text += decoded;
+      name += decoded;
       i = next;
     } else {
       text += char;
       i += 1;
+      if (isNameChar(char)) {
+        name += char;
+      } else {
+        endName(char);
+      }
     }
   }
   // Only A–Z, so every position in one is the same position in the other.
@@ -158,8 +264,11 @@ const addressAt = (read: ReadCss, at: number): string => {
   return read.text.slice(i, end < 0 ? undefined : end).trim();
 };
 
-/** url(), src(), and @import with its address. */
-const ADDRESS_USES = /@import|(?<![a-z0-9_\-\u0080-￿])(url|src)\(/g;
+/**
+ * url(), src(), and @import with its address. Not after # or @, which
+ * make #url( and @url( a name rather than a function.
+ */
+const ADDRESS_USES = /@import|(?<![a-z0-9_\-\u0080-￿#@])(url|src)\(/g;
 
 /** Every address the CSS uses, in order: imported stylesheets apart. */
 const addressesIn = (

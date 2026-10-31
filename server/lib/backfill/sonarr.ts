@@ -46,6 +46,8 @@ export interface SonarrEpisodeFile {
   size: number;
   quality: SonarrQuality;
   customFormatScore?: number;
+  /** Below its quality profile's cutoff. */
+  qualityCutoffNotMet?: boolean;
   releaseGroup?: string;
   languages?: SonarrLanguage[];
   /** What Sonarr read from the file itself: "eng", "eng/jpn"; "13:43". */

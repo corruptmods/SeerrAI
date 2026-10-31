@@ -205,12 +205,12 @@ backfillRoutes.get('/', async (req, res, next) => {
       where: { status: 'ready' },
     });
     const bestBySeries = new Map<number, BackfillCandidate>();
+    const score = (x: BackfillCandidate) =>
+      (x.summary?.fill ?? 0) * 1e6 +
+      (x.summary?.upgrade ?? 0) * 1e3 +
+      (x.summary?.score ?? 0) / 1e3;
     for (const c of ready) {
       const held = bestBySeries.get(c.seriesId);
-      const score = (x: BackfillCandidate) =>
-        (x.summary?.fill ?? 0) * 1e6 +
-        (x.summary?.upgrade ?? 0) * 1e3 +
-        (x.summary?.score ?? 0) / 1e3;
       if (!held || score(c) > score(held)) bestBySeries.set(c.seriesId, c);
     }
     const jobsRepo = getRepository(BackfillJob);
@@ -276,22 +276,23 @@ backfillRoutes.get('/', async (req, res, next) => {
         ],
       },
       counts,
-      series: rows.map((row) => ({
-        ...seriesView(row),
-        best: bestBySeries.has(row.id)
-          ? candidateView(bestBySeries.get(row.id)!)
-          : undefined,
-        readyCount: ready.filter((c) => c.seriesId === row.id).length,
-        job: active.find((j) => j.seriesId === row.id)
-          ? jobView(active.find((j) => j.seriesId === row.id)!)
-          : undefined,
-      })),
-      jobs: active.map((job) => ({
-        ...jobView(job),
-        series: titles.has(job.seriesId)
-          ? seriesView(titles.get(job.seriesId)!)
-          : undefined,
-      })),
+      series: rows.map((row) => {
+        const best = bestBySeries.get(row.id);
+        const job = active.find((j) => j.seriesId === row.id);
+        return {
+          ...seriesView(row),
+          best: best ? candidateView(best) : undefined,
+          readyCount: ready.filter((c) => c.seriesId === row.id).length,
+          job: job ? jobView(job) : undefined,
+        };
+      }),
+      jobs: active.map((job) => {
+        const title = titles.get(job.seriesId);
+        return {
+          ...jobView(job),
+          series: title ? seriesView(title) : undefined,
+        };
+      }),
       awaiting: waiting.map((row) => ({
         ...candidateView(bestBySeries.get(row.id)!),
         series: seriesView(row),
@@ -652,9 +653,7 @@ const seriesOnDisk = async (row: BackfillSeries): Promise<SeriesOnDisk> => {
                 : 'unaired',
           quality: file?.quality.quality.name,
           score: file?.customFormatScore,
-          belowCutoff: file
-            ? (file as { qualityCutoffNotMet?: boolean }).qualityCutoffNotMet
-            : undefined,
+          belowCutoff: file?.qualityCutoffNotMet,
         };
       }),
   };

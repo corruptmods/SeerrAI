@@ -229,9 +229,12 @@ export const seasonEpisodeIn = (
   };
 };
 
-/** A whole season, named as such. */
+/**
+ * A whole season, named as such. The number is optional as a group, never
+ * as `\s*\d*\s+`, which takes time squared in a long run of spaces.
+ */
 const WHOLE_SEASON =
-  /\b(whole|entire|full|complete)\s+(season|series)\b|\ball\s+(of\s+)?(the\s+)?season\b|\bseason\s*\d*\s+(is\s+)?(all|completely|totally|entirely)\b/i;
+  /\b(whole|entire|full|complete)\s+(season|series)\b|\ball\s+(of\s+)?(the\s+)?season\b|\bseason(?:\s*\d+)?\s+(is\s+)?(all|completely|totally|entirely)\b/i;
 /** Everything there, in other words. */
 const WHOLE_OTHERWISE =
   /\b(every|all( of)?( the)?) (episodes?|files?)\b|\b(replace|redownload|re-download)\s+(it|them)\s+all\b/i;

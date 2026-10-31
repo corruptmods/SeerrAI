@@ -1462,6 +1462,23 @@ describe('Auto-fix: reading which season and episode', () => {
       'subtitles'
     );
     assert.equal(classify('Fix season 6 of quiet ravens'), undefined);
+    assert.equal(classify('season 6 all bad')?.kind, 'replaceSeason');
+    assert.equal(classify('season all wrong')?.kind, 'replaceSeason');
+  });
+
+  it('reads a long report in good time, whatever is in it', () => {
+    // A report is up to the size of a request body: spaces after "season"
+    // once took seconds, holding up every other request meanwhile.
+    const started = Date.now();
+    for (const text of [
+      `season${' '.repeat(90_000)}x`,
+      `season 2${' '.repeat(90_000)}x`,
+      `${'season '.repeat(12_000)}x`,
+    ]) {
+      classify(text, IssueType.VIDEO);
+      seasonEpisodeIn(text);
+    }
+    assert.ok(Date.now() - started < 500, `${Date.now() - started} ms`);
   });
 });
 

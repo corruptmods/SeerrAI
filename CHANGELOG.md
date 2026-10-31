@@ -6,6 +6,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### New
 
+- **Quality profiles** (Settings → Quality): Seerr AI can set up Radarr and Sonarr profiles for you, from its own presets (SD to 2160p Remux, and Anime) or from TRaSH Guides, with a few adjustments on top: prefer usenet, file size, languages, HDR, x265, dual audio. Each server has its own. **What it does** says in plain words what each profile takes and prefers, and lets you try a release name. Every server starts Not managed and nothing is sent until you preview and apply; it only changes what it creates, and History has Undo. Backfill can also step a title down a preset when nothing turns up, off unless you turn it on. ([guide](./docs/seerr-ai/quality.md))
 - **Backfill gives up on torrents that won't finish**: when part of what's wanted is on no one's computer, after the stall time, even while the rest trickles in; and when one is so slow it would take over 3 days, after four hours at that pace. Either is replaced like a stalled one. Change the 3 days, or turn it off, in Settings → Backfill. Songs taken from albums too.
 - **Backfill trusts seeders less**: a torrent whose swarm never had all of it is given up within its first hour, since an indexer's count of seeders is often old. A torrent its indexer says nobody seeds is never taken by itself, and is offered after ones that are seeded.
 - **Artist pictures from TheAudioDB without a key**: its free key is used for artists Lidarr has no picture of. A supporter's key still takes its place when entered.

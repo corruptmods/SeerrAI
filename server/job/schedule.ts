@@ -18,6 +18,10 @@ import notificationReconciler from '@server/lib/notificationReconciler';
 import playlists from '@server/lib/playlists';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import plexUserImport from '@server/lib/plexUserImport';
+import {
+  qualityCheckRunning,
+  runQualityCheck,
+} from '@server/lib/quality/check';
 import refreshToken from '@server/lib/refreshToken';
 import { jellyfinScanners } from '@server/lib/scanners/jellyfin';
 import { musicFullScan, musicSync } from '@server/lib/scanners/music';
@@ -667,6 +671,21 @@ export const startJobs = (): void => {
       runJob('Download Check', () => downloadCheck.run())
     ),
     running: () => downloadCheck.status().running,
+  });
+
+  // Quality profiles (Settings → Quality): does nothing until an admin
+  // manages a server there, or turns on Backfill's step-down.
+  scheduledJobs.push({
+    id: 'quality-check',
+    name: 'Quality Profiles Check',
+    type: 'process',
+    interval: 'hours',
+    cronSchedule: jobs['quality-check'].schedule,
+    job: schedule.scheduleJob(
+      jobs['quality-check'].schedule,
+      runJob('Quality Profiles Check', runQualityCheck)
+    ),
+    running: qualityCheckRunning,
   });
 
   // Report only: folders a media server matched to a different title than

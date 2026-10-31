@@ -25,6 +25,7 @@ import ImageProxy from '@server/lib/imageproxy';
 import notificationReconciler from '@server/lib/notificationReconciler';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import plexUserImport from '@server/lib/plexUserImport';
+import * as qualityCheck from '@server/lib/quality/check';
 import refreshToken from '@server/lib/refreshToken';
 import {
   embyFullScanner,
@@ -90,6 +91,7 @@ const stubEveryJob = () => {
     [plexMatchCheck, 'run'],
     [healthAlerts, 'run'],
     [dbMaintenance, 'runDbMaintenance'],
+    [qualityCheck, 'runQualityCheck'],
   ] as const) {
     mock.method(target as unknown as Record<string, () => unknown>, name, fail);
   }

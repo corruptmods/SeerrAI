@@ -1,5 +1,6 @@
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
+import { noteGrab } from '@server/lib/quality/notes';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import type { AxiosInstance } from 'axios';
 
@@ -167,11 +168,18 @@ const records = (data: unknown): ArrHistoryRecord[] =>
     : ((data as { records?: ArrHistoryRecord[] })?.records ?? []);
 
 export class FixSonarr extends SonarrAPI {
+  /** The server it is, for notes on what Seerr AI grabs (lib/quality). */
+  public serverId?: number;
+  /** The releases last offered, so a grab can say what it was chosen over. */
+  private offered: ArrRelease[] = [];
+
   static forServer(server: SonarrSettings): FixSonarr {
-    return new FixSonarr({
+    const api = new FixSonarr({
       apiKey: server.apiKey,
       url: SonarrAPI.buildUrl(server, '/api/v3'),
     });
+    api.serverId = server.id;
+    return api;
   }
 
   public get extras(): ArrExtras {
@@ -226,7 +234,8 @@ export class FixSonarr extends SonarrAPI {
       params: { episodeId },
       timeout: RELEASE_SEARCH_TIMEOUT_MS,
     });
-    return Array.isArray(data) ? data : [];
+    this.offered = Array.isArray(data) ? data : [];
+    return this.offered;
   }
 
   /**
@@ -241,7 +250,8 @@ export class FixSonarr extends SonarrAPI {
       params: { seriesId, seasonNumber },
       timeout: RELEASE_SEARCH_TIMEOUT_MS,
     });
-    return Array.isArray(data) ? data : [];
+    this.offered = Array.isArray(data) ? data : [];
+    return this.offered;
   }
 
   /** One season's events, newest first: where each file came from. */
@@ -276,6 +286,11 @@ export class FixSonarr extends SonarrAPI {
       guid: release.guid,
       indexerId: release.indexerId,
     });
+    if (this.serverId !== undefined) {
+      await noteGrab('sonarr', this.serverId, release.guid, this.offered).catch(
+        () => undefined
+      );
+    }
   }
 
   public async parse(title: string): Promise<SonarrParse> {
@@ -297,11 +312,18 @@ export interface RadarrMovieDetail {
 }
 
 export class FixRadarr extends RadarrAPI {
+  /** The server it is, for notes on what Seerr AI grabs (lib/quality). */
+  public serverId?: number;
+  /** The releases last offered, so a grab can say what it was chosen over. */
+  private offered: ArrRelease[] = [];
+
   static forServer(server: RadarrSettings): FixRadarr {
-    return new FixRadarr({
+    const api = new FixRadarr({
       apiKey: server.apiKey,
       url: RadarrAPI.buildUrl(server, '/api/v3'),
     });
+    api.serverId = server.id;
+    return api;
   }
 
   public get extras(): ArrExtras {
@@ -336,7 +358,8 @@ export class FixRadarr extends RadarrAPI {
       params: { movieId },
       timeout: RELEASE_SEARCH_TIMEOUT_MS,
     });
-    return Array.isArray(data) ? data : [];
+    this.offered = Array.isArray(data) ? data : [];
+    return this.offered;
   }
 
   public async grab(release: Pick<ArrRelease, 'guid' | 'indexerId'>) {
@@ -344,5 +367,10 @@ export class FixRadarr extends RadarrAPI {
       guid: release.guid,
       indexerId: release.indexerId,
     });
+    if (this.serverId !== undefined) {
+      await noteGrab('radarr', this.serverId, release.guid, this.offered).catch(
+        () => undefined
+      );
+    }
   }
 }

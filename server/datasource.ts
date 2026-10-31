@@ -31,6 +31,10 @@ import MusicMetadata from '@server/entity/MusicMetadata';
 import { NotificationDelivery } from '@server/entity/NotificationDelivery';
 import OidcLink from '@server/entity/OidcLink';
 import OverrideRule from '@server/entity/OverrideRule';
+import QualityApply from '@server/entity/QualityApply';
+import QualityGrabNote from '@server/entity/QualityGrabNote';
+import QualityManaged from '@server/entity/QualityManaged';
+import QualityStepDown from '@server/entity/QualityStepDown';
 import RemovedPlexAccount from '@server/entity/RemovedPlexAccount';
 import Season from '@server/entity/Season';
 import SeasonRequest from '@server/entity/SeasonRequest';
@@ -90,6 +94,10 @@ const entities = [
   NotificationDelivery,
   OidcLink,
   OverrideRule,
+  QualityApply,
+  QualityGrabNote,
+  QualityManaged,
+  QualityStepDown,
   RemovedPlexAccount,
   Season,
   SeasonRequest,

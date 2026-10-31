@@ -111,6 +111,7 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages(
     'music-sync': 'Music Sync',
     'music-full-scan': 'Music Full Scan',
     'playlist-sync': 'Playlist Sync',
+    'quality-check': 'Quality Profiles Check',
     'database-maintenance': 'Database Maintenance',
     editJobSchedule: 'Modify Job',
     jobScheduleEditSaved: 'Job edited successfully!',

@@ -22,6 +22,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 - **[Single sign-on](./single-sign-on.md#setting-it-up-admins)**: adding providers, sign-ups, who can sign in.
 - **[Music](./music.md#setting-it-up-admins)**: Lidarr, music libraries, limits.
 - **[Backfill and the admin agent](./backfill-and-agent.md)**: getting what Sonarr, Radarr and Lidarr can't find.
+- **[Quality profiles](./quality.md)**: Radarr and Sonarr profiles from Seerr AI's presets or TRaSH Guides, with your adjustments, and what each does.
 - **[Download Check](./download-check.md)**: fakes, wrong titles and stuck imports, sorted out.
 - **[Keeping it healthy](./health.md)**: the Health page, alerts, Match Check, Anime Check.
 - **[Notifications](../using-seerr/notifications/)**: each notification service and its settings.
@@ -46,6 +47,7 @@ Almost everything here is optional. Admins turn a feature off for everyone in **
 | **Arrival estimates** | "Digital release expected 3 Nov", or time left while downloading. |
 | **Failed requests** | Say why, with Retry and Edit. |
 | **Backfill and the admin agent** | Find what Sonarr, Radarr and Lidarr can't; nothing changes without approval. |
+| **Quality profiles** | Radarr and Sonarr profiles from Seerr AI or TRaSH Guides, per server, with what each does in plain words; off until you apply. |
 | **Health and Match Check** | Every service checked, alerts when something breaks, wrong matches caught. |
 | **AI** | Claude, OpenAI or your own model: search for films, series and music, group picks, recaps, fixes for problems you describe, log explanations. |
 | **Your home page** | Hide rows, arrange your menu, Suggested for You, Anime, leave out streaming services. |

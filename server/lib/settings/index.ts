@@ -16,6 +16,8 @@ import {
 } from '@server/constants/theme';
 import { cssVersion } from '@server/lib/customCss';
 import { Permission } from '@server/lib/permissions';
+import type { QualitySettings } from '@server/lib/quality/types';
+import { QUALITY_DEFAULTS } from '@server/lib/quality/types';
 import type { SeasonCalendar, SeasonsSettings } from '@server/lib/seasons';
 import { seasonCalendar, seasonSettings } from '@server/lib/seasons';
 import { runMigrations } from '@server/lib/settings/migrator';
@@ -301,6 +303,16 @@ export interface BackfillSettings {
     /** Days a finished conversation is kept; 0 keeps them for good. */
     keepDays: number;
   };
+  /**
+   * A title on one of Seerr AI's quality presets (Settings → Quality) that
+   * nothing has been grabbed for in `days` moves to the next looser preset
+   * on its server, then back once something is grabbed (lib/quality/
+   * stepDown). Off by default.
+   */
+  stepDown: {
+    enabled: boolean;
+    days: number;
+  };
 }
 
 export const BACKFILL_DEFAULTS: BackfillSettings = {
@@ -341,6 +353,7 @@ export const BACKFILL_DEFAULTS: BackfillSettings = {
     instructions: '',
     keepDays: 30,
   },
+  stepDown: { enabled: false, days: 30 },
 };
 
 /**
@@ -1010,6 +1023,7 @@ export type JobId =
   | 'music-sync'
   | 'music-full-scan'
   | 'playlist-sync'
+  | 'quality-check'
   | 'database-maintenance';
 
 export interface AllSettings {
@@ -1027,6 +1041,8 @@ export interface AllSettings {
   downloadClients: DownloadClientSettings[];
   bazarr: BazarrSettings;
   backfill: BackfillSettings;
+  /** Quality profiles Seerr AI sets up (lib/quality). */
+  quality?: QualitySettings;
   oidc: OidcSettings;
   radarr: RadarrSettings[];
   sonarr: SonarrSettings[];
@@ -1381,6 +1397,11 @@ class Settings {
         'playlist-sync': {
           schedule: '0 25 * * * *',
         },
+        // Quality profiles (Settings → Quality): TRaSH Guides once a day,
+        // whether anyone changed Seerr AI's profiles, and the step-down.
+        'quality-check': {
+          schedule: '0 20 * * * *',
+        },
         // Clears out rows nothing reads any more, then vacuums.
         'database-maintenance': {
           schedule: '0 45 3 * * *',
@@ -1520,6 +1541,17 @@ class Settings {
 
   set backfill(data: BackfillSettings) {
     this.data.backfill = data;
+  }
+
+  get quality(): QualitySettings {
+    return mergeSettings(
+      structuredClone(QUALITY_DEFAULTS),
+      this.data.quality ?? {}
+    );
+  }
+
+  set quality(data: QualitySettings) {
+    this.data.quality = data;
   }
 
   get tautulli(): TautulliSettings {

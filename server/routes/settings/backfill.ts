@@ -84,6 +84,12 @@ const body = z.object({
       instructions: '',
       keepDays: 30,
     }),
+  stepDown: z
+    .object({
+      enabled: z.boolean(),
+      days: z.coerce.number().int().min(7).max(365),
+    })
+    .optional(),
 });
 
 const shown = (settings: BackfillSettings) => ({
@@ -114,6 +120,7 @@ const withKey = (data: z.infer<typeof body>): BackfillSettings => ({
   // Changed only through /blocked-groups and /download-check.
   blockedGroups: getSettings().backfill.blockedGroups,
   downloadCheck: getSettings().backfill.downloadCheck,
+  stepDown: data.stepDown ?? getSettings().backfill.stepDown,
 });
 
 const prowlarrFailed = (e: unknown) => {

@@ -68,6 +68,10 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
   slowHoursTip:
     'Judged by its speed over the last four hours. Paused or queued time doesn’t count. 0 never gives up.',
   minFreeSpaceGb: 'Keep free on the series’ disk (GB)',
+  stepDown: 'Step down a quality preset',
+  stepDownTip:
+    'A title on one of Seerr AI’s quality presets (Settings → Quality) that nothing is grabbed for moves to the next looser preset, then back once something is.',
+  stepDownDays: 'Days before it steps down',
   historyDays: 'Days to keep finished downloads',
   historyDaysTip:
     'Older ones are removed nightly; packs you turned down are kept. 0 keeps everything.',
@@ -183,6 +187,10 @@ const SettingsBackfill = () => {
               stallHours: Number(values.stallHours),
               slowHours: Number(values.slowHours),
               replaceFailed: values.replaceFailed,
+              stepDown: {
+                enabled: values.stepDown.enabled,
+                days: Number(values.stepDown.days),
+              },
               historyDays: Number(values.historyDays),
               agent: {
                 autoRun: values.agent.autoRun,
@@ -411,6 +419,33 @@ const SettingsBackfill = () => {
                   {checkbox('replaceFailed', values.replaceFailed)}
                 </div>
               </div>
+              <div className="form-row">
+                <label htmlFor="stepDown.enabled" className="checkbox-label">
+                  {intl.formatMessage(messages.stepDown)}
+                  <span className="label-tip">
+                    {intl.formatMessage(messages.stepDownTip)}
+                  </span>
+                </label>
+                <div className="form-input-area">
+                  {checkbox('stepDown.enabled', values.stepDown.enabled)}
+                </div>
+              </div>
+              {values.stepDown.enabled && (
+                <div className="form-row">
+                  <label htmlFor="stepDown.days" className="text-label">
+                    {intl.formatMessage(messages.stepDownDays)}
+                  </label>
+                  <div className="form-input-area">
+                    <Field
+                      id="stepDown.days"
+                      name="stepDown.days"
+                      type="text"
+                      inputMode="numeric"
+                      className="short"
+                    />
+                  </div>
+                </div>
+              )}
               {(values.autoApprove.enabled || values.replaceFailed) && (
                 <>
                   <div className="form-row">

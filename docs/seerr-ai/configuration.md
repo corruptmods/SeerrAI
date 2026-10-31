@@ -34,6 +34,7 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | **Settings → Services → Override Rules** | **Age Ratings** to match on; Sonarr rules can set **Series Type**, Radarr rules **Anime**. | None; left to detection |
 | **Settings → Services → Anime** | **Leave out anime made in**: countries whose anime-styled titles don't count as anime unless they're in Japanese. | Empty (United States on servers from before the setting) |
 | **Settings → Services** | **Anime Check** report and **Run Check**. | |
+| **Settings → Quality** | Quality profiles Seerr AI creates in Radarr and Sonarr, per server: presets from Seerr AI or TRaSH Guides, adjustments, band step; **Fill gaps with Seerr AI** and **Apply updates automatically** for TRaSH Guides. Nothing is sent to a server until it is managed and applied. See [Quality profiles](./quality.md). | Every server Not managed; Fill gaps on; Apply updates automatically off; usenet at equal quality, torrents wait 2 hours when chosen, band step 100 |
 | **Settings → AI** | Provider, key, model, per-feature models (Advanced), **Daily Limit per Person**, credit. See [AI](./ai.md). | Off; 20 answers a day |
 | **Settings → Backfill** | Download clients, category, when a title is stuck, approval, the admin agent; limits under Advanced. See [Backfill](./backfill-and-agent.md). **Download Check** (Off, Report only or On) is saved on its own and needs nothing else here; see [Download Check](./download-check.md). | Off; see below |
 | **Settings → Notifications** | New types: **Plex Reauth** (always sent), **Backfill**, **Health** and **Wrong Match** (admins), and **List Activity** (each person's own settings, never a channel's). | Web push on; Wrong Match on wherever Health was |
@@ -63,6 +64,7 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | *Advanced:* agent runs a day on its own / downloads a day / largest download | 12 / 10 / 40 GB |
 | *Advanced:* agent steps per go / times it carries on by itself | 30 / 3 |
 | *Advanced:* days to keep finished agent conversations | 30 (0 forever) |
+| Step down a quality preset (titles on Seerr AI's presets) | Off (30 days) |
 
 ## Plex, Jellyfin and Emby
 
@@ -95,6 +97,7 @@ Seerr AI adds these to **Settings → Jobs & Cache**, where each can be reschedu
 | Download Check | every 30 seconds | Checks what Sonarr and Radarr grabbed, and imports that got stuck. Only with Download Check on or on Report only. |
 | Health Alerts | every 10 minutes | Tells admins when a connected service newly has a problem. |
 | Anime Check | daily, 04:15 | Report: series and movies in the wrong anime folder, type or profile. |
+| Quality Profiles Check | hourly, at :20 | For servers in Settings → Quality: checks TRaSH Guides for changes once every 24 hours if a preset uses it, notes changes made in Radarr or Sonarr (shown on Health), applies TRaSH Guides updates only with **Apply updates automatically** on, and every 6 hours steps titles down or back. Only does anything for managed servers. |
 | Match Check | daily, 04:20 | Report: folders a connected media server (Plex, Jellyfin or Emby) matched to another title. |
 | Music Sync | every 5 minutes (at :03, :08…) | Reads what each server's music libraries added recently, follows Lidarr's work on requests (counting its files, adding albums it didn't have yet), completes requests whose albums are all here, and says so. Also runs a minute after Lidarr imports something. Only while music is set up and on. |
 | Music Full Scan | daily, 03:40 | Reads every music library and all of Lidarr; with **Enable Scan** on, brings in what Lidarr has; marks albums gone from everywhere as deleted (or not here, if nobody asked for them), unless a server, Lidarr or MusicBrainz didn't answer. Only while music is set up and on. |

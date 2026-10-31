@@ -48,6 +48,8 @@ import { lidarrApi, musicReady } from '@server/lib/music/access';
 import { lidarrOnly } from '@server/lib/music/availability';
 import type { PlexMatchProblem } from '@server/lib/plexMatchCheck';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
+import { lastStates } from '@server/lib/quality/engine';
+import { readTrashState } from '@server/lib/quality/trash';
 import type { DownloadClientSettings } from '@server/lib/settings';
 import { aiReady, getSettings } from '@server/lib/settings';
 import type { ShownId } from '@server/utils/plexMatch';
@@ -1638,6 +1640,66 @@ const collectionGapsCheck = (page: Page): HealthCheck => {
  * agent's conversations waiting on an admin, while each is on. Only when
  * Backfill is on.
  */
+/**
+ * Seerr AI's quality profiles (Settings → Quality), on servers an admin
+ * manages: one someone changed or removed in Radarr or Sonarr, a TRaSH
+ * Guides update that changes a format an admin moved (the admin's choice
+ * stays), a server that couldn't be checked, and TRaSH Guides not reached
+ * for 3 days. From the last hourly check.
+ */
+const qualityChecks = async (): Promise<HealthCheck[]> => {
+  const managed = getSettings().quality.servers.filter((s) => s.managed);
+  if (!managed.length) return [];
+  const href = '/settings/quality';
+  const items: HealthItem[] = [];
+  for (const state of lastStates()) {
+    const app = state.kind === 'radarr' ? 'Radarr' : 'Sonarr';
+    for (const change of state.changed) {
+      items.push({
+        title: `${state.name}: ${change.name}`,
+        detail: change.removed ? `removed in ${app}` : `changed in ${app}`,
+        href,
+      });
+    }
+    for (const name of state.clashes) {
+      items.push({
+        title: `${state.name}: ${name}`,
+        detail: 'TRaSH Guides changed its score; your choice stays',
+        href,
+      });
+    }
+    if (state.status === 'unreachable') {
+      items.push({
+        title: state.name,
+        detail: 'could not be reached to check its quality profiles',
+        href,
+      });
+    }
+  }
+  if (managed.some((s) => Object.values(s.presets).includes('trash'))) {
+    const trash = await readTrashState();
+    const lastGood = Date.parse(trash.checkedAt ?? '') || 0;
+    if (trash.failedAt && Date.now() - lastGood > 3 * DAY_MS) {
+      items.push({
+        title: 'TRaSH Guides',
+        detail: `not reached for 3 days${trash.error ? `: ${trash.error}` : ''}`,
+        href,
+      });
+    }
+  }
+  return [
+    {
+      id: 'qualityProfiles',
+      group: 'services',
+      reachable: true,
+      status: items.length ? 'warning' : 'ok',
+      count: items.length,
+      detail: `${managed.length} managed, in step`,
+      items: items.slice(0, ITEM_LIMIT),
+    },
+  ];
+};
+
 const backfillChecks = async (
   page: Page = FIRST_PAGE
 ): Promise<HealthCheck[]> => {
@@ -1843,6 +1905,7 @@ export const runHealthChecks = async (): Promise<{
       ? healthActivity().catch(() => undefined)
       : undefined,
     guarded('services', serviceChecks),
+    guarded('services', qualityChecks),
     guarded('backfill', backfillChecks),
     guarded('requests', requestChecks),
     guarded('media', mediaChecks),
@@ -1880,6 +1943,7 @@ export const runHealthCheck = async (
     backfillFailed: backfillChecks,
     downloadCheckWaiting: backfillChecks,
     agentWaiting: backfillChecks,
+    qualityProfiles: qualityChecks,
   }[id];
 
   if (!group) {

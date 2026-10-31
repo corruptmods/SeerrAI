@@ -13,6 +13,7 @@ const messages = defineMessages('components.Settings', {
   menuMusic: 'Music',
   menuMediaServers: 'Media Servers',
   menuServices: 'Services',
+  menuQuality: 'Quality',
   menuNetwork: 'Network',
   menuNotifications: 'Notifications',
   menuLogs: 'Logs',
@@ -69,6 +70,11 @@ const SettingsLayout = ({ children }: SettingsLayoutProps) => {
       text: intl.formatMessage(messages.menuServices),
       route: '/settings/services',
       regex: /^\/settings\/services/,
+    },
+    {
+      text: intl.formatMessage(messages.menuQuality),
+      route: '/settings/quality',
+      regex: /^\/settings\/quality/,
     },
     {
       text: intl.formatMessage(messages.menuNetwork),

@@ -85,6 +85,7 @@ const messages = defineMessages('components.Settings.SettingsHealth', {
     'Looks a few minutes after each import and tells admins once (Wrong Match notification).',
   settingFailed: 'Could not save the setting.',
   plexSignIn: 'Expired Plex sign-ins',
+  qualityProfiles: 'Quality profiles',
   backfill: 'Backfill',
   backfillSearchErrors: 'Titles Backfill could not search',
   backfillAwaiting: 'Packs waiting for approval',

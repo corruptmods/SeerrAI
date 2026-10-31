@@ -256,6 +256,16 @@ components:
             mode:
               type: string
               enum: ['off', 'report', 'on']
+        stepDown:
+          type: object
+          description: A title on one of Seerr AI's quality presets that nothing has been grabbed for in this many days moves to the next looser preset, then back once something is grabbed. Off by default; kept as it is when left out.
+          properties:
+            enabled:
+              type: boolean
+            days:
+              type: integer
+              minimum: 7
+              maximum: 365
     BackfillAnswer:
       type: object
       additionalProperties: true
@@ -5904,6 +5914,355 @@ paths:
                   mode:
                     type: string
                     enum: ['off', 'report', 'on']
+  /settings/quality:
+    get:
+      summary: 'Quality profiles: TRaSH Guides, each server, and History'
+      description: "What Seerr AI sets up in each Radarr and Sonarr (Settings → Quality): the TRaSH Guides switches and copy, every server's choices and state (not managed, ready, in sync, update ready, changed in the app), and the latest applies."
+      tags:
+        - settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    put:
+      summary: 'Save the quality profile choices'
+      description: 'Saves only: nothing is sent to Radarr or Sonarr until an apply. Servers start as not managed. Answers what GET answers.'
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - trash
+                - servers
+              properties:
+                trash:
+                  type: object
+                  required: [autoApply, fillGaps]
+                  properties:
+                    autoApply:
+                      type: boolean
+                    fillGaps:
+                      type: boolean
+                servers:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      [
+                        kind,
+                        serverId,
+                        managed,
+                        presets,
+                        adjustments,
+                        nudges,
+                        bandStep,
+                      ]
+                    properties:
+                      kind:
+                        type: string
+                        enum: [radarr, sonarr]
+                      serverId:
+                        type: integer
+                      managed:
+                        type: boolean
+                      presets:
+                        type: object
+                        additionalProperties:
+                          type: string
+                          enum: [seerr, trash, 'off']
+                      adjustments:
+                        type: object
+                        additionalProperties: true
+                      nudges:
+                        type: object
+                        additionalProperties:
+                          type: string
+                          enum: [up, down, never]
+                      bandStep:
+                        type: integer
+                        enum: [50, 100, 250, 500]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /settings/quality/trash/check:
+    post:
+      summary: 'Check TRaSH Guides now'
+      description: 'Fetches what changed in TRaSH Guides since the copy kept. Applies nothing.'
+      tags:
+        - settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /settings/quality/servers/{kind}/{serverId}/preview:
+    post:
+      summary: 'What applying would change on a server'
+      description: 'Creates, updates, puts back and leaves alone, profile by profile and format by format, and the delay profile. Changes nothing.'
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [radarr, sonarr]
+        - in: path
+          name: serverId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /settings/quality/servers/{kind}/{serverId}/apply:
+    post:
+      summary: "Apply a server's quality profiles"
+      description: "Makes the preview so. Only Seerr AI's own profiles and formats are written, and the default delay profile when Prefer usenet needs it. A copy of everything changed is kept for Undo. Titles move only when asked, from the admin's own profiles."
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [radarr, sonarr]
+        - in: path
+          name: serverId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                move:
+                  type: array
+                  items:
+                    type: object
+                    required: [fromProfileId, preset]
+                    properties:
+                      fromProfileId:
+                        type: integer
+                      preset:
+                        type: string
+                restoreKept:
+                  type: boolean
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /settings/quality/servers/{kind}/{serverId}/keep:
+    post:
+      summary: "Keep changes made in Radarr or Sonarr to Seerr AI's profiles"
+      description: 'They are left as they are, and skipped by later applies, until someone puts them back.'
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [radarr, sonarr]
+        - in: path
+          name: serverId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /settings/quality/servers/{kind}/{serverId}/formats:
+    get:
+      summary: "Every format a server's presets use"
+      description: 'For Advanced: each format, where it comes from, and the presets that use it.'
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [radarr, sonarr]
+        - in: path
+          name: serverId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+  /settings/quality/servers/{kind}/{serverId}/presets/{preset}:
+    get:
+      summary: 'What a preset does'
+      description: 'Its qualities, what it prefers in bands, what it never takes, how ties are broken, and whether it is applied.'
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [radarr, sonarr]
+        - in: path
+          name: serverId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: preset
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /settings/quality/servers/{kind}/{serverId}/presets/{preset}/try:
+    post:
+      summary: 'Whether a preset would take a release name'
+      description: 'Radarr or Sonarr reads the name; the score is added up from the profile as it is there.'
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [radarr, sonarr]
+        - in: path
+          name: serverId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: preset
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                  minLength: 3
+                  maxLength: 300
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /settings/quality/servers/{kind}/{serverId}/presets/{preset}/grabs:
+    get:
+      summary: "The latest grabs onto a preset's profile"
+      description: "Newest first, from the app's history. Why one won is known only for grabs Seerr AI made itself."
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [radarr, sonarr]
+        - in: path
+          name: serverId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: preset
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+  /settings/quality/history/{applyId}/undo:
+    post:
+      summary: 'Undo an apply'
+      description: "Puts back what it changed, and moves titles back. Only a server's newest apply can be undone; a profile it created is removed only when nothing uses it."
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: applyId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /backfill/download-check:
     get:
       summary: "Download Check's findings"

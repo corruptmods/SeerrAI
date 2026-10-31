@@ -1658,7 +1658,13 @@ const qualityChecks = async (): Promise<HealthCheck[]> => {
   if (!managed.length) return [];
   const href = '/settings/quality';
   const items: HealthItem[] = [];
-  for (const state of lastStates()) {
+  // Only servers still managed: one that was stopped or removed keeps its
+  // last state.
+  const keys = new Set(managed.map((s) => `${s.kind}:${s.serverId}`));
+  const states = lastStates().filter((s) =>
+    keys.has(`${s.kind}:${s.serverId}`)
+  );
+  for (const state of states) {
     const app = state.kind === 'radarr' ? 'Radarr' : 'Sonarr';
     for (const change of state.changed) {
       items.push({
@@ -1700,7 +1706,9 @@ const qualityChecks = async (): Promise<HealthCheck[]> => {
       reachable: true,
       status: items.length ? 'warning' : 'ok',
       count: items.length,
-      detail: `${managed.length} managed, in step`,
+      detail: items.length
+        ? `${managed.length} managed`
+        : `${managed.length} managed, in step`,
       items: items.slice(0, ITEM_LIMIT),
     },
   ];

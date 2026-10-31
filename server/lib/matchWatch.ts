@@ -273,12 +273,35 @@ const kindOfServer = (name: MediaServerName): MediaServerKind =>
   name === 'Plex' ? 'plex' : name === 'Emby' ? 'emby' : 'jellyfin';
 
 /**
+ * A reading of what was added since a time, shared by the titles that ask:
+ * read again for a title imported before it, which it may have missed.
+ */
+const sinceShared = <T>(
+  cache: Map<string, { since: number; read: Promise<T> }>,
+  key: string,
+  since: Date,
+  read: () => Promise<T>
+): Promise<T> => {
+  const cached = cache.get(key);
+  if (cached && cached.since <= since.getTime()) return cached.read;
+  const fresh = { since: since.getTime(), read: read() };
+  cache.set(key, fresh);
+  return fresh.read;
+};
+
+/**
  * What one run has read, so several titles on one server share a reading
  * of its newest items.
  */
 class Reading {
-  private lists = new Map<string, Promise<MatchItem[]>>();
-  private albums = new Map<string, Promise<ServerAlbum[]>>();
+  private lists = new Map<
+    string,
+    { since: number; read: Promise<MatchItem[]> }
+  >();
+  private albums = new Map<
+    string,
+    { since: number; read: Promise<ServerAlbum[]> }
+  >();
   private plex?: Promise<PlexAPI>;
   private plexAlbumLookups = 0;
 
@@ -298,11 +321,9 @@ class Reading {
     kind: 'movie' | 'series',
     since: Date
   ): Promise<MatchItem[]> {
-    const key = `${server}:${kind}`;
-    if (!this.lists.has(key)) {
-      this.lists.set(key, this.readNewest(server, kind, since));
-    }
-    return this.lists.get(key) as Promise<MatchItem[]>;
+    return sinceShared(this.lists, `${server}:${kind}`, since, () =>
+      this.readNewest(server, kind, since)
+    );
   }
 
   private async readNewest(
@@ -391,10 +412,9 @@ class Reading {
     server: MediaServerKind,
     since: Date
   ): Promise<ServerAlbum[]> {
-    if (!this.albums.has(server)) {
-      this.albums.set(server, this.readAlbums(server, since));
-    }
-    return this.albums.get(server) as Promise<ServerAlbum[]>;
+    return sinceShared(this.albums, server, since, () =>
+      this.readAlbums(server, since)
+    );
   }
 
   private async readAlbums(

@@ -443,6 +443,49 @@ describe('looking at new requests as they are imported', () => {
     );
   });
 
+  it('finds an older import on Plex when a newer one is looked at first', async () => {
+    const film = await requestedMovie(846213, 10);
+    await requestedMovie(1000, 12);
+    radarrHas({
+      10: borderFeud,
+      12: {
+        title: 'Orvane',
+        year: 2025,
+        tmdbId: 1000,
+        folder: 'Orvane (2025)',
+      },
+    });
+    // Plex lists only what was added since the time it is asked for.
+    const addedAt: Record<string, number> = {
+      '70': at(1).getTime(),
+      '71': at(110).getTime(),
+    };
+    const library = [
+      plexMovie('70', 'Border Feud', undefined, 'Border Feud (2024)', []),
+      plexMovie('71', 'Orvane', 2025, 'Orvane (2025)', ['tmdb://1000']),
+    ];
+    mock.method(
+      PlexAPI.prototype,
+      'getRecentlyAdded',
+      async (_id: string, options: { addedAt: number }, type: string) =>
+        type === 'movie'
+          ? library.filter((item) => addedAt[item.ratingKey] >= options.addedAt)
+          : []
+    );
+    await matchWatch.noteImports([imported('movie', 10)], T0);
+    for (const minute of [2, 7, 22, 52]) await matchWatch.run(at(minute));
+    assert.equal((await problems()).length, 0, 'not matched, but not yet');
+
+    // Imported later, its first look falls just before the other's last.
+    await matchWatch.noteImports([imported('movie', 12)], at(109));
+    await matchWatch.run(at(112));
+    const found = await problems();
+    assert.deepEqual(
+      found.map((p) => [p.mediaId, JSON.parse(p.problem).reason]),
+      [[film.id, 'unmatched']]
+    );
+  });
+
   it('puts problems found close together into one message', async () => {
     await requestedMovie(846213, 10);
     await requestedMovie(1000, 12);

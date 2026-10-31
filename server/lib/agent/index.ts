@@ -163,6 +163,30 @@ interface Decision {
 export const proposalOf = (run: AgentRun): Proposal | undefined =>
   (run.memory as { proposal?: Proposal } | null)?.proposal;
 
+/** What an admin approved that a run never got to, said so. */
+const notDone = (decision: Decision): string =>
+  `What ${decision.by} approved was not done: ${decision.changes
+    .map((c) => c.headline)
+    .join('; ')}. Reply to have it proposed again.`;
+
+/** A run keeps only its newest steps. */
+const trimSteps = (run: AgentRun): void => {
+  if (run.steps.length > MAX_STEPS_KEPT) {
+    run.steps.splice(0, run.steps.length - MAX_STEPS_KEPT);
+  }
+};
+
+/** The downloads these runs started since a time. */
+const grabsSince = (runs: Pick<AgentRun, 'actions'>[], since: number) =>
+  runs.reduce(
+    (n, r) =>
+      n +
+      r.actions.filter(
+        (a) => a.type === 'grab' && new Date(a.at).getTime() > since
+      ).length,
+    0
+  );
+
 /** Where a report's run was asked from, kept with it. */
 interface ReportMemory {
   issueId?: number;
@@ -476,9 +500,14 @@ class Agent {
     void purge();
     this.purgeTimer = setInterval(purge, PURGE_EVERY_MS);
     this.purgeTimer.unref();
+    const checkFailed = (e: unknown) =>
+      logger.warn('Could not check on held or interrupted conversations', {
+        label: LABEL,
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
     this.holdTimer = setInterval(() => {
-      void this.checkHeld();
-      void this.checkOutages();
+      this.checkHeld().catch(checkFailed);
+      this.checkOutages().catch(checkFailed);
     }, HOLD_CHECK_MS);
     this.holdTimer.unref();
   }
@@ -1106,26 +1135,18 @@ class Agent {
     };
     void _dropped;
     run.memory = memory;
-    // A run that stopped before its first turn (or a report replied to
-    // while held) has no conversation yet: what it was asked comes first.
-    const opening = run.conversation.length
-      ? ''
-      : `${this.firstMessage(run)}\n\n`;
-    run.conversation = [
-      ...run.conversation,
-      {
-        role: 'user',
-        text: `${opening}${user.displayName} (admin) says: ${said}${
-          pending
-            ? '\n(What you proposed was not approved and nothing of it was done; propose again if it is still wanted.)'
-            : ''
-        }${
-          undone
-            ? '\n(What an admin approved earlier was never done: you stopped before getting to it. Propose it again if it is still wanted.)'
-            : ''
-        }`,
-      },
-    ];
+    this.tellRun(
+      run,
+      `${user.displayName} (admin) says: ${said}${
+        pending
+          ? '\n(What you proposed was not approved and nothing of it was done; propose again if it is still wanted.)'
+          : ''
+      }${
+        undone
+          ? '\n(What an admin approved earlier was never done: you stopped before getting to it. Propose it again if it is still wanted.)'
+          : ''
+      }`
+    );
     run.status = 'queued';
     run.question = null;
     run.error = null;
@@ -1172,11 +1193,7 @@ class Agent {
     run.memory = memory;
     run.status = 'done';
     run.summary = `Stopped by ${user.displayName} before it started.${
-      undone
-        ? ` What ${undone.by} approved was not done: ${undone.changes
-            .map((c) => c.headline)
-            .join('; ')}. Reply to have it proposed again.`
-        : ''
+      undone ? ` ${notDone(undone)}` : ''
     }`;
     run.finishedAt = new Date();
     run.steps.push({
@@ -1206,18 +1223,10 @@ class Agent {
     for (const note of notes) {
       run.steps.push({ at, kind: 'reply', text: `${note.by}: ${note.text}` });
     }
-    const opening = run.conversation.length
-      ? ''
-      : `${this.firstMessage(run)}\n\n`;
-    run.conversation = [
-      ...run.conversation,
-      {
-        role: 'user',
-        text: `${opening}${notes
-          .map((note) => `${note.by} (admin) says: ${note.text}`)
-          .join('\n')}`,
-      },
-    ];
+    this.tellRun(
+      run,
+      notes.map((note) => `${note.by} (admin) says: ${note.text}`).join('\n')
+    );
     if (resume && run.status !== 'waiting') {
       run.status = 'queued';
       run.error = null;
@@ -1519,6 +1528,21 @@ class Agent {
     }
   }
 
+  /**
+   * Puts something to a run as its next message. One that has not had its
+   * first turn (stopped before it, a report replied to while held, a change
+   * approved on someone's behalf) is told what it was asked first.
+   */
+  private tellRun(run: AgentRun, text: string): void {
+    const opening = run.conversation.length
+      ? ''
+      : `${this.firstMessage(run)}\n\n`;
+    run.conversation = [
+      ...run.conversation,
+      { role: 'user', text: `${opening}${text}` },
+    ];
+  }
+
   private firstMessage(run: AgentRun): string {
     if (
       run.trigger === 'ask' &&
@@ -1590,9 +1614,7 @@ class Agent {
         text: text.slice(0, 2000),
         ...(tool ? { tool } : {}),
       });
-      if (run.steps.length > MAX_STEPS_KEPT) {
-        run.steps.splice(0, run.steps.length - MAX_STEPS_KEPT);
-      }
+      trimSteps(run);
     };
 
     let asked: string | null = null;
@@ -1614,13 +1636,9 @@ class Agent {
         select: { id: true, actions: true },
         where: { finishedAt: MoreThan(new Date(dayAgo)) },
       });
-      const grabsToday = [...others.filter((r) => r.id !== run.id), run].reduce(
-        (n, r) =>
-          n +
-          r.actions.filter(
-            (a) => a.type === 'grab' && new Date(a.at).getTime() > dayAgo
-          ).length,
-        0
+      const grabsToday = grabsSince(
+        [...others.filter((r) => r.id !== run.id), run],
+        dayAgo
       );
       const remembered = (run.memory?.releases ?? {}) as Record<
         string,
@@ -1959,9 +1977,7 @@ class Agent {
                 0,
                 answer
               );
-              if (run.steps.length > MAX_STEPS_KEPT) {
-                run.steps.splice(0, run.steps.length - MAX_STEPS_KEPT);
-              }
+              trimSteps(run);
               if (calls.length > 1) {
                 saving = saving.then(() => runs.save(run)).catch(() => null);
               }
@@ -2074,9 +2090,7 @@ class Agent {
       };
       if (undone) {
         run.memory = rest;
-        const note = `What ${undone.by} approved was not done: ${undone.changes
-          .map((c) => c.headline)
-          .join('; ')}. Reply to have it proposed again.`.slice(0, 500);
+        const note = notDone(undone).slice(0, 500);
         step('error', note);
         run.error = `${run.error}\n\n${note}`;
       }
@@ -2203,14 +2217,7 @@ class Agent {
       select: { id: true, actions: true },
       where: { finishedAt: MoreThan(new Date(dayAgo)) },
     });
-    return runs.reduce(
-      (n, r) =>
-        n +
-        r.actions.filter(
-          (a) => a.type === 'grab' && new Date(a.at).getTime() > dayAgo
-        ).length,
-      0
-    );
+    return grabsSince(runs, dayAgo);
   }
 
   /** One at a time, so two failures at once tell a conversation once. */
@@ -2325,18 +2332,8 @@ class Agent {
 
     const text = this.lookAgainText(telling, run.kind);
     run.steps.push({ at: new Date().toISOString(), kind: 'followUp', text });
-    if (run.steps.length > MAX_STEPS_KEPT) {
-      run.steps.splice(0, run.steps.length - MAX_STEPS_KEPT);
-    }
-    // A conversation never put to the model (a change approved on someone's
-    // behalf) starts with what it was asked.
-    const opening = run.conversation.length
-      ? ''
-      : `${this.firstMessage(run)}\n\n`;
-    run.conversation = [
-      ...run.conversation,
-      { role: 'user', text: `${opening}${text}` },
-    ];
+    trimSteps(run);
+    this.tellRun(run, text);
     run.memory = {
       ...run.memory,
       lookingFor: telling.map((job) => job.id),

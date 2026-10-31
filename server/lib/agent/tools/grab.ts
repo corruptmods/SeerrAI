@@ -475,7 +475,8 @@ const prepareAlbum = async (
 /**
  * Checks a download against every rule and builds what Backfill needs,
  * without starting anything. Throws why it cannot be done at all; lists
- * what makes it doubtful, which only an admin can wave through.
+ * what makes it doubtful, which the model is told to look at again before
+ * it may say it is certain (and which an admin sees in a replacement).
  */
 const prepareGrab = async (
   state: AgentState,

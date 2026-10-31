@@ -163,12 +163,15 @@ interface ReadCss {
   lower: string;
   /** The strings' contents, escapes decoded, by placeholder number. */
   strings: string[];
+  /** Where the argument of each url() and src() starts in the text. */
+  calls: number[];
 }
 
 const readCss = (css: string): ReadCss => {
   // As the browser does, so no NUL in the CSS can pass for STRING_MARK.
   const source = css.replaceAll(STRING_MARK, '\ufffd');
   const strings: string[] = [];
+  const calls: number[] = [];
   let text = '';
   // The name being read (escapes decoded), and the character before it:
   // url( starts an unquoted address only after the name url on its own,
@@ -182,13 +185,11 @@ const readCss = (css: string): ReadCss => {
   let i = 0;
   while (i < source.length) {
     const char = source[i];
-    const url =
-      char === '(' &&
-      name.replace(/[A-Z]/g, (letter) => letter.toLowerCase()) === 'url' &&
-      beforeName !== '#' &&
-      beforeName !== '@'
-        ? readUrl(source, i)
-        : undefined;
+    const called =
+      char === '(' && beforeName !== '#' && beforeName !== '@'
+        ? name.replace(/[A-Z]/g, (letter) => letter.toLowerCase())
+        : '';
+    const url = called === 'url' ? readUrl(source, i) : undefined;
     if (char === '/' && source[i + 1] === '*') {
       const end = source.indexOf('*/', i + 2);
       i = end < 0 ? source.length : end + 2;
@@ -196,10 +197,17 @@ const readCss = (css: string): ReadCss => {
       endName(' ');
     } else if (url) {
       // An unquoted address, kept like a string.
-      text += `(${stringPlaceholder(strings.length)})`;
+      text += '(';
+      calls.push(text.length);
+      text += `${stringPlaceholder(strings.length)})`;
       strings.push(url[0]);
       i = url[1];
       endName(')');
+    } else if (source.startsWith('<!--', i)) {
+      // Read by the browser as one piece: a name after it starts afresh.
+      text += '<!--';
+      i += 4;
+      endName(' ');
     } else if (char === '"' || char === "'") {
       let value = '';
       i += 1;
@@ -235,6 +243,9 @@ const readCss = (css: string): ReadCss => {
     } else {
       text += char;
       i += 1;
+      if (called === 'url' || called === 'src') {
+        calls.push(text.length);
+      }
       if (isNameChar(char)) {
         name += char;
       } else {
@@ -244,7 +255,7 @@ const readCss = (css: string): ReadCss => {
   }
   // Only A–Z, so every position in one is the same position in the other.
   const lower = text.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
-  return { text, lower, strings };
+  return { text, lower, strings, calls };
 };
 
 /**
@@ -265,40 +276,40 @@ const addressAt = (read: ReadCss, at: number): string => {
 };
 
 /**
- * url(), src(), and @import with its address. Not after # or @, which
- * make #url( and @url( a name rather than a function.
+ * Anything that looks like url( or src(, as well as those the browser reads
+ * as such: an extra one only makes the check stricter. Not after # or @,
+ * which make #url( and @url( a name rather than a function.
  */
-const ADDRESS_USES = /@import|(?<![a-z0-9_\-\u0080-￿#@])(url|src)\(/g;
+const LOOKS_CALLED = /(?<![a-z0-9_\-\u0080-￿#@])(url|src)\(/g;
 
 /** Every address the CSS uses, in order: imported stylesheets apart. */
 const addressesIn = (
   read: ReadCss
 ): { address: string; imported: boolean }[] => {
-  const found: { address: string; imported: boolean }[] = [];
-  // The url() of an @import url(…), counted as the import's.
-  let importedUrlAt = -1;
-  for (const match of read.lower.matchAll(ADDRESS_USES)) {
-    if (match[0] !== '@import') {
-      if (match.index !== importedUrlAt) {
-        found.push({
-          address: addressAt(read, match.index + match[0].length),
-          imported: false,
-        });
-      }
-      continue;
-    }
+  // By where each address starts in the text.
+  const uses = new Map<number, { address: string; imported: boolean }>();
+  const calls = new Set(read.calls);
+  for (const match of read.lower.matchAll(LOOKS_CALLED)) {
+    calls.add(match.index + match[0].length);
+  }
+  for (const at of calls) {
+    uses.set(at, { address: addressAt(read, at), imported: false });
+  }
+  // @import with its address, a string or a url(), which is then the
+  // import's.
+  for (const match of read.lower.matchAll(/@import/g)) {
     let at = match.index + match[0].length;
     while (isSpace(read.text[at])) {
       at += 1;
     }
     if (read.lower.startsWith('url(', at)) {
-      importedUrlAt = at;
-      found.push({ address: addressAt(read, at + 4), imported: true });
-    } else if (STRING_AT.test(read.text.slice(at))) {
-      found.push({ address: addressAt(read, at), imported: true });
+      at += 4;
+    } else if (!STRING_AT.test(read.text.slice(at))) {
+      continue;
     }
+    uses.set(at, { address: addressAt(read, at), imported: true });
   }
-  return found;
+  return [...uses.entries()].sort(([a], [b]) => a - b).map(([, use]) => use);
 };
 
 /**

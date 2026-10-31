@@ -93,6 +93,10 @@ svg { filter: url(#glow); mask: url("data:image/svg+xml;utf8,<svg/>"); }
         "a{background:url(/x')}b{background:url(https://evil.example/)}c{content:'}",
         "/x'",
       ],
+      [
+        '<!--url(/x/*)}b{background:url(https://evil.example/)}c{background:url(/y*/)}',
+        'https://evil.example/',
+      ],
       ['a{background:url(/a b)}', '/a b'],
       ['a{background:url(  https://evil.example  )}', 'https://evil.example'],
     ]) {

@@ -889,6 +889,31 @@ describe('taking a song from its album', () => {
     assert.notEqual(fetch.stage, 'Choosing the songs’ files');
   });
 
+  it('never has Lidarr import a file named outside the torrent’s folder', async () => {
+    const qbit = QBittorrentAPI.prototype;
+    const getFiles = qbit.getFiles;
+    mock.method(qbit, 'getFiles', async function (this: unknown, hash: string) {
+      const files = await getFiles.call(this, hash);
+      // Once finished, the client names the song's file out of the folder.
+      return done
+        ? files.map((f) => ({ ...f, name: `${INFO.name}/../../${f.name}` }))
+        : files;
+    });
+    await requestSongs([LANTERN]);
+    await startFetching();
+    assert.equal((await fetchOf()).status, 'downloading');
+
+    done = true;
+    await songFetcher.tick();
+    assert.notEqual((await fetchOf()).status, 'importing');
+    assert.equal(
+      lidarr.calls.filter(
+        (c) => c.path === '/api/v1/command' && c.body?.name === 'ManualImport'
+      ).length,
+      0
+    );
+  });
+
   it('waits for a download slot without searching again', async () => {
     getSettings().backfill = { ...getSettings().backfill, maxActiveJobs: 0 };
     await requestSongs([LANTERN]);

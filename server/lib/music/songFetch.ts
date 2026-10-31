@@ -890,6 +890,13 @@ class SongFetcher {
         });
         return;
       }
+      // Lidarr copies what it is given: never a file named out of the
+      // torrent's folder.
+      if (chosen.some((f) => f.name.split(/[\\/]/).includes('..'))) {
+        throw new ReleaseProblem(
+          'The torrent names files outside its own folder.'
+        );
+      }
       await torrents.stopTorrent(fetch.downloadId).catch(() => undefined);
       const save = torrent.savePath.replace(/[\\/]+$/, '');
       const sep = save.includes('\\') ? '\\' : '/';

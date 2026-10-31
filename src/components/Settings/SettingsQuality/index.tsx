@@ -459,6 +459,8 @@ const SettingsQuality = () => {
         autoDismiss: true,
       });
       mutate();
+    } catch (e) {
+      addToast(errorOf(e), { appearance: 'error', autoDismiss: true });
     } finally {
       setChecking(false);
     }

@@ -77,6 +77,23 @@ const Layout = ({ children }: LayoutProps) => {
     };
   }, []);
 
+  // Safari on an iPhone doesn't always bring the page back up when what's
+  // on it gets shorter (a long list closed, say): the space it took stays
+  // as empty page to scroll through. Put the page back at its new end.
+  const mainRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const main = mainRef.current;
+    if (!main || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      const end = document.documentElement.scrollHeight - window.innerHeight;
+      if (window.scrollY > end + 1) {
+        window.scrollTo({ top: Math.max(0, end) });
+      }
+    });
+    observer.observe(main);
+    return () => observer.disconnect();
+  }, []);
+
   // How far into this visit's history the current page is, so the back
   // button knows whether there is anywhere to go. A reload — an update
   // prompt, or the app being restored by iOS — wipes the history stack, and
@@ -210,6 +227,7 @@ const Layout = ({ children }: LayoutProps) => {
           </div>
 
           <main
+            ref={mainRef}
             className="relative top-16 z-0 focus:outline-none"
             tabIndex={0}
             data-seerr="page"

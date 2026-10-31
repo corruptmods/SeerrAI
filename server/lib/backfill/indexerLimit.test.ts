@@ -300,6 +300,12 @@ describe('an indexer’s limit, read from its answer', () => {
     );
     assert.equal(retryAfterOf('Wed, 14 Oct 2026 21:00:00 GMT', at), undefined);
     assert.equal(retryAfterOf('soon', at), undefined);
+    // Never longer than a day, nor past the last date there is.
+    assert.equal(retryAfterOf('99999999999999999999', at), at + 86_400_000);
+    assert.equal(
+      retryAfterOf('Fri, 01 Jan 2100 00:00:00 GMT', at),
+      at + 86_400_000
+    );
     assert.deepEqual(limitOf(answered(429, { 'retry-after': '60' }), at), {
       until: at + 60_000,
     });

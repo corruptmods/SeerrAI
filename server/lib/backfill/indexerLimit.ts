@@ -29,6 +29,13 @@ export interface IndexerRef {
 /** What is asked of it: a search, or a release's .torrent or .nzb. */
 export type IndexerUse = 'search' | 'download';
 
+/**
+ * The longest wait a Retry-After is taken at: limits reset daily. Longer
+ * would keep an indexer, or every search through Prowlarr, waiting for
+ * good on one wrong answer.
+ */
+const LONGEST_RETRY_AFTER_MS = 24 * 60 * 60_000;
+
 /** The time a Retry-After header gives, in seconds or as an HTTP date. */
 export const retryAfterOf = (
   header: unknown,
@@ -36,9 +43,13 @@ export const retryAfterOf = (
 ): number | undefined => {
   const value = String(header ?? '').trim();
   if (!value) return undefined;
-  if (/^\d+$/.test(value)) return now + Number(value) * 1000;
+  if (/^\d+$/.test(value)) {
+    return now + Math.min(Number(value) * 1000, LONGEST_RETRY_AFTER_MS);
+  }
   const at = Date.parse(value);
-  return Number.isNaN(at) || at <= now ? undefined : at;
+  return Number.isNaN(at) || at <= now
+    ? undefined
+    : Math.min(at, now + LONGEST_RETRY_AFTER_MS);
 };
 
 /**

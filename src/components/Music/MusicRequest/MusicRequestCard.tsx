@@ -152,7 +152,7 @@ const MusicRequestCard = ({
             { type: 'or' }
           ) &&
             requestData.requestedBy && (
-              <div className="card-field">
+              <div className="card-field truncate">
                 <Link
                   href={`/users/${requestData.requestedBy.id}`}
                   className="group flex items-center"

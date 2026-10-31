@@ -117,7 +117,7 @@ const RequestItemError = ({
   );
 
   return (
-    <div className="flex h-64 w-full flex-col justify-center rounded-xl bg-gray-800 py-4 text-gray-400 shadow-md ring-1 ring-red-500 xl:h-28 xl:flex-row">
+    <div className="flex min-h-64 w-full flex-col justify-center rounded-xl bg-gray-800 py-4 text-gray-400 shadow-md ring-1 ring-red-500 xl:h-28 xl:min-h-0 xl:flex-row">
       <div className="flex w-full flex-col justify-between overflow-hidden sm:flex-row">
         <div className="flex w-full flex-col justify-center overflow-hidden pl-4 pr-4 sm:pr-0 xl:w-7/12 2xl:w-2/3">
           <div className="flex text-lg font-bold text-strong xl:text-xl">
@@ -198,7 +198,7 @@ const RequestItemError = ({
                     <span className="card-field-name">
                       {intl.formatMessage(messages.requested)}
                     </span>
-                    <span className="flex truncate text-sm text-gray-300">
+                    <span className="flex min-w-0 flex-wrap text-sm text-gray-300 xl:flex-nowrap xl:truncate">
                       {intl.formatMessage(messages.modifieduserdate, {
                         date: (
                           <FormattedRelativeTime
@@ -214,7 +214,7 @@ const RequestItemError = ({
                         user: (
                           <Link
                             href={`/users/${requestData.requestedBy.id}`}
-                            className="group flex items-center truncate"
+                            className="group flex min-w-0 items-center xl:truncate"
                           >
                             <span className="avatar-sm ml-1.5">
                               <CachedImage
@@ -226,7 +226,7 @@ const RequestItemError = ({
                                 height={20}
                               />
                             </span>
-                            <span className="truncate text-sm group-hover:underline">
+                            <span className="min-w-0 break-words text-sm group-hover:underline xl:truncate">
                               {requestData.requestedBy.displayName}
                             </span>
                           </Link>
@@ -239,7 +239,7 @@ const RequestItemError = ({
                     <span className="card-field-name">
                       {intl.formatMessage(messages.requesteddate)}
                     </span>
-                    <span className="flex truncate text-sm text-gray-300">
+                    <span className="flex min-w-0 text-sm text-gray-300 xl:truncate">
                       <FormattedRelativeTime
                         value={Math.floor(
                           (new Date(requestData.createdAt).getTime() -
@@ -258,7 +258,7 @@ const RequestItemError = ({
                   <span className="card-field-name">
                     {intl.formatMessage(messages.modified)}
                   </span>
-                  <span className="flex truncate text-sm text-gray-300">
+                  <span className="flex min-w-0 flex-wrap text-sm text-gray-300 xl:flex-nowrap xl:truncate">
                     {intl.formatMessage(messages.modifieduserdate, {
                       date: (
                         <FormattedRelativeTime
@@ -274,7 +274,7 @@ const RequestItemError = ({
                       user: (
                         <Link
                           href={`/users/${requestData.modifiedBy.id}`}
-                          className="group flex items-center truncate"
+                          className="group flex min-w-0 items-center xl:truncate"
                         >
                           <span className="avatar-sm ml-1.5">
                             <CachedImage
@@ -286,7 +286,7 @@ const RequestItemError = ({
                               height={20}
                             />
                           </span>
-                          <span className="truncate text-sm group-hover:underline">
+                          <span className="min-w-0 break-words text-sm group-hover:underline xl:truncate">
                             {requestData.modifiedBy.displayName}
                           </span>
                         </Link>
@@ -527,7 +527,7 @@ const RequestItem = ({
                     ? `/movie/${requestData.media.tmdbId}`
                     : `/tv/${requestData.media.tmdbId}`
                 }
-                className="mr-2 min-w-0 truncate text-lg font-bold text-strong hover:underline xl:text-xl"
+                className="mr-2 min-w-0 break-words text-lg font-bold text-strong hover:underline xl:truncate xl:text-xl"
               >
                 {isMovie(title) ? title.title : title.name}
               </Link>
@@ -626,7 +626,7 @@ const RequestItem = ({
                 </span>
                 <RequestEta
                   eta={eta}
-                  className="truncate text-sm text-gray-300"
+                  className="min-w-0 break-words text-sm text-gray-300 xl:truncate"
                 />
               </div>
             )}
@@ -639,7 +639,7 @@ const RequestItem = ({
                   <span className="card-field-name">
                     {intl.formatMessage(messages.requested)}
                   </span>
-                  <span className="flex truncate text-sm text-gray-300">
+                  <span className="flex min-w-0 flex-wrap text-sm text-gray-300 xl:flex-nowrap xl:truncate">
                     {intl.formatMessage(messages.modifieduserdate, {
                       date: (
                         <FormattedRelativeTime
@@ -655,7 +655,7 @@ const RequestItem = ({
                       user: (
                         <Link
                           href={`/users/${requestData.requestedBy.id}`}
-                          className="group flex items-center truncate"
+                          className="group flex min-w-0 items-center xl:truncate"
                         >
                           <span className="avatar-sm ml-1.5">
                             <CachedImage
@@ -667,7 +667,7 @@ const RequestItem = ({
                               height={20}
                             />
                           </span>
-                          <span className="truncate text-sm font-semibold group-hover:text-strong group-hover:underline">
+                          <span className="min-w-0 break-words text-sm font-semibold group-hover:text-strong group-hover:underline xl:truncate">
                             {requestData.requestedBy.displayName}
                           </span>
                         </Link>
@@ -680,7 +680,7 @@ const RequestItem = ({
                   <span className="card-field-name">
                     {intl.formatMessage(messages.requesteddate)}
                   </span>
-                  <span className="flex truncate text-sm text-gray-300">
+                  <span className="flex min-w-0 text-sm text-gray-300 xl:truncate">
                     <FormattedRelativeTime
                       value={Math.floor(
                         (new Date(requestData.createdAt).getTime() -
@@ -699,7 +699,7 @@ const RequestItem = ({
                 <span className="card-field-name">
                   {intl.formatMessage(messages.modified)}
                 </span>
-                <span className="flex truncate text-sm text-gray-300">
+                <span className="flex min-w-0 flex-wrap text-sm text-gray-300 xl:flex-nowrap xl:truncate">
                   {intl.formatMessage(messages.modifieduserdate, {
                     date: (
                       <FormattedRelativeTime
@@ -715,7 +715,7 @@ const RequestItem = ({
                     user: (
                       <Link
                         href={`/users/${requestData.modifiedBy.id}`}
-                        className="group flex items-center truncate"
+                        className="group flex min-w-0 items-center xl:truncate"
                       >
                         <span className="avatar-sm ml-1.5">
                           <CachedImage
@@ -727,7 +727,7 @@ const RequestItem = ({
                             height={20}
                           />
                         </span>
-                        <span className="truncate text-sm font-semibold group-hover:text-strong group-hover:underline">
+                        <span className="min-w-0 break-words text-sm font-semibold group-hover:text-strong group-hover:underline xl:truncate">
                           {requestData.modifiedBy.displayName}
                         </span>
                       </Link>
@@ -741,7 +741,7 @@ const RequestItem = ({
                 <span className="card-field-name">
                   {intl.formatMessage(messages.profileName)}
                 </span>
-                <span className="flex truncate text-sm text-gray-300">
+                <span className="flex min-w-0 break-words text-sm text-gray-300 xl:truncate">
                   {request.profileName}
                 </span>
               </div>

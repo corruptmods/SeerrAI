@@ -155,11 +155,11 @@ export const SongsField = ({
             {songs.map((song) => (
               <li key={song.id} className="flex items-center gap-2">
                 <span className="min-w-0">
-                  <span className="block truncate">
+                  <span className="block break-words">
                     {songName(song.title, song.version)}
                   </span>
                   {song.fetchStage && (
-                    <span className="block truncate text-xs text-muted">
+                    <span className="block break-words text-xs text-muted">
                       {song.fetchStage}
                     </span>
                   )}
@@ -226,7 +226,7 @@ export const AlbumsField = ({
           <ul className="space-y-1 text-left">
             {albums.map((album) => (
               <li key={album.id} className="flex items-center gap-2">
-                <span className="truncate">{album.title}</span>
+                <span className="min-w-0 break-words">{album.title}</span>
                 <MusicStatusBadge
                   status={album.albumStatus}
                   downloads={albumDownloads(

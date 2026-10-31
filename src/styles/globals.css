@@ -718,7 +718,7 @@
   }
 
   .card-field {
-    @apply flex items-center truncate py-0.5 text-sm sm:py-1;
+    @apply flex items-center py-0.5 text-sm sm:py-1 xl:truncate;
   }
 
   /*
@@ -737,7 +737,7 @@
   }
 
   .card-field-name {
-    @apply mr-2 font-bold;
+    @apply mr-2 flex-none font-bold;
   }
 
   .card-field a {

@@ -64,7 +64,7 @@ const DeviceItem = ({
                   })
                 : 'N/A'}
             </div>
-            <div className="mr-2 min-w-0 truncate text-lg font-bold text-strong hover:underline xl:text-xl">
+            <div className="mr-2 min-w-0 break-words text-lg font-bold text-strong hover:underline xl:truncate xl:text-xl">
               {device.userAgent && parsedUserAgent.device.model
                 ? parsedUserAgent.device.model
                 : intl.formatMessage(messages.unknown)}
@@ -76,7 +76,7 @@ const DeviceItem = ({
             <span className="card-field-name">
               {intl.formatMessage(messages.operatingsystem)}
             </span>
-            <span className="flex truncate text-sm text-gray-300">
+            <span className="flex min-w-0 break-words text-sm text-gray-300 xl:truncate">
               {device.userAgent ? parsedUserAgent.os.name : 'N/A'}
             </span>
           </div>
@@ -84,7 +84,7 @@ const DeviceItem = ({
             <span className="card-field-name">
               {intl.formatMessage(messages.browser)}
             </span>
-            <span className="flex truncate text-sm text-gray-300">
+            <span className="flex min-w-0 break-words text-sm text-gray-300 xl:truncate">
               {device.userAgent ? parsedUserAgent.browser.name : 'N/A'}
             </span>
           </div>
@@ -92,7 +92,7 @@ const DeviceItem = ({
             <span className="card-field-name">
               {intl.formatMessage(messages.engine)}
             </span>
-            <span className="flex truncate text-sm text-gray-300">
+            <span className="flex min-w-0 break-words text-sm text-gray-300 xl:truncate">
               {device.userAgent ? parsedUserAgent.engine.name : 'N/A'}
             </span>
           </div>

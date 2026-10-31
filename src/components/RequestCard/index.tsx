@@ -138,7 +138,7 @@ const RequestCardError = ({ requestData }: RequestCardErrorProps) => {
                   [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
                   { type: 'or' }
                 ) && (
-                  <div className="card-field !hidden sm:!block">
+                  <div className="card-field !hidden truncate sm:!block">
                     <Link
                       href={`/users/${requestData.requestedBy.id}`}
                       className="group flex items-center"
@@ -437,7 +437,7 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
             [Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW],
             { type: 'or' }
           ) && (
-            <div className="card-field">
+            <div className="card-field truncate">
               <Link
                 href={`/users/${requestData.requestedBy.id}`}
                 className="group flex items-center"

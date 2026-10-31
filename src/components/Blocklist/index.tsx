@@ -275,7 +275,7 @@ const Blocklist = () => {
             </p>
           </div>
           <div className="flex justify-center sm:flex-1 sm:justify-start lg:justify-center">
-            <span className="-mt-3 items-center truncate text-sm sm:mt-0">
+            <span className="-mt-3 items-center text-sm sm:mt-0">
               {intl.formatMessage(globalMessages.resultsperpage, {
                 pageSize: (
                   <select
@@ -443,7 +443,7 @@ const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
                   : `/tv/${item.tmdbId}`
               }
             >
-              <span className="mr-2 min-w-0 truncate text-lg font-bold text-strong hover:underline xl:text-xl">
+              <span className="mr-2 min-w-0 break-words text-lg font-bold text-strong hover:underline xl:truncate xl:text-xl">
                 {title && (isMovie(title) ? title.title : title.name)}
               </span>
             </Link>
@@ -463,7 +463,7 @@ const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
               <span className="card-field-name">
                 {intl.formatMessage(globalMessages.blocklisted)}
               </span>
-              <span className="flex truncate text-sm text-gray-300">
+              <span className="flex min-w-0 flex-wrap text-sm text-gray-300 xl:flex-nowrap xl:truncate">
                 {intl.formatMessage(messages.blocklistedby, {
                   date: (
                     <FormattedRelativeTime
@@ -475,8 +475,8 @@ const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
                     />
                   ),
                   user: item.user ? (
-                    <Link href={`/users/${item.user.id}`}>
-                      <span className="group flex items-center truncate">
+                    <Link href={`/users/${item.user.id}`} className="min-w-0">
+                      <span className="group flex min-w-0 items-center xl:truncate">
                         <CachedImage
                           type="avatar"
                           src={item.user.avatar}
@@ -486,7 +486,7 @@ const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
                           height={20}
                           style={{ objectFit: 'cover' }}
                         />
-                        <span className="ml-1 truncate text-sm font-semibold group-hover:text-strong group-hover:underline">
+                        <span className="ml-1 min-w-0 break-words text-sm font-semibold group-hover:text-strong group-hover:underline xl:truncate">
                           {item.user.displayName}
                         </span>
                       </span>
@@ -510,7 +510,7 @@ const BlocklistedItem = ({ item, revalidateList }: BlocklistedItemProps) => {
                 {intl.formatMessage(messages.reason)}
               </span>
               <span
-                className="truncate text-sm text-gray-300"
+                className="min-w-0 break-words text-sm text-gray-300 xl:truncate"
                 title={item.reason}
               >
                 {item.reason}

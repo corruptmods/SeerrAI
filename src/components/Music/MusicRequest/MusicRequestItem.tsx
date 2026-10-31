@@ -60,7 +60,7 @@ const Person = ({
 }) => (
   <Link
     href={`/users/${person.id}`}
-    className="group flex items-center truncate"
+    className="group flex min-w-0 items-center xl:truncate"
   >
     <span className="avatar-sm ml-1.5">
       <CachedImage
@@ -72,7 +72,7 @@ const Person = ({
         height={20}
       />
     </span>
-    <span className="truncate text-sm font-semibold group-hover:text-strong group-hover:underline">
+    <span className="min-w-0 break-words text-sm font-semibold group-hover:text-strong group-hover:underline xl:truncate">
       {person.displayName}
     </span>
   </Link>
@@ -177,7 +177,7 @@ const MusicRequestItem = ({
               </div>
               <Link
                 href={href}
-                className="mr-2 min-w-0 truncate text-lg font-bold text-strong hover:underline xl:text-xl"
+                className="mr-2 min-w-0 break-words text-lg font-bold text-strong hover:underline xl:truncate xl:text-xl"
               >
                 {title}
               </Link>
@@ -204,7 +204,7 @@ const MusicRequestItem = ({
               <span className="card-field-name">
                 {intl.formatMessage(messages.requested)}
               </span>
-              <span className="flex truncate text-sm text-gray-300">
+              <span className="flex min-w-0 flex-wrap text-sm text-gray-300 xl:flex-nowrap xl:truncate">
                 {seesOthers && requestData.requestedBy
                   ? intl.formatMessage(messages.modifieduserdate, {
                       date: since(requestData.createdAt),
@@ -218,7 +218,7 @@ const MusicRequestItem = ({
                 <span className="card-field-name">
                   {intl.formatMessage(messages.modified)}
                 </span>
-                <span className="flex truncate text-sm text-gray-300">
+                <span className="flex min-w-0 flex-wrap text-sm text-gray-300 xl:flex-nowrap xl:truncate">
                   {intl.formatMessage(messages.modifieduserdate, {
                     date: since(requestData.updatedAt),
                     user: <Person person={requestData.modifiedBy} />,

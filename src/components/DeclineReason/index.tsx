@@ -57,7 +57,7 @@ const DeclineReason = ({
       ) : (
         <div className={`flex min-w-0 items-start text-sm ${className ?? ''}`}>
           <span className="card-field-name">{label}</span>
-          <span className="line-clamp-2 min-w-0 whitespace-pre-line break-words text-gray-300">
+          <span className="min-w-0 whitespace-pre-line break-words text-gray-300 sm:line-clamp-2">
             {reason}
           </span>
         </div>

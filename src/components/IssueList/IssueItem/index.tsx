@@ -170,7 +170,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
                   ? `/movie/${issue.media.tmdbId}`
                   : `/tv/${issue.media.tmdbId}`
               }
-              className="mr-2 min-w-0 truncate text-lg font-bold text-strong hover:underline xl:text-xl"
+              className="mr-2 min-w-0 break-words text-lg font-bold text-strong hover:underline xl:truncate xl:text-xl"
             >
               {isMovie(title) ? title.title : title.name}
             </Link>
@@ -194,7 +194,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
                         offset: [0, 8],
                       }}
                     >
-                      <span className="block cursor-help truncate transition-colors hover:text-gray-200">
+                      <span className="block cursor-help break-words transition-colors hover:text-gray-200 sm:truncate">
                         {truncatedDescription}
                       </span>
                     </Tooltip>
@@ -232,7 +232,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
             <span className="card-field-name">
               {intl.formatMessage(messages.issuetype)}
             </span>
-            <span className="flex truncate text-sm text-gray-300">
+            <span className="flex min-w-0 text-sm text-gray-300 xl:truncate">
               {intl.formatMessage(
                 issueOption?.name ?? messages.unknownissuetype
               )}
@@ -246,7 +246,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
                 <span className="card-field-name">
                   {intl.formatMessage(messages.opened)}
                 </span>
-                <span className="flex truncate text-sm text-gray-300">
+                <span className="flex min-w-0 flex-wrap text-sm text-gray-300 xl:flex-nowrap xl:truncate">
                   {intl.formatMessage(messages.openeduserdate, {
                     date: (
                       <FormattedRelativeTime
@@ -261,7 +261,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
                     user: (
                       <Link
                         href={`/users/${issue.createdBy.id}`}
-                        className="group flex items-center truncate"
+                        className="group flex min-w-0 items-center xl:truncate"
                       >
                         <CachedImage
                           type="avatar"
@@ -271,7 +271,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
                           width={20}
                           height={20}
                         />
-                        <span className="truncate text-sm font-semibold group-hover:text-strong group-hover:underline">
+                        <span className="min-w-0 break-words text-sm font-semibold group-hover:text-strong group-hover:underline xl:truncate">
                           {issue.createdBy.displayName}
                         </span>
                       </Link>
@@ -284,7 +284,7 @@ const IssueItem = ({ issue }: IssueItemProps) => {
                 <span className="card-field-name">
                   {intl.formatMessage(messages.opened)}
                 </span>
-                <span className="flex truncate text-sm text-gray-300">
+                <span className="flex min-w-0 text-sm text-gray-300 xl:truncate">
                   <FormattedRelativeTime
                     value={Math.floor(
                       (new Date(issue.createdAt).getTime() - Date.now()) / 1000

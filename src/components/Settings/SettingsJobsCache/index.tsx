@@ -620,7 +620,7 @@ const SettingsJobs = () => {
               >
                 <div className="flex items-start justify-between space-x-2">
                   <div className="flex min-w-0 items-center text-sm font-medium leading-5 text-strong">
-                    <span className="truncate">
+                    <span className="min-w-0 break-words">
                       {intl.formatMessage(
                         messages[job.id] ?? messages.unknownJob
                       )}

@@ -276,7 +276,7 @@ const SettingsMediaServers = () => {
                 <div className="flex flex-1 items-start justify-between space-x-4 p-6">
                   <div className="min-w-0 flex-1">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <h4 className="truncate font-medium leading-5 text-strong">
+                      <h4 className="min-w-0 break-words font-medium leading-5 text-strong">
                         {name}
                       </h4>
                       {server.primary && (
@@ -293,7 +293,7 @@ const SettingsMediaServers = () => {
                     {server.connected && (
                       <>
                         {server.name && server.name !== name && (
-                          <p className="truncate text-sm leading-5 text-gray-300">
+                          <p className="break-words text-sm leading-5 text-gray-300">
                             {server.name}
                           </p>
                         )}

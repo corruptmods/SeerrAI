@@ -174,7 +174,7 @@ const SingleSignOn = () => {
                 <div className="flex w-full items-center justify-between space-x-6 p-6">
                   <div className="min-w-0 flex-1">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <h4 className="truncate font-medium leading-5 text-strong">
+                      <h4 className="min-w-0 break-words font-medium leading-5 text-strong">
                         {provider.name}
                       </h4>
                       {provider.enabled ? (
@@ -190,13 +190,13 @@ const SingleSignOn = () => {
                         </Badge>
                       )}
                     </div>
-                    <p className="mt-1 truncate text-sm leading-5 text-gray-300">
+                    <p className="mt-1 break-words text-sm leading-5 text-gray-300">
                       <span className="mr-2 font-bold">
                         {intl.formatMessage(messages.id)}
                       </span>
                       {provider.id}
                     </p>
-                    <p className="mt-1 truncate text-sm leading-5 text-gray-300">
+                    <p className="mt-1 break-words text-sm leading-5 text-gray-300">
                       <span className="mr-2 font-bold">
                         {intl.formatMessage(messages.issuer)}
                       </span>

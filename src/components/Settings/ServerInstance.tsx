@@ -64,9 +64,9 @@ const ServerInstance = ({
   return (
     <li className="col-span-1 rounded-lg bg-gray-800 shadow ring-1 ring-gray-500">
       <div className="flex w-full items-center justify-between space-x-6 p-6">
-        <div className="flex-1 truncate">
-          <div className="mb-2 flex items-center space-x-2">
-            <h3 className="truncate font-medium leading-5 text-strong">
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <h3 className="min-w-0 break-words font-medium leading-5 text-strong">
               <a
                 href={serviceUrl}
                 target="_blank"
@@ -93,7 +93,7 @@ const ServerInstance = ({
               </Badge>
             )}
           </div>
-          <p className="mt-1 truncate text-sm leading-5 text-gray-300">
+          <p className="mt-1 break-words text-sm leading-5 text-gray-300">
             <span className="mr-2 font-bold">
               {intl.formatMessage(messages.address)}
             </span>
@@ -106,7 +106,7 @@ const ServerInstance = ({
               {internalUrl}
             </a>
           </p>
-          <p className="mt-1 truncate text-sm leading-5 text-gray-300">
+          <p className="mt-1 break-words text-sm leading-5 text-gray-300">
             <span className="mr-2 font-bold">
               {detail?.label ?? intl.formatMessage(messages.activeProfile)}
             </span>

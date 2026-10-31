@@ -89,8 +89,8 @@ const Release = ({ currentVersion, release, isLatest }: ReleaseProps) => {
           </div>
         </Modal>
       </Transition>
-      <div className="flex w-full flex-grow items-center justify-center space-x-2 truncate sm:justify-start">
-        <span className="truncate text-lg font-bold">
+      <div className="flex w-full flex-grow flex-wrap items-center justify-center gap-2 sm:justify-start">
+        <span className="min-w-0 break-words text-lg font-bold">
           <span className="mr-2 whitespace-nowrap text-xs font-normal">
             <FormattedRelativeTime
               value={Math.floor(

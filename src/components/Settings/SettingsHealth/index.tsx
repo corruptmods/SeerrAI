@@ -355,14 +355,12 @@ const ItemText = ({ item }: { item: HealthItem }) => (
     {item.href ? (
       <Link
         href={item.href}
-        className="line-clamp-2 break-words text-gray-100 hover:text-strong hover:underline"
+        className="break-words text-gray-100 hover:text-strong hover:underline sm:line-clamp-2"
       >
         {item.title}
       </Link>
     ) : (
-      <span className="line-clamp-3 break-words text-gray-100">
-        {item.title}
-      </span>
+      <span className="break-words text-gray-100">{item.title}</span>
     )}
     {item.detail && (
       <span className="mt-0.5 block break-words text-xs text-gray-400">

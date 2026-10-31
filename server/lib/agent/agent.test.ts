@@ -4541,11 +4541,24 @@ describe('stopping and correcting the admin agent while it works', () => {
     ];
     const first = await agent.ask('Get Wendle', user);
     const second = await agent.ask('Get Wendle too', user);
+    // Said while it waited: kept, not lost with the stop.
+    await agent.reply(second.id, 'And the specials', user);
     const stopped = await agent.stop(second.id, user);
     assert.equal(stopped.status, 'done');
     assert.equal(
       stopped.summary,
       `Stopped by ${user.displayName} before it started.`
+    );
+    assert.ok(
+      stopped.steps.some(
+        (s) =>
+          s.kind === 'reply' &&
+          s.text === `${user.displayName}: And the specials`
+      )
+    );
+    assert.match(
+      JSON.stringify(stopped.conversation),
+      /\(admin\) says: And the specials/
     );
     await assert.rejects(
       agent.stop(second.id, user),

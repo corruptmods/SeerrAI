@@ -1158,10 +1158,13 @@ class Agent {
     if (!this.queue.includes(id)) {
       throw new Error('It is not working on this one.');
     }
-    // Out of the queue first, so it cannot start; then read afresh, as
-    // nothing else writes it now.
+    // Out of the queue first, so it cannot start; anything said to it
+    // while it waited is kept, for when it is replied to; then read
+    // afresh, as nothing else writes it now.
     this.queue = this.queue.filter((queued) => queued !== id);
+    const notes = this.live.get(id)?.notes ?? [];
     this.live.delete(id);
+    if (notes.length) await this.deliverLate(id, notes, false);
     const run = await runs.findOneOrFail({ where: { id } });
     const { decision: undone, ...memory } = (run.memory ?? {}) as {
       decision?: Decision;
@@ -1221,7 +1224,7 @@ class Agent {
       if (run.purpose === 'retry') run.purpose = 'work';
     }
     await runs.save(run);
-    if (run.status === 'queued') this.queue.push(id);
+    if (resume && run.status === 'queued') this.queue.push(id);
   }
 
   /**

@@ -289,7 +289,8 @@ below it on its own (`pnpm why <package>`).
 | Override | Keeps out | Notes |
 |---|---|---|
 | `handlebars >=4.7.10` | [CVE-2026-106446](https://github.com/advisories/GHSA-8r5x-fm3f-whwj), [CVE-2026-106445](https://github.com/advisories/GHSA-p8wg-vrv2-v86f), [CVE-2026-106444](https://github.com/advisories/GHSA-xw65-4hp5-5hc7), and the 4.7.8 advisories ([GHSA-2w6w-674q-4c4q](https://github.com/advisories/GHSA-2w6w-674q-4c4q) and others) | Only through eslint-plugin-formatjs (ts-jest), a development tool; nothing in the image uses it |
-| `follow-redirects >=1.16.1` | [CVE-2026-111756](https://github.com/advisories/GHSA-q3jh-wrc6-jgq8), [CVE-2026-111755](https://github.com/advisories/GHSA-8r9p-f939-6h3c) | Through axios: credential headers sent on after a cross-origin redirect |
+| `follow-redirects >=1.16.2` | [GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p), and before it [CVE-2026-111756](https://github.com/advisories/GHSA-q3jh-wrc6-jgq8), [CVE-2026-111755](https://github.com/advisories/GHSA-8r9p-f939-6h3c) | Through axios: credential headers sent on after a cross-origin redirect |
+| `typeorm>glob`, `cacache>glob` `>=14.0.2 <15` | [GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4), and through glob 14 its minimatch 11 past [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) | typeorm finds entity and migration files with it (`glob.sync`, still in 14); cacache is node-gyp's, while sqlite3 is built |
 | `source-map-js >=1.2.2` | [CVE-2026-93749](https://github.com/advisories/GHSA-68fv-2mgg-jv7q) | Through Next's PostCSS; build only |
 | `tar >=7.5.21` | [GHSA-23hp-3jrh-7fpw](https://github.com/advisories/GHSA-23hp-3jrh-7fpw), [GHSA-r292-9mhp-454m](https://github.com/advisories/GHSA-r292-9mhp-454m) | Through sqlite3's build; denial of service on unpacking |
 | `nodemailer 10.1.4` | [GHSA-8c8m-p3m8-cjg8](https://github.com/advisories/GHSA-8c8m-p3m8-cjg8), [GHSA-m943-m63m-w62w](https://github.com/advisories/GHSA-m943-m63m-w62w), [GHSA-85x2-q946-cp5h](https://github.com/advisories/GHSA-85x2-q946-cp5h), and before them [GHSA-v53p-9fqp-m79j](https://github.com/advisories/GHSA-v53p-9fqp-m79j), [GHSA-6vj9-mwq6-2f5v](https://github.com/advisories/GHSA-6vj9-mwq6-2f5v), [GHSA-8vvx-rff5-p5rq](https://github.com/advisories/GHSA-8vvx-rff5-p5rq) and the 9.x advisories | Sends every email |
@@ -303,7 +304,11 @@ below it on its own (`pnpm why <package>`).
 [CVE-2026-87776](https://github.com/advisories/GHSA-vc2v-76pw-4v95). One advisory is knowingly
 left: [CVE-2026-93748](https://github.com/advisories/GHSA-ch52-4w7c-c8xp) (http-cache-semantics, no
 fixed version), inside node-gyp, which only runs if sqlite3 has to be
-built.
+built. And [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249)
+(minimatch, fixed only in 11) is left in minimatch 3 under
+email-templates' @ladjs/i18n: its multimatch is only called by that
+package's Koa redirect middleware, which nothing here uses, and minimatch
+11 can't stand in for 3 (no default export).
 
 deepmerge has no fixed release for
 [CVE-2026-93753](https://github.com/advisories/GHSA-gcqx-w48m-w2h4) (a `__proto__` key in what is

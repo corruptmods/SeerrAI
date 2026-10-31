@@ -213,7 +213,8 @@
         "GHSA-ch52-4w7c-c8xp",
         "GHSA-gcqx-w48m-w2h4",
         "GHSA-jmr9-qjv8-65gv",
-        "GHSA-7pqw-9j4j-h8q3"
+        "GHSA-7pqw-9j4j-h8q3",
+        "GHSA-g3hv-75wg-m249"
       ]
     },
     "onlyBuiltDependencies": [
@@ -235,14 +236,16 @@
       "external-editor>tmp": ">=0.2.6",
       "qs": ">=6.16.1 <7",
       "cypress>systeminformation": ">=5.33.16",
-      "follow-redirects": ">=1.16.1",
+      "follow-redirects": ">=1.16.2",
       "source-map-js": ">=1.2.2",
       "body-parser": ">=2.4.0",
       "multer": ">=2.5.0",
       "fast-uri": ">=3.1.9 <4",
       "cheerio>undici": ">=6.29.1 <7",
       "postcss-selector-parser": ">=6.1.5 <7",
-      "@cypress/request>uuid": ">=11.1.1"
+      "@cypress/request>uuid": ">=11.1.1",
+      "typeorm>glob": ">=14.0.2 <15",
+      "cacache>glob": ">=14.0.2 <15"
     },
     "patchedDependencies": {
       "deepmerge@4.3.1": "patches/deepmerge@4.3.1.patch",

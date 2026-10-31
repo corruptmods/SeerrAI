@@ -61,10 +61,6 @@ const isRequestAvailable = async (
 };
 
 /**
- * One claim per request, so the catch-up moment is announced exactly once
- * however many episodes air afterwards.
- */
-/**
  * One request failing must not abandon the rest of the pass. A single bad row
  * used to abort the whole reconcile, so everything after it was never
  * notified.
@@ -88,6 +84,10 @@ const deliverSafely = async (
   }
 };
 
+/**
+ * One claim per request, so the catch-up moment is announced exactly once
+ * however many episodes air afterwards.
+ */
 const CAUGHT_UP_CLAIM_KEY = 'caught-up';
 
 const deliver = async (

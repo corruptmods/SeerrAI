@@ -7,17 +7,6 @@ import logger from '@server/logger';
 import { isUniqueViolation } from '@server/utils/isUniqueViolation';
 
 /**
- * Claims a notification for a request so it is only ever sent once.
- *
- * The unique constraint on (requestId, type) is the arbiter: whichever caller
- * inserts first wins, and every later attempt fails with a unique violation.
- * This is race-safe across the subscriber and the reconciler without a lock.
- *
- * Returns true when this call won the claim and the caller should send. Returns
- * false when the notification was already claimed, or when the claim could not
- * be recorded — never sending is preferred over sending twice.
- */
-/**
  * Whether a notification has already been sent, without claiming it.
  *
  * Lets a caller skip expensive work — a TMDB lookup per season, say — for
@@ -36,6 +25,17 @@ export const hasDelivery = async (
     episodeKey,
   })) > 0;
 
+/**
+ * Claims a notification for a request so it is only ever sent once.
+ *
+ * The unique constraint on (requestId, type) is the arbiter: whichever caller
+ * inserts first wins, and every later attempt fails with a unique violation.
+ * This is race-safe across the subscriber and the reconciler without a lock.
+ *
+ * Returns true when this call won the claim and the caller should send. Returns
+ * false when the notification was already claimed, or when the claim could not
+ * be recorded — never sending is preferred over sending twice.
+ */
 export const claimDelivery = async (
   requestId: number,
   type: Notification,

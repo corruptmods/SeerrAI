@@ -256,12 +256,6 @@ listRoutes.post('/', isAuthenticated(), async (req, res, next) => {
   }
 });
 
-// Which of the caller's accessible lists already contain a title. Registered
-// before "/:listId" so the literal path is matched first.
-// Everything the current user has marked, in one request. Cards need this to
-// badge posters, and a lookup per card would be dozens of requests per page —
-// SWR de-duplicates this single key across every card instead.
-
 listRoutes.get<{ listId: string }>(
   '/:listId',
   isAuthenticated(),
@@ -740,7 +734,5 @@ listRoutes.delete<{ listId: string }>(
     }
   }
 );
-
-// Anyone who can see a list can curate it; membership is the owner's call.
 
 export default listRoutes;

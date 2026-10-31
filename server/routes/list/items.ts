@@ -26,6 +26,9 @@ import { In, IsNull } from 'typeorm';
 
 const listRoutes = Router();
 
+// Everything the current user has marked, in one request. Cards need this to
+// badge posters, and a lookup per card would be dozens of requests per page —
+// SWR de-duplicates this single key across every card instead.
 listRoutes.get('/markers', isAuthenticated(), async (req, res, next) => {
   try {
     const userId = req.user?.id as number;
@@ -77,6 +80,7 @@ listRoutes.get('/markers', isAuthenticated(), async (req, res, next) => {
   }
 });
 
+// Which of the caller's lists already contain a title.
 listRoutes.get('/contains', isAuthenticated(), async (req, res, next) => {
   try {
     const userId = req.user?.id as number;
@@ -115,10 +119,6 @@ listRoutes.get('/contains', isAuthenticated(), async (req, res, next) => {
     next({ status: 500, message: 'Failed to check lists.' });
   }
 });
-
-// Pending removal suggestions for the caller's own lists. Fetched when the
-// app loads, which is also when the watch-history check runs (throttled),
-// so the prompt is ready rather than computed while the user waits.
 
 /*
  * Where the viewer is in each series on a list, from the server's watch
@@ -161,6 +161,9 @@ listRoutes.get<{ listId: string }>(
   }
 );
 
+// Pending removal suggestions for the caller's own lists. Fetched when the
+// app loads, which is also when the watch-history check runs (throttled),
+// so the prompt is ready rather than computed while the user waits.
 listRoutes.get('/suggestions', isAuthenticated(), async (req, res, next) => {
   try {
     // Turned off: no watch-history check, and nothing suggested.
@@ -282,10 +285,7 @@ listRoutes.post<{ suggestionId: string }>(
   }
 );
 
-// Turns pasted text into candidate matches for review. Deliberately does not
-// add anything: automatic title matching gets things wrong, so the user
-// confirms before any of it lands on a list.
-
+// Anyone who can see a list can curate it; membership is the owner's call.
 listRoutes.post<{ listId: string }>(
   '/:listId/item',
   isAuthenticated(),

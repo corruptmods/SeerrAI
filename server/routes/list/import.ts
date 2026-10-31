@@ -122,6 +122,9 @@ const candidatesFor = async (tmdb: TheMovieDb, line: ParsedLine) => {
 
 const listRoutes = Router();
 
+// Turns pasted text into candidate matches for review. Deliberately does not
+// add anything: automatic title matching gets things wrong, so the user
+// confirms before any of it lands on a list.
 listRoutes.post('/import/search', isAuthenticated(), async (req, res, next) => {
   try {
     const text = String(req.body.text ?? '');

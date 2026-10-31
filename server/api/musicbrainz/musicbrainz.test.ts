@@ -550,6 +550,8 @@ describe('the MusicBrainz client', () => {
       plainText('<p>Glasswing are an <b>English</b> rock band &amp; more.</p>'),
       'Glasswing are an English rock band & more.'
     );
+    // A character past Unicode's last is left alone, not thrown on.
+    assert.equal(plainText('Caf&#233; &#99999999;'), 'Café &#99999999;');
     const { client } = stubbed({
       [`/artist/${ARTIST}/wikipedia-extract`]: {
         wikipediaExtract: { content: '<p>A band.</p>' },

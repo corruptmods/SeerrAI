@@ -174,7 +174,11 @@ export const plainText = (html: string): string =>
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#0?39;|&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    // One past Unicode's last character is left as it is: decoding it
+    // throws, and the biography would never show.
+    .replace(/&#(\d+);/g, (entity, code) =>
+      Number(code) <= 0x10ffff ? String.fromCodePoint(Number(code)) : entity
+    )
     .replace(/&amp;/g, '&')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s*\n+/g, '\n\n')

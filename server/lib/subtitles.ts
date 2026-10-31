@@ -356,6 +356,11 @@ const originsForEpisodes = async (
   episodes: BazarrEpisode[]
 ): Promise<Map<number, Map<string, FileOrigin>>> => {
   const now = Date.now();
+  // Answers past their time are dropped, not kept for every episode ever
+  // looked at.
+  for (const [id, cached] of episodeOrigins) {
+    if (now - cached.at >= HISTORY_TTL_MS) episodeOrigins.delete(id);
+  }
   const found = new Map<number, Map<string, FileOrigin>>();
   const toAsk = episodes.filter((episode) => {
     // Only a file has an origin to tell.

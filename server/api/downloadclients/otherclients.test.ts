@@ -491,6 +491,15 @@ describe('talking to them', () => {
     );
   });
 
+  it('Deluge: tests a wrong password as wrong, though the right one is signed in', async () => {
+    const right = new DelugeAPI(at('deluge', { password: 'deluge-pass' }));
+    assert.equal(await right.getVersion(), '2.1.1');
+    await assert.rejects(
+      new DelugeAPI(at('deluge', { password: 'wrong' })).getVersion(),
+      /Deluge did not accept the password/
+    );
+  });
+
   it('NZBGet: matches jobs by Sonarr’s id or the NZBID', async () => {
     const api = new NzbgetAPI(
       at('nzbget', { username: 'nzbget', password: 'tegbzn6789' })

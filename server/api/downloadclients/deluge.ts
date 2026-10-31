@@ -8,6 +8,7 @@ import {
   CLIENT_TIMEOUT_MS,
   clientBaseUrl,
   isTorrentHash,
+  sessionKeyOf,
 } from '@server/api/downloadclients/types';
 import type { DownloadClientSettings } from '@server/lib/settings';
 import type { AxiosInstance } from 'axios';
@@ -173,7 +174,7 @@ interface RpcAnswer<T> {
   id: number;
 }
 
-/** Signed-in sessions, by client address, kept between passes. */
+/** Signed-in sessions, by client address and password, kept between passes. */
 const sessions = new Map<string, string>();
 
 class DelugeAPI implements TorrentClient {
@@ -191,8 +192,8 @@ class DelugeAPI implements TorrentClient {
     >
   ) {
     const base = clientBaseUrl(settings);
-    this.sessionKey = base;
     this.password = settings.password ?? '';
+    this.sessionKey = sessionKeyOf(base, '', this.password);
     this.axios = axios.create({
       baseURL: `${base}/json`,
       timeout: CLIENT_TIMEOUT_MS,

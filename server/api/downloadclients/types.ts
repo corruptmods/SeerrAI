@@ -1,5 +1,6 @@
 import type { DownloadStage, DownloadStep } from '@server/constants/downloads';
 import type { DownloadClientSettings } from '@server/lib/settings';
+import { createHash } from 'node:crypto';
 
 /** One download as its download client reports it, right now. */
 export interface LiveDownload {
@@ -183,6 +184,19 @@ export const clientBaseUrl = (
     settings.port
   }${base ? `/${base}` : ''}`;
 };
+
+/**
+ * What a client's signed-in session is kept under: its address and the
+ * sign-in, the password only as a digest. Another password signs in afresh
+ * rather than riding on the session the saved one opened, so testing a
+ * wrong one fails.
+ */
+export const sessionKeyOf = (
+  baseUrl: string,
+  username: string,
+  password: string
+): string =>
+  `${baseUrl}|${username}|${createHash('sha256').update(password).digest('hex')}`;
 
 /** A torrent's hash: 40 hex characters, or 64 for a v2-only torrent. */
 export const isTorrentHash = (id: string): boolean =>

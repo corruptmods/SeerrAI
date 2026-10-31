@@ -8,6 +8,7 @@ import {
   CLIENT_TIMEOUT_MS,
   clientBaseUrl,
   isTorrentHash,
+  sessionKeyOf,
 } from '@server/api/downloadclients/types';
 import type { DownloadClientSettings } from '@server/lib/settings';
 import type { AxiosInstance, AxiosResponse } from 'axios';
@@ -154,7 +155,7 @@ export const qbitDownload = (torrent: Torrent): LiveDownload => {
   }
 };
 
-/** Signed-in sessions, by client address and user, kept between passes. */
+/** Signed-in sessions, by client address and sign-in, kept between passes. */
 const sessions = new Map<string, string>();
 
 class QBittorrentAPI implements TorrentClient {
@@ -176,7 +177,7 @@ class QBittorrentAPI implements TorrentClient {
     this.baseUrl = clientBaseUrl(settings);
     this.username = settings.username ?? '';
     this.password = settings.password ?? '';
-    this.sessionKey = `${this.baseUrl}|${this.username}`;
+    this.sessionKey = sessionKeyOf(this.baseUrl, this.username, this.password);
     this.axios = axios.create({
       baseURL: `${this.baseUrl}/api/v2`,
       timeout: CLIENT_TIMEOUT_MS,

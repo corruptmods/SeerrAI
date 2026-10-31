@@ -417,6 +417,11 @@ describe('talking to them', () => {
       /did not accept/
     );
   });
+
+  it('tests a wrong qBittorrent password as wrong, though the right one is signed in', async () => {
+    assert.equal(await qbit('secret').getVersion(), 'v5.0.4');
+    await assert.rejects(qbit('nope').getVersion(), /did not accept/);
+  });
 });
 
 describe('adding a torrent to qBittorrent for Backfill', () => {

@@ -58,16 +58,26 @@ interface PlexAnswer {
 const yes = (value: unknown) =>
   value === true || value === 1 || value === '1' || value === 'true';
 
-const tokens = new Map<number, { at: number; token: string }>();
+/** By person: their token, and the server (machine id) it is for. */
+const tokens = new Map<
+  number,
+  { at: number; machineId: string; token: string }
+>();
 
 /** The person's own token for this Plex server, if they have one. */
 const serverToken = async (userId: number): Promise<string | undefined> => {
   const settings = getSettings();
-  if (!isConnected('plex') || !settings.plex.machineId) {
+  const { machineId } = settings.plex;
+  if (!isConnected('plex') || !machineId) {
     return undefined;
   }
+  // A token for a server Seerr has since moved off is never sent to the new.
   const cached = tokens.get(userId);
-  if (cached && Date.now() - cached.at < TOKEN_TTL_MS) {
+  if (
+    cached &&
+    cached.machineId === machineId &&
+    Date.now() - cached.at < TOKEN_TTL_MS
+  ) {
     return cached.token;
   }
   const user = await getRepository(User).findOne({
@@ -78,12 +88,12 @@ const serverToken = async (userId: number): Promise<string | undefined> => {
     return undefined;
   }
   const server = (await new PlexTvAPI(user.plexToken).getDevices()).find(
-    (device) => device.clientIdentifier === settings.plex.machineId
+    (device) => device.clientIdentifier === machineId
   );
   if (!server?.accessToken) {
     return undefined;
   }
-  tokens.set(userId, { at: Date.now(), token: server.accessToken });
+  tokens.set(userId, { at: Date.now(), machineId, token: server.accessToken });
   return server.accessToken;
 };
 

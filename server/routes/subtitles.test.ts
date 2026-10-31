@@ -1431,6 +1431,15 @@ describe('the subtitle your own Plex player starts with', () => {
     );
     assert.equal(body.available, false);
   });
+
+  it('never sends the token it kept for one Plex server to another', async () => {
+    const read = () => call('GET', '/movie/471906/plex-default');
+    assert.equal((await read()).status, 200);
+    // Seerr moved to the other server plex.tv lists: its own token, which
+    // the stand-in (the old server's address) turns away.
+    getSettings().plex.machineId = 'other';
+    assert.equal((await read()).status, 502);
+  });
 });
 
 describe('a job’s place in Bazarr’s queue', () => {

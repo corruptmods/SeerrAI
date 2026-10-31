@@ -422,6 +422,7 @@ const appAsked = (e: unknown): string | undefined => {
   return [
     ...settings.sonarr,
     ...settings.radarr,
+    ...settings.lidarr,
     ...settings.downloadClients,
   ].find(at)?.name;
 };

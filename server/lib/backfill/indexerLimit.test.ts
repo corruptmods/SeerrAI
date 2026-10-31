@@ -21,7 +21,7 @@ import { summarize } from '@server/lib/backfill/plan';
 import type { SonarrEpisode } from '@server/lib/backfill/sonarr';
 import BackfillSonarr from '@server/lib/backfill/sonarr';
 import notificationManager from '@server/lib/notifications';
-import type { SonarrSettings } from '@server/lib/settings';
+import type { LidarrSettings, SonarrSettings } from '@server/lib/settings';
 import { BACKFILL_DEFAULTS, getSettings } from '@server/lib/settings';
 import { AddBackfillIndexerWait1795000000000 as PostgresMigration } from '@server/migration/postgres/1795000000000-AddBackfillIndexerWait';
 import { AddBackfillIndexerWait1795000000000 as SqliteMigration } from '@server/migration/sqlite/1795000000000-AddBackfillIndexerWait';
@@ -642,6 +642,29 @@ describe('what went wrong, in plain words', () => {
       'Tabula Rasa refused the API key'
     );
     assert.equal(plainProblem(new Error('Something else')), 'Something else');
+  });
+
+  it('names Lidarr when it is the app that did not answer', () => {
+    const settings = getSettings();
+    const lidarr = settings.lidarr;
+    settings.lidarr = [
+      {
+        id: 0,
+        name: 'Lidarr',
+        hostname: 'lidarr',
+        port: 8686,
+        apiKey: 'l',
+        useSsl: false,
+      } as unknown as LidarrSettings,
+    ];
+    try {
+      assert.equal(
+        plainProblem(unanswered('http://lidarr:8686/api/v1/album/7')),
+        'Lidarr did not answer'
+      );
+    } finally {
+      settings.lidarr = lidarr;
+    }
   });
 
   it('writes a refused key on the job by the indexer’s name, and the raw answer only in the server log', async () => {

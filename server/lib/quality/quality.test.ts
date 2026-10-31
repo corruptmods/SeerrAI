@@ -252,6 +252,9 @@ const standIn = (
     grabs: async () => clone(state.grabs),
     titles: async () => clone(state.titles),
     moveTitles: async (ids: number[], profileId: number) => {
+      if (!state.profiles.some((p) => p.id === profileId)) {
+        throw new Error(`No profile ${profileId}`);
+      }
       state.calls.push(`move ${ids.join(',')} to ${profileId}`);
       for (const t of state.titles)
         if (ids.includes(t.id)) t.profileId = profileId;
@@ -1228,6 +1231,44 @@ describe('the step-down', () => {
     radarr.state.titles[0].hasFile = true;
     assert.deepEqual(await runStepDown(), { down: 0, back: 1 });
     assert.equal(radarr.state.titles[0].profileId, p1080?.id);
+    assert.equal(await getRepository(QualityStepDown).count(), 0);
+  });
+
+  it('goes on when a title’s own profile was removed', async () => {
+    getSettings().backfill = {
+      ...getSettings().backfill,
+      stepDown: { enabled: true, days: 30 },
+    };
+    manage('radarr', (c) => {
+      c.presets = { '1080p': 'seerr', '720p': 'seerr' };
+    });
+    await apply(RADARR);
+    const p1080 = radarr.state.profiles.find(
+      (p) => p.name === 'Seerr AI · 1080p'
+    );
+    const p720 = radarr.state.profiles.find(
+      (p) => p.name === 'Seerr AI · 720p'
+    );
+    radarr.state.titles = [
+      {
+        id: 5,
+        title: 'A Hard To Find Film',
+        profileId: p1080?.id as number,
+        hasFile: false,
+        monitored: true,
+        wanted: true,
+        added: '2026-01-01T00:00:00Z',
+      },
+    ];
+    await runStepDown();
+    assert.equal(radarr.state.titles[0].profileId, p720?.id);
+    // The admin removes the 1080p profile; the film turns up meanwhile.
+    radarr.state.profiles = radarr.state.profiles.filter(
+      (p) => p.id !== p1080?.id
+    );
+    radarr.state.titles[0].hasFile = true;
+    assert.deepEqual(await runStepDown(), { down: 0, back: 0 });
+    assert.equal(radarr.state.titles[0].profileId, p720?.id);
     assert.equal(await getRepository(QualityStepDown).count(), 0);
   });
 });

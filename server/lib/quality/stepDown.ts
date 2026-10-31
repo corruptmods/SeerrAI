@@ -44,10 +44,18 @@ const stepServer = async (
   const titles = await arr.titles();
   const byId = new Map(titles.map((t) => [t.id, t]));
 
-  // Back up first: what has a file now, or was moved by someone else.
+  // Back up first: what has a file now, or was moved by someone else. A
+  // title whose own profile is gone stays where it is.
+  const there = stepped.length
+    ? new Set((await arr.profiles()).map((p) => p.id))
+    : new Set<number>();
   for (const step of stepped) {
     const title = byId.get(step.arrId);
-    if (!title || title.profileId !== step.toProfileId) {
+    if (
+      !title ||
+      title.profileId !== step.toProfileId ||
+      !there.has(step.fromProfileId)
+    ) {
       await steps.remove(step);
       continue;
     }

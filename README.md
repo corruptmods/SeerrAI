@@ -36,6 +36,7 @@
 **Admin tools**
 - Backfill: searches Prowlarr for stuck titles and albums, and imports only what's missing.
 - Download Check: catches fake and wrong downloads and stuck imports.
+- Quality profiles for Radarr and Sonarr, from Seerr AI's presets or TRaSH Guides, with your own adjustments and a plain-words view of what each one takes. Off until you apply it.
 - A Health page with alerts, and live progress from six download clients.
 - Subtitles through Bazarr, transcribed with Whisper when none can be found, showing what Bazarr is doing as it works.
 - Works with Radarr 7.
@@ -55,6 +56,7 @@ Every extra can be turned off for everyone, or by each person for themselves.
 | ![Discover: titles deleting soon, recently added and recent requests](./docs/seerr-ai/screenshots/discover.jpg)<br>**Discover** | ![A film's page: poster, overview and crew](./docs/seerr-ai/screenshots/title-page.jpg)<br>**A title page** |
 | ![The Music page: new music and popular albums](./docs/seerr-ai/screenshots/music.jpg)<br>**Music**, requested through Lidarr | ![Settings, Media Servers: Plex as the primary server, Jellyfin and Emby ready to connect](./docs/seerr-ai/screenshots/media-servers.jpg)<br>**Media Servers**: Plex, Jellyfin and Emby, in any mix |
 | ![Profile, Settings, Appearance: mode, accent colour and dark background](./docs/seerr-ai/screenshots/appearance.jpg)<br>**Appearance**: everyone picks their own look | ![On a phone: Discover, and the sign-in page with Jellyfin, Quick Connect, Plex, Emby, Authentik and a Seerr AI password](./docs/seerr-ai/screenshots/phones.jpg)<br>**On a phone**, with every way to sign in |
+| ![Settings, Quality: a Sonarr server's presets from TRaSH Guides, 720p filled in by Seerr AI](./docs/seerr-ai/screenshots/quality.jpg)<br>**Quality profiles**: presets from Seerr AI or TRaSH Guides, per server | ![What it does: a profile's goal, what it prefers, in bands, and what it never takes](./docs/seerr-ai/screenshots/quality-what-it-does.jpg)<br>**What it does**: every profile in plain words |
 
 ## Install
 

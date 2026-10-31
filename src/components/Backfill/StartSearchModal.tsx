@@ -194,7 +194,7 @@ const StartSearchModal = ({
                           : 'text-gray-200'
                       }`}
                     >
-                      <span className="min-w-0">
+                      <span className="min-w-0 whitespace-normal break-words">
                         {o.title}{' '}
                         {o.year > 0 && (
                           <span className="text-gray-400">({o.year})</span>

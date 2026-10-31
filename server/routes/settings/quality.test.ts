@@ -1,3 +1,5 @@
+import { getRepository } from '@server/datasource';
+import QualityApply from '@server/entity/QualityApply';
 import { QualityArr } from '@server/lib/quality/arr';
 import * as trashModule from '@server/lib/quality/trash';
 import { serverDefaults } from '@server/lib/quality/types';
@@ -14,7 +16,7 @@ import request from 'supertest';
 
 /*
  * Settings → Quality's choices as saved: only what is valid, one entry a
- * server. Nothing reaches a server here.
+ * server, and what an apply recorded kept. Nothing reaches a server here.
  */
 
 setupTestDb();
@@ -60,7 +62,9 @@ beforeEach(() => {
   settings.sonarr = [];
   settings.quality = {
     trash: { autoApply: false, fillGaps: true },
-    servers: [server(true)],
+    servers: [
+      { ...server(true), trashCommit: 'abc1234', appliedChoices: 'applied' },
+    ],
   };
   mock.method(settings, 'save', async () => undefined);
   // No server is reached: each answers as one that can't be.
@@ -83,5 +87,41 @@ describe('saving the quality choices', () => {
     assert.equal(res.status, 400);
     assert.equal(getSettings().quality.trash.autoApply, false);
     assert.equal(getSettings().quality.servers[0].managed, true);
+  });
+
+  it('keeps what the last apply recorded', async () => {
+    const res = await request(app)
+      .put('/api/v1/settings/quality')
+      .send({
+        trash: { autoApply: false, fillGaps: true },
+        servers: [{ ...server(true), trashCommit: 'x', appliedChoices: 'x' }],
+      });
+    assert.equal(res.status, 200);
+    const [saved] = getSettings().quality.servers;
+    assert.equal(saved.trashCommit, 'abc1234');
+    assert.equal(saved.appliedChoices, 'applied');
+  });
+
+  it('offers Undo only on a server Seerr AI manages', async () => {
+    await getRepository(QualityApply).save(
+      new QualityApply({
+        serverKind: 'radarr',
+        serverId: 0,
+        userId: null,
+        summary: { created: 1, updated: 0 },
+        befores: [],
+        moved: [],
+        undoneAt: null,
+      })
+    );
+    const managed = await request(app).get('/api/v1/settings/quality');
+    assert.equal(managed.body.history[0].canUndo, true);
+    const res = await request(app)
+      .put('/api/v1/settings/quality')
+      .send({
+        trash: { autoApply: false, fillGaps: true },
+        servers: [server(false)],
+      });
+    assert.equal(res.body.history[0].canUndo, false);
   });
 });

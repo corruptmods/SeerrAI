@@ -8,17 +8,17 @@ import type {
   ScoreChange,
   ScoredFormat,
 } from '@server/lib/quality/build';
-import { buildDesired } from '@server/lib/quality/build';
+import { notesFor } from '@server/lib/quality/notes';
 import {
   QualityError,
   configFor,
+  defaultDelay,
+  desiredFor,
   loadContext,
-} from '@server/lib/quality/engine';
-import { notesFor } from '@server/lib/quality/notes';
+} from '@server/lib/quality/plan';
 import { LAST_RESORT } from '@server/lib/quality/presets';
 import { trashData } from '@server/lib/quality/trash';
 import type { PresetKey } from '@server/lib/quality/types';
-import { getSettings } from '@server/lib/settings';
 
 /*
  * What it does: one preset on one server, laid out for an admin. All but
@@ -108,12 +108,7 @@ const desiredOf = async (ref: QualityServerRef, preset: PresetKey) => {
     );
   }
   const ctx = await loadContext(ref);
-  const desired = buildDesired(
-    config,
-    ctx.facts,
-    await trashData(),
-    getSettings().quality.trash.fillGaps
-  );
+  const desired = desiredFor(config, ctx.facts, await trashData());
   const profile = desired.profiles.find((p) => p.preset === preset);
   if (!profile) {
     throw new QualityError('not-found', 'That preset is off on this server.');
@@ -179,8 +174,7 @@ export const describe = async (
   });
   const applied =
     !!rows.length && ctx.profiles.some((p) => p.id === rows[0].arrId);
-  const delay =
-    ctx.delays.find((d) => !d.tags?.length) ?? ctx.delays[0] ?? undefined;
+  const delay = defaultDelay(ctx.delays);
   return {
     preset,
     name: profile.name,
@@ -358,11 +352,10 @@ export const serverFormats = async (
   const config = configFor(ref);
   const ctx = await loadContext(ref);
   // Without nudges, so a format's own score is what is listed.
-  const desired = buildDesired(
+  const desired = desiredFor(
     { ...config, nudges: {} },
     ctx.facts,
-    await trashData(),
-    getSettings().quality.trash.fillGaps
+    await trashData()
   );
   const out = new Map<string, ServerFormat>();
   for (const profile of desired.profiles) {

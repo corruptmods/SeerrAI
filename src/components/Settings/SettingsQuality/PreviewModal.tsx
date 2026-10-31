@@ -16,7 +16,7 @@ import type {
 } from '@server/lib/quality/engine';
 import type { ArrKind, PresetKey } from '@server/lib/quality/types';
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.Settings.SettingsQuality.Preview', {
@@ -90,26 +90,33 @@ const PreviewModal = ({
   const [busy, setBusy] = useState(false);
   const [moves, setMoves] = useState<Record<number, PresetKey | ''>>({});
 
+  const load = useCallback(
+    (live: () => boolean = () => true) =>
+      axios
+        .post<Preview>(
+          `/api/v1/settings/quality/servers/${kind}/${serverId}/preview`,
+          restoreKept ? { restoreKept: true } : {}
+        )
+        .then(({ data }) => live() && setPreview(data))
+        .catch((e) => {
+          addToast(
+            intl.formatMessage(messages.previewFailed, { detail: errorOf(e) }),
+            { appearance: 'error', autoDismiss: true }
+          );
+          onClose();
+        }),
+    // Made when the preview opens, and again if it is out of date.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
   useEffect(() => {
     let live = true;
-    axios
-      .post<Preview>(
-        `/api/v1/settings/quality/servers/${kind}/${serverId}/preview`
-      )
-      .then(({ data }) => live && setPreview(data))
-      .catch((e) => {
-        addToast(
-          intl.formatMessage(messages.previewFailed, { detail: errorOf(e) }),
-          { appearance: 'error', autoDismiss: true }
-        );
-        onClose();
-      });
+    load(() => live);
     return () => {
       live = false;
     };
-    // Made once, when the preview opens.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
 
   const protocol = (p: string) =>
     intl.formatMessage(p === 'usenet' ? messages.usenet : messages.torrent);
@@ -196,6 +203,7 @@ const PreviewModal = ({
     .map((c) => c.key as PresetKey);
 
   const apply = async () => {
+    if (!preview) return;
     setBusy(true);
     try {
       const move = Object.entries(moves)
@@ -211,6 +219,7 @@ const PreviewModal = ({
       }>(`/api/v1/settings/quality/servers/${kind}/${serverId}/apply`, {
         ...(move.length ? { move } : {}),
         ...(restoreKept ? { restoreKept: true } : {}),
+        token: preview.token,
       });
       addToast(
         intl.formatMessage(
@@ -225,6 +234,11 @@ const PreviewModal = ({
         appearance: 'error',
         autoDismiss: true,
       });
+      // Something changed since the preview: show what applying does now.
+      if (axios.isAxiosError(e) && e.response?.data?.code === 'stale') {
+        setPreview(null);
+        await load();
+      }
     } finally {
       setBusy(false);
     }

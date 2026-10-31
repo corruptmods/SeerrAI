@@ -80,6 +80,11 @@ export interface QualityServerSettings {
    * admin moved: a later update that changes one is pointed out once.
    */
   trashRaw?: Record<string, number>;
+  /**
+   * The choices last applied (see lib/quality/engine), so a TRaSH Guides
+   * update can be told from choices nobody has applied yet. Cleared by Undo.
+   */
+  appliedChoices?: string;
 }
 
 export interface QualitySettings {

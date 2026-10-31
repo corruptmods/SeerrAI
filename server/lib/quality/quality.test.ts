@@ -190,6 +190,13 @@ const standIn = (
     calls: [] as string[],
   };
   const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
+  // The apps take a profile only with every format they have scored.
+  const everyFormat = (p: ArrQualityProfile) => {
+    const scored = new Set((p.formatItems ?? []).map((i) => i.format));
+    if (state.formats.some((f) => !scored.has(f.id as number))) {
+      throw new Error('All Custom Formats need to be present');
+    }
+  };
   // A new format lands in every profile at 0, as the apps do.
   const addToProfiles = (format: ArrCustomFormat) => {
     for (const p of state.profiles) {
@@ -206,12 +213,14 @@ const standIn = (
     template: async () => clone(template(kind, options.sizes)),
     profiles: async () => clone(state.profiles),
     createProfile: async (p: ArrQualityProfile) => {
+      everyFormat(p);
       state.calls.push(`create profile ${p.name}`);
       const saved = { ...clone(p), id: nextProfile++ } as ArrQualityProfile;
       state.profiles.push(saved);
       return clone(saved);
     },
     saveProfile: async (p: ArrQualityProfile) => {
+      everyFormat(p);
       state.calls.push(`save profile ${p.id}`);
       const at = state.profiles.findIndex((x) => x.id === p.id);
       state.profiles[at] = clone(p);
@@ -1022,6 +1031,16 @@ describe('applying, undoing and changes made elsewhere', () => {
   });
 });
 
+/** Changes a server's saved choices, as saving the page does. */
+const save = (kind: ArrKind, change: (s: QualityServerSettings) => void) => {
+  const settings = getSettings();
+  const quality = settings.quality;
+  for (const server of quality.servers) {
+    if (server.kind === kind) change(server);
+  }
+  settings.quality = quality;
+};
+
 describe('applying only what was previewed, and undoing it whole', () => {
   it('names a TRaSH Guides format apart from a Seerr AI one of the same name', async () => {
     setTrashDataForTests(trashFixture());
@@ -1035,6 +1054,241 @@ describe('applying only what was previewed, and undoing it whole', () => {
     assert.ok(names.includes('Seerr AI · AV1 (TRaSH Guides)'));
     assert.equal(new Set(names).size, names.length);
     assert.equal((await stateOf(RADARR)).status, 'in-sync');
+  });
+
+  it('applies nothing once what the preview showed has changed', async () => {
+    manage('radarr');
+    const { token } = await preview(RADARR);
+    manage('radarr', (c) => {
+      c.adjustments.x265At1080p = true;
+    });
+    await assert.rejects(
+      apply(RADARR, { token }),
+      (e: QualityError) => e.code === 'stale'
+    );
+    assert.equal(radarr.state.calls.length, 0);
+    const fresh = await preview(RADARR);
+    assert.ok((await apply(RADARR, { token: fresh.token })).applyId);
+  });
+
+  it('shows kept changes as kept, unless they are being put back', async () => {
+    manage('radarr');
+    await apply(RADARR);
+    const profile = radarr.state.profiles.find(
+      (p) => p.name === 'Seerr AI · 1080p'
+    );
+    assert.ok(profile);
+    profile.cutoff = 3;
+    await keepChanges(RADARR);
+    const action = (p: Awaited<ReturnType<typeof preview>>) =>
+      p.changes.find((c) => c.itemKind === 'profile' && c.key === '1080p')
+        ?.action;
+    assert.equal(action(await preview(RADARR)), 'kept');
+    assert.equal(
+      action(await preview(RADARR, { restoreKept: true })),
+      'put-back'
+    );
+  });
+
+  it('puts back a change the details have no words for, such as a name', async () => {
+    manage('radarr');
+    await apply(RADARR);
+    const profile = radarr.state.profiles.find(
+      (p) => p.name === 'Seerr AI · 1080p'
+    );
+    assert.ok(profile);
+    profile.name = 'Renamed in the app';
+    assert.equal((await stateOf(RADARR)).status, 'changed');
+    const shown = await preview(RADARR, { restoreKept: true });
+    assert.ok(
+      shown.changes.some((c) => c.key === '1080p' && c.action === 'put-back')
+    );
+    await apply(RADARR, { restoreKept: true, token: shown.token });
+    assert.equal(
+      radarr.state.profiles.find((p) => p.id === profile.id)?.name,
+      'Seerr AI · 1080p'
+    );
+    assert.equal((await stateOf(RADARR)).status, 'in-sync');
+  });
+
+  it('keeps Stop managing pressed while an apply runs', async () => {
+    manage('radarr');
+    const create = radarr.fake.createProfile;
+    mock.method(radarr.fake, 'createProfile', (p: ArrQualityProfile) => {
+      save('radarr', (s) => {
+        s.managed = false;
+      });
+      return create.call(radarr.fake, p);
+    });
+    await apply(RADARR);
+    assert.equal(configFor(RADARR).managed, false);
+  });
+
+  it('keeps what an apply did before it failed, so it can be undone', async () => {
+    manage('radarr');
+    const create = radarr.fake.createProfile;
+    mock.method(radarr.fake, 'createProfile', (p: ArrQualityProfile) =>
+      p.name === 'Seerr AI · Anime'
+        ? Promise.reject(new Error('Radarr said no'))
+        : create.call(radarr.fake, p)
+    );
+    await assert.rejects(apply(RADARR), /Radarr said no/);
+    const [entry] = await getRepository(QualityApply).find();
+    assert.ok(entry);
+    assert.ok(entry.befores.some((b) => b.key === '1080p'));
+    await undo(entry.id);
+    assert.deepEqual(
+      radarr.state.profiles.map((p) => p.name),
+      ['Admin’s own']
+    );
+    assert.deepEqual(
+      radarr.state.formats.map((f) => f.name),
+      ['Admin’s format']
+    );
+  });
+
+  it('undoes a profile change though formats were made since', async () => {
+    manage('radarr');
+    await apply(RADARR);
+    // Smaller files: a new size format, and the profiles score it.
+    save('radarr', (s) => {
+      s.adjustments.fileSize = 'small';
+    });
+    const second = await apply(RADARR);
+    assert.ok(
+      radarr.state.formats.some((f) => f.name === 'Seerr AI · Over 8 GB')
+    );
+    // And one the admin made meanwhile.
+    radarr.state.formats.push({
+      id: 99,
+      name: 'Made later',
+      specifications: [],
+    });
+    await undo(second.applyId as number);
+    assert.ok(
+      !radarr.state.formats.some((f) => f.name === 'Seerr AI · Over 8 GB')
+    );
+    const profile = radarr.state.profiles.find(
+      (p) => p.name === 'Seerr AI · 1080p'
+    );
+    assert.ok(profile?.formatItems?.some((i) => i.format === 99));
+  });
+
+  it('moves back only titles still on its profiles, and needs the server managed', async () => {
+    manage('radarr');
+    radarr.state.profiles.push({
+      ...template('radarr'),
+      id: 2,
+      name: 'Another of the admin’s',
+    });
+    radarr.state.titles = [1, 2].map((id) => ({
+      id,
+      title: `Made-Up Film ${id}`,
+      profileId: 1,
+      hasFile: true,
+      monitored: true,
+      wanted: true,
+    }));
+    const { applyId } = await apply(RADARR, {
+      move: [{ fromProfileId: 1, preset: '1080p' }],
+    });
+    // The admin moves one elsewhere themselves.
+    radarr.state.titles[1].profileId = 2;
+    save('radarr', (s) => {
+      s.managed = false;
+    });
+    radarr.state.calls.length = 0;
+    await assert.rejects(
+      undo(applyId as number),
+      (e: QualityError) => e.code === 'not-managed'
+    );
+    assert.equal(radarr.state.calls.length, 0);
+    save('radarr', (s) => {
+      s.managed = true;
+    });
+    const undone = await undo(applyId as number);
+    assert.equal(undone.movedBack, 1);
+    assert.deepEqual(
+      radarr.state.titles.map((t) => t.profileId),
+      [1, 2]
+    );
+  });
+
+  it('undoes an apply once, though asked twice at once', async () => {
+    manage('radarr');
+    const { applyId } = await apply(RADARR);
+    const results = await Promise.allSettled([
+      undo(applyId as number),
+      undo(applyId as number),
+    ]);
+    assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
+  });
+
+  it('leaves a tagged delay profile alone when the default one is missing', async () => {
+    radarr.state.delays = radarr.state.delays.map((d) => ({
+      ...d,
+      tags: [3],
+    }));
+    manage('radarr');
+    await apply(RADARR);
+    assert.ok(!radarr.state.calls.includes('save delay'));
+  });
+
+  it('applies a TRaSH Guides update on its own only onto choices already applied', async () => {
+    setTrashDataForTests(trashFixture());
+    manage('radarr', (c) => {
+      c.presets = { '1080p': 'trash' };
+    });
+    await apply(RADARR);
+    getSettings().quality = {
+      ...getSettings().quality,
+      trash: { autoApply: true, fillGaps: true },
+    };
+    // Saved, not applied.
+    save('radarr', (s) => {
+      s.adjustments.x265At1080p = true;
+    });
+    const next = trashFixture();
+    next.commit = 'def5678';
+    next.radarr.formats.tier1.trash_scores = { default: 2000 };
+    setTrashDataForTests(next);
+    assert.equal((await stateOf(RADARR)).status, 'ready');
+    await runQualityCheck();
+    assert.equal(await getRepository(QualityApply).count(), 1);
+
+    // Back to the choices applied: the update goes on, the delay profile
+    // someone changed in the app stays as they left it.
+    save('radarr', (s) => {
+      s.adjustments.x265At1080p = false;
+    });
+    radarr.state.delays[0].preferredProtocol = 'torrent';
+    assert.equal((await stateOf(RADARR)).status, 'update-ready');
+    await runQualityCheck();
+    assert.equal(await getRepository(QualityApply).count(), 2);
+    assert.equal(radarr.state.delays[0].preferredProtocol, 'torrent');
+  });
+
+  it('applies nothing on its own after an undo, until an admin applies', async () => {
+    setTrashDataForTests(trashFixture());
+    manage('radarr', (c) => {
+      c.presets = { '1080p': 'trash' };
+    });
+    await apply(RADARR);
+    save('radarr', (s) => {
+      s.nudges = { 'trash:tier1': 'down' };
+    });
+    const second = await apply(RADARR);
+    await undo(second.applyId as number);
+    getSettings().quality = {
+      ...getSettings().quality,
+      trash: { autoApply: true, fillGaps: true },
+    };
+    const next = trashFixture();
+    next.commit = 'def5678';
+    setTrashDataForTests(next);
+    assert.equal((await stateOf(RADARR)).status, 'ready');
+    await runQualityCheck();
+    assert.equal(await getRepository(QualityApply).count(), 2);
   });
 });
 

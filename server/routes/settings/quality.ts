@@ -98,7 +98,9 @@ const failed = (res: Response, e: unknown, what: string) => {
     const status =
       e.code === 'not-found'
         ? 404
-        : e.code === 'busy' || e.code === 'undo-newer-first'
+        : e.code === 'busy' ||
+            e.code === 'stale' ||
+            e.code === 'undo-newer-first'
           ? 409
           : 400;
     return res.status(status).json({ code: e.code, message: e.message });
@@ -127,7 +129,14 @@ const historyOf = async () => {
     const key = `${entry.serverKind}:${entry.serverId}`;
     if (!entry.undoneAt && !newest.has(key)) newest.set(key, entry.id);
   }
+  // Undo writes to the server, so only while Seerr AI manages it.
+  const managed = new Set(
+    getSettings()
+      .quality.servers.filter((s) => s.managed)
+      .map((s) => `${s.kind}:${s.serverId}`)
+  );
   return entries.map((entry) => {
+    const key = `${entry.serverKind}:${entry.serverId}`;
     const server = serverSettingsOf({
       kind: entry.serverKind,
       serverId: entry.serverId,
@@ -144,7 +153,7 @@ const historyOf = async () => {
       by: users.find((u) => u.id === entry.userId)?.displayName ?? null,
       createdAt: entry.createdAt,
       undoneAt: entry.undoneAt,
-      canUndo: newest.get(`${entry.serverKind}:${entry.serverId}`) === entry.id,
+      canUndo: managed.has(key) && newest.get(key) === entry.id,
     };
   });
 };
@@ -209,6 +218,7 @@ qualityRoutes.put('/', async (req, res, next) => {
         ...s,
         trashCommit: saved?.trashCommit,
         trashRaw: saved?.trashRaw,
+        appliedChoices: saved?.appliedChoices,
       };
     }),
   };
@@ -233,9 +243,13 @@ qualityRoutes.post('/trash/check', async (_req, res) => {
   });
 });
 
+const previewBody = z.object({ restoreKept: z.boolean().optional() });
+
 qualityRoutes.post('/servers/:kind/:serverId/preview', async (req, res) => {
   const ref = refOf(req.params);
   if (!ref) return res.status(404).json({ code: 'not-found' });
+  const parsed = previewBody.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ code: 'bad-request' });
   try {
     // Never apply a copy of TRaSH Guides more than a day old (the
     // daily check may not have run, say while the server was off).
@@ -243,7 +257,7 @@ qualityRoutes.post('/servers/:kind/:serverId/preview', async (req, res) => {
     if (config.managed && Object.values(config.presets).includes('trash')) {
       await refreshTrashIfOlder(24 * 60 * 60 * 1000);
     }
-    return res.status(200).json(await preview(ref));
+    return res.status(200).json(await preview(ref, parsed.data));
   } catch (e) {
     return failed(res, e, 'make a preview');
   }
@@ -260,6 +274,8 @@ const applyBody = z.object({
     .max(50)
     .optional(),
   restoreKept: z.boolean().optional(),
+  /** The preview's: nothing is applied if what it showed has changed. */
+  token: z.string().max(64).optional(),
 });
 
 qualityRoutes.post('/servers/:kind/:serverId/apply', async (req, res) => {

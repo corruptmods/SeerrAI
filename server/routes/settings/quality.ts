@@ -62,16 +62,28 @@ const serverBody = z.object({
     burnedInLastResort: z.boolean(),
     av1LastResort: z.boolean(),
   }),
-  nudges: z.record(
-    z.string().regex(/^(seerr|trash):[\w-]{1,64}$/),
-    z.enum(['up', 'down', 'never'])
-  ),
+  nudges: z
+    .record(
+      z.string().regex(/^(seerr|trash):[\w-]{1,64}$/),
+      z.enum(['up', 'down', 'never'])
+    )
+    .refine((nudges) => Object.keys(nudges).length <= 1000, {
+      message: 'Too many formats moved.',
+    }),
   bandStep: z.union(BAND_STEPS.map((n) => z.literal(n))),
 });
 
 const body = z.object({
   trash: z.object({ autoApply: z.boolean(), fillGaps: z.boolean() }),
-  servers: z.array(serverBody).max(100),
+  servers: z
+    .array(serverBody)
+    .max(100)
+    .refine(
+      (servers) =>
+        new Set(servers.map((s) => `${s.kind}:${s.serverId}`)).size ===
+        servers.length,
+      { message: 'A server is listed twice.' }
+    ),
 });
 
 const refOf = (params: { kind?: string; serverId?: string }) => {

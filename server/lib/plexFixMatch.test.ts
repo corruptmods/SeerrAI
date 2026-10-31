@@ -79,12 +79,29 @@ const asItem = (guid: string): PlexLibraryItem =>
   }) as unknown as PlexLibraryItem;
 
 /** A Plex with item 70 matched to `guid`, offering `results` by search. */
-const plexWith = (guid: string, results: Record<string, PlexMatchResult[]>) => {
+/**
+ * A Plex with item 70 matched to `guid`, offering `results` by search. As
+ * Plex does, a new match shows its guid, name and year at once, but keeps
+ * the old title's ids for `lag` reads (forever, with Infinity) while it
+ * fetches the new title's details.
+ */
+const plexWith = (
+  guid: string,
+  results: Record<string, PlexMatchResult[]>,
+  lag = 0
+) => {
   let item = asItem(guid);
+  let staleReads = 0;
+  let fetched = item;
   const calls: string[] = [];
-  mock.method(PlexAPI.prototype, 'getMatchItem', async (key: string) =>
-    key === '70' ? item : undefined
-  );
+  mock.method(PlexAPI.prototype, 'getMatchItem', async (key: string) => {
+    if (key !== '70') return undefined;
+    if (staleReads > 0) {
+      staleReads -= 1;
+      if (staleReads === 0) item = fetched;
+    }
+    return item;
+  });
   mock.method(PlexAPI.prototype, 'getLibraries', async () => [
     {
       key: '1',
@@ -107,7 +124,13 @@ const plexWith = (guid: string, results: Record<string, PlexMatchResult[]>) => {
     'setMatch',
     async (_key: string, to: { guid: string }) => {
       calls.push(`match ${to.guid}`);
-      item = asItem(to.guid);
+      fetched = asItem(to.guid);
+      if (lag > 0) {
+        staleReads = lag;
+        item = { ...fetched, Guid: item.Guid };
+      } else {
+        item = fetched;
+      }
     }
   );
   mock.method(PlexAPI.prototype, 'unmatch', async () => {
@@ -190,10 +213,40 @@ describe('fixing a wrong Plex match', () => {
     assert.equal((await recentFixes()).length, 0);
   });
 
+  it('waits for Plex to fetch the new title before judging it', async () => {
+    const plex = plexWith(WRONG, { 'tmdb-846213': offers(RIGHT) }, 3);
+    const outcome = await fixMatch(problem(), 2);
+    assert.equal(outcome.state, 'fixed');
+    assert.equal(
+      outcome.state === 'fixed' && outcome.fix.confirmed,
+      true,
+      'confirmed once its ids were the new title’s'
+    );
+    assert.deepEqual(
+      plex.calls.filter((c) => c.startsWith('match')),
+      [`match ${RIGHT}`],
+      'never put back'
+    );
+  });
+
+  it('never puts a match back over the old title’s ids, however long Plex takes', async () => {
+    const plex = plexWith(WRONG, { 'tmdb-846213': offers(RIGHT) }, Infinity);
+    const outcome = await fixMatch(problem(), 2);
+    assert.equal(outcome.state, 'fixed');
+    assert.equal(outcome.state === 'fixed' && outcome.fix.confirmed, false);
+    assert.equal(plex.now().guid, RIGHT);
+    assert.deepEqual(
+      plex.calls.filter((c) => c.startsWith('match')),
+      [`match ${RIGHT}`]
+    );
+  });
+
   it('puts the old match back when Plex takes it as another title', async () => {
-    const plex = plexWith(WRONG, {
-      'tmdb-846213': offers('plex://movie/other'),
-    });
+    const plex = plexWith(
+      WRONG,
+      { 'tmdb-846213': offers('plex://movie/other') },
+      2
+    );
     const outcome = await fixMatch(problem(), 2);
     assert.equal(outcome.state, 'putBack');
     assert.deepEqual(plex.calls.slice(-2), [

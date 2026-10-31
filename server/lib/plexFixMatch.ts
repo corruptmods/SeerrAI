@@ -6,6 +6,7 @@ import type { PlexMatchProblem } from '@server/lib/plexMatchCheck';
 import { plexIds, sameTitle } from '@server/lib/plexMatchCheck';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import type { MatchIds } from '@server/utils/plexMatch';
 import { fileLooksWrong, fixSearch } from '@server/utils/plexMatch';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
@@ -30,7 +31,7 @@ export const FIXES_PATH = process.env.CONFIG_DIRECTORY
 const KEEP = 50;
 const TIMEOUT_MS = 20_000;
 /** How long Plex gets to show the new match, and how often it's read. */
-let confirmMs = 12_000;
+let confirmMs = 25_000;
 let pollMs = 2_000;
 
 /** For tests: no waiting on Plex. */
@@ -143,30 +144,38 @@ const pick = (
 const wait = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/** The same ids, all of them: Plex hasn't fetched the new title's yet. */
+const sameIds = (a: MatchIds, b: MatchIds): boolean =>
+  a.tmdbId === b.tmdbId && a.tvdbId === b.tvdbId && a.imdbId === b.imdbId;
+
 /**
- * The item once Plex shows it matched to `guid` and has its ids, or as it
- * last was when that takes too long.
+ * The item once Plex has fetched the new title's details. Plex shows the
+ * new match (its guid, name and year) at once, but its ids (tmdb://,
+ * imdb://) stay the old title's until it has fetched the new one's, which
+ * takes a few seconds or more: until then they say nothing about the new
+ * match. `fresh` is whether they had changed by the time it stopped
+ * looking.
  */
 const readBack = async (
   plex: PlexAPI,
   ratingKey: string,
   guid: string,
   kind: 'movie' | 'series',
-  expected: PlexMatchProblem['expected']
-): Promise<PlexLibraryItem | undefined> => {
+  expected: PlexMatchProblem['expected'],
+  before: MatchIds
+): Promise<{ item?: PlexLibraryItem; fresh: boolean }> => {
+  const freshNow = (item?: PlexLibraryItem) =>
+    !!item &&
+    item.guid === guid &&
+    !sameIds(plexIds(item), before) &&
+    sameTitle(kind, expected, plexIds(item)) !== undefined;
   const until = Date.now() + confirmMs;
   let item = await plex.getMatchItem(ratingKey);
-  while (
-    Date.now() < until &&
-    !(
-      item?.guid === guid &&
-      sameTitle(kind, expected, plexIds(item)) !== undefined
-    )
-  ) {
+  while (Date.now() < until && !freshNow(item)) {
     await wait(pollMs);
     item = await plex.getMatchItem(ratingKey);
   }
-  return item;
+  return { item, fresh: freshNow(item) };
 };
 
 /** Puts an item back as it was: its old match, or none. */
@@ -258,9 +267,18 @@ export const fixMatch = async (
     name: chosen.name,
     year: chosen.year,
   });
-  const after = await readBack(plex, ratingKey, chosen.guid, kind, expected);
+  const { item: after, fresh } = await readBack(
+    plex,
+    ratingKey,
+    chosen.guid,
+    kind,
+    expected,
+    plexIds(item)
+  );
   if (!after || after.guid !== chosen.guid) return { state: 'unchanged' };
-  const same = sameTitle(kind, expected, plexIds(after));
+  // Judged by its ids only once they are the new title's: the old title's
+  // would always read as another title.
+  const same = fresh ? sameTitle(kind, expected, plexIds(after)) : undefined;
   if (same === false) {
     await putBack(plex, ratingKey, from);
     logger.warn(

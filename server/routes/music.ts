@@ -15,6 +15,7 @@ import {
   artistStatuses,
   markBeingAdded,
 } from '@server/lib/music/library';
+import { pageOf } from '@server/lib/music/page';
 import { songStandings } from '@server/lib/music/requestSongs';
 import {
   rankAlbums,
@@ -279,7 +280,7 @@ musicRoutes.get<{ mbid: string }>('/artist/:mbid', async (req, res, next) => {
 musicRoutes.get<{ mbid: string }>(
   '/artist/:mbid/albums',
   async (req, res, next) => {
-    const page = Math.max(1, Number(req.query.page) || 1);
+    const page = pageOf(req.query.page);
     try {
       const found = await musicBrainz().getArtistReleaseGroups(
         req.params.mbid,

@@ -7,6 +7,7 @@ import MusicAlbum from '@server/entity/MusicAlbum';
 import type { ChartSong } from '@server/lib/music/charts';
 import { chartArtists, charts, trending } from '@server/lib/music/charts';
 import { albumStatuses, artistStatuses } from '@server/lib/music/library';
+import { pageOf } from '@server/lib/music/page';
 import {
   artistsLikeYours,
   moreFromYourArtists,
@@ -24,7 +25,7 @@ import type {
   MusicSongResult,
 } from '@server/models/Music';
 import { mapFreshRelease, mapSongResult } from '@server/models/Music';
-import type { NextFunction, Request } from 'express';
+import type { NextFunction } from 'express';
 import { Router } from 'express';
 import { IsNull, Not } from 'typeorm';
 
@@ -39,9 +40,6 @@ const discoverMusicRoutes = Router();
 discoverMusicRoutes.use(requireMusic);
 
 export const MUSIC_PAGE_SIZE = 20;
-
-const pageOf = (req: Request): number =>
-  Math.max(1, Math.floor(Number(req.query.page)) || 1);
 
 /** One page of a list worked out in full. */
 const paged = <T>(items: T[], page: number): MusicPage<T> => ({
@@ -73,7 +71,7 @@ const once = <T extends { id: string }>(items: T[]): T[] => {
 };
 
 discoverMusicRoutes.get('/new-releases', async (req, res, next) => {
-  const page = pageOf(req);
+  const page = pageOf(req.query.page);
   if (!getSettings().music.listenBrainz) {
     return res.status(200).json(empty(page));
   }
@@ -136,7 +134,7 @@ const songRows = async (
  * far; the rest are matched behind the scenes and show on a later visit.
  */
 discoverMusicRoutes.get('/top-songs', async (req, res, next) => {
-  const page = pageOf(req);
+  const page = pageOf(req.query.page);
   if (!getSettings().music.listenBrainz) {
     return res.status(200).json(empty(page));
   }
@@ -148,7 +146,7 @@ discoverMusicRoutes.get('/top-songs', async (req, res, next) => {
 });
 
 discoverMusicRoutes.get('/trending', async (req, res, next) => {
-  const page = pageOf(req);
+  const page = pageOf(req.query.page);
   if (!getSettings().music.listenBrainz) {
     return res.status(200).json(empty(page));
   }
@@ -162,7 +160,7 @@ discoverMusicRoutes.get('/trending', async (req, res, next) => {
 });
 
 discoverMusicRoutes.get('/popular-albums', async (req, res, next) => {
-  const page = pageOf(req);
+  const page = pageOf(req.query.page);
   if (!getSettings().music.listenBrainz) {
     return res.status(200).json(empty(page));
   }
@@ -188,7 +186,7 @@ discoverMusicRoutes.get('/popular-albums', async (req, res, next) => {
 });
 
 discoverMusicRoutes.get('/popular-artists', async (req, res, next) => {
-  const page = pageOf(req);
+  const page = pageOf(req.query.page);
   if (!getSettings().music.listenBrainz) {
     return res.status(200).json(empty(page));
   }
@@ -224,7 +222,7 @@ for (const [show, row] of [
   ['artists-like-yours', artistsLikeYours],
 ] as const) {
   discoverMusicRoutes.get(`/${show}`, async (req, res, next) => {
-    const page = pageOf(req);
+    const page = pageOf(req.query.page);
     if (!req.user) {
       return res.status(200).json(empty(page));
     }
@@ -250,7 +248,7 @@ for (const [show, row] of [
 
 /** Albums a media server has, newest first, from Seerr's own records. */
 discoverMusicRoutes.get('/recently-added', async (req, res) => {
-  const page = pageOf(req);
+  const page = pageOf(req.query.page);
   const [albums, total] = await getRepository(MusicAlbum).findAndCount({
     relations: { media: true },
     select: {

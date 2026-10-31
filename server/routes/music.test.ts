@@ -26,6 +26,7 @@ import { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
 import { musicImageProxy } from '@server/lib/imageproxy';
 import { chartsMatched, forgetChartMatches } from '@server/lib/music/charts';
+import { MOST_PAGES } from '@server/lib/music/page';
 import type { LidarrSettings, MusicSettings } from '@server/lib/settings';
 import { getSettings, musicDefaults } from '@server/lib/settings';
 import discoverMusicRoutes from '@server/routes/discoverMusic';
@@ -846,6 +847,28 @@ describe('an artist', () => {
       { page: 1 },
     ]);
   });
+
+  it('asks MusicBrainz for a whole page, and none past any real one', async () => {
+    const browse = mock.method(
+      MusicBrainz.prototype,
+      'getArtistReleaseGroups',
+      async () => ({
+        'release-group-count': 0,
+        'release-group-offset': 0,
+        'release-groups': [],
+      })
+    );
+    for (const asked of ['2.5', '1e300']) {
+      const { status } = await get(
+        `/music/artist/${IDS.artist}/albums?page=${asked}`
+      );
+      assert.equal(status, 200);
+    }
+    assert.deepEqual(
+      browse.mock.calls.map((call) => call.arguments[1]),
+      [{ page: 1 }, { page: MOST_PAGES - 1 }]
+    );
+  });
 });
 
 describe('an artist’s picture', () => {
@@ -1583,6 +1606,15 @@ describe('Discover’s music rows', () => {
       ).results.map((a) => [a.id, a.artistId, a.artistName, a.title]),
       [[IDS.album, IDS.artist, 'Glasswing', 'Sing to the Ferryman']]
     );
+  });
+
+  it('answer a page far past the end with nothing, not an error', async () => {
+    await seedMusicFixtures();
+    const { status, body } = await get(
+      '/discover/music/recently-added?page=1e300'
+    );
+    assert.equal(status, 200);
+    assert.deepEqual((body as { results: unknown[] }).results, []);
   });
 
   it('have numbers of their own and are added after the others, on', async () => {

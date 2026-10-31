@@ -33,6 +33,7 @@ import { getSettings } from '@server/lib/settings';
 import type { TranscriptionTask } from '@server/lib/transcriber';
 import transcriber, { SubtitleProblem } from '@server/lib/transcriber';
 import logger from '@server/logger';
+import { createHash } from 'node:crypto';
 
 /*
  * Subtitles as Bazarr has them, for title pages. Bazarr knows a movie by
@@ -231,6 +232,66 @@ export const toSearchResult = (
   missed: MATCH_FIELDS.filter((field) => result.dont_matches?.includes(field)),
   ai: result.provider === WHISPER_PROVIDER,
 });
+
+/*
+ * What a manual search offered, by title ("movie:3745", "episode:139851").
+ * Bazarr names a search result by the provider's subtitle object, pickled,
+ * and unpickles whatever is sent back to download it: a forged one would
+ * run code in Bazarr. So only a result Bazarr itself offered for the same
+ * title, in the last hour, is ever sent back. Only a hash of each is kept.
+ */
+const OFFER_TTL_MS = 60 * 60_000;
+/** Titles whose offers are kept, the least recently searched dropped first. */
+const OFFERED_TITLES = 500;
+/** Results kept for one title, over its searches. */
+const OFFERS_PER_TITLE = 2000;
+const offers = new Map<string, Map<string, number>>();
+
+const offerHash = (choice: { provider: string; subtitle: string }) =>
+  createHash('sha256')
+    .update(choice.provider)
+    .update('\0')
+    .update(choice.subtitle)
+    .digest('base64');
+
+/** Notes the results a search for a title offered. */
+export const rememberOffered = (
+  title: string,
+  results: Pick<BazarrSearchResult, 'provider' | 'subtitle'>[]
+): void => {
+  const now = Date.now();
+  const kept = offers.get(title) ?? new Map<string, number>();
+  offers.delete(title);
+  for (const [hash, at] of kept) {
+    if (now - at >= OFFER_TTL_MS) kept.delete(hash);
+  }
+  for (const result of results) {
+    const hash = offerHash(result);
+    kept.delete(hash);
+    kept.set(hash, now);
+  }
+  for (const hash of kept.keys()) {
+    if (kept.size <= OFFERS_PER_TITLE) break;
+    kept.delete(hash);
+  }
+  offers.set(title, kept);
+  for (const oldest of offers.keys()) {
+    if (offers.size <= OFFERED_TITLES) break;
+    offers.delete(oldest);
+  }
+};
+
+/** Whether a search for the title offered this result, recently. */
+export const wasOffered = (
+  title: string,
+  choice: { provider: string; subtitle: string }
+): boolean => {
+  const at = offers.get(title)?.get(offerHash(choice));
+  return at !== undefined && Date.now() - at < OFFER_TTL_MS;
+};
+
+/** For tests: forget what searches offered. */
+export const forgetOffered = () => offers.clear();
 
 /** Each language profile's name, and the languages it asks for. */
 const profilesOf = async (api: BazarrAPI) =>

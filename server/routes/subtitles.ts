@@ -25,6 +25,7 @@ import {
   movieSubtitles,
   queueMovieTranscription,
   queueSeriesTranscription,
+  rememberOffered,
   searchEpisodeOrTranscribe,
   searchMissingMovieOrTranscribe,
   searchMissingSeriesOrTranscribe,
@@ -32,6 +33,7 @@ import {
   seriesSubtitles,
   subtitlesReady,
   toSearchResult,
+  wasOffered,
   whisperOn,
   whisperProblemText,
   whisperUnavailable,
@@ -226,13 +228,24 @@ const manage = isAuthenticated(Permission.MANAGE_REQUESTS);
 const transcribeIfNone = (req: Request) =>
   ['true', '1'].includes(String(req.query.transcribeIfNone));
 
-const searchResponse = (found: {
-  results: BazarrSearchResult[];
-  noneFound?: NoneFoundOutcome;
-}): SubtitleSearchResponse => ({
-  results: found.results.map(toSearchResult),
-  ...(found.noneFound ? { noneFound: found.noneFound } : {}),
-});
+/** What a search offered, noted so only those can be downloaded. */
+const searchResponse = (
+  title: string,
+  found: {
+    results: BazarrSearchResult[];
+    noneFound?: NoneFoundOutcome;
+  }
+): SubtitleSearchResponse => {
+  rememberOffered(title, found.results);
+  return {
+    results: found.results.map(toSearchResult),
+    ...(found.noneFound ? { noneFound: found.noneFound } : {}),
+  };
+};
+
+// Bazarr's names for the titles searches offer results for.
+const movieOffers = (radarrId: number) => `movie:${radarrId}`;
+const episodeOffers = (sonarrEpisodeId: number) => `episode:${sonarrEpisodeId}`;
 
 subtitleRoutes.get<{ tmdbId: string }>(
   '/movie/:tmdbId/search',
@@ -249,7 +262,7 @@ subtitleRoutes.get<{ tmdbId: string }>(
             radarrId
           )
         : { results: await bazarr().searchMovie(radarrId) };
-      return res.status(200).json(searchResponse(found));
+      return res.status(200).json(searchResponse(movieOffers(radarrId), found));
     } catch (e) {
       return bazarrFailed(next, e, 'search for a movie’s subtitles');
     }
@@ -276,7 +289,11 @@ subtitleRoutes.get<EpisodeParams>(
               found.episode.sonarrEpisodeId
             ),
           };
-      return res.status(200).json(searchResponse(searched));
+      return res
+        .status(200)
+        .json(
+          searchResponse(episodeOffers(found.episode.sonarrEpisodeId), searched)
+        );
     } catch (e) {
       return bazarrFailed(next, e, 'search for an episode’s subtitles');
     }
@@ -296,6 +313,12 @@ const choiceBody = z.object({
   originalFormat: z.boolean().default(false),
 });
 
+const notOffered = (next: NextFunction) =>
+  next({
+    status: 400,
+    message: 'Search again: Bazarr did not offer that result for this.',
+  });
+
 subtitleRoutes.post<{ tmdbId: string }>(
   '/movie/:tmdbId/download',
   manage,
@@ -307,6 +330,9 @@ subtitleRoutes.post<{ tmdbId: string }>(
     const radarrId = await arrId('movie', req.params.tmdbId, next);
     if (!radarrId) {
       return;
+    }
+    if (!wasOffered(movieOffers(radarrId), choice.data)) {
+      return notOffered(next);
     }
     try {
       const end = await bazarr().downloadMovie(radarrId, choice.data);
@@ -331,6 +357,11 @@ subtitleRoutes.post<EpisodeParams>(
     const found = await episodeOf(req.params, next);
     if (!found) {
       return;
+    }
+    if (
+      !wasOffered(episodeOffers(found.episode.sonarrEpisodeId), choice.data)
+    ) {
+      return notOffered(next);
     }
     try {
       const end = await bazarr().downloadEpisode(

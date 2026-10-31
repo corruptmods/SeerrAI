@@ -17,6 +17,7 @@ import { pickStream } from '@server/lib/plexSubtitles';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import {
+  forgetOffered,
   forgetWhisper,
   gapsOf,
   originsOf,
@@ -555,6 +556,7 @@ beforeEach(async () => {
   jobEnds = [];
   whisperWritten = {};
   forgetWhisper();
+  forgetOffered();
   const settings = getSettings();
   settings.bazarr = {
     hostname: '127.0.0.1',
@@ -788,12 +790,13 @@ describe('searching, downloading and deleting', () => {
 
   it('downloads the chosen result for an episode, by Sonarr’s ids', async () => {
     actingAs = manager;
+    await call('GET', '/tv/318472/season/4/episode/11/search');
     const { status } = await call(
       'POST',
       '/tv/318472/season/4/episode/11/download',
       {
         provider: 'opensubtitlescom',
-        subtitle: 'abc',
+        subtitle: 'f5039fa8',
         hi: false,
         forced: false,
         originalFormat: false,
@@ -811,15 +814,55 @@ describe('searching, downloading and deleting', () => {
           forced: 'False',
           original_format: 'False',
           provider: 'opensubtitlescom',
-          subtitle: 'abc',
+          subtitle: 'f5039fa8',
         },
       },
     ]);
   });
 
+  it('downloads only a result Bazarr offered for that title', async () => {
+    // Bazarr unpickles what it is sent back: a made-up one runs as code.
+    actingAs = manager;
+    const choice = {
+      provider: 'opensubtitlescom',
+      subtitle: 'f5039fa8',
+    };
+    const before = await call('POST', '/movie/471906/download', choice);
+    assert.equal(before.status, 400, 'not searched for yet');
+    await call('GET', '/tv/318472/season/4/episode/11/search');
+    assert.equal(
+      (await call('POST', '/movie/471906/download', choice)).status,
+      400,
+      'offered for another title'
+    );
+    assert.equal(
+      (await call('POST', '/tv/318472/season/4/episode/10/download', choice))
+        .status,
+      400,
+      'offered for another episode'
+    );
+    await call('GET', '/movie/471906/search');
+    for (const forged of [
+      { ...choice, subtitle: 'Y29zCnN5c3RlbQ==' },
+      { ...choice, provider: 'subsource' },
+    ]) {
+      assert.equal(
+        (await call('POST', '/movie/471906/download', forged)).status,
+        400
+      );
+    }
+    assert.deepEqual(writes, [], 'nothing was sent to Bazarr');
+    assert.equal(
+      (await call('POST', '/movie/471906/download', choice)).status,
+      204
+    );
+    assert.equal(writes.length, 1);
+  });
+
   it('says so when Bazarr’s download job fails', async () => {
     actingAs = manager;
     jobEnds = ['failed'];
+    await call('GET', '/movie/471906/search');
     const res = await call('POST', '/movie/471906/download', {
       provider: 'opensubtitlescom',
       subtitle: 'f5039fa8',

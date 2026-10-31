@@ -5989,6 +5989,14 @@ paths:
                       bandStep:
                         type: integer
                         enum: [50, 100, 250, 500]
+                      requestPreset:
+                        type: string
+                        description: "The preset whose profile this server's new requests use, set on Apply; keep leaves it as it is"
+                        enum: [sd, 720p, 1080p, 1080p-remux, 2160p, 2160p-remux, keep]
+                      animeRequestPreset:
+                        type: string
+                        description: 'The same for anime requests'
+                        enum: [anime, keep]
       responses:
         '200':
           description: OK
@@ -6095,8 +6103,40 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '202':
+          description: 'Still applying after a few seconds: { job }, to follow at /settings/quality/jobs/{jobId}'
         '409':
           description: 'Not applied: what would change is no longer what was previewed (code stale), or an apply is already running (code busy)'
+  /settings/quality/servers/{kind}/{serverId}/apply/progress:
+    get:
+      summary: 'How far an apply under way has got'
+      description: 'The step it is on (formats, profiles, delay, requests, titles) and how many of its changes are written; progress is null when no apply is running.'
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [radarr, sonarr]
+        - in: path
+          name: serverId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  progress:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
   /settings/quality/servers/{kind}/{serverId}/keep:
     post:
       summary: "Keep changes made in Radarr or Sonarr to Seerr AI's profiles"
@@ -6182,10 +6222,51 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+    post:
+      summary: 'What a preset would do with choices not saved yet'
+      description: 'As the GET, built from the choices sent, with the saved ones for anything left out.'
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [radarr, sonarr]
+        - in: path
+          name: serverId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: preset
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                choices:
+                  type: object
+                  description: "Choices on the page not saved yet (presets, adjustments, nudges, bandStep), shown as they would be"
+                  additionalProperties: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /settings/quality/servers/{kind}/{serverId}/presets/{preset}/try:
     post:
       summary: 'Whether a preset would take a release name'
-      description: 'Radarr or Sonarr reads the name; the score is added up from the profile as it is there.'
+      description: 'Radarr or Sonarr reads the name; the score is added up from the profile as it is there, or as the choices sent would make it.'
       tags:
         - settings
       parameters:
@@ -6217,6 +6298,10 @@ paths:
                   type: string
                   minLength: 3
                   maxLength: 300
+                choices:
+                  type: object
+                  description: "Choices on the page not saved yet (presets, adjustments, nudges, bandStep), shown as they would be"
+                  additionalProperties: true
       responses:
         '200':
           description: OK
@@ -6258,6 +6343,28 @@ paths:
                 items:
                   type: object
                   additionalProperties: true
+  /settings/quality/jobs/{jobId}:
+    get:
+      summary: 'How a slow apply or undo went'
+      description: 'Still going (done false, with the apply''s progress), or done with the status and answer it would have given at once. Kept for 30 minutes.'
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: No such job, or it was over 30 minutes ago
   /settings/quality/history/{applyId}/undo:
     post:
       summary: 'Undo an apply'
@@ -6278,6 +6385,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '202':
+          description: 'Still undoing after a few seconds: { job }, to follow at /settings/quality/jobs/{jobId}'
         '400':
           description: 'The server is no longer managed (code not-managed), or it was already undone (code already-undone)'
         '409':

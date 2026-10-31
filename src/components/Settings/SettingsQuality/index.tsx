@@ -6,9 +6,11 @@ import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import PreviewModal from '@app/components/Settings/SettingsQuality/PreviewModal';
 import WhatItDoes from '@app/components/Settings/SettingsQuality/WhatItDoes';
+import { postAndFollow } from '@app/components/Settings/SettingsQuality/jobs';
 import {
   formatLabel,
   presetLabel,
+  profileLabel,
 } from '@app/components/Settings/SettingsQuality/labels';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
@@ -30,8 +32,13 @@ import type {
   PresetKey,
   PresetSource,
   QualityAdjustments,
+  QualityServerSettings,
 } from '@server/lib/quality/types';
-import { BAND_STEPS, PRESET_KEYS } from '@server/lib/quality/types';
+import {
+  BAND_STEPS,
+  PRESET_KEYS,
+  requestPresetsOf,
+} from '@server/lib/quality/types';
 import axios from 'axios';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
@@ -104,6 +111,11 @@ const messages = defineMessages('components.Settings.SettingsQuality', {
   adjustmentsTip:
     'On top of this server’s presets, whichever source they come from.',
   copyFrom: 'Copy from another server',
+  requestsUse: 'New requests use',
+  requestsUseTip:
+    'The profile new requests to this server get (its quality profile in Settings → Services), set when you apply.',
+  animeRequestsUse: 'New anime requests use',
+  requestsKeep: 'Leave it as it is',
   copied: 'Copied from {server}.',
   preferUsenet: 'Prefer usenet',
   preferEqualTip: 'Releases of the same quality tie, so usenet wins them.',
@@ -176,6 +188,8 @@ type ServerView = ServerState & {
   adjustments: QualityAdjustments;
   nudges: Record<string, Nudge>;
   bandStep: BandStep;
+  requestPreset?: QualityServerSettings['requestPreset'];
+  animeRequestPreset?: QualityServerSettings['animeRequestPreset'];
 };
 
 interface HistoryEntry {
@@ -215,6 +229,8 @@ type Draft = Pick<
   | 'adjustments'
   | 'nudges'
   | 'bandStep'
+  | 'requestPreset'
+  | 'animeRequestPreset'
 >;
 
 const keyOf = (s: { kind: ArrKind; serverId: number }) =>
@@ -228,6 +244,8 @@ const draftOf = (s: ServerView): Draft => ({
   adjustments: { ...s.adjustments },
   nudges: { ...s.nudges },
   bandStep: s.bandStep,
+  requestPreset: s.requestPreset,
+  animeRequestPreset: s.animeRequestPreset,
 });
 
 const errorOf = (e: unknown) =>
@@ -416,11 +434,11 @@ const SettingsQuality = () => {
 
   const undo = async (entry: HistoryEntry) => {
     try {
-      const { data: result } = await axios.post<{
+      const result = await postAndFollow<{
         restored: number;
         removed: number;
         keptInUse: string[];
-      }>(`/api/v1/settings/quality/history/${entry.id}/undo`);
+      }>(`/api/v1/settings/quality/history/${entry.id}/undo`, {});
       addToast(
         <span>
           {intl.formatMessage(messages.undoDone, result)}
@@ -659,7 +677,7 @@ const SettingsQuality = () => {
                 kind={s.kind}
                 className="service-logo h-5 w-5 flex-shrink-0"
               />
-              <span className="truncate font-medium">{s.name}</span>
+              <span className="min-w-0 break-words font-medium">{s.name}</span>
               <span
                 className={`h-2 w-2 flex-shrink-0 rounded-full ${DOT[s.status]}`}
               />
@@ -771,7 +789,6 @@ const SettingsQuality = () => {
               <div className="mt-4 max-w-6xl divide-y divide-gray-700 overflow-hidden rounded-lg ring-1 ring-gray-700">
                 {PRESET_KEYS.map((preset) => {
                   const source = draft.presets[preset] ?? 'off';
-                  const savedSource = server.presets[preset] ?? 'off';
                   const trashless = source === 'trash' && noTrashPreset(preset);
                   return (
                     <div
@@ -794,7 +811,7 @@ const SettingsQuality = () => {
                         <div className="text-xs text-gray-400">
                           {sourceLine(preset, source)}
                         </div>
-                        {savedSource !== 'off' &&
+                        {source !== 'off' &&
                           !(trashless && !trash.fillGaps) && (
                             <button
                               type="button"
@@ -834,6 +851,76 @@ const SettingsQuality = () => {
                   );
                 })}
               </div>
+              {(() => {
+                const on = PRESET_KEYS.filter(
+                  (preset) =>
+                    preset !== 'anime' &&
+                    (draft.presets[preset] ?? 'off') !== 'off'
+                );
+                const animeOn = (draft.presets.anime ?? 'off') !== 'off';
+                if (!on.length && !animeOn) return null;
+                const usual = requestPresetsOf(
+                  draft as QualityServerSettings,
+                  server.is4k
+                );
+                return (
+                  <div className="mt-4 max-w-6xl">
+                    {on.length > 0 && (
+                      <Row
+                        id="requestPreset"
+                        label={intl.formatMessage(messages.requestsUse)}
+                        tip={intl.formatMessage(messages.requestsUseTip)}
+                      >
+                        <select
+                          id="requestPreset"
+                          value={usual.main ?? 'keep'}
+                          onChange={(e) =>
+                            edit((d) => ({
+                              ...d,
+                              requestPreset: e.target
+                                .value as Draft['requestPreset'],
+                            }))
+                          }
+                        >
+                          {on.map((preset) => (
+                            <option key={preset} value={preset}>
+                              {profileLabel(intl, preset, '')}
+                            </option>
+                          ))}
+                          <option value="keep">
+                            {intl.formatMessage(messages.requestsKeep)}
+                          </option>
+                        </select>
+                      </Row>
+                    )}
+                    {animeOn && (
+                      <Row
+                        id="animeRequestPreset"
+                        label={intl.formatMessage(messages.animeRequestsUse)}
+                      >
+                        <select
+                          id="animeRequestPreset"
+                          value={usual.anime ? 'anime' : 'keep'}
+                          onChange={(e) =>
+                            edit((d) => ({
+                              ...d,
+                              animeRequestPreset: e.target
+                                .value as Draft['animeRequestPreset'],
+                            }))
+                          }
+                        >
+                          <option value="anime">
+                            {profileLabel(intl, 'anime', '')}
+                          </option>
+                          <option value="keep">
+                            {intl.formatMessage(messages.requestsKeep)}
+                          </option>
+                        </select>
+                      </Row>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="mt-10 flex max-w-6xl flex-wrap items-end justify-between gap-3">
                 <div>
@@ -1272,6 +1359,12 @@ const SettingsQuality = () => {
           serverId={server.serverId}
           serverName={server.name}
           preset={describing}
+          choices={{
+            presets: draft?.presets,
+            adjustments: draft?.adjustments,
+            nudges: draft?.nudges,
+            bandStep: draft?.bandStep,
+          }}
           onClose={() => setDescribing(null)}
         />
       )}

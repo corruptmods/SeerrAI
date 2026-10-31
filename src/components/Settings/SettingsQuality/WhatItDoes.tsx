@@ -10,6 +10,7 @@ import defineMessages from '@app/utils/defineMessages';
 import type {
   DescribedFormat,
   Description,
+  DraftChoices,
   RecentGrab,
   TryResult,
 } from '@server/lib/quality/describe';
@@ -132,6 +133,8 @@ interface WhatItDoesProps {
   serverId: number;
   serverName: string;
   preset: PresetKey | null;
+  /** The page's choices, saved or not: what it does is shown with these. */
+  choices: DraftChoices;
   onClose: () => void;
 }
 
@@ -144,13 +147,22 @@ const WhatItDoes = ({
   serverId,
   serverName,
   preset,
+  choices,
   onClose,
 }: WhatItDoesProps) => {
   const intl = useIntl();
   const base = preset
     ? `/api/v1/settings/quality/servers/${kind}/${serverId}/presets/${preset}`
     : null;
-  const { data: d, error } = useSWR<Description>(base);
+  // Built from the page's choices as they are now, saved or not.
+  const choicesKey = JSON.stringify(choices);
+  const { data: d, error } = useSWR<Description>(
+    base ? [base, choicesKey] : null,
+    ([url, sent]: [string, string]) =>
+      axios
+        .post<Description>(url, { choices: JSON.parse(sent) })
+        .then((res) => res.data)
+  );
   const { data: grabs } = useSWR<RecentGrab[]>(base ? `${base}/grabs` : null);
   const [title, setTitle] = useState('');
   const [tried, setTried] = useState<TryResult | null>(null);
@@ -166,6 +178,7 @@ const WhatItDoes = ({
     try {
       const { data } = await axios.post<TryResult>(`${base}/try`, {
         title: title.trim(),
+        choices,
       });
       setTried(data);
     } catch (err) {

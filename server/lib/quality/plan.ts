@@ -18,10 +18,19 @@ import type {
   ServerFacts,
 } from '@server/lib/quality/build';
 import { buildDesired, materialize } from '@server/lib/quality/build';
+import { LAST_RESORT, NEVER } from '@server/lib/quality/presets';
 import type { TrashData } from '@server/lib/quality/trash';
 import { trashData } from '@server/lib/quality/trash';
-import type { ArrKind, QualityServerSettings } from '@server/lib/quality/types';
-import { PRESET_KEYS, serverDefaults } from '@server/lib/quality/types';
+import type {
+  ArrKind,
+  PresetKey,
+  QualityServerSettings,
+} from '@server/lib/quality/types';
+import {
+  PRESET_KEYS,
+  requestPresetsOf,
+  serverDefaults,
+} from '@server/lib/quality/types';
 import { getSettings } from '@server/lib/settings';
 import { createHash } from 'crypto';
 
@@ -98,6 +107,7 @@ export const choicesOf = (
     ),
     bandStep: config.bandStep,
     fillGaps,
+    requests: [config.requestPreset ?? '', config.animeRequestPreset ?? ''],
   });
 
 export interface ServerContext {
@@ -235,7 +245,7 @@ export const profileFingerprint = (
   });
 };
 
-export const formatFingerprint = (format: ArrCustomFormat) =>
+const fingerprintOf = (format: ArrCustomFormat, dropFalse: boolean) =>
   hash({
     name: format.name,
     specs: (format.specifications ?? [])
@@ -246,11 +256,30 @@ export const formatFingerprint = (format: ArrCustomFormat) =>
         required: !!spec.required,
         fields: (spec.fields ?? [])
           .map((field) => [field.name, field.value ?? null])
-          .filter(([, value]) => value !== null && value !== '')
+          .filter(
+            ([, value]) =>
+              value !== null && value !== '' && !(dropFalse && value === false)
+          )
           .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
       }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   });
+
+/**
+ * A format's rules in short. A field left out and one that is false are
+ * the same: TRaSH Guides leaves out a language rule's exceptLanguage, and
+ * Radarr and Sonarr answer with it false.
+ */
+export const formatFingerprint = (format: ArrCustomFormat) =>
+  fingerprintOf(format, true);
+
+/**
+ * Whether a format is as it was kept: by its fingerprint, or by the one
+ * kept before false fields counted as left out.
+ */
+export const formatMatches = (format: ArrCustomFormat, stored: string) =>
+  stored === fingerprintOf(format, true) ||
+  stored === fingerprintOf(format, false);
 
 /**
  * The delay profile every title without its own tags uses: the only one
@@ -269,15 +298,43 @@ export type ChangeDetail =
   | { kind: 'min-score'; from: number; to: number }
   | { kind: 'rules' }
   | { kind: 'protocol'; from: string; to: string }
-  | { kind: 'torrent-delay'; from: number; to: number };
+  | { kind: 'torrent-delay'; from: number; to: number }
+  | {
+      kind: 'requests';
+      which: 'main' | 'anime';
+      preset: PresetKey;
+      from?: string;
+      to: string;
+    };
+
+/** What a format does to a release that matches it, in one profile. */
+export type FormatEffect =
+  | 'never'
+  | 'last-resort'
+  | 'lower'
+  | 'prefer'
+  | 'none';
 
 export interface PreviewChange {
-  itemKind: 'profile' | 'format' | 'delay';
+  itemKind: 'profile' | 'format' | 'delay' | 'requests';
   key: string;
   name: string;
   action: 'create' | 'update' | 'put-back' | 'unchanged' | 'kept';
   details: ChangeDetail[];
+  /** A format's effect in each profile that uses it, by preset. */
+  effects?: { preset: PresetKey; effect: FormatEffect }[];
 }
+
+export const effectOf = (score: number): FormatEffect =>
+  score <= NEVER
+    ? 'never'
+    : score <= LAST_RESORT
+      ? 'last-resort'
+      : score < 0
+        ? 'lower'
+        : score > 0
+          ? 'prefer'
+          : 'none';
 
 export interface Preview {
   kind: ArrKind;
@@ -517,6 +574,17 @@ export const planFor = async (
     details: ChangeDetail[] = []
   ) => changes.push({ itemKind, key, name, action, details });
 
+  // What each format does, profile by profile, so the preview can say
+  // which avoid a release and which make it likelier to be grabbed.
+  const effects = new Map<string, NonNullable<PreviewChange['effects']>>();
+  for (const profile of desired.profiles) {
+    for (const scored of profile.formats) {
+      const list = effects.get(scored.key) ?? [];
+      list.push({ preset: profile.preset, effect: effectOf(scored.score) });
+      effects.set(scored.key, list);
+    }
+  }
+
   for (const def of desired.formats) {
     const row = rows.find((r) => r.itemKind === 'format' && r.key === def.key);
     const id = formatIds.get(def.key);
@@ -527,7 +595,7 @@ export const planFor = async (
     } else if (row?.keptAsEdited && !options.restoreKept) {
       change('format', def.key, name, 'kept');
     } else if (formatFingerprint(current) !== formatFingerprint(def.format)) {
-      const drifted = !!row && formatFingerprint(current) !== row.fingerprint;
+      const drifted = !!row && !formatMatches(current, row.fingerprint);
       change('format', def.key, name, drifted ? 'put-back' : 'update', [
         { kind: 'rules' },
       ]);
@@ -536,11 +604,17 @@ export const planFor = async (
     }
   }
 
+  for (const c of changes) {
+    if (c.itemKind === 'format') c.effects = effects.get(c.key) ?? [];
+  }
+
   const placeholderIds = new Map(formatIds);
   const formats = withPlaceholders(ctx, desired, placeholderIds);
   const names = namesOf(formats);
+  const profileIds = new Map<PresetKey, number>();
   for (const profile of desired.profiles) {
     const { row, current } = matchProfile(ctx, profile, rows);
+    if (current) profileIds.set(profile.preset, current.id);
     if (!current) {
       change(
         'profile',
@@ -599,6 +673,43 @@ export const planFor = async (
       details.length ? 'update' : 'unchanged',
       details
     );
+  }
+
+  // Where new requests to this server go (its Services settings): onto
+  // the presets' profiles, unless they are left as they are.
+  const server = serverSettingsOf(ref);
+  if (server) {
+    const wanted = requestPresetsOf(config, server.is4k);
+    const details: ChangeDetail[] = [];
+    const point = (
+      which: 'main' | 'anime',
+      preset: PresetKey | undefined,
+      currentId: number | undefined,
+      currentName: string | undefined
+    ) => {
+      const to =
+        preset && desired.profiles.find((p) => p.preset === preset)?.name;
+      if (!preset || !to) return;
+      if (currentId !== undefined && profileIds.get(preset) === currentId) {
+        return;
+      }
+      details.push({ kind: 'requests', which, preset, from: currentName, to });
+    };
+    point(
+      'main',
+      wanted.main,
+      server.activeProfileId,
+      server.activeProfileName
+    );
+    point(
+      'anime',
+      wanted.anime,
+      server.activeAnimeProfileId,
+      server.activeAnimeProfileName
+    );
+    if (details.length) {
+      change('requests', 'requests', 'Request defaults', 'update', details);
+    }
   }
 
   const own = new Set(

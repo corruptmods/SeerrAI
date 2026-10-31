@@ -85,7 +85,42 @@ export interface QualityServerSettings {
    * update can be told from choices nobody has applied yet. Cleared by Undo.
    */
   appliedChoices?: string;
+  /**
+   * Which preset's profile new requests to this server go to (its quality
+   * profile in Settings → Services), set on Apply: a preset, or 'keep' to
+   * leave it as it is. Unset: the usual one (requestPresetsOf).
+   */
+  requestPreset?: PresetKey | 'keep';
+  /** The same for anime requests: the Anime preset, or 'keep'. */
+  animeRequestPreset?: 'anime' | 'keep';
 }
+
+/** The presets new requests use first, on a 4K server and on others. */
+const REQUEST_ORDER: Record<'4k' | 'hd', PresetKey[]> = {
+  '4k': ['2160p', '2160p-remux', '1080p-remux', '1080p', '720p', 'sd'],
+  hd: ['1080p', '1080p-remux', '720p', '2160p', '2160p-remux', 'sd'],
+};
+
+/**
+ * Which presets' profiles a server's new requests go to, as its choices
+ * say: undefined where they are left as they are.
+ */
+export const requestPresetsOf = (
+  config: QualityServerSettings,
+  is4k: boolean
+): { main?: PresetKey; anime?: PresetKey } => {
+  const on = (preset: PresetKey) => (config.presets[preset] ?? 'off') !== 'off';
+  const chosen = config.requestPreset;
+  const main =
+    chosen === 'keep'
+      ? undefined
+      : chosen && chosen !== 'anime' && on(chosen)
+        ? chosen
+        : REQUEST_ORDER[is4k ? '4k' : 'hd'].find(on);
+  const anime =
+    config.animeRequestPreset !== 'keep' && on('anime') ? 'anime' : undefined;
+  return { main, anime };
+};
 
 export interface QualitySettings {
   trash: {

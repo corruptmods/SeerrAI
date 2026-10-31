@@ -11,6 +11,7 @@ import type {
 import { notesFor } from '@server/lib/quality/notes';
 import {
   QualityError,
+  choicesOf,
   configFor,
   defaultDelay,
   desiredFor,
@@ -18,7 +19,11 @@ import {
 } from '@server/lib/quality/plan';
 import { LAST_RESORT } from '@server/lib/quality/presets';
 import { trashData } from '@server/lib/quality/trash';
-import type { PresetKey } from '@server/lib/quality/types';
+import type {
+  PresetKey,
+  QualityServerSettings,
+} from '@server/lib/quality/types';
+import { getSettings } from '@server/lib/settings';
 
 /*
  * What it does: one preset on one server, laid out for an admin. All but
@@ -98,9 +103,22 @@ const describeFormat = (format: ScoredFormat): DescribedFormat => ({
   changes: format.changes,
 });
 
+/**
+ * Choices on the page not saved yet, which What it does shows as they
+ * would be: the saved ones stand for anything left out.
+ */
+export type DraftChoices = Partial<
+  Pick<QualityServerSettings, 'presets' | 'adjustments' | 'nudges' | 'bandStep'>
+>;
+
 /** Builds what a server's preset is, or throws when it isn't one. */
-const desiredOf = async (ref: QualityServerRef, preset: PresetKey) => {
-  const config = configFor(ref);
+const desiredOf = async (
+  ref: QualityServerRef,
+  preset: PresetKey,
+  choices?: DraftChoices
+) => {
+  const saved = configFor(ref);
+  const config = { ...saved, ...choices, managed: saved.managed };
   if (!config.managed) {
     throw new QualityError(
       'not-managed',
@@ -121,9 +139,14 @@ const sumPositive = (profile: DesiredProfile) =>
 
 export const describe = async (
   ref: QualityServerRef,
-  preset: PresetKey
+  preset: PresetKey,
+  choices?: DraftChoices
 ): Promise<Description> => {
-  const { ctx, config, desired, profile } = await desiredOf(ref, preset);
+  const { ctx, config, desired, profile } = await desiredOf(
+    ref,
+    preset,
+    choices
+  );
   const allowed = profile.ladder.entries.filter((e) => e.allowed);
   const sizes = new Map(profile.sizes?.map((s) => [s.quality, s]));
   const qualities = allowed.map((entry, i) => {
@@ -172,8 +195,14 @@ export const describe = async (
       key: preset,
     },
   });
+  // In Radarr or Sonarr, and as these choices make it (the page's, which
+  // may not be the ones applied).
   const applied =
-    !!rows.length && ctx.profiles.some((p) => p.id === rows[0].arrId);
+    !!rows.length &&
+    ctx.profiles.some((p) => p.id === rows[0].arrId) &&
+    (!choices ||
+      choicesOf(config, getSettings().quality.trash.fillGaps) ===
+        configFor(ref).appliedChoices);
   const delay = defaultDelay(ctx.delays);
   return {
     preset,
@@ -227,11 +256,15 @@ export interface TryResult {
   result: TryVerdict;
 }
 
-/** Whether this profile, as it is in Radarr or Sonarr, would take a name. */
+/**
+ * Whether this profile would take a name: as it is in Radarr or Sonarr, or
+ * as the choices on the page would make it.
+ */
 export const tryName = async (
   ref: QualityServerRef,
   preset: PresetKey,
-  title: string
+  title: string,
+  choices?: DraftChoices
 ): Promise<TryResult> => {
   const arr = QualityArr.forServer(ref);
   if (!arr) throw new QualityError('not-found', 'There is no such server.');
@@ -259,25 +292,47 @@ export const tryName = async (
       result: { verdict: 'not-applied' },
     };
   }
-  const scores = new Map(
-    (profile.formatItems ?? []).map((item) => [item.format, item.score])
-  );
-  const matched = parsed.formats.map((f) => ({
-    name: f.name,
-    score: scores.get(f.id) ?? 0,
-  }));
   const allowedQualities = new Set<string>();
-  const walk = (items: ArrProfileItem[], parentAllowed = false) => {
-    for (const item of items) {
-      const on = item.allowed || parentAllowed;
-      if (item.quality && on) allowedQualities.add(item.quality.name);
-      walk(item.items ?? [], on);
+  let matched: { name: string; score: number }[];
+  let min: number;
+  let reach: number;
+  if (choices) {
+    // As the page's choices would make it: the formats Radarr or Sonarr
+    // matched, scored as they would be.
+    const { profile: wanted } = await desiredOf(ref, preset, choices);
+    const byName = new Map(wanted.formats.map((f) => [f.name, f.score]));
+    matched = parsed.formats.map((f) => ({
+      name: f.name,
+      score: byName.get(f.name) ?? 0,
+    }));
+    for (const entry of wanted.ladder.entries) {
+      if (!entry.allowed) continue;
+      for (const quality of entry.items ?? [entry.name]) {
+        allowedQualities.add(quality);
+      }
     }
-  };
-  walk((profile.items as ArrProfileItem[]) ?? []);
+    min = wanted.minFormatScore;
+    reach = sumPositive(wanted);
+  } else {
+    const scores = new Map(
+      (profile.formatItems ?? []).map((item) => [item.format, item.score])
+    );
+    matched = parsed.formats.map((f) => ({
+      name: f.name,
+      score: scores.get(f.id) ?? 0,
+    }));
+    const walk = (items: ArrProfileItem[], parentAllowed = false) => {
+      for (const item of items) {
+        const on = item.allowed || parentAllowed;
+        if (item.quality && on) allowedQualities.add(item.quality.name);
+        walk(item.items ?? [], on);
+      }
+    };
+    walk((profile.items as ArrProfileItem[]) ?? []);
+    min = profile.minFormatScore ?? 0;
+    reach = [...scores.values()].reduce((n, s) => n + Math.max(0, s), 0);
+  }
   const score = matched.reduce((n, f) => n + f.score, 0);
-  const min = profile.minFormatScore ?? 0;
-  const reach = [...scores.values()].reduce((n, s) => n + Math.max(0, s), 0);
   const blocker = matched.find((f) => f.score < 0 && f.score + reach < min);
   const result: TryVerdict =
     parsed.quality && !allowedQualities.has(parsed.quality)

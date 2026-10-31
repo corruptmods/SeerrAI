@@ -13,6 +13,7 @@ import {
   QualityError,
   allServers,
   apply,
+  applyProgress,
   configFor,
   keepChanges,
   preview,
@@ -29,6 +30,7 @@ import type { QualityServerSettings } from '@server/lib/quality/types';
 import { BAND_STEPS, PRESET_KEYS } from '@server/lib/quality/types';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import { randomUUID } from 'crypto';
 import type { Response } from 'express';
 import { Router } from 'express';
 import { In } from 'typeorm';
@@ -71,6 +73,10 @@ const serverBody = z.object({
       message: 'Too many formats moved.',
     }),
   bandStep: z.union(BAND_STEPS.map((n) => z.literal(n))),
+  requestPreset: z
+    .union([presetKey.exclude(['anime']), z.literal('keep')])
+    .optional(),
+  animeRequestPreset: z.enum(['anime', 'keep']).optional(),
 });
 
 const body = z.object({
@@ -93,7 +99,13 @@ const refOf = (params: { kind?: string; serverId?: string }) => {
   return parsed.success ? (parsed.data as QualityServerRef) : undefined;
 };
 
-const failed = (res: Response, e: unknown, what: string) => {
+interface Answer {
+  status: number;
+  body: unknown;
+}
+
+/** An error as the page is told it. */
+const answerFor = (e: unknown, what: string): Answer => {
   if (e instanceof QualityError) {
     const status =
       e.code === 'not-found'
@@ -103,14 +115,67 @@ const failed = (res: Response, e: unknown, what: string) => {
             e.code === 'undo-newer-first'
           ? 409
           : 400;
-    return res.status(status).json({ code: e.code, message: e.message });
+    return { status, body: { code: e.code, message: e.message } };
   }
   const message = e instanceof Error ? e.message : String(e);
   logger.warn(`Quality: could not ${what}`, {
     label: 'Quality',
     errorMessage: message,
   });
-  return res.status(502).json({ code: 'unreachable', message });
+  return { status: 502, body: { code: 'unreachable', message } };
+};
+
+const failed = (res: Response, e: unknown, what: string) => {
+  const { status, body } = answerFor(e, what);
+  return res.status(status).json(body);
+};
+
+/*
+ * Applies and undoes can take minutes on a big server, longer than a proxy
+ * in front of Seerr AI waits for an answer (it answers 502 and the page
+ * sees a network error, while the work goes on). One that isn't done in a
+ * few seconds answers 202 with a job, and the page asks how it went.
+ */
+let waitMs = 4000;
+
+/** For tests: how long a request waits before answering with a job. */
+export const setJobWaitForTests = (ms: number) => {
+  waitMs = ms;
+};
+const KEEP_MS = 30 * 60_000;
+const jobs = new Map<
+  string,
+  { ref?: QualityServerRef; at: number; answer?: Answer }
+>();
+
+const runJob = async (
+  res: Response,
+  ref: QualityServerRef | undefined,
+  work: () => Promise<Answer>
+) => {
+  for (const [id, job] of jobs) {
+    if (Date.now() - job.at > KEEP_MS) jobs.delete(id);
+  }
+  const id = randomUUID();
+  const job: { ref?: QualityServerRef; at: number; answer?: Answer } = {
+    ref,
+    at: Date.now(),
+  };
+  jobs.set(id, job);
+  const finished = work().then((answer) => {
+    job.answer = answer;
+  });
+  let timer: NodeJS.Timeout | undefined;
+  const waited = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, waitMs);
+  });
+  await Promise.race([finished, waited]);
+  clearTimeout(timer);
+  if (job.answer) {
+    jobs.delete(id);
+    return res.status(job.answer.status).json(job.answer.body);
+  }
+  return res.status(202).json({ job: id });
 };
 
 const historyOf = async () => {
@@ -172,6 +237,8 @@ const shown = async () => {
         adjustments: config.adjustments,
         nudges: config.nudges,
         bandStep: config.bandStep,
+        requestPreset: config.requestPreset,
+        animeRequestPreset: config.animeRequestPreset,
       };
     })
   );
@@ -263,6 +330,13 @@ qualityRoutes.post('/servers/:kind/:serverId/preview', async (req, res) => {
   }
 });
 
+// How far an apply under way has got, for the page's progress bar.
+qualityRoutes.get('/servers/:kind/:serverId/apply/progress', (req, res) => {
+  const ref = refOf(req.params);
+  if (!ref) return res.status(404).json({ code: 'not-found' });
+  return res.status(200).json({ progress: applyProgress(ref) });
+});
+
 const applyBody = z.object({
   move: z
     .array(
@@ -283,16 +357,31 @@ qualityRoutes.post('/servers/:kind/:serverId/apply', async (req, res) => {
   if (!ref) return res.status(404).json({ code: 'not-found' });
   const parsed = applyBody.safeParse(req.body ?? {});
   if (!parsed.success) return res.status(400).json({ code: 'bad-request' });
-  try {
-    const result = await apply(ref, {
-      ...parsed.data,
-      userId: req.user?.id ?? null,
+  const userId = req.user?.id ?? null;
+  return runJob(res, ref, async () => {
+    try {
+      const result = await apply(ref, { ...parsed.data, userId });
+      await stateOf(ref);
+      return { status: 200, body: result };
+    } catch (e) {
+      return answerFor(e, 'apply');
+    }
+  });
+});
+
+// How a slow apply or undo went: done with its answer, or still going.
+qualityRoutes.get('/jobs/:jobId', (req, res) => {
+  const job = jobs.get(req.params.jobId);
+  if (!job) return res.status(404).json({ code: 'not-found' });
+  if (!job.answer) {
+    return res.status(200).json({
+      done: false,
+      progress: job.ref ? applyProgress(job.ref) : null,
     });
-    await stateOf(ref);
-    return res.status(200).json(result);
-  } catch (e) {
-    return failed(res, e, 'apply');
   }
+  return res
+    .status(200)
+    .json({ done: true, status: job.answer.status, body: job.answer.body });
 });
 
 qualityRoutes.post('/servers/:kind/:serverId/keep', async (req, res) => {
@@ -334,6 +423,32 @@ qualityRoutes.get(
   }
 );
 
+/** Choices on the page not saved yet, for What it does. */
+const choicesBody = serverBody
+  .pick({ presets: true, adjustments: true, nudges: true, bandStep: true })
+  .partial();
+
+// What it does with the page's choices, saved or not.
+qualityRoutes.post(
+  '/servers/:kind/:serverId/presets/:preset',
+  async (req, res) => {
+    const ref = refOf(req.params);
+    const preset = presetOf(req.params.preset);
+    if (!ref || !preset) return res.status(404).json({ code: 'not-found' });
+    const parsed = z
+      .object({ choices: choicesBody.optional() })
+      .safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ code: 'bad-request' });
+    try {
+      return res
+        .status(200)
+        .json(await describe(ref, preset, parsed.data.choices));
+    } catch (e) {
+      return failed(res, e, 'describe a preset');
+    }
+  }
+);
+
 qualityRoutes.post(
   '/servers/:kind/:serverId/presets/:preset/try',
   async (req, res) => {
@@ -341,13 +456,18 @@ qualityRoutes.post(
     const preset = presetOf(req.params.preset);
     if (!ref || !preset) return res.status(404).json({ code: 'not-found' });
     const parsed = z
-      .object({ title: z.string().trim().min(3).max(300) })
+      .object({
+        title: z.string().trim().min(3).max(300),
+        choices: choicesBody.optional(),
+      })
       .safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ code: 'bad-request' });
     try {
       return res
         .status(200)
-        .json(await tryName(ref, preset, parsed.data.title));
+        .json(
+          await tryName(ref, preset, parsed.data.title, parsed.data.choices)
+        );
     } catch (e) {
       return failed(res, e, 'try a release name');
     }
@@ -371,11 +491,13 @@ qualityRoutes.get(
 qualityRoutes.post('/history/:applyId/undo', async (req, res) => {
   const id = Number(req.params.applyId);
   if (!Number.isInteger(id)) return res.status(404).json({ code: 'not-found' });
-  try {
-    return res.status(200).json(await undo(id));
-  } catch (e) {
-    return failed(res, e, 'undo');
-  }
+  return runJob(res, undefined, async () => {
+    try {
+      return { status: 200, body: await undo(id) };
+    } catch (e) {
+      return answerFor(e, 'undo');
+    }
+  });
 });
 
 export default qualityRoutes;

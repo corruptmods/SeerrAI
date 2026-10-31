@@ -13,7 +13,7 @@ import {
  * when the apply created it. Undo puts these back.
  */
 export interface QualityBefore {
-  itemKind: 'profile' | 'format' | 'delay';
+  itemKind: 'profile' | 'format' | 'delay' | 'requests';
   key: string;
   arrId: number;
   before: Record<string, unknown> | null;

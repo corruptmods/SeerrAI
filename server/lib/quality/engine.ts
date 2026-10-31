@@ -24,6 +24,7 @@ import {
   configFor,
   defaultDelay,
   formatFingerprint,
+  formatMatches,
   matchProfile,
   namesOf,
   planFor,
@@ -165,6 +166,39 @@ interface Done {
   created: number;
   updated: number;
 }
+
+export type ApplyStep =
+  | 'formats'
+  | 'profiles'
+  | 'delay'
+  | 'requests'
+  | 'titles';
+
+/** An apply under way, for the page's progress bar. */
+export interface ApplyProgress {
+  step: ApplyStep;
+  done: number;
+  total: number;
+}
+
+const running = new Map<
+  string,
+  { step: ApplyStep; done: Done; total: number; titlesDone: number }
+>();
+
+/** How far an apply on a server has got; null when none is running. */
+export const applyProgress = (ref: QualityServerRef): ApplyProgress | null => {
+  const live = running.get(keyOf(ref));
+  if (!live) return null;
+  return {
+    step: live.step,
+    done: Math.min(
+      live.total,
+      live.done.created + live.done.updated + live.titlesDone
+    ),
+    total: live.total,
+  };
+};
 
 const writeFormats = async (plan: Plan, done: Done) => {
   const { ctx, desired, formatIds } = plan;
@@ -309,6 +343,87 @@ const writeDelay = async (plan: Plan, done: Done) => {
   done.updated += 1;
 };
 
+/** The request settings an apply changed, as they were before it. */
+interface RequestDefaults {
+  main?: { id: number; name: string };
+  anime?: { id?: number; name?: string };
+}
+
+/**
+ * Points new requests to this server (its Services settings) at the
+ * presets' profiles, as the preview showed.
+ */
+const writeRequests = async (
+  plan: Plan,
+  profileIds: Map<PresetKey, number>,
+  done: Done
+) => {
+  const change = plan.preview.changes.find((c) => c.itemKind === 'requests');
+  const server = serverSettingsOf(plan.ctx.ref);
+  if (!change || !server) return;
+  const before: RequestDefaults = {};
+  for (const detail of change.details) {
+    if (detail.kind !== 'requests') continue;
+    const id = profileIds.get(detail.preset);
+    if (id === undefined) continue;
+    if (detail.which === 'main') {
+      before.main = {
+        id: server.activeProfileId,
+        name: server.activeProfileName,
+      };
+      server.activeProfileId = id;
+      server.activeProfileName = detail.to;
+    } else {
+      before.anime = {
+        id: server.activeAnimeProfileId,
+        name: server.activeAnimeProfileName,
+      };
+      server.activeAnimeProfileId = id;
+      server.activeAnimeProfileName = detail.to;
+    }
+  }
+  if (!before.main && !before.anime) return;
+  await getSettings().save();
+  done.befores.push({
+    itemKind: 'requests',
+    key: 'requests',
+    arrId: 0,
+    before: before as unknown as Record<string, unknown>,
+  });
+  done.updated += 1;
+};
+
+/**
+ * Puts the request settings an apply changed back as they were, where
+ * they still send requests to one of Seerr AI's profiles (an admin may
+ * have chosen another since).
+ */
+const restoreRequests = async (
+  ref: QualityServerRef,
+  before: RequestDefaults,
+  ours: Set<number>
+): Promise<boolean> => {
+  const server = serverSettingsOf(ref);
+  if (!server) return false;
+  let changed = false;
+  if (before.main && ours.has(server.activeProfileId)) {
+    server.activeProfileId = before.main.id;
+    server.activeProfileName = before.main.name;
+    changed = true;
+  }
+  if (
+    before.anime &&
+    server.activeAnimeProfileId !== undefined &&
+    ours.has(server.activeAnimeProfileId)
+  ) {
+    server.activeAnimeProfileId = before.anime.id;
+    server.activeAnimeProfileName = before.anime.name;
+    changed = true;
+  }
+  if (changed) await getSettings().save();
+  return changed;
+};
+
 /** Moves titles off the admin's own profiles, as the preview offered. */
 const moveOwnTitles = async (
   plan: Plan,
@@ -403,14 +518,40 @@ export const apply = async (
       );
     }
     const done: Done = { befores: [], moved: [], created: 0, updated: 0 };
+    // Each item to write counts one, and moving titles one more.
+    const writes = plan.preview.changes.filter(
+      (c) =>
+        c.action !== 'unchanged' &&
+        c.action !== 'kept' &&
+        !(
+          options.trash &&
+          (c.itemKind === 'delay' || c.itemKind === 'requests')
+        )
+    ).length;
+    const live = {
+      step: 'formats' as ApplyStep,
+      done,
+      total: writes + (options.move?.length ? 1 : 0),
+      titlesDone: 0,
+    };
+    running.set(keyOf(ref), live);
     try {
       // Formats first: the profiles score them by their ids.
       await writeFormats(plan, done);
+      live.step = 'profiles';
       const profileIds = await writeProfiles(plan, done);
-      // A TRaSH Guides update never changes the delay profile.
-      if (!options.trash) await writeDelay(plan, done);
+      // A TRaSH Guides update never changes the delay profile, nor where
+      // requests go.
+      if (!options.trash) {
+        live.step = 'delay';
+        await writeDelay(plan, done);
+        live.step = 'requests';
+        await writeRequests(plan, profileIds, done);
+      }
       if (options.move?.length) {
+        live.step = 'titles';
         await moveOwnTitles(plan, options.move, profileIds, done);
+        live.titlesDone = 1;
       }
     } catch (e) {
       // What was done before it failed can still be undone.
@@ -422,6 +563,8 @@ export const apply = async (
         errorMessage: e instanceof Error ? e.message : String(e),
       });
       throw e;
+    } finally {
+      running.delete(keyOf(ref));
     }
 
     const applyId = await record(ref, done, options);
@@ -574,14 +717,29 @@ export const undo = async (applyId: number): Promise<UndoResult> => {
       }
     }
 
+    // Where requests go first, so a profile it pointed them at is free.
+    for (const item of entry.befores) {
+      if (item.itemKind !== 'requests' || !item.before) continue;
+      const put = await restoreRequests(
+        ref,
+        item.before as unknown as RequestDefaults,
+        ours
+      );
+      if (put) result.restored += 1;
+    }
+
     const names = namesOf(formats);
     const needed = inUseBySettings(ref);
     const rows = getRepository(QualityManaged);
     // Profiles, then the delay profile, then formats.
     const rank = { profile: 0, delay: 1, format: 2 };
-    const order = [...entry.befores].sort(
-      (a, b) => rank[a.itemKind] - rank[b.itemKind]
-    );
+    const order = entry.befores
+      .filter((item) => item.itemKind !== 'requests')
+      .sort(
+        (a, b) =>
+          rank[a.itemKind as keyof typeof rank] -
+          rank[b.itemKind as keyof typeof rank]
+      );
     for (const item of order) {
       const where = {
         serverKind: ref.kind,
@@ -713,13 +871,12 @@ const driftOf = (plan: Plan) => {
     } else if (!item) {
       changed.push({ row, name, removed: true });
     } else {
-      const fingerprint =
+      const same =
         row.itemKind === 'profile'
-          ? profileFingerprint(item as ArrQualityProfile, formatNames)
-          : formatFingerprint(item as ArrCustomFormat);
-      if (fingerprint !== row.fingerprint) {
-        changed.push({ row, name, removed: false });
-      }
+          ? profileFingerprint(item as ArrQualityProfile, formatNames) ===
+            row.fingerprint
+          : formatMatches(item as ArrCustomFormat, row.fingerprint);
+      if (!same) changed.push({ row, name, removed: false });
     }
   }
   return { changed, kept };

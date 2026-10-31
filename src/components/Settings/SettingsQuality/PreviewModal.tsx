@@ -1,6 +1,8 @@
+import { ProgressBar } from '@app/components/Backfill/shared';
 import Badge from '@app/components/Common/Badge';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import Modal from '@app/components/Common/Modal';
+import { postAndFollow } from '@app/components/Settings/SettingsQuality/jobs';
 import {
   formatLabel,
   presetLabel,
@@ -9,11 +11,15 @@ import {
 import useToasts from '@app/hooks/useToasts';
 import defineMessages from '@app/utils/defineMessages';
 import { Transition } from '@headlessui/react';
+import { ArrowDownIcon, ArrowUpIcon } from '@heroicons/react/20/solid';
 import type {
+  ApplyProgress,
+  ApplyStep,
   ChangeDetail,
   Preview,
   PreviewChange,
 } from '@server/lib/quality/engine';
+import type { FormatEffect } from '@server/lib/quality/plan';
 import type { ArrKind, PresetKey } from '@server/lib/quality/types';
 import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
@@ -55,6 +61,24 @@ const messages = defineMessages('components.Settings.SettingsQuality.Preview', {
     'Torrents wait {to, plural, one {# minute} other {# minutes}} (was {from})',
   usenet: 'usenet',
   torrent: 'torrent',
+  effectNever: 'Avoid: never grabbed',
+  effectLastResort: 'Avoid: only as a last resort',
+  effectLower: 'Avoid: less likely to be grabbed',
+  effectPrefer: 'Prefer: more likely to be grabbed',
+  effectNone: 'No effect',
+  effectIn: '{effect} ({presets})',
+  requests: 'Where new requests go',
+  stepFormats: 'Writing formats',
+  stepProfiles: 'Writing profiles',
+  stepTitles: 'Moving titles',
+  progressStarting: 'Applying… this can take a few minutes on a big server.',
+  progressCount: '{done} of {total}',
+  requestsNote:
+    'Seerr AI’s own setting: each server’s quality profile in Settings → Services.',
+  requestsMain: 'New requests use {to} (was {from})',
+  requestsMainNew: 'New requests use {to}',
+  requestsAnime: 'New anime requests use {to} (was {from})',
+  requestsAnimeNew: 'New anime requests use {to}',
   applied:
     'Applied: {created, plural, one {# created} other {# created}}, {updated, plural, one {# updated} other {# updated}}.',
   appliedMoved:
@@ -88,6 +112,7 @@ const PreviewModal = ({
   const { addToast } = useToasts();
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<ApplyProgress | null>(null);
   const [moves, setMoves] = useState<Record<number, PresetKey | ''>>({});
 
   const load = useCallback(
@@ -149,6 +174,23 @@ const PreviewModal = ({
         });
       case 'torrent-delay':
         return intl.formatMessage(messages.torrentDelay, detail);
+      case 'requests': {
+        const to = profileLabel(intl, detail.preset, detail.to);
+        if (detail.which === 'main') {
+          return detail.from
+            ? intl.formatMessage(messages.requestsMain, {
+                to,
+                from: detail.from,
+              })
+            : intl.formatMessage(messages.requestsMainNew, { to });
+        }
+        return detail.from
+          ? intl.formatMessage(messages.requestsAnime, {
+              to,
+              from: detail.from,
+            })
+          : intl.formatMessage(messages.requestsAnimeNew, { to });
+      }
     }
   };
 
@@ -157,7 +199,89 @@ const PreviewModal = ({
       ? profileLabel(intl, change.key, change.name)
       : change.itemKind === 'delay'
         ? intl.formatMessage(messages.delay)
-        : formatLabel(intl, change.key, change.name);
+        : change.itemKind === 'requests'
+          ? intl.formatMessage(messages.requests)
+          : formatLabel(intl, change.key, change.name);
+
+  /**
+   * What a format does to a release that matches it: avoided or preferred,
+   * once when every profile agrees, or profile by profile.
+   */
+  const effectsOf = (change: PreviewChange) => {
+    if (change.itemKind !== 'format' || !change.effects?.length) return null;
+    const groups = new Map<FormatEffect, PresetKey[]>();
+    for (const { preset, effect } of change.effects) {
+      groups.set(effect, [...(groups.get(effect) ?? []), preset]);
+    }
+    const look: Record<
+      FormatEffect,
+      { text: string; className: string; up?: boolean; down?: boolean }
+    > = {
+      never: {
+        text: intl.formatMessage(messages.effectNever),
+        className: 'text-red-400 light:text-danger-text',
+        down: true,
+      },
+      'last-resort': {
+        text: intl.formatMessage(messages.effectLastResort),
+        className: 'text-yellow-300 light:text-warning-text',
+        down: true,
+      },
+      lower: {
+        text: intl.formatMessage(messages.effectLower),
+        className: 'text-yellow-300 light:text-warning-text',
+        down: true,
+      },
+      prefer: {
+        text: intl.formatMessage(messages.effectPrefer),
+        className: 'text-green-400 light:text-success-text',
+        up: true,
+      },
+      none: {
+        text: intl.formatMessage(messages.effectNone),
+        className: 'text-gray-400',
+      },
+    };
+    const order: FormatEffect[] = [
+      'never',
+      'last-resort',
+      'lower',
+      'prefer',
+      'none',
+    ];
+    const all = groups.size === 1;
+    return (
+      <ul className="mt-1 space-y-0.5">
+        {order
+          .filter((effect) => groups.has(effect))
+          .map((effect) => {
+            const { text, className, up, down } = look[effect];
+            return (
+              <li
+                key={effect}
+                className={`flex items-start gap-1 text-sm ${className}`}
+              >
+                {up && <ArrowUpIcon className="mt-0.5 h-4 w-4 flex-none" />}
+                {down && <ArrowDownIcon className="mt-0.5 h-4 w-4 flex-none" />}
+                <span>
+                  {all
+                    ? text
+                    : intl.formatMessage(messages.effectIn, {
+                        effect: text,
+                        presets: intl.formatList(
+                          (groups.get(effect) ?? []).map((preset) =>
+                            presetLabel(intl, preset)
+                          ),
+                          { type: 'conjunction' }
+                        ),
+                      })}
+                </span>
+              </li>
+            );
+          })}
+      </ul>
+    );
+  };
 
   const badgeOf = (change: PreviewChange) => {
     if (change.itemKind === 'delay') {
@@ -195,8 +319,9 @@ const PreviewModal = ({
     (c) => c.action !== 'unchanged'
   );
   const unchanged = (preview?.changes ?? []).length - shown.length;
-  // Profiles first, then the shared delay profile, then formats.
-  const order = { profile: 0, delay: 1, format: 2 };
+  // Profiles first, then where requests go and the shared delay profile,
+  // then formats.
+  const order = { profile: 0, requests: 1, delay: 2, format: 3 };
   shown.sort((a, b) => order[a.itemKind] - order[b.itemKind]);
   const presets = (preview?.changes ?? [])
     .filter((c) => c.itemKind === 'profile')
@@ -212,15 +337,19 @@ const PreviewModal = ({
           fromProfileId: Number(from),
           preset: preset as PresetKey,
         }));
-      const { data } = await axios.post<{
+      const data = await postAndFollow<{
         created: number;
         updated: number;
         moved: number;
-      }>(`/api/v1/settings/quality/servers/${kind}/${serverId}/apply`, {
-        ...(move.length ? { move } : {}),
-        ...(restoreKept ? { restoreKept: true } : {}),
-        token: preview.token,
-      });
+      }>(
+        `/api/v1/settings/quality/servers/${kind}/${serverId}/apply`,
+        {
+          ...(move.length ? { move } : {}),
+          ...(restoreKept ? { restoreKept: true } : {}),
+          token: preview.token,
+        },
+        setProgress
+      );
       addToast(
         intl.formatMessage(
           data.moved ? messages.appliedMoved : messages.applied,
@@ -241,7 +370,16 @@ const PreviewModal = ({
       }
     } finally {
       setBusy(false);
+      setProgress(null);
     }
+  };
+
+  const stepText: Record<ApplyStep, string> = {
+    formats: intl.formatMessage(messages.stepFormats),
+    profiles: intl.formatMessage(messages.stepProfiles),
+    delay: intl.formatMessage(messages.delay),
+    requests: intl.formatMessage(messages.requests),
+    titles: intl.formatMessage(messages.stepTitles),
   };
 
   const withTitles = (preview?.ownProfiles ?? []).filter((p) => p.titles > 0);
@@ -299,9 +437,15 @@ const PreviewModal = ({
                       {nameOf(change)}
                     </span>
                   </div>
+                  {effectsOf(change)}
                   {change.itemKind === 'delay' && (
                     <p className="mt-1 text-gray-400">
                       {intl.formatMessage(messages.delayNote)}
+                    </p>
+                  )}
+                  {change.itemKind === 'requests' && (
+                    <p className="mt-1 text-gray-400">
+                      {intl.formatMessage(messages.requestsNote)}
                     </p>
                   )}
                   {change.details.length > 0 && (
@@ -348,7 +492,7 @@ const PreviewModal = ({
                       key={own.id}
                       className="flex flex-wrap items-center gap-2"
                     >
-                      <span className="min-w-0 flex-1 truncate text-gray-300">
+                      <span className="min-w-0 flex-1 break-words text-gray-300">
                         {own.name}
                       </span>
                       <select
@@ -380,6 +524,32 @@ const PreviewModal = ({
                 </div>
               </div>
             )}
+          </div>
+        )}
+        {busy && (
+          <div className="mt-4 space-y-1.5" aria-live="polite">
+            <div className="flex flex-wrap justify-between gap-x-3 text-xs text-gray-300">
+              <span>
+                {progress
+                  ? stepText[progress.step]
+                  : intl.formatMessage(messages.progressStarting)}
+              </span>
+              {progress && progress.total > 0 && (
+                <span>
+                  {intl.formatMessage(messages.progressCount, {
+                    done: progress.done,
+                    total: progress.total,
+                  })}
+                </span>
+              )}
+            </div>
+            <ProgressBar
+              value={
+                progress && progress.total > 0
+                  ? (progress.done / progress.total) * 100
+                  : 3
+              }
+            />
           </div>
         )}
       </Modal>

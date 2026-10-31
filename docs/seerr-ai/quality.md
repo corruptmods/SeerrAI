@@ -8,6 +8,7 @@
 
 - **Only what it creates.** Every profile and custom format it makes is named `Seerr AI · …`, such as `Seerr AI · 1080p`; a TRaSH Guides format whose name Seerr AI's own already uses ends in `(TRaSH Guides)`, since Radarr and Sonarr need each name once. Your own profiles, and the titles on them, stay as they are.
 - **One shared setting.** "Prefer usenet" changes the delay profile that titles without tags use, which affects every profile on that server. The preview marks it **Shared setting**.
+- **New requests go to its profiles.** Apply also sets each server's quality profile for new requests (Settings → Services), and its anime profile, to Seerr AI's, so what's requested next lands where it should. Choose which preset under Presets (**New requests use**), or **Leave it as it is**. Undo sets them back.
 - **Titles move only if you choose.** The preview can move the titles on your own profiles onto Seerr AI's; each is off unless you pick a profile. Undo moves them back.
 - **New servers start as Not managed**, and TRaSH Guides updates wait for you unless you turn on **Apply updates automatically**.
 
@@ -16,9 +17,9 @@ Sonarr needs v4 or later (custom formats). Sonarr v5 keeps file sizes on each pr
 ## Setting up a server
 
 1. Pick the server under **Servers** and turn on **Manage this server**.
-2. Under **Presets**, choose where each comes from: **Seerr AI**, **TRaSH Guides**, or **Off** (not created). The presets are SD, 720p, 1080p, 1080p Remux, 2160p, 2160p Remux and Anime. A 4K server starts with 2160p; others with 1080p and Anime.
+2. Under **Presets**, choose where each comes from: **Seerr AI**, **TRaSH Guides**, or **Off** (not created). The presets are SD, 720p, 1080p, 1080p Remux, 2160p, 2160p Remux and Anime. A 4K server starts with 2160p; others with 1080p and Anime. **New requests use** picks the one new requests get (2160p on a 4K server, else 1080p, to start).
 3. Set the **Adjustments** (below), or **Copy from another server**.
-4. **Preview & apply** lists each change: **Create**, **Update**, **Put back** (someone changed it in Radarr or Sonarr), **Kept** (you kept their change). Press **Apply**.
+4. **Preview & apply** lists each change: **Create**, **Update**, **Put back** (someone changed it in Radarr or Sonarr), **Kept** (you kept their change). Each format says what it does to a release that matches it: **Avoid** (never grabbed, only as a last resort, or less likely) or **Prefer** (more likely), profile by profile when they differ. Press **Apply**; a bar shows how far it has got. On a big server it can take a few minutes: the page follows it to the end, even through a proxy that gives up on slow answers.
 
 Each server has its own presets and adjustments, so a 4K server and an anime server can differ.
 
@@ -52,7 +53,7 @@ TRaSH Guides is used under its MIT licence, copyright TRaSH.
 
 ## What it does
 
-Tap a preset's **What it does** to see, in words, what that profile does on that server:
+Tap a preset's **What it does** to see, in words, what that profile does on that server, with the choices on the page as they are now, saved and applied or not (it says when they aren't applied yet):
 
 - **In short**: what it takes first and what it upgrades to.
 - **Qualities, best first**, with the lowest it takes, and what isn't allowed.

@@ -26,6 +26,7 @@ import {
 import type { QualityError } from '@server/lib/quality/engine';
 import {
   apply,
+  applyProgress,
   configFor,
   keepChanges,
   preview,
@@ -43,7 +44,7 @@ import {
   trashProfileFormats,
 } from '@server/lib/quality/trash';
 import type { ArrKind, QualityServerSettings } from '@server/lib/quality/types';
-import { serverDefaults } from '@server/lib/quality/types';
+import { requestPresetsOf, serverDefaults } from '@server/lib/quality/types';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
@@ -919,7 +920,10 @@ describe('applying, undoing and changes made elsewhere', () => {
   });
 
   it('keeps a profile on undo while titles or request settings use it', async () => {
-    manage('radarr');
+    // Anime requests left as they are, so an admin's own choice is tested.
+    manage('radarr', (c) => {
+      c.animeRequestPreset = 'keep';
+    });
     radarr.state.titles = [
       {
         id: 1,
@@ -1554,5 +1558,198 @@ describe('a server’s choices', () => {
     assert.deepEqual(plain.presets, { '1080p': 'seerr', anime: 'seerr' });
     getSettings().radarr[0].is4k = true;
     assert.deepEqual(configFor(RADARR).presets, { '2160p': 'seerr' });
+  });
+});
+
+describe('where new requests go', () => {
+  it('is the usual preset unless chosen, and never one that is off', () => {
+    const config = serverDefaults('radarr', 0, false);
+    assert.deepEqual(requestPresetsOf(config, false), {
+      main: '1080p',
+      anime: 'anime',
+    });
+    config.presets = { '1080p-remux': 'trash', '2160p': 'seerr' };
+    assert.equal(requestPresetsOf(config, false).main, '1080p-remux');
+    assert.equal(requestPresetsOf(config, true).main, '2160p');
+    assert.equal(requestPresetsOf(config, false).anime, undefined);
+    config.requestPreset = '2160p';
+    assert.equal(requestPresetsOf(config, false).main, '2160p');
+    // A choice since turned off falls back to the usual one.
+    config.requestPreset = 'sd';
+    assert.equal(requestPresetsOf(config, false).main, '1080p-remux');
+    config.requestPreset = 'keep';
+    assert.equal(requestPresetsOf(config, false).main, undefined);
+  });
+
+  it('is set on Apply to its profiles, shown first, and put back by Undo', async () => {
+    manage('radarr');
+    const server = getSettings().radarr[0] as RadarrSettings;
+    server.activeProfileName = 'Admin’s own';
+    const shown = await preview(RADARR);
+    const requests = shown.changes.find((c) => c.itemKind === 'requests');
+    assert.deepEqual(requests?.details, [
+      {
+        kind: 'requests',
+        which: 'main',
+        preset: '1080p',
+        from: 'Admin’s own',
+        to: 'Seerr AI · 1080p',
+      },
+      {
+        kind: 'requests',
+        which: 'anime',
+        preset: 'anime',
+        from: undefined,
+        to: 'Seerr AI · Anime',
+      },
+    ]);
+    const result = await apply(RADARR, { token: shown.token });
+    const id = (name: string) =>
+      radarr.state.profiles.find((p) => p.name === name)?.id;
+    assert.equal(server.activeProfileId, id('Seerr AI · 1080p'));
+    assert.equal(server.activeProfileName, 'Seerr AI · 1080p');
+    assert.equal(server.activeAnimeProfileId, id('Seerr AI · Anime'));
+    assert.equal((await stateOf(RADARR)).status, 'in-sync');
+
+    const undone = await undo(result.applyId as number);
+    assert.equal(server.activeProfileId, 1);
+    assert.equal(server.activeProfileName, 'Admin’s own');
+    assert.equal(server.activeAnimeProfileId, undefined);
+    // No longer used by the request settings, so they go.
+    assert.deepEqual(undone.keptInUse, []);
+    assert.ok(
+      !radarr.state.profiles.some((p) => p.name.startsWith('Seerr AI'))
+    );
+  });
+
+  it('is left alone when an admin says so, and by TRaSH Guides updates', async () => {
+    manage('radarr', (c) => {
+      c.requestPreset = 'keep';
+      c.animeRequestPreset = 'keep';
+    });
+    const shown = await preview(RADARR);
+    assert.ok(!shown.changes.some((c) => c.itemKind === 'requests'));
+    await apply(RADARR);
+    assert.equal(getSettings().radarr[0].activeProfileId, 1);
+  });
+});
+
+describe('what a format does, in the preview', () => {
+  it('says which avoid a release and which prefer it, profile by profile', async () => {
+    manage('radarr');
+    const { changes } = await preview(RADARR);
+    const effects = (name: string) =>
+      changes.find((c) => c.itemKind === 'format' && c.name === name)?.effects;
+    assert.deepEqual(effects('Seerr AI · x265 at 1080p or below'), [
+      { preset: '1080p', effect: 'never' },
+      { preset: 'anime', effect: 'never' },
+    ]);
+    assert.deepEqual(effects('Seerr AI · AV1'), [
+      { preset: '1080p', effect: 'last-resort' },
+      { preset: 'anime', effect: 'last-resort' },
+    ]);
+    assert.deepEqual(effects('Seerr AI · Dual audio'), [
+      { preset: 'anime', effect: 'prefer' },
+    ]);
+  });
+});
+
+describe('what it does, with choices not saved yet', () => {
+  it('shows them as they would be, not as applied', async () => {
+    manage('radarr');
+    await apply(RADARR);
+    const saved = await describeProfile(RADARR, '1080p');
+    assert.equal(saved.applied, true);
+    assert.ok(saved.lastResort.some((f) => f.name === 'Seerr AI · AV1'));
+
+    const config = configFor(RADARR);
+    const draft = await describeProfile(RADARR, '1080p', {
+      adjustments: { ...config.adjustments, av1LastResort: false },
+    });
+    assert.ok(!draft.lastResort.some((f) => f.name === 'Seerr AI · AV1'));
+    assert.equal(draft.applied, false);
+
+    // The same choices as applied: applied.
+    const same = await describeProfile(RADARR, '1080p', {
+      adjustments: config.adjustments,
+    });
+    assert.equal(same.applied, true);
+  });
+});
+
+describe('a format as Radarr and Sonarr answer with it', () => {
+  it('is the same with a field left out or false', async () => {
+    const { formatFingerprint, formatMatches } =
+      await import('@server/lib/quality/plan');
+    const spec = (fields: { name: string; value: unknown }[]) => ({
+      name: 'Made-up format',
+      specifications: [
+        {
+          name: 'Not original',
+          implementation: 'LanguageSpecification',
+          negate: true,
+          required: false,
+          fields,
+        },
+      ],
+    });
+    // TRaSH Guides leaves exceptLanguage out; Sonarr answers with it false.
+    const sent = spec([{ name: 'value', value: -2 }]);
+    const answered = spec([
+      { name: 'value', value: -2 },
+      { name: 'exceptLanguage', value: false },
+    ]);
+    assert.equal(formatFingerprint(sent), formatFingerprint(answered));
+    // Not when it is true.
+    assert.notEqual(
+      formatFingerprint(sent),
+      formatFingerprint(
+        spec([
+          { name: 'value', value: -2 },
+          { name: 'exceptLanguage', value: true },
+        ])
+      )
+    );
+    // A fingerprint kept before this (false fields counted) still matches.
+    const { createHash } = await import('crypto');
+    const legacy = createHash('sha1')
+      .update(
+        JSON.stringify({
+          name: answered.name,
+          specs: [
+            {
+              name: 'Not original',
+              implementation: 'LanguageSpecification',
+              negate: true,
+              required: false,
+              fields: [
+                ['exceptLanguage', false],
+                ['value', -2],
+              ],
+            },
+          ],
+        })
+      )
+      .digest('hex');
+    assert.notEqual(legacy, formatFingerprint(answered));
+    assert.ok(formatMatches(answered, legacy));
+    assert.ok(formatMatches(answered, formatFingerprint(sent)));
+  });
+
+  it('is followed while it is applied', async () => {
+    manage('radarr');
+    assert.equal(applyProgress(RADARR), null);
+    const seen: (ReturnType<typeof applyProgress> | null)[] = [];
+    const saveFormat = radarr.fake.saveFormat.bind(radarr.fake);
+    mock.method(radarr.fake, 'saveFormat', async (f: ArrCustomFormat) => {
+      seen.push(applyProgress(RADARR));
+      return saveFormat(f);
+    });
+    await apply(RADARR);
+    assert.ok(seen.length > 0);
+    assert.equal(seen[0]?.step, 'formats');
+    assert.ok((seen.at(-1)?.done ?? 0) > 0);
+    assert.ok(seen.every((p) => p && p.done <= p.total));
+    assert.equal(applyProgress(RADARR), null);
   });
 });

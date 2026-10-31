@@ -197,7 +197,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
           )}
           <div className="relative -mx-4 overflow-x-hidden px-4 pt-0.5 sm:flex sm:items-center">
             <div
-              className={`mt-3 truncate text-center text-strong sm:mt-0 sm:text-left ${
+              className={`mt-3 min-w-0 text-center text-strong sm:mt-0 sm:text-left ${
                 showCloseButton ? 'px-8 sm:pl-0 sm:pr-10' : ''
               }`}
             >
@@ -205,7 +205,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
                 <div className="flex flex-col space-y-1">
                   {title && (
                     <span
-                      className="text-overseerr truncate pb-0.5 text-2xl font-bold leading-6"
+                      className="text-overseerr break-words pb-0.5 text-2xl font-bold leading-7"
                       id={titleId}
                       data-testid="modal-title"
                     >
@@ -214,7 +214,7 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>(
                   )}
                   {subTitle && (
                     <span
-                      className="truncate text-lg font-semibold leading-6 text-gray-200"
+                      className="break-words text-lg font-semibold leading-6 text-gray-200"
                       id={subTitleId}
                       data-testid="modal-title"
                     >

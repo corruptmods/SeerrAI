@@ -1,4 +1,5 @@
 import Modal from '@app/components/Common/Modal';
+import { useSubtitleReasons } from '@app/components/Subtitles/parts';
 import { subtitlesKey } from '@app/hooks/useSubtitles';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
@@ -6,9 +7,10 @@ import defineMessages from '@app/utils/defineMessages';
 import { isTranscribed } from '@app/utils/subtitles';
 import type {
   EpisodeSubtitles,
+  SubtitleError,
   TranscribeScope,
 } from '@server/interfaces/api/subtitlesInterfaces';
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 
@@ -45,6 +47,7 @@ const TranscribeModal = ({
 }: TranscribeModalProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
+  const { reasonOf } = useSubtitleReasons('tv');
   const todo = episodes.filter((episode) => !isTranscribed(episode));
   const seasons = [...new Set(todo.map((e) => e.seasonNumber))].sort(
     (a, b) => b - a
@@ -77,11 +80,18 @@ const TranscribeModal = ({
         { appearance: data.added > 0 ? 'success' : 'info', autoDismiss: true }
       );
       onStarted();
-    } catch {
-      addToast(intl.formatMessage(messages.failed), {
-        appearance: 'error',
-        autoDismiss: true,
-      });
+    } catch (e) {
+      // Whisper paused or off says so, as on the card; only Bazarr not
+      // answering is worth another try.
+      const code = isAxiosError(e)
+        ? (e.response?.data as Partial<SubtitleError> | undefined)?.code
+        : undefined;
+      addToast(
+        code && code !== 'bazarrFailed'
+          ? reasonOf(e)
+          : intl.formatMessage(messages.failed),
+        { appearance: 'error', autoDismiss: true }
+      );
     } finally {
       setSending(false);
     }

@@ -41,6 +41,7 @@ import {
 import transcriber from '@server/lib/transcriber';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
+import { perUserRateLimit } from '@server/middleware/perUserRateLimit';
 import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -646,8 +647,13 @@ subtitleRoutes.get<{ tmdbId: string }>(
   }
 );
 
+// Each choice for a series goes through every episode in the background,
+// so how often one person can make one is limited.
+const seriesChoices = perUserRateLimit({ windowMs: 60_000, limit: 20 });
+
 subtitleRoutes.put<{ tmdbId: string }>(
   '/tv/:tmdbId/plex-default',
+  seriesChoices,
   async (req, res, next) => {
     const body = z
       .object({ language: z.string().regex(/^[a-z]{0,3}$/) })

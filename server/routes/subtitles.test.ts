@@ -1432,6 +1432,40 @@ describe('the subtitle your own Plex player starts with', () => {
     assert.equal(body.available, false);
   });
 
+  it('limits how often one person sets a series, as each goes through every episode', async () => {
+    // A series not in Plex: refused after the limit is counted, with no
+    // episodes gone through. Past the limit the answer is plain text.
+    const choose = () =>
+      new Promise<number>((resolve, reject) => {
+        const payload = JSON.stringify({ language: 'eng' });
+        http
+          .request(
+            {
+              host: '127.0.0.1',
+              port,
+              path: '/api/v1/subtitles/tv/990002/plex-default',
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload),
+              },
+            },
+            (res) => {
+              res.resume();
+              res.on('end', () => resolve(res.statusCode ?? 0));
+            }
+          )
+          .on('error', reject)
+          .end(payload);
+      });
+    const statuses: number[] = [];
+    for (let i = 0; i < 25; i++) statuses.push(await choose());
+    assert.equal(statuses[0], 404);
+    assert.equal(statuses[24], 429);
+    actingAs = manager;
+    assert.equal(await choose(), 404, 'counted for each person on their own');
+  });
+
   it('never sends the token it kept for one Plex server to another', async () => {
     const read = () => call('GET', '/movie/471906/plex-default');
     assert.equal((await read()).status, 200);

@@ -98,7 +98,6 @@ const load = async (start: Date, end: Date): Promise<CalendarItem[]> => {
 
   const seenEpisodes = new Set<string>();
   const episodesByShowAndTime = new Map<string, CalendarItem>();
-  const tvdbIds = new Set<number>();
   const tvdbOf = new Map<CalendarItem, number>();
   for (const server of [...settings.sonarr].sort(
     (a, b) => Number(a.is4k) - Number(b.is4k)
@@ -125,9 +124,6 @@ const load = async (start: Date, end: Date): Promise<CalendarItem[]> => {
           continue;
         }
         seenEpisodes.add(key);
-        if (show.tvdbId) {
-          tvdbIds.add(show.tvdbId);
-        }
 
         // Episodes of one show airing together, as a streaming service drops
         // a season, read as one line.
@@ -172,9 +168,14 @@ const load = async (start: Date, end: Date): Promise<CalendarItem[]> => {
   const missing = items.filter(
     (item) => item.mediaType === MediaType.TV && !item.tmdbId
   );
-  if (missing.length && tvdbIds.size) {
+  const tvdbIds = [
+    ...new Set(
+      missing.map((item) => tvdbOf.get(item)).filter((id): id is number => !!id)
+    ),
+  ];
+  if (tvdbIds.length) {
     const known = await getRepository(Media).find({
-      where: { mediaType: MediaType.TV, tvdbId: In([...tvdbIds]) },
+      where: { mediaType: MediaType.TV, tvdbId: In(tvdbIds) },
     });
     const byTvdb = new Map(known.map((m) => [m.tvdbId, m.tmdbId]));
     for (const item of missing) {

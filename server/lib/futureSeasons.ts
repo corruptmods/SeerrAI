@@ -218,10 +218,9 @@ class FutureSeasons {
       // One TMDB lookup per series, however many people follow it.
       const byShow = new Map<number, FutureSeasonSubscription[]>();
       for (const subscription of subscriptions) {
-        byShow.set(subscription.tmdbId, [
-          ...(byShow.get(subscription.tmdbId) ?? []),
-          subscription,
-        ]);
+        const followers = byShow.get(subscription.tmdbId) ?? [];
+        followers.push(subscription);
+        byShow.set(subscription.tmdbId, followers);
       }
 
       const tmdb = new TheMovieDb();

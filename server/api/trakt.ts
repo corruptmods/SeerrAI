@@ -114,10 +114,16 @@ export const parseTraktUrl = (text: string): TraktSource | undefined => {
   } catch {
     return undefined;
   }
-  const parts = url.pathname
-    .split('/')
-    .filter(Boolean)
-    .map((part) => decodeURIComponent(part));
+  let parts: string[];
+  try {
+    parts = url.pathname
+      .split('/')
+      .filter(Boolean)
+      .map((part) => decodeURIComponent(part));
+  } catch {
+    // A stray % that starts no character.
+    return undefined;
+  }
 
   if (parts[0] === 'users' && parts[1] && SLUG.test(parts[1])) {
     if (parts[2] === 'watchlist' && parts.length === 3) {

@@ -105,6 +105,9 @@ describe('reading Trakt links', () => {
       'https://trakt.tv/users/someone/watchlist/extra',
       'https://trakt.tv/lists/not-a-number',
       'https://trakt.tv/movies/the-mazewright-1999',
+      // Not a name once decoded: refused, not thrown.
+      'https://trakt.tv/users/%E0%A4%A/watchlist',
+      'https://trakt.tv/users/someone/lists/%ZZ',
     ]) {
       assert.equal(parseTraktUrl(text), undefined, text);
     }

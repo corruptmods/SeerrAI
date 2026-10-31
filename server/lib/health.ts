@@ -46,8 +46,9 @@ import {
 } from '@server/lib/mediaServers';
 import { lidarrApi, musicReady } from '@server/lib/music/access';
 import { lidarrOnly } from '@server/lib/music/availability';
+import { canFix, fixingOn } from '@server/lib/plexFixMatch';
 import type { PlexMatchProblem } from '@server/lib/plexMatchCheck';
-import plexMatchCheck from '@server/lib/plexMatchCheck';
+import plexMatchCheck, { problemKey } from '@server/lib/plexMatchCheck';
 import { lastStates } from '@server/lib/quality/engine';
 import { readTrashState } from '@server/lib/quality/trash';
 import type { DownloadClientSettings } from '@server/lib/settings';
@@ -82,6 +83,8 @@ export interface HealthItem {
   searchable?: { mediaId: number; is4k: boolean; mediaType: MediaType };
   /** When it was found, for a list that says. */
   at?: string;
+  /** A wrong Plex match Seerr AI can fix: the problem's key. */
+  fix?: string;
 }
 
 export interface HealthCheck {
@@ -1510,6 +1513,7 @@ export const plexMatchText = (
  * has, whose page says the same.
  */
 const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
+  const fixable = (p: PlexMatchProblem) => fixingOn() && canFix(p);
   const report = await plexMatchCheck.lastReport();
   const items = report.problems.slice(page.skip, page.skip + page.take);
   const recent = await getRepository(MatchProblem).find({
@@ -1567,6 +1571,7 @@ const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
       const media = row.mediaId ? recentMedia.get(row.mediaId) : undefined;
       return {
         ...plexMatchText(p),
+        ...(fixable(p) ? { fix: row.key } : {}),
         at: row.foundAt.toISOString(),
         href:
           p.kind === 'music'
@@ -1592,6 +1597,7 @@ const plexMatchesCheck = async (page: Page): Promise<HealthCheck> => {
         : 'Runs nightly (Settings → Jobs → Match Check)',
     items: items.map((p) => ({
       ...plexMatchText(p),
+      ...(fixable(p) ? { fix: problemKey(p) } : {}),
       href: (() => {
         const tmdbId =
           p.expected.tmdbId ??

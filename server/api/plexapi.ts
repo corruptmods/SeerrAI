@@ -34,6 +34,7 @@ export interface PlexLibraryItem {
   Media: Media[];
   /** A show's folders on disk. */
   Location?: { path: string }[];
+  librarySectionID?: number | string;
 }
 
 interface PlexLibraryResponse {
@@ -49,6 +50,15 @@ export interface PlexLibrary {
   key: string;
   title: string;
   agent: string;
+  language?: string;
+}
+
+/** A title Plex's Fix Match offers for an item. */
+export interface PlexMatchResult {
+  guid: string;
+  name: string;
+  year?: number;
+  score?: number;
 }
 
 interface PlexLibrariesResponse {
@@ -314,6 +324,44 @@ class PlexAPI extends ExternalAPI {
       if (e.response?.status === 404) return undefined;
       throw e;
     }
+  }
+
+  /**
+   * What Plex's Fix Match offers for an item when searched for `title`,
+   * which may be an id ("tmdb-123", "tvdb-456", "imdb-tt789"), as in Plex
+   * Web. The agent and language are its library's.
+   */
+  public async findMatches(
+    ratingKey: string,
+    title: string,
+    library?: { agent?: string; language?: string }
+  ): Promise<PlexMatchResult[]> {
+    const params = new URLSearchParams({ manual: '1', title });
+    if (library?.agent) params.set('agent', library.agent);
+    if (library?.language) params.set('language', library.language);
+    const response = await this.get<{
+      MediaContainer: { SearchResult?: PlexMatchResult[] };
+    }>(`/library/metadata/${encodeURIComponent(ratingKey)}/matches?${params}`);
+    return response.MediaContainer.SearchResult ?? [];
+  }
+
+  /** Matches an item to a title Fix Match offered, as Plex Web does. */
+  public async setMatch(
+    ratingKey: string,
+    to: { guid: string; name: string; year?: number }
+  ): Promise<void> {
+    const params = new URLSearchParams({ guid: to.guid, name: to.name });
+    if (to.year) params.set('year', String(to.year));
+    await this.axios.put(
+      `/library/metadata/${encodeURIComponent(ratingKey)}/match?${params}`
+    );
+  }
+
+  /** Leaves an item matched to nothing, as Plex Web's Unmatch does. */
+  public async unmatch(ratingKey: string): Promise<void> {
+    await this.axios.put(
+      `/library/metadata/${encodeURIComponent(ratingKey)}/unmatch`
+    );
   }
 
   public async getChildrenMetadata(key: string): Promise<PlexMetadata[]> {

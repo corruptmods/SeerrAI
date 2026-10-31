@@ -14,17 +14,20 @@ import {
 } from '@headlessui/react';
 import {
   ArrowPathIcon,
+  ArrowUturnLeftIcon,
   ChevronDownIcon,
   MagnifyingGlassIcon,
   TrashIcon,
+  WrenchIcon,
 } from '@heroicons/react/24/outline';
 import type { HealthCheck, HealthItem, HealthStatus } from '@server/lib/health';
 import type { HealthActivity } from '@server/lib/healthActivity';
+import type { FixOutcome, MatchFix } from '@server/lib/plexFixMatch';
 import axios from 'axios';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 
 const messages = defineMessages('components.Settings.SettingsHealth', {
   health: 'Health',
@@ -84,6 +87,30 @@ const messages = defineMessages('components.Settings.SettingsHealth', {
   checkOnImportTip:
     'Looks a few minutes after each import and tells admins once (Wrong Match notification).',
   settingFailed: 'Could not save the setting.',
+  fixMatches: 'Fix matches from here',
+  fixMatchesTip:
+    'A Fix Match button on each one Seerr AI can put right: it finds the title in Plex by the ID Radarr or Sonarr has, then checks Plex took it.',
+  fixAuto: 'Fix automatically',
+  fixAutoTip:
+    'New ones as they’re found, and up to 20 from the nightly check each night, without asking. Admins are told, and each can be undone below.',
+  fixMatch: 'Fix match',
+  fixing: 'Fixing…',
+  fixed: 'Fixed: Plex now has {title}.',
+  fixRight: 'Plex has it right already.',
+  fixGone: 'It’s no longer on Plex.',
+  fixNotFound: 'Plex found nothing by {searched}.',
+  fixPutBack: 'Plex took it as {title}, so its old match was put back.',
+  fixUnchanged: 'Plex hasn’t shown the new match yet. Check again in a minute.',
+  fixFailed: 'Could not fix it.',
+  fixedLately: 'Fixed lately',
+  fixedFromTo: '{from} → {to}',
+  fixedBy: '{name} · {time}',
+  fixedByItself: 'By itself · {time}',
+  fixUnconfirmed: 'Plex hadn’t shown its IDs yet',
+  undo: 'Undo',
+  undone: 'Undone',
+  undoDone: 'Put back as Plex had it.',
+  undoFailed: 'Could not undo it.',
   plexSignIn: 'Expired Plex sign-ins',
   qualityProfiles: 'Quality profiles',
   backfill: 'Backfill',
@@ -299,52 +326,285 @@ const SearchAll = ({ onDone }: { onDone: () => void }) => {
   );
 };
 
+interface MatchSettingsData {
+  matchCheckOnImport?: boolean;
+  matchFix?: boolean;
+  matchFixAuto?: boolean;
+}
+
+/** One of Match Check's settings, saved as it's ticked. */
+const MatchSetting = ({
+  id,
+  label,
+  tip,
+  checked,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  tip: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => void;
+}) => (
+  <div className="flex items-start gap-3 py-2">
+    <input
+      type="checkbox"
+      id={id}
+      className="mt-0.5 flex-none"
+      checked={checked}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.checked)}
+    />
+    <label htmlFor={id} className="min-w-0 text-sm">
+      <span className="text-gray-100">{label}</span>
+      <span className="block text-xs text-gray-400">{tip}</span>
+    </label>
+  </div>
+);
+
 /**
- * Match Check's one setting: whether titles just requested and imported
- * are looked at as they arrive, as well as nightly.
+ * Match Check's settings: whether titles just requested and imported are
+ * looked at as they arrive, as well as nightly; whether wrong Plex matches
+ * get a Fix button; and whether they're fixed without asking.
  */
-const MatchOnImport = () => {
+const MatchSettings = ({ onChanged }: { onChanged: () => void }) => {
   const intl = useIntl();
   const { addToast } = useToasts();
-  const { data, mutate } = useSWR<{ matchCheckOnImport?: boolean }>(
-    '/api/v1/settings/main',
-    { revalidateOnFocus: false }
-  );
+  const { data, mutate } = useSWR<MatchSettingsData>('/api/v1/settings/main', {
+    revalidateOnFocus: false,
+  });
   const [saving, setSaving] = useState(false);
-  const on = data?.matchCheckOnImport !== false;
+  const onImport = data?.matchCheckOnImport !== false;
+  const fix = data?.matchFix !== false;
+  const auto = fix && data?.matchFixAuto === true;
+
+  const save = async (change: MatchSettingsData) => {
+    setSaving(true);
+    try {
+      await axios.post('/api/v1/settings/main', change);
+      await mutate({ ...data, ...change }, false);
+      // Fix buttons come and go with the setting.
+      if (change.matchFix !== undefined) onChanged();
+    } catch {
+      addToast(intl.formatMessage(messages.settingFailed), {
+        appearance: 'error',
+        autoDismiss: true,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="flex items-start gap-3 border-b border-gray-700 py-2">
-      <input
-        type="checkbox"
+    <div className="border-b border-gray-700 py-1">
+      <MatchSetting
         id="matchCheckOnImport"
-        className="mt-0.5 flex-none"
-        checked={on}
+        label={intl.formatMessage(messages.checkOnImport)}
+        tip={intl.formatMessage(messages.checkOnImportTip)}
+        checked={onImport}
         disabled={!data || saving}
-        onChange={async (e) => {
-          const matchCheckOnImport = e.target.checked;
-          setSaving(true);
-          try {
-            await axios.post('/api/v1/settings/main', { matchCheckOnImport });
-            await mutate({ ...data, matchCheckOnImport }, false);
-          } catch {
-            addToast(intl.formatMessage(messages.settingFailed), {
-              appearance: 'error',
-              autoDismiss: true,
-            });
-          } finally {
-            setSaving(false);
-          }
-        }}
+        onChange={(matchCheckOnImport) => save({ matchCheckOnImport })}
       />
-      <label htmlFor="matchCheckOnImport" className="min-w-0 text-sm">
-        <span className="text-gray-100">
-          {intl.formatMessage(messages.checkOnImport)}
-        </span>
-        <span className="block text-xs text-gray-400">
-          {intl.formatMessage(messages.checkOnImportTip)}
-        </span>
-      </label>
+      <MatchSetting
+        id="matchFix"
+        label={intl.formatMessage(messages.fixMatches)}
+        tip={intl.formatMessage(messages.fixMatchesTip)}
+        checked={fix}
+        disabled={!data || saving}
+        onChange={(matchFix) => save({ matchFix })}
+      />
+      <div className="pl-6">
+        <MatchSetting
+          id="matchFixAuto"
+          label={intl.formatMessage(messages.fixAuto)}
+          tip={intl.formatMessage(messages.fixAutoTip)}
+          checked={auto}
+          disabled={!data || saving || !fix}
+          onChange={(matchFixAuto) => save({ matchFixAuto })}
+        />
+      </div>
+    </div>
+  );
+};
+
+const FIXES_URL = '/api/v1/settings/health/match-fixes';
+
+const titled = (t: { title: string; year?: number }) =>
+  t.year ? `${t.title} (${t.year})` : t.title;
+
+/** Fixes one wrong Plex match, and says how it went. */
+const FixButton = ({
+  fixKey,
+  onFixed,
+}: {
+  fixKey: string;
+  onFixed: () => void;
+}) => {
+  const intl = useIntl();
+  const { addToast } = useToasts();
+  const { mutate } = useSWRConfig();
+  const [busy, setBusy] = useState(false);
+
+  const said = (outcome: FixOutcome): [string, 'success' | 'warning'] => {
+    switch (outcome.state) {
+      case 'fixed':
+        return [
+          intl.formatMessage(messages.fixed, {
+            title: titled(outcome.fix.to),
+          }),
+          'success',
+        ];
+      case 'right':
+        return [intl.formatMessage(messages.fixRight), 'success'];
+      case 'gone':
+        return [intl.formatMessage(messages.fixGone), 'warning'];
+      case 'notFound':
+        return [
+          intl.formatMessage(messages.fixNotFound, {
+            searched: outcome.searched.join(', '),
+          }),
+          'warning',
+        ];
+      case 'putBack':
+        return [
+          intl.formatMessage(messages.fixPutBack, {
+            title: titled(outcome.to),
+          }),
+          'warning',
+        ];
+      default:
+        return [intl.formatMessage(messages.fixUnchanged), 'warning'];
+    }
+  };
+
+  return (
+    <Button
+      buttonType="ghost"
+      buttonSize="sm"
+      className="mt-2"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          const { data } = await axios.post<FixOutcome>(
+            '/api/v1/settings/health/fix-match',
+            { key: fixKey }
+          );
+          const [text, appearance] = said(data);
+          addToast(text, { appearance, autoDismiss: true });
+          if (data.state === 'fixed' || data.state === 'right') {
+            await mutate(FIXES_URL);
+            onFixed();
+          }
+        } catch (e) {
+          addToast(
+            e?.response?.data?.message ??
+              intl.formatMessage(messages.fixFailed),
+            { appearance: 'error', autoDismiss: true }
+          );
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <WrenchIcon />
+      <span>
+        {intl.formatMessage(busy ? messages.fixing : messages.fixMatch)}
+      </span>
+    </Button>
+  );
+};
+
+type ListedFix = MatchFix & {
+  byName?: string | null;
+  undoneByName?: string | null;
+};
+
+/** Matches fixed lately, each with Undo. Nothing when there are none. */
+const FixedLately = ({ onChanged }: { onChanged: () => void }) => {
+  const intl = useIntl();
+  const { addToast } = useToasts();
+  const { data, mutate } = useSWR<{ fixes: ListedFix[] }>(FIXES_URL, {
+    revalidateOnFocus: false,
+  });
+  const [busy, setBusy] = useState<string>();
+  if (!data?.fixes.length) return null;
+
+  const when = (iso: string) =>
+    intl.formatDate(iso, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+
+  return (
+    <div className="border-b border-gray-700 py-2">
+      <h5 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+        {intl.formatMessage(messages.fixedLately)}
+      </h5>
+      <ul>
+        {data.fixes.map((fix) => (
+          <li key={fix.id} className="py-1.5 text-sm">
+            <span className="break-words text-gray-100">{fix.folder}</span>
+            <span className="mt-0.5 block break-words text-xs text-gray-400">
+              {intl.formatMessage(messages.fixedFromTo, {
+                from: titled(fix.from),
+                to: titled(fix.to),
+              })}
+              {!fix.confirmed &&
+                ` · ${intl.formatMessage(messages.fixUnconfirmed)}`}
+            </span>
+            <span className="mt-0.5 block text-xs text-gray-500">
+              {fix.by === 'auto'
+                ? intl.formatMessage(messages.fixedByItself, {
+                    time: when(fix.at),
+                  })
+                : intl.formatMessage(messages.fixedBy, {
+                    name: fix.byName ?? '',
+                    time: when(fix.at),
+                  })}
+            </span>
+            {fix.undoneAt ? (
+              <span className="mt-1 block text-xs text-gray-500">
+                {intl.formatMessage(messages.undone)}
+              </span>
+            ) : (
+              <Button
+                buttonType="ghost"
+                buttonSize="sm"
+                className="mt-2"
+                disabled={busy !== undefined}
+                onClick={async () => {
+                  setBusy(fix.id);
+                  try {
+                    await axios.post(`${FIXES_URL}/${fix.id}/undo`);
+                    addToast(intl.formatMessage(messages.undoDone), {
+                      appearance: 'success',
+                      autoDismiss: true,
+                    });
+                    await mutate();
+                    onChanged();
+                  } catch (e) {
+                    addToast(
+                      e?.response?.data?.message ??
+                        intl.formatMessage(messages.undoFailed),
+                      { appearance: 'error', autoDismiss: true }
+                    );
+                  } finally {
+                    setBusy(undefined);
+                  }
+                }}
+              >
+                <ArrowUturnLeftIcon />
+                <span>{intl.formatMessage(messages.undo)}</span>
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };
@@ -482,7 +742,8 @@ const CheckRow = ({
               {row(open)}
             </DisclosureButton>
             <DisclosurePanel className="border-t border-gray-700 bg-gray-900/40 px-4 py-2">
-              {matchCheck && <MatchOnImport />}
+              {matchCheck && <MatchSettings onChanged={onChanged} />}
+              {matchCheck && <FixedLately onChanged={onChanged} />}
               {recent.length > 0 && (
                 <div className="border-b border-gray-700 py-2">
                   <h5 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
@@ -506,6 +767,9 @@ const CheckRow = ({
                               }),
                             })}
                           </span>
+                        )}
+                        {item.fix && (
+                          <FixButton fixKey={item.fix} onFixed={onChanged} />
                         )}
                       </li>
                     ))}
@@ -543,6 +807,15 @@ const CheckRow = ({
                         mediaId={item.searchable.mediaId}
                         is4k={item.searchable.is4k}
                         mediaType={item.searchable.mediaType}
+                      />
+                    )}
+                    {item.fix && (
+                      <FixButton
+                        fixKey={item.fix}
+                        onFixed={() => {
+                          void refreshPage();
+                          onChanged();
+                        }}
                       />
                     )}
                   </li>

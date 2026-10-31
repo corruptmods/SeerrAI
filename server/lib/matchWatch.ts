@@ -28,6 +28,7 @@ import {
 } from '@server/lib/music/matcher';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import { wrongMatchEvent } from '@server/lib/notifications/eventTitles';
+import { autoFix, canFix, fixingAuto } from '@server/lib/plexFixMatch';
 import type {
   Expected,
   MatchItem,
@@ -40,6 +41,7 @@ import plexMatchCheck, {
   folderName,
   jellyfinMatchItem,
   plexMatchItem,
+  problemKey,
   radarrFileFacts,
 } from '@server/lib/plexMatchCheck';
 import { providerId } from '@server/lib/scanners/music/jellyfin';
@@ -90,6 +92,9 @@ export const RECHECK_MS = 6 * HOUR_MS;
 
 /** Titles looked at in one run, so a burst of imports is spread out. */
 const PER_RUN = 25;
+
+/** Nightly problems fixed in Plex by themselves, at most, a night. */
+const AUTO_PER_NIGHT = 20;
 
 /** The newest items of each library looked through for the one imported. */
 const NEWEST = 100;
@@ -147,36 +152,6 @@ const yearOf = (date?: string | null): number | undefined => {
 
 const titled = (t: { title: string; year?: number }) =>
   t.year ? `${t.title} (${t.year})` : t.title;
-
-/**
- * The same problem, whoever found it: the server, the title Radarr, Sonarr
- * or Lidarr has, and what the server matched it to (its ids, not its own
- * item id, which a rescan changes).
- */
-export const problemKey = (p: PlexMatchProblem): string => {
-  const e = p.expected;
-  const title =
-    p.kind === 'music'
-      ? `mb:${e.mbid ?? p.folder.toLowerCase()}`
-      : p.kind === 'series'
-        ? e.tvdbId
-          ? `tvdb:${e.tvdbId}`
-          : `tmdb:${e.tmdbId ?? ''}:${e.imdbId ?? ''}`
-        : e.tmdbId
-          ? `tmdb:${e.tmdbId}`
-          : `imdb:${e.imdbId ?? ''}`;
-  const m = p.matched;
-  const ids = [m.tmdbId, m.tvdbId, m.imdbId, m.mbid]
-    .map((id) => id ?? '')
-    .join(',');
-  const to =
-    p.reason === 'unmatched'
-      ? 'unmatched'
-      : ids.replace(/,/g, '')
-        ? ids
-        : `title:${m.title.toLowerCase()}`;
-  return [p.mediaServer ?? 'Plex', p.kind, title, to].join('|');
-};
 
 /** Neither title is the other: one may be a longer edition's. */
 const titlesClose = (a?: string, b?: string): boolean => {
@@ -892,7 +867,74 @@ class MatchWatchJob {
       );
     } catch {
       // Recorded at the same moment by another look.
+      return;
     }
+    await this.fixOnItsOwn(problem, key, now);
+  }
+
+  /**
+   * With "Fix automatically" on, a new problem is fixed in Plex there and
+   * then, and admins are told it was fixed rather than asked to.
+   */
+  private async fixOnItsOwn(
+    problem: PlexMatchProblem,
+    key: string,
+    now: Date
+  ): Promise<void> {
+    const outcome = await autoFix(problem, key);
+    if (outcome?.state === 'right') {
+      await this.resolveKeys([key], now);
+    } else if (outcome?.state === 'fixed') {
+      const { title, year } = outcome.fix.to;
+      // Left 'waiting', unlike other problems put right: still told.
+      await getRepository(MatchProblem).update(
+        { key },
+        {
+          problem: JSON.stringify({ ...problem, fixed: { title, year } }),
+          resolvedAt: now,
+          nextCheckAt: null,
+        }
+      );
+    }
+  }
+
+  /** Problems put right, by their keys: over, and not told. */
+  private async resolveKeys(keys: string[], now: Date): Promise<void> {
+    if (!keys.length) return;
+    const repo = getRepository(MatchProblem);
+    await repo.update(
+      {
+        key: In(keys),
+        resolvedAt: IsNull(),
+        notice: In<MatchNotice>(['waiting', 'held']),
+      },
+      { notice: 'none' }
+    );
+    await repo.update(
+      { key: In(keys), resolvedAt: IsNull() },
+      { resolvedAt: now, nextCheckAt: null }
+    );
+  }
+
+  /** An open problem by its key: a new request's, or the nightly check's. */
+  public async findProblem(key: string): Promise<PlexMatchProblem | undefined> {
+    const row = await getRepository(MatchProblem).findOne({
+      where: { key, resolvedAt: IsNull() },
+    });
+    if (row) return JSON.parse(row.problem) as PlexMatchProblem;
+    const report = await plexMatchCheck.lastReport();
+    return report.problems.find((p) => problemKey(p) === key);
+  }
+
+  /** A problem an admin fixed: off the Health page, and not told. */
+  public async markFixed(
+    problem: PlexMatchProblem,
+    now = new Date()
+  ): Promise<void> {
+    const key = problemKey(problem);
+    await this.resolveKeys([key], now);
+    await plexMatchCheck.forget([key]);
+    await this.showWaiting();
   }
 
   /**
@@ -1042,7 +1084,35 @@ class MatchWatchJob {
           : {}),
       });
     }
+    await this.fixNightlyOnItsOwn(report, unread, now);
     await this.showWaiting();
+  }
+
+  /**
+   * With "Fix automatically" on, what the nightly check found is fixed in
+   * Plex too, up to AUTO_PER_NIGHT a night, and taken off its list.
+   */
+  private async fixNightlyOnItsOwn(
+    report: PlexMatchReport,
+    unread: MediaServerName[],
+    now: Date
+  ): Promise<void> {
+    if (!fixingAuto() || unread.includes('Plex')) return;
+    const fixed: string[] = [];
+    let tried = 0;
+    for (const problem of report.problems) {
+      if (tried >= AUTO_PER_NIGHT) break;
+      if (!canFix(problem)) continue;
+      const key = problemKey(problem);
+      const outcome = await autoFix(problem, key);
+      if (!outcome) continue;
+      tried += 1;
+      if (outcome.state === 'fixed' || outcome.state === 'right') {
+        fixed.push(key);
+      }
+    }
+    await this.resolveKeys(fixed, now);
+    await plexMatchCheck.forget(fixed);
   }
 
   /**
@@ -1051,8 +1121,10 @@ class MatchWatchJob {
    */
   private async tell(now: Date): Promise<void> {
     const repo = getRepository(MatchProblem);
+    // Problems put right are no longer 'waiting', but those fixed on
+    // their own still are: they are told as fixed.
     const waiting = await repo.find({
-      where: { notice: 'waiting', resolvedAt: IsNull() },
+      where: { notice: 'waiting' },
       order: { foundAt: 'ASC' },
     });
     if (!waiting.length) return;
@@ -1170,11 +1242,19 @@ export const wrongMatchMessage = (
   const moreLine = more
     ? `Plus ${more} more found since the last message, past the ${DAILY_MESSAGES} messages a day: see the Health page.`
     : '';
-  const texts = told.map(({ problem, path }) => ({
-    problem,
-    path,
-    text: plexMatchText(problem),
-  }));
+  const texts = told.map(({ problem, path }) => {
+    const text = plexMatchText(problem);
+    return {
+      problem,
+      path,
+      text: problem.fixed
+        ? {
+            title: text.title,
+            detail: `Fixed in ${problem.mediaServer ?? 'Plex'} by itself: it is now ${titled(problem.fixed)}. Undo it on the Health page if that's wrong.`,
+          }
+        : text,
+    };
+  });
   const [first] = texts;
   if (texts.length === 1) {
     return {

@@ -33,6 +33,14 @@ Media servers match files to titles by name; Sonarr, Radarr and Lidarr by id. Wh
 
 To see them, open **Settings → Health** and, under **Titles**, **Folders matched to another title**. It lists **Recent requests** (newest first) and the **Nightly check**, and has the switch **Check new requests as they're imported**.
 
+### Fixing them from here (Plex)
+
+- **Fix matches from here** (on to start): each film or series on Plex that Seerr AI can put right gets a **Fix match** button. It looks the title up in Plex's Fix Match by the id Radarr or Sonarr has (`tmdb-846213`, then the IMDb id), never by name, matches it, and reads Plex back. If Plex then has it as another title, the old match is put back. It doesn't offer to fix music, Jellyfin or Emby, or a film whose file is far off the film's length (replace that one in Radarr instead).
+- **Fix automatically** (off to start): new problems are fixed as they're found, and up to 20 from the nightly check each night, without asking. Admins still get the Wrong Match notification, saying it was fixed. One that didn't work isn't tried again for a week.
+- **Fixed lately** lists the last fixes, by whom or "By itself", each with **Undo**, which puts the item back as Plex had it.
+
+It uses the calls Plex Web's own Fix Match makes, with the server owner's sign-in. Plex keeps watch history with the match, so fixing a title that was already watched may show it unwatched.
+
 What a row can say:
 
 | It says | Meaning | Fix |

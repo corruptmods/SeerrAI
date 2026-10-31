@@ -1,6 +1,8 @@
 import DelugeAPI from '@server/api/downloadclients/deluge';
 import NzbgetAPI from '@server/api/downloadclients/nzbget';
 import { musicBrainzQueue } from '@server/api/musicbrainz';
+import type { PlexLibraryItem } from '@server/api/plexapi';
+import PlexAPI from '@server/api/plexapi';
 import TheMovieDb from '@server/api/themoviedb';
 import {
   MediaRequestStatus,
@@ -21,7 +23,13 @@ import MusicAlbum from '@server/entity/MusicAlbum';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
-import plexMatchCheck from '@server/lib/plexMatchCheck';
+import {
+  FIXES_PATH,
+  forgetFixesForTests,
+  setFixTimingForTests,
+} from '@server/lib/plexFixMatch';
+import type { PlexMatchProblem } from '@server/lib/plexMatchCheck';
+import plexMatchCheck, { problemKey } from '@server/lib/plexMatchCheck';
 import type { LidarrSettings, RadarrSettings } from '@server/lib/settings';
 import { BACKFILL_DEFAULTS, getSettings } from '@server/lib/settings';
 import mediaRoutes from '@server/routes/media';
@@ -30,10 +38,19 @@ import { setupTestDb } from '@server/test/db';
 import express from 'express';
 import * as OpenApiValidator from 'express-openapi-validator';
 import assert from 'node:assert/strict';
+import { promises as fs } from 'node:fs';
 import type { Server } from 'node:http';
 import http from 'node:http';
 import path from 'node:path';
-import { after, before, beforeEach, describe, it, mock } from 'node:test';
+import {
+  after,
+  afterEach,
+  before,
+  beforeEach,
+  describe,
+  it,
+  mock,
+} from 'node:test';
 
 /*
  * The admin health page's checks, against a real database and real HTTP:
@@ -153,7 +170,7 @@ type Check = {
   count: number;
   detail?: string;
   partial?: boolean;
-  items: { title: string; detail?: string; href?: string }[];
+  items: { title: string; detail?: string; href?: string; fix?: string }[];
 };
 const health = () =>
   new Promise<Check[]>((resolve, reject) => {
@@ -1730,6 +1747,182 @@ describe('requests, titles and users', () => {
         'plexSignIn:ok',
       ]
     );
+  });
+});
+
+describe('fixing a wrong Plex match', () => {
+  const wrong: PlexMatchProblem = {
+    kind: 'movie',
+    folder: 'Border Feud (2024)',
+    reason: 'other',
+    expected: {
+      title: 'Border Feud',
+      year: 2024,
+      tmdbId: 846213,
+      server: 'Radarr',
+    },
+    mediaServer: 'Plex',
+    matched: {
+      title: 'Guerra Fronteriza',
+      year: 2024,
+      key: '70',
+      tmdbId: 1427986,
+    },
+  };
+  const key = problemKey(wrong);
+
+  const call = (method: 'GET' | 'POST', route: string, body?: unknown) =>
+    new Promise<{ status: number; body: Record<string, unknown> }>(
+      (resolve, reject) => {
+        const payload = body === undefined ? '' : JSON.stringify(body);
+        const req = http.request(
+          {
+            host: '127.0.0.1',
+            port,
+            path: route,
+            method,
+            headers: payload
+              ? {
+                  'Content-Type': 'application/json',
+                  'Content-Length': Buffer.byteLength(payload),
+                }
+              : {},
+          },
+          (res) => {
+            let raw = '';
+            res.on('data', (c) => (raw += c));
+            res.on('end', () => {
+              // This app answers errors as HTML: their status is enough.
+              let parsed: Record<string, unknown> = {};
+              try {
+                parsed = JSON.parse(raw);
+              } catch {
+                parsed = {};
+              }
+              resolve({ status: res.statusCode ?? 0, body: parsed });
+            });
+          }
+        );
+        req.on('error', reject);
+        req.end(payload);
+      }
+    );
+
+  let forgotten: string[][];
+  // Restored one by one: the file's own mock of lastReport stays.
+  let mocked: { mock: { restore: () => void } }[] = [];
+  const stub = <T extends object>(
+    target: T,
+    name: keyof T & string,
+    fn: (...args: never[]) => unknown
+  ) => {
+    mocked.push(mock.method(target, name, fn as never));
+  };
+
+  beforeEach(async () => {
+    forgotten = [];
+    setFixTimingForTests(50, 1);
+    actingAs = await getRepository(User).findOneByOrFail({ id: 1 });
+    await getRepository(User).update(1, { plexToken: 'token' });
+    const settings = getSettings();
+    settings.plex = { ...settings.plex, ip: 'plex.invalid' };
+    settings.main.matchFix = true;
+    stub(plexMatchCheck, 'lastReport', async () => ({
+      finishedAt: new Date().toISOString(),
+      running: false,
+      checked: 1,
+      notChecked: 0,
+      problems: [wrong],
+    }));
+    stub(plexMatchCheck, 'forget', async (keys: string[]) => {
+      forgotten.push(keys);
+    });
+    let item = {
+      ratingKey: '70',
+      title: 'Guerra Fronteriza',
+      year: 2024,
+      guid: 'plex://movie/wrong',
+      Guid: [{ id: 'tmdb://1427986' }],
+      type: 'movie',
+      Media: [],
+    } as unknown as PlexLibraryItem;
+    stub(PlexAPI.prototype, 'getMatchItem', async () => item);
+    stub(PlexAPI.prototype, 'getLibraries', async () => []);
+    stub(
+      PlexAPI.prototype,
+      'findMatches',
+      async (_key: string, term: string) =>
+        term === 'tmdb-846213'
+          ? [{ guid: 'plex://movie/right', name: 'Border Feud', year: 2024 }]
+          : []
+    );
+    stub(
+      PlexAPI.prototype,
+      'setMatch',
+      async (_key: string, to: { guid: string }) => {
+        item = {
+          ...item,
+          title: 'Border Feud',
+          guid: to.guid,
+          Guid: [{ id: 'tmdb://846213' }],
+        };
+      }
+    );
+  });
+
+  afterEach(async () => {
+    for (const m of mocked) m.mock.restore();
+    mocked = [];
+    forgetFixesForTests();
+    await fs.rm(FIXES_PATH, { force: true });
+    getSettings().main.matchFix = true;
+  });
+
+  it('offers a fix for each it can put right, and fixes it by its key', async () => {
+    const [listed] = byId(await health(), 'plexMatches').items;
+    assert.equal(listed.fix, key);
+
+    const fixed = await call('POST', '/api/v1/settings/health/fix-match', {
+      key,
+    });
+    assert.equal(fixed.status, 200);
+    assert.equal(fixed.body.state, 'fixed');
+    assert.deepEqual(forgotten, [[key]], 'off the nightly list');
+
+    const { body } = await call('GET', '/api/v1/settings/health/match-fixes');
+    const [fix] = body.fixes as {
+      id: string;
+      by: number;
+      byName: string;
+      to: { title: string };
+    }[];
+    assert.equal(fix.by, 1);
+    assert.equal(fix.byName, actingAs?.displayName);
+    assert.equal(fix.to.title, 'Border Feud');
+
+    const undone = await call(
+      'POST',
+      `/api/v1/settings/health/match-fixes/${fix.id}/undo`
+    );
+    assert.equal(undone.status, 200);
+    assert.ok(undone.body.undoneAt);
+  });
+
+  it('offers no fix, and fixes nothing, with fixing turned off', async () => {
+    getSettings().main.matchFix = false;
+    const [listed] = byId(await health(), 'plexMatches').items;
+    assert.equal(listed.fix, undefined);
+    const refused = await call('POST', '/api/v1/settings/health/fix-match', {
+      key,
+    });
+    assert.equal(refused.status, 403);
+  });
+
+  it('says so for a problem no longer listed', async () => {
+    const gone = await call('POST', '/api/v1/settings/health/fix-match', {
+      key: 'Plex|movie|tmdb:1|5,,,',
+    });
+    assert.equal(gone.status, 404);
   });
 });
 

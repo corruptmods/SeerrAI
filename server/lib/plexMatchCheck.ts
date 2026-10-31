@@ -87,6 +87,8 @@ export interface PlexMatchProblem {
    * - unmatched: not matched to anything.
    */
   reason: 'other' | 'differentId' | 'unmatched';
+  /** Fixed in Plex by Seerr AI on its own: what it is matched to now. */
+  fixed?: { title: string; year?: number };
 }
 
 export interface PlexMatchReport {
@@ -103,6 +105,36 @@ export interface PlexMatchReport {
 export const REPORT_PATH = process.env.CONFIG_DIRECTORY
   ? `${process.env.CONFIG_DIRECTORY}/plex-match-check.json`
   : path.join(__dirname, '../../config/plex-match-check.json');
+
+/**
+ * The same problem, whoever found it: the server, the title Radarr, Sonarr
+ * or Lidarr has, and what the server matched it to (its ids, not its own
+ * item id, which a rescan changes).
+ */
+export const problemKey = (p: PlexMatchProblem): string => {
+  const e = p.expected;
+  const title =
+    p.kind === 'music'
+      ? `mb:${e.mbid ?? p.folder.toLowerCase()}`
+      : p.kind === 'series'
+        ? e.tvdbId
+          ? `tvdb:${e.tvdbId}`
+          : `tmdb:${e.tmdbId ?? ''}:${e.imdbId ?? ''}`
+        : e.tmdbId
+          ? `tmdb:${e.tmdbId}`
+          : `imdb:${e.imdbId ?? ''}`;
+  const m = p.matched;
+  const ids = [m.tmdbId, m.tvdbId, m.imdbId, m.mbid]
+    .map((id) => id ?? '')
+    .join(',');
+  const to =
+    p.reason === 'unmatched'
+      ? 'unmatched'
+      : ids.replace(/,/g, '')
+        ? ids
+        : `title:${m.title.toLowerCase()}`;
+  return [p.mediaServer ?? 'Plex', p.kind, title, to].join('|');
+};
 
 /** Items read from the media server at a time. */
 const PAGE_SIZE = 200;
@@ -361,6 +393,23 @@ class PlexMatchCheck {
 
   public cancel() {
     this.cancelled = true;
+  }
+
+  /** Takes problems put right (a fix) off the last report, and keeps it. */
+  public async forget(keys: string[]): Promise<void> {
+    const report = await this.lastReport();
+    const gone = new Set(keys);
+    const problems = report.problems.filter((p) => !gone.has(problemKey(p)));
+    if (problems.length === report.problems.length) return;
+    this.report = { ...(this.report as PlexMatchReport), problems };
+    await fs
+      .writeFile(REPORT_PATH, JSON.stringify(this.report))
+      .catch((e: Error) =>
+        logger.warn('Could not keep the Match Check report', {
+          label: 'Match Check',
+          errorMessage: e.message,
+        })
+      );
   }
 
   /** The last report, from memory or from the file it was kept in. */

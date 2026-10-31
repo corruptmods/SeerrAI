@@ -60,6 +60,54 @@ servers:
 
 components:
   schemas:
+    MatchFix:
+      type: object
+      description: A wrong Plex match fixed from Seerr AI, kept so it can be undone.
+      properties:
+        id:
+          type: string
+        at:
+          type: string
+          format: date-time
+        by:
+          oneOf:
+            - type: number
+            - type: string
+              enum: [auto]
+          description: The admin's user id, or auto when Seerr AI fixed it on its own
+        kind:
+          type: string
+          enum: [movie, series]
+        folder:
+          type: string
+        ratingKey:
+          type: string
+        expected:
+          $ref: '#/components/schemas/MatchFixTitle'
+        from:
+          $ref: '#/components/schemas/MatchFixTitle'
+        to:
+          $ref: '#/components/schemas/MatchFixTitle'
+        confirmed:
+          type: boolean
+          description: Plex's item was read back carrying the id it was fixed by
+        undoneAt:
+          type: string
+          format: date-time
+        undoneBy:
+          oneOf:
+            - type: number
+            - type: string
+              enum: [auto]
+    MatchFixTitle:
+      type: object
+      properties:
+        title:
+          type: string
+        year:
+          type: number
+        guid:
+          type: string
     HiddenSliders:
       type: object
       properties:
@@ -915,6 +963,12 @@ components:
         matchCheckOnImport:
           type: boolean
           description: Look for a wrong match on each media server a few minutes after a requested title is imported, as well as nightly.
+        matchFix:
+          type: boolean
+          description: A Fix button on each wrong Plex match Seerr AI can put right (Health → Match Check). On unless turned off.
+        matchFixAuto:
+          type: boolean
+          description: Fix wrong Plex matches without an admin, new ones as found and up to 20 a night from the nightly check. Off unless turned on; needs matchFix.
         autoImportPlexUsers:
           type: boolean
           description: Give everyone the server owner shares Plex with an account, hourly.
@@ -7958,6 +8012,104 @@ paths:
                     type: number
                   failed:
                     type: number
+  /settings/health/fix-match:
+    post:
+      summary: Fix a wrong Plex match
+      description: |
+        Admin only, with matchFix on. The problem's `fix` key from the health page's Match Check. The title is looked up in Plex by the id Radarr or Sonarr has for it, never by name, matched to what that finds, and read back; if Plex then has it as another title, its old match is put back.
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key:
+                  type: string
+      responses:
+        '200':
+          description: 'How it went: fixed, right (Plex had it right), gone (no longer on Plex), notFound (with what was searched), putBack (with what Plex took it as), or unchanged (Plex has not shown the new match yet)'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  state:
+                    type: string
+                    enum: [fixed, right, gone, notFound, putBack, unchanged]
+                  fix:
+                    $ref: '#/components/schemas/MatchFix'
+                  searched:
+                    type: array
+                    items:
+                      type: string
+                  to:
+                    type: object
+                    properties:
+                      title:
+                        type: string
+                      year:
+                        type: number
+        '400':
+          description: Seerr AI can't fix this one (another server, music, or a film whose file is another film's length)
+        '403':
+          description: Fixing matches is turned off
+        '404':
+          description: No such problem is listed now
+        '502':
+          description: Plex didn't take it
+  /settings/health/match-fixes:
+    get:
+      summary: Matches fixed lately
+      description: Admin only. The newest ten, by an admin or by Seerr AI on its own, with Undo for those not undone.
+      tags:
+        - settings
+      responses:
+        '200':
+          description: The fixes, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fixes:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/MatchFix'
+                        - type: object
+                          properties:
+                            byName:
+                              type: string
+                              nullable: true
+                              description: The admin who fixed it; null when Seerr AI did on its own
+                            undoneByName:
+                              type: string
+                              nullable: true
+  /settings/health/match-fixes/{id}/undo:
+    post:
+      summary: Undo a match fix
+      description: Admin only. Puts the item back as Plex had it before the fix.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The fix, now undone
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchFix'
+        '400':
+          description: Not listed, undone already, or no longer on Plex
   /settings/health/unlinked-requests:
     delete:
       summary: Remove requests no longer linked to a title

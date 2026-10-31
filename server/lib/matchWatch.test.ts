@@ -1,5 +1,9 @@
 import JellyfinAPI from '@server/api/jellyfin';
-import type { PlexLibraryItem, PlexMusicItem } from '@server/api/plexapi';
+import type {
+  PlexLibraryItem,
+  PlexMatchResult,
+  PlexMusicItem,
+} from '@server/api/plexapi';
 import PlexAPI from '@server/api/plexapi';
 import LidarrAPI from '@server/api/servarr/lidarr';
 import RadarrAPI from '@server/api/servarr/radarr';
@@ -25,6 +29,13 @@ import matchWatch, {
 } from '@server/lib/matchWatch';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import type { NotificationPayload } from '@server/lib/notifications/agents/agent';
+import {
+  FIXES_PATH,
+  forgetAutoTriedForTests,
+  forgetFixesForTests,
+  recentFixes,
+  setFixTimingForTests,
+} from '@server/lib/plexFixMatch';
 import plexMatchCheck, { REPORT_PATH } from '@server/lib/plexMatchCheck';
 import type {
   LidarrSettings,
@@ -275,6 +286,51 @@ const guerraCivil = () =>
     'tmdb://1427986',
   ]);
 
+/**
+ * Fix Match in Plex turned on to work by itself: a search for Border
+ * Feud's TMDB id finds it, and matching item 70 to it makes it so.
+ */
+const fixesByItself = async (item: { current: PlexLibraryItem }) => {
+  setFixTimingForTests(50, 1);
+  const settings = getSettings();
+  settings.plex.ip = 'plex.invalid';
+  settings.main.matchFix = true;
+  settings.main.matchFixAuto = true;
+  await getRepository(User).update(1, { plexToken: 'token' });
+  mock.method(PlexAPI.prototype, 'getLibraries', async () => [
+    { key: '1', type: 'movie', title: 'Movies', agent: 'tv.plex.agents.movie' },
+  ]);
+  mock.method(
+    PlexAPI.prototype,
+    'findMatches',
+    async (_key: string, term: string): Promise<PlexMatchResult[]> =>
+      term === 'tmdb-846213'
+        ? [{ guid: 'plex://movie/right', name: 'Border Feud', year: 2024 }]
+        : []
+  );
+  mock.method(
+    PlexAPI.prototype,
+    'setMatch',
+    async (key: string, to: { guid: string }) => {
+      item.current = {
+        ...plexMovie(key, 'Border Feud', 2024, 'Border Feud (2024)', [
+          'tmdb://846213',
+        ]),
+        guid: to.guid,
+      };
+    }
+  );
+};
+
+const noFixing = async () => {
+  forgetFixesForTests();
+  forgetAutoTriedForTests();
+  await fs.rm(FIXES_PATH, { force: true });
+  const settings = getSettings();
+  settings.plex.ip = '';
+  settings.main.matchFixAuto = false;
+};
+
 const pending = () =>
   getRepository(MatchWatch).find({ order: { mediaServer: 'ASC' } });
 const problems = () =>
@@ -418,6 +474,37 @@ describe('looking at new requests as they are imported', () => {
     for (const minute of [302, 307, 330]) await matchWatch.run(at(minute));
     assert.equal(sent.length, 1);
     assert.equal((await problems()).length, 1);
+  });
+
+  it('with Fix automatically on, fixes a wrong match in Plex and tells admins it did', async () => {
+    await requestedMovie(846213, 10);
+    radarrHas({ 10: borderFeud });
+    const item = { current: guerraCivil() };
+    plexHas(() => [item.current]);
+    await fixesByItself(item);
+    try {
+      await matchWatch.noteImports([imported('movie', 10)], T0);
+      await matchWatch.run(at(2));
+      const [problem] = await problems();
+      assert.ok(problem.resolvedAt, 'fixed there and then');
+      assert.equal(item.current.guid, 'plex://movie/right');
+      assert.equal(
+        downloadTracker.getMovieProgress(0, 10)[0]?.matching,
+        undefined,
+        'the request no longer waits on it'
+      );
+
+      await matchWatch.run(at(2 + GATHER_MS / MIN));
+      assert.equal(sent.length, 1, 'still told');
+      assert.match(
+        sent[0].message ?? '',
+        /Fixed in Plex by itself: it is now Border Feud \(2024\)/
+      );
+      const [fix] = await recentFixes();
+      assert.equal(fix.by, 'auto');
+    } finally {
+      await noFixing();
+    }
   });
 
   it('says "not matched" only once the server has had its time', async () => {
@@ -901,5 +988,23 @@ describe('sharing what is found with the nightly Match Check', () => {
     assert.ok(cleared.resolvedAt, 'the nightly check found it right');
     assert.equal(sent.length, 1, 'without a word');
     assert.equal(downloadTracker.getMovieProgress(0, 10).length, 0);
+  });
+  it('with Fix automatically on, fixes what the nightly check finds and takes it off the list', async () => {
+    const item = { current: guerraCivil() };
+    mock.method(PlexAPI.prototype, 'getMatchItem', async (key: string) =>
+      key === '70' ? item.current : undefined
+    );
+    await fixesByItself(item);
+    try {
+      await nightlyFinds([guerraCivil()]);
+      assert.equal(item.current.guid, 'plex://movie/right');
+      assert.equal((await plexMatchCheck.lastReport()).problems.length, 0);
+      const [fix] = await recentFixes();
+      assert.equal(fix.folder, 'Border Feud (2024)');
+      assert.equal(fix.by, 'auto');
+      assert.equal(sent.length, 0, 'the nightly list is not told');
+    } finally {
+      await noFixing();
+    }
   });
 });

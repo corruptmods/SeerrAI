@@ -39,6 +39,14 @@ import {
 import type { MusicImageSource } from '@server/lib/music/imageSources';
 import { MUSIC_IMAGE_ORIGINS } from '@server/lib/music/imageSources';
 import { Permission } from '@server/lib/permissions';
+import type { FixBy } from '@server/lib/plexFixMatch';
+import {
+  canFix,
+  fixMatch,
+  fixingOn,
+  recentFixes,
+  undoFix,
+} from '@server/lib/plexFixMatch';
 import type { MediaServerName } from '@server/lib/plexMatchCheck';
 import plexMatchCheck from '@server/lib/plexMatchCheck';
 import { plexFullScanner } from '@server/lib/scanners/plex';
@@ -61,6 +69,7 @@ import fs from 'fs';
 import { escapeRegExp, merge, omit, set, sortBy } from 'lodash';
 import { rescheduleJob } from 'node-schedule';
 import path from 'path';
+import { In } from 'typeorm';
 import { URL } from 'url';
 import { z } from 'zod';
 import aiSettingsRoutes from './ai';
@@ -636,6 +645,90 @@ settingsRoutes.get<{ id: string }>(
  * stuck and searchable. Films go to each Radarr in one command; a series
  * whose whole aired season is missing gets a season search.
  */
+/**
+ * Fixes one wrong Plex match the Health page lists, by its key: looked up
+ * in Plex by the id Radarr or Sonarr has, matched, and read back.
+ */
+settingsRoutes.post<never, unknown, { key?: unknown }>(
+  '/health/fix-match',
+  async (req, res, next) => {
+    if (!fixingOn()) {
+      return next({
+        status: 403,
+        message: 'Fixing matches is turned off (Health → Match Check).',
+      });
+    }
+    const key = typeof req.body?.key === 'string' ? req.body.key : '';
+    const problem = key ? await matchWatch.findProblem(key) : undefined;
+    if (!problem) {
+      return next({ status: 404, message: 'That match is not listed now.' });
+    }
+    if (!canFix(problem)) {
+      return next({ status: 400, message: 'Seerr AI can’t fix this one.' });
+    }
+    try {
+      const outcome = await fixMatch(problem, req.user?.id ?? 'auto');
+      if (outcome.state === 'fixed' || outcome.state === 'right') {
+        await matchWatch.markFixed(problem);
+      }
+      return res.status(200).json(outcome);
+    } catch (e) {
+      logger.warn('Could not fix a match in Plex', {
+        label: 'Match Check',
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+      return next({
+        status: 502,
+        message: `Plex didn’t take it: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    }
+  }
+);
+
+/** The matches fixed lately, by an admin or by themselves, newest first. */
+settingsRoutes.get('/health/match-fixes', async (_req, res) => {
+  const fixes = await recentFixes();
+  const ids = [
+    ...new Set(
+      fixes.flatMap((f) =>
+        [f.by, f.undoneBy].filter((by): by is number => typeof by === 'number')
+      )
+    ),
+  ];
+  const users = ids.length
+    ? await getRepository(User).find({ where: { id: In(ids) } })
+    : [];
+  const name = (by?: FixBy) =>
+    by === undefined
+      ? undefined
+      : by === 'auto'
+        ? null
+        : (users.find((u) => u.id === by)?.displayName ?? null);
+  return res.status(200).json({
+    fixes: fixes.map((f) => ({
+      ...f,
+      byName: name(f.by),
+      undoneByName: name(f.undoneBy),
+    })),
+  });
+});
+
+/** Puts a fix back as Plex had it. */
+settingsRoutes.post<{ id: string }>(
+  '/health/match-fixes/:id/undo',
+  async (req, res, next) => {
+    try {
+      const fix = await undoFix(req.params.id, req.user?.id ?? 'auto');
+      return res.status(200).json(fix);
+    } catch (e) {
+      return next({
+        status: 400,
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+);
+
 settingsRoutes.post('/health/search-all-missing', async (req, res, next) => {
   try {
     const titles = await searchableStuckTitles();

@@ -734,6 +734,10 @@ export interface MainSettings {
    * requested title is imported (lib/matchWatch), as well as nightly.
    */
   matchCheckOnImport: boolean;
+  /** A Fix button on each wrong Plex match Seerr AI can put right. */
+  matchFix?: boolean;
+  /** Fixes them without an admin: new ones as found, and nightly. */
+  matchFixAuto?: boolean;
 }
 
 export interface ProxySettings {
@@ -1130,6 +1134,8 @@ class Settings {
         youtubeUrl: '',
         versionCheck: true,
         matchCheckOnImport: true,
+        matchFix: true,
+        matchFixAuto: false,
       },
       plex: {
         name: '',

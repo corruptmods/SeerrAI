@@ -2,6 +2,7 @@ import { checkPersonalCss } from '@server/constants/customCss';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
+import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import { isOwnProfileOrAdmin } from '@server/utils/profileMiddleware';
 import { Router } from 'express';
@@ -58,7 +59,14 @@ personalCssRoutes.post<{ id: string }>(
       if (!user) {
         return next({ status: 404, message: 'User not found.' });
       }
-      if (user.id === 1 && req.user?.id !== 1) {
+      // Someone else's screens: the owner's only by the owner, and an
+      // admin's only by an admin.
+      if (
+        user.id !== req.user?.id &&
+        (user.id === 1 ||
+          (user.hasPermission(Permission.ADMIN) &&
+            !req.user?.hasPermission(Permission.ADMIN)))
+      ) {
         return next({
           status: 403,
           message: "You do not have permission to modify this user's settings.",

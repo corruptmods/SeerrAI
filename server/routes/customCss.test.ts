@@ -1,6 +1,8 @@
 import { SERVER_CSS_MAX_BYTES } from '@server/constants/customCss';
 import { SERVER_THEME_DEFAULTS } from '@server/constants/theme';
+import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
+import { User } from '@server/entity/User';
 import { UserSettings } from '@server/entity/UserSettings';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
@@ -255,6 +257,56 @@ describe('a person’s own CSS', () => {
       (await agent.post('/api/v1/user/1/settings/css').send({ css: mine }))
         .status,
       403
+    );
+  });
+
+  it('can’t be changed on an admin’s screens by someone who only manages users', async () => {
+    getSettings().appearance.personalCss = true;
+    const users = getRepository(User);
+    await users.update(
+      { email: 'friend@seerr.dev' },
+      { permissions: Permission.MANAGE_USERS }
+    );
+    const make = (email: string, permissions: Permission) =>
+      users.save(
+        Object.assign(new User(), {
+          email,
+          username: email.split('@')[0],
+          permissions,
+          avatar: '',
+          userType: UserType.LOCAL,
+        })
+      );
+    const otherAdmin = await make('second-admin@seerr.dev', Permission.ADMIN);
+    const someone = await make('someone@seerr.dev', Permission.REQUEST);
+
+    const { agent } = await signIn('friend@seerr.dev');
+    assert.equal(
+      (
+        await agent
+          .post(`/api/v1/user/${otherAdmin.id}/settings/css`)
+          .send({ css: mine })
+      ).status,
+      403
+    );
+    assert.equal(
+      (
+        await agent
+          .post(`/api/v1/user/${someone.id}/settings/css`)
+          .send({ css: mine })
+      ).status,
+      200
+    );
+
+    // The owner may.
+    const owner = await signIn('admin@seerr.dev');
+    assert.equal(
+      (
+        await owner.agent
+          .post(`/api/v1/user/${otherAdmin.id}/settings/css`)
+          .send({ css: mine })
+      ).status,
+      200
     );
   });
 });

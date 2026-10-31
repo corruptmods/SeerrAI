@@ -7,6 +7,7 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import OidcLink from '@server/entity/OidcLink';
 import { User } from '@server/entity/User';
+import UserApiKey from '@server/entity/UserApiKey';
 import {
   CORRELATION_COOKIE,
   forgetDiscovery,
@@ -14,6 +15,7 @@ import {
   sealCorrelation,
 } from '@server/lib/oidc';
 import { Permission } from '@server/lib/permissions';
+import { makeKey } from '@server/lib/personalApiKeys';
 import type { OidcProviderSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -926,6 +928,40 @@ describe('linking a provider account', () => {
       res.headers.location,
       '/login?redirect=%2Fprofile%2Fsettings%2Flinked-accounts'
     );
+  });
+
+  it('is never started with an API key, personal or the server’s', async () => {
+    const settings = getSettings();
+    const before = {
+      access: settings.main.personalApiKeys,
+      serverKey: settings.main.apiKey,
+    };
+    settings.main.personalApiKeys = 'everyone';
+    settings.main.apiKey = 'the-servers-own-key';
+    try {
+      const friend = await getRepository(User).findOneByOrFail({
+        email: 'friend@seerr.dev',
+      });
+      const { key, publicId, secretHash } = makeKey();
+      await getRepository(UserApiKey).save(
+        new UserApiKey({ userId: friend.id, publicId, secretHash, name: 'x' })
+      );
+
+      for (const headers of [
+        { 'X-Api-Key': key },
+        { 'X-Api-Key': 'the-servers-own-key', 'X-Api-User': String(friend.id) },
+      ]) {
+        const res = await request(app)
+          .get('/api/v1/auth/oidc/authentik/link')
+          .set(headers);
+
+        assert.equal(res.status, 403);
+        assert.equal(cookiesOf(res)[CORRELATION_COOKIE], undefined);
+      }
+    } finally {
+      settings.main.personalApiKeys = before.access;
+      settings.main.apiKey = before.serverKey;
+    }
   });
 });
 

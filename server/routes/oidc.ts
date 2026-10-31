@@ -180,6 +180,15 @@ oidcRoutes.get<{ providerId: string }>(
     if (!req.user) {
       return res.redirect(loginUrl(LINKED_ACCOUNTS));
     }
+    // Not with an API key: a link is a way to sign in, and a key, which
+    // might have leaked, must not be able to make itself one.
+    if (req.authMethod !== 'session') {
+      return res.status(403).json({
+        status: 403,
+        message:
+          'A sign-in provider can only be linked while signed in, not with a key.',
+      });
+    }
     await goToProvider(req, res, {
       returnTo: LINKED_ACCOUNTS,
       userId: req.user.id,

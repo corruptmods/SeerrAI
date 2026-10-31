@@ -10,7 +10,7 @@ merged back in.
 there, or to cherry-pick a fix worth having. Nothing is expected to merge
 cleanly, and nothing has to.
 
-Upstream `develop` has been read through `c0759ce07` (29 October 2026).
+Upstream `develop` has been read through `c0759ce0` (29 October 2026; checked again 31 October, nothing newer).
 Its two security advisories there are covered: GHSA-xc6j-6p6h-p799 (other
 people's details and issues in a title's media info) by `mediaForViewer`,
 done here before upstream's fix; GHSA-8j73-j6rc-q8xh (notification

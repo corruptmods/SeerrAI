@@ -31,9 +31,29 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - sqlite3 6.0.1 (SQLite 3.52), from Seerr. Nothing to do: databases open as before.
 
+### Fixed
+
+- Removing a title's file went to the default Radarr or Sonarr server when the title was on the first one added.
+- **Keep** on Deleting Soon no longer postpones the deletion on a Maintainerr server that doesn't allow Keep.
+- Quality profiles: Undo works after a new format was added, an apply that stopped part way can be undone, and Stop managing during an apply is kept.
+- Match Check on import no longer misses an older import looked at in the same run.
+- Backfill reads an NZB with a bad character in it, names Lidarr when Lidarr doesn't answer, and waits at most a day when an indexer says to wait.
+- Testing a qBittorrent or Deluge password that's wrong says it's wrong, even while the right one is signed in.
+- A Trakt link with a stray `%` in it, a music page number like `1e300`, and a Wikipedia biography with an odd character no longer fail.
+- Transcribe Episodes says why it couldn't start, instead of "Bazarr did not answer".
+
 ### Security
 
 - [CVE-2026-93753](https://github.com/advisories/GHSA-gcqx-w48m-w2h4): deepmerge, which email templates use, has no fixed release yet, so Seerr AI carries its own fix.
+- **Subtitles**: only a subtitle Bazarr itself offered for that title can be downloaded. A forged choice could have made Bazarr run code (it reads the choice back as a Python object).
+- A personal or server API key can't link a single sign-on, Plex, Jellyfin or Emby account, or set a password to sign in with: a key that leaked could have made itself a full sign-in.
+- **Personal CSS** is checked the way the browser reads it, so a stylesheet can't load from another server by hiding an address in a comment; only an admin sets an admin's CSS.
+- **The admin agent**: approving one of its proposals no longer counts as an admin joining the conversation, which gave a run started by a report the admin's tools.
+- **Quality profiles**: Apply applies only what the preview showed, and automatic TRaSH Guides updates never change the delay profile or choices that weren't applied.
+- Backfill never imports a torrent's file named outside its own folder, and rTorrent removes only what is inside the torrent's folder. Prowlarr's key isn't sent on when an indexer redirects elsewhere.
+- Playlist links: at most 20 every 10 minutes a person, and a playlist page is read only from Spotify or Apple Music, up to 5 MB. Setting a series' Plex subtitle is limited too.
+- A long problem report can't stall the server any more, and nor can sign-in attempts with very long account names.
+- follow-redirects 1.16.2 ([GHSA-mrwp-f3q8-3g9p](https://github.com/advisories/GHSA-mrwp-f3q8-3g9p)) and glob 14 ([GHSA-3g3m-2fjr-6pw4](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4)).
 
 ## 2.2.1 (27 October 2026)
 

@@ -164,12 +164,29 @@ export interface AgentTool extends ConverseTool {
 
 // ---- titles ----------------------------------------------------------------
 
+/** An admin's decision on what a run proposed, as its step says it. */
+export const decisionText = (
+  by: string,
+  approved: boolean,
+  headlines: string
+): string => `${by} ${approved ? 'approved' : 'declined'}: ${headlines}`;
+
+/** Whether a reply step is a decision, not something an admin said. */
+const isDecision = (text: string | undefined): boolean => {
+  const said = text ?? '';
+  const end = said.indexOf(': ');
+  return end > 0 && / (approved|declined)$/.test(said.slice(0, end));
+};
+
 /**
  * Whether an admin is in the conversation: they asked, or have replied
- * since. Only then may it propose changes or request titles.
+ * since. Only then may it propose changes or request titles. Approving
+ * what it proposed is not replying: a run that read release names on its
+ * own gets no more say for it.
  */
 export const adminPresent = (run: AgentRun): boolean =>
-  run.trigger === 'ask' || run.steps.some((step) => step.kind === 'reply');
+  run.trigger === 'ask' ||
+  run.steps.some((step) => step.kind === 'reply' && !isDecision(step.text));
 
 /** Someone reported the files bad and asked for them to be replaced. */
 const replaceReported = (run: AgentRun): boolean =>

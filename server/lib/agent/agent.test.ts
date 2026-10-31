@@ -31,6 +31,7 @@ import {
 } from '@server/lib/agent/rules';
 import type { AgentState } from '@server/lib/agent/tools';
 import {
+  decisionText,
   forgetSearches,
   lookups,
   runTool,
@@ -2827,6 +2828,60 @@ describe('changes the admin agent proposes', () => {
     assert.match(replaced.text, /replaced only when an admin asks/);
     // Once an admin has replied, they are.
     (state.run.steps as { kind: string }[]).push({ kind: 'reply' });
+    const allowed = await runTool(state, 'propose_change', {
+      kind: 'unblockGroup',
+      group: 'x',
+      reason: 'test',
+    });
+    assert.match(allowed.text, /x is not blocked/);
+  });
+
+  it('gives a run no more say for an admin approving what it proposed', async () => {
+    // A report run, which read release names on its own, after an admin
+    // approved the replacement it proposed.
+    const steps: { kind: string; text?: string }[] = [
+      { kind: 'propose', text: 'Replace a file of Wendle the Gentle Lantern' },
+      {
+        kind: 'reply',
+        text: decisionText(
+          'Admin Ana',
+          true,
+          'Replace a file of Wendle the Gentle Lantern'
+        ),
+      },
+    ];
+    const state = {
+      run: {
+        trigger: 'report',
+        kind: 'series',
+        serverId: 0,
+        arrId: 1283,
+        title: 'Wendle the Gentle Lantern',
+        memory: { report: { replace: true } },
+        steps,
+        actions: [],
+      },
+      releases: new Map(),
+    } as unknown as AgentState;
+    const requested = await runTool(state, 'request_title', {
+      tmdb: 'tmdb:movie:4242',
+    });
+    assert.match(requested.text, /There is no tool called request_title/);
+    const other = await runTool(state, 'title_status', {
+      title: 'series:0:77',
+    });
+    assert.match(other.text, /only about Wendle the Gentle Lantern/);
+    // Its replacing, which the report asked for, is still put to an admin.
+    const replaced = await runTool(state, 'grab', {
+      title: 'series:0:1283',
+      release: 'r9',
+      files: [{ index: 0, season: 1, episode: 3 }],
+      reason: 'better',
+      replace: true,
+    });
+    assert.match(replaced.text, /not a release reference/);
+    // An admin saying something is replying.
+    steps.push({ kind: 'reply', text: 'Admin Ana: get the specials too' });
     const allowed = await runTool(state, 'propose_change', {
       kind: 'unblockGroup',
       group: 'x',

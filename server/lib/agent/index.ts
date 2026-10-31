@@ -28,6 +28,7 @@ import {
   TOOLS,
   adminPresent,
   boundTitle,
+  decisionText,
   notLookedFor,
   readTitleRef,
   runTool,
@@ -1285,7 +1286,7 @@ class Agent {
       run.steps.push({
         at: new Date().toISOString(),
         kind: 'reply',
-        text: `${user.displayName} ${approved ? 'approved' : 'declined'}: ${headlines}`,
+        text: decisionText(user.displayName, approved, headlines),
       });
       if (approved) {
         const decision: Decision = {

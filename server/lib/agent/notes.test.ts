@@ -70,6 +70,17 @@ describe('the admin agent’s notes', () => {
       )?.what,
       "Radarr's search"
     );
+    // An album's search is Lidarr's, not Radarr's.
+    assert.equal(
+      noteOfCall(
+        'search_releases',
+        { title: 'album:0:31' },
+        { text: '5 results:\n…', isError: false },
+        undefined,
+        AT
+      )?.what,
+      "Lidarr's search"
+    );
   });
 
   it('notes a release started, or turned down for what it is, but not a mistake in asking', () => {

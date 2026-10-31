@@ -175,14 +175,17 @@ export const noteOfCall = (
     }
     const season = wholeNumber(input.season);
     const episode = wholeNumber(input.episode);
+    const ref = String(input.title ?? '');
     const what =
       name === 'search_indexers'
         ? String(input.query ?? '')
-        : String(input.title ?? '').startsWith('movie:') || season === undefined
-          ? "Radarr's search"
-          : episode === undefined
-            ? `Sonarr's search of season ${season}`
-            : `Sonarr's search of ${episodeLabel(season, episode)}`;
+        : ref.startsWith('album:')
+          ? "Lidarr's search"
+          : ref.startsWith('movie:') || season === undefined
+            ? "Radarr's search"
+            : episode === undefined
+              ? `Sonarr's search of season ${season}`
+              : `Sonarr's search of ${episodeLabel(season, episode)}`;
     return {
       at,
       kind: 'searched',

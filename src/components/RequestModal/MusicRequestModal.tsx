@@ -453,7 +453,9 @@ const MusicRequestModal = ({
                       toggle([album.id], !chosen.includes(album.id))
                     }
                   />
-                  <span className="min-w-0 flex-1 truncate">{album.title}</span>
+                  <span className="min-w-0 flex-1 break-words">
+                    {album.title}
+                  </span>
                   {!tickableAlbum && <MusicStatusBadge status={album.status} />}
                   <span className="w-10 shrink-0 text-right tabular-nums text-gray-400">
                     {yearOf(album.releaseDate) ?? ''}
@@ -603,7 +605,7 @@ const MusicRequestModal = ({
             </p>
             <ul className="mt-1 space-y-1 text-sm text-gray-300">
               {editRequest.songs.map((song) => (
-                <li key={song.id} className="truncate">
+                <li key={song.id} className="break-words">
                   {songName(song.title, song.version)}
                 </li>
               ))}

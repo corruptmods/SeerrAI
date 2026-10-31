@@ -98,7 +98,7 @@ const RequestListPicker = ({
                 onChange={() => toggle(list.id)}
                 type="checkbox"
               />
-              <span className="truncate">{list.name}</span>
+              <span className="min-w-0 break-words">{list.name}</span>
               {alreadyOn.includes(list.id) && (
                 <span className="flex-none text-xs text-gray-500">
                   {intl.formatMessage(messages.alreadyon)}

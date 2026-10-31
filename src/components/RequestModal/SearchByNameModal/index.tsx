@@ -106,10 +106,6 @@ const SearchByNameModal = ({
                 <div
                   className="text-grey-200 text-xl font-bold leading-tight"
                   style={{
-                    WebkitLineClamp: 1,
-                    display: '-webkit-box',
-                    overflow: 'hidden',
-                    WebkitBoxOrient: 'vertical',
                     wordBreak: 'break-word',
                   }}
                 >

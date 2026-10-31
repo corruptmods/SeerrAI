@@ -871,7 +871,7 @@ const AdvancedRequester = ({
                                     {user.displayName}
                                   </span>
                                   {shownEmail(user.displayName, user.email) && (
-                                    <span className="ml-1 truncate text-gray-400">
+                                    <span className="ml-1 min-w-0 text-gray-400 [overflow-wrap:anywhere]">
                                       ({user.email})
                                     </span>
                                   )}

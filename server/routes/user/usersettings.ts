@@ -76,7 +76,7 @@ import {
   isOwnProfile,
   isOwnProfileOrAdmin,
 } from '@server/utils/profileMiddleware';
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import gravatarUrl from 'gravatar-url';
 import net from 'net';
@@ -314,6 +314,18 @@ userSettingsRoutes.post<
       });
     }
 
+    // A key can't set a password to sign in with: never a personal key, and
+    // the server's key only someone else's, as an admin would.
+    if (
+      req.authMethod === 'personalKey' ||
+      (req.authMethod !== 'session' && req.user?.id === user.id)
+    ) {
+      return next({
+        status: 403,
+        message: 'A password can only be set while signed in, not with a key.',
+      });
+    }
+
     // If the user has the permission to manage users and they are not
     // editing themselves, we will just set the new password
     if (
@@ -365,6 +377,18 @@ userSettingsRoutes.post<
  */
 
 /** The address Jellyfin and Emby are told a sign-in comes from. */
+/**
+ * Only while signed in, not with a key: linking a sign-in or setting a
+ * password would let a key, which might have leaked, become a full sign-in.
+ */
+const signedInOnly = (req: Request, _res: Response, next: NextFunction) =>
+  req.authMethod === 'session'
+    ? next()
+    : next({
+        status: 403,
+        message: 'This can only be done while signed in, not with a key.',
+      });
+
 const clientIpOf = (req: Request): string | undefined => {
   const ip = req.ip;
   if (ip && net.isIPv4(ip)) {
@@ -559,6 +583,7 @@ const unlinkAccount = async (
 userSettingsRoutes.post<{ id: string }>(
   '/linked-accounts/plex',
   isOwnProfile(),
+  signedInOnly,
   async (req, res) => {
     const userRepository = getRepository(User);
     const user = req.user;
@@ -726,12 +751,14 @@ const linkWithPassword =
 userSettingsRoutes.post<{ id: string }>(
   '/linked-accounts/jellyfin',
   isOwnProfile(),
+  signedInOnly,
   linkWithPassword(() => jellyfinRouteKind())
 );
 
 userSettingsRoutes.post<{ id: string }>(
   '/linked-accounts/emby',
   isOwnProfile(),
+  signedInOnly,
   linkWithPassword(() => 'emby')
 );
 
@@ -857,6 +884,7 @@ userSettingsRoutes.delete<{ id: string; providerId: string }>(
 userSettingsRoutes.post<{ secret: string }>(
   '/linked-accounts/jellyfin/quickconnect',
   isOwnProfile(),
+  signedInOnly,
   async (req, res) => {
     const user = req.user;
     if (!user) {

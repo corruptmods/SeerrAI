@@ -18,11 +18,13 @@ import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import DiscoverSlider from '@server/entity/DiscoverSlider';
 import { User } from '@server/entity/User';
+import UserApiKey from '@server/entity/UserApiKey';
 import UserPasskey from '@server/entity/UserPasskey';
 import { UserPushSubscription } from '@server/entity/UserPushSubscription';
 import { UserSettings } from '@server/entity/UserSettings';
 import { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
+import { makeKey } from '@server/lib/personalApiKeys';
 import { getSettings } from '@server/lib/settings';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
 import authRoutes from '@server/routes/auth';
@@ -1191,5 +1193,72 @@ describe('a person’s Discord notification types', () => {
       res.body.discordEnabledTypes,
       Notification.MEDIA_AVAILABLE | Notification.ISSUE_CREATED
     );
+  });
+});
+
+/*
+ * A key, which might have leaked, can't become a full sign-in: linking a
+ * media server account or setting a password needs someone signed in.
+ */
+describe('a key linking an account or setting a password', () => {
+  it('is refused, personal key or the server’s', async () => {
+    const settings = getSettings();
+    const before = {
+      access: settings.main.personalApiKeys,
+      serverKey: settings.main.apiKey,
+    };
+    settings.main.personalApiKeys = 'everyone';
+    settings.main.apiKey = 'the-servers-own-key';
+    configureJellyfin();
+    try {
+      const friend = await getRepository(User).findOneByOrFail({
+        email: 'friend@seerr.dev',
+      });
+      const beforeAccount = await getRepository(User).findOneOrFail({
+        select: ['id', 'password', 'plexId', 'jellyfinUserId'],
+        where: { id: friend.id },
+      });
+      const { key, publicId, secretHash } = makeKey();
+      await getRepository(UserApiKey).save(
+        new UserApiKey({ userId: friend.id, publicId, secretHash, name: 'x' })
+      );
+      const asFriend = [
+        { 'X-Api-Key': key },
+        { 'X-Api-Key': 'the-servers-own-key', 'X-Api-User': String(friend.id) },
+      ];
+      for (const headers of asFriend) {
+        for (const [path, body] of [
+          ['linked-accounts/plex', { authToken: 'plex-token' }],
+          ['linked-accounts/jellyfin', { username: 'a', password: 'b' }],
+          ['linked-accounts/emby', { username: 'a', password: 'b' }],
+          [
+            'linked-accounts/jellyfin/quickconnect',
+            { secret: 'abc123def456abc123def456' },
+          ],
+          ['password', { newPassword: 'a-new-password' }],
+        ] as const) {
+          const res = await request(app)
+            .post(`/user/${friend.id}/settings/${path}`)
+            .set(headers)
+            .send(body);
+          assert.strictEqual(res.status, 403, `${path} with a key`);
+        }
+      }
+      const after = await getRepository(User).findOneOrFail({
+        select: ['id', 'password', 'plexId', 'jellyfinUserId'],
+        where: { id: friend.id },
+      });
+      assert.deepStrictEqual(after, beforeAccount);
+
+      // The server's key still sets someone else's password, as upstream.
+      const res = await request(app)
+        .post(`/user/${friend.id}/settings/password`)
+        .set({ 'X-Api-Key': 'the-servers-own-key' })
+        .send({ newPassword: 'a-new-password' });
+      assert.strictEqual(res.status, 204);
+    } finally {
+      settings.main.personalApiKeys = before.access;
+      settings.main.apiKey = before.serverKey;
+    }
   });
 });

@@ -149,7 +149,31 @@ export interface ServerFacts {
   sizesOnProfile: boolean;
 }
 
-const trashFormatName = (name: string) => `${NAME_PREFIX}${name}`;
+/** Names Seerr AI's own formats have, which no TRaSH Guides one may take. */
+const SEERR_NAMES = new Set(
+  [
+    REPACK,
+    HDR,
+    X265_HD,
+    UPSCALED,
+    AV1,
+    BURNED_IN,
+    DUAL_AUDIO,
+    MULTI_EPISODE,
+    languageFormat('original'),
+  ].map((f) => f?.format.name)
+);
+
+/**
+ * A TRaSH Guides format's name in the app. Names there are unique, so one
+ * named like a format of Seerr AI's own (AV1, Upscaled) says where it is from.
+ */
+const trashFormatName = (name: string) => {
+  const named = `${NAME_PREFIX}${name}`;
+  return SEERR_NAMES.has(named) || /^Over \d+ GB$/.test(name)
+    ? `${named} (TRaSH Guides)`
+    : named;
+};
 
 /** Rounds a score to the band step; halves go down. */
 export const band = (score: number, step: number): number => {

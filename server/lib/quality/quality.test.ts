@@ -223,6 +223,10 @@ const standIn = (
     },
     formats: async () => clone(state.formats),
     saveFormat: async (f: ArrCustomFormat) => {
+      // Format names are unique in the apps.
+      if (state.formats.some((x) => x.name === f.name && x.id !== f.id)) {
+        throw new Error(`${f.name}: must be unique`);
+      }
       state.calls.push(
         f.id ? `save format ${f.id}` : `create format ${f.name}`
       );
@@ -741,7 +745,7 @@ describe('TRaSH Guides presets', () => {
         facts('radarr'),
         trashFixture(),
         true
-      ).profiles[0].formats.find((f) => /AV1$/.test(f.name));
+      ).profiles[0].formats.find((f) => /AV1/.test(f.name));
     assert.equal(av1(true, 'seerr')?.score, LAST_RESORT);
     assert.equal(av1(false, 'seerr')?.score, 0);
     // TRaSH Guides never takes AV1; the adjustment goes on top of it.
@@ -1015,6 +1019,22 @@ describe('applying, undoing and changes made elsewhere', () => {
     assert.deepEqual((await stateOf(RADARR)).clashes, [
       'Seerr AI · WEB Tier 01',
     ]);
+  });
+});
+
+describe('applying only what was previewed, and undoing it whole', () => {
+  it('names a TRaSH Guides format apart from a Seerr AI one of the same name', async () => {
+    setTrashDataForTests(trashFixture());
+    // SD is filled in by Seerr AI (its own AV1); 1080p has TRaSH's AV1.
+    manage('radarr', (c) => {
+      c.presets = { sd: 'trash', '1080p': 'trash' };
+    });
+    await apply(RADARR);
+    const names = radarr.state.formats.map((f) => f.name);
+    assert.ok(names.includes('Seerr AI · AV1'));
+    assert.ok(names.includes('Seerr AI · AV1 (TRaSH Guides)'));
+    assert.equal(new Set(names).size, names.length);
+    assert.equal((await stateOf(RADARR)).status, 'in-sync');
   });
 });
 

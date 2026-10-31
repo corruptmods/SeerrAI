@@ -804,6 +804,30 @@ describe('Download Check', () => {
     assert.deepEqual(JSON.parse(row.params).files, ['Show.S01E03.exe']);
   });
 
+  it('forgets which client has a torrent once it is in no queue', async (t) => {
+    getSettings().downloadClients = [
+      {
+        id: 1,
+        name: 'qBittorrent',
+        type: 'qbittorrent',
+        hostname: 'qbit.test',
+        port: 8080,
+      } as DownloadClientSettings,
+    ];
+    t.mock.method(QBittorrentAPI.prototype, 'findTorrent', async () => ({
+      hash: 'hash1',
+    }));
+    t.mock.method(QBittorrentAPI.prototype, 'getFiles', async () => []);
+    const holder = (downloadCheck as unknown as { holder: Map<string, number> })
+      .holder;
+    sonarr.queueNow = [grab({ protocol: 'torrent' })];
+    await downloadCheck.run();
+    assert.deepEqual([...holder], [['hash1', 1]]);
+    sonarr.queueNow = [];
+    await downloadCheck.run();
+    assert.equal(holder.size, 0);
+  });
+
   it('imports the right show filed by ID, telling Sonarr the episode', async () => {
     const stuck = grab({
       title:

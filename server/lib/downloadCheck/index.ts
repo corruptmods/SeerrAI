@@ -278,10 +278,12 @@ class DownloadCheckEngine {
     if (mode === 'off' || this.running) return;
     this.running = true;
     try {
+      // Every download in a queue this pass, by its key.
+      const queued = new Set<string>();
       for (const ref of this.servers()) {
         const name = `${appName(ref.app)} ${ref.settings.name}`;
         try {
-          await this.checkServer(ref, mode);
+          await this.checkServer(ref, mode, queued);
           if (this.unreachable.delete(name)) {
             logger.info(`${name} is answering again`, { label: LABEL });
           }
@@ -301,12 +303,20 @@ class DownloadCheckEngine {
       for (const [key, seen] of this.seen) {
         if (seen.lastSeen < cutoff) this.seen.delete(key);
       }
+      // Which client holds a torrent, once it is in no queue.
+      for (const hash of this.holder.keys()) {
+        if (!queued.has(hash)) this.holder.delete(hash);
+      }
     } finally {
       this.running = false;
     }
   }
 
-  private async checkServer(ref: ServerRef, mode: DownloadCheckMode) {
+  private async checkServer(
+    ref: ServerRef,
+    mode: DownloadCheckMode,
+    queued: Set<string>
+  ) {
     const server = this.apiFor(ref);
     const pass = new Pass(server);
     const grabs = await server.queue();
@@ -315,6 +325,7 @@ class DownloadCheckEngine {
 
     for (const grab of grabs) {
       live.add(grab.key);
+      queued.add(grab.key);
       const stage = stageOf(grab);
       if (!stage) continue;
       const memoKey = `${ref.app}:${ref.settings.id}:${grab.key}:${stage}`;

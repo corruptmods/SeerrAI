@@ -84,16 +84,16 @@ export type SongCovered =
   | { by: 'request'; status: MediaRequestStatus }
   | { by: 'album'; albumMbid: string; albumTitle: string; status: MediaStatus };
 
-/**
- * For each version, whatever already brings it: a request for it that is
- * not declined, or an album or single it is on that is here or on its way
- * (a single it was fetched through, too).
- */
 /** A song as covering needs it: its id and the albums it is on. */
 type CoverableSong = Pick<SongVersion, 'mbId'> & {
   releaseGroups: Pick<SongRelease, 'mbId' | 'title'>[];
 };
 
+/**
+ * For each version, whatever already brings it: a request for it that is
+ * not declined, or an album or single it is on that is here or on its way
+ * (a single it was fetched through, too).
+ */
 export const songsCovered = async (
   versions: CoverableSong[]
 ): Promise<Map<string, SongCovered>> => {

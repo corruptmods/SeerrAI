@@ -93,7 +93,7 @@ const MultiSelectFilter = ({
                 onChange={() => toggle(option.value)}
                 type="checkbox"
               />
-              <span className="truncate">{option.label}</span>
+              <span className="min-w-0 break-words">{option.label}</span>
             </label>
           ))}
         </div>

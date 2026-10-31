@@ -58,7 +58,7 @@ const RequestServerIssue = ({
       />
       {compact ? (
         <>
-          <span className="line-clamp-2 min-w-0 break-words">{fact}</span>
+          <span className="min-w-0 break-words sm:line-clamp-2">{fact}</span>
           {manages && <span className="sr-only">{hint}</span>}
         </>
       ) : (

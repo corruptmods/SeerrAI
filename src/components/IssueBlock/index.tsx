@@ -37,13 +37,13 @@ const IssueBlock = ({ issue }: IssueBlockProps) => {
         <div className="mr-6 min-w-0 flex-1 flex-col items-center text-sm leading-5">
           <div className="flex flex-nowrap">
             <ExclamationTriangleIcon className="mr-1.5 h-5 w-5 flex-shrink-0" />
-            <span className="w-40 truncate md:w-auto">
+            <span className="min-w-0 break-words">
               {intl.formatMessage(issueOption.name)}
             </span>
           </div>
           <div className="white mb-1 flex flex-nowrap">
             <UserIcon className="mr-1.5 h-5 w-5 min-w-0 flex-shrink-0" />
-            <span className="w-40 truncate md:w-auto">
+            <span className="min-w-0 break-words">
               <Link
                 href={
                   issue.createdBy.id === user?.id
@@ -58,7 +58,7 @@ const IssueBlock = ({ issue }: IssueBlockProps) => {
           </div>
           <div className="white mb-1 flex flex-nowrap">
             <CalendarIcon className="mr-1.5 h-5 w-5 min-w-0 flex-shrink-0" />
-            <span className="w-40 truncate md:w-auto">
+            <span className="min-w-0 break-words">
               {intl.formatDate(issue.createdAt, {
                 year: 'numeric',
                 month: 'long',

@@ -138,7 +138,7 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
         <div className="flex items-center justify-between">
           <div className="mr-6 min-w-0 flex-1 flex-col items-center text-sm leading-5">
             <div className="white mb-1 flex flex-nowrap">
-              <span className="flex w-40 items-center truncate md:w-auto">
+              <span className="flex min-w-0 items-center">
                 <Tooltip content={intl.formatMessage(messages.requestedby)}>
                   <UserIcon className="mr-1.5 h-5 w-5 min-w-0 flex-shrink-0" />
                 </Tooltip>
@@ -148,7 +148,7 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
                       ? '/profile'
                       : `/users/${request.requestedBy.id}`
                   }
-                  className="flex items-center font-semibold text-gray-100 transition duration-300 hover:text-strong hover:underline"
+                  className="flex min-w-0 items-center font-semibold text-gray-100 transition duration-300 [overflow-wrap:anywhere] hover:text-strong hover:underline"
                 >
                   <span className="avatar-sm">
                     <CachedImage
@@ -166,7 +166,7 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
             </div>
             {request.modifiedBy && (
               <div className="flex flex-nowrap">
-                <span className="flex w-40 items-center truncate md:w-auto">
+                <span className="flex min-w-0 items-center">
                   <Tooltip
                     content={intl.formatMessage(messages.lastmodifiedby)}
                   >
@@ -178,7 +178,7 @@ const RequestBlock = ({ request, onUpdate }: RequestBlockProps) => {
                         ? '/profile'
                         : `/users/${request.modifiedBy.id}`
                     }
-                    className="flex items-center font-semibold text-gray-100 transition duration-300 hover:text-strong hover:underline"
+                    className="flex min-w-0 items-center font-semibold text-gray-100 transition duration-300 [overflow-wrap:anywhere] hover:text-strong hover:underline"
                   >
                     <span className="avatar-sm">
                       <CachedImage

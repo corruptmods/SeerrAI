@@ -527,7 +527,7 @@ const SubtitlesCard = ({ kind, tmdbId, title }: SubtitlesCardProps) => {
             <span className="text-[15px] font-bold">
               {intl.formatMessage(messages.subtitles)}
             </span>
-            <span className="truncate text-xs font-normal text-muted">
+            <span className="whitespace-normal break-words text-xs font-normal text-muted">
               {summary}
             </span>
           </span>

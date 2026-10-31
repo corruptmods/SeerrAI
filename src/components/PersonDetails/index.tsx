@@ -218,7 +218,7 @@ const PersonDetails = () => {
                 media.mediaType === 'movie' ? media.title : media.name
               )}
               {media.character && (
-                <div className="mt-2 w-full truncate text-center text-xs text-default">
+                <div className="mt-2 w-full break-words text-center text-xs text-default">
                   {intl.formatMessage(messages.ascharacter, {
                     character: media.character,
                   })}
@@ -272,7 +272,7 @@ const PersonDetails = () => {
                 media.mediaType === 'movie' ? media.title : media.name
               )}
               {media.job && (
-                <div className="mt-2 w-full truncate text-center text-xs text-default">
+                <div className="mt-2 w-full break-words text-center text-xs text-default">
                   {media.job}
                 </div>
               )}

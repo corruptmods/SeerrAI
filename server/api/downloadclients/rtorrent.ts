@@ -329,6 +329,38 @@ const parentOf = (path: string) => path.replace(/\/+[^/]*\/*$/, '') || '/';
 const lastPart = (path: string) =>
   path.replace(/\/+$/, '').split('/').pop() ?? '';
 
+/**
+ * What deleting a torrent's data removes, by the names of its files: each
+ * file, then the folders of a multi-file torrent, deepest first. A name
+ * that would lead out of the torrent's folder (a ".." part, or a path from
+ * the root) is refused rather than deleted, as is every name when rTorrent
+ * gives no folder.
+ */
+export const rtorrentRemovals = (
+  info: Pick<RtorrentInfo, 'directory' | 'isMultiFile'>,
+  names: string[]
+): { files: string[]; folders: string[]; refused: string[] } => {
+  const base = info.isMultiFile ? parentOf(info.directory) : info.directory;
+  const inside = (name: string) =>
+    base.length > 1 && !name.startsWith('/') && !name.split('/').includes('..');
+  const files = names.filter(inside).map((name) => `${base}/${name}`);
+  const folders = new Set<string>();
+  if (info.isMultiFile) {
+    for (const file of files) {
+      let dir = parentOf(file);
+      while (dir.length > base.length) {
+        folders.add(dir);
+        dir = parentOf(dir);
+      }
+    }
+  }
+  return {
+    files,
+    folders: [...folders].sort((a, b) => b.length - a.length),
+    refused: names.filter((name) => !inside(name)),
+  };
+};
+
 export const rtorrentTorrent = (info: RtorrentInfo): ClientTorrent => {
   const { size, left, done } = rtorrentWanted(info);
   const speed = Math.max(0, info.downRate || 0);
@@ -525,32 +557,23 @@ class RtorrentAPI implements TorrentClient {
     if (!info) return;
     const files = isMeta(info.name) ? [] : await this.getFiles(info.hash);
     await this.call('d.erase', [info.hash]);
-    const base = info.isMultiFile ? parentOf(info.directory) : info.directory;
-    const failed: string[] = [];
-    for (const file of files) {
-      await this.call('execute.throw', [
-        '',
-        'rm',
-        '-f',
-        '--',
-        `${base}/${file.name}`,
-      ]).catch((e) => failed.push((e as Error).message));
+    const removals = rtorrentRemovals(
+      info,
+      files.map((file) => file.name)
+    );
+    const failed = removals.refused.map(
+      (name) => `${name} is not inside the torrent's folder`
+    );
+    for (const path of removals.files) {
+      await this.call('execute.throw', ['', 'rm', '-f', '--', path]).catch(
+        (e) => failed.push((e as Error).message)
+      );
     }
-    if (info.isMultiFile) {
-      const folders = new Set<string>();
-      for (const file of files) {
-        let dir = parentOf(`${base}/${file.name}`);
-        while (dir.length > base.length) {
-          folders.add(dir);
-          dir = parentOf(dir);
-        }
-      }
-      // Deepest first; rmdir leaves a folder alone unless it is empty.
-      for (const dir of [...folders].sort((a, b) => b.length - a.length)) {
-        await this.call('execute.throw', ['', 'rmdir', '--', dir]).catch(
-          () => undefined
-        );
-      }
+    // rmdir leaves a folder alone unless it is empty.
+    for (const dir of removals.folders) {
+      await this.call('execute.throw', ['', 'rmdir', '--', dir]).catch(
+        () => undefined
+      );
     }
     if (failed.length) {
       throw new Error(

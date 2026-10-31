@@ -6,6 +6,7 @@ import NzbgetAPI, {
 } from '@server/api/downloadclients/nzbget';
 import RtorrentAPI, {
   rtorrentDownload,
+  rtorrentRemovals,
   xmlRpcCall,
   xmlRpcResult,
 } from '@server/api/downloadclients/rtorrent';
@@ -238,6 +239,26 @@ describe('reading each client’s states', () => {
           '<member><name>faultString</name><value><string>Method not defined</string></value></member></struct></value></fault></methodResponse>'
       ),
       /rTorrent: Method not defined/
+    );
+  });
+
+  it('rTorrent: deletes only what is inside the torrent’s folder', () => {
+    assert.deepEqual(
+      rtorrentRemovals({ directory: '/dl/Pack', isMultiFile: 1 }, [
+        'Pack/S1/a.mkv',
+        'Pack/../../srv/app.db',
+        '/srv/app.db',
+      ]),
+      {
+        files: ['/dl/Pack/S1/a.mkv'],
+        folders: ['/dl/Pack/S1', '/dl/Pack'],
+        refused: ['Pack/../../srv/app.db', '/srv/app.db'],
+      }
+    );
+    // No folder from rTorrent: nothing is taken from the root.
+    assert.deepEqual(
+      rtorrentRemovals({ directory: '', isMultiFile: 0 }, ['a.mkv']),
+      { files: [], folders: [], refused: ['a.mkv'] }
     );
   });
 });

@@ -55,11 +55,11 @@ import { converse, isOutage, listModels } from '@server/lib/ai/providers';
 import type { AgentHandBack } from '@server/lib/backfill/engine';
 import backfill, {
   jobEpisodes,
-  requestedSince,
   startedByAgent,
 } from '@server/lib/backfill/engine';
 import { releaseGroup } from '@server/lib/backfill/naming';
 import backfillNotices from '@server/lib/backfill/notices';
+import { requestedSince } from '@server/lib/backfill/schedule';
 import { recordMediaEvent } from '@server/lib/mediaHistory';
 import notificationManager, { Notification } from '@server/lib/notifications';
 import { adminAgentEvent } from '@server/lib/notifications/eventTitles';

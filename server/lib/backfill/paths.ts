@@ -5,6 +5,13 @@ import { baseName } from '@server/lib/backfill/naming';
  * and a path the client gave as Sonarr, Radarr or Lidarr sees it.
  */
 
+/**
+ * Whether a file name a torrent gives reaches outside its own folder: a
+ * `..` part, or a path from the root or a drive.
+ */
+export const escapesFolder = (name: string): boolean =>
+  /^([\\/]|[A-Za-z]:)/.test(name) || name.split(/[\\/]/).includes('..');
+
 /** A path inside a torrent without its top folder, which clients may rename. */
 const insidePath = (path: string): string => {
   const parts = path.replace(/\\/g, '/').split('/');

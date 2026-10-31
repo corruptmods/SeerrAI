@@ -21,15 +21,14 @@ import type { SongFetchFile } from '@server/entity/SongFetch';
 import SongFetch from '@server/entity/SongFetch';
 import SongRequest from '@server/entity/SongRequest';
 import { magnetHash, parseTorrent } from '@server/lib/backfill/bencode';
-import backfill, {
-  mapRemotePath,
-  torrentStage,
-} from '@server/lib/backfill/engine';
+import backfill from '@server/lib/backfill/engine';
 import {
   IndexerLimitReached,
   PROWLARR,
   indexerLimits,
 } from '@server/lib/backfill/indexerLimit';
+import { mapRemotePath } from '@server/lib/backfill/paths';
+import { torrentStage } from '@server/lib/backfill/progress';
 import type { TorrentReading } from '@server/lib/backfill/watchdog';
 import { TorrentWatch, swarmLacks } from '@server/lib/backfill/watchdog';
 import downloadTracker from '@server/lib/downloadtracker';

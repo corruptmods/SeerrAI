@@ -6014,7 +6014,7 @@ paths:
   /settings/quality/servers/{kind}/{serverId}/preview:
     post:
       summary: 'What applying would change on a server'
-      description: 'Creates, updates, puts back and leaves alone, profile by profile and format by format, and the delay profile. Changes nothing.'
+      description: 'Creates, updates, puts back and leaves alone, profile by profile and format by format, and the delay profile. Changes nothing. Answers with a token that Apply hands back, so only what was previewed is applied.'
       tags:
         - settings
       parameters:
@@ -6029,6 +6029,15 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                restoreKept:
+                  type: boolean
       responses:
         '200':
           description: OK
@@ -6074,6 +6083,10 @@ paths:
                         type: string
                 restoreKept:
                   type: boolean
+                token:
+                  type: string
+                  maxLength: 64
+                  description: "The preview's token; a 409 (code stale) when the server or the choices changed since"
       responses:
         '200':
           description: OK
@@ -6082,6 +6095,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '409':
+          description: 'Not applied: what would change is no longer what was previewed (code stale), or an apply is already running (code busy)'
   /settings/quality/servers/{kind}/{serverId}/keep:
     post:
       summary: "Keep changes made in Radarr or Sonarr to Seerr AI's profiles"
@@ -6246,7 +6261,7 @@ paths:
   /settings/quality/history/{applyId}/undo:
     post:
       summary: 'Undo an apply'
-      description: "Puts back what it changed, and moves titles back. Only a server's newest apply can be undone; a profile it created is removed only when nothing uses it."
+      description: "Puts back what it changed, and moves titles back. Only a server's newest apply can be undone, and only while the server is managed; a profile it created is removed only when nothing uses it."
       tags:
         - settings
       parameters:
@@ -6263,6 +6278,10 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '400':
+          description: 'The server is no longer managed (code not-managed), or it was already undone (code already-undone)'
+        '409':
+          description: 'A newer apply must be undone first (code undo-newer-first), or the server is busy (code busy)'
   /backfill/download-check:
     get:
       summary: "Download Check's findings"
@@ -10149,7 +10168,7 @@ paths:
           name: tvId
           required: true
           schema:
-            type: number
+            type: integer
         - in: query
           name: season
           required: true
@@ -10195,7 +10214,7 @@ paths:
           name: issueId
           required: true
           schema:
-            type: number
+            type: integer
       responses:
         '200':
           description: Suggestion
@@ -10417,6 +10436,8 @@ paths:
       responses:
         '302':
           description: On to the provider, to Linked Accounts when it can't be used, or to sign in first
+        '403':
+          description: Asked with an API key, personal or the server's; only someone signed in can link an account
   /auth/oidc/{providerId}/callback:
     get:
       summary: Where a single sign-on provider sends people back to

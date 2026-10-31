@@ -52,7 +52,11 @@ import { judgeMoviePack } from '@server/lib/backfill/movies';
 import { baseName, isExtra, isVideo } from '@server/lib/backfill/naming';
 import backfillNotices from '@server/lib/backfill/notices';
 import { packingOf, readNzb } from '@server/lib/backfill/nzb';
-import { mapRemotePath, placeFiles } from '@server/lib/backfill/paths';
+import {
+  escapesFolder,
+  mapRemotePath,
+  placeFiles,
+} from '@server/lib/backfill/paths';
 import type { PlanEntry, PlanSummary } from '@server/lib/backfill/plan';
 import {
   multiMustWait,
@@ -106,11 +110,6 @@ import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAxiosError } from 'axios';
 import { In, IsNull, MoreThan, Not } from 'typeorm';
-
-// Still imported from here by the admin agent and songs taken from albums.
-export { mapRemotePath } from '@server/lib/backfill/paths';
-export { torrentStage } from '@server/lib/backfill/progress';
-export { requestedSince } from '@server/lib/backfill/schedule';
 
 /*
  * Backfill's engine.
@@ -3148,6 +3147,12 @@ class Backfill {
       const sep = save.includes('\\') ? '\\' : '/';
       for (const file of job.files) {
         const there = files.find((f) => f.index === file.index);
+        // A name reaching out of the torrent's folder would have Sonarr or
+        // Radarr import a file from elsewhere on its disk.
+        if (there && escapesFolder(there.name)) {
+          file.note = 'The torrent names files outside its own folder.';
+          continue;
+        }
         if (there) {
           const inside = there.name.replace(/[\\/]/g, sep);
           paths.set(

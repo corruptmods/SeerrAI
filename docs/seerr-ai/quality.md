@@ -6,7 +6,7 @@
 
 ## What it changes, and what it doesn't
 
-- **Only what it creates.** Every profile and custom format it makes is named `Seerr AI · …`, such as `Seerr AI · 1080p`. Your own profiles, and the titles on them, stay as they are.
+- **Only what it creates.** Every profile and custom format it makes is named `Seerr AI · …`, such as `Seerr AI · 1080p`; a TRaSH Guides format whose name Seerr AI's own already uses ends in `(TRaSH Guides)`, since Radarr and Sonarr need each name once. Your own profiles, and the titles on them, stay as they are.
 - **One shared setting.** "Prefer usenet" changes the delay profile that titles without tags use, which affects every profile on that server. The preview marks it **Shared setting**.
 - **Titles move only if you choose.** The preview can move the titles on your own profiles onto Seerr AI's; each is off unless you pick a profile. Undo moves them back.
 - **New servers start as Not managed**, and TRaSH Guides updates wait for you unless you turn on **Apply updates automatically**.
@@ -46,7 +46,7 @@ Under **Advanced**:
 Choosing TRaSH Guides for a preset uses its profile of that name (such as *HD Bluray + WEB* for 1080p), with its custom formats and scores, and your adjustments on top. It is fetched from GitHub the first time a preset uses it, then checked for changes once every 24 hours (and before a preview, if the last check is older than that); **Check now** checks straight away. Health says if GitHub hasn't answered for 3 days.
 
 - **Fill gaps with Seerr AI** (on to start): TRaSH Guides has no SD or 720p profile, so Seerr AI builds those, and adds its own rules (language, burned-in subtitles, sizes) beside TRaSH's formats.
-- **Apply updates automatically** (off to start): when TRaSH Guides changes, a managed server shows **TRaSH update ready** until you preview and apply it. When on, each update is applied by the hourly check and listed in History, with Undo.
+- **Apply updates automatically** (off to start): when TRaSH Guides changes, a managed server shows **TRaSH update ready** until you preview and apply it. When on, the hourly check applies each update, listed in History with Undo, onto the choices you last applied: choices saved but not yet applied wait for you, the delay profile is never changed this way, changes made in Radarr or Sonarr aren't put back, and after an Undo nothing more is applied by itself until you apply again.
 
 TRaSH Guides is used under its MIT licence, copyright TRaSH.
 
@@ -70,7 +70,9 @@ The hourly **Quality Profiles Check** job compares each managed server with what
 
 ## History and Undo
 
-Each apply is listed under **History**, with who applied it. **Undo** restores what it changed, removes what it created, and moves titles back. Undo the newest first. A profile still used by titles or by a server's request settings stays, and Undo says so.
+Each apply is listed under **History**, with who applied it. **Undo** restores what it changed, removes what it created, and moves back titles still where it put them. Undo the newest first, while the server is managed. A profile still used by titles or by a server's request settings stays, and Undo says so.
+
+**Apply** applies exactly what the preview showed: if the server or your choices changed in between, it says so and shows the new preview instead. If an apply stops part way (the server stops answering, say), what it did is still in History, so Undo can put it back.
 
 **Stop managing** leaves the profiles in Radarr or Sonarr, still working; Seerr AI just stops changing them.
 

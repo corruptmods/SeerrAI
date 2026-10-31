@@ -18,7 +18,7 @@ import type {
   ServerFacts,
 } from '@server/lib/quality/build';
 import { buildDesired, materialize } from '@server/lib/quality/build';
-import { LAST_RESORT, NEVER } from '@server/lib/quality/presets';
+import { LAST_RESORT, NEVER, foldName } from '@server/lib/quality/presets';
 import type { TrashData } from '@server/lib/quality/trash';
 import { trashData } from '@server/lib/quality/trash';
 import type {
@@ -501,10 +501,11 @@ export const matchFormats = (
   const taken = new Set(ids.values());
   for (const def of desired.formats) {
     if (ids.has(def.key)) continue;
+    const name = foldName(def.format.name);
     const same = formats.find(
       (f) =>
         f.id !== undefined &&
-        f.name === def.format.name &&
+        foldName(f.name) === name &&
         !owned.has(f.id) &&
         !taken.has(f.id)
     );
@@ -514,6 +515,39 @@ export const matchFormats = (
     }
   }
   return ids;
+};
+
+/**
+ * Radarr and Sonarr take each format name once. A format whose name
+ * another on the server already has, in any case (one Seerr AI no longer
+ * uses, say), or another it makes has, gets a number on the end, so the
+ * apply never stops there.
+ */
+export const unclash = (
+  formats: ArrCustomFormat[],
+  desired: DesiredState,
+  ids: Map<string, number>
+): DesiredState => {
+  const onServer = new Map<string, number[]>();
+  for (const f of formats) {
+    if (f.id === undefined) continue;
+    const name = foldName(f.name);
+    onServer.set(name, [...(onServer.get(name) ?? []), f.id]);
+  }
+  const given = new Set<string>();
+  const out = desired.formats.map((def) => {
+    const own = ids.get(def.key);
+    const free = (name: string) =>
+      !given.has(foldName(name)) &&
+      (onServer.get(foldName(name)) ?? []).every((id) => id === own);
+    let name = def.format.name;
+    for (let n = 2; !free(name); n += 1) name = `${def.format.name} (${n})`;
+    given.add(foldName(name));
+    return name === def.format.name
+      ? def
+      : { ...def, format: { ...def.format, name } };
+  });
+  return { ...desired, formats: out };
 };
 
 /** The server profile a preset is: the one Seerr AI made, or one of its name. */
@@ -563,9 +597,10 @@ export const planFor = async (
     rowsFor(ref),
     trashData(),
   ]);
-  const desired = desiredFor(config, ctx.facts, trash, fillGaps);
+  const built = desiredFor(config, ctx.facts, trash, fillGaps);
+  const formatIds = matchFormats(ctx.formats, built, rows);
+  const desired = unclash(ctx.formats, built, formatIds);
   const changes: PreviewChange[] = [];
-  const formatIds = matchFormats(ctx.formats, desired, rows);
   const change = (
     itemKind: PreviewChange['itemKind'],
     key: string,

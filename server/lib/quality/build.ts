@@ -20,6 +20,7 @@ import {
   SEERR_SCORES,
   UPSCALED,
   X265_HD,
+  foldName,
   is2160,
   languageFormat,
   profileName,
@@ -149,7 +150,10 @@ export interface ServerFacts {
   sizesOnProfile: boolean;
 }
 
-/** Names Seerr AI's own formats have, which no TRaSH Guides one may take. */
+/**
+ * Names Seerr AI's own formats have, which no TRaSH Guides one may take,
+ * in any case (see foldName).
+ */
 const SEERR_NAMES = new Set(
   [
     REPACK,
@@ -161,16 +165,17 @@ const SEERR_NAMES = new Set(
     DUAL_AUDIO,
     MULTI_EPISODE,
     languageFormat('original'),
-  ].map((f) => f?.format.name)
+  ].map((f) => f && foldName(f.format.name))
 );
 
 /**
  * A TRaSH Guides format's name in the app. Names there are unique, so one
- * named like a format of Seerr AI's own (AV1, Upscaled) says where it is from.
+ * named like a format of Seerr AI's own (AV1, Upscaled, Wrong Language)
+ * says where it is from.
  */
 const trashFormatName = (name: string) => {
   const named = `${NAME_PREFIX}${name}`;
-  return SEERR_NAMES.has(named) || /^Over \d+ GB$/.test(name)
+  return SEERR_NAMES.has(foldName(named)) || /^Over \d+ GB$/i.test(name)
     ? `${named} (TRaSH Guides)`
     : named;
 };

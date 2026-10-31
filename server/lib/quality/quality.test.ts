@@ -1060,6 +1060,67 @@ describe('applying only what was previewed, and undoing it whole', () => {
     assert.equal((await stateOf(RADARR)).status, 'in-sync');
   });
 
+  it('names a TRaSH Guides format apart from a Seerr AI one named in another case', async () => {
+    // TRaSH Guides' "Wrong Language" beside Seerr AI's "Wrong language",
+    // applied after Seerr AI's own presets were.
+    manage('radarr');
+    await apply(RADARR);
+    const trash = trashFixture();
+    trash.radarr.formats['wrong-language'] = {
+      trash_id: 'wrong-language',
+      name: 'Wrong Language',
+      trash_scores: { default: -10000 },
+      specifications: [],
+    } as (typeof trash.radarr.formats)[string];
+    trash.radarr.groups[0].custom_formats.push({
+      name: 'Wrong Language',
+      trash_id: 'wrong-language',
+      required: false,
+      default: true,
+    });
+    setTrashDataForTests(trash);
+    save('radarr', (c) => {
+      c.presets = { '1080p': 'trash' };
+    });
+    await apply(RADARR);
+    const names = radarr.state.formats.map((f) => f.name);
+    assert.ok(names.includes('Seerr AI · Wrong language'));
+    assert.ok(names.includes('Seerr AI · Wrong Language (TRaSH Guides)'));
+    assert.equal(new Set(names.map((n) => n.toLowerCase())).size, names.length);
+    assert.equal((await stateOf(RADARR)).status, 'in-sync');
+  });
+
+  it('never stops on a name a format it no longer uses still has', async () => {
+    setTrashDataForTests(trashFixture());
+    manage('radarr', (c) => {
+      c.presets = { '1080p': 'trash' };
+    });
+    await apply(RADARR);
+    // TRaSH Guides gives WEB Tier 01 a new id; the old format stays.
+    const next = trashFixture();
+    next.commit = 'def5678';
+    const { tier1 } = next.radarr.formats;
+    delete next.radarr.formats.tier1;
+    next.radarr.formats['tier1-new'] = { ...tier1, trash_id: 'tier1-new' };
+    const id1080 = TRASH_PROFILES.radarr['1080p'] as string;
+    next.radarr.profiles[id1080].formatItems['WEB Tier 01'] = 'tier1-new';
+    next.radarr.conflicts = [['tier1-new', 'tier2']];
+    setTrashDataForTests(next);
+    await apply(RADARR);
+    const names = radarr.state.formats.map((f) => f.name);
+    assert.ok(names.includes('Seerr AI · WEB Tier 01'));
+    assert.ok(names.includes('Seerr AI · WEB Tier 01 (2)'));
+    // It stays as it is from then on.
+    assert.equal((await stateOf(RADARR)).status, 'in-sync');
+    const again = await preview(RADARR);
+    assert.deepEqual(
+      again.changes
+        .filter((c) => c.itemKind === 'format' && c.action !== 'unchanged')
+        .map((c) => c.name),
+      []
+    );
+  });
+
   it('applies nothing once what the preview showed has changed', async () => {
     manage('radarr');
     const { token } = await preview(RADARR);

@@ -16,6 +16,13 @@ import type {
 /** What everything Seerr AI creates in Radarr and Sonarr is named with. */
 export const NAME_PREFIX = 'Seerr AI · ';
 
+/**
+ * A custom format's name, for keeping names apart: two that differ only in
+ * case (Seerr AI's "Wrong language", TRaSH Guides' "Wrong Language") read
+ * as one in Radarr's and Sonarr's lists.
+ */
+export const foldName = (name: string) => name.toLowerCase();
+
 /** Never taken: low enough that no score makes up for it. */
 export const NEVER = -1_000_000;
 /** Taken only when nothing else is out. */

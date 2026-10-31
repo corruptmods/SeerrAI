@@ -1,7 +1,5 @@
-import type { TorrentClient, TorrentState } from '@server/api/downloadclients';
+import type { TorrentClient } from '@server/api/downloadclients';
 import {
-  CLIENT_PRODUCTS,
-  TORRENT_CLIENT_TYPES,
   downloadClientFor,
   isTorrentClient,
   torrentClientFor,
@@ -14,9 +12,7 @@ import ProwlarrAPI, {
   TV_CATEGORIES,
 } from '@server/api/prowlarr';
 import type { LidarrAlbum } from '@server/api/servarr/lidarr';
-import { MediaRequestStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
-import AlbumRequest from '@server/entity/AlbumRequest';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import type {
   BackfillJobFile,
@@ -25,7 +21,6 @@ import type {
 import BackfillJob from '@server/entity/BackfillJob';
 import type { BackfillKind } from '@server/entity/BackfillSeries';
 import BackfillSeries from '@server/entity/BackfillSeries';
-import { MediaRequest } from '@server/entity/MediaRequest';
 import SongFetch from '@server/entity/SongFetch';
 import type { User } from '@server/entity/User';
 import {
@@ -41,8 +36,6 @@ import {
   IndexerLimitReached,
   PROWLARR,
   indexerLimits,
-  limitMessage,
-  limitOf,
 } from '@server/lib/backfill/indexerLimit';
 import type { AlbumTrack } from '@server/lib/backfill/lidarr';
 import BackfillLidarr from '@server/lib/backfill/lidarr';
@@ -59,6 +52,7 @@ import { judgeMoviePack } from '@server/lib/backfill/movies';
 import { baseName, isExtra, isVideo } from '@server/lib/backfill/naming';
 import backfillNotices from '@server/lib/backfill/notices';
 import { packingOf, readNzb } from '@server/lib/backfill/nzb';
+import { mapRemotePath, placeFiles } from '@server/lib/backfill/paths';
 import type { PlanEntry, PlanSummary } from '@server/lib/backfill/plan';
 import {
   multiMustWait,
@@ -66,18 +60,38 @@ import {
   selectEntries,
   unseeded,
 } from '@server/lib/backfill/plan';
+import {
+  PackedRelease,
+  ReleaseProblem,
+  SaidPlainly,
+  isUnreachable,
+  message,
+  plainProblem,
+  requestOf,
+} from '@server/lib/backfill/problems';
+import type { Progress } from '@server/lib/backfill/progress';
+import {
+  TORRENT_STAGES,
+  backfillDownloadsOf,
+  backfillImportsOf,
+  measureNzb,
+  measureTorrent,
+  torrentStage,
+  usenetStage,
+} from '@server/lib/backfill/progress';
 import type { RadarrMovieDetail } from '@server/lib/backfill/radarr';
 import BackfillRadarr from '@server/lib/backfill/radarr';
+import {
+  albumsAskedSince,
+  pickSearches,
+  requestedSince,
+} from '@server/lib/backfill/schedule';
 import type { OpinionRequest } from '@server/lib/backfill/secondOpinion';
 import { aiSecondOpinion } from '@server/lib/backfill/secondOpinion';
 import type { SonarrCommand, SonarrEpisode } from '@server/lib/backfill/sonarr';
 import BackfillSonarr, { commandFinished } from '@server/lib/backfill/sonarr';
 import { TorrentWatch, swarmLacks } from '@server/lib/backfill/watchdog';
 import { blockedGroupOf, blockedGroups } from '@server/lib/blockedGroups';
-import type {
-  BackfillDownload,
-  DownloadStage,
-} from '@server/lib/downloadtracker';
 import downloadTracker from '@server/lib/downloadtracker';
 import { musicReady } from '@server/lib/music/access';
 import { namesAlbum } from '@server/lib/music/albumRelease';
@@ -92,6 +106,11 @@ import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAxiosError } from 'axios';
 import { In, IsNull, MoreThan, Not } from 'typeorm';
+
+// Still imported from here by the admin agent and songs taken from albums.
+export { mapRemotePath } from '@server/lib/backfill/paths';
+export { torrentStage } from '@server/lib/backfill/progress';
+export { requestedSince } from '@server/lib/backfill/schedule';
 
 /*
  * Backfill's engine.
@@ -110,123 +129,6 @@ import { In, IsNull, MoreThan, Not } from 'typeorm';
  */
 
 const LABEL = 'Backfill';
-
-const STAGE: Record<string, DownloadStage> = {
-  queued: 'queued',
-  downloading: 'downloading',
-  paused: 'paused',
-  importing: 'importing',
-};
-
-const clock = (seconds: number) =>
-  [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60]
-    .map((n) => String(Math.floor(n)).padStart(2, '0'))
-    .join(':');
-
-/**
- * A job as the download tracker shows downloads: what it has still to
- * bring, or (imported) what it has brought.
- */
-const downloadsOf = (
-  job: BackfillJob,
-  imported: boolean,
-  now: number
-): BackfillDownload[] => {
-  const row = job.series;
-  if (!row) return [];
-  const stage = STAGE[job.status] ?? 'queued';
-  const base = {
-    status: job.status,
-    stage,
-    timeLeft: job.secondsLeft ? clock(job.secondsLeft) : '',
-    ...(job.secondsLeft && stage === 'downloading'
-      ? { estimatedCompletionTime: new Date(now + job.secondsLeft * 1000) }
-      : {}),
-    title: `Backfill: ${job.title}`,
-    downloadId: job.downloadId ?? `backfill-${job.id}`,
-  };
-  if (row.kind === 'album') {
-    if (imported && !(job.status === 'done' && job.imported > 0)) return [];
-    // Music is followed by its artist, each download naming its album.
-    if (!row.artistArrId) return [];
-    return [
-      {
-        kind: 'album',
-        serverId: row.serverId,
-        jobId: job.id,
-        item: {
-          ...base,
-          mediaType: MediaType.MUSIC,
-          externalId: row.artistArrId,
-          size: job.size,
-          sizeLeft: job.sizeLeft,
-          album: {
-            id: row.arrId,
-            title: row.title,
-            foreignAlbumId: row.foreignId ?? '',
-          },
-        },
-      },
-    ];
-  }
-  if (row.kind === 'movie') {
-    if (imported && !(job.status === 'done' && job.imported > 0)) return [];
-    return [
-      {
-        kind: 'movie',
-        serverId: row.serverId,
-        jobId: job.id,
-        item: {
-          ...base,
-          mediaType: MediaType.MOVIE,
-          externalId: row.arrId,
-          size: job.size,
-          sizeLeft: job.sizeLeft,
-        },
-      },
-    ];
-  }
-  // Each episode its own item, its share of what is left.
-  const left = job.size ? job.sizeLeft / job.size : 1;
-  return job.files
-    .filter(
-      (file) =>
-        (file.state === 'imported') === imported &&
-        file.episodeIds.length &&
-        file.season !== undefined &&
-        file.episode !== undefined
-    )
-    .map((file) => ({
-      kind: 'series' as const,
-      serverId: row.serverId,
-      jobId: job.id,
-      item: {
-        ...base,
-        mediaType: MediaType.TV,
-        externalId: row.arrId,
-        size: file.size,
-        sizeLeft: Math.round(file.size * left),
-        episode: {
-          seasonNumber: file.season!,
-          episodeNumber: file.episode!,
-          absoluteEpisodeNumber: file.absolute ?? 0,
-          id: file.episodeIds[0],
-        },
-      },
-    }));
-};
-
-/** A running job as the download tracker shows downloads. */
-export const backfillDownloadsOf = (
-  job: BackfillJob,
-  now = Date.now()
-): BackfillDownload[] => downloadsOf(job, false, now);
-
-/** What a job has imported: each episode, or the movie once it is done. */
-export const backfillImportsOf = (
-  job: BackfillJob,
-  now = Date.now()
-): BackfillDownload[] => downloadsOf(job, true, now);
 
 /** How long after a job finishes its imports are still told of. */
 const RECENTLY_DONE_MS = 10 * 60_000;
@@ -247,84 +149,6 @@ const MAX_AI_PACKS = 3;
 const OPEN_AT_ONCE = 3;
 /** How long a magnet link gets to produce its file list. */
 const METADATA_WAIT_MS = 60_000;
-/**
- * What a Usenet download is doing, in words: the client's own status names
- * ("Running", "Extracting") mean little on their own, and after the
- * download its post-processing can take a while.
- */
-export const usenetStage = (
-  job: { place: string; status: string },
-  product: string
-): string => {
-  const status = job.status.toLowerCase();
-  const words: Record<string, string> =
-    job.place === 'queue'
-      ? {
-          downloading: 'Downloading',
-          queued: `Waiting its turn in ${product}`,
-          paused: `Paused in ${product}`,
-          grabbing: `${product} is fetching the NZB`,
-          fetching: `${product} is fetching the NZB`,
-          propagating: 'Waiting for the post to reach your Usenet server',
-          checking: `${product} is checking the post`,
-        }
-      : {
-          queued: `Downloaded; waiting for ${product} to unpack it`,
-          verifying: `${product} is checking the download`,
-          quickcheck: `${product} is checking the download`,
-          repairing: `${product} is repairing the download`,
-          fetching: `${product} is fetching repair blocks`,
-          renaming: `${product} is renaming its files`,
-          extracting: `${product} is unpacking it`,
-          moving: `${product} is moving it to its folder`,
-          running: `${product} is running its post-processing script`,
-          completed: 'Downloaded',
-          failed: `${product} could not finish it`,
-        };
-  return words[status] ?? job.status;
-};
-
-/**
- * What a torrent is doing, in words, and whether the client is holding it
- * back (paused, queued behind its own download limit, or checking): time
- * held back is not time without progress.
- */
-export const torrentStage = (
-  torrent: { state: TorrentState; speed: number },
-  product: string
-): { stage: string; held: boolean } => {
-  switch (torrent.state) {
-    case 'paused':
-      return { stage: `Paused in ${product}`, held: true };
-    case 'queued':
-      return { stage: `Queued in ${product}`, held: true };
-    case 'checking':
-      return { stage: `${product} is checking it`, held: true };
-    case 'moving':
-      return { stage: `${product} is moving it`, held: true };
-    default:
-      return {
-        stage: torrent.speed > 0 ? 'Downloading' : 'Waiting for peers',
-        held: false,
-      };
-  }
-};
-
-/** The torrent stages above, which a live reading may update. */
-const TORRENT_STAGES = new Set([
-  'Downloading',
-  'Waiting for peers',
-  ...TORRENT_CLIENT_TYPES.flatMap((type) => {
-    const product = CLIENT_PRODUCTS[type];
-    return [
-      `Paused in ${product}`,
-      `Queued in ${product}`,
-      `${product} is checking it`,
-      `${product} is moving it`,
-    ];
-  }),
-]);
-
 /** The least time between two readings a Usenet job's speed is taken from. */
 const PACE_MIN_MS = 5_000;
 /** How often the torrent client is checked for magnet probes left behind. */
@@ -355,112 +179,6 @@ const heldReason = (error: string | null): string => {
 /** Who approved a pack Backfill took itself, by the auto-approve rule. */
 const AUTO_APPROVED = 'Backfill (auto-approve)';
 const ACTIVE: BackfillJob['status'][] = ['queued', 'downloading', 'importing'];
-
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-/** Failures of the network itself: nothing answered, or not in time. */
-const UNREACHABLE = new Set([
-  'ECONNREFUSED',
-  'ECONNRESET',
-  'ECONNABORTED',
-  'ETIMEDOUT',
-  'ENOTFOUND',
-  'EAI_AGAIN',
-  'EHOSTUNREACH',
-  'ENETUNREACH',
-  'EPIPE',
-  'ERR_NETWORK',
-]);
-
-/**
- * Whether an error says only that Sonarr, Radarr or the download client
- * could not be reached for now: no answer at all, or a proxy in front of it
- * saying it is down. A job waits that out rather than counting it towards
- * giving up, since nothing is wrong with the download itself.
- */
-export const isUnreachable = (e: unknown, depth = 0): boolean => {
-  if (!e || typeof e !== 'object' || depth > 3) return false;
-  if (isAxiosError(e) && e.response) {
-    return [502, 503, 504].includes(e.response.status);
-  }
-  const { code, cause } = e as { code?: unknown; cause?: unknown };
-  // Sonarr's and Radarr's own calls wrap what went wrong as the cause.
-  return UNREACHABLE.has(String(code ?? '')) || isUnreachable(cause, depth + 1);
-};
-
-/** The HTTP request an error came from, looking into what it wraps. */
-const requestOf = (
-  e: unknown,
-  depth = 0
-): { status?: number; url?: URL } | null => {
-  if (!e || typeof e !== 'object' || depth > 3) return null;
-  if (isAxiosError(e)) {
-    let url: URL | undefined;
-    try {
-      url = new URL(e.config?.url ?? '', e.config?.baseURL);
-    } catch {
-      url = undefined;
-    }
-    return { status: e.response?.status, url };
-  }
-  return requestOf((e as { cause?: unknown }).cause, depth + 1);
-};
-
-/**
- * Which of the apps Backfill talks to an error came from, by the address
- * it was asking: "Sonarr", "SABnzbd", "Prowlarr".
- */
-const appAsked = (e: unknown): string | undefined => {
-  const url = requestOf(e)?.url;
-  if (!url) return undefined;
-  const port = Number(url.port || (url.protocol === 'https:' ? 443 : 80));
-  const settings = getSettings();
-  const at = (s: { hostname: string; port: number }) =>
-    s.hostname.toLowerCase() === url.hostname.toLowerCase() &&
-    Number(s.port) === port;
-  if (at(settings.backfill.prowlarr)) return 'Prowlarr';
-  return [
-    ...settings.sonarr,
-    ...settings.radarr,
-    ...settings.lidarr,
-    ...settings.downloadClients,
-  ].find(at)?.name;
-};
-
-/**
- * A problem put in plain words already, carrying what came in as its
- * cause for the server's log.
- */
-class SaidPlainly extends Error {}
-
-/**
- * What went wrong, in plain words, for the cases met often: a limit
- * reached, an app not answering, an API key refused. Anything else is
- * said as it came. `indexer` is the indexer a release was being fetched
- * from, when it was.
- */
-export const plainProblem = (e: unknown, indexer?: string): string => {
-  if (e instanceof IndexerLimitReached || e instanceof SaidPlainly) {
-    return e.message;
-  }
-  if (limitOf(e)) {
-    return limitMessage(indexer ?? appAsked(e) ?? 'The indexer', 'download');
-  }
-  if (isUnreachable(e)) {
-    return `${appAsked(e) ?? 'An app Backfill uses'} did not answer`;
-  }
-  const status = requestOf(e)?.status;
-  if (status === 401 || status === 403) {
-    return `${indexer ?? appAsked(e) ?? 'An app Backfill uses'} refused the API key`;
-  }
-  return message(e);
-};
-
-/**
- * Something wrong with the release itself rather than with Seerr, the apps
- * or the download client: only then is it marked dead when its job gives up.
- */
-class ReleaseProblem extends Error {}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -566,92 +284,6 @@ const jobWhat = (row: BackfillSeries, job: BackfillJob): string => {
 /** Below this, a video in a release grabbed whole is a sample. */
 const WHOLE_MIN_BYTES = 20 * 1024 * 1024;
 
-/** A path inside a torrent without its top folder, which clients may rename. */
-const insidePath = (path: string): string => {
-  const parts = path.replace(/\\/g, '/').split('/');
-  return parts.length > 1 ? parts.slice(1).join('/') : parts[0];
-};
-
-/**
- * Where each chosen file is in the client's own list, in the order given;
- * undefined for one that is not there.
- *
- * Backfill numbers a .torrent's files leaving out its padding files (BEP
- * 47), as qBittorrent does. rTorrent, Transmission before 4, and Deluge on
- * some versions list them, which moves every file after one along. So a
- * file numbered the same in the client is taken when it is the same file;
- * otherwise it is looked for by its path inside the torrent and its size,
- * and last by its name and size.
- */
-export const placeFiles = (
-  chosen: { index: number; path: string; size: number }[],
-  files: { index: number; name: string; size: number }[]
-): (number | undefined)[] =>
-  chosen.map((file) => {
-    const inside = insidePath(file.path);
-    const same = files.find((f) => f.index === file.index);
-    if (same && insidePath(same.name) === inside) return same.index;
-    const byPath = files.filter(
-      (f) => insidePath(f.name) === inside && f.size === file.size
-    );
-    if (byPath.length === 1) return byPath[0].index;
-    const name = baseName(file.path.replace(/\\/g, '/'));
-    if (same && baseName(same.name.replace(/\\/g, '/')) === name) {
-      return same.index;
-    }
-    const byName = files.filter(
-      (f) =>
-        baseName(f.name.replace(/\\/g, '/')) === name && f.size === file.size
-    );
-    return byName.length === 1 ? byName[0].index : undefined;
-  });
-
-/**
- * A path the download client gave, as Sonarr or Radarr sees it, by the
- * remote path mapping that fits it best. What follows the mapped folder is
- * written with the app's own separators: a Windows client's
- * "D:\dl\Show\ep.mkv" mapped to "/data/" is "/data/Show/ep.mkv".
- */
-export const mapRemotePath = (
-  path: string,
-  host: string,
-  mappings: { host: string; remotePath: string; localPath: string }[]
-): string => {
-  const windows = /^[a-z]:\\|^\\\\/i.test(path);
-  const norm = (p: string) =>
-    windows ? p.replace(/\//g, '\\').toLowerCase() : p;
-  const mapping = mappings
-    .filter(
-      (m) =>
-        m.host.toLowerCase() === host.toLowerCase() &&
-        norm(path).startsWith(norm(m.remotePath))
-    )
-    .sort((a, b) => b.remotePath.length - a.remotePath.length)[0];
-  if (!mapping) return path;
-  const local = mapping.localPath;
-  // A backslash is a separator only in a Windows path; elsewhere it can be
-  // part of a file's name.
-  const theirs = windows ? /[\\/]+/g : /\/+/g;
-  const rest = path.slice(mapping.remotePath.length).replace(/^[\\/]+/, '');
-  if (!rest) return local;
-  const sep = /^[a-z]:[\\/]|^\\\\/i.test(local) ? '\\' : '/';
-  return `${local.replace(/[\\/]+$/, '')}${sep}${rest.replace(theirs, sep)}`;
-};
-
-/**
- * A Usenet post in archives, or with scrambled file names: its files
- * cannot be listed before it is downloaded.
- */
-export class PackedRelease extends Error {
-  constructor(public readonly packing: 'archives' | 'scrambled') {
-    super(
-      packing === 'archives'
-        ? 'Packed in archives, so its files cannot be checked'
-        : 'Its file names are scrambled (only its repair files are named), so its files cannot be checked'
-    );
-  }
-}
-
 export interface SearchOptions {
   /** False keeps auto-approve out of it, for searches people asked for. */
   autoApprove?: boolean;
@@ -704,196 +336,9 @@ export const jobEpisodes = (job: Pick<BackfillJob, 'files'>): number[] => [
  */
 export const MAX_FAILED_PER_DAY = 6;
 
-/** Where a download stands, as its page shows it. */
-export interface Progress {
-  progress: number;
-  size: number;
-  sizeLeft: number;
-  speed: number;
-  secondsLeft: number | null;
-  /** What it is doing, read live: downloading, or waiting for peers. */
-  stage?: string;
-}
-
-/** A torrent's progress over the chosen files only, not the whole pack. */
-const measureTorrent = (
-  job: BackfillJob,
-  torrent: { speed: number; secondsLeft?: number },
-  files: { index: number; size: number; progress: number }[]
-): Progress & { have: number; complete: boolean } => {
-  const wanted = new Set(job.files.map((f) => f.index));
-  const chosen = files.filter((f) => wanted.has(f.index));
-  const size = chosen.reduce((n, f) => n + f.size, 0);
-  const have = chosen.reduce((n, f) => n + f.size * f.progress, 0);
-  const sizeLeft = Math.max(0, Math.round(size - have));
-  const speed = torrent.speed ?? 0;
-  return {
-    have,
-    complete: chosen.length > 0 && chosen.every((f) => f.progress >= 1),
-    size,
-    sizeLeft,
-    progress: size ? Math.floor((have / size) * 100) : 0,
-    speed,
-    // The client's own estimate, else what is left at today's speed.
-    secondsLeft:
-      torrent.secondsLeft ??
-      (speed > 0 && sizeLeft > 0 ? Math.round(sizeLeft / speed) : null),
-  };
-};
-
-const measureNzb = (nzbJob: {
-  size: number;
-  sizeLeft: number;
-  percentage: number;
-  secondsLeft?: number;
-  speed?: number;
-}): Progress => ({
-  size: nzbJob.size,
-  sizeLeft: nzbJob.sizeLeft,
-  progress: Math.floor(nzbJob.percentage),
-  speed: nzbJob.speed ?? 0,
-  secondsLeft: nzbJob.secondsLeft ?? null,
-});
-
-/** A date from a raw query: SQLite gives UTC text with no zone on it. */
-const utcDate = (value: string | Date) =>
-  value instanceof Date
-    ? value
-    : new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(value) ? value : `${value}Z`);
-
 /** Whether a date Sonarr or Radarr gave is set and earlier than `when`. */
 const before = (date: string | undefined, when: number) =>
   !!date && new Date(date).getTime() < when;
-
-/**
- * How long a title whose last search failed (Prowlarr down, say) waits
- * before it is tried again, so it never holds a place in every scan.
- */
-const RETRY_FAILED_AFTER_MS = 24 * 60 * 60 * 1000;
-
-/**
- * When each album was first asked for, by MusicBrainz id: its oldest
- * approved request still open. Albums nobody asked for are absent.
- */
-const albumsAskedSince = async (
-  mbids: string[]
-): Promise<Map<string, Date>> => {
-  const first = new Map<string, Date>();
-  const ids = [...new Set(mbids.filter(Boolean))];
-  for (let i = 0; i < ids.length; i += 400) {
-    const asked = await getRepository(AlbumRequest)
-      .createQueryBuilder('album')
-      .innerJoin('album.request', 'request')
-      .select('album.albumMbid', 'mbid')
-      .addSelect('MIN(request.createdAt)', 'first')
-      .where('request.status = :status', {
-        status: MediaRequestStatus.APPROVED,
-      })
-      // An album already here, in a request still open for others, is not.
-      .andWhere('album.status = :albumStatus', {
-        albumStatus: MediaRequestStatus.APPROVED,
-      })
-      .andWhere('album.albumMbid IN (:...mbids)', {
-        mbids: ids.slice(i, i + 400),
-      })
-      .groupBy('album.albumMbid')
-      .getRawMany<{ mbid: string; first: string | Date }>();
-    for (const a of asked) first.set(a.mbid, utcDate(a.first));
-  }
-  return first;
-};
-
-/**
- * When each title someone asked for was first asked for: the oldest request
- * approved and still open, by TMDB id. Titles nobody asked for are absent.
- */
-export const requestedSince = async (
-  rows: BackfillSeries[]
-): Promise<Map<number, Date>> => {
-  const since = new Map<number, Date>();
-  const byKind = (kind: BackfillKind) =>
-    rows
-      .filter((row) => row.kind === kind && row.tmdbId)
-      .map((row) => row.tmdbId!);
-  // Albums asked for, by their MusicBrainz ids.
-  const albums = rows.filter((row) => row.kind === 'album' && row.foreignId);
-  const firstByMbid = await albumsAskedSince(
-    albums.map((row) => row.foreignId!)
-  );
-  for (const row of albums) {
-    const first = firstByMbid.get(row.foreignId!);
-    if (first) since.set(row.id, first);
-  }
-  for (const kind of ['series', 'movie'] as const) {
-    const tmdbIds = byKind(kind);
-    if (!tmdbIds.length) continue;
-    const requests = await getRepository(MediaRequest)
-      .createQueryBuilder('request')
-      .innerJoin('request.media', 'media')
-      .select('media.tmdbId', 'tmdbId')
-      .addSelect('MIN(request.createdAt)', 'first')
-      .where('request.status = :status', {
-        status: MediaRequestStatus.APPROVED,
-      })
-      .andWhere('request.is4k = :is4k', { is4k: false })
-      .andWhere('media.mediaType = :type', {
-        type: kind === 'movie' ? MediaType.MOVIE : MediaType.TV,
-      })
-      .andWhere('media.tmdbId IN (:...tmdbIds)', { tmdbIds })
-      .groupBy('media.tmdbId')
-      .getRawMany<{ tmdbId: number | string; first: string | Date }>();
-    const firstById = new Map(
-      requests.map((r) => [Number(r.tmdbId), utcDate(r.first)])
-    );
-    for (const row of rows) {
-      const first =
-        row.kind === kind && row.tmdbId ? firstById.get(row.tmdbId) : undefined;
-      if (first) since.set(row.id, first);
-    }
-  }
-  return since;
-};
-
-/**
- * Which titles this scan searches, at most `searchesPerScan`. A title is
- * due when Backfill has never searched for it; when its last search failed
- * a day ago or more; or when nothing was found and `researchAfterDays` have
- * passed. Every search, found or not, restarts that wait, so the same few
- * titles never take every scan: each in turn goes to the back.
- *
- * Of those due, titles never searched come first, then ones searched
- * before. Within each, a title someone asked for goes ahead of one nobody
- * did (the oldest request first); then, of titles never searched, the one
- * missing most, and of the rest, the one that has waited longest.
- */
-export const pickSearches = (
-  due: BackfillSeries[],
-  requested: Map<number, Date>,
-  settings: { searchesPerScan: number; researchAfterDays: number },
-  now = Date.now()
-): BackfillSeries[] => {
-  const waitFor = (row: BackfillSeries) =>
-    row.status === 'stuck'
-      ? RETRY_FAILED_AFTER_MS
-      : settings.researchAfterDays * 86_400_000;
-  const eligible = due.filter(
-    (row) =>
-      !row.lastSearchedAt || now - row.lastSearchedAt.getTime() >= waitFor(row)
-  );
-  const asked = (row: BackfillSeries) =>
-    requested.get(row.id)?.getTime() ?? Infinity;
-  return eligible
-    .sort(
-      (a, b) =>
-        Number(!!a.lastSearchedAt) - Number(!!b.lastSearchedAt) ||
-        asked(a) - asked(b) ||
-        (a.lastSearchedAt?.getTime() ?? 0) -
-          (b.lastSearchedAt?.getTime() ?? 0) ||
-        b.missing - a.missing ||
-        a.id - b.id
-    )
-    .slice(0, settings.searchesPerScan);
-};
 
 /** Between one title and the next when searching everything stuck. */
 const SEARCH_ALL_PAUSE_MS = 30_000;

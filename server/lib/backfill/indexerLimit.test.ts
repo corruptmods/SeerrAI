@@ -6,7 +6,7 @@ import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
 import type { User } from '@server/entity/User';
-import backfill, { plainProblem } from '@server/lib/backfill/engine';
+import backfill from '@server/lib/backfill/engine';
 import {
   backoffMs,
   IndexerLimitReached,
@@ -18,6 +18,7 @@ import type { Notice } from '@server/lib/backfill/notices';
 import backfillNotices from '@server/lib/backfill/notices';
 import type { PlanEntry } from '@server/lib/backfill/plan';
 import { summarize } from '@server/lib/backfill/plan';
+import { plainProblem } from '@server/lib/backfill/problems';
 import type { SonarrEpisode } from '@server/lib/backfill/sonarr';
 import BackfillSonarr from '@server/lib/backfill/sonarr';
 import notificationManager from '@server/lib/notifications';

@@ -8,7 +8,7 @@ import BackfillSeries from '@server/entity/BackfillSeries';
 import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { User } from '@server/entity/User';
-import { pickSearches, requestedSince } from '@server/lib/backfill/engine';
+import { pickSearches, requestedSince } from '@server/lib/backfill/schedule';
 import { setupTestDb } from '@server/test/db';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

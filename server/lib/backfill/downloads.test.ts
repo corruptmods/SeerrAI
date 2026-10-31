@@ -4,7 +4,7 @@ import type BackfillSeries from '@server/entity/BackfillSeries';
 import {
   backfillDownloadsOf,
   backfillImportsOf,
-} from '@server/lib/backfill/engine';
+} from '@server/lib/backfill/progress';
 import downloadTracker from '@server/lib/downloadtracker';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
@@ -204,7 +204,7 @@ describe("a Usenet download's own speed", () => {
 
 describe('what a Usenet download is doing, in words', () => {
   it('says what the client is doing after the download, not its bare status', async () => {
-    const { usenetStage } = await import('@server/lib/backfill/engine');
+    const { usenetStage } = await import('@server/lib/backfill/progress');
     assert.equal(
       usenetStage({ place: 'history', status: 'Running' }, 'SABnzbd'),
       'SABnzbd is running its post-processing script'
@@ -230,7 +230,7 @@ describe('what a Usenet download is doing, in words', () => {
   });
 
   it('says what a torrent is doing in the words of its own client', async () => {
-    const { torrentStage } = await import('@server/lib/backfill/engine');
+    const { torrentStage } = await import('@server/lib/backfill/progress');
     assert.deepEqual(torrentStage({ state: 'paused', speed: 0 }, 'Deluge'), {
       stage: 'Paused in Deluge',
       held: true,

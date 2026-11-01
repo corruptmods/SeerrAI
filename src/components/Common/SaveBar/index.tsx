@@ -38,8 +38,13 @@ const SaveBar = ({ dirty, className = '', children }: SaveBarProps) => {
 
   useEffect(() => {
     if (dirty !== undefined || formik) return;
+    // Its own form, else its own section: a change elsewhere on the page is
+    // another Save's.
     const scope =
-      ref.current?.closest('form') ?? ref.current?.closest('main') ?? null;
+      ref.current?.closest('form') ??
+      ref.current?.closest('section') ??
+      ref.current?.closest('main') ??
+      null;
     if (!scope) return;
     const mark = () => setTouched(true);
     scope.addEventListener('input', mark);
@@ -57,10 +62,53 @@ const SaveBar = ({ dirty, className = '', children }: SaveBarProps) => {
         ? formik.dirty && values !== savedValues
         : touched;
 
+  // Whether it is held at the bottom of the screen, away from its place.
+  // Where Save is already on screen, as at the end of a short page, or cut
+  // off by an edge of the screen as the page scrolls past it, it looks as
+  // it does saved.
+  const [floating, setFloating] = useState(false);
+  useEffect(() => {
+    const bar = ref.current;
+    if (!unsaved || !bar) {
+      setFloating(false);
+      return;
+    }
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      // Where it is held: its distance from the bottom of the screen, which
+      // changes with the screen's width (the phone's tab bar).
+      const line =
+        window.innerHeight - (parseFloat(getComputedStyle(bar).bottom) || 0);
+      const box = bar.getBoundingClientRect();
+      setFloating(Math.abs(box.bottom - line) < 1 && box.top < line);
+    };
+    const soon = () => {
+      if (!frame) frame = window.requestAnimationFrame(check);
+    };
+    check();
+    window.addEventListener('scroll', soon, { passive: true });
+    window.addEventListener('resize', soon);
+    // A page that grows or shrinks moves it without a scroll.
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? undefined
+        : new ResizeObserver(soon);
+    observer?.observe(document.body);
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', soon);
+      window.removeEventListener('resize', soon);
+      observer?.disconnect();
+    };
+  }, [unsaved]);
+
   return (
     <div
       ref={ref}
-      className={`actions ${unsaved ? 'actions-unsaved' : ''} ${className}`}
+      className={`actions ${unsaved ? 'actions-unsaved' : ''} ${
+        unsaved && floating ? 'actions-floating' : ''
+      } ${className}`}
       onClickCapture={
         dirty === undefined && !formik ? () => setTouched(false) : undefined
       }

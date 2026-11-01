@@ -2,6 +2,12 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
+## Coming next
+
+### Fixed
+
+- With TV details from TheTVDB (Settings → Metadata), a series whose seasons TMDB splits differently went back and forth between Available and Partially Available every hour. The hourly availability check now counts seasons the way the scans do.
+
 ## 2.3.0 (31 October 2026)
 
 Quality profiles for Radarr and Sonarr, wrong Plex matches fixed from Seerr AI, playlists from Spotify and Apple Music, whole collections on lists, and Backfill that gives up on torrents that can't finish.

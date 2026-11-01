@@ -1,5 +1,6 @@
 import type { JellyfinLibraryItem } from '@server/api/jellyfin';
 import JellyfinAPI from '@server/api/jellyfin';
+import { getMetadataProvider } from '@server/api/metadata';
 import type { PlexMetadata } from '@server/api/plexapi';
 import PlexAPI from '@server/api/plexapi';
 import RadarrAPI, { type RadarrMovie } from '@server/api/servarr/radarr';
@@ -24,6 +25,7 @@ import Media from '@server/entity/Media';
 import MediaRequest from '@server/entity/MediaRequest';
 import type Season from '@server/entity/Season';
 import { User } from '@server/entity/User';
+import { detectAnime } from '@server/lib/animeDecision';
 import { recordMediaDeletion } from '@server/lib/mediaDeletions';
 import {
   MEDIA_ID,
@@ -302,21 +304,37 @@ class AvailabilitySync {
             ...sonarrSeasonsMap4k,
           ]);
 
-          // We need to fetch from TMDB to get the episode count for each season
+          // Each season's episode count, from where the scans take it
           let tvShow: TmdbTvScanDetails | TmdbTvDetails | undefined;
           try {
+            let found: TmdbTvScanDetails | TmdbTvDetails | undefined;
             if (media.tmdbId) {
-              tvShow = await this.tmdb.getTvShowForScan({
+              found = await this.tmdb.getTvShowForScan({
                 tvId: Number(media.tmdbId),
               });
             } else if (media.tvdbId) {
-              tvShow = await this.tmdb.getShowByTvdbIdForScan({
+              found = await this.tmdb.getShowByTvdbIdForScan({
                 tvdbId: Number(media.tvdbId),
               });
             }
+
+            // With TheTVDB chosen for series (Settings → Metadata), the scans
+            // number seasons its way, and so must this. TMDB can split a
+            // series' seasons differently: a season only TMDB has would read
+            // as missing here, and the next scan would set it back, hour
+            // after hour.
+            if (found) {
+              const provider = detectAnime(found)
+                ? await getMetadataProvider('anime')
+                : await getMetadataProvider('tv');
+              if (!(provider instanceof TheMovieDb)) {
+                found = await provider.getTvShow({ tvId: found.id });
+              }
+            }
+            tvShow = found;
           } catch (e) {
             logger.debug(
-              `Failed to fetch TMDB data for show [TMDB ID ${media.tmdbId}]. Skipping season enrichment.`,
+              `Failed to fetch the seasons of show [TMDB ID ${media.tmdbId}]. Skipping season enrichment.`,
               { label: 'AvailabilitySync', errorMessage: e.message }
             );
           }

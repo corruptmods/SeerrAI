@@ -17,6 +17,7 @@ import type {
   TmdbTvDetails,
   TmdbTvSeasonResult,
 } from '@server/api/themoviedb/interfaces';
+import Tvdb from '@server/api/tvdb';
 import { ApiErrorCode } from '@server/constants/error';
 import {
   MediaRequestStatus,
@@ -34,7 +35,7 @@ import { scheduledJobs } from '@server/job/schedule';
 import availabilitySync from '@server/lib/availabilitySync';
 import { removeServer } from '@server/lib/mediaServerAdmin';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
-import { getSettings } from '@server/lib/settings';
+import { MetadataProviderType, getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
 import { ApiError } from '@server/types/error';
 import schedule from 'node-schedule';
@@ -2058,6 +2059,107 @@ describe('AvailabilitySync', () => {
       assert.strictEqual(s1?.status4k, MediaStatus.AVAILABLE);
       assert.strictEqual(updated.status, MediaStatus.AVAILABLE);
       assert.strictEqual(s1?.status, MediaStatus.AVAILABLE);
+    });
+  });
+
+  describe('series numbered by TheTVDB', () => {
+    const season = (seasonNumber: number, episodeCount: number) => ({
+      id: 500 + seasonNumber,
+      air_date: '2020-01-01',
+      episode_count: episodeCount,
+      name: `Season ${seasonNumber}`,
+      overview: '',
+      season_number: seasonNumber,
+    });
+
+    it('does not count a season only TMDB has as missing', async () => {
+      configurePlex();
+      configureSonarr([{ syncEnabled: true }]);
+      const settings = getSettings();
+      const before = { ...settings.metadataSettings };
+      settings.metadataSettings.tv = MetadataProviderType.TVDB;
+      // Login is not needed for the stand-in lookup below.
+      Object.defineProperty(Tvdb.prototype, 'login', {
+        value: async () => undefined,
+        configurable: true,
+        writable: true,
+      });
+      // TheTVDB: 10 and 15 episodes, then an announced season with none.
+      Object.defineProperty(Tvdb.prototype, 'getTvShow', {
+        value: async () =>
+          fakeTmdbShow(4100, [season(1, 10), season(2, 15), season(3, 0)]),
+        configurable: true,
+        writable: true,
+      });
+
+      try {
+        const mediaRepository = getRepository(Media);
+        const media = new Media();
+        media.tmdbId = 4100;
+        media.mediaType = MediaType.TV;
+        media.status = MediaStatus.AVAILABLE;
+        media.ratingKey = 'plex-lantern-rk';
+        media.externalServiceId = 410;
+        media.seasons = [1, 2, 3].map(
+          (seasonNumber) =>
+            new Season({
+              seasonNumber,
+              status:
+                seasonNumber < 3 ? MediaStatus.AVAILABLE : MediaStatus.UNKNOWN,
+              status4k: MediaStatus.UNKNOWN,
+            })
+        );
+        await mediaRepository.save(media);
+
+        // TMDB splits the same 25 episodes over three seasons.
+        getTvShowImpl = async () =>
+          fakeTmdbShow(4100, [season(1, 10), season(2, 10), season(3, 5)]);
+        getMetadataImpl = async (key: string) => {
+          if (key === 'plex-lantern-rk') {
+            return fakePlexShow('plex-lantern-rk');
+          }
+          throw new Error('404');
+        };
+        getChildrenMetadataImpl = async (key: string) => {
+          if (key === 'plex-lantern-rk') {
+            return [
+              fakePlexSeason(1, 'plex-lantern-s1-rk'),
+              fakePlexSeason(2, 'plex-lantern-s2-rk'),
+            ];
+          }
+          if (key === 'plex-lantern-s1-rk') return fakePlexEpisodes(10);
+          if (key === 'plex-lantern-s2-rk') return fakePlexEpisodes(15);
+          return [];
+        };
+        getSeriesByIdImpl = async (id: number) => {
+          if (id !== 410) throw new Error('404');
+          return {
+            id: 410,
+            title: 'The Lantern House',
+            titleSlug: 'the-lantern-house',
+            monitored: true,
+            statistics: {
+              episodeFileCount: 25,
+              totalEpisodeCount: 25,
+              episodeCount: 25,
+              percentOfEpisodes: 100,
+              sizeOnDisk: 0,
+              seasonCount: 2,
+            },
+            seasons: fakeSonarrSeasons(2, { 1: 10, 2: 15 }),
+          } as unknown as SonarrSeries;
+        };
+
+        await availabilitySync.run();
+
+        const updated = await mediaRepository.findOneOrFail({
+          where: { tmdbId: 4100 },
+          relations: ['seasons'],
+        });
+        assert.strictEqual(updated.status, MediaStatus.AVAILABLE);
+      } finally {
+        settings.metadataSettings = before;
+      }
     });
   });
 

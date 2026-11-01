@@ -1,0 +1,27 @@
+{{ template "chart.header" . }}
+
+{{ template "chart.deprecationWarning" . }}
+
+{{ template "chart.badgesSection" . }}
+
+{{ template "chart.description" . }}
+
+{{ template "chart.homepageLine" . }}
+
+{{ template "chart.maintainersSection" . }}
+
+{{ template "chart.sourcesSection" . }}
+
+{{ template "chart.requirementsSection" . }}
+
+## Installation
+
+```sh
+helm install seerr-ai oci://ghcr.io/corruptmods/seerr-ai-chart
+```
+
+Then reach it through its service (port 80, `service.port`), an `ingress` or a `route` (below), and follow the setup. Settings, the database and the image cache live in the `config` volume (5 Gi to start; raise `config.persistence.size` for a big library). More in the [install guide](https://github.com/corruptmods/SeerrAI/blob/main/docs/seerr-ai/install.md#kubernetes).
+
+Seerr AI keeps its database in that volume, so it runs as one pod: a StatefulSet, with no replica count.
+
+{{ template "chart.valuesSection" . }}

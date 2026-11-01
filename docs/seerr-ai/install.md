@@ -55,6 +55,22 @@ Open port 5055 and follow the setup: sign in with Plex, Jellyfin or Emby, then c
 
 Sonarr v4 and the Sonarr v5 beta both work. On v5, a series you set to another language in Sonarr shows there under its translated title; Backfill also searches under its original title, which is what most releases use. If you switch a series to another episode order in Sonarr v5 (DVD order, say), its season numbers no longer match TMDB's, so requests for single seasons of that series may pick the wrong season.
 
+### Kubernetes
+
+A Helm chart, signed like the images, installs Seerr AI on Kubernetes:
+
+```bash
+helm install seerr-ai oci://ghcr.io/corruptmods/seerr-ai-chart
+```
+
+It runs one pod (a StatefulSet: the database is in its `config` volume, 5 Gi to start), reached through its service on port 80, or an ingress or Gateway API route you turn on. Set the time zone, or a PostgreSQL database, with `extraEnv` (`TZ`, `DB_TYPE`, `DB_HOST` and so on, as above). Every setting is in the [chart's README](../../charts/seerr-ai-chart/README.md). To check a chart before installing it:
+
+```bash
+cosign verify ghcr.io/corruptmods/seerr-ai-chart:1.0.0 \
+  --certificate-identity-regexp '^https://github\.com/corruptmods/SeerrAI/\.github/workflows/charts\.yml@refs/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
 ### Checking an image
 
 Every published image is signed, and carries a list of everything inside it (an SBOM). With [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) you can check that an image was built by this project's own workflow before you run it:
@@ -179,6 +195,7 @@ The **Seerr AI Release** workflow (`.github/workflows/release.yml`) builds the i
 - **Why `ai-v`:** Seerr's own tags (`v1.0.0` to `v3.x`) arrive in a copy that fetches Seerr as `upstream`, so Seerr AI's releases are tagged apart from them. Push one tag at a time; `git push --tags` would send Seerr's too.
 - **`:develop`:** pushing to `dev` publishes nothing. When `dev` is ready to share: Actions → Seerr AI Release → Run workflow, with **Use workflow from** set to `dev`.
 - **A preview:** to let someone try work that isn't on `dev` yet, push a tag `preview-<name>` (`git tag preview-music-fix && git push origin preview-music-fix`) for `:preview-music-fix`, or run the workflow by hand from that branch for `:preview-<branch>` (a `/` in its name becomes `-`). A preview never moves `:latest` or `:develop`, and creates no release. Started by hand from `main`, the workflow stops without publishing: `main` only moves for a release.
+- **The Helm chart** (`charts/seerr-ai-chart`) goes out on its own: the **Seerr AI Charts** workflow (`.github/workflows/charts.yml`) publishes a chart version that isn't in the registry yet whenever `main` gets a change under `charts/`, signs it, and pushes its Artifact Hub metadata beside it. For a release, raise `appVersion` in its `Chart.yaml` to the new version and `version` by one, and update the two version badges at the top of its README (or run helm-docs); on `dev`, the workflow lints it (it refuses a chart change without a new `version`) and installs it in a throwaway Kubernetes cluster. Make the `seerr-ai-chart` package public, as for the image.
 - **Cutting a release again:** move the tag (`git tag -f ai-v1.2.3 && git push -f origin ai-v1.2.3`); the images are rebuilt, and the existing release page is kept and published again (GitHub turns it into a draft while its tag is gone).
 
 Every image is also tagged `:sha-<commit>`. Building the two platforms side by side, natively, should be much quicker than the half hour arm64 used to take under emulation. GitHub's standard runners, the arm64 ones included, cost nothing for a public repository; a private copy uses its account's Actions minutes.

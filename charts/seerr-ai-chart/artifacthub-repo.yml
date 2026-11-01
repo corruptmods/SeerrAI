@@ -1,0 +1,4 @@
+# Artifact Hub's metadata for this chart, pushed beside it to its OCI
+# repository. Once the repository is added on artifacthub.io, its
+# repositoryID goes here, which marks the listing as Seerr AI's own.
+owners: []

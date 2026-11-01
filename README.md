@@ -74,7 +74,7 @@ services:
     restart: unless-stopped
 ```
 
-Open port 5055 and follow the setup. Images are for amd64 and arm64. It can also take over an existing Seerr database: back it up first. [Installing and updating](./docs/seerr-ai/install.md) covers PostgreSQL, updates and building it yourself.
+Open port 5055 and follow the setup. Images are for amd64 and arm64; on Kubernetes, `helm install seerr-ai oci://ghcr.io/corruptmods/seerr-ai-chart`. It can also take over an existing Seerr database: back it up first. [Installing and updating](./docs/seerr-ai/install.md) covers PostgreSQL, updates and building it yourself.
 
 ## Documentation
 

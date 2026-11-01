@@ -81,15 +81,33 @@ listRoutes.get('/markers', isAuthenticated(), async (req, res, next) => {
   }
 });
 
-// Which of the caller's lists already contain a title.
+/** Titles looked up at once, at most: a collection's films fit easily. */
+const CONTAINS_LIMIT = 500;
+
+// Which of the caller's lists already contain a title, or each of several
+// (tmdbIds=1,2,3: a collection's films), one entry per list and title.
 listRoutes.get('/contains', isAuthenticated(), async (req, res, next) => {
   try {
     const userId = req.user?.id as number;
-    const tmdbId = Number(req.query.tmdbId);
     const mediaType = req.query.mediaType === 'tv' ? 'tv' : 'movie';
+    // An array once the API spec has split it; a string without it.
+    const raw = req.query.tmdbIds as unknown;
+    const tmdbIds =
+      raw !== undefined
+        ? (Array.isArray(raw) ? raw : String(raw).split(','))
+            .filter((id) => id !== '')
+            .map(Number)
+        : [Number(req.query.tmdbId)];
 
-    if (!Number.isFinite(tmdbId)) {
-      return next({ status: 400, message: 'A valid tmdbId is required.' });
+    if (
+      !tmdbIds.length ||
+      tmdbIds.length > CONTAINS_LIMIT ||
+      !tmdbIds.every((id) => Number.isInteger(id) && id > 0)
+    ) {
+      return next({
+        status: 400,
+        message: 'A valid tmdbId, or tmdbIds, is required.',
+      });
     }
 
     const accessibleIds = await accessibleListIds(userId);
@@ -99,7 +117,7 @@ listRoutes.get('/contains', isAuthenticated(), async (req, res, next) => {
     }
 
     const items = await getRepository(MediaListItem).find({
-      where: { listId: In(accessibleIds), tmdbId, mediaType },
+      where: { listId: In(accessibleIds), tmdbId: In(tmdbIds), mediaType },
     });
 
     const lists = await getRepository(MediaList).find({
@@ -110,6 +128,7 @@ listRoutes.get('/contains', isAuthenticated(), async (req, res, next) => {
       items.map((item) => ({
         listId: item.listId,
         listName: lists.find((list) => list.id === item.listId)?.name ?? '',
+        tmdbId: item.tmdbId,
       }))
     );
   } catch (e) {

@@ -15,6 +15,7 @@ import { getRepository } from '@server/datasource';
 import { MediaList, MediaListItem } from '@server/entity/MediaList';
 import type { User } from '@server/entity/User';
 import { loadAccessibleList } from '@server/lib/listAccess';
+import { notifyListAdded } from '@server/lib/listActivity';
 import { listTitle } from '@server/lib/listTitles';
 import { requestMissing } from '@server/lib/requestMissing';
 import { getSettings } from '@server/lib/settings';
@@ -476,6 +477,7 @@ listRoutes.post<{ listId: string }>(
         await getRepository(MediaList).update(access.list.id, {
           updatedAt: new Date(),
         });
+        await notifyListAdded(access.list, toInsert, req.user as User);
       }
 
       return res

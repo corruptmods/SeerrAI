@@ -12,7 +12,7 @@ import { useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR, { useSWRConfig } from 'swr';
 
-const messages = defineMessages('components.AddToList', {
+export const messages = defineMessages('components.AddToList', {
   addtolist: 'Add to List',
   inlist: 'In List',
   newlist: 'New list name',
@@ -265,7 +265,7 @@ const AddToList = ({ tmdbId, mediaType, compact }: AddToListProps) => {
             </Modal>
           </Transition>
         ) : (
-          <div className="absolute right-0 z-50 mt-2 w-64 rounded-md border border-gray-700 bg-gray-800 p-2 shadow-lg">
+          <div className="media-action-menu absolute right-0 z-50 mt-2 w-64 rounded-md border border-gray-700 bg-gray-800 p-2 shadow-lg">
             {body}
           </div>
         ))}

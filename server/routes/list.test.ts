@@ -602,7 +602,9 @@ describe('watch lists', () => {
         'GET',
         '/api/v1/list/contains?tmdbId=55&mediaType=tv'
       );
-      assert.deepEqual(contains.body, [{ listId: shared, listName: 'Shared' }]);
+      assert.deepEqual(contains.body, [
+        { listId: shared, listName: 'Shared', tmdbId: 55 },
+      ]);
       const elsewhere = await call<unknown[]>(
         'GET',
         '/api/v1/list/contains?tmdbId=66&mediaType=movie'
@@ -615,6 +617,35 @@ describe('watch lists', () => {
         '/api/v1/list/markers'
       );
       assert.deepEqual(stranger.body.lists, []);
+    });
+
+    it('says which of several titles each list has, as for a collection’s films', async () => {
+      const films = await createList('Films');
+      const more = await createList('More');
+      for (const [list, tmdbId] of [
+        [films, 8001],
+        [more, 8001],
+        [more, 8002],
+      ]) {
+        await call('POST', `/api/v1/list/${list}/item`, {
+          tmdbId,
+          mediaType: 'movie',
+        });
+      }
+
+      const { body } = await call<
+        { listId: number; listName: string; tmdbId: number }[]
+      >('GET', '/api/v1/list/contains?tmdbIds=8001,8002,8003&mediaType=movie');
+      assert.deepEqual(
+        body.map((entry) => `${entry.listName}:${entry.tmdbId}`).sort(),
+        ['Films:8001', 'More:8001', 'More:8002']
+      );
+
+      const bad = await call(
+        'GET',
+        '/api/v1/list/contains?tmdbIds=8001,abc&mediaType=movie'
+      );
+      assert.equal(bad.status, 400);
     });
   });
 
@@ -1123,6 +1154,55 @@ describe('watch lists', () => {
   });
 
   describe('collections on import', () => {
+    it('add a collection’s films, leaving those already on the list', async () => {
+      const id = await createList();
+      await call('POST', `/api/v1/list/${id}/item`, {
+        tmdbId: 8002,
+        mediaType: 'movie',
+      });
+      const { body } = await call<{ added: number; skipped: number }>(
+        'POST',
+        `/api/v1/list/${id}/import`,
+        { items: [{ tmdbId: 500, mediaType: 'collection' }], request: false }
+      );
+      assert.deepEqual(body, {
+        added: 2,
+        skipped: 1,
+        requested: 0,
+        requestFailed: 0,
+        notRequested: 0,
+      });
+      const onList = await getRepository(MediaListItem).find({
+        where: { listId: id },
+        order: { tmdbId: 'ASC' },
+      });
+      assert.deepEqual(
+        onList.map((item) => item.tmdbId),
+        [8001, 8002, 8003]
+      );
+    });
+
+    it('tell the others on a shared list once, not once per film', async () => {
+      const id = await createList();
+      await call('PUT', `/api/v1/list/${id}`, { memberIds: [member.id] });
+      notified = [];
+
+      actingAs = member;
+      const { body } = await call<{ added: number }>(
+        'POST',
+        `/api/v1/list/${id}/import`,
+        {
+          items: [8001, 8002, 8003].map((tmdbId) => ({
+            tmdbId,
+            mediaType: 'movie',
+          })),
+          request: false,
+        }
+      );
+      assert.equal(body.added, 3);
+      assert.deepEqual(notified, ['list-owner']);
+    });
+
     it('count each film towards the 500-title limit', async () => {
       const id = await createList();
       const { body } = await call<{ added: number; skipped: number }>(

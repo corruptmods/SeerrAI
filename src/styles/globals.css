@@ -613,16 +613,20 @@
       min-width: 0;
     }
 
-    .media-actions a,
-    .media-actions button {
+    /*
+     * Only the row's own buttons: a menu one of them opens (Add to List)
+     * keeps its rows' own layout.
+     */
+    .media-actions a:not(.media-action-menu *),
+    .media-actions button:not(.media-action-menu *) {
       justify-content: center;
     }
 
     /* A button that is itself one of the row's, as well as one inside. */
     .media-actions > a:not(.media-action-icon),
     .media-actions > button:not(.media-action-icon),
-    .media-actions > :not(.media-action-icon) a,
-    .media-actions > :not(.media-action-icon) button {
+    .media-actions > :not(.media-action-icon) a:not(.media-action-menu *),
+    .media-actions > :not(.media-action-icon) button:not(.media-action-menu *) {
       white-space: normal;
       text-align: center;
       /* A little narrower, so "Get New Seasons" still fits on one line on

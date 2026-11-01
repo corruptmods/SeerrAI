@@ -1,3 +1,4 @@
+import AddCollectionToList from '@app/components/AddToList/Collection';
 import BlocklistModal from '@app/components/BlocklistModal';
 import Button from '@app/components/Common/Button';
 import ButtonWithDropdown from '@app/components/Common/ButtonWithDropdown';
@@ -460,6 +461,16 @@ const CollectionDetails = ({ collection }: CollectionDetailsProps) => {
                 </Button>
               </Tooltip>
             ))}
+          {data.parts.length > 0 && (
+            <div className="z-20">
+              <AddCollectionToList
+                movies={data.parts.map((part) => ({
+                  tmdbId: part.id,
+                  posterPath: part.posterPath ?? null,
+                }))}
+              />
+            </div>
+          )}
           {(hasRequestable || hasRequestable4k) && (
             <ButtonWithDropdown
               buttonType="primary"

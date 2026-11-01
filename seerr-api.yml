@@ -11511,15 +11511,27 @@ paths:
                           type: string
   /list/contains:
     get:
-      summary: Which of the user's lists contain a title
+      summary: Which of the user's lists contain a title, or each of several
+      description: One title by `tmdbId`, or up to 500 at once by `tmdbIds` (comma-separated, such as a collection's films). One entry per list and title.
       tags:
         - list
       parameters:
         - in: query
           name: tmdbId
-          required: true
           schema:
             type: number
+        - in: query
+          name: tmdbIds
+          description: TMDB ids, comma-separated
+          style: form
+          explode: false
+          schema:
+            type: array
+            maxItems: 500
+            items:
+              type: integer
+              minimum: 1
+            example: [603, 604, 605]
         - in: query
           name: mediaType
           required: true
@@ -11528,13 +11540,22 @@ paths:
             enum: [movie, tv]
       responses:
         '200':
-          description: Matching list ids
+          description: The lists each title is on
           content:
             application/json:
               schema:
                 type: array
                 items:
                   type: object
+                  properties:
+                    listId:
+                      type: number
+                    listName:
+                      type: string
+                    tmdbId:
+                      type: number
+        '400':
+          description: No valid tmdbId or tmdbIds
   /list/suggestions:
     get:
       summary: Pending removal suggestions for the caller's lists

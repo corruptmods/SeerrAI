@@ -50,13 +50,13 @@ Every grid of posters (Discover pages, search, watchlists, recommendations, Sugg
 
 ### Watch lists
 
-Anyone signed in can make lists of movies and series and add to them from **Add to List** on posters and title pages, or from **Also add to** when requesting.
+Anyone signed in can make lists of movies and series and add to them from **Add to List** on posters and title pages, or from **Also add to** when requesting. A collection's page has its own **Add to List**: each list says how many of the films it has, and picking one adds the rest.
 
 - **Sharing:** the owner shares a list with people (and can change who later). Each is invited first: **Accept** lets the list tell when everyone has finished a title and include them in Pick for the Room; **Leave List** turns it down. People on a list can add, remove and mark watched, or leave it. Only the owner renames, shares, deletes or imports. A list is seen only by its owner and the people it is shared with.
 - **Sections:** **To watch** (here now), **Not Available Yet**, and **Watched**.
 - **Where you are in each series:** series show "Up next S2E4 · 6 to catch up", "Not started" or "Caught up", from your own watch history (with Plex this needs Tautulli and a linked Plex account; with Jellyfin or Emby, a linked account on the server).
 - **Sorting:** recently added, oldest added, title, newest or oldest release. Remembered on each device.
-- **Activity:** people on a list are notified when someone adds, removes or marks something watched (the **List Activity** notification). Private lists send nothing.
+- **Activity:** people on a list are notified when someone adds, removes or marks something watched (the **List Activity** notification). Several added at once, as from a collection or an import, make one notice. Private lists send nothing.
 - **Import:** the owner can paste a list of titles, one per line (bullets, numbers and years are fine). Each line is matched to TMDB and **you review every match** before anything is added; nothing is added on a guess. A collection adds all its films. Optionally, anything not already in the library is requested (at most 20 per import, with your usual permissions).
 - **Import from Trakt:** paste the link to a public Trakt list, or to someone's public Trakt watchlist, instead (once an admin has set up Trakt in Settings → Services). Its titles come matched by their ids, up to 500, for you to review the same way.
 - **Finished watching?** If the owner ticks the option on a list, Seerr AI notices when everyone on the list has watched a title, and offers to remove it. Nothing is removed on its own, and **Keep** stops it asking about that title. Switch: `watchSuggestions`.

@@ -23,6 +23,29 @@ const VERBS: Record<ListActivity, string> = {
 const nameOf = (actor: User): string =>
   actor.displayName || actor.plexUsername || actor.username || 'Someone';
 
+/** Everyone who sees a list, but whoever made the change. */
+const recipientsOf = async (list: MediaList, actor: User): Promise<User[]> => {
+  const members = await getRepository(MediaListMember).find({
+    where: { listId: list.id },
+    relations: { user: true },
+  });
+  const recipients: User[] = [];
+
+  if (list.owner && list.owner.id !== actor.id) {
+    recipients.push(list.owner);
+  }
+  for (const member of members) {
+    if (member.user && member.user.id !== actor.id) {
+      recipients.push(member.user);
+    }
+  }
+
+  return recipients;
+};
+
+const posterUrl = (path?: string | null) =>
+  path ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${path}` : undefined;
+
 /**
  * Tells everyone who shares a list that its contents changed.
  *
@@ -36,24 +59,7 @@ export const notifyListActivity = async (
   actor: User
 ): Promise<void> => {
   try {
-    const members = await getRepository(MediaListMember).find({
-      where: { listId: list.id },
-      relations: { user: true },
-    });
-
-    // Everyone with visibility: the owner plus every member, minus whoever
-    // performed the action.
-    const recipients: User[] = [];
-
-    if (list.owner && list.owner.id !== actor.id) {
-      recipients.push(list.owner);
-    }
-
-    for (const member of members) {
-      if (member.user && member.user.id !== actor.id) {
-        recipients.push(member.user);
-      }
-    }
+    const recipients = await recipientsOf(list, actor);
 
     if (!recipients.length) {
       return;
@@ -66,9 +72,7 @@ export const notifyListActivity = async (
     try {
       const found = await listTitle(tmdb, item.tmdbId, item.mediaType);
       title = found.title;
-      image = found.posterPath
-        ? `https://image.tmdb.org/t/p/w600_and_h900_bestv2${found.posterPath}`
-        : undefined;
+      image = posterUrl(found.posterPath);
     } catch {
       // A title without metadata is still worth announcing.
     }
@@ -81,6 +85,49 @@ export const notifyListActivity = async (
         notifyUser: recipient,
         subject: list.name,
         message: `${nameOf(actor)} ${VERBS[activity]} ${title}.`,
+        image,
+      });
+    }
+  } catch (e) {
+    logger.error('Failed to send list activity notification', {
+      label: 'Notifications',
+      listId: list.id,
+      errorMessage: e instanceof Error ? e.message : String(e),
+    });
+  }
+};
+
+/**
+ * Tells everyone who shares a list that several titles were added at once,
+ * as by an import or a collection, in one notice rather than one each.
+ */
+export const notifyListAdded = async (
+  list: MediaList,
+  items: Pick<MediaListItem, 'tmdbId' | 'mediaType' | 'posterPath'>[],
+  actor: User
+): Promise<void> => {
+  if (items.length <= 1) {
+    if (items.length) {
+      await notifyListActivity(list, items[0], 'added', actor);
+    }
+    return;
+  }
+
+  try {
+    const recipients = await recipientsOf(list, actor);
+    const what = items.every((item) => item.mediaType === 'movie')
+      ? 'films'
+      : 'titles';
+    const image = posterUrl(items.find((item) => item.posterPath)?.posterPath);
+
+    for (const recipient of recipients) {
+      notificationManager.sendNotification(Notification.LIST_ACTIVITY, {
+        event: list.name,
+        notifyAdmin: false,
+        notifySystem: false,
+        notifyUser: recipient,
+        subject: list.name,
+        message: `${nameOf(actor)} added ${items.length} ${what}.`,
         image,
       });
     }

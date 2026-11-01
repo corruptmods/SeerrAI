@@ -84,7 +84,7 @@ const messages = defineMessages('components.Settings.SettingsGuide', {
   lookHealth:
     'Health: whether each service answers, what Radarr, Sonarr, Prowlarr and Bazarr report, low disks and stuck titles. Admins are notified of new problems.',
   lookMatch:
-    'Match Check (on Health): folders your media server matched to the wrong title. Fix with Fix Match in Plex or Identify in Jellyfin and Emby.',
+    'Match Check (on Health): folders your media server matched to the wrong title. For Plex, Fix match there puts it right; in Jellyfin and Emby, use Identify.',
   lookBackfill:
     'Backfill: what it found, what waits for approval, and its downloads.',
   lookJobs: 'Jobs & Cache: when each job runs, and Run now.',
@@ -97,6 +97,8 @@ const messages = defineMessages('components.Settings.SettingsGuide', {
     'Services: Radarr, Sonarr, Lidarr, Prowlarr, Bazarr, Tautulli, Maintainerr and the download clients.',
   settingsBackfill:
     'Backfill: the download client, when a title counts as stuck, and what’s approved automatically. Prowlarr is in Services.',
+  settingsQuality:
+    'Quality: Radarr and Sonarr profiles from Seerr AI’s presets or TRaSH Guides. Nothing changes until you preview and apply.',
   settingsAi:
     'AI: the provider and model behind the AI features, and a daily limit per person.',
   settingsNotifications:
@@ -274,6 +276,7 @@ const SettingsGuide = () => {
           {where('/settings/users', 'settingsUsers')}
           {where('/settings/services', 'settingsServices')}
           {where('/settings/backfill', 'settingsBackfill')}
+          {where('/settings/quality', 'settingsQuality')}
           {where('/settings/ai', 'settingsAi')}
           {where('/settings/notifications/email', 'settingsNotifications')}
         </ul>

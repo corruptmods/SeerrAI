@@ -7,6 +7,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 ### New
 
 - **Add a collection to a list**: a collection's page has Add to List. Each list says how many of its films it has, and picking one adds the rest. Adding several at once, from a collection or an import, sends one List Activity notice instead of none. ([guide](./docs/seerr-ai/discover-and-lists.md#watch-lists))
+- **Save stays in view in Settings**: once something is changed, a settings page's Save floats at the bottom of the screen, above a phone's tab bar, wherever you've scrolled; saved, it goes back to the end of the page. Your own settings too.
+- **On a phone, long names wrap instead of being cut off**: titles, release names, list, playlist, song and user names, menus, the calendar, AI results, request dialogs, Backfill, and Settings' lists.
 - **Fix wrong Plex matches from Seerr AI** (Settings → Health → Folders matched to another title): a **Fix match** button looks the title up in Plex by the id Radarr or Sonarr has, matches it, and checks Plex took it, putting the old match back if not. **Fix automatically**, off to start, does it as problems are found, up to 20 a night from the nightly check, and still tells admins. Each fix can be undone. ([guide](./docs/seerr-ai/health.md#fixing-them-from-here-plex))
 - **Quality profiles** (Settings → Quality): Seerr AI can set up Radarr and Sonarr profiles for you, from its own presets (SD to 2160p Remux, and Anime) or from TRaSH Guides, with a few adjustments on top: prefer usenet, file size, languages, HDR, x265, AV1, dual audio. Each server has its own. **What it does** says in plain words what each profile takes and prefers, and lets you try a release name. Every server starts Not managed and nothing is sent until you preview and apply, which marks each format as one to avoid or prefer and shows its progress; it only changes what it creates, sets where new requests go to its profiles, and History has Undo. Backfill can also step a title down a preset when nothing turns up, off unless you turn it on. ([guide](./docs/seerr-ai/quality.md))
 - **Backfill gives up on torrents that won't finish**: when part of what's wanted is on no one's computer, after the stall time, even while the rest trickles in; and when one is so slow it would take over 3 days, after four hours at that pace. Either is replaced like a stalled one. Change the 3 days, or turn it off, in Settings → Backfill. Songs taken from albums too.
@@ -41,6 +43,11 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - **Download Check no longer rejects the same release over and over**: one numbered another way (S03E02 that's really S03E04) isn't searched for again by its number, which found it again on the next indexer; Backfill looks for the episode by its title. Each reject now says why, and what came after.
 - Match Check on import no longer misses an older import looked at in the same run.
 - **A fast download no longer skips "Adding to Plex"**: one grabbed and imported between two looks at the queue showed Requested until the next regular scan, up to 5 minutes. It's now found in Radarr's or Sonarr's history, shows Adding to Plex, and the quick scan runs a minute later, which also checks its match.
+- On an iPhone, a page that gets shorter (a long Health list closing) no longer leaves empty space to scroll past: it goes back to its new end.
+- On a busy server, music searches no longer fail for no reason.
+- The admin agent: an admin who replies while it works can approve its changes at once, and a reply to a run stopped before it began is kept.
+- Paging through one Health list runs only that check, not every check in its group.
+- Two records that grew for as long as the server ran (where each episode's subtitles came from, and which client holds each torrent Download Check saw) are now trimmed.
 - Backfill reads an NZB with a bad character in it, names Lidarr when Lidarr doesn't answer, and waits at most a day when an indexer says to wait.
 - Testing a qBittorrent or Deluge password that's wrong says it's wrong, even while the right one is signed in.
 - A Trakt link with a stray `%` in it, a music page number like `1e300`, and a Wikipedia biography with an odd character no longer fail.
@@ -50,6 +57,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - [CVE-2026-93753](https://github.com/advisories/GHSA-gcqx-w48m-w2h4): deepmerge, which email templates use, has no fixed release yet, so Seerr AI carries its own fix.
 - **Subtitles**: only a subtitle Bazarr itself offered for that title can be downloaded. A forged choice could have made Bazarr run code (it reads the choice back as a Python object).
+- After an admin moves Seerr AI to another Plex server, a person's Plex token for the old server is no longer sent to the new one.
 - A personal or server API key can't link a single sign-on, Plex, Jellyfin or Emby account, or set a password to sign in with: a key that leaked could have made itself a full sign-in.
 - **Personal CSS** is checked the way the browser reads it, so a stylesheet can't load from another server by hiding an address in a comment; only an admin sets an admin's CSS.
 - **The admin agent**: approving one of its proposals no longer counts as an admin joining the conversation, which gave a run started by a report the admin's tools.

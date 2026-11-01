@@ -37,10 +37,11 @@ If it can't tell, it says nothing. Dates use your Discover region, then the serv
 | **Adding to Plex** | In the folder; Plex (or Jellyfin, Emby) hasn't listed it yet. Usually a minute or two. "Waiting for Plex to match it" means it may have been filed under another title. |
 | **Needs attention** | Held up in Radarr or Sonarr, usually an import they won't make alone. |
 | **Download failed** | Looking for another release. |
+| **AI searching** | The [admin agent](./backfill-and-agent.md#the-admin-agent) is looking for what's missing. |
 | **Failed** | The request couldn't be sent. See [Failed requests](#failed-requests). |
 | **Partially Available** / **Available** | Some or all of it is in the library. |
 
-For a series the pill names what's downloading: **S1E3**, **S1** (a season pack), **S1E3–E5**, **S1–S3**. The tooltip lists each download.
+For a series the pill names what's downloading: **S1E3**, **S1** (a season pack), **S1E3–E5**, **S1–S3**. The tooltip lists each download. Clicking a downloading pill opens the title's downloads; on a touchscreen a tap shows its details first. **Play on Plex** (or Jellyfin, Emby) is at the foot of the details.
 
 About a minute after an import, Seerr AI asks the media server what it added, and keeps asking for a few minutes, so a title turns Available within a minute or two. A download that's grabbed and imported between two looks at the queue (a fast Usenet download can take under a minute) is found in Radarr's or Sonarr's history instead, and shows **Adding to Plex** the same way. Pages refresh every 5 seconds while downloading and every 30 seconds while requested.
 

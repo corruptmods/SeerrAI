@@ -24,7 +24,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 - **[Backfill and the admin agent](./backfill-and-agent.md)**: getting what Sonarr, Radarr and Lidarr can't find.
 - **[Quality profiles](./quality.md)**: Radarr and Sonarr profiles from Seerr AI's presets or TRaSH Guides, with your adjustments, and what each does.
 - **[Download Check](./download-check.md)**: fakes, wrong titles and stuck imports, sorted out.
-- **[Keeping it healthy](./health.md)**: the Health page, alerts, Match Check, Anime Check.
+- **[Keeping it healthy](./health.md)**: the Health page, alerts, Match Check and fixing Plex matches, Anime Check.
 - **[Notifications](../using-seerr/notifications/)**: each notification service and its settings.
 - **[Configuration reference](./configuration.md)**: every setting the fork adds, its default, the jobs and the feature switches.
 
@@ -48,10 +48,10 @@ Almost everything here is optional. Admins turn a feature off for everyone in **
 | **Failed requests** | Say why, with Retry and Edit. |
 | **Backfill and the admin agent** | Find what Sonarr, Radarr and Lidarr can't; nothing changes without approval. |
 | **Quality profiles** | Radarr and Sonarr profiles from Seerr AI or TRaSH Guides, per server, with what each does in plain words; off until you apply. |
-| **Health and Match Check** | Every service checked, alerts when something breaks, wrong matches caught. |
+| **Health and Match Check** | Every service checked, alerts when something breaks, wrong matches caught and, on Plex, fixed. |
 | **AI** | Claude, OpenAI or your own model: search for films, series and music, group picks, recaps, fixes for problems you describe, log explanations. |
 | **Your home page** | Hide rows, arrange your menu, Suggested for You, Anime, leave out streaming services. |
-| **Lists** | Shared watch lists with "up next" per series, activity, import, Roulette; playlists from a Spotify or Apple Music link, their songs requested within each person's limit. |
+| **Lists** | Shared watch lists with "up next" per series, activity, import, whole collections, Roulette; playlists from a Spotify or Apple Music link, their songs requested within each person's limit. |
 | **Series and anime** | Request one episode; get new seasons as they premiere; one rule for what's anime. |
 | **Subtitles** | See, replace or transcribe subtitles through Bazarr, with what Bazarr is doing shown as it works. |
 | **Maintainerr** | "Deleting in N days" badges, a Deleting Soon row and Keep. |

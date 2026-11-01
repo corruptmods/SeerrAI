@@ -45,7 +45,7 @@ What a row can say:
 
 | It says | Meaning | Fix |
 |---|---|---|
-| Plex matched "Border Feud (2024)" to Guerra Fronteriza (2024) | The server picked another title. | **Fix Match** (Plex) or **Identify** (Jellyfin, Emby) with the id shown, such as `tmdb-846213`. |
+| Plex matched "Border Feud (2024)" to Guerra Fronteriza (2024) | The server picked another title. | **Fix match** on the row (Plex), or Plex's own **Fix Match** or **Identify** (Jellyfin, Emby) with the id shown, such as `tmdb-846213`. |
 | …to a different film named Quillmore (2025) | Two titles share a name and year. | The same. |
 | Plex and Radarr use different entries for… | Same title, but different TMDB or TVDB entries, usually because one was replaced. | Fix the match with the id shown; if nothing is found, Radarr's entry may be outdated. |
 | Plex has not matched "…" | No match for the folder. | Fix the match. |

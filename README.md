@@ -13,11 +13,11 @@
 - Request films, series, single seasons or single episodes; get new seasons as they premiere.
 - Status that says what a download is doing and when it should arrive.
 - Discover rows each person arranges, Suggested for You, an Anime page, filters that can leave out streaming services.
-- Shared watch lists with "up next" for each series, a release calendar, Roulette; playlists that bring in a Spotify or Apple Music playlist and request its songs.
+- Shared watch lists with "up next" for each series, that take a film or a whole collection at once; a release calendar, Roulette; playlists that bring in a Spotify or Apple Music playlist and request its songs.
 
 **Media servers**
 - Plex, Jellyfin and Emby, one or all three at once. Available on any counts; Play on each.
-- Match Check finds titles a server matched wrongly, nightly and as requests arrive.
+- Match Check finds titles a server matched wrongly, nightly and as requests arrive, and puts them right in Plex: at the press of a button, or by itself if you turn that on. Every fix can be undone.
 
 **Music**
 - Request albums, a whole discography, or just one song (the radio edit or the club mix) through Lidarr.
@@ -34,8 +34,8 @@
 - An admin agent that finds what Sonarr, Radarr and Lidarr can't, and changes nothing without approval.
 
 **Admin tools**
-- Backfill: searches Prowlarr for stuck titles and albums, and imports only what's missing.
-- Download Check: catches fake and wrong downloads and stuck imports.
+- Backfill: searches Prowlarr for stuck titles and albums, imports only what's missing, and replaces a torrent that can't finish.
+- Download Check: catches fake and wrong downloads and stuck imports, and says why it turned each one down.
 - Quality profiles for Radarr and Sonarr, from Seerr AI's presets or TRaSH Guides, with your own adjustments and a plain-words view of what each one takes. Off until you apply it.
 - A Health page with alerts, and live progress from six download clients.
 - Subtitles through Bazarr, transcribed with Whisper when none can be found, showing what Bazarr is doing as it works.

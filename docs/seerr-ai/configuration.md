@@ -6,6 +6,8 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 
 ## Settings pages
 
+Once something on a settings page is changed, **Save** floats at the bottom of the screen until it's saved, wherever you've scrolled to.
+
 | Where | What | Defaults |
 |---|---|---|
 | **Settings → General** | **Image Cache Size Limit**, with **Enable Image Caching**: posters, backdrops and music artwork from outside are kept in the config folder, also as AVIF and WebP at three sizes (these count towards the limit); the least recently viewed go first past it. | 2048 MB (at least 256) |
@@ -38,7 +40,7 @@ What Seerr AI adds to Seerr's settings, with defaults. Everything here is admin-
 | **Settings → AI** | Provider, key, model, per-feature models (Advanced), **Daily Limit per Person**, credit. See [AI](./ai.md). | Off; 20 answers a day |
 | **Settings → Backfill** | Download clients, category, when a title is stuck, approval, the admin agent; limits under Advanced. See [Backfill](./backfill-and-agent.md). **Download Check** (Off, Report only or On) is saved on its own and needs nothing else here; see [Download Check](./download-check.md). | Off; see below |
 | **Settings → Notifications** | New types: **Plex Reauth** (always sent), **Backfill**, **Health** and **Wrong Match** (admins), and **List Activity** (each person's own settings, never a channel's). | Web push on; Wrong Match on wherever Health was |
-| **Settings → Health** | Checks, Search all, resources, and **Check new requests as they're imported** (under Titles → Folders matched to another title). See [Keeping it healthy](./health.md). | On |
+| **Settings → Health** | Checks, Search all, resources, and under Titles → Folders matched to another title: **Check new requests as they're imported**, **Fix matches from here** (Plex) and **Fix automatically**. See [Keeping it healthy](./health.md). | On; on; off |
 | **Settings → How It Works** | The admin overview. | |
 
 ### Backfill defaults
@@ -73,7 +75,7 @@ Seerr AI works with all three, as Seerr does, and with more than one at once (se
 | Feature | Plex | Jellyfin and Emby |
 |---|---|---|
 | Suggested for You, Who Watched, Pick for the Room, Catch Me Up, "up next" and watch sync on lists, AI Search knowing what you watched | Needs Tautulli | Read from the server itself; nothing to set up |
-| Match Check (wrong matches on Health and title pages) | Yes, fixed with **Fix Match** | Yes, fixed with **Identify** |
+| Match Check (wrong matches on Health and title pages) | Yes; Seerr AI's **Fix match** on Health puts it right, or Plex's **Fix Match** | Yes, fixed with **Identify** |
 | Health: the media server answering, and its version | Yes | Yes |
 | Passkeys | Refused once the server owner stops sharing with the account (and no other linked account still lets them in) | Refused once the account is deleted or switched off on the server (likewise) |
 | Your default subtitle on the Subtitles card | Yes | No: Jellyfin and Emby choose subtitles by language preference rather than per title |

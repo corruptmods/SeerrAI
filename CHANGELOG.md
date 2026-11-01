@@ -2,7 +2,9 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
-## Coming next
+## 2.3.0 (31 October 2026)
+
+Quality profiles for Radarr and Sonarr, wrong Plex matches fixed from Seerr AI, playlists from Spotify and Apple Music, whole collections on lists, and Backfill that gives up on torrents that can't finish.
 
 ### New
 

@@ -1,5 +1,6 @@
 import type { LiveDownload } from '@server/api/downloadclients';
 import { downloadClientFor } from '@server/api/downloadclients';
+import type { ImportRecord } from '@server/api/servarr/base';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
 import type { DownloadStage, DownloadStep } from '@server/constants/downloads';
@@ -247,6 +248,13 @@ export interface MatchWait {
   title: string;
 }
 
+/**
+ * How far back of the last look Radarr's and Sonarr's history is read for
+ * imports, so one recorded just as it was read isn't missed. Imports seen
+ * already are told apart by their history id.
+ */
+const IMPORT_OVERLAP_MS = 60_000;
+
 /** Stages from which leaving the queue means it was imported. */
 const DONE_STAGES: DownloadStage[] = ['importing', 'finishing'];
 
@@ -388,6 +396,91 @@ class DownloadTracker {
       }
     }
     if (imported.length) this.importedNow(imported);
+  }
+
+  /** Where each Radarr's and Sonarr's history was last read for imports. */
+  private importMarks = new Map<string, { at: number; lastId: number }>();
+
+  /**
+   * Imports Radarr or Sonarr made since the last look, from its history.
+   * A fast download can be grabbed, downloaded and imported between two
+   * reads of the queue, and never be seen leaving it as imported; each is
+   * held as being added to the library all the same. Imports by hand (no
+   * download id) are left out: Backfill holds its own.
+   */
+  private async noteImportedFromHistory(
+    kind: 'movie' | 'series',
+    api: RadarrAPI | SonarrAPI,
+    markKey: string,
+    serverIds: number[],
+    queue: DownloadingItem[]
+  ) {
+    const startedAt = Date.now();
+    const mark = this.importMarks.get(markKey);
+    if (!mark) {
+      // The first look only marks where to read from.
+      this.importMarks.set(markKey, { at: startedAt, lastId: 0 });
+      return;
+    }
+
+    let records: ImportRecord[];
+    try {
+      records = await api.getImportsSince(
+        new Date(mark.at - IMPORT_OVERLAP_MS)
+      );
+    } catch (e) {
+      // Read from the same mark next time.
+      logger.debug('Could not read imports from history', {
+        label: 'Download Tracker',
+        server: markKey,
+        errorMessage: e instanceof Error ? e.message : String(e),
+      });
+      return;
+    }
+    this.importMarks.set(markKey, {
+      at: startedAt,
+      lastId: Math.max(mark.lastId, ...records.map((record) => record.id)),
+    });
+
+    const inQueue = new Set(queue.map(itemKey));
+    const held: ImportedDownload[] = [];
+    for (const record of records) {
+      const externalId = kind === 'movie' ? record.movieId : record.seriesId;
+      if (record.id <= mark.lastId || !record.downloadId || !externalId) {
+        continue;
+      }
+      const size = Number(record.data?.size) || 0;
+      const item: DownloadingItem = {
+        mediaType: kind === 'movie' ? MediaType.MOVIE : MediaType.TV,
+        externalId,
+        size,
+        sizeLeft: 0,
+        status: 'completed',
+        stage: 'imported',
+        timeLeft: '',
+        title: record.sourceTitle,
+        downloadId: record.downloadId,
+        ...(record.episode
+          ? {
+              episode: {
+                id: record.episode.id,
+                seasonNumber: record.episode.seasonNumber,
+                episodeNumber: record.episode.episodeNumber,
+                absoluteEpisodeNumber:
+                  record.episode.absoluteEpisodeNumber ?? 0,
+              },
+            }
+          : {}),
+      };
+      // Still in the queue, or seen leaving it: shown as that already.
+      if (inQueue.has(itemKey(item))) continue;
+      for (const serverId of serverIds) {
+        if (!this.imported.has(`${kind}:${serverId}:${itemKey(item)}`)) {
+          held.push(this.hold(kind, serverId, item, startedAt));
+        }
+      }
+    }
+    if (held.length) this.importedNow(held);
   }
 
   /** Shows a download as being added to the library, until it is listed. */
@@ -670,7 +763,13 @@ class DownloadTracker {
     this.backfill = [];
     this.songs = [];
     this.imported = new Map();
+    this.importMarks = new Map();
     this.queueDown = new Set();
+    // Nothing is held any more, so there is nothing to scan for.
+    if (this.importTimer) {
+      clearTimeout(this.importTimer);
+      this.importTimer = undefined;
+    }
   }
 
   private updating?: Promise<void>;
@@ -855,19 +954,27 @@ class DownloadTracker {
             this.radarrServers[server.id] = queueItems.map((item) =>
               trackedItem(item, MediaType.MOVIE, item.movieId)
             );
+            const sharing = settings.radarr
+              .filter(
+                (rs) =>
+                  rs.id === server.id ||
+                  (rs.syncEnabled &&
+                    rs.hostname === server.hostname &&
+                    rs.port === server.port &&
+                    rs.baseUrl === server.baseUrl)
+              )
+              .map((rs) => rs.id);
             this.noteImported(
               'movie',
-              settings.radarr
-                .filter(
-                  (rs) =>
-                    rs.id === server.id ||
-                    (rs.syncEnabled &&
-                      rs.hostname === server.hostname &&
-                      rs.port === server.port &&
-                      rs.baseUrl === server.baseUrl)
-                )
-                .map((rs) => rs.id),
+              sharing,
               before,
+              this.radarrServers[server.id]
+            );
+            await this.noteImportedFromHistory(
+              'movie',
+              radarr,
+              `Radarr ${server.id}`,
+              sharing,
               this.radarrServers[server.id]
             );
 
@@ -937,19 +1044,27 @@ class DownloadTracker {
             this.sonarrServers[server.id] = queueItems.map((item) =>
               trackedItem(item, MediaType.TV, item.seriesId, item.episode)
             );
+            const sharing = settings.sonarr
+              .filter(
+                (ss) =>
+                  ss.id === server.id ||
+                  (ss.syncEnabled &&
+                    ss.hostname === server.hostname &&
+                    ss.port === server.port &&
+                    ss.baseUrl === server.baseUrl)
+              )
+              .map((ss) => ss.id);
             this.noteImported(
               'series',
-              settings.sonarr
-                .filter(
-                  (ss) =>
-                    ss.id === server.id ||
-                    (ss.syncEnabled &&
-                      ss.hostname === server.hostname &&
-                      ss.port === server.port &&
-                      ss.baseUrl === server.baseUrl)
-                )
-                .map((ss) => ss.id),
+              sharing,
               before,
+              this.sonarrServers[server.id]
+            );
+            await this.noteImportedFromHistory(
+              'series',
+              sonarr,
+              `Sonarr ${server.id}`,
+              sharing,
               this.sonarrServers[server.id]
             );
 

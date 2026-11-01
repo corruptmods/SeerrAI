@@ -42,7 +42,7 @@ If it can't tell, it says nothing. Dates use your Discover region, then the serv
 
 For a series the pill names what's downloading: **S1E3**, **S1** (a season pack), **S1E3–E5**, **S1–S3**. The tooltip lists each download.
 
-About a minute after an import, Seerr AI asks the media server what it added, and keeps asking for a few minutes, so a title turns Available within a minute or two. Pages refresh every 5 seconds while downloading and every 30 seconds while requested.
+About a minute after an import, Seerr AI asks the media server what it added, and keeps asking for a few minutes, so a title turns Available within a minute or two. A download that's grabbed and imported between two looks at the queue (a fast Usenet download can take under a minute) is found in Radarr's or Sonarr's history instead, and shows **Adding to Plex** the same way. Pages refresh every 5 seconds while downloading and every 30 seconds while requested.
 
 ### Live progress from the download client
 

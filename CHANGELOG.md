@@ -40,6 +40,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - Quality profiles: Undo works after a new format was added, an apply that stopped part way can be undone, and Stop managing during an apply is kept. An apply no longer stops on a format name Radarr or Sonarr already has.
 - **Download Check no longer rejects the same release over and over**: one numbered another way (S03E02 that's really S03E04) isn't searched for again by its number, which found it again on the next indexer; Backfill looks for the episode by its title. Each reject now says why, and what came after.
 - Match Check on import no longer misses an older import looked at in the same run.
+- **A fast download no longer skips "Adding to Plex"**: one grabbed and imported between two looks at the queue showed Requested until the next regular scan, up to 5 minutes. It's now found in Radarr's or Sonarr's history, shows Adding to Plex, and the quick scan runs a minute later, which also checks its match.
 - Backfill reads an NZB with a bad character in it, names Lidarr when Lidarr doesn't answer, and waits at most a day when an indexer says to wait.
 - Testing a qBittorrent or Deluge password that's wrong says it's wrong, even while the right one is signed in.
 - A Trakt link with a stray `%` in it, a music page number like `1e300`, and a Wikipedia biography with an odd character no longer fail.

@@ -20,6 +20,8 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
  */
 
 let queue: Record<string, unknown>[] = [];
+/** Sonarr's history of imports, as /history/since answers. */
+let history: Record<string, unknown>[] = [];
 
 const record = (
   id: string,
@@ -50,6 +52,7 @@ const record = (
 beforeEach(async () => {
   await downloadTracker.resetDownloadTracker();
   queue = [];
+  history = [];
   const settings = getSettings();
   settings.downloadClients = [];
   settings.radarr = [];
@@ -71,9 +74,10 @@ beforeEach(async () => {
       request: { use: () => 0 },
       response: { use: () => 0 },
     },
-    get: async () => ({
-      data: { records: queue, totalRecords: queue.length },
-    }),
+    get: async (url: string) =>
+      url === '/history/since'
+        ? { data: history }
+        : { data: { records: queue, totalRecords: queue.length } },
     post: async () => ({ data: {} }),
   };
   mock.method(axios, 'create', () => fake);
@@ -206,6 +210,90 @@ describe('a download Sonarr imported', () => {
     ];
     await downloadTracker.updateDownloads();
     queue = [];
+    await downloadTracker.updateDownloads();
+    assert.deepEqual(downloadTracker.getSeriesProgress(0, 1286), []);
+  });
+});
+
+describe('a download imported between two reads of the queue', () => {
+  /** Sonarr's record of importing an episode, as its history has it. */
+  const imported = (
+    id: number,
+    downloadId: string | undefined,
+    episode = 1
+  ) => ({
+    id,
+    date: new Date().toISOString(),
+    downloadId,
+    sourceTitle: `Wrenna.S01E0${episode}.1080p.HEVC.x265-LeSigh`,
+    seriesId: 1286,
+    episode: {
+      id: 145875 + episode,
+      seasonNumber: 1,
+      episodeNumber: episode,
+    },
+    data: { size: '500' },
+  });
+
+  it('is shown as being added all the same, from Sonarr’s history', async () => {
+    mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 4_000_000 });
+    let scans = 0;
+    downloadTracker.whenImported(() => {
+      scans++;
+    });
+    // Last seen still downloading; grabbed, finished and imported since.
+    queue = [record('one', 1, 'downloading', 'downloading', 400)];
+    await downloadTracker.updateDownloads();
+    queue = [];
+    history = [imported(10, 'one')];
+    mock.timers.tick(30_000);
+    await downloadTracker.updateDownloads();
+    assert.deepEqual(
+      downloadTracker
+        .getSeriesProgress(0, 1286)
+        .map((i) => [i.episode?.episodeNumber, i.stage, i.sizeLeft]),
+      [[1, 'imported', 0]]
+    );
+    mock.timers.tick(IMPORTED_SCAN_DELAY_MS);
+    assert.equal(scans, 1, 'the media server’s scan runs a minute later');
+  });
+
+  it('is held once, and not again after the media server lists it', async () => {
+    mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 5_000_000 });
+    await downloadTracker.updateDownloads();
+    history = [imported(10, 'one')];
+    mock.timers.tick(30_000);
+    await downloadTracker.updateDownloads();
+    assert.equal(downloadTracker.getSeriesProgress(0, 1286).length, 1);
+
+    mock.timers.tick(30_000);
+    downloadTracker.forgetImported('series', 0, 1286);
+    // Read again, since history is read a little back of the last look.
+    await downloadTracker.updateDownloads();
+    assert.deepEqual(downloadTracker.getSeriesProgress(0, 1286), []);
+  });
+
+  it('leaves out what is still in the queue, and what was imported by hand', async () => {
+    mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 6_000_000 });
+    await downloadTracker.updateDownloads();
+    // Episode 2 of a pack is in, the rest of it still importing.
+    queue = [record('pack', 1, 'completed', 'importing', 0)];
+    history = [imported(11, 'pack', 2), imported(12, undefined, 3)];
+    mock.timers.tick(30_000);
+    await downloadTracker.updateDownloads();
+    assert.deepEqual(
+      downloadTracker
+        .getSeriesProgress(0, 1286)
+        .map((i) => [i.episode?.episodeNumber, i.stage]),
+      [
+        [1, 'importing'],
+        [2, 'imported'],
+      ]
+    );
+  });
+
+  it('only starts from the first look, so a restart shows nothing old', async () => {
+    history = [imported(10, 'one')];
     await downloadTracker.updateDownloads();
     assert.deepEqual(downloadTracker.getSeriesProgress(0, 1286), []);
   });

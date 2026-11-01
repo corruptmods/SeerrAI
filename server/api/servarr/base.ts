@@ -78,6 +78,25 @@ export interface Tag {
   label: string;
 }
 
+/** A download Radarr or Sonarr imported, from its history. */
+export interface ImportRecord {
+  /** Its history id, which only grows. */
+  id: number;
+  date: string;
+  /** None for a file imported by hand. */
+  downloadId?: string;
+  sourceTitle: string;
+  movieId?: number;
+  seriesId?: number;
+  episode?: {
+    id: number;
+    seasonNumber: number;
+    episodeNumber: number;
+    absoluteEpisodeNumber?: number;
+  };
+  data?: { size?: string };
+}
+
 const QUEUE_PAGE_SIZE = 250;
 const QUEUE_MAX_PAGES = 20;
 
@@ -235,6 +254,21 @@ class ServarrBase<QueueItemAppendT> extends ExternalAPI {
         { cause: e }
       );
     }
+  };
+
+  /**
+   * What Radarr or Sonarr imported from downloads since a moment: for
+   * Sonarr, one record for each episode.
+   */
+  public getImportsSince = async (since: Date): Promise<ImportRecord[]> => {
+    const response = await this.axios.get<ImportRecord[]>('/history/since', {
+      params: {
+        date: since.toISOString(),
+        eventType: 'downloadFolderImported',
+        includeEpisode: true,
+      },
+    });
+    return Array.isArray(response.data) ? response.data : [];
   };
 
   public getTags = async (): Promise<Tag[]> => {

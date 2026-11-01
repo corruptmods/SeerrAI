@@ -36,6 +36,7 @@ Quality profiles for Radarr and Sonarr, wrong Plex matches fixed from Seerr AI, 
 ### Changed
 
 - sqlite3 6.0.1 (SQLite 3.52), from Seerr. Nothing to do: databases open as before.
+- axios 1.21.0, Nodemailer 10.2.1 and express-rate-limit 8.7.1, from Seerr.
 
 ### Fixed
 

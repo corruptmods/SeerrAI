@@ -26,6 +26,15 @@ export type PreferUsenet = 'equal' | 'always' | 'none';
 
 export type FileSize = 'small' | 'balanced' | 'best';
 
+/**
+ * One preset's file size: one of the three above, or an admin's own limit,
+ * in MB a minute in Sonarr and GB a film in Radarr.
+ */
+export type PresetSize = FileSize | number;
+
+/** The largest own limit: Sonarr's own most (MB a minute), or a GB a film. */
+export const MAX_OWN_SIZE = 1000;
+
 /** The audio a release must have. */
 export type Languages = 'english-or-original' | 'original' | 'any';
 
@@ -70,6 +79,11 @@ export interface QualityServerSettings {
   managed: boolean;
   presets: Partial<Record<PresetKey, PresetSource>>;
   adjustments: QualityAdjustments;
+  /**
+   * Each preset's own file size. A preset without one takes the server's
+   * (adjustments.fileSize), as every preset did before they had their own.
+   */
+  sizes?: Partial<Record<PresetKey, PresetSize>>;
   /** By format key (see lib/quality/build). */
   nudges: Record<string, Nudge>;
   bandStep: BandStep;

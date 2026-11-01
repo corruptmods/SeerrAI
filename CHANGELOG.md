@@ -4,12 +4,22 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ## 2.3.1 (1 November 2026)
 
-A series no longer switches between Available and Partially Available every hour, and the Health page no longer ends in screens of empty space.
+A file size for each quality preset, including your own, a series no longer switching between Available and Partially Available every hour, and the Health page without screens of empty space.
+
+### New
+
+- **File size for each preset** (Settings → Quality): each preset's row has its own: Smaller files, Balanced, Best quality, or your own limit, in MB a minute in Sonarr v5 and GB a film in Radarr. Each choice shows the limit it sets. ([guide](./docs/seerr-ai/quality.md#file-size))
+
+### Changed
+
+- Balanced takes bigger files: a usual 1080p WEB-DL fits. In Sonarr v5, 1080p goes from 45 to 80 MB a minute; in Radarr, from 15 to 20 GB. The other presets rise with them.
+- In Radarr, a film over its preset's size is never taken, instead of taken as a last resort.
 
 ### Fixed
 
 - With TV details from TheTVDB (Settings → Metadata), a series whose seasons TMDB splits differently went back and forth between Available and Partially Available every hour. The hourly availability check now counts seasons the way the scans do.
 - The Health page had several screens of empty space below its last section, most noticeable on a phone: the CPU and memory charts' hidden tables, there for screen readers, made the page that much longer.
+- Save on a settings page no longer turns into a bar across the screen when it's already in view, as on Appearance: it floats only when the page is scrolled away from it.
 
 ## 2.3.0 (31 October 2026)
 

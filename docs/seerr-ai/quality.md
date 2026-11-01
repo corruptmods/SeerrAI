@@ -12,12 +12,13 @@
 - **Titles move only if you choose.** The preview can move the titles on your own profiles onto Seerr AI's; each is off unless you pick a profile. Undo moves them back.
 - **New servers start as Not managed**, and TRaSH Guides updates wait for you unless you turn on **Apply updates automatically**.
 
-Sonarr needs v4 or later (custom formats). Sonarr v5 keeps file sizes on each profile; Sonarr v4 keeps them for the whole server, so there they stay as Sonarr has them. In Radarr the size limit is a custom format.
+Sonarr needs v4 or later (custom formats). Sonarr v5 keeps file sizes on each profile; Sonarr v4 keeps them for the whole server, so there they stay as Sonarr has them. Radarr keeps them for the whole server too, so there the size limit is a custom format.
 
 ## Setting up a server
 
 1. Pick the server under **Servers** and turn on **Manage this server**.
 2. Under **Presets**, choose where each comes from: **Seerr AI**, **TRaSH Guides**, or **Off** (not created). The presets are SD, 720p, 1080p, 1080p Remux, 2160p, 2160p Remux and Anime. A 4K server starts with 2160p; others with 1080p and Anime. **New requests use** picks the one new requests get (2160p on a 4K server, else 1080p, to start).
+   Each preset that's on has its own **File size** (see [File size](#file-size)).
 3. Set the **Adjustments** (below), or **Copy from another server**.
 4. **Preview & apply** lists each change: **Create**, **Update**, **Put back** (someone changed it in Radarr or Sonarr), **Kept** (you kept their change). Each format says what it does to a release that matches it: **Avoid** (never grabbed, only as a last resort, or less likely) or **Prefer** (more likely), profile by profile when they differ. Press **Apply**; a bar shows how far it has got. On a big server it can take a few minutes: the page follows it to the end, even through a proxy that gives up on slow answers.
 
@@ -28,7 +29,6 @@ Each server has its own presets and adjustments, so a 4K server and an anime ser
 | Setting | Choices | What it does |
 |---|---|---|
 | **Prefer usenet** | At equal quality (recommended), Whenever usenet has it, No preference | At equal quality: near-equal releases tie, and usenet wins a tie. Whenever usenet has it: torrents also wait (2 hours to start; you set it), so usenet gets the first chance. |
-| **File size** | Smaller files, Balanced, Best quality | How big a release may be. In Radarr a film over the limit is a last resort; in Sonarr v5 it's the most each quality takes a minute. |
 | **Languages** | English or the original language, The original language, Any | Audio the release must have. A name that doesn't say its language is fine. |
 | **HDR and Dolby Vision** | On or off | Preferred on 2160p presets. |
 | **Allow x265 at 1080p** | On or off | Smaller files; some older TVs can't play them. Off makes it never taken below 2160p. |
@@ -41,6 +41,20 @@ Under **Advanced**:
 
 - **Band step** (50, 100, 250 or 500): scores round to it, so releases that are nearly as good tie, and usenet wins. Bigger means more ties.
 - **Moving a format**: any custom format on the server can go **Up a band**, **Down a band**, or to **Never**.
+
+
+## File size
+
+Each preset has its own, on its row under **Presets**:
+
+| Choice | Sonarr v5: the most an episode takes, a minute | Radarr: the biggest film |
+|---|---|---|
+| **Smaller files** | SD 10 MB, 720p 15, 1080p 25, 1080p Remux 80, 2160p 60, 2160p Remux 200, Anime 20 | SD 2 GB, 720p 4, 1080p 8, 1080p Remux 30, 2160p 20, 2160p Remux 60, Anime 6 |
+| **Balanced** (to start) | SD 20 MB, 720p 40, 1080p 80, 1080p Remux 250, 2160p 200, 2160p Remux 600, Anime 60 | SD 5 GB, 720p 10, 1080p 20, 1080p Remux 60, 2160p 60, 2160p Remux 120, Anime 15 |
+| **Best quality** | No limit of Seerr AI's (a TRaSH Guides preset keeps TRaSH Guides' sizes) | No limit |
+| **Your own limit** | Any whole number of MB a minute, up to 1000 | Any whole number of GB, up to 1000 |
+
+In Radarr a film over its preset's limit is never taken. Sonarr v4 keeps sizes for the whole server, so there the rows have no File size.
 
 ## TRaSH Guides
 

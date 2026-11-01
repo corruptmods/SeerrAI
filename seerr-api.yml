@@ -6035,6 +6035,16 @@ paths:
                       adjustments:
                         type: object
                         additionalProperties: true
+                      sizes:
+                        type: object
+                        description: "Each preset's own file size: small, balanced or best, or an admin's own limit (MB a minute in Sonarr, GB a film in Radarr). A preset without one takes adjustments.fileSize"
+                        additionalProperties:
+                          oneOf:
+                            - type: string
+                              enum: [small, balanced, best]
+                            - type: integer
+                              minimum: 1
+                              maximum: 1000
                       nudges:
                         type: object
                         additionalProperties:
@@ -6316,7 +6326,7 @@ paths:
               properties:
                 choices:
                   type: object
-                  description: 'Choices on the page not saved yet (presets, adjustments, nudges, bandStep), shown as they would be'
+                  description: 'Choices on the page not saved yet (presets, adjustments, sizes, nudges, bandStep), shown as they would be'
                   additionalProperties: true
       responses:
         '200':
@@ -6363,7 +6373,7 @@ paths:
                   maxLength: 300
                 choices:
                   type: object
-                  description: 'Choices on the page not saved yet (presets, adjustments, nudges, bandStep), shown as they would be'
+                  description: 'Choices on the page not saved yet (presets, adjustments, sizes, nudges, bandStep), shown as they would be'
                   additionalProperties: true
       responses:
         '200':

@@ -108,6 +108,17 @@ export const choicesOf = (
     bandStep: config.bandStep,
     fillGaps,
     requests: [config.requestPreset ?? '', config.animeRequestPreset ?? ''],
+    // Only once a preset has its own size, so a server applied before they
+    // could still reads as applied.
+    ...(config.sizes && Object.keys(config.sizes).length
+      ? {
+          sizes: PRESET_KEYS.flatMap((preset) =>
+            config.sizes?.[preset] === undefined
+              ? []
+              : [[preset, config.sizes[preset]]]
+          ),
+        }
+      : {}),
   });
 
 export interface ServerContext {

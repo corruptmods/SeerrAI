@@ -27,7 +27,11 @@ import {
   refreshTrashIfOlder,
 } from '@server/lib/quality/trash';
 import type { QualityServerSettings } from '@server/lib/quality/types';
-import { BAND_STEPS, PRESET_KEYS } from '@server/lib/quality/types';
+import {
+  BAND_STEPS,
+  MAX_OWN_SIZE,
+  PRESET_KEYS,
+} from '@server/lib/quality/types';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { randomUUID } from 'crypto';
@@ -64,6 +68,17 @@ const serverBody = z.object({
     burnedInLastResort: z.boolean(),
     av1LastResort: z.boolean(),
   }),
+  // Each preset's own: one of the three, or MB a minute (Sonarr) or GB a
+  // film (Radarr).
+  sizes: z
+    .partialRecord(
+      presetKey,
+      z.union([
+        z.enum(['small', 'balanced', 'best']),
+        z.number().int().min(1).max(MAX_OWN_SIZE),
+      ])
+    )
+    .optional(),
   nudges: z
     .record(
       z.string().regex(/^(seerr|trash):[\w-]{1,64}$/),
@@ -235,6 +250,7 @@ const shown = async () => {
         managed: config.managed,
         presets: config.presets,
         adjustments: config.adjustments,
+        sizes: config.sizes ?? {},
         nudges: config.nudges,
         bandStep: config.bandStep,
         requestPreset: config.requestPreset,
@@ -425,7 +441,13 @@ qualityRoutes.get(
 
 /** Choices on the page not saved yet, for What it does. */
 const choicesBody = serverBody
-  .pick({ presets: true, adjustments: true, nudges: true, bandStep: true })
+  .pick({
+    presets: true,
+    adjustments: true,
+    sizes: true,
+    nudges: true,
+    bandStep: true,
+  })
   .partial();
 
 // What it does with the page's choices, saved or not.

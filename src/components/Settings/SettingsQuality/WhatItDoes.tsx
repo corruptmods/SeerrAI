@@ -42,7 +42,7 @@ const messages = defineMessages(
     goal: 'Goal',
     lowest: 'Lowest it takes',
     mbMin: 'up to {mb} MB a minute',
-    filmCap: 'A film over {gb} GB is a last resort.',
+    filmCap: 'It never takes a film over {gb} GB.',
     notAllowed: 'Not allowed: {list}',
     prefers: 'What it prefers',
     best: 'Best',

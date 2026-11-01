@@ -209,4 +209,28 @@ describe('where new requests go, as saved', () => {
     assert.equal((await save('keep')).status, 200);
     assert.equal((await save('anime')).status, 400);
   });
+
+  it("takes each preset's own size: one of the three, or a whole number up to 1000", async () => {
+    const save = (sizes: unknown) =>
+      request(app)
+        .put('/api/v1/settings/quality')
+        .send({
+          trash: { autoApply: false, fillGaps: true },
+          servers: [{ ...server(true), sizes }],
+        });
+    assert.equal(
+      (await save({ '1080p': 120, '720p': 'small', anime: 'best' })).status,
+      200
+    );
+    assert.deepEqual(getSettings().quality.servers[0].sizes, {
+      '1080p': 120,
+      '720p': 'small',
+      anime: 'best',
+    });
+    assert.equal((await save({ '1080p': 0 })).status, 400);
+    assert.equal((await save({ '1080p': 1001 })).status, 400);
+    assert.equal((await save({ '1080p': 12.5 })).status, 400);
+    assert.equal((await save({ '1080p': 'huge' })).status, 400);
+    assert.equal((await save({ '4320p': 100 })).status, 400);
+  });
 });

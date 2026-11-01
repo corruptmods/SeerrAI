@@ -8,8 +8,6 @@ import {
   AV1,
   BURNED_IN,
   DUAL_AUDIO,
-  EPISODE_CAPS_MB_MIN,
-  FILM_CAPS_GB,
   HDR,
   LAST_RESORT,
   LOWEST_TAKEN,
@@ -20,12 +18,15 @@ import {
   SEERR_SCORES,
   UPSCALED,
   X265_HD,
+  episodeCapMbMin,
+  filmCapGb,
   foldName,
   is2160,
   languageFormat,
   profileName,
   seerrLadder,
   sizeFormat,
+  sizeOf,
 } from '@server/lib/quality/presets';
 import type { TrashApp, TrashData } from '@server/lib/quality/trash';
 import {
@@ -228,14 +229,17 @@ const adjustmentRules = (
   preset: PresetKey,
   facts: ServerFacts
 ) => {
-  const adj = config.adjustments;
   const out: { def: DesiredFormat; scored: ScoredFormat }[] = [];
-  const lang = languageFormat(adj.languages);
+  const lang = languageFormat(config.adjustments.languages);
   if (lang) out.push(seerrScored(lang, NEVER));
-  let sizeCapGb: number | undefined;
-  if (facts.kind === 'radarr' && adj.fileSize !== 'best') {
-    sizeCapGb = FILM_CAPS_GB[adj.fileSize][preset];
-    out.push(seerrScored(sizeFormat(sizeCapGb), LAST_RESORT));
+  // Radarr keeps sizes for the whole server, so a film over the preset's
+  // size is turned away by a format instead.
+  const sizeCapGb =
+    facts.kind === 'radarr'
+      ? filmCapGb(sizeOf(config, preset), preset)
+      : undefined;
+  if (sizeCapGb !== undefined) {
+    out.push(seerrScored(sizeFormat(sizeCapGb), NEVER));
   }
   return { rules: out, sizeCapGb };
 };
@@ -245,7 +249,7 @@ const flatQualities = (items: ArrProfileItem[]): ArrProfileItem[] =>
     item.quality ? [item] : flatQualities(item.items ?? [])
   );
 
-/** Sonarr v5: each allowed quality's sizes, capped by the file size choice. */
+/** Sonarr v5: each allowed quality's sizes, capped by the preset's size. */
 const sizesFor = (
   config: QualityServerSettings,
   preset: PresetKey,
@@ -267,9 +271,9 @@ const sizesFor = (
     )
   );
   const cap =
-    config.adjustments.fileSize === 'best'
-      ? undefined
-      : EPISODE_CAPS_MB_MIN[config.adjustments.fileSize][preset];
+    facts.kind === 'sonarr'
+      ? episodeCapMbMin(sizeOf(config, preset), preset)
+      : undefined;
   const names = ladder.entries
     .filter((entry) => entry.allowed)
     .flatMap((entry) => entry.items ?? [entry.name]);

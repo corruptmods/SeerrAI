@@ -4,6 +4,7 @@ import type {
   FileSize,
   Languages,
   PresetKey,
+  PresetSize,
 } from '@server/lib/quality/types';
 
 /*
@@ -240,7 +241,7 @@ export const MULTI_EPISODE = named('multi-episode', 'More than one episode', [
   },
 ]);
 
-/** Radarr: a film bigger than this is a last resort. */
+/** Radarr: a film bigger than this, which is never taken. */
 export const sizeFormat = (gb: number): SeerrFormat =>
   named(`size-${gb}`, `Over ${gb} GB`, [
     {
@@ -255,7 +256,10 @@ export const sizeFormat = (gb: number): SeerrFormat =>
     },
   ]);
 
-/** Radarr: the largest film (about two hours) each preset takes first. */
+/**
+ * Radarr: the largest film each preset takes, in GB. Room is left for a
+ * long film: one over it is never taken.
+ */
 export const FILM_CAPS_GB: Record<
   Exclude<FileSize, 'best'>,
   Record<PresetKey, number>
@@ -270,17 +274,21 @@ export const FILM_CAPS_GB: Record<
     anime: 6,
   },
   balanced: {
-    sd: 4,
-    '720p': 8,
-    '1080p': 15,
-    '1080p-remux': 45,
-    '2160p': 40,
-    '2160p-remux': 90,
-    anime: 12,
+    sd: 5,
+    '720p': 10,
+    '1080p': 20,
+    '1080p-remux': 60,
+    '2160p': 60,
+    '2160p-remux': 120,
+    anime: 15,
   },
 };
 
-/** Sonarr v5: the most each preset takes, in MB a minute. */
+/**
+ * Sonarr v5: the most each preset takes, in MB a minute. Balanced takes a
+ * usual release (a 1080p WEB-DL runs about 40 to 80); Smaller files, the
+ * compact ones.
+ */
 export const EPISODE_CAPS_MB_MIN: Record<
   Exclude<FileSize, 'best'>,
   Record<PresetKey, number>
@@ -295,15 +303,46 @@ export const EPISODE_CAPS_MB_MIN: Record<
     anime: 20,
   },
   balanced: {
-    sd: 15,
-    '720p': 30,
-    '1080p': 45,
-    '1080p-remux': 150,
-    '2160p': 120,
-    '2160p-remux': 400,
-    anime: 40,
+    sd: 20,
+    '720p': 40,
+    '1080p': 80,
+    '1080p-remux': 250,
+    '2160p': 200,
+    '2160p-remux': 600,
+    anime: 60,
   },
 };
+
+/** A preset's file size: its own, else the server's. */
+export const sizeOf = (
+  config: {
+    sizes?: Partial<Record<PresetKey, PresetSize>>;
+    adjustments: { fileSize: FileSize };
+  },
+  preset: PresetKey
+): PresetSize => config.sizes?.[preset] ?? config.adjustments.fileSize;
+
+/** Radarr: the largest film a size takes, in GB; none for Best. */
+export const filmCapGb = (
+  size: PresetSize,
+  preset: PresetKey
+): number | undefined =>
+  typeof size === 'number'
+    ? size
+    : size === 'best'
+      ? undefined
+      : FILM_CAPS_GB[size][preset];
+
+/** Sonarr v5: the most a size takes, in MB a minute; none for Best. */
+export const episodeCapMbMin = (
+  size: PresetSize,
+  preset: PresetKey
+): number | undefined =>
+  typeof size === 'number'
+    ? size
+    : size === 'best'
+      ? undefined
+      : EPISODE_CAPS_MB_MIN[size][preset];
 
 /** The raw scores of Seerr AI's own formats in its presets. */
 export const SEERR_SCORES = {

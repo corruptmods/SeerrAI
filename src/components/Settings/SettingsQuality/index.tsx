@@ -5,6 +5,7 @@ import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import SaveBar from '@app/components/Common/SaveBar';
+import PresetSizeChoice from '@app/components/Settings/SettingsQuality/PresetSizeChoice';
 import PreviewModal from '@app/components/Settings/SettingsQuality/PreviewModal';
 import WhatItDoes from '@app/components/Settings/SettingsQuality/WhatItDoes';
 import { postAndFollow } from '@app/components/Settings/SettingsQuality/jobs';
@@ -31,6 +32,7 @@ import type {
   BandStep,
   Nudge,
   PresetKey,
+  PresetSize,
   PresetSource,
   QualityAdjustments,
   QualityServerSettings,
@@ -128,13 +130,8 @@ const messages = defineMessages('components.Settings.SettingsQuality', {
   preferNone: 'No preference',
   torrentsWait: 'Torrents wait',
   hours: 'hours',
-  fileSize: 'File size',
-  fileSizeTip: 'How big a release may be.',
   fileSizeSonarr4:
     'Sonarr v4 keeps sizes for the whole server, so they stay as Sonarr has them.',
-  sizeSmall: 'Smaller files',
-  sizeBalanced: 'Balanced',
-  sizeBest: 'Best quality',
   languages: 'Languages',
   languagesTip: 'Audio the release must have.',
   langEnglishOriginal: 'English, or the original language',
@@ -187,6 +184,7 @@ type ServerView = ServerState & {
   managed: boolean;
   presets: Partial<Record<PresetKey, PresetSource>>;
   adjustments: QualityAdjustments;
+  sizes: Partial<Record<PresetKey, PresetSize>>;
   nudges: Record<string, Nudge>;
   bandStep: BandStep;
   requestPreset?: QualityServerSettings['requestPreset'];
@@ -228,6 +226,7 @@ type Draft = Pick<
   | 'managed'
   | 'presets'
   | 'adjustments'
+  | 'sizes'
   | 'nudges'
   | 'bandStep'
   | 'requestPreset'
@@ -243,6 +242,7 @@ const draftOf = (s: ServerView): Draft => ({
   managed: s.managed,
   presets: { ...s.presets },
   adjustments: { ...s.adjustments },
+  sizes: { ...s.sizes },
   nudges: { ...s.nudges },
   bandStep: s.bandStep,
   requestPreset: s.requestPreset,
@@ -359,6 +359,10 @@ const SettingsQuality = () => {
   const server = data?.servers.find((s) => keyOf(s) === selected);
   const draft = server ? drafts[keyOf(server)] : undefined;
   const app = server?.kind === 'radarr' ? 'Radarr' : 'Sonarr';
+  // Sonarr v4 keeps sizes for the whole server: they stay as Sonarr has them.
+  const sizesApply = !(
+    server?.kind === 'sonarr' && server.sizesOnProfile === false
+  );
 
   const { data: formats } = useSWR<ServerFormat[]>(
     advanced && server?.managed
@@ -794,7 +798,7 @@ const SettingsQuality = () => {
                   return (
                     <div
                       key={preset}
-                      className="flex items-center gap-3 bg-gray-800 px-4 py-3"
+                      className="flex flex-wrap items-center gap-3 bg-gray-800 px-4 py-3"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2 font-medium text-strong">
@@ -848,10 +852,33 @@ const SettingsQuality = () => {
                           {intl.formatMessage(messages.sourceOff)}
                         </option>
                       </select>
+                      {source !== 'off' &&
+                        !(trashless && !trash.fillGaps) &&
+                        sizesApply && (
+                          <div className="basis-full">
+                            <PresetSizeChoice
+                              kind={server.kind}
+                              preset={preset}
+                              value={draft.sizes[preset]}
+                              fallback={draft.adjustments.fileSize}
+                              onChange={(size) =>
+                                edit((d) => ({
+                                  ...d,
+                                  sizes: { ...d.sizes, [preset]: size },
+                                }))
+                              }
+                            />
+                          </div>
+                        )}
                     </div>
                   );
                 })}
               </div>
+              {!sizesApply && (
+                <p className="mt-2 text-xs text-gray-400">
+                  {intl.formatMessage(messages.fileSizeSonarr4)}
+                </p>
+              )}
               {(() => {
                 const on = PRESET_KEYS.filter(
                   (preset) =>
@@ -1033,43 +1060,6 @@ const SettingsQuality = () => {
                         </span>
                       </div>
                     )}
-                  </div>
-                </div>
-                <div className="form-row">
-                  <label htmlFor="fileSize" className="text-label">
-                    {intl.formatMessage(messages.fileSize)}
-                    <span className="label-tip">
-                      {server.kind === 'sonarr' &&
-                      server.sizesOnProfile === false
-                        ? intl.formatMessage(messages.fileSizeSonarr4)
-                        : intl.formatMessage(messages.fileSizeTip)}
-                    </span>
-                  </label>
-                  <div className="form-input-area">
-                    <select
-                      id="fileSize"
-                      value={draft.adjustments.fileSize}
-                      disabled={
-                        server.kind === 'sonarr' &&
-                        server.sizesOnProfile === false
-                      }
-                      onChange={(e) =>
-                        adjust(
-                          'fileSize',
-                          e.target.value as QualityAdjustments['fileSize']
-                        )
-                      }
-                    >
-                      <option value="small">
-                        {intl.formatMessage(messages.sizeSmall)}
-                      </option>
-                      <option value="balanced">
-                        {intl.formatMessage(messages.sizeBalanced)}
-                      </option>
-                      <option value="best">
-                        {intl.formatMessage(messages.sizeBest)}
-                      </option>
-                    </select>
                   </div>
                 </div>
                 <div className="form-row">
@@ -1363,6 +1353,7 @@ const SettingsQuality = () => {
           choices={{
             presets: draft?.presets,
             adjustments: draft?.adjustments,
+            sizes: draft?.sizes,
             nudges: draft?.nudges,
             bandStep: draft?.bandStep,
           }}

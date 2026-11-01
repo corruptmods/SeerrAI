@@ -108,7 +108,10 @@ const describeFormat = (format: ScoredFormat): DescribedFormat => ({
  * would be: the saved ones stand for anything left out.
  */
 export type DraftChoices = Partial<
-  Pick<QualityServerSettings, 'presets' | 'adjustments' | 'nudges' | 'bandStep'>
+  Pick<
+    QualityServerSettings,
+    'presets' | 'adjustments' | 'sizes' | 'nudges' | 'bandStep'
+  >
 >;
 
 /** Builds what a server's preset is, or throws when it isn't one. */
@@ -174,8 +177,17 @@ export const describe = async (
   const scores = [...new Set(positive.map((f) => f.score))].sort(
     (a, b) => b - a
   );
+  // A film over the size limit is said with the qualities (sizeCapGb).
   const never = profile.formats
-    .filter((f) => f.score < 0 && f.score + reach < profile.minFormatScore)
+    .filter(
+      (f) =>
+        f.score < 0 &&
+        f.score + reach < profile.minFormatScore &&
+        !(
+          profile.sizeCapGb !== undefined &&
+          f.key === `seerr:size-${profile.sizeCapGb}`
+        )
+    )
     .map(describeFormat);
   const block = ctx.formats.find((f) => f.name === BLOCK_FORMAT_NAME);
   if (block) {

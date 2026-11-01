@@ -423,7 +423,7 @@ describe("Seerr AI's own presets", () => {
     assert.equal(score('seerr:upscaled'), NEVER);
     assert.equal(score('seerr:language'), NEVER);
     assert.equal(score('seerr:burned-in'), LAST_RESORT);
-    assert.equal(score('seerr:size-15'), LAST_RESORT);
+    assert.equal(score('seerr:size-20'), NEVER);
     // Repack's 5 is rounded to the band: it can't beat usenet.
     assert.equal(score('seerr:repack'), 0);
     assert.equal(p1080.minUpgradeFormatScore, 100);
@@ -983,8 +983,74 @@ describe('applying, undoing and changes made elsewhere', () => {
       (i) => i.allowed
     );
     assert.ok(allowed.length);
-    assert.ok(allowed.every((i) => i.maxSize === 45));
+    assert.ok(allowed.every((i) => i.maxSize === 80));
     assert.equal((await stateOf(SONARR)).sizesOnProfile, true);
+  });
+
+  it('gives each preset its own size, in MB a minute in Sonarr', async () => {
+    manage('sonarr', (c) => {
+      c.presets = { '720p': 'seerr', '1080p': 'seerr', '2160p': 'seerr' };
+      c.adjustments.fileSize = 'balanced';
+      c.sizes = { '1080p': 120, '720p': 'small' };
+    });
+    await apply(SONARR);
+    const flat = (items: ArrProfileItem[]): ArrProfileItem[] =>
+      items.flatMap((i) => (i.quality ? [i] : flat(i.items)));
+    const maxOf = (name: string) => {
+      const profile = sonarr.state.profiles.find((p) => p.name === name);
+      return [
+        ...new Set(
+          flat((profile?.items as ArrProfileItem[]) ?? [])
+            .filter((i) => i.allowed)
+            .map((i) => i.maxSize)
+        ),
+      ];
+    };
+    assert.deepEqual(maxOf('Seerr AI · 1080p'), [120]);
+    assert.deepEqual(maxOf('Seerr AI · 720p'), [15]);
+    // No size of its own: the server's, Balanced.
+    assert.deepEqual(maxOf('Seerr AI · 2160p'), [200]);
+  });
+
+  it("never takes a film over its preset's own size in Radarr", async () => {
+    manage('radarr', (c) => {
+      c.presets = { '1080p': 'seerr', '2160p': 'seerr' };
+      c.adjustments.fileSize = 'balanced';
+      c.sizes = { '1080p': 25, '2160p': 'best' };
+    });
+    await apply(RADARR);
+    const scoreOf = (profileName: string, formatName: string) => {
+      const profile = radarr.state.profiles.find((p) => p.name === profileName);
+      const format = radarr.state.formats.find((f) => f.name === formatName);
+      return profile?.formatItems?.find((i) => i.format === format?.id)?.score;
+    };
+    assert.equal(scoreOf('Seerr AI · 1080p', 'Seerr AI · Over 25 GB'), NEVER);
+    // Whatever else it matches, it stays under the profile's minimum.
+    const p1080 = radarr.state.profiles.find(
+      (p) => p.name === 'Seerr AI · 1080p'
+    );
+    const reach = (p1080?.formatItems ?? []).reduce(
+      (sum, i) => sum + Math.max(0, i.score),
+      0
+    );
+    assert.ok(NEVER + reach < (p1080?.minFormatScore ?? 0));
+    // Best quality: no limit, so no size format scores in it.
+    const p2160 = radarr.state.profiles.find(
+      (p) => p.name === 'Seerr AI · 2160p'
+    );
+    const sizeIds = new Set(
+      radarr.state.formats
+        .filter((f) => /^Seerr AI · Over \d+ GB$/.test(f.name))
+        .map((f) => f.id)
+    );
+    assert.ok(
+      !(p2160?.formatItems ?? []).some(
+        (i) => sizeIds.has(i.format) && i.score !== 0
+      )
+    );
+    const d = await describeProfile(RADARR, '1080p');
+    assert.equal(d.sizeCapGb, 25);
+    assert.ok(!d.never.some((f) => f.key === 'seerr:size-25'));
   });
 
   it('applies TRaSH Guides updates on its own only when switched on', async () => {
@@ -1376,7 +1442,7 @@ describe('what it does', () => {
     assert.ok(d.never.some((f) => f.key === 'seerr:x265-hd'));
     assert.ok(d.lastResort.some((f) => f.key === 'seerr:burned-in'));
     assert.ok(d.nothing.some((f) => f.key === 'seerr:repack'));
-    assert.equal(d.sizeCapGb, 15);
+    assert.equal(d.sizeCapGb, 20);
     assert.equal(d.preferredProtocol, 'usenet');
   });
 

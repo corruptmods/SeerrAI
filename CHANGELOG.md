@@ -2,7 +2,9 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
-## Coming next
+## 2.3.1 (1 November 2026)
+
+A series no longer switches between Available and Partially Available every hour, and the Health page no longer ends in screens of empty space.
 
 ### Fixed
 

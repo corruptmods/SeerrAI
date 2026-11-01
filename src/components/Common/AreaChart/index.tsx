@@ -227,19 +227,26 @@ const AreaChart = ({
         <span>{points.length ? formatTime(last) : ''}</span>
       </div>
 
-      <table id={tableId} className="sr-only">
-        <caption>{label}</caption>
-        <tbody>
-          {points
-            .filter((p) => p.v !== null)
-            .map((p) => (
-              <tr key={p.t}>
-                <th scope="row">{formatTime(p.t)}</th>
-                <td>{formatValue(p.v as number)}</td>
-              </tr>
-            ))}
-        </tbody>
-      </table>
+      {/*
+        Hidden in a box, not on the table itself: a table grows to fit its
+        rows whatever height it's given, so an hour of readings made the page
+        several screens longer, all of it empty.
+      */}
+      <div className="sr-only">
+        <table id={tableId}>
+          <caption>{label}</caption>
+          <tbody>
+            {points
+              .filter((p) => p.v !== null)
+              .map((p) => (
+                <tr key={p.t}>
+                  <th scope="row">{formatTime(p.t)}</th>
+                  <td>{formatValue(p.v as number)}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

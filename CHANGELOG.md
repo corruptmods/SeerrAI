@@ -7,6 +7,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 ### Fixed
 
 - With TV details from TheTVDB (Settings → Metadata), a series whose seasons TMDB splits differently went back and forth between Available and Partially Available every hour. The hourly availability check now counts seasons the way the scans do.
+- The Health page had several screens of empty space below its last section, most noticeable on a phone: the CPU and memory charts' hidden tables, there for screen readers, made the page that much longer.
 
 ## 2.3.0 (31 October 2026)
 

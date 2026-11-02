@@ -147,15 +147,26 @@ const songName = (song: Pick<SongRequest, 'title' | 'version'>): string =>
  */
 const musicNotification = async (
   request: MediaRequest,
-  media: Media
+  media: Media,
+  type?: Notification
 ): Promise<{
   subject: string;
   message: string;
   image?: string;
   extra: { name: string; value: string }[];
 }> => {
-  const asked = [...(request.albums ?? [])].sort((a, b) => a.id - b.id);
-  const songs = [...(request.songs ?? [])].sort((a, b) => a.id - b.id);
+  let asked = [...(request.albums ?? [])].sort((a, b) => a.id - b.id);
+  let songs = [...(request.songs ?? [])].sort((a, b) => a.id - b.id);
+  // A failure names what failed: one song that couldn't be got fails its
+  // request, while the others in it still come.
+  if (type === Notification.MEDIA_FAILED) {
+    const failed = (item: { status: MediaRequestStatus }) =>
+      item.status === MediaRequestStatus.FAILED;
+    if (asked.some(failed) || songs.some(failed)) {
+      asked = asked.filter(failed);
+      songs = songs.filter(failed);
+    }
+  }
   const artist = media.foreignTitle || 'Unknown Artist';
   const titles = [...asked.map((album) => album.title), ...songs.map(songName)];
 
@@ -1526,7 +1537,7 @@ export class MediaRequest {
           ],
         });
       } else if (entity.type === MediaType.MUSIC) {
-        const music = await musicNotification(entity, media);
+        const music = await musicNotification(entity, media, type);
         notificationManager.sendNotification(type, {
           media,
           request: entity,

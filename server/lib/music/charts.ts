@@ -1,7 +1,10 @@
 import type { AppleChartEntry } from '@server/api/applecharts';
 import AppleChartsAPI from '@server/api/applecharts';
 import { isMbid, musicBrainz } from '@server/api/musicbrainz';
-import type { MbReleaseGroup } from '@server/api/musicbrainz/interfaces';
+import type {
+  MbRecording,
+  MbReleaseGroup,
+} from '@server/api/musicbrainz/interfaces';
 import { VARIOUS_ARTISTS_MBID } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import MusicMetadata from '@server/entity/MusicMetadata';
@@ -216,6 +219,7 @@ export const songNamed = async (
   const { songTitle } = splitTitle(title);
   const wanted = plainName(songTitle);
   let song: Song | undefined;
+  let recordings: MbRecording[] = [];
   // MusicBrainz's search drops "&" but keeps "and": "Salt & Sand" is
   // only found as "Salt Sand", and the other way round.
   for (const phrase of [
@@ -231,13 +235,19 @@ export const songNamed = async (
       { limit: 50 },
       'background'
     );
-    song = groupSongs(found.recordings ?? [], songTitle, [artist.id], {
+    recordings = found.recordings ?? [];
+    song = groupSongs(recordings, songTitle, [artist.id], {
       songs: 5,
       versions: 5,
     }).find((s) => plainName(s.title) === wanted);
     if (song) break;
   }
   if (!song) return null;
+  // Asking for it next looks its versions up: they are kept as found.
+  const versions = new Set(song.versions.map((v) => v.mbId));
+  await musicBrainz().keepRecordings(
+    recordings.filter((r) => versions.has(r.id))
+  );
   // The version the title names, when some are titled just so.
   const full = plainName(title);
   const named = song.versions.filter((v) => plainName(v.title) === full);

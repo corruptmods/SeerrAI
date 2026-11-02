@@ -20,7 +20,9 @@ export type PlaylistSongShown =
   | Exclude<PlaylistSongState, 'matched' | 'waiting' | 'removed'>
   | 'queued'
   | 'limit'
-  | 'declined';
+  | 'declined'
+  /** Requested, but its album couldn't be got with it. */
+  | 'notGot';
 
 export interface PlaylistSongView {
   id: number;
@@ -60,7 +62,7 @@ const shownState = (
       case MediaRequestStatus.COMPLETED:
         return 'here';
       case MediaRequestStatus.FAILED:
-        return 'failed';
+        return 'notGot';
       default:
         return 'requested';
     }

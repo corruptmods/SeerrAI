@@ -21,6 +21,10 @@ import {
 import { Notification } from '@server/lib/notifications';
 import type { NotificationEvent } from '@server/lib/notifications/eventTitles';
 import { seriesReadyToWatchEvent } from '@server/lib/notifications/eventTitles';
+import {
+  notifyPlaylistFailures,
+  playlistOfRequests,
+} from '@server/lib/playlists/failureNotices';
 import logger from '@server/logger';
 import { In } from 'typeorm';
 
@@ -250,15 +254,27 @@ class NotificationReconciler {
       Notification.MEDIA_FAILED
     );
 
+    // A playlist's are told together, once they have settled.
+    const listOf = await playlistOfRequests(
+      requests
+        .filter((request) => request.type === MediaType.MUSIC)
+        .map((request) => request.id)
+    );
+
     for (const request of requests) {
       // As in the other passes: a request whose title is gone has nothing to
       // announce, and trying failed on every pass.
-      if (!request.media) {
+      if (!request.media || listOf.has(request.id)) {
         continue;
       }
 
       await deliverSafely(request, request.media, Notification.MEDIA_FAILED);
     }
+
+    await notifyPlaylistFailures(
+      requests.filter((request) => request.media),
+      listOf
+    );
   }
 
   /**

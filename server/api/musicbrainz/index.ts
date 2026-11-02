@@ -448,6 +448,24 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
+   * Keeps recordings a search found as if each was looked up: a recording's
+   * lookup is the same search by its id, so the answer is the same. Asking
+   * for a song found this way (a playlist's, a chart's) then needs no second
+   * request.
+   */
+  public async keepRecordings(recordings: MbRecording[]): Promise<void> {
+    for (const recording of recordings) {
+      if (isMbid(recording.id)) {
+        await this.keep(
+          `recording:${recording.id}`,
+          { recording },
+          MB_LIFETIMES.recording
+        );
+      }
+    }
+  }
+
+  /**
    * A recording as kept from an earlier lookup, without asking MusicBrainz:
    * undefined when none is kept (or it is past its time).
    */

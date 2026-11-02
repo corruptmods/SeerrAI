@@ -16,6 +16,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- A song taken from an album whose search found no download is looked for again a few times over about two days, instead of failing at once: indexers come and go.
+- Songs from a playlist that couldn't be downloaded are told in one notification for the playlist, once they've settled, instead of one for each artist. A failure now names only the songs that failed, not every song in the request.
+- A playlist song that couldn't be downloaded says so ("Couldn't be downloaded", with why under it), and **Try again** tries its request again.
+- Matching a playlist's songs asks MusicBrainz less: a song found is kept, so requesting it needs no second lookup.
 - Playlist songs with a part in brackets, such as "Song (Tide Me Over)" or "Song [Remix]", were all "Not found", however well MusicBrainz knew them. They're found now, the version named included, and songs already marked are looked for again on update. "(duet with …)" and "and" where MusicBrainz has "&" are found too.
 - A playlist song showed "Can't be requested" when another song in the same request failed; each now shows its own state.
 - Your Music Requests on the Music page showed what it had last time until the page was reloaded.

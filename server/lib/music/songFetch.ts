@@ -84,6 +84,14 @@ const METADATA_GIVE_UP_MS = 30 * 60_000;
 const IMPORT_GIVE_UP_MS = 3 * 60 * 60_000;
 /** How long Lidarr may take to know the artist and album. */
 const LOOKUP_GIVE_UP_MS = 7 * 24 * 60 * 60_000;
+/**
+ * How long to wait before looking again for a release with the songs, after
+ * each search that found none: indexers come and go, so the songs are
+ * given up on only after about two days of finding nothing.
+ */
+const SEARCH_AGAIN_MS = [2, 6, 12, 24].map((hours) => hours * 60 * 60_000);
+/** What a fetch waiting to look again shows. */
+const SEARCHING_AGAIN = 'Nothing found yet; looking again later';
 /** How long a fetch may keep stumbling on errors before it gives up. */
 const STUMBLE_GIVE_UP_MS = 24 * 60 * 60_000;
 
@@ -322,6 +330,10 @@ class SongFetcher {
         // Chosen already, and waiting for a download slot or the indexer.
         if (fetch.release && fetch.files.length) {
           await this.start(fetch);
+          return;
+        }
+        // Found nothing last time: waits its turn to look again.
+        if (fetch.searchAgainAt && fetch.searchAgainAt.getTime() > Date.now()) {
           return;
         }
         await this.search(fetch, songs);
@@ -692,6 +704,21 @@ class SongFetcher {
 
     const needed = wanted.map((w) => w.song);
     if (!best) {
+      const wait = SEARCH_AGAIN_MS[fetch.searches ?? 0];
+      if (wait !== undefined) {
+        fetch.searches = (fetch.searches ?? 0) + 1;
+        fetch.searchAgainAt = new Date(Date.now() + wait);
+        fetch.stage = SEARCHING_AGAIN;
+        await getRepository(SongFetch).save(fetch);
+        logger.info('No release with the songs yet; looking again later', {
+          label: LABEL,
+          fetchId: fetch.id,
+          album: fetch.albumTitle,
+          searches: fetch.searches,
+          searchAgainAt: fetch.searchAgainAt.toISOString(),
+        });
+        return;
+      }
       await this.failSongs(
         needed,
         `No release of ${fetch.albumTitle} with “${needed[0].title}” was found.`,
@@ -713,6 +740,7 @@ class SongFetcher {
     }
 
     const { release } = best;
+    fetch.searchAgainAt = null;
     fetch.release = {
       guid: release.guid,
       title: release.title,

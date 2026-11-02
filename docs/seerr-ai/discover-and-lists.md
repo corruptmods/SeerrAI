@@ -69,7 +69,11 @@ A playlist holds songs. Its owner imports a Spotify or Apple Music playlist by p
 - **Requested for you:** each song is found on MusicBrainz (the version nearest its length) and requested as a song in the owner's name, one request per artist, with their usual permissions and song limit. Songs already here or on their way are skipped.
 - **Over the limit:** by default, what the limit can't take waits and is requested as it frees up, the next day and after. Or, under Settings → Music → **Big Playlist Imports**, an import of more songs than you set waits for an admin to approve, as one batch that doesn't count against the limit.
 - **Not found:** a song MusicBrainz doesn't know can't be requested. Music that's only on Spotify or YouTube often isn't there. These are listed apart, looked for again each week, or now with **Try again**.
-- **Each song says where it is:** finding it, about to be requested, waiting for your limit, waiting for approval, requested, here or on its way, declined, can't be requested, or not found.
+- **Each song says where it is:** finding it, about to be requested, waiting for your limit, waiting for approval, requested, here or on its way, declined, can't be requested, couldn't be downloaded, or not found. Each follows its own song, not the rest of its request.
+- **Couldn't be downloaded:** when no download of a song's album with it turns up, it's looked for again a few times over about two days before it's given up on. **Try again** looks once more.
+- **Told once:** songs from one playlist that couldn't be downloaded come as one notification, once none has failed for 10 minutes (or after an hour at most), with the playlist and the songs.
+- **On the home page:** an import shows as one card in **Recent Music Requests**, with how its songs are getting on.
+- **Finding songs takes time:** each is looked up on MusicBrainz, which answers one request a second, after anything you're browsing. It carries on in the background and after a restart, so you can leave the page.
 - **Unlink** stops new songs coming in; the songs stay. A song taken off a linked playlist isn't read back in.
 
 ### Roulette

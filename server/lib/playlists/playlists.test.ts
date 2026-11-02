@@ -10,8 +10,15 @@ import { MediaList, MediaListSong } from '@server/entity/MediaList';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
+import notificationManager from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import playlists, { versionFor } from '@server/lib/playlists';
+import {
+  LONGEST_MS,
+  QUIET_MS,
+  notifyPlaylistFailures,
+  playlistOfRequests,
+} from '@server/lib/playlists/failureNotices';
 import {
   playlistRequestGroups,
   withoutPlaylistRequests,
@@ -454,10 +461,69 @@ describe('a playlist’s songs as they are got', () => {
       { status: MediaRequestStatus.APPROVED }
     );
     assert.deepEqual(await songsOf(list), {
-      'Lantern Song': 'failed',
+      'Lantern Song': 'notGot',
       'Night Swim': 'requested',
       'Unheard Tune': 'unmatched',
     });
+
+    // Try again: its request is tried again, the song with it.
+    const song = await getRepository(MediaListSong).findOneByOrFail({
+      listId: list.id,
+      recordingMbid: LANTERN,
+    });
+    await playlists.retry(song);
+    const again = await getRepository(MediaRequest).findOneByOrFail({
+      id: request.id,
+    });
+    assert.equal(again.status, MediaRequestStatus.APPROVED);
+    assert.equal(
+      again.songs.find((s) => s.recordingMbid === LANTERN)?.status,
+      MediaRequestStatus.APPROVED
+    );
+  });
+});
+
+describe('a playlist’s songs that couldn’t be got', () => {
+  it('are told as one, once they have settled', async () => {
+    const list = await linked();
+    const [request] = await getRepository(MediaRequest).find();
+    await getRepository(MediaRequest).update(request.id, {
+      status: MediaRequestStatus.FAILED,
+    });
+    await getRepository(SongRequest).update(
+      { recordingMbid: LANTERN },
+      { status: MediaRequestStatus.FAILED }
+    );
+    const failed = await getRepository(MediaRequest).find({
+      relations: { media: true, requestedBy: true },
+    });
+    const listOf = await playlistOfRequests(failed.map((r) => r.id));
+    assert.equal(listOf.get(request.id), list.id);
+    const told: { subject: string; actionUrl?: string; message?: string }[] =
+      [];
+    mock.method(
+      notificationManager,
+      'sendNotification',
+      (_type: unknown, payload: (typeof told)[number]) => {
+        told.push(payload);
+      }
+    );
+    const failedAt = new Date(failed[0].updatedAt).getTime();
+
+    // Still failing one after another: held.
+    await notifyPlaylistFailures(failed, listOf, failedAt + 60_000);
+    assert.equal(told.length, 0);
+
+    // Settled: one, for the playlist, naming the song that failed.
+    await notifyPlaylistFailures(failed, listOf, failedAt + QUIET_MS);
+    assert.equal(told.length, 1);
+    assert.equal(told[0].subject, 'Drives — 1 song');
+    assert.equal(told[0].message, 'Lantern Song (radio edit) — Glasswing');
+    assert.equal(told[0].actionUrl, `/lists/${list.id}`);
+
+    // Told once.
+    await notifyPlaylistFailures(failed, listOf, failedAt + LONGEST_MS);
+    assert.equal(told.length, 1);
   });
 });
 

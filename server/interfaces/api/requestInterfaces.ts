@@ -32,6 +32,8 @@ export interface PlaylistRequestGroup {
   approval: number;
   /** Not requested yet: being found, or waiting on the person's limit. */
   waiting: number;
+  /** Couldn't be requested, or couldn't be downloaded. */
+  failed: number;
   /** Album ids, for covers on its card. */
   albums: string[];
   /** When its latest request was made. */

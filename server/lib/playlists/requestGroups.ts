@@ -113,6 +113,7 @@ export const playlistRequestGroups = async (
       onTheWay: count('requested'),
       approval: count('approval'),
       waiting: count('queued', 'limit', 'matching'),
+      failed: count('failed', 'notGot'),
       albums: covers,
       latestAt: (latest.get(list.id) ?? new Date()).toISOString(),
     });

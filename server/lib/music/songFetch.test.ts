@@ -168,6 +168,14 @@ const startFetching = async () => {
   await songFetcher.tick();
 };
 
+const searches = () =>
+  (
+    ProwlarrAPI.prototype.search as unknown as {
+      mock: { callCount: () => number };
+    }
+  ).mock.callCount();
+
+/** The latest fetch. */
 const fetchOf = () =>
   getRepository(SongFetch).findOneOrFail({ where: {}, order: { id: 'DESC' } });
 
@@ -633,13 +641,34 @@ describe('taking a song from its album', () => {
     ]);
   });
 
-  it('fails the song, saying why, when no release has it', async () => {
+  it('looks again later when no release has it, then fails the song', async () => {
     found = [{ ...RELEASE, title: 'Someone Else - Other Album [MP3]' }];
     const request = await requestSongs([LANTERN]);
 
     await startFetching();
 
-    assert.equal((await fetchOf()).status, 'failed');
+    // Indexers come and go: nothing found is looked for again, later.
+    let fetch = await fetchOf();
+    assert.equal(fetch.status, 'searching');
+    assert.equal(fetch.searches, 1);
+    assert.ok(fetch.searchAgainAt!.getTime() > Date.now());
+    assert.equal(
+      (await getRepository(MediaRequest).findOneByOrFail({ id: request.id }))
+        .status,
+      MediaRequestStatus.APPROVED
+    );
+    const searched = searches();
+    await songFetcher.tick();
+    assert.equal(searches(), searched, 'not before its time');
+
+    // Its last time, still nothing: the song fails, saying why.
+    await getRepository(SongFetch).update(fetch.id, {
+      searches: 4,
+      searchAgainAt: new Date(Date.now() - 1000),
+    });
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'failed');
     const after = await getRepository(MediaRequest).findOneByOrFail({
       id: request.id,
     });
@@ -921,12 +950,6 @@ describe('taking a song from its album', () => {
     let fetch = await fetchOf();
     assert.equal(fetch.status, 'searching');
     assert.equal(fetch.stage, 'Waiting for another song download to finish');
-    const searches = () =>
-      (
-        ProwlarrAPI.prototype.search as unknown as {
-          mock: { callCount: () => number };
-        }
-      ).mock.callCount();
     const searched = searches();
 
     await songFetcher.tick();

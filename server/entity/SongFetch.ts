@@ -114,6 +114,18 @@ class SongFetch {
   @Column({ type: 'int', nullable: true })
   public commandId: number | null;
 
+  /**
+   * Searches that found no release with the songs. Indexers come and go
+   * (one busy, one at its limit), so it is looked for again a few times
+   * before the songs are given up on.
+   */
+  @Column({ type: 'int', default: 0 })
+  public searches: number;
+
+  /** When it is next looked for, after a search found nothing. */
+  @DbAwareColumn({ type: 'datetime', nullable: true })
+  public searchAgainAt: Date | null;
+
   /** Releases tried that failed, never taken again for this album. */
   @Column({ type: 'simple-json', default: '[]' })
   public tried: string[];

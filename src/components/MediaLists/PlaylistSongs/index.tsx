@@ -38,6 +38,9 @@ const messages = defineMessages('components.MediaLists.PlaylistSongs', {
   here: 'Here or on its way',
   declined: 'Declined',
   failed: 'Can’t be requested',
+  notGot: 'Couldn’t be downloaded',
+  notGotTip:
+    'No download of its album with this song could be got. Try again to look once more.',
   unmatched: 'Not found',
   unmatchedTip:
     'MusicBrainz doesn’t know this song, so it can’t be requested yet. Music that’s only on Spotify or YouTube often isn’t there. It’s looked for again each week.',
@@ -62,6 +65,7 @@ const BADGE: Record<
   here: 'success',
   declined: 'danger',
   failed: 'danger',
+  notGot: 'danger',
   unmatched: 'danger',
 };
 
@@ -104,7 +108,9 @@ const PlaylistSongs = ({
         ? intl.formatMessage(messages.limitTip)
         : song.state === 'unmatched'
           ? intl.formatMessage(messages.unmatchedTip)
-          : (song.problem ?? undefined);
+          : song.state === 'notGot'
+            ? intl.formatMessage(messages.notGotTip)
+            : (song.problem ?? undefined);
     return (
       <li
         key={song.id}
@@ -138,6 +144,12 @@ const PlaylistSongs = ({
             )}
             {song.length ? ` · ${trackLength(song.length)}` : ''}
           </div>
+          {/* Why, in words: a tooltip can't be read on a phone. */}
+          {(song.state === 'failed' || song.state === 'notGot') && tip && (
+            <div className="mt-0.5 break-words text-xs text-red-300 light:text-danger-text">
+              {tip}
+            </div>
+          )}
         </div>
         <div className="flex flex-none items-center gap-2">
           {tip ? (
@@ -149,7 +161,9 @@ const PlaylistSongs = ({
           ) : (
             <Badge badgeType={BADGE[song.state]}>{label}</Badge>
           )}
-          {(song.state === 'unmatched' || song.state === 'failed') && (
+          {(song.state === 'unmatched' ||
+            song.state === 'failed' ||
+            song.state === 'notGot') && (
             <Tooltip content={intl.formatMessage(messages.tryAgain)}>
               <button
                 type="button"

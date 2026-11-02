@@ -15426,6 +15426,8 @@ paths:
                           type: integer
                         waiting:
                           type: integer
+                        failed:
+                          type: integer
                         albums:
                           type: array
                           items:

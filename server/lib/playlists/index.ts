@@ -1,3 +1,4 @@
+import { MediaRequestStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import type { PlaylistSongState } from '@server/entity/MediaList';
 import { MediaList, MediaListSong } from '@server/entity/MediaList';
@@ -17,6 +18,8 @@ import {
   UnrequestableSongError,
 } from '@server/lib/music/requestSongs';
 import type { Song, SongVersion } from '@server/lib/music/songs';
+import { releaseDelivery } from '@server/lib/notificationDelivery';
+import { Notification } from '@server/lib/notifications';
 import type { PlaylistLink, SourceSong } from '@server/lib/playlists/sources';
 import {
   PlaylistSourceError,
@@ -25,6 +28,7 @@ import {
 } from '@server/lib/playlists/sources';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import requestLock, { requestKey } from '@server/utils/requestLock';
 import { In, IsNull, LessThan, Not } from 'typeorm';
 
 /*
@@ -112,14 +116,42 @@ class Playlists {
     this.kick();
   }
 
-  /** Looks for a song MusicBrainz didn't know once more, now. */
+  /**
+   * Tries a song once more, now: one MusicBrainz didn't know, or that
+   * couldn't be requested, is looked for again; one whose request failed
+   * (its album couldn't be got) has its request tried again.
+   */
   public async retry(song: MediaListSong): Promise<void> {
+    if (
+      (song.state === 'requested' || song.state === 'approval') &&
+      song.requestId
+    ) {
+      await this.retryRequest(song.requestId);
+      return;
+    }
     if (song.state !== 'unmatched' && song.state !== 'failed') return;
     await getRepository(MediaListSong).update(song.id, {
       state: 'matching',
       problem: null,
     });
     this.kick();
+  }
+
+  /** A failed request tried again, as Retry on the request does. */
+  private async retryRequest(requestId: number): Promise<void> {
+    await requestLock.dispatch(requestKey(requestId), async () => {
+      const repo = getRepository(MediaRequest);
+      const request = await repo.findOne({
+        where: { id: requestId },
+        relations: { requestedBy: true, modifiedBy: true },
+      });
+      if (request?.status !== MediaRequestStatus.FAILED) return;
+      // Told once; a second failure after this is told again.
+      await releaseDelivery(request.id, Notification.MEDIA_FAILED);
+      // Approving it again takes its failed songs up again.
+      request.status = MediaRequestStatus.APPROVED;
+      await repo.save(request);
+    });
   }
 
   /** Unlinks it: its songs stay, and nothing new is read. */

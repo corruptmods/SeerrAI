@@ -230,6 +230,22 @@ describe('music in each channel', () => {
     getSettings().main.applicationUrl = '';
   });
 
+  it('names only what failed when one part of a request did', async () => {
+    const { media, request } = await musicRequest([
+      { mbId: STATIC_GARDEN, title: 'Static Garden', date: '1997-05-21' },
+      { mbId: FOG_B, title: 'Fog B', date: '2000-10-02' },
+    ]);
+    request.albums[0].status = MediaRequestStatus.APPROVED;
+    request.albums[1].status = MediaRequestStatus.FAILED;
+    await MediaRequest.sendNotification(
+      request,
+      media,
+      Notification.MEDIA_FAILED
+    );
+    assert.equal(sent[0].payload.subject, 'Fog B — Glasswing (2000)');
+    assert.equal(sent[0].payload.message, 'Fog B');
+  });
+
   it('says "music" in email, with Lidarr as the service that failed', async () => {
     getSettings().main.applicationUrl = 'https://seerr.example';
     const payload = await payloadOf(Notification.MEDIA_FAILED);

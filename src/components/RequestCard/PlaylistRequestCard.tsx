@@ -16,6 +16,7 @@ const messages = defineMessages('components.RequestCard.PlaylistRequestCard', {
   onTheWay: '{count} on the way',
   approval: '{count} waiting for approval',
   waiting: '{count} still to request',
+  failed: '{count} couldn’t be downloaded',
 });
 
 /**
@@ -36,6 +37,7 @@ const PlaylistRequestCard = ({ group }: { group: PlaylistRequestGroup }) => {
       ['onTheWay', messages.onTheWay],
       ['approval', messages.approval],
       ['waiting', messages.waiting],
+      ['failed', messages.failed],
     ] as const
   )
     .filter(([key]) => group[key] > 0)

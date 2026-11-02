@@ -1,4 +1,4 @@
-import { MusicBrainz } from '@server/api/musicbrainz';
+import { MusicBrainz, musicBrainz } from '@server/api/musicbrainz';
 import type { ChartSong } from '@server/lib/music/charts';
 import {
   MOST_HELD,
@@ -174,6 +174,11 @@ describe('a song a playlist names', () => {
     useMusicBrainz();
     const song = await songNamed('Harbour Girl (Tide Me Over)', 'Glasswing');
     assert.equal(song?.versions[0].title, 'Harbour Girl (Tide Me Over)');
+    // Kept as found: asking for it next needs no second lookup.
+    assert.equal(
+      (await musicBrainz().keptRecording(song!.versions[0].mbId))?.title,
+      'Harbour Girl (Tide Me Over)'
+    );
   });
 
   it('is the version its title names', async () => {

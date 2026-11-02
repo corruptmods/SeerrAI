@@ -13,6 +13,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - **Notifications that ask for an approval open at it**: a pack waiting for approval opens its title's Backfill page at the plan, with that pack on show; several titles' packs, at Backfill's Awaiting approval; the admin agent asking for approval, at its proposal; asking a question, at the conversation and the box to answer in.
 
+### Fixed
+
+- A season Sonarr stopped looking for, with nothing downloaded, no longer stays Processing. Its request drops that season, so it can be requested again, or is declined if every season it asked for was dropped. With several Sonarr servers, a season one of them still downloads is left alone. (From Seerr.)
+
 ## 2.3.1 (1 November 2026)
 
 A file size for each quality preset, including your own, a series no longer switching between Available and Partially Available every hour, and the Health page without screens of empty space.

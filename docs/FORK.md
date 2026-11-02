@@ -10,12 +10,19 @@ merged back in.
 there, or to cherry-pick a fix worth having. Nothing is expected to merge
 cleanly, and nothing has to.
 
-Upstream `develop` has been read through `c0759ce0` (29 October 2026; checked again 31 October, nothing newer).
+Upstream `develop` has been read through `b185621e` (2 November 2026).
 Its two security advisories there are covered: GHSA-xc6j-6p6h-p799 (other
 people's details and issues in a title's media info) by `mediaForViewer`,
 done here before upstream's fix; GHSA-8j73-j6rc-q8xh (notification
 credentials in every embedded user) by `User.toJSON`. Start the next read
 from that commit.
+
+From `c0759ce07` to `b185621e`: #3579 is taken (abandoned seasons settled
+at the end of a Sonarr run). It keeps the fork's own rules: a series Sonarr
+has under another TVDB id still counts as there, and one Sonarr lists no
+seasons for never has its request declined. Its tests went into
+`baseScanner.statusReset.test.ts`, where upstream's scanner tests live here.
+Not taken: a new Indonesian server translation (the fork has no Indonesian).
 
 From `84eae6727` to `c0759ce07`: dependency updates only. Taken: axios
 1.21.0, express-rate-limit 8.7.1, nodemailer 10.2.1 and Cypress 16.2.0

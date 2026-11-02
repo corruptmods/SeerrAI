@@ -2106,6 +2106,92 @@ components:
                 type: string
               logoUrl:
                 type: string
+    AccessLibrary:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+          enum: [movie, show, music, photo, other]
+    AccessPerson:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Their id on the server
+        name:
+          type: string
+        userId:
+          type: integer
+          description: Their Seerr AI account, when linked
+        all:
+          type: boolean
+          description: Every library, new ones too
+        libraries:
+          type: array
+          items:
+            type: string
+        admin:
+          type: boolean
+        disabled:
+          type: boolean
+    LibraryAccessBulk:
+      type: object
+      properties:
+        libraryId:
+          type: string
+        action:
+          type: string
+          enum: [remove, add]
+      required:
+        - libraryId
+        - action
+    LibraryAccessChange:
+      type: object
+      properties:
+        id:
+          type: integer
+        kind:
+          type: string
+          enum: [plex, jellyfin, emby]
+        action:
+          type: string
+          enum: [remove, add, person]
+        libraryTitle:
+          type: string
+        personName:
+          type: string
+        byName:
+          type: string
+        createdAt:
+          type: string
+        undoneAt:
+          type: string
+        changed:
+          type: integer
+        failed:
+          type: integer
+    LibraryAccessResult:
+      type: object
+      properties:
+        change:
+          $ref: '#/components/schemas/LibraryAccessChange'
+        changed:
+          type: integer
+        failed:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              error:
+                type: string
+        skipped:
+          type: integer
     MediaServerSummary:
       type: object
       description: A media server as Settings → Media Servers shows it.
@@ -5578,6 +5664,228 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/MediaServerSummary'
+  /settings/library-access/history:
+    get:
+      summary: Recent changes to library access
+      description: The latest changes made from Seerr AI to who sees which library, newest first, for one server or all.
+      tags:
+        - settings
+      parameters:
+        - in: query
+          name: kind
+          required: false
+          schema:
+            type: string
+            enum: [plex, jellyfin, emby]
+      responses:
+        '200':
+          description: Changes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LibraryAccessChange'
+  /settings/library-access/history/{id}/undo:
+    post:
+      summary: Undo a change to library access
+      description: Puts back what each person had before the change, for everyone still as the change left them; anyone changed again since is left alone and counted as skipped. A change can be undone once (409 after).
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: What the undo did
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryAccessResult'
+  /settings/library-access/user/{userId}:
+    get:
+      summary: A user's libraries on each media server
+      description: For each connected server the user has an account linked from, its libraries and which of them the user has. `person` is missing when the server is not shared with them.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: One entry per linked server
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    kind:
+                      type: string
+                      enum: [plex, jellyfin, emby]
+                    libraries:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/AccessLibrary'
+                    canGiveAll:
+                      type: boolean
+                    person:
+                      $ref: '#/components/schemas/AccessPerson'
+                    error:
+                      type: string
+    put:
+      summary: Set a user's libraries on one media server
+      description: Gives the user exactly these libraries (ids as listed), or with `all` every library including new ones (Jellyfin and Emby only). At least one library must stay (400); administrators cannot be changed (400).
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind:
+                  type: string
+                  enum: [plex, jellyfin, emby]
+                all:
+                  type: boolean
+                libraries:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - kind
+                - libraries
+      responses:
+        '200':
+          description: What changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryAccessResult'
+  /settings/library-access/{kind}:
+    get:
+      summary: Who sees which library on a media server
+      description: Every library on the server with how many people have it, and everyone it is shared with (Plex) or every account (Jellyfin, Emby). Administrators see everything and are not counted.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [plex, jellyfin, emby]
+      responses:
+        '200':
+          description: Libraries and people
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kind:
+                    type: string
+                  libraries:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/AccessLibrary'
+                        - type: object
+                          properties:
+                            sharedWith:
+                              type: integer
+                  people:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AccessPerson'
+  /settings/library-access/{kind}/plan:
+    post:
+      summary: Preview taking a library from everyone, or giving it to everyone
+      description: Who would change, who would be left with no library (they are left as they are), and who already is as asked. Nothing is changed.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [plex, jellyfin, emby]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LibraryAccessBulk'
+      responses:
+        '200':
+          description: The preview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kind:
+                    type: string
+                  library:
+                    $ref: '#/components/schemas/AccessLibrary'
+                  action:
+                    type: string
+                  change:
+                    type: array
+                    items:
+                      type: object
+                  fromAll:
+                    type: integer
+                  emptied:
+                    type: array
+                    items:
+                      type: object
+                  unchanged:
+                    type: integer
+                  admins:
+                    type: integer
+  /settings/library-access/{kind}/apply:
+    post:
+      summary: Take a library from everyone, or give it to everyone
+      description: A one-time change, worked out afresh as the preview. Administrators and anyone it would leave with no library are left as they are. Kept in the history for Undo.
+      tags:
+        - settings
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema:
+            type: string
+            enum: [plex, jellyfin, emby]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LibraryAccessBulk'
+      responses:
+        '200':
+          description: What changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LibraryAccessResult'
   /settings/metadatas:
     get:
       summary: Get Metadata settings

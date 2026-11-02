@@ -78,6 +78,7 @@ import bazarrSettingsRoutes from './bazarr';
 import serverCssRoutes from './customCss';
 import downloadClientRoutes from './downloadClients';
 import jellyfinSettingsRoutes from './jellyfin';
+import libraryAccessRoutes from './libraryAccess';
 import lidarrRoutes from './lidarr';
 import maintainerrSettingsRoutes from './maintainerr';
 import mediaServerRoutes from './mediaServers';
@@ -111,6 +112,7 @@ settingsRoutes.use('/metadatas', metadataRoutes);
 settingsRoutes.use('/jellyfin', jellyfinSettingsRoutes('jellyfin'));
 settingsRoutes.use('/emby', jellyfinSettingsRoutes('emby'));
 settingsRoutes.use('/media-servers', mediaServerRoutes);
+settingsRoutes.use('/library-access', libraryAccessRoutes);
 settingsRoutes.use('/oidc', oidcSettingsRoutes);
 settingsRoutes.use('/appearance/css', serverCssRoutes);
 

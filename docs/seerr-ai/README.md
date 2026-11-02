@@ -18,7 +18,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 ## For admins
 
 - **[Installing and updating](./install.md)**: the image, updates, backups, trying a beta.
-- **[Plex, Jellyfin and Emby together](./media-servers.md#for-admins)**: connecting servers, the primary one, removing one.
+- **[Plex, Jellyfin and Emby together](./media-servers.md#for-admins)**: connecting servers, the primary one, who sees each library, removing one.
 - **[Single sign-on](./single-sign-on.md#setting-it-up-admins)**: adding providers, sign-ups, who can sign in.
 - **[Music](./music.md#setting-it-up-admins)**: Lidarr, music libraries, limits.
 - **[Backfill and the admin agent](./backfill-and-agent.md)**: getting what Sonarr, Radarr and Lidarr can't find.

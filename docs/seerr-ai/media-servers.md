@@ -71,6 +71,20 @@ Each card has **Allow sign-in with …**. The media server sign-in switch in **S
 
 The owner keeps their account on the primary server, and their Plex account while Plex is connected. A Jellyfin or Emby server is read as the administrator it was connected with, so the owner can unlink their own account there.
 
+### Library sharing
+
+**Settings → Media Servers → Library Sharing** lists each connected server's libraries, and how many people have each. Plex counts the people the server is shared with; Jellyfin and Emby count every account except administrators, who always see everything. Open **Shared with …** to see who.
+
+- **Remove from everyone** takes a library away from everyone at once; **Share with everyone** gives it to everyone who lacks it. Both show who would change before you confirm.
+- It's done once, there and then: people shared with later are not changed.
+- Nobody is left with no library: someone for whom it is the only one is left as they are, and the preview names them.
+- Someone who had every library shared keeps the others, but new libraries are no longer shared with them on their own.
+- **Recent Changes** lists what was changed here, with **Undo**. Undo gives each person back what they had, unless their libraries were changed again since.
+
+To change one person's libraries, open their settings: **Users → (person) → Libraries**. It shows a box for each library on each server they have an account on. On Jellyfin and Emby, **Every library, new ones too** gives them everything. Plex can't do that from here; tick each library instead.
+
+Plex sharing goes through the owner's Plex account, so it needs the owner's Plex account linked.
+
 ### Removing a server
 
 **Remove** on a card. Before you confirm, it says how many people could then sign in only with a password, and how many not at all (people with single sign-on count as fine). Then:

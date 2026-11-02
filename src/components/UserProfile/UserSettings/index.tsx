@@ -27,6 +27,7 @@ const messages = defineMessages('components.UserProfile.UserSettings', {
   menuSiri: 'Siri',
   menuNotifications: 'Notifications',
   menuPermissions: 'Permissions',
+  menuLibraries: 'Libraries',
   unauthorizedDescription:
     "You do not have permission to modify this user's settings.",
 });
@@ -158,6 +159,14 @@ const UserSettings = ({ children }: UserSettingsProps) => {
             ? '/settings/notifications/discord'
             : '/settings/notifications/pushbullet',
       regex: /\/settings\/notifications/,
+    },
+    {
+      text: intl.formatMessage(messages.menuLibraries),
+      route: '/settings/libraries',
+      regex: /\/settings\/libraries/,
+      // An admin, for someone else with an account on a media server.
+      requiredPermission: Permission.ADMIN,
+      hidden: currentUser?.id === user.id || !user.linkedServers?.length,
     },
     {
       text: intl.formatMessage(messages.menuPermissions),

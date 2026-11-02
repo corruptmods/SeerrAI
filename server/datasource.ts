@@ -13,6 +13,7 @@ import EpisodeRequest from '@server/entity/EpisodeRequest';
 import FutureSeasonSubscription from '@server/entity/FutureSeasonSubscription';
 import Issue from '@server/entity/Issue';
 import IssueComment from '@server/entity/IssueComment';
+import LibraryAccessChange from '@server/entity/LibraryAccessChange';
 import { MatchProblem, MatchWatch } from '@server/entity/MatchWatch';
 import Media from '@server/entity/Media';
 import MediaDeletion from '@server/entity/MediaDeletion';
@@ -89,6 +90,7 @@ const entities = [
   MediaListWatchSuggestion,
   MediaRequest,
   MediaRequestWatcher,
+  LibraryAccessChange,
   MusicAlbum,
   MusicMetadata,
   NotificationDelivery,

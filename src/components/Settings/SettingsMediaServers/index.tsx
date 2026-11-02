@@ -9,6 +9,7 @@ import Modal from '@app/components/Common/Modal';
 import PageTitle from '@app/components/Common/PageTitle';
 import SlideCheckbox from '@app/components/Common/SlideCheckbox';
 import CardFooter from '@app/components/Settings/CardFooter';
+import LibrarySharing from '@app/components/Settings/SettingsMediaServers/LibrarySharing';
 import { SERVER_NAMES } from '@app/components/Settings/SettingsMediaServers/names';
 import useLazyModule, { preloadModule } from '@app/hooks/useLazyModule';
 import useToasts from '@app/hooks/useToasts';
@@ -388,6 +389,14 @@ const SettingsMediaServers = () => {
           })}
         </ul>
       </div>
+
+      {data?.some((server) => server.connected) && (
+        <LibrarySharing
+          servers={data
+            .filter((server) => server.connected)
+            .map((server) => ({ kind: server.kind, name: nameOf(server) }))}
+        />
+      )}
 
       <Fade show={!!removing}>
         {removingServer && (

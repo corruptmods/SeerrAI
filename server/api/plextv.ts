@@ -81,6 +81,8 @@ interface ServerResponse {
     lastSeenAt: string;
     numLibraries: string;
     owned: string;
+    /** Every library is shared, new ones too. */
+    allLibraries?: string;
   };
 }
 
@@ -97,6 +99,27 @@ interface UsersResponse {
       Server: ServerResponse[];
     }[];
   };
+}
+
+interface PlexSectionAttrs {
+  id: string;
+  key: string;
+  title?: string;
+  type?: string;
+  shared?: string;
+}
+
+/** A library as plex.tv shares it. */
+export interface PlexSharingSection {
+  /** plex.tv's id for it, which shares list. */
+  id: string;
+  /** The server's own key for it. */
+  key: string;
+  title: string;
+  /** movie, show, artist or photo. */
+  type: string;
+  /** In a share: whether it is shared. */
+  shared: boolean;
 }
 
 interface WatchlistResponse {
@@ -592,6 +615,83 @@ class PlexTvAPI extends ExternalAPI {
 
       return null;
     }
+  }
+
+  /** Reads one of plex.tv's XML answers, uncached. */
+  private async getXml<T>(path: string): Promise<T> {
+    const response = await this.axios.get(path, {
+      transformResponse: [],
+      responseType: 'text',
+    });
+    return (await xml2js.parseStringPromise(response.data)) as T;
+  }
+
+  /**
+   * A server's libraries as plex.tv numbers them for sharing: these ids,
+   * not the server's own keys, are what a share lists.
+   */
+  public async getSharingSections(
+    machineId: string
+  ): Promise<PlexSharingSection[]> {
+    const parsed = await this.getXml<{
+      MediaContainer?: { Server?: { Section?: { $: PlexSectionAttrs }[] }[] };
+    }>(`/api/servers/${encodeURIComponent(machineId)}`);
+    return (parsed.MediaContainer?.Server?.[0]?.Section ?? []).map(({ $ }) => ({
+      id: $.id,
+      key: $.key,
+      title: $.title ?? '',
+      type: $.type ?? '',
+      shared: $.shared === '1',
+    }));
+  }
+
+  /** The libraries one share of a server gives, each with whether it is. */
+  public async getShareSections(
+    machineId: string,
+    shareId: string
+  ): Promise<PlexSharingSection[]> {
+    const parsed = await this.getXml<{
+      MediaContainer?: {
+        SharedServer?: { Section?: { $: PlexSectionAttrs }[] }[];
+      };
+    }>(
+      `/api/servers/${encodeURIComponent(machineId)}/shared_servers/${encodeURIComponent(shareId)}`
+    );
+    return (parsed.MediaContainer?.SharedServer?.[0]?.Section ?? []).map(
+      ({ $ }) => ({
+        id: $.id,
+        key: $.key,
+        title: $.title ?? '',
+        type: $.type ?? '',
+        shared: $.shared === '1',
+      })
+    );
+  }
+
+  /**
+   * Shares exactly these libraries (plex.tv's section ids) of a server
+   * with someone it is already shared with.
+   */
+  public async setShareSections(
+    machineId: string,
+    shareId: string,
+    sectionIds: string[]
+  ): Promise<void> {
+    await this.axios.put(
+      `/api/servers/${encodeURIComponent(machineId)}/shared_servers/${encodeURIComponent(shareId)}`,
+      {
+        server_id: machineId,
+        shared_server: {
+          library_section_ids: sectionIds.map((id) => Number(id)),
+        },
+      },
+      {
+        headers: {
+          'X-Plex-Client-Identifier': getSettings().clientId,
+          'X-Plex-Product': 'Seerr AI',
+        },
+      }
+    );
   }
 
   public async pingToken() {

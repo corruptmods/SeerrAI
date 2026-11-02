@@ -6,6 +6,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### New
 
+- **Library sharing** (Settings → Media Servers): see who has each library on Plex, Jellyfin and Emby, and take a library from everyone, or give it to everyone, in one go, with a preview first and Undo after. An admin can also tick one person's libraries on their settings page (**Libraries**). ([guide](./docs/seerr-ai/media-servers.md#library-sharing))
 - **A Helm chart for Kubernetes**, as Seerr has: `helm install seerr-ai oci://ghcr.io/corruptmods/seerr-ai-chart`. It's signed like the images, and listed with its settings in its [README](./charts/seerr-ai-chart/README.md). ([guide](./docs/seerr-ai/install.md#kubernetes))
 
 ### Changed

@@ -227,6 +227,30 @@ export interface JellyfinAccount {
   Policy?: { IsAdministrator?: boolean; IsDisabled?: boolean };
 }
 
+/** A library, as the libraries a user may see are kept. */
+export interface JellyfinAccessFolder {
+  Name: string;
+  Id: string;
+  /** Emby's: what its user policies list. */
+  Guid?: string;
+  Type: string;
+  CollectionType?: string;
+}
+
+/** An account with the parts of its policy that say which libraries. */
+export interface JellyfinPolicyAccount {
+  Name: string;
+  Id: string;
+  Policy: {
+    IsAdministrator?: boolean;
+    IsDisabled?: boolean;
+    EnableAllFolders?: boolean;
+    EnabledFolders?: string[];
+    /** The rest is sent back as it came. */
+    [key: string]: unknown;
+  };
+}
+
 class JellyfinAPI extends ExternalAPI {
   private userId?: string;
   /** Jellyfin and Emby differ in a few places; this says which it is. */
@@ -862,6 +886,50 @@ class JellyfinAPI extends ExternalAPI {
       }
       throw e;
     }
+  }
+
+  /**
+   * Every library on the server, of any kind, as a user's access lists
+   * them. Emby lists them by Guid, Jellyfin by Id.
+   */
+  public async getAccessFolders(): Promise<JellyfinAccessFolder[]> {
+    const response = await this.get<{ Items?: JellyfinAccessFolder[] }>(
+      '/Library/MediaFolders',
+      { timeout: WATCH_TIMEOUT_MS },
+      0
+    );
+    return (response?.Items ?? []).filter(
+      (folder) => folder.Type === 'CollectionFolder'
+    );
+  }
+
+  /** Every account with its policy, read afresh. */
+  public async getPolicyAccounts(): Promise<JellyfinPolicyAccount[]> {
+    const accounts = await this.get<JellyfinPolicyAccount[]>(
+      '/Users',
+      { timeout: WATCH_TIMEOUT_MS },
+      0
+    );
+    return Array.isArray(accounts) ? accounts : [];
+  }
+
+  /** One account with its policy, read afresh. */
+  public async getPolicyAccount(id: string): Promise<JellyfinPolicyAccount> {
+    return this.get<JellyfinPolicyAccount>(
+      `/Users/${encodeURIComponent(id)}`,
+      { timeout: WATCH_TIMEOUT_MS },
+      0
+    );
+  }
+
+  /** Replaces an account's policy: the whole of it is sent. */
+  public async setPolicy(
+    id: string,
+    policy: JellyfinPolicyAccount['Policy']
+  ): Promise<void> {
+    await this.axios.post(`/Users/${encodeURIComponent(id)}/Policy`, policy, {
+      timeout: WATCH_TIMEOUT_MS,
+    });
   }
 
   public async createApiToken(appName: string): Promise<string> {

@@ -38,6 +38,7 @@ import { useIntl } from 'react-intl';
 import useSWR from 'swr';
 
 const messages = defineMessages('components.MediaLists.ListDetail', {
+  searchingAgain: 'Searching again now',
   empty: 'Nothing here yet. Use Add to List on any movie or series.',
   share: 'Share',
   rename: 'Rename',
@@ -206,6 +207,19 @@ const ListDetail = () => {
   const removeSong = async (song: PlaylistSongView) => {
     try {
       await axios.delete(`/api/v1/list/${data.id}/song/${song.id}`);
+      mutate();
+    } catch (e) {
+      showFailure(e);
+    }
+  };
+
+  const searchAgain = async () => {
+    try {
+      await axios.post(`/api/v1/list/${data.id}/search-again`);
+      addToast(intl.formatMessage(messages.searchingAgain), {
+        appearance: 'success',
+        autoDismiss: true,
+      });
       mutate();
     } catch (e) {
       showFailure(e);
@@ -464,6 +478,7 @@ const ListDetail = () => {
           onUnlink={unlinkPlaylist}
           onRemove={removeSong}
           onRetry={retrySong}
+          onSearchAgain={searchAgain}
         />
       )}
 

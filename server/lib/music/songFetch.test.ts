@@ -34,6 +34,10 @@ import songFetcher, {
   holdsSlot,
   rankReleases,
 } from '@server/lib/music/songFetch';
+import {
+  albumsWaitingToSearch,
+  searchAgainNow,
+} from '@server/lib/music/songFetchWaits';
 import { Permission } from '@server/lib/permissions';
 import {
   BACKFILL_DEFAULTS,
@@ -284,6 +288,7 @@ beforeEach(async () => {
     async (id: string) => RECORDINGS[id] ?? null
   );
   mock.method(ProwlarrAPI.prototype, 'search', async () => found);
+  mock.method(ProwlarrAPI.prototype, 'musicIndexerIds', async () => [3, 12]);
   mock.method(ProwlarrAPI.prototype, 'fetchRelease', async () => ({
     kind: 'torrent',
     data: TORRENT,
@@ -668,7 +673,7 @@ describe('taking a song from its album', () => {
 
     // Its last time, still nothing: the song fails, saying why.
     await getRepository(SongFetch).update(fetch.id, {
-      searches: 4,
+      searches: 5,
       searchAgainAt: new Date(Date.now() - 1000),
     });
     await songFetcher.tick();
@@ -1140,6 +1145,52 @@ describe('taking a song from its album', () => {
     await songFetcher.tick();
     fetch = await fetchOf();
     assert.equal(fetch.status, 'downloading');
+  });
+
+  it('asks only Prowlarr’s indexers with music that are answering', async () => {
+    const asked: (number[] | undefined)[] = [];
+    mock.method(
+      ProwlarrAPI.prototype,
+      'search',
+      async (_term: string, options: { indexerIds?: number[] }) => {
+        asked.push(options.indexerIds);
+        return found;
+      }
+    );
+    await requestSongs([LANTERN]);
+    await startFetching();
+    assert.deepEqual(asked[0], [3, 12]);
+    assert.equal((await fetchOf()).status, 'downloading');
+  });
+
+  it('waits, without counting a search, while no indexer with music answers', async () => {
+    mock.method(ProwlarrAPI.prototype, 'musicIndexerIds', async () => []);
+    await requestSongs([LANTERN]);
+    await startFetching();
+    const fetch = await fetchOf();
+    assert.equal(fetch.status, 'searching');
+    assert.equal(searches(), 0);
+    assert.equal(fetch.searches ?? 0, 0);
+  });
+
+  it('searches a waiting album again now, without counting the wait', async () => {
+    found = [{ ...RELEASE, title: 'Someone Else - Other Album [MP3]' }];
+    await requestSongs([LANTERN]);
+    await startFetching();
+    let fetch = await fetchOf();
+    assert.equal(fetch.searches, 1);
+    assert.equal(await albumsWaitingToSearch([LANTERN]), 1);
+    assert.equal(await albumsWaitingToSearch([OPENING]), 0);
+
+    assert.equal(await searchAgainNow([LANTERN]), 1);
+    assert.equal(await albumsWaitingToSearch([LANTERN]), 0);
+    const searched = searches();
+    await songFetcher.tick();
+    assert.equal(searches(), searched + 2, 'both its searches, now');
+    fetch = await fetchOf();
+    // Found nothing again: waits as long as the first time did.
+    assert.equal(fetch.searches, 1);
+    assert.ok(fetch.searchAgainAt!.getTime() > Date.now());
   });
 
   it('waits for a download slot without searching again', async () => {

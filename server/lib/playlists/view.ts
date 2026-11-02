@@ -6,6 +6,7 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
 import { featureEnabled } from '@server/lib/features';
 import { musicReady } from '@server/lib/music/access';
+import { albumsWaitingToSearch } from '@server/lib/music/songFetchWaits';
 import { In, Not } from 'typeorm';
 
 /** Whether this person can have playlists: music is set up and on for them. */
@@ -42,6 +43,11 @@ export interface PlaylistView {
   sourceName: string | null;
   sourceReadAt: Date | null;
   sourceProblem: string | null;
+  /**
+   * Albums of its songs whose search found nothing, waiting hours to look
+   * again: they can be looked for now.
+   */
+  waitingToSearch: number;
   songs: PlaylistSongView[];
 }
 
@@ -101,7 +107,13 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
         ?.status ?? request?.status
     );
   };
+  const waitingToSearch = await albumsWaitingToSearch(
+    songs
+      .filter((song) => song.state === 'requested' && song.recordingMbid)
+      .map((song) => song.recordingMbid!)
+  );
   return {
+    waitingToSearch,
     sourceUrl: list.sourceUrl ?? null,
     sourceService: list.sourceService ?? null,
     sourceName: list.sourceName ?? null,

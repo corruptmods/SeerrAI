@@ -16,6 +16,27 @@ import { after, before, describe, it } from 'node:test';
 const MAGNET = 'magnet:?xt=urn:btih:7ea162cd6756dd883e69ce57085648ecd035dae3';
 const TORRENT = Buffer.from('d4:infod4:name4:showee');
 
+const music = { id: 3000, subCategories: [{ id: 3040 }] };
+const INDEXERS = [
+  { id: 1, enable: true, capabilities: { categories: [music] } },
+  // Only a music subcategory.
+  {
+    id: 2,
+    enable: true,
+    capabilities: { categories: [{ id: 8000, subCategories: [{ id: 3010 }] }] },
+  },
+  { id: 3, enable: true, capabilities: { categories: [{ id: 5070 }] } },
+  { id: 4, enable: false, capabilities: { categories: [music] } },
+  { id: 5, enable: true, capabilities: { categories: [music] } },
+  { id: 6, enable: true, capabilities: { categories: [music] } },
+];
+const STATUSES = [
+  // Resting until tomorrow.
+  { indexerId: 5, disabledTill: '2026-11-03T12:00:00Z' },
+  // Rested, and answering again.
+  { indexerId: 6, disabledTill: '2026-11-01T12:00:00Z' },
+];
+
 let server: Server;
 let prowlarr: ProwlarrAPI;
 let base = '';
@@ -28,6 +49,16 @@ before(async () => {
       res.writeHead(301, { Location: MAGNET }).end();
     } else if (req.url?.startsWith('/2/download')) {
       res.writeHead(200).end(TORRENT);
+    } else if (req.url === '/api/v1/indexer') {
+      res
+        .writeHead(200, { 'Content-Type': 'application/json' })
+        .end(JSON.stringify(INDEXERS));
+    } else if (req.url === '/api/v1/indexerstatus') {
+      res
+        .writeHead(200, { 'Content-Type': 'application/json' })
+        .end(JSON.stringify(STATUSES));
+    } else if (req.url?.startsWith('/api/v1/search?')) {
+      res.writeHead(200, { 'Content-Type': 'application/json' }).end('[]');
     } else {
       res.writeHead(404).end();
     }
@@ -130,5 +161,24 @@ describe('Fetching a result through Prowlarr', () => {
       prowlarr.fetchRelease(release({})),
       /no download link/
     );
+  });
+});
+
+describe('Searching Prowlarr for music', () => {
+  it('asks only indexers with music that aren’t resting', async () => {
+    assert.deepEqual(
+      await prowlarr.musicIndexerIds(Date.parse('2026-11-02T12:00:00Z')),
+      [1, 2, 6]
+    );
+  });
+
+  it('limits a search to the indexers given', async () => {
+    await prowlarr.search('Glasswing Static Garden', {
+      categories: [3000],
+      indexerIds: [1, 2],
+    });
+    const url = new URL(seen.at(-1)!.url, base);
+    assert.deepEqual(url.searchParams.getAll('indexerIds'), ['1', '2']);
+    assert.deepEqual(url.searchParams.getAll('categories'), ['3000']);
   });
 });

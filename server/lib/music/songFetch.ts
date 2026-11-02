@@ -136,7 +136,7 @@ const LOOKUP_GIVE_UP_MS = 7 * 24 * 60 * 60_000;
  * each search that found none: indexers come and go, so the songs are
  * given up on only after about two days of finding nothing.
  */
-const SEARCH_AGAIN_MS = [2, 6, 12, 24].map((hours) => hours * 60 * 60_000);
+const SEARCH_AGAIN_MS = [1, 3, 6, 12, 24].map((hours) => hours * 60 * 60_000);
 /** What a fetch waiting to look again shows. */
 const SEARCHING_AGAIN = 'Nothing found yet; looking again later';
 /** How long a fetch may keep stumbling on errors before it gives up. */
@@ -678,6 +678,18 @@ class SongFetcher {
       return;
     }
     const prowlarr = new ProwlarrAPI(getSettings().backfill.prowlarr);
+    // Only indexers with music that aren't resting: a search waits on every
+    // indexer it asks. Without an answer, all of them.
+    const indexerIds = await prowlarr.musicIndexerIds().catch((e) => {
+      logger.debug('Could not read Prowlarr’s indexers', {
+        label: LABEL,
+        errorMessage: message(e),
+      });
+      return undefined;
+    });
+    if (indexerIds && !indexerIds.length) {
+      throw new Error('No indexer in Prowlarr with music is answering.');
+    }
     const found = new Map<string, ProwlarrRelease>();
     let searchError: unknown;
     for (const term of [
@@ -688,7 +700,8 @@ class SongFetcher {
         for (const release of await indexerLimits.guard(
           PROWLARR,
           'search',
-          () => prowlarr.search(term, { categories: AUDIO_CATEGORIES })
+          () =>
+            prowlarr.search(term, { categories: AUDIO_CATEGORIES, indexerIds })
         )) {
           found.set(release.infoHash?.toLowerCase() || release.guid, release);
         }
@@ -705,9 +718,6 @@ class SongFetcher {
       }
       if (found.size >= MAX_OPEN) break;
     }
-    // Nothing found because a search failed: tried again soon, not counted
-    // as a search that found nothing.
-    if (!found.size && searchError) throw searchError;
 
     // As Lidarr would choose for the artist: the protocol it prefers, and
     // none it is told not to use. Without an answer, torrents first.
@@ -742,6 +752,10 @@ class SongFetcher {
       ),
       prefer
     ).slice(0, MAX_OPEN);
+
+    // Nothing usable while a search failed: it may have been there. Tried
+    // again soon, not counted as a search that found nothing.
+    if (!usable.length && searchError) throw searchError;
 
     let best:
       | {

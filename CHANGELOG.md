@@ -4,7 +4,13 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ## Coming next
 
+### New
+
+- **Search again now** on a playlist's page: albums of its songs that found nothing yet, waiting hours to be searched again, are searched straight away.
+
 ### Fixed
+
+- Taking a song from an album asks only Prowlarr's indexers that carry music and aren't paused, instead of waiting on every indexer, so searches take seconds rather than a minute or more. An album that found nothing is searched again after 1, 3, 6, 12 and 24 hours, one more try than before over the same two days.
 
 - A song taken from an album could sit for hours on a torrent nobody was sharing. It now goes by Lidarr's delay profile for the artist: the protocol it prefers first (Usenet, including packed posts, the song found once unpacked; or a torrent with seeders), then the other, and a torrent nobody shares only when there's nothing else. A download bringing nothing no longer holds up the songs behind it, and a search Prowlarr didn't answer is tried again soon instead of counting as nothing found. Albums waiting to be searched again are searched on update.
 

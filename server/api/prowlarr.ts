@@ -109,9 +109,57 @@ class ProwlarrAPI {
       }));
   }
 
+  /**
+   * Indexers worth asking for music: turned on, carrying a music category,
+   * and not resting after failures (Prowlarr refuses them until then, and
+   * a search waits on them all).
+   */
+  public async musicIndexerIds(now = Date.now()): Promise<number[]> {
+    const [{ data: indexers }, { data: statuses }] = await Promise.all([
+      this.axios.get<
+        {
+          id: number;
+          enable?: boolean;
+          capabilities?: {
+            categories?: { id: number; subCategories?: { id: number }[] }[];
+          };
+        }[]
+      >('/indexer'),
+      this.axios.get<{ indexerId: number; disabledTill?: string }[]>(
+        '/indexerstatus'
+      ),
+    ]);
+    const resting = new Set(
+      (Array.isArray(statuses) ? statuses : [])
+        .filter(
+          (status) =>
+            !!status.disabledTill && Date.parse(status.disabledTill) > now
+        )
+        .map((status) => status.indexerId)
+    );
+    const music = (id: number) => id >= 3000 && id < 4000;
+    return (Array.isArray(indexers) ? indexers : [])
+      .filter(
+        (indexer) =>
+          indexer.enable !== false &&
+          !resting.has(indexer.id) &&
+          (indexer.capabilities?.categories ?? []).some(
+            (category) =>
+              music(category.id) ||
+              (category.subCategories ?? []).some((sub) => music(sub.id))
+          )
+      )
+      .map((indexer) => indexer.id);
+  }
+
   public async search(
     query: string,
-    options: { categories?: number[]; limit?: number } = {}
+    options: {
+      categories?: number[];
+      limit?: number;
+      /** Only these indexers; all of them when left out. */
+      indexerIds?: number[];
+    } = {}
   ): Promise<ProwlarrRelease[]> {
     const params = new URLSearchParams({
       query,
@@ -120,6 +168,9 @@ class ProwlarrAPI {
     });
     for (const category of options.categories ?? TV_CATEGORIES) {
       params.append('categories', String(category));
+    }
+    for (const id of options.indexerIds ?? []) {
+      params.append('indexerIds', String(id));
     }
     const { data } = await this.axios.get<ProwlarrRelease[]>('/search', {
       params,

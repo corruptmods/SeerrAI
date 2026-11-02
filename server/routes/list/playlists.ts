@@ -5,6 +5,7 @@
 import { getRepository } from '@server/datasource';
 import { MediaListSong } from '@server/entity/MediaList';
 import { loadAccessibleList } from '@server/lib/listAccess';
+import { searchAgainNow } from '@server/lib/music/songFetchWaits';
 import playlists, { PlaylistLinkError } from '@server/lib/playlists';
 import { PlaylistSourceError } from '@server/lib/playlists/sources';
 import { musicAllowed, playlistView } from '@server/lib/playlists/view';
@@ -34,6 +35,8 @@ const playlistFor = async (req: Request<{ listId: string }>) => {
  * and not while many of their songs are still waiting to be looked for.
  */
 const linkRate = perUserRateLimit({ windowMs: 10 * 60_000, limit: 20 });
+/** Each search asks every music indexer: a few a person, now and then. */
+const searchAgainRate = perUserRateLimit({ windowMs: 10 * 60_000, limit: 5 });
 /** A person's songs waiting to be looked for, past which nothing is linked. */
 export const MOST_SONGS_MATCHING = 1000;
 
@@ -148,6 +151,30 @@ playlistRoutes.post<{ listId: string; songId: string }>(
     }
     await playlists.retry(song);
     return res.status(204).send();
+  }
+);
+
+/**
+ * Has the albums of its requested songs that found nothing, waiting hours
+ * to look again, looked for now. Answers how many.
+ */
+playlistRoutes.post<{ listId: string }>(
+  '/:listId/search-again',
+  isAuthenticated(),
+  searchAgainRate,
+  async (req, res, next) => {
+    const access = await playlistFor(req);
+    if (!access) {
+      return next(NOT_FOUND);
+    }
+    const songs = await getRepository(MediaListSong).find({
+      select: { recordingMbid: true },
+      where: { listId: access.list.id, state: 'requested' },
+    });
+    const albums = await searchAgainNow(
+      songs.flatMap((song) => (song.recordingMbid ? [song.recordingMbid] : []))
+    );
+    return res.status(200).json({ albums });
   }
 );
 

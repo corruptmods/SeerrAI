@@ -12294,6 +12294,30 @@ paths:
       responses:
         '204':
           description: Being looked for
+  /list/{listId}/search-again:
+    post:
+      summary: Look for a playlist's waiting songs now
+      description: Albums of its requested songs whose search found nothing, waiting hours to look again, are searched at the next turn. The wait it ends isn't counted against them.
+      tags:
+        - list
+      parameters:
+        - in: path
+          name: listId
+          required: true
+          schema:
+            type: number
+      responses:
+        '200':
+          description: How many albums will be searched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  albums:
+                    type: number
+        '429':
+          description: Asked too often lately
   /list/{listId}/item:
     post:
       summary: Add a title to a list

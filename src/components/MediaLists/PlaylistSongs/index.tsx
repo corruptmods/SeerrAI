@@ -49,6 +49,9 @@ const messages = defineMessages('components.MediaLists.PlaylistSongs', {
     'These can’t be requested yet: MusicBrainz, where songs are found for Lidarr, doesn’t know them. Songs released only on Spotify or YouTube often aren’t there. Each is looked for again every week, or now with Try again.',
   tryAgain: 'Try again',
   remove: 'Take off the playlist',
+  waitingToSearch:
+    'Albums with nothing found yet, to be searched again later: {count}',
+  searchAgain: 'Search again now',
   summary:
     '{requested} requested · {waiting} waiting · {finding} being found · {notFound} not found',
 });
@@ -75,6 +78,7 @@ interface PlaylistSongsProps {
   onUnlink: () => void;
   onRemove: (song: PlaylistSongView) => void;
   onRetry: (song: PlaylistSongView) => void;
+  onSearchAgain: () => void;
 }
 
 const SERVICE_NAMES: Record<string, string> = {
@@ -93,6 +97,7 @@ const PlaylistSongs = ({
   onUnlink,
   onRemove,
   onRetry,
+  onSearchAgain,
 }: PlaylistSongsProps) => {
   const intl = useIntl();
   const { currentSettings } = useSettings();
@@ -255,6 +260,19 @@ const PlaylistSongs = ({
               notFound: notFound.length,
             })}
           </p>
+          {playlist.waitingToSearch > 0 && (
+            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted">
+              <span>
+                {intl.formatMessage(messages.waitingToSearch, {
+                  count: playlist.waitingToSearch,
+                })}
+              </span>
+              <Button buttonSize="sm" onClick={onSearchAgain}>
+                <ArrowPathIcon />
+                <span>{intl.formatMessage(messages.searchAgain)}</span>
+              </Button>
+            </div>
+          )}
           <ul className="mb-8 space-y-1">{found.map(row)}</ul>
           {notFound.length > 0 && (
             <>

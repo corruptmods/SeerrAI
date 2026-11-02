@@ -7,20 +7,32 @@
 
 **Seerr AI** is a request manager for Plex, Jellyfin and Emby: people find films, series and music and ask for them, and it gets them through Radarr, Sonarr and Lidarr. It is a fork of [Seerr](https://github.com/seerr-team/seerr) and keeps everything Seerr does.
 
+## Highlights
+
+- **Bring in a playlist**: paste a Spotify or Apple Music share link and every song is found and requested, then kept up to date each day. Songs that were never a single are taken from their album, so you get the song, not the whole album.
+- **AI Search and the admin agent**: describe a title or show a photo; report a problem in plain words and it gets fixed; an agent that finds what Sonarr, Radarr and Lidarr can't, with nothing changed until you approve.
+- **Backfill and Download Check**: stuck titles and albums found through Prowlarr, and fake or wrong downloads turned away before they land.
+- **Plex, Jellyfin and Emby together**, with sign-in through any of them or single sign-on, and who has which library managed from one page.
+- **Quality profiles** for Radarr and Sonarr from Seerr AI's presets or TRaSH Guides, explained in plain words.
+- **Status that says why**: what each download is doing, when it should arrive, live as it happens, for films, series and music alike.
+
 ## What it does
 
 **Requests and discovery**
 - Request films, series, single seasons or single episodes; get new seasons as they premiere.
 - Status that says what a download is doing and when it should arrive.
 - Discover rows each person arranges, Suggested for You, an Anime page, filters that can leave out streaming services.
-- Shared watch lists with "up next" for each series, that take a film or a whole collection at once; a release calendar, Roulette; playlists that bring in a Spotify or Apple Music playlist and request its songs.
+- Shared lists with "up next" for each series, that take a film or a whole collection at once; a release calendar, Roulette.
 
 **Media servers**
 - Plex, Jellyfin and Emby, one or all three at once. Available on any counts; Play on each.
+- Library sharing: see who has each library on Plex, Jellyfin and Emby, and give or take one from everyone at once, with a preview first and Undo after.
 - Match Check finds titles a server matched wrongly, nightly and as requests arrive, and puts them right in Plex: at the press of a button, or by itself if you turn that on. Every fix can be undone.
 
 **Music**
-- Request albums, a whole discography, or just one song (the radio edit or the club mix) through Lidarr.
+- Playlist import from Spotify or Apple Music: each song matched on MusicBrainz and requested within your limit (or as one batch for an admin to approve), with where every song stands, Try again for those that couldn't be found or downloaded, and one notification for the whole playlist. It carries on in the background and after a restart.
+- Request albums, a whole discography, or just one song (the radio edit or the club mix) through Lidarr; a song only on an album can be taken from it on its own.
+- Recent Music Requests and Recently Added Music rows, with status that updates by itself.
 - Top Songs, Trending Songs, Top Albums and Top Artists from Apple Music's charts, and rows of your own from the music you ask for.
 - Backfill and the admin agent go after albums Lidarr couldn't find.
 

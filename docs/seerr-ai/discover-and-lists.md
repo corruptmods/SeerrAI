@@ -71,8 +71,8 @@ A playlist holds songs. Its owner imports a Spotify or Apple Music playlist by p
 - **Not found:** a song MusicBrainz doesn't know can't be requested. Music that's only on Spotify or YouTube often isn't there. These are listed apart, looked for again each week, or now with **Try again**.
 - **Each song says where it is:** finding it, about to be requested, waiting for your limit, waiting for approval, requested, here or on its way, declined, can't be requested, couldn't be downloaded, or not found. Each follows its own song, not the rest of its request.
 - **Couldn't be downloaded:** when no download of a song's album with it turns up, it's looked for again a few times over about two days before it's given up on. **Try again** looks once more.
-- **Told once:** songs from one playlist that couldn't be downloaded come as one notification, once none has failed for 10 minutes (or after an hour at most), with the playlist and the songs.
-- **On the home page:** an import shows as one card in **Recent Music Requests**, with how its songs are getting on.
+- **Told once:** songs from one playlist that couldn't be downloaded come as one notification, once none has failed for 10 minutes (or after an hour at most), naming the songs and opening the playlist. The playlist's own name stays on its page.
+- **On the home page:** an import shows as one card, **Playlist import**, in **Recent Music Requests**, with a status pill and how its songs are getting on. Both update by themselves while songs are on their way.
 - **Finding songs takes time:** each is looked up on MusicBrainz, which answers one request a second, after anything you're browsing. It carries on in the background and after a restart, so you can leave the page.
 - **Unlink** stops new songs coming in; the songs stay. A song taken off a linked playlist isn't read back in.
 

@@ -18,7 +18,7 @@ Seerr AI is a fork of [Seerr](https://github.com/seerr-team/seerr). These pages 
 ## For admins
 
 - **[Installing and updating](./install.md)**: the image, updates, backups, trying a beta.
-- **[Plex, Jellyfin and Emby together](./media-servers.md#for-admins)**: connecting servers, the primary one, who sees each library, removing one.
+- **[Plex, Jellyfin and Emby together](./media-servers.md#for-admins)**: connecting servers, the primary one, library sharing, removing one.
 - **[Single sign-on](./single-sign-on.md#setting-it-up-admins)**: adding providers, sign-ups, who can sign in.
 - **[Music](./music.md#setting-it-up-admins)**: Lidarr, music libraries, limits.
 - **[Backfill and the admin agent](./backfill-and-agent.md)**: getting what Sonarr, Radarr and Lidarr can't find.
@@ -39,8 +39,8 @@ Almost everything here is optional. Admins turn a feature off for everyone in **
 | | |
 |---|---|
 | **Themes** | Light or dark, accent colours, dark backgrounds, seasonal themes, theme files, custom CSS. |
-| **Several media servers** | Plex, Jellyfin and Emby at once: available on any, sign in with any, Play on each. |
-| **Music** | Albums, whole discographies or single songs through Lidarr; Top Songs, Trending, Top Albums and Top Artists from Apple Music's charts; rows of your own. |
+| **Several media servers** | Plex, Jellyfin and Emby at once: available on any, sign in with any, Play on each; who has each library, changed for everyone at once. |
+| **Music** | Albums, whole discographies or single songs through Lidarr, a song taken from its album when it was never a single; playlists brought in from Spotify or Apple Music; Top Songs, Trending, Top Albums and Top Artists from Apple Music's charts; rows of your own. |
 | **Single sign-on** | Authentik, Authelia, Keycloak, Pocket ID, Google or any OpenID Connect provider. |
 | **Passkeys and API keys** | Sign in without a password; personal keys for apps and scripts. |
 | **Status that says why** | Waiting on a delay profile, queued, stalled, unpacking, importing, adding to Plex; live progress from six download clients. |

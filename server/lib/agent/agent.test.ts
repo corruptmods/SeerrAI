@@ -1283,6 +1283,8 @@ describe('the admin agent', () => {
     );
     assert.equal(sent.length, 1, 'admins are told it has a question');
     assert.match(sent[0].subject ?? '', /has a question/);
+    // It opens at the conversation, with the box to answer in.
+    assert.equal(sent[0].actionUrl, `/backfill/agent/${run.id}#answer`);
 
     script = [
       (body) => {
@@ -2607,6 +2609,8 @@ describe('changes the admin agent proposes', () => {
     assert.equal(await getRepository(BackfillJob).count(), 0);
     assert.equal(waiting.actions.length, 0);
     assert.match(sent[0]?.subject ?? '', /needs your approval/);
+    // It opens at the proposal, with Approve.
+    assert.equal(sent[0]?.actionUrl, `/backfill/agent/${waiting.id}#review`);
 
     script = [
       (body) => {

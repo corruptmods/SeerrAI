@@ -98,6 +98,7 @@ export const summarize = (notices: Notice[]): NotificationPayload => {
       actionUrlTitle: 'Open',
     };
   }
+  const waiting = notices.filter((n) => n.kind === 'found');
   if (titles.length === 1) {
     const [first] = notices;
     return {
@@ -120,7 +121,13 @@ export const summarize = (notices: Notice[]): NotificationPayload => {
         })
         .join('\n'),
       image: notices.find((n) => n.poster)?.poster ?? undefined,
-      actionUrl: `/backfill/series/${first.seriesId}`,
+      // A pack waiting: its review, the pack itself when it's the only one.
+      actionUrl:
+        waiting.length === 1
+          ? waiting[0].url
+          : waiting.length
+            ? `/backfill/series/${first.seriesId}#review`
+            : `/backfill/series/${first.seriesId}`,
       actionUrlTitle: 'Open',
     };
   }
@@ -138,7 +145,8 @@ export const summarize = (notices: Notice[]): NotificationPayload => {
     message:
       perTitle.slice(0, 8).join('\n') +
       (perTitle.length > 8 ? `\n…and ${perTitle.length - 8} more titles` : ''),
-    actionUrl: '/backfill',
+    // Packs waiting: Backfill's list of them.
+    actionUrl: waiting.length ? '/backfill#awaiting' : '/backfill',
     actionUrlTitle: 'Open Backfill',
   };
 };

@@ -3909,7 +3909,8 @@ class Backfill {
       detail: `${parts.join(' and ')}${
         s.quality ? ` (${s.quality}, score ${s.score})` : ''
       }`,
-      url: `/backfill/series/${row.id}`,
+      // Its review on the title's page, with this pack on show.
+      url: `/backfill/series/${row.id}?pack=${candidate.id}#review`,
     });
     await getRepository(BackfillCandidate).update(candidate.id, {
       notifiedAt: new Date(),

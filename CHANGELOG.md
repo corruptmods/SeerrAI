@@ -8,6 +8,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - **A Helm chart for Kubernetes**, as Seerr has: `helm install seerr-ai oci://ghcr.io/corruptmods/seerr-ai-chart`. It's signed like the images, and listed with its settings in its [README](./charts/seerr-ai-chart/README.md). ([guide](./docs/seerr-ai/install.md#kubernetes))
 
+### Changed
+
+- **Notifications that ask for an approval open at it**: a pack waiting for approval opens its title's Backfill page at the plan, with that pack on show; several titles' packs, at Backfill's Awaiting approval; the admin agent asking for approval, at its proposal; asking a question, at the conversation and the box to answer in.
+
 ## 2.3.1 (1 November 2026)
 
 A file size for each quality preset, including your own, a series no longer switching between Available and Partially Available every hour, and the Health page without screens of empty space.

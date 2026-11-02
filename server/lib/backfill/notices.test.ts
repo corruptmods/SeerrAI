@@ -73,7 +73,38 @@ describe('Backfill notices', () => {
       many.message,
       'ReefRoy TidePants: 2 downloads finished\nWendle: 1 pack waits for approval'
     );
-    assert.equal(many.actionUrl, '/backfill');
+    // A pack waits: Backfill's list of packs waiting for approval.
+    assert.equal(many.actionUrl, '/backfill#awaiting');
+    assert.equal(
+      summarize([notice({}), notice({ seriesId: 2, title: 'Wendle' })])
+        .actionUrl,
+      '/backfill'
+    );
+  });
+
+  it('opens a pack waiting for approval at its review', () => {
+    const pack = (id: number, seriesId = 1) =>
+      notice({
+        kind: 'found',
+        seriesId,
+        what: `pack ${id}`,
+        url: `/backfill/series/${seriesId}?pack=${id}#review`,
+      });
+    // One: that pack, as its notice links.
+    assert.equal(
+      summarize([pack(7)]).actionUrl,
+      '/backfill/series/1?pack=7#review'
+    );
+    // One title, one pack among other news: still that pack.
+    assert.equal(
+      summarize([notice({}), pack(7)]).actionUrl,
+      '/backfill/series/1?pack=7#review'
+    );
+    // One title, two packs: its review, with the best one on show.
+    assert.equal(
+      summarize([pack(7), pack(8)]).actionUrl,
+      '/backfill/series/1#review'
+    );
   });
 
   it('waits until things go quiet, but not forever', () => {

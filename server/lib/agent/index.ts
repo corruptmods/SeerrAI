@@ -2433,7 +2433,10 @@ class Agent {
           ? `${name}: the admin agent needs your approval`
           : `${name}: the admin agent has a question`,
         message: run.question ?? '',
-        actionUrl: `/backfill/agent/${run.id}`,
+        // To the proposal, or the question and the box to answer it.
+        actionUrl: `/backfill/agent/${run.id}${
+          proposal ? '#review' : '#answer'
+        }`,
         actionUrlTitle: proposal ? 'Review' : 'Answer',
       });
       // What it did before it stopped to ask is told as any other go's.

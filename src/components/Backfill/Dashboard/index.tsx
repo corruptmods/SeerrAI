@@ -26,6 +26,7 @@ import Header from '@app/components/Common/Header';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
 import useDebouncedState from '@app/hooks/useDebouncedState';
+import useScrollToHash from '@app/hooks/useScrollToHash';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import {
@@ -163,6 +164,9 @@ const BackfillDashboard = () => {
             : 30000,
     }
   );
+
+  // From a notification (#awaiting): the packs waiting for approval.
+  useScrollToHash(!!data);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -417,7 +421,10 @@ const BackfillDashboard = () => {
               </div>
             </section>
 
-            <section className="rounded-lg bg-gray-800 ring-1 ring-gray-700">
+            <section
+              id="awaiting"
+              className="scroll-mt-[calc(5rem+env(safe-area-inset-top))] rounded-lg bg-gray-800 ring-1 ring-gray-700"
+            >
               <h3 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-strong">
                 {intl.formatMessage(messages.awaitingApproval)}
               </h3>

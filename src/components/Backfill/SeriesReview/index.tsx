@@ -25,6 +25,7 @@ import Badge from '@app/components/Common/Badge';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
+import useScrollToHash from '@app/hooks/useScrollToHash';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import {
@@ -199,9 +200,13 @@ const SeriesReview = () => {
     [data]
   );
   const bestId = ranked[0]?.id;
+  // A notification about one pack links to it (?pack=), so that's the one
+  // on show until another is picked.
+  const linked = Number(router.query.pack) || undefined;
   const selected =
-    data?.candidates.find((c) => c.id === selectedId && c.status === 'ready') ??
-    ranked[0];
+    data?.candidates.find(
+      (c) => c.id === (selectedId ?? linked) && c.status === 'ready'
+    ) ?? ranked[0];
 
   // Keep the pack on show, even when the page refreshes and another ranks
   // above it, so Approve and Skip act on the pack the admin is reading. It
@@ -209,6 +214,9 @@ const SeriesReview = () => {
   useEffect(() => {
     if (selected && selected.id !== selectedId) setSelectedId(selected.id);
   }, [selected, selectedId]);
+
+  // From a notification (#review): the plan, with Approve, once it's drawn.
+  useScrollToHash(!!data);
 
   if (error && !data) {
     return (
@@ -603,7 +611,10 @@ const SeriesReview = () => {
           </section>
         </div>
 
-        <section className="rounded-lg bg-gray-800 ring-1 ring-gray-700">
+        <section
+          id="review"
+          className="scroll-mt-[calc(5rem+env(safe-area-inset-top))] rounded-lg bg-gray-800 ring-1 ring-gray-700"
+        >
           <h2 className="border-b border-gray-700 px-5 py-4 text-lg font-semibold text-strong">
             {intl.formatMessage(messages.plan)}
           </h2>

@@ -1033,8 +1033,11 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       'found'
     );
     backfillNotices.flush();
+    // It opens at that pack's review, on the title's page.
     const offered = sent.filter(
-      (s) => s.payload.actionUrl === `/backfill/series/${series.id}`
+      (s) =>
+        s.payload.actionUrl ===
+        `/backfill/series/${series.id}?pack=${next.id}#review`
     );
     assert.equal(offered.length, 1);
     assert.match(offered[0].payload.message ?? '', /\[Other\] Kitsuraga/);
@@ -1590,8 +1593,12 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
     );
     backfillNotices.flush();
     assert.ok(
-      sent.some((s) => s.payload.actionUrl === `/backfill/series/${series.id}`),
-      'admins are asked instead'
+      sent.some(
+        (s) =>
+          s.payload.actionUrl ===
+          `/backfill/series/${series.id}?pack=${found.id}#review`
+      ),
+      'admins are asked instead, at the pack’s review'
     );
   });
 });

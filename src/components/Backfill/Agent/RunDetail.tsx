@@ -19,6 +19,7 @@ import Button from '@app/components/Common/Button';
 import ConfirmButton from '@app/components/Common/ConfirmButton';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import PageTitle from '@app/components/Common/PageTitle';
+import useScrollToHash from '@app/hooks/useScrollToHash';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import {
@@ -434,6 +435,10 @@ const RunDetail = () => {
     if (pinned.current) setUnseen(false);
   };
 
+  // From a notification: its proposal (#review), or the conversation with
+  // the question and the box to answer it (#answer), once the run is drawn.
+  useScrollToHash(!!data);
+
   if (error && !data) return <ErrorPage statusCode={404} />;
   if (!data) return <LoadingSpinner />;
   const working = data.status === 'running' || data.status === 'queued';
@@ -653,14 +658,22 @@ const RunDetail = () => {
       )}
 
       {data.proposal && (
-        <ProposalCard
-          proposal={data.proposal}
-          busy={sending}
-          onDecide={(approve) => void decide(approve)}
-        />
+        <div
+          id="review"
+          className="scroll-mt-[calc(5rem+env(safe-area-inset-top))]"
+        >
+          <ProposalCard
+            proposal={data.proposal}
+            busy={sending}
+            onDecide={(approve) => void decide(approve)}
+          />
+        </div>
       )}
 
-      <section className="mt-4 rounded-lg bg-gray-800 ring-1 ring-gray-700">
+      <section
+        id="answer"
+        className="mt-4 scroll-mt-[calc(5rem+env(safe-area-inset-top))] rounded-lg bg-gray-800 ring-1 ring-gray-700"
+      >
         <div className="relative">
           <div
             ref={log}

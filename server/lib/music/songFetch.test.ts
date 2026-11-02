@@ -30,6 +30,7 @@ import {
 import { completeMusicRequests } from '@server/lib/music/completion';
 import { songStandings } from '@server/lib/music/requestSongs';
 import songFetcher, {
+  delayProfileFor,
   holdsSlot,
   rankReleases,
 } from '@server/lib/music/songFetch';
@@ -1060,6 +1061,32 @@ describe('taking a song from its album', () => {
     ]);
   });
 
+  it('prefers what Lidarr’s delay profile prefers', async () => {
+    const { usenet } = useUsenet(false);
+    found = [RELEASE, usenet];
+    await requestSongs([LANTERN]);
+    await startFetching();
+    assert.equal((await fetchOf()).release?.protocol, 'usenet');
+  });
+
+  it('prefers a shared torrent when Lidarr prefers torrents', async () => {
+    const { usenet } = useUsenet(false);
+    lidarr.delayProfiles[0].preferredProtocol = 'torrent';
+    found = [usenet, RELEASE];
+    await requestSongs([LANTERN]);
+    await startFetching();
+    assert.equal((await fetchOf()).release?.protocol, 'torrent');
+  });
+
+  it('leaves out what Lidarr is told not to use', async () => {
+    const { usenet } = useUsenet(false);
+    lidarr.delayProfiles[0].enableUsenet = false;
+    found = [usenet, { ...RELEASE, seeders: 0 }];
+    await requestSongs([LANTERN]);
+    await startFetching();
+    assert.equal((await fetchOf()).release?.protocol, 'torrent');
+  });
+
   it('takes the song from a packed Usenet post, finding it once unpacked', async () => {
     const { usenet } = useUsenet(true);
     found = [usenet];
@@ -1173,6 +1200,37 @@ describe('choosing a release of an album', () => {
       ]).map((r) => r.guid),
       ['many', 'few', 'unknown', 'nzb', 'dead']
     );
+    // Lidarr preferring Usenet: Usenet first, unshared torrents still last.
+    assert.deepEqual(
+      rankReleases(
+        [
+          release('dead', 'torrent', 0),
+          release('many', 'torrent', 40),
+          release('nzb', 'usenet'),
+        ],
+        'usenet'
+      ).map((r) => r.guid),
+      ['nzb', 'many', 'dead']
+    );
+  });
+
+  it('follows the delay profile Lidarr uses for the artist', () => {
+    const profile = (id: number, order: number, tags: number[]) => ({
+      id,
+      enableUsenet: true,
+      enableTorrent: true,
+      preferredProtocol: 'torrent' as const,
+      order,
+      tags,
+    });
+    const profiles = [
+      profile(1, 2147483647, []),
+      profile(2, 2, [7]),
+      profile(3, 1, [7, 8]),
+    ];
+    assert.equal(delayProfileFor(profiles, [7])?.id, 3);
+    assert.equal(delayProfileFor(profiles, [9])?.id, 1);
+    assert.equal(delayProfileFor([], [7]), undefined);
   });
 
   it('lets a download that brings nothing stop holding up the next song', () => {

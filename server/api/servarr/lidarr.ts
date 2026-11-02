@@ -72,6 +72,16 @@ export interface LidarrManualImportItem {
   quality?: LidarrQualityModel;
 }
 
+/** Which protocol Lidarr prefers, for the artists with its tags. */
+export interface LidarrDelayProfile {
+  id: number;
+  enableUsenet: boolean;
+  enableTorrent: boolean;
+  preferredProtocol: 'usenet' | 'torrent';
+  order: number;
+  tags: number[];
+}
+
 /** A quality as Lidarr writes it on a file. */
 export interface LidarrQualityModel {
   quality: { id: number; name: string };
@@ -343,6 +353,14 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
       ).data;
     } catch (e) {
       this.fail('read the remote path mappings', e);
+    }
+  };
+
+  public getDelayProfiles = async (): Promise<LidarrDelayProfile[]> => {
+    try {
+      return (await this.axios.get<LidarrDelayProfile[]>('/delayprofile')).data;
+    } catch (e) {
+      this.fail('read the delay profiles', e);
     }
   };
 

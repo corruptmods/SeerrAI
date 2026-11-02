@@ -41,6 +41,15 @@ export interface FakeLidarr {
   releaseTracks: Map<number, LidarrTrack[]>;
   /** Where the download client's folders are, as Lidarr sees them. */
   remotePathMappings: { host: string; remotePath: string; localPath: string }[];
+  /** Lidarr's delay profiles; its own default prefers Usenet. */
+  delayProfiles: {
+    id: number;
+    enableUsenet: boolean;
+    enableTorrent: boolean;
+    preferredProtocol: 'usenet' | 'torrent';
+    order: number;
+    tags: number[];
+  }[];
   /** What Lidarr finds in a folder for manual import, by folder. */
   folders: Map<string, { path: string; size?: number }[]>;
   /** Whether a manual import takes its files (or refuses them all). */
@@ -76,6 +85,16 @@ export const createFakeLidarr = (): FakeLidarr => {
     releaseTracks: new Map(),
     remotePathMappings: [],
     folders: new Map(),
+    delayProfiles: [
+      {
+        id: 1,
+        enableUsenet: true,
+        enableTorrent: true,
+        preferredProtocol: 'usenet',
+        order: 2147483647,
+        tags: [],
+      },
+    ],
     importTakes: true,
     tags: [],
     down: false,
@@ -114,6 +133,16 @@ export const createFakeLidarr = (): FakeLidarr => {
       fake.releaseTracks = new Map();
       fake.remotePathMappings = [];
       fake.folders = new Map();
+      fake.delayProfiles = [
+        {
+          id: 1,
+          enableUsenet: true,
+          enableTorrent: true,
+          preferredProtocol: 'usenet',
+          order: 2147483647,
+          tags: [],
+        },
+      ];
       fake.importTakes = true;
       fake.tags = [];
       fake.down = false;
@@ -267,6 +296,9 @@ export const createFakeLidarr = (): FakeLidarr => {
     }
     if (method === 'GET' && path === '/api/v1/remotepathmapping') {
       return [200, fake.remotePathMappings];
+    }
+    if (method === 'GET' && path === '/api/v1/delayprofile') {
+      return [200, fake.delayProfiles];
     }
     if (method === 'GET' && path === '/api/v1/manualimport') {
       return [200, fake.folders.get(query.folder ?? '') ?? []];

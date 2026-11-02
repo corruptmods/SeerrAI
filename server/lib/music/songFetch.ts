@@ -5,6 +5,7 @@ import type LidarrAPI from '@server/api/servarr/lidarr';
 import type {
   LidarrAlbum,
   LidarrArtist,
+  LidarrDelayProfile,
   LidarrQualityModel,
   LidarrTrack,
 } from '@server/api/servarr/lidarr';
@@ -73,19 +74,41 @@ import { In, IsNull, Not } from 'typeorm';
 const LABEL = 'Song Fetch';
 
 /**
- * Which releases are opened first: torrents someone is sharing, which can
- * download only the songs; then Usenet, which brings the whole album; then
- * torrents nobody seems to share, which may never finish and whose file
- * list can take minutes to come from the swarm.
+ * Which releases are opened first: whichever of torrents and Usenet
+ * Lidarr's delay profile prefers (a torrent can download only the songs;
+ * Usenet brings the whole album), then the other; torrents nobody seems to
+ * share come last, as they may never finish and their file list can take
+ * minutes to come from the swarm.
  */
-const releaseTier = (release: ProwlarrRelease): number =>
-  release.protocol === 'usenet' ? 1 : (release.seeders ?? 1) > 0 ? 0 : 2;
+const releaseTier = (
+  release: ProwlarrRelease,
+  prefer: LidarrDelayProfile['preferredProtocol']
+): number => {
+  if (release.protocol === 'torrent' && (release.seeders ?? 1) <= 0) return 2;
+  return release.protocol === prefer ? 0 : 1;
+};
+
+/**
+ * The delay profile Lidarr uses for an artist: the first, in Lidarr's
+ * order, sharing a tag with them, else the one for everyone.
+ */
+export const delayProfileFor = (
+  profiles: LidarrDelayProfile[],
+  artistTags: number[]
+): LidarrDelayProfile | undefined =>
+  [...profiles]
+    .sort((a, b) => a.order - b.order)
+    .find((p) => p.tags.some((tag) => artistTags.includes(tag))) ??
+  profiles.find((p) => !p.tags.length);
 
 /** Releases of an album in the order they are opened. */
-export const rankReleases = (releases: ProwlarrRelease[]): ProwlarrRelease[] =>
+export const rankReleases = (
+  releases: ProwlarrRelease[],
+  prefer: LidarrDelayProfile['preferredProtocol'] = 'torrent'
+): ProwlarrRelease[] =>
   [...releases].sort(
     (a, b) =>
-      releaseTier(a) - releaseTier(b) ||
+      releaseTier(a, prefer) - releaseTier(b, prefer) ||
       (b.seeders ?? 0) - (a.seeders ?? 0) ||
       a.size - b.size
   );
@@ -686,15 +709,38 @@ class SongFetcher {
     // as a search that found nothing.
     if (!found.size && searchError) throw searchError;
 
+    // As Lidarr would choose for the artist: the protocol it prefers, and
+    // none it is told not to use. Without an answer, torrents first.
+    const profile = await Promise.all([
+      lidarr.getDelayProfiles(),
+      fetch.lidarrArtistId
+        ? lidarr.getArtistByMbid(fetch.artistMbid)
+        : Promise.resolve(undefined),
+    ])
+      .then(([profiles, artist]) =>
+        delayProfileFor(profiles, artist?.tags ?? [])
+      )
+      .catch((e) => {
+        logger.debug('Could not read Lidarr’s delay profiles', {
+          label: LABEL,
+          errorMessage: message(e),
+        });
+        return undefined;
+      });
+    const prefer = profile?.preferredProtocol ?? 'torrent';
     const usable = rankReleases(
       [...found.values()].filter(
         (release) =>
           !!clientFor(release.protocol) &&
+          (release.protocol === 'torrent'
+            ? profile?.enableTorrent !== false
+            : profile?.enableUsenet !== false) &&
           release.size <= MAX_RELEASE_BYTES &&
           !fetch.tried.includes(release.guid) &&
           !fetch.tried.includes(`hash:${release.infoHash?.toLowerCase()}`) &&
           namesAlbum(release.title, fetch.albumTitle, fetch.artistName)
-      )
+      ),
+      prefer
     ).slice(0, MAX_OPEN);
 
     let best:
@@ -709,7 +755,7 @@ class SongFetcher {
     let packedRelease: ProwlarrRelease | undefined;
     for (const release of usable) {
       // Torrents nobody seems to share, only when nothing better was found.
-      if (releaseTier(release) === 2 && (best || packedRelease)) break;
+      if (releaseTier(release, prefer) === 2 && (best || packedRelease)) break;
       try {
         const { files, infoHash, packed } = await backfill.filesOf(release);
         if (packed) {

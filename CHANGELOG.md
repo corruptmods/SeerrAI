@@ -6,7 +6,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
-- A song taken from an album could sit for hours on a torrent nobody was sharing. Torrents with seeders are tried first, then Usenet (including packed posts, the song found once unpacked), and an unshared torrent only when there's nothing else. A download bringing nothing no longer holds up the songs behind it, and a search Prowlarr didn't answer is tried again soon instead of counting as nothing found. Albums waiting to be searched again are searched on update.
+- A song taken from an album could sit for hours on a torrent nobody was sharing. It now goes by Lidarr's delay profile for the artist: the protocol it prefers first (Usenet, including packed posts, the song found once unpacked; or a torrent with seeders), then the other, and a torrent nobody shares only when there's nothing else. A download bringing nothing no longer holds up the songs behind it, and a search Prowlarr didn't answer is tried again soon instead of counting as nothing found. Albums waiting to be searched again are searched on update.
 
 ## 2.4.0 (2 November 2026)
 

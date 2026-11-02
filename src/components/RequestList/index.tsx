@@ -111,16 +111,16 @@ const RequestList = () => {
   } = useSWR<RequestResultsResponse>(
     `/api/v1/request?take=${currentPageSize}&skip=${
       pageIndex * currentPageSize
-    }&filter=${currentFilters.join(',') || 'all'}&mediaType=${
-      currentMediaTypes.join(',') || 'all'
-    }&sort=${currentSort}&sortDirection=${currentSortDirection}${
+    }&filter=${encodeURIComponent(
+      currentFilters.join(',') || 'all'
+    )}&mediaType=${encodeURIComponent(currentMediaTypes.join(',') || 'all')}&sort=${currentSort}&sortDirection=${currentSortDirection}${
       router.pathname.startsWith('/profile')
         ? `&requestedBy=${currentUser?.id}`
         : router.query.userId
           ? `&requestedBy=${router.query.userId}`
           : // Also ignores a filter saved on this device by someone else.
             canFilterByUser && currentRequestedBy.length
-            ? `&requestedBy=${currentRequestedBy.join(',')}`
+            ? `&requestedBy=${encodeURIComponent(currentRequestedBy.join(','))}`
             : ''
     }`
   );

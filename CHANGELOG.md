@@ -16,6 +16,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- The Requests page showed nothing with more than one status, kind or person ticked in its filters.
 - A song taken from an album whose search found no download is looked for again a few times over about two days, instead of failing at once: indexers come and go.
 - Songs from a playlist that couldn't be downloaded are told in one notification for the playlist, once they've settled, instead of one for each artist. A failure now names only the songs that failed, not every song in the request.
 - A playlist song that couldn't be downloaded says so ("Couldn't be downloaded", with why under it), and **Try again** tries its request again.

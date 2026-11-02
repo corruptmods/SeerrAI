@@ -477,6 +477,15 @@ describe('music requests in the lists', () => {
 
     list = await call('GET', '/request?mediaType=movie%2Ctv');
     assert.equal((list.body as { results: unknown[] }).results.length, 0);
+    // A comma written plainly is refused before the route sees it: the
+    // pages send it encoded.
+    list = await call('GET', '/request?mediaType=movie,tv');
+    assert.equal(list.status, 400);
+
+    // Music's own row: its requests, and the playlists they came from.
+    list = await call('GET', '/request?mediaType=music&playlists=group');
+    assert.equal(list.status, 200);
+    assert.deepEqual((list.body as { playlists: unknown[] }).playlists, []);
 
     getSettings().main.disabledFeatures = ['music'];
     list = await call('GET', '/request?mediaType=music');

@@ -26,8 +26,11 @@ const RecentRequestsSlider = ({ music = false }: { music?: boolean }) => {
   const { hasPermission } = useUser();
   const { data: requests, error: requestError } =
     useSWR<RequestResultsResponse>(
+      // A comma is sent encoded: the API refuses one written plainly.
       `/api/v1/request?filter=all&take=10&sort=added&skip=0&${
-        music ? 'mediaType=music&playlists=group' : 'mediaType=movie,tv'
+        music
+          ? 'mediaType=music&playlists=group'
+          : `mediaType=${encodeURIComponent('movie,tv')}`
       }`,
       {
         revalidateOnMount: true,

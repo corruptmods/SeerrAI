@@ -61,13 +61,23 @@ export const useListDetail = (listId: number | string | undefined) => {
     listId ? `/api/v1/list/${listId}` : null,
     {
       // A playlist's songs are matched and requested in the background:
-      // followed while any are still on their way to being requested.
-      refreshInterval: (latest) =>
-        latest?.playlist?.songs.some(
-          (song) => song.state === 'matching' || song.state === 'queued'
+      // followed closely while any are being found or requested, then less
+      // often while requested ones are still on their way.
+      refreshInterval: (latest) => {
+        const songs = latest?.playlist?.songs ?? [];
+        if (
+          songs.some(
+            (song) => song.state === 'matching' || song.state === 'queued'
+          )
+        ) {
+          return 4000;
+        }
+        return songs.some((song) =>
+          ['requested', 'approval', 'limit'].includes(song.state)
         )
-          ? 4000
-          : 0,
+          ? 15_000
+          : 0;
+      },
     }
   );
 

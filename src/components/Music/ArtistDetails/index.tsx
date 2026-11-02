@@ -23,6 +23,10 @@ import { Permission, useUser } from '@app/hooks/useUser';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import {
+  refreshIntervalHelper,
+  watchMusic,
+} from '@app/utils/refreshIntervalHelper';
+import {
   ArrowDownTrayIcon,
   ArrowTopRightOnSquareIcon,
   CogIcon,
@@ -103,6 +107,8 @@ interface DiscographyProps {
   refreshToken: number;
   /** Told when an album was requested from its card. */
   onRequested: () => void;
+  /** How often to ask again while something is on its way; 0 not to. */
+  follow?: number;
 }
 
 /** The artist's releases, a hundred at a time, grouped by kind. */
@@ -111,15 +117,19 @@ const Discography = ({
   downloads,
   refreshToken,
   onRequested,
+  follow = 0,
 }: DiscographyProps) => {
   const intl = useIntl();
   const [showOther, setShowOther] = useState(false);
   const { data, error, size, setSize, isValidating, mutate } = useSWRInfinite<
     MusicPage<MusicAlbumResult>
-  >((index, previous: MusicPage<MusicAlbumResult> | null) =>
-    previous && index + 1 > previous.totalPages
-      ? null
-      : `/api/v1/music/artist/${artistId}/albums?page=${index + 1}`
+  >(
+    (index, previous: MusicPage<MusicAlbumResult> | null) =>
+      previous && index + 1 > previous.totalPages
+        ? null
+        : `/api/v1/music/artist/${artistId}/albums?page=${index + 1}`,
+    // Its albums' pills move with the artist's page.
+    { refreshInterval: follow }
   );
 
   useEffect(() => {
@@ -238,8 +248,17 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
   const [requested, setRequested] = useState(0);
   const [managing, setManaging] = useState(false);
   const router = useRouter();
+  // Followed while something of theirs is on its way, as a film's or a
+  // series' page is.
+  const follow = refreshIntervalHelper<MusicArtistDetails>((artist) =>
+    watchMusic({
+      status: artist.mediaInfo?.status,
+      downloads: artist.mediaInfo?.downloadStatus,
+    })
+  );
   const { data, error, mutate } = useSWR<MusicArtistDetails>(
-    musicOn ? `/api/v1/music/artist/${artistId}` : null
+    musicOn ? `/api/v1/music/artist/${artistId}` : null,
+    { refreshInterval: follow }
   );
   // Played the way a movie or series is: on an iPhone or iPad, Plex's app
   // opens; the viewer's own servers come first.
@@ -477,6 +496,7 @@ const ArtistDetails = ({ artistId }: ArtistDetailsProps) => {
       )}
       <Discography
         artistId={data.id}
+        follow={follow(data)}
         downloads={data.mediaInfo?.downloadStatus}
         refreshToken={requested}
         // The artist's status may change with an album asked for.

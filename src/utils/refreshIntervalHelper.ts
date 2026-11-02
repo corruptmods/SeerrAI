@@ -66,6 +66,28 @@ export const watchMedia = (
     : undefined;
 
 /**
+ * What to watch on a music page (an album, an artist): its downloads, and
+ * whether one may start any moment, as `watchMedia` for a film or series.
+ * `downloads` are the page's own (an album's of the artist's); `onItsWay`
+ * covers what only the page knows (an album being added to the library).
+ */
+export const watchMusic = ({
+  status,
+  downloads,
+  onItsWay = false,
+}: {
+  status?: MediaStatus;
+  downloads?: DownloadingItem[];
+  onItsWay?: boolean;
+}): Watched => ({
+  downloadStatus: downloads,
+  waiting:
+    onItsWay ||
+    status === MediaStatus.PROCESSING ||
+    status === MediaStatus.PARTIALLY_AVAILABLE,
+});
+
+/**
  * What to watch on a request card: its title, as `watchMedia`, until the
  * request itself is finished with. A completed request (everything it asked
  * for is here) or a declined one has nothing more coming, however the title

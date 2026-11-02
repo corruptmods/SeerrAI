@@ -552,7 +552,7 @@ describe('a playlist’s songs that couldn’t be got', () => {
     // Settled: one, for the playlist, naming the song that failed.
     await notifyPlaylistFailures(failed, listOf, failedAt + QUIET_MS);
     assert.equal(told.length, 1);
-    assert.equal(told[0].subject, 'Drives — 1 song');
+    assert.equal(told[0].subject, 'Playlist import — 1 song');
     assert.equal(told[0].message, 'Lantern Song (radio edit) — Glasswing');
     assert.equal(told[0].actionUrl, `/lists/${list.id}`);
 
@@ -573,14 +573,14 @@ describe('a playlist’s requests in a row of requests', () => {
     const [group, ...rest] = await playlistRequestGroups(requests(), user, 10);
     assert.deepEqual(rest, []);
     assert.equal(group.listId, list.id);
-    assert.equal(group.name, 'Drives');
+    assert.equal(group.canOpen, true);
     assert.equal(group.requestedBy.id, user.id);
     assert.equal(group.songs, 3);
     assert.equal(group.approval, 2);
     assert.equal(group.waiting, 0);
     assert.deepEqual(group.albums, [LANTERN_SINGLE, NIGHT_SWIM_SINGLE]);
 
-    // Someone who can't open the list sees it without its name.
+    // Someone who can't open the list isn't sent there.
     const other = await getRepository(User).save(
       new User({
         email: `pl-other-${Math.random()}@test.local`,
@@ -590,6 +590,6 @@ describe('a playlist’s requests in a row of requests', () => {
     );
     const [seen] = await playlistRequestGroups(requests(), other, 10);
     assert.equal(seen.listId, list.id);
-    assert.equal(seen.name, undefined);
+    assert.equal(seen.canOpen, false);
   });
 });

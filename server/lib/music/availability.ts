@@ -433,6 +433,14 @@ export const applyLidarr = async (
       }
       if (row.trackFileCount !== lidarr.trackFileCount) {
         changes.trackFileCount = lidarr.trackFileCount;
+        // More of it came (songs taken from it, or the rest of it): it is
+        // newly added again, at the front of Recently Added.
+        if (
+          row.trackFileCount != null &&
+          lidarr.trackFileCount > row.trackFileCount
+        ) {
+          changes.mediaAddedAt = new Date();
+        }
       }
       const status = decide
         ? lidarrStatus(lidarr.trackCount, lidarr.trackFileCount)

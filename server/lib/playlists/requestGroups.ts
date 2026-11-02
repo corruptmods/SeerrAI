@@ -102,7 +102,7 @@ export const playlistRequestGroups = async (
     ].slice(0, COVERS);
     groups.push({
       listId: list.id,
-      ...(openable.includes(list.id) ? { name: list.name } : {}),
+      canOpen: openable.includes(list.id),
       requestedBy: {
         id: requester.id,
         displayName: requester.displayName,

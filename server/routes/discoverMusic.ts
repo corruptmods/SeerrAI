@@ -27,7 +27,7 @@ import type {
 import { mapFreshRelease, mapSongResult } from '@server/models/Music';
 import type { NextFunction } from 'express';
 import { Router } from 'express';
-import { IsNull, Not } from 'typeorm';
+import { In, IsNull, Not } from 'typeorm';
 
 /*
  * Music's Discover rows. New releases come from ListenBrainz, and the
@@ -246,7 +246,10 @@ for (const [show, row] of [
   });
 }
 
-/** Albums a media server has, newest first, from Seerr's own records. */
+/**
+ * Albums a media server has, wholly or in part (songs taken from them),
+ * newest first, from Seerr's own records.
+ */
 discoverMusicRoutes.get('/recently-added', async (req, res) => {
   const page = pageOf(req.query.page);
   const [albums, total] = await getRepository(MusicAlbum).findAndCount({
@@ -262,7 +265,10 @@ discoverMusicRoutes.get('/recently-added', async (req, res) => {
       mediaAddedAt: true,
       media: { id: true, foreignId: true, foreignTitle: true },
     },
-    where: { status: MediaStatus.AVAILABLE, mbId: Not(IsNull()) },
+    where: {
+      status: In([MediaStatus.AVAILABLE, MediaStatus.PARTIALLY_AVAILABLE]),
+      mbId: Not(IsNull()),
+    },
     order: {
       mediaAddedAt: { direction: 'DESC', nulls: 'LAST' },
       id: 'DESC',

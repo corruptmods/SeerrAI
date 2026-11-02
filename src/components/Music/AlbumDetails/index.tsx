@@ -25,6 +25,10 @@ import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import {
+  refreshIntervalHelper,
+  watchMusic,
+} from '@app/utils/refreshIntervalHelper';
+import {
   ArrowDownTrayIcon,
   ChevronDownIcon,
   ChevronUpIcon,
@@ -70,8 +74,11 @@ const TrackList = ({
   albumId,
   songsOf,
   downloads,
+  follow = 0,
 }: {
   albumId: string;
+  /** How often to ask again while the album is on its way; 0 not to. */
+  follow?: number;
   songsOf?: string;
   /** The artist's downloads: each song's own shows on its row. */
   downloads?: DownloadingItem[];
@@ -81,12 +88,37 @@ const TrackList = ({
   const { mutate: mutateAlbum } = useSWRConfig();
   // Open to start, on a phone too; there it can be folded away.
   const [open, setChosen] = useState(true);
+  // Songs asked for by themselves are followed too, while on their way;
+  // their downloads are the album's, so it is asked again with them.
+  const ownFollow = refreshIntervalHelper<{ tracks: MusicTrack[] }>(
+    ({ tracks }) =>
+      watchMusic({
+        downloads: songDownloads(
+          downloads,
+          tracks.flatMap((track) =>
+            track.recordingId ? [track.recordingId] : []
+          )
+        ),
+        onItsWay: tracks.some(
+          (track) => track.status === MediaStatus.PROCESSING
+        ),
+      })
+  );
   const { data, error, mutate } = useSWR<{ tracks: MusicTrack[] }>(
     `/api/v1/music/album/${albumId}/tracks`,
     {
-      // Asked again while some are still being looked up.
-      refreshInterval: (latest) =>
-        latest?.tracks.some((track) => track.checking) ? 5000 : 0,
+      // Asked again while some are still being looked up, and while the
+      // album or a song of it is on its way.
+      refreshInterval: (latest) => {
+        if (latest?.tracks.some((track) => track.checking)) return 5000;
+        const own = ownFollow(latest);
+        return own && follow ? Math.min(own, follow) : own || follow;
+      },
+      onSuccess: (latest) => {
+        if (!follow && ownFollow(latest)) {
+          mutateAlbum(`/api/v1/music/album/${albumId}`);
+        }
+      },
     }
   );
 
@@ -241,8 +273,17 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
   const { hasPermission } = useUser();
   const [requesting, setRequesting] = useState(false);
   const { mutate: globalMutate } = useSWRConfig();
+  // Followed while it is on its way, as a film's or a series' page is: its
+  // pill and its songs' move on their own.
+  const watch = (album: MusicAlbumDetails) =>
+    watchMusic({
+      status: album.status,
+      downloads: albumDownloads(album.mediaInfo?.downloadStatus, album.id),
+      onItsWay: !!album.addingToLibrary,
+    });
   const { data, error, mutate } = useSWR<MusicAlbumDetails>(
-    musicOn ? `/api/v1/music/album/${albumId}` : null
+    musicOn ? `/api/v1/music/album/${albumId}` : null,
+    { refreshInterval: refreshIntervalHelper<MusicAlbumDetails>(watch) }
   );
   // Played the way a movie or series is: on an iPhone or iPad, Plex's app
   // opens; the viewer's own servers come first.
@@ -400,6 +441,7 @@ const AlbumDetails = ({ albumId }: AlbumDetailsProps) => {
         <div className="media-overview-left">
           <TrackList
             albumId={data.id}
+            follow={refreshIntervalHelper<MusicAlbumDetails>(watch)(data)}
             downloads={data.mediaInfo?.downloadStatus}
             songsOf={
               canRequest && currentSettings.musicSongs

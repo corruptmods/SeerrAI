@@ -10,6 +10,7 @@ import {
   getRequestDownloadStatus,
   refreshIntervalHelper,
   watchMedia,
+  watchMusic,
   watchRequest,
 } from './refreshIntervalHelper';
 
@@ -255,5 +256,34 @@ describe('watching a request', () => {
       }),
       5_000
     );
+  });
+});
+
+describe('watching an album or artist', () => {
+  const follow = refreshIntervalHelper(watchMusic);
+
+  it('checks often while downloading', () => {
+    assert.equal(
+      follow({
+        status: MediaStatus.PROCESSING,
+        downloads: [createDownloadItem({ downloadId: 'a' })],
+      }),
+      5_000
+    );
+  });
+
+  it('keeps checking while it is on its way or here only in part', () => {
+    assert.equal(follow({ status: MediaStatus.PROCESSING }), 30_000);
+    assert.equal(follow({ status: MediaStatus.PARTIALLY_AVAILABLE }), 30_000);
+    assert.equal(
+      follow({ status: MediaStatus.UNKNOWN, onItsWay: true }),
+      30_000
+    );
+  });
+
+  it('leaves one that is here, or not asked for, alone', () => {
+    assert.equal(follow({ status: MediaStatus.AVAILABLE }), 0);
+    assert.equal(follow({ status: MediaStatus.UNKNOWN }), 0);
+    assert.equal(follow({}), 0);
   });
 });

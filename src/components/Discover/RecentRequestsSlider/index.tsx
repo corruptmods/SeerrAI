@@ -34,6 +34,16 @@ const RecentRequestsSlider = ({ music = false }: { music?: boolean }) => {
       }`,
       {
         revalidateOnMount: true,
+        // A playlist's songs move along in the background: its card is
+        // followed while any are still to come. Each request's own card
+        // follows itself.
+        refreshInterval: (latest) =>
+          music &&
+          latest?.playlists?.some(
+            (group) => group.onTheWay + group.approval + group.waiting > 0
+          )
+            ? 15_000
+            : 0,
       }
     );
 

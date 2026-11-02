@@ -1,16 +1,19 @@
+import Badge from '@app/components/Common/Badge';
 import CachedImage from '@app/components/Common/CachedImage';
 import MusicImage from '@app/components/Music/MusicImage';
+import MusicStatusBadge from '@app/components/Music/MusicStatusBadge';
 import useNearScreen, { NearScreen } from '@app/hooks/useNearScreen';
 import { Permission, useUser } from '@app/hooks/useUser';
+import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
 import { albumCoverUrl } from '@server/api/coverartarchive';
+import { MediaStatus } from '@server/constants/media';
 import type { PlaylistRequestGroup } from '@server/interfaces/api/requestInterfaces';
 import Link from 'next/link';
 import { useIntl } from 'react-intl';
 
 const messages = defineMessages('components.RequestCard.PlaylistRequestCard', {
-  playlist: 'Playlist',
-  aPlaylist: 'A playlist',
+  playlistImport: 'Playlist import',
   songs: '{count, plural, one {# song} other {# songs}}',
   here: '{count} here',
   onTheWay: '{count} on the way',
@@ -18,6 +21,27 @@ const messages = defineMessages('components.RequestCard.PlaylistRequestCard', {
   waiting: '{count} still to request',
   failed: '{count} couldn’t be downloaded',
 });
+
+/**
+ * Where a playlist's songs stand, as one pill, as a request's: here, partly
+ * here, on their way, waiting for approval, or failed when every song
+ * requested failed.
+ */
+export const playlistStatus = (
+  group: Pick<
+    PlaylistRequestGroup,
+    'here' | 'onTheWay' | 'approval' | 'waiting' | 'failed'
+  >
+): MediaStatus | 'failed' => {
+  if (group.here > 0) {
+    return group.onTheWay + group.approval + group.waiting > 0
+      ? MediaStatus.PARTIALLY_AVAILABLE
+      : MediaStatus.AVAILABLE;
+  }
+  if (group.onTheWay > 0) return MediaStatus.PROCESSING;
+  if (group.approval > 0 || group.waiting > 0) return MediaStatus.PENDING;
+  return group.failed > 0 ? 'failed' : MediaStatus.PENDING;
+};
 
 /**
  * The song requests made from one playlist, as one card in a row of
@@ -28,7 +52,7 @@ const PlaylistRequestCard = ({ group }: { group: PlaylistRequestGroup }) => {
   const { hasPermission } = useUser();
   const { ref, nearness } = useNearScreen();
   // Lists are private: someone who can't open it goes to the requests.
-  const href = group.name
+  const href = group.canOpen
     ? `/lists/${group.listId}`
     : `/users/${group.requestedBy.id}/requests`;
   const progress = (
@@ -46,6 +70,7 @@ const PlaylistRequestCard = ({ group }: { group: PlaylistRequestGroup }) => {
     // A part written in lower case may come first.
     .replace(/^./, (first) => first.toLocaleUpperCase(intl.locale));
   const covers = group.albums.slice(0, 4);
+  const status = playlistStatus(group);
 
   return (
     // As tall as a film's or a series' card, whose poster is 2:3.
@@ -75,14 +100,15 @@ const PlaylistRequestCard = ({ group }: { group: PlaylistRequestGroup }) => {
         </div>
       )}
       <div className="relative z-10 flex min-w-0 flex-1 flex-col pr-4">
+        {/* The playlist's own name stays on its page. */}
         <div className="truncate text-xs font-medium text-strong">
-          {intl.formatMessage(messages.playlist)}
+          {intl.formatMessage(messages.songs, { count: group.songs })}
         </div>
         <Link
           href={href}
           className="line-clamp-2 whitespace-normal break-words text-base font-bold leading-tight text-strong hover:underline sm:text-lg sm:leading-snug"
         >
-          {group.name ?? intl.formatMessage(messages.aPlaylist)}
+          {intl.formatMessage(messages.playlistImport)}
         </Link>
         {hasPermission([Permission.MANAGE_REQUESTS, Permission.REQUEST_VIEW], {
           type: 'or',
@@ -108,12 +134,25 @@ const PlaylistRequestCard = ({ group }: { group: PlaylistRequestGroup }) => {
             </Link>
           </div>
         )}
-        <div className="mt-1 text-sm font-semibold text-strong">
-          {intl.formatMessage(messages.songs, { count: group.songs })}
-        </div>
+        {/* As a music request's albums and songs: on a phone, the status
+            alone, so the card is as tall as the others in the row. */}
         {progress && (
-          <div className="mt-0.5 whitespace-normal text-sm">{progress}</div>
+          <div className="my-0.5 hidden whitespace-normal text-sm sm:my-1 sm:block">
+            {progress}
+          </div>
         )}
+        <div className="mt-2 flex items-center text-sm sm:mt-1">
+          <span className="mr-2 hidden font-bold sm:block">
+            {intl.formatMessage(globalMessages.status)}
+          </span>
+          {status === 'failed' ? (
+            <Badge badgeType="danger" href={href}>
+              {intl.formatMessage(globalMessages.failed)}
+            </Badge>
+          ) : (
+            <MusicStatusBadge status={status} plain />
+          )}
+        </div>
       </div>
       <Link
         href={href}

@@ -43,9 +43,14 @@ const PRECACHE_CONCURRENCY = 3;
 const SESSION_CHANGES =
   /^\/api\/v1\/auth\/(local|plex|jellyfin|jellyfin\/quickconnect\/authenticate|passkey\/login|logout|oidc\/[^/]+\/(sign-in|link|callback))$/;
 
-/** Rows of a person's own music, which change as their requests are made. */
-const PERSONAL_MUSIC_ROWS =
-  /^\/api\/v1\/discover\/music\/(your-requests|more-from-your-artists|artists-like-yours)$/;
+/**
+ * The music someone asked for, which a playlist import adds to in the
+ * background. The rows made from it (more from their artists, artists like
+ * theirs) are slower to make and change little, and are kept like the rest.
+ */
+const OWN_MUSIC_REQUESTS = /^\/api\/v1\/discover\/music\/your-requests$/;
+/** How long the server has to answer before the stored copy is shown. */
+const OWN_MUSIC_WAIT_MS = 3000;
 
 /** Changes after which the cached Discover rows are out of date. */
 const DISCOVER_CHANGES =
@@ -410,14 +415,15 @@ const staleWhileRevalidate = async (
 };
 
 /**
- * The network first, the stored copy only when it can't be reached: for
- * rows that change without the page doing anything, such as the music
- * someone asked for, which a playlist import requests in the background.
+ * The network first, the stored copy only when it can't be reached in
+ * time: for rows that change without the page doing anything, such as the
+ * music someone asked for, which a playlist import requests in the
+ * background.
  */
-const networkFirst = async (request, cacheName, maxEntries) => {
+const networkFirst = async (request, cacheName, maxEntries, timeoutMs) => {
   const cache = await caches.open(cacheName);
   try {
-    const response = await fetchWithTimeout(request);
+    const response = await fetchWithTimeout(request, timeoutMs);
     if (
       response.ok &&
       response.type !== 'opaqueredirect' &&
@@ -603,12 +609,17 @@ self.addEventListener('fetch', (event) => {
     // and each can take seconds while the server looks titles up: caching it
     // only pushes real rows out of the cache, and a timeout here would cut it
     // off. Both go straight to the network.
-    // Each person's own music rows follow what they asked for, which a
-    // playlist import requests on the server, with no call from the page to
-    // empty the cache: shown from the server, the stored copy only offline.
-    if (PERSONAL_MUSIC_ROWS.test(url.pathname)) {
+    // The music someone asked for follows what a playlist import requests
+    // on the server, with no call from the page to empty the cache: shown
+    // from the server, the stored copy only when it is slow or offline.
+    if (OWN_MUSIC_REQUESTS.test(url.pathname)) {
       event.respondWith(
-        networkFirst(request, DISCOVER_CACHE, DISCOVER_CACHE_MAX_ENTRIES)
+        networkFirst(
+          request,
+          DISCOVER_CACHE,
+          DISCOVER_CACHE_MAX_ENTRIES,
+          OWN_MUSIC_WAIT_MS
+        )
       );
       return;
     }

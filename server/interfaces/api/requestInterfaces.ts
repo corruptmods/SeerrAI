@@ -19,8 +19,8 @@ export interface RequestResultsResponse extends PaginatedResponse {
 /** The song requests made from one playlist, shown as one. */
 export interface PlaylistRequestGroup {
   listId: number;
-  /** The playlist's name, when this person may open it. */
-  name?: string;
+  /** This person may open the playlist (lists are private). */
+  canOpen: boolean;
   /** Who linked it, whose requests these are. */
   requestedBy: { id: number; displayName: string; avatar: string };
   /** Songs on it. */

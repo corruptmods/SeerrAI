@@ -15411,9 +15411,9 @@ paths:
                       properties:
                         listId:
                           type: integer
-                        name:
-                          type: string
-                          description: Only when the person may open the list
+                        canOpen:
+                          type: boolean
+                          description: Whether the person may open the playlist
                         requestedBy:
                           type: object
                         songs:

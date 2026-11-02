@@ -1608,6 +1608,24 @@ describe('Discover’s music rows', () => {
     );
   });
 
+  it('show an album with songs taken from it, newest first', async () => {
+    await seedMusicFixtures();
+    await getRepository(MusicAlbum).update(
+      { mbId: IDS.otherAlbum },
+      { status: MediaStatus.PARTIALLY_AVAILABLE, mediaAddedAt: new Date() }
+    );
+    const { body } = await get('/discover/music/recently-added');
+    assert.deepEqual(
+      (body as { results: { id: string; status: MediaStatus }[] }).results.map(
+        (a) => [a.id, a.status]
+      ),
+      [
+        [IDS.otherAlbum, MediaStatus.PARTIALLY_AVAILABLE],
+        [IDS.album, MediaStatus.AVAILABLE],
+      ]
+    );
+  });
+
   it('answer a page far past the end with nothing, not an error', async () => {
     await seedMusicFixtures();
     const { status, body } = await get(

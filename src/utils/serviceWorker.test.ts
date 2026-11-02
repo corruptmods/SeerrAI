@@ -657,6 +657,12 @@ describe('Discover rows kept on the device', () => {
 
   it('show other rows from the device first, fetched again for next time', async () => {
     const worker = loadRowWorker();
+    // Rows made from someone's music are slower to make: kept as the rest.
+    const like = '/api/v1/discover/music/artists-like-yours?page=1';
+    assert.equal(await worker.row(like), 1);
+    worker.server.rows = 2;
+    assert.equal(await worker.row(like), 1);
+    worker.server.rows = 1;
     const top = '/api/v1/discover/music/top-songs?page=1';
     assert.equal(await worker.row(top), 1);
     worker.server.rows = 2;

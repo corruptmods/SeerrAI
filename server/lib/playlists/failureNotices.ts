@@ -1,7 +1,7 @@
 import { albumCoverUrl } from '@server/api/coverartarchive';
 import { MediaRequestStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
-import { MediaList, MediaListSong } from '@server/entity/MediaList';
+import { MediaListSong } from '@server/entity/MediaList';
 import type { MediaRequest } from '@server/entity/MediaRequest';
 import SongRequest from '@server/entity/SongRequest';
 import { claimDelivery } from '@server/lib/notificationDelivery';
@@ -79,9 +79,6 @@ export const notifyPlaylistFailures = async (
     if (!claimed.length) continue;
 
     try {
-      const list = await getRepository(MediaList).findOne({
-        where: { id: listId },
-      });
       const songs = await getRepository(SongRequest).find({
         where: {
           request: { id: In(claimed.map((r) => r.id)) },
@@ -97,7 +94,8 @@ export const notifyPlaylistFailures = async (
       const first = claimed[0];
       notificationManager.sendNotification(Notification.MEDIA_FAILED, {
         ...mediaEvent(Notification.MEDIA_FAILED, MediaType.MUSIC, false),
-        subject: `${list?.name ?? 'A playlist'} — ${
+        // The playlist's own name stays on its page.
+        subject: `Playlist import — ${
           count
             ? `${count} ${count === 1 ? 'song' : 'songs'}`
             : `${claimed.length} ${claimed.length === 1 ? 'request' : 'requests'}`
@@ -116,10 +114,7 @@ export const notifyPlaylistFailures = async (
         notifySystem: true,
         notifyUser: first.requesterMuted ? undefined : first.requestedBy,
         actionUrl: `/lists/${listId}`,
-        extra: [
-          ...(list ? [{ name: 'Playlist', value: list.name }] : []),
-          ...(count ? [{ name: 'Failed Songs', value: String(count) }] : []),
-        ],
+        extra: count ? [{ name: 'Failed Songs', value: String(count) }] : [],
       });
     } catch (e) {
       logger.error('Could not tell a playlist’s failed songs', {

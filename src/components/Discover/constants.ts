@@ -81,6 +81,7 @@ export const sliderTitles = defineMessages('components.Discover', {
   networks: 'Networks',
   anime: 'Anime This Season',
   musicRecentlyAdded: 'Recently Added Music',
+  musicRecentRequests: 'Recent Music Requests',
   musicNewReleases: 'New Music',
   musicTopSongs: 'Top Songs',
   musicTrending: 'Trending Songs',

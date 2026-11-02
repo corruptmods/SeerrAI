@@ -6,7 +6,11 @@ import { VARIOUS_ARTISTS_MBID } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import MusicMetadata from '@server/entity/MusicMetadata';
 import type { Song } from '@server/lib/music/songs';
-import { groupSongs, normalizeTitle } from '@server/lib/music/songs';
+import {
+  groupSongs,
+  normalizeTitle,
+  splitTitle,
+} from '@server/lib/music/songs';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { In } from 'typeorm';
@@ -124,11 +128,14 @@ export const plainName = (name: string): string =>
 
 /**
  * Apple's song title without what only credits someone: "Song (feat. B)"
- * is the song "Song".
+ * and "Song (duet with B)" are the song "Song".
  */
 export const chartSongTitle = (name: string): string =>
   name
-    .replace(/\s*[([](?:feat\.?|ft\.?|featuring|with)\s[^)\]]*[)\]]/gi, '')
+    .replace(
+      /\s*[([](?:feat\.?|ft\.?|featuring|(?:duet\s+)?with)\s[^)\]]*[)\]]/gi,
+      ''
+    )
     .trim() || name;
 
 /**
@@ -203,18 +210,40 @@ export const songNamed = async (
   const artist = await artistFor(artistName);
   if (!artist) return null;
   const title = chartSongTitle(name);
-  const found = await musicBrainz().searchRecordings(
-    title,
-    [artist.id],
-    { limit: 50 },
-    'background'
-  );
-  const songs = groupSongs(found.recordings ?? [], title, [artist.id], {
-    songs: 5,
-    versions: 5,
-  });
-  const wanted = plainName(title);
-  return songs.find((song) => plainName(song.title) === wanted) ?? null;
+  // Songs are grouped under their title without what names a version
+  // ("Song (Tide Me Over)", "Song [Remix]" are "Song"), so that is what is
+  // looked for; the rest picks the version below.
+  const { songTitle } = splitTitle(title);
+  const wanted = plainName(songTitle);
+  let song: Song | undefined;
+  // MusicBrainz's search drops "&" but keeps "and": "Salt & Sand" is
+  // only found as "Salt Sand", and the other way round.
+  for (const phrase of [
+    ...new Set([
+      songTitle,
+      songTitle.replace(/\s+(?:&|and)\s+/gi, ' '),
+      songTitle.replace(/\s+&\s+/g, ' and '),
+    ]),
+  ]) {
+    const found = await musicBrainz().searchRecordings(
+      phrase,
+      [artist.id],
+      { limit: 50 },
+      'background'
+    );
+    song = groupSongs(found.recordings ?? [], songTitle, [artist.id], {
+      songs: 5,
+      versions: 5,
+    }).find((s) => plainName(s.title) === wanted);
+    if (song) break;
+  }
+  if (!song) return null;
+  // The version the title names, when some are titled just so.
+  const full = plainName(title);
+  const named = song.versions.filter((v) => plainName(v.title) === full);
+  return named.length && named.length < song.versions.length
+    ? { ...song, versions: named }
+    : song;
 };
 
 /** The song on a chart, among its artist's recordings. */

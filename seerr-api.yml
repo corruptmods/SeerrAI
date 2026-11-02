@@ -15380,6 +15380,15 @@ paths:
             nullable: true
             default: all
             example: movie,tv
+        - in: query
+          name: playlists
+          description: >-
+            "group" leaves out song requests made from a playlist, and lists
+            each playlist they came from once under `playlists`, newest
+            first: as many as `take`.
+          schema:
+            type: string
+            enum: [group]
       responses:
         '200':
           description: Requests returned
@@ -15394,6 +15403,35 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/MediaRequest'
+                  playlists:
+                    type: array
+                    description: With playlists=group, one entry per playlist whose song requests were left out.
+                    items:
+                      type: object
+                      properties:
+                        listId:
+                          type: integer
+                        name:
+                          type: string
+                          description: Only when the person may open the list
+                        requestedBy:
+                          type: object
+                        songs:
+                          type: integer
+                        here:
+                          type: integer
+                        onTheWay:
+                          type: integer
+                        approval:
+                          type: integer
+                        waiting:
+                          type: integer
+                        albums:
+                          type: array
+                          items:
+                            type: string
+                        latestAt:
+                          type: string
     post:
       summary: Create new request
       description: |

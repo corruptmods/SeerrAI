@@ -39,6 +39,8 @@ export enum DiscoverSliderType {
   MUSIC_POPULAR_ARTISTS,
   MUSIC_TOP_SONGS,
   MUSIC_TRENDING,
+  /** Music's own Recent Requests, a playlist import as one card. */
+  MUSIC_RECENT_REQUESTS,
 }
 
 /** Music's rows, which only show once music is ready. */
@@ -49,6 +51,7 @@ export const MUSIC_SLIDERS: readonly DiscoverSliderType[] = [
   DiscoverSliderType.MUSIC_POPULAR_ARTISTS,
   DiscoverSliderType.MUSIC_TOP_SONGS,
   DiscoverSliderType.MUSIC_TRENDING,
+  DiscoverSliderType.MUSIC_RECENT_REQUESTS,
 ];
 
 export const defaultSliders: Partial<DiscoverSlider>[] = [
@@ -150,35 +153,43 @@ export const defaultSliders: Partial<DiscoverSlider>[] = [
     isBuiltIn: true,
     order: 15,
   },
+  // Music requests apart from films' and series': a playlist import's
+  // songs would fill Recent Requests.
+  {
+    type: DiscoverSliderType.MUSIC_RECENT_REQUESTS,
+    enabled: true,
+    isBuiltIn: true,
+    order: 16,
+  },
   {
     type: DiscoverSliderType.MUSIC_NEW_RELEASES,
     enabled: true,
     isBuiltIn: true,
-    order: 16,
+    order: 17,
   },
   // The charts' songs before their albums and artists.
   {
     type: DiscoverSliderType.MUSIC_TOP_SONGS,
     enabled: true,
     isBuiltIn: true,
-    order: 17,
+    order: 18,
   },
   {
     type: DiscoverSliderType.MUSIC_TRENDING,
     enabled: true,
     isBuiltIn: true,
-    order: 18,
+    order: 19,
   },
   {
     type: DiscoverSliderType.MUSIC_POPULAR_ALBUMS,
     enabled: true,
     isBuiltIn: true,
-    order: 19,
+    order: 20,
   },
   {
     type: DiscoverSliderType.MUSIC_POPULAR_ARTISTS,
     enabled: true,
     isBuiltIn: true,
-    order: 20,
+    order: 21,
   },
 ];

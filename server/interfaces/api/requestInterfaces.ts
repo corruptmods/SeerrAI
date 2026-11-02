@@ -12,6 +12,30 @@ export interface RequestResultsResponse extends PaginatedResponse {
     radarr: { id: number; name: string }[];
     sonarr: { id: number; name: string }[];
   };
+  /** With playlists=group: the playlists whose requests were left out. */
+  playlists?: PlaylistRequestGroup[];
+}
+
+/** The song requests made from one playlist, shown as one. */
+export interface PlaylistRequestGroup {
+  listId: number;
+  /** The playlist's name, when this person may open it. */
+  name?: string;
+  /** Who linked it, whose requests these are. */
+  requestedBy: { id: number; displayName: string; avatar: string };
+  /** Songs on it. */
+  songs: number;
+  here: number;
+  /** Requested, on their way. */
+  onTheWay: number;
+  /** Waiting for an admin's approval. */
+  approval: number;
+  /** Not requested yet: being found, or waiting on the person's limit. */
+  waiting: number;
+  /** Album ids, for covers on its card. */
+  albums: string[];
+  /** When its latest request was made. */
+  latestAt: string;
 }
 
 export type MediaRequestBody = {

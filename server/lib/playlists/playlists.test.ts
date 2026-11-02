@@ -8,9 +8,14 @@ import { MediaRequestStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import { MediaList, MediaListSong } from '@server/entity/MediaList';
 import { MediaRequest } from '@server/entity/MediaRequest';
+import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
 import playlists, { versionFor } from '@server/lib/playlists';
+import {
+  playlistRequestGroups,
+  withoutPlaylistRequests,
+} from '@server/lib/playlists/requestGroups';
 import {
   parsePlaylistLink,
   readApplePage,
@@ -429,5 +434,61 @@ describe('a linked playlist', () => {
       playlists.link(list, 'https://example.com/x', user),
       /isn’t a link to a Spotify or Apple Music playlist/
     );
+  });
+});
+
+describe('a playlist’s songs as they are got', () => {
+  it('each follow their own part of the request', async () => {
+    const list = await linked();
+    const [request] = await getRepository(MediaRequest).find();
+    // Lidarr couldn't get one song: the request fails, the other goes on.
+    await getRepository(MediaRequest).update(request.id, {
+      status: MediaRequestStatus.FAILED,
+    });
+    await getRepository(SongRequest).update(
+      { recordingMbid: LANTERN },
+      { status: MediaRequestStatus.FAILED }
+    );
+    await getRepository(SongRequest).update(
+      { recordingMbid: NIGHT_SWIM },
+      { status: MediaRequestStatus.APPROVED }
+    );
+    assert.deepEqual(await songsOf(list), {
+      'Lantern Song': 'failed',
+      'Night Swim': 'requested',
+      'Unheard Tune': 'unmatched',
+    });
+  });
+});
+
+describe('a playlist’s requests in a row of requests', () => {
+  const requests = () =>
+    getRepository(MediaRequest).createQueryBuilder('request');
+
+  it('are shown once, for their playlist', async () => {
+    const list = await linked();
+    assert.equal(await withoutPlaylistRequests(requests()).getCount(), 0);
+
+    const [group, ...rest] = await playlistRequestGroups(requests(), user, 10);
+    assert.deepEqual(rest, []);
+    assert.equal(group.listId, list.id);
+    assert.equal(group.name, 'Drives');
+    assert.equal(group.requestedBy.id, user.id);
+    assert.equal(group.songs, 3);
+    assert.equal(group.approval, 2);
+    assert.equal(group.waiting, 0);
+    assert.deepEqual(group.albums, [LANTERN_SINGLE, NIGHT_SWIM_SINGLE]);
+
+    // Someone who can't open the list sees it without its name.
+    const other = await getRepository(User).save(
+      new User({
+        email: `pl-other-${Math.random()}@test.local`,
+        avatar: '',
+        permissions: Permission.ADMIN,
+      })
+    );
+    const [seen] = await playlistRequestGroups(requests(), other, 10);
+    assert.equal(seen.listId, list.id);
+    assert.equal(seen.name, undefined);
   });
 });

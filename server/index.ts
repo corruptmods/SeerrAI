@@ -12,6 +12,7 @@ import resourceMonitor from '@server/lib/containerResources';
 import { stylePolicy } from '@server/lib/customCss';
 import { splitEmbyData } from '@server/lib/embySplit';
 import { isConnected, rememberJellyfinAdmins } from '@server/lib/mediaServers';
+import { musicReady } from '@server/lib/music/access';
 import notificationManager from '@server/lib/notifications';
 import DiscordAgent from '@server/lib/notifications/agents/discord';
 import EmailAgent from '@server/lib/notifications/agents/email';
@@ -24,6 +25,7 @@ import TelegramAgent from '@server/lib/notifications/agents/telegram';
 import WebhookAgent from '@server/lib/notifications/agents/webhook';
 import WebPushAgent from '@server/lib/notifications/agents/webpush';
 import checkOverseerrMerge from '@server/lib/overseerrMerge';
+import playlists from '@server/lib/playlists';
 import { sessionStoreFor } from '@server/lib/sessionStore';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -211,6 +213,11 @@ app
         })
       );
       startJobs();
+      // Playlist songs still to be found or requested carry on where the
+      // restart left them, rather than at the next hourly sync.
+      if (musicReady()) {
+        playlists.kick();
+      }
       // The admin agent picks up its queue and hears of empty searches.
       agent.init().catch((e) =>
         logger.error('The admin agent could not start', {

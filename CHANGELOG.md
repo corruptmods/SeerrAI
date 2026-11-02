@@ -11,10 +11,15 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Changed
 
+- **Music has its own Recent Music Requests row**, with the music rows, so Recent Requests keeps to films and series. A playlist import shows there as one card, with how its songs are getting on, instead of a card per artist.
 - **Notifications that ask for an approval open at it**: a pack waiting for approval opens its title's Backfill page at the plan, with that pack on show; several titles' packs, at Backfill's Awaiting approval; the admin agent asking for approval, at its proposal; asking a question, at the conversation and the box to answer in.
 
 ### Fixed
 
+- Playlist songs with a part in brackets, such as "Song (Tide Me Over)" or "Song [Remix]", were all "Not found", however well MusicBrainz knew them. They're found now, the version named included, and songs already marked are looked for again on update. "(duet with …)" and "and" where MusicBrainz has "&" are found too.
+- A playlist song showed "Can't be requested" when another song in the same request failed; each now shows its own state.
+- Your Music Requests on the Music page showed what it had last time until the page was reloaded.
+- Finding and requesting a playlist's songs carries on straight after a restart, not at the next hourly sync.
 - A season Sonarr stopped looking for, with nothing downloaded, no longer stays Processing. Its request drops that season, so it can be requested again, or is declined if every season it asked for was dropped. With several Sonarr servers, a season one of them still downloads is left alone. (From Seerr.)
 
 ## 2.3.1 (1 November 2026)

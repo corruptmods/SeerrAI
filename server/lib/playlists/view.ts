@@ -81,11 +81,24 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
   ];
   const requests = requestIds.length
     ? await getRepository(MediaRequest).find({
-        select: { id: true, status: true },
+        select: {
+          id: true,
+          status: true,
+          songs: { id: true, recordingMbid: true, status: true },
+        },
+        relations: { songs: true },
         where: { id: In(requestIds) },
       })
     : [];
-  const statusOf = new Map(requests.map((r) => [r.id, r.status]));
+  // Each song by its own part of the request: one song Lidarr couldn't get
+  // fails the request, not the others in it, still on their way.
+  const statusOf = (song: MediaListSong) => {
+    const request = requests.find((r) => r.id === song.requestId);
+    return (
+      request?.songs?.find((s) => s.recordingMbid === song.recordingMbid)
+        ?.status ?? request?.status
+    );
+  };
   return {
     sourceUrl: list.sourceUrl ?? null,
     sourceService: list.sourceService ?? null,
@@ -100,10 +113,7 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
       artistMbid: song.artistMbid ?? null,
       recordingMbid: song.recordingMbid ?? null,
       albumMbid: song.albumMbid ?? null,
-      state: shownState(
-        song,
-        song.requestId ? statusOf.get(song.requestId) : undefined
-      ),
+      state: shownState(song, song.requestId ? statusOf(song) : undefined),
       problem: song.state === 'failed' ? (song.problem ?? null) : null,
     })),
   };

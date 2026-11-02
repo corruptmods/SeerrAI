@@ -47,6 +47,10 @@ import { getNotificationChannels } from '@server/lib/notificationChannels';
 import { releaseDelivery } from '@server/lib/notificationDelivery';
 import { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
+import {
+  playlistRequestGroups,
+  withoutPlaylistRequests,
+} from '@server/lib/playlists/requestGroups';
 import { defaultRegion, estimateRequest } from '@server/lib/requestEta';
 import { requestMissing } from '@server/lib/requestMissing';
 import {
@@ -324,6 +328,15 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
         mediaTypes: mediaTypes.length ? mediaTypes : listedTypes,
       });
 
+      // A playlist import's many requests, as one each.
+      const playlists =
+        req.query.playlists === 'group' && req.user
+          ? await playlistRequestGroups(query, req.user, pageSize)
+          : undefined;
+      if (playlists) {
+        query = withoutPlaylistRequests(query);
+      }
+
       const [requests, requestCount] = await query
         .orderBy(sortFilter, sortDirection)
         .addOrderBy('request.id', sortDirection)
@@ -431,6 +444,7 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
           page: Math.ceil(skip / pageSize) + 1,
         },
         results: mappedRequests,
+        ...(playlists ? { playlists } : {}),
         serviceErrors: {
           radarr: radarrServers
             .filter((s) => !s.profiles)

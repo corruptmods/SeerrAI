@@ -43,6 +43,10 @@ const PRECACHE_CONCURRENCY = 3;
 const SESSION_CHANGES =
   /^\/api\/v1\/auth\/(local|plex|jellyfin|jellyfin\/quickconnect\/authenticate|passkey\/login|logout|oidc\/[^/]+\/(sign-in|link|callback))$/;
 
+/** Rows of a person's own music, which change as their requests are made. */
+const PERSONAL_MUSIC_ROWS =
+  /^\/api\/v1\/discover\/music\/(your-requests|more-from-your-artists|artists-like-yours)$/;
+
 /** Changes after which the cached Discover rows are out of date. */
 const DISCOVER_CHANGES =
   /^\/api\/v1\/(request|media|blocklist|watchlist)(\/|$)/;
@@ -406,6 +410,35 @@ const staleWhileRevalidate = async (
 };
 
 /**
+ * The network first, the stored copy only when it can't be reached: for
+ * rows that change without the page doing anything, such as the music
+ * someone asked for, which a playlist import requests in the background.
+ */
+const networkFirst = async (request, cacheName, maxEntries) => {
+  const cache = await caches.open(cacheName);
+  try {
+    const response = await fetchWithTimeout(request);
+    if (
+      response.ok &&
+      response.type !== 'opaqueredirect' &&
+      (await readsAsJson(response))
+    ) {
+      await cache.put(request, response.clone());
+      if (maxEntries) {
+        trimCache(cacheName, maxEntries);
+      }
+    }
+    return response;
+  } catch (e) {
+    const cached = await cache.match(request);
+    if (cached && (await readsAsJson(cached))) {
+      return cached;
+    }
+    throw e;
+  }
+};
+
+/**
  * Whether a stored copy may still be served as it is. Most never go out of
  * date: immutable ones, and those the server gave no lifetime. One the server
  * said can change at its address (an album's cover, which picture stands for
@@ -570,6 +603,16 @@ self.addEventListener('fetch', (event) => {
     // and each can take seconds while the server looks titles up: caching it
     // only pushes real rows out of the cache, and a timeout here would cut it
     // off. Both go straight to the network.
+    // Each person's own music rows follow what they asked for, which a
+    // playlist import requests on the server, with no call from the page to
+    // empty the cache: shown from the server, the stored copy only offline.
+    if (PERSONAL_MUSIC_ROWS.test(url.pathname)) {
+      event.respondWith(
+        networkFirst(request, DISCOVER_CACHE, DISCOVER_CACHE_MAX_ENTRIES)
+      );
+      return;
+    }
+
     if (
       url.pathname.startsWith('/api/v1/discover/') &&
       url.pathname !== '/api/v1/discover/watchlist' &&

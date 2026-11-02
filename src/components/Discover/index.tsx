@@ -425,6 +425,13 @@ const Discover = () => {
           case DiscoverSliderType.RECENT_REQUESTS:
             sliderComponent = <RecentRequestsSlider />;
             break;
+          case DiscoverSliderType.MUSIC_RECENT_REQUESTS:
+            // Music's, for people with music on; not there for anyone else.
+            if (!featureIsOn('music')) {
+              return null;
+            }
+            sliderComponent = <RecentRequestsSlider music />;
+            break;
           case DiscoverSliderType.PLEX_WATCHLIST:
             sliderComponent = <PlexWatchlistSlider />;
             break;

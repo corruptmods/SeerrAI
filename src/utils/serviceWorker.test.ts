@@ -573,3 +573,94 @@ describe('Discover rows after a sign-in or sign-out', () => {
     }
   });
 });
+
+/*
+ * Discover rows: the worker with a cache standing in for the browser's, and
+ * a server whose answer each test sets (or that can't be reached).
+ */
+const loadRowWorker = () => {
+  const handlers: Record<string, Handler> = {};
+  const stored = new Map<string, Response>();
+  const server = { rows: 1, offline: false };
+  const urlOf = (request: Request | string) =>
+    typeof request === 'string' ? new URL(request, ORIGIN).href : request.url;
+  const cache = {
+    match: async (request: Request) => stored.get(urlOf(request))?.clone(),
+    put: async (request: Request, response: Response) => {
+      stored.set(urlOf(request), response);
+    },
+    keys: async () => [...stored.keys()].map((url) => new Request(url)),
+    delete: async (request: Request) => stored.delete(urlOf(request)),
+  };
+
+  class WorkerRequest extends Request {
+    constructor(input: string, init?: RequestInit) {
+      super(new URL(input, ORIGIN), init);
+    }
+  }
+
+  runInNewContext(source, {
+    self: {
+      location: { origin: ORIGIN },
+      addEventListener: (type: string, handler: Handler) => {
+        handlers[type] = handler;
+      },
+    },
+    clients: { matchAll: async () => [], openWindow: async () => null },
+    caches: { open: async () => cache },
+    navigator: {},
+    Request: WorkerRequest,
+    Response,
+    URL,
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    fetch: async () => {
+      if (server.offline) throw new TypeError('Failed to fetch');
+      return new Response(JSON.stringify({ results: server.rows }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  });
+
+  /** The page asking for a row: what it is handed, once all is stored. */
+  const row = async (path: string) => {
+    let response: Promise<Response> | undefined;
+    const waits: Promise<unknown>[] = [];
+    handlers.fetch({
+      request: new WorkerRequest(path),
+      respondWith: (promise: Promise<Response>) => {
+        response = promise;
+      },
+      waitUntil: (promise: Promise<unknown>) => waits.push(promise),
+    });
+    const shown = await (await response!).json();
+    await Promise.all(waits);
+    return shown.results;
+  };
+
+  return { row, server };
+};
+
+describe('Discover rows kept on the device', () => {
+  it('show someone’s own music as it is now, requested in the background', async () => {
+    const worker = loadRowWorker();
+    const yours = '/api/v1/discover/music/your-requests?page=1';
+    assert.equal(await worker.row(yours), 1);
+    // A playlist import requested more on the server; nothing on the page.
+    worker.server.rows = 2;
+    assert.equal(await worker.row(yours), 2);
+    // Offline, the last copy.
+    worker.server.offline = true;
+    assert.equal(await worker.row(yours), 2);
+  });
+
+  it('show other rows from the device first, fetched again for next time', async () => {
+    const worker = loadRowWorker();
+    const top = '/api/v1/discover/music/top-songs?page=1';
+    assert.equal(await worker.row(top), 1);
+    worker.server.rows = 2;
+    assert.equal(await worker.row(top), 1);
+    assert.equal(await worker.row(top), 2);
+  });
+});

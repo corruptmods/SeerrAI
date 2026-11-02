@@ -38,6 +38,10 @@ describe('a chart’s names', () => {
       chartSongTitle('Ferry Lights [with Somebody]'),
       'Ferry Lights'
     );
+    assert.equal(
+      chartSongTitle('Ferry Lights (duet with Somebody)'),
+      'Ferry Lights'
+    );
     assert.equal(chartSongTitle('Ferry Lights (Live)'), 'Ferry Lights (Live)');
   });
 
@@ -96,5 +100,107 @@ describe('matches held in memory', () => {
       assert.equal(await songNamed('Ferry Lights', `Act number ${n}`), null);
     }
     assert.equal(chartMatchesHeld(), MOST_HELD);
+  });
+});
+
+describe('a song a playlist names', () => {
+  const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
+  const recording = (id: string, title: string, length: number) => ({
+    id,
+    title,
+    length,
+    'artist-credit': [
+      { name: 'Glasswing', artist: { id: ARTIST, name: 'Glasswing' } },
+    ],
+    releases: [
+      {
+        id: `${id.slice(0, 30)}r1`,
+        title,
+        status: 'Official',
+        date: '2011-08-09',
+        'release-group': {
+          id: `${id.slice(0, 30)}g1`,
+          title,
+          'primary-type': 'Single',
+          'secondary-types': [],
+        },
+      },
+    ],
+  });
+  const RECORDINGS = [
+    recording(
+      'a1b2c3d4-0001-4000-8000-000000000001',
+      'Harbour Girl (Tide Me Over)',
+      226_000
+    ),
+    recording('a1b2c3d4-0002-4000-8000-000000000002', 'Glass Road', 113_000),
+    recording(
+      'a1b2c3d4-0003-4000-8000-000000000003',
+      'Glass Road (remix)',
+      157_000
+    ),
+    recording(
+      'a1b2c3d4-0004-4000-8000-000000000004',
+      'Lanterns, Salt, & Sand (The Loud One)',
+      196_000
+    ),
+  ];
+  /** MusicBrainz's phrase search: its words in a row, "&" dropped. */
+  const words = (text: string) =>
+    plainName(text.replace(/&/g, ' ')).split(' ').filter(Boolean).join(' ');
+  const asked: string[] = [];
+
+  const useMusicBrainz = () => {
+    asked.length = 0;
+    mock.method(MusicBrainz.prototype, 'searchArtists', async () => ({
+      count: 1,
+      offset: 0,
+      artists: [{ id: ARTIST, name: 'Glasswing', score: 100 }],
+    }));
+    mock.method(
+      MusicBrainz.prototype,
+      'searchRecordings',
+      async (phrase: string) => {
+        asked.push(phrase);
+        const found = RECORDINGS.filter((r) =>
+          ` ${words(r.title)} `.includes(` ${words(phrase)} `)
+        );
+        return { count: found.length, offset: 0, recordings: found };
+      }
+    );
+  };
+
+  it('is found when its title has a part in brackets', async () => {
+    useMusicBrainz();
+    const song = await songNamed('Harbour Girl (Tide Me Over)', 'Glasswing');
+    assert.equal(song?.versions[0].title, 'Harbour Girl (Tide Me Over)');
+  });
+
+  it('is the version its title names', async () => {
+    useMusicBrainz();
+    const song = await songNamed(
+      'Glass Road (feat. Somebody) [Remix]',
+      'Glasswing'
+    );
+    assert.deepEqual(
+      song?.versions.map((v) => v.title),
+      ['Glass Road (remix)']
+    );
+    // Named plainly: the version titled plainly.
+    const plain = await songNamed('Glass Road', 'Glasswing');
+    assert.deepEqual(
+      plain?.versions.map((v) => v.title),
+      ['Glass Road']
+    );
+  });
+
+  it('is found with "and" where MusicBrainz has "&"', async () => {
+    useMusicBrainz();
+    const song = await songNamed(
+      'Lanterns, Salt and Sand (The Loud One)',
+      'Glasswing'
+    );
+    assert.ok(song);
+    assert.deepEqual(asked, ['Lanterns, Salt and Sand', 'Lanterns, Salt Sand']);
   });
 });

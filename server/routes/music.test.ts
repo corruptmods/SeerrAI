@@ -1618,7 +1618,7 @@ describe('Discover’s music rows', () => {
   });
 
   it('have numbers of their own and are added after the others, on', async () => {
-    assert.deepEqual(MUSIC_SLIDERS, [25, 26, 27, 28, 29, 30]);
+    assert.deepEqual(MUSIC_SLIDERS, [25, 26, 27, 28, 29, 30, 31]);
     assert.equal(DiscoverSliderType.MUSIC_RECENTLY_ADDED, 25);
 
     // A home page from before music.
@@ -1636,10 +1636,11 @@ describe('Discover’s music rows', () => {
     const sliders = await repository.find({ order: { order: 'ASC' } });
     // The charts' songs before their albums and artists.
     assert.deepEqual(
-      sliders.slice(-7).map((s) => [s.type, s.enabled]),
+      sliders.slice(-8).map((s) => [s.type, s.enabled]),
       [
         [DiscoverSliderType.NETWORKS, true],
         [DiscoverSliderType.MUSIC_RECENTLY_ADDED, true],
+        [DiscoverSliderType.MUSIC_RECENT_REQUESTS, true],
         [DiscoverSliderType.MUSIC_NEW_RELEASES, true],
         [DiscoverSliderType.MUSIC_TOP_SONGS, true],
         [DiscoverSliderType.MUSIC_TRENDING, true],

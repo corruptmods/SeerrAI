@@ -175,6 +175,8 @@ const DiscoverSliderEdit = ({
         return intl.formatMessage(sliderTitles.anime);
       case DiscoverSliderType.MUSIC_RECENTLY_ADDED:
         return intl.formatMessage(sliderTitles.musicRecentlyAdded);
+      case DiscoverSliderType.MUSIC_RECENT_REQUESTS:
+        return intl.formatMessage(sliderTitles.musicRecentRequests);
       case DiscoverSliderType.MUSIC_NEW_RELEASES:
         return intl.formatMessage(sliderTitles.musicNewReleases);
       case DiscoverSliderType.MUSIC_TOP_SONGS:

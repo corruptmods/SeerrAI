@@ -16,6 +16,7 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- A playlist song could be matched to a version that's only on other artists' compilations, and then "couldn't be requested", though the artist's own album or single had it. Matching now picks a version that can be requested, and songs already refused this way are matched again.
 - The Requests page showed nothing with more than one status, kind or person ticked in its filters.
 - A song taken from an album whose search found no download is looked for again a few times over about two days, instead of failing at once: indexers come and go.
 - Songs from a playlist that couldn't be downloaded are told in one notification for the playlist, once they've settled, instead of one for each artist. A failure now names only the songs that failed, not every song in the request.

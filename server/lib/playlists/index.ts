@@ -17,7 +17,9 @@ import {
   NotTheArtistsSongError,
   UnrequestableSongError,
 } from '@server/lib/music/requestSongs';
+import { songFetchProblem } from '@server/lib/music/songFetchReady';
 import type { Song, SongVersion } from '@server/lib/music/songs';
+import { albumFor, singleFor } from '@server/lib/music/songs';
 import { releaseDelivery } from '@server/lib/notificationDelivery';
 import { Notification } from '@server/lib/notifications';
 import type { PlaylistLink, SourceSong } from '@server/lib/playlists/sources';
@@ -58,13 +60,27 @@ const LENGTH_SLACK_MS = 8000;
 
 export class PlaylistLinkError extends Error {}
 
-/** The version of a song a playlist means: nearest its length, else best known. */
+/**
+ * Whether a version can be requested: on a single or EP of the artist's,
+ * or, while songs may be taken from albums, on one of their albums. One
+ * only on others' compilations ("Now That's…") can't be.
+ */
+const fetchable = (version: SongVersion): boolean =>
+  !!version.releaseGroups &&
+  (!!singleFor(version) || (!songFetchProblem() && !!albumFor(version)));
+
+/**
+ * The version of a song a playlist means: nearest its length, else best
+ * known; among those that can be requested, when any can.
+ */
 export const versionFor = (
   song: Song,
   length: number | null | undefined
 ): SongVersion | undefined => {
+  const requestable = song.versions.filter(fetchable);
+  const versions = requestable.length ? requestable : song.versions;
   if (length) {
-    const near = song.versions
+    const near = versions
       .filter(
         (v) =>
           v.length != null && Math.abs(v.length - length) <= LENGTH_SLACK_MS
@@ -79,7 +95,7 @@ export const versionFor = (
     // version can be seconds apart.
     if (near.length) return near[0];
   }
-  return song.versions[0];
+  return versions[0];
 };
 
 const describe = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -306,7 +322,9 @@ class Playlists {
     for (const song of songs.slice(0, MATCH_PER_PASS)) {
       let found: Song | null;
       try {
-        found = await songNamed(song.title, song.artistName);
+        found = await songNamed(song.title, song.artistName, (s) =>
+          versionFor(s, song.length)
+        );
       } catch (e) {
         // MusicBrainz is unreachable: tried again on the next pass.
         logger.debug('Could not match a playlist song', {

@@ -304,6 +304,41 @@ describe('a playlist link', () => {
     assert.equal(versionFor(song, 300_000)?.mbId, LANTERN_ALBUM);
     assert.equal(versionFor(song, null)?.mbId, LANTERN_ALBUM);
   });
+
+  it('picks a version that can be requested over one only on others’ compilations', () => {
+    const group = (
+      type: string,
+      byArtist: boolean,
+      secondary: string[] = []
+    ) => ({
+      mbId: `g-${type}-${byArtist}`,
+      title: type,
+      primaryType: type,
+      secondaryTypes: secondary,
+      date: '2017-06-02',
+      byArtist,
+    });
+    const song = {
+      key: 'k',
+      title: 'Lantern Song',
+      artistMbid: ARTIST,
+      artistName: 'Glasswing',
+      versions: [
+        // Nearest the length, but only on someone else's compilation.
+        {
+          mbId: LANTERN,
+          length: 223_000,
+          releaseGroups: [group('Album', false, ['Compilation'])],
+        },
+        {
+          mbId: LANTERN_ALBUM,
+          length: 224_500,
+          releaseGroups: [group('Single', true)],
+        },
+      ],
+    } as unknown as Parameters<typeof versionFor>[0];
+    assert.equal(versionFor(song, 223_000)?.mbId, LANTERN_ALBUM);
+  });
 });
 
 describe('a linked playlist', () => {

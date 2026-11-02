@@ -8,7 +8,7 @@ import type {
 import { VARIOUS_ARTISTS_MBID } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import MusicMetadata from '@server/entity/MusicMetadata';
-import type { Song } from '@server/lib/music/songs';
+import type { Song, SongVersion } from '@server/lib/music/songs';
 import {
   groupSongs,
   normalizeTitle,
@@ -208,7 +208,12 @@ const artistFor = async (artistName: string): Promise<ChartArtist | null> => {
  */
 export const songNamed = async (
   name: string,
-  artistName: string
+  artistName: string,
+  /**
+   * The version that will be asked for: kept as found, so asking for it
+   * needs no second lookup. The best known, when not given.
+   */
+  pick: (song: Song) => SongVersion | undefined = (song) => song.versions[0]
 ): Promise<Song | null> => {
   const artist = await artistFor(artistName);
   if (!artist) return null;
@@ -236,24 +241,28 @@ export const songNamed = async (
       'background'
     );
     recordings = found.recordings ?? [];
+    // Its versions all: the one a playlist means may be little known.
     song = groupSongs(recordings, songTitle, [artist.id], {
       songs: 5,
-      versions: 5,
+      versions: 50,
     }).find((s) => plainName(s.title) === wanted);
     if (song) break;
   }
   if (!song) return null;
-  // Asking for it next looks its versions up: they are kept as found.
-  const versions = new Set(song.versions.map((v) => v.mbId));
-  await musicBrainz().keepRecordings(
-    recordings.filter((r) => versions.has(r.id))
-  );
   // The version the title names, when some are titled just so.
   const full = plainName(title);
   const named = song.versions.filter((v) => plainName(v.title) === full);
-  return named.length && named.length < song.versions.length
-    ? { ...song, versions: named }
-    : song;
+  const result =
+    named.length && named.length < song.versions.length
+      ? { ...song, versions: named }
+      : song;
+  const picked = pick(result);
+  if (picked) {
+    await musicBrainz().keepRecordings(
+      recordings.filter((r) => r.id === picked.mbId)
+    );
+  }
+  return result;
 };
 
 /** The song on a chart, among its artist's recordings. */

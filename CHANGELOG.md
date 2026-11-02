@@ -2,7 +2,9 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
-## Coming next
+## 2.4.0 (2 November 2026)
+
+Library sharing for Plex, Jellyfin and Emby, a Helm chart for Kubernetes, and playlist imports that find more songs, say where each one stands, and carry on after a restart.
 
 ### New
 

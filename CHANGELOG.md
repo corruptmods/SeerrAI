@@ -2,6 +2,12 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
+## Coming next
+
+### Fixed
+
+- A song taken from an album could sit for hours on a torrent nobody was sharing. Torrents with seeders are tried first, then Usenet (including packed posts, the song found once unpacked), and an unshared torrent only when there's nothing else. A download bringing nothing no longer holds up the songs behind it, and a search Prowlarr didn't answer is tried again soon instead of counting as nothing found. Albums waiting to be searched again are searched on update.
+
 ## 2.4.0 (2 November 2026)
 
 Library sharing for Plex, Jellyfin and Emby, a Helm chart for Kubernetes, and playlist imports that find more songs, say where each one stands, and carry on after a restart.

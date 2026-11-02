@@ -41,6 +41,8 @@ export interface FakeLidarr {
   releaseTracks: Map<number, LidarrTrack[]>;
   /** Where the download client's folders are, as Lidarr sees them. */
   remotePathMappings: { host: string; remotePath: string; localPath: string }[];
+  /** What Lidarr finds in a folder for manual import, by folder. */
+  folders: Map<string, { path: string; size?: number }[]>;
   /** Whether a manual import takes its files (or refuses them all). */
   importTakes: boolean;
   tags: { id: number; label: string }[];
@@ -73,6 +75,7 @@ export const createFakeLidarr = (): FakeLidarr => {
     tracksOnAdd: new Map(),
     releaseTracks: new Map(),
     remotePathMappings: [],
+    folders: new Map(),
     importTakes: true,
     tags: [],
     down: false,
@@ -110,6 +113,7 @@ export const createFakeLidarr = (): FakeLidarr => {
       fake.tracksOnAdd = new Map();
       fake.releaseTracks = new Map();
       fake.remotePathMappings = [];
+      fake.folders = new Map();
       fake.importTakes = true;
       fake.tags = [];
       fake.down = false;
@@ -265,7 +269,7 @@ export const createFakeLidarr = (): FakeLidarr => {
       return [200, fake.remotePathMappings];
     }
     if (method === 'GET' && path === '/api/v1/manualimport') {
-      return [200, []];
+      return [200, fake.folders.get(query.folder ?? '') ?? []];
     }
     if (method === 'GET' && /^\/api\/v1\/album\/\d+$/.test(path)) {
       const album = fake.albums.find(

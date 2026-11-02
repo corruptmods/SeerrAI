@@ -72,8 +72,32 @@ import { In, IsNull, Not } from 'typeorm';
 
 const LABEL = 'Song Fetch';
 
+/**
+ * Which releases are opened first: torrents someone is sharing, which can
+ * download only the songs; then Usenet, which brings the whole album; then
+ * torrents nobody seems to share, which may never finish and whose file
+ * list can take minutes to come from the swarm.
+ */
+const releaseTier = (release: ProwlarrRelease): number =>
+  release.protocol === 'usenet' ? 1 : (release.seeders ?? 1) > 0 ? 0 : 2;
+
+/** Releases of an album in the order they are opened. */
+export const rankReleases = (releases: ProwlarrRelease[]): ProwlarrRelease[] =>
+  [...releases].sort(
+    (a, b) =>
+      releaseTier(a) - releaseTier(b) ||
+      (b.seeders ?? 0) - (a.seeders ?? 0) ||
+      a.size - b.size
+  );
+
 /** Results opened for their file lists, best first. */
 const MAX_OPEN = 5;
+/**
+ * A download that has brought nothing for this long stops holding one of
+ * the song download slots, so the next song can start meanwhile; it is
+ * still given up only at Backfill's stall time.
+ */
+const IDLE_SLOT_MS = 15 * 60_000;
 /** Releases tried before the songs are given up on. */
 const MAX_TRIES = 3;
 /** Bigger than any album the songs are worth. */
@@ -109,6 +133,21 @@ class ReleaseProblem extends Error {}
 
 /** A torrent's stage until only the songs' files are picked and it starts. */
 const CHOOSING = 'Choosing the songs’ files';
+
+/**
+ * Whether a download counts against the song download slots: not once it
+ * has brought nothing for a while (`idleMs`, as its watch last saw), or the
+ * swarm hasn't sent its file list for as long, so one nobody shares doesn't
+ * hold up the songs behind it.
+ */
+export const holdsSlot = (
+  fetch: Pick<SongFetch, 'stage' | 'startedAt'>,
+  idleMs: number,
+  now = Date.now()
+): boolean =>
+  fetch.stage === CHOOSING
+    ? !fetch.startedAt || now - fetch.startedAt.getTime() < IDLE_SLOT_MS
+    : idleMs < IDLE_SLOT_MS;
 
 /**
  * Songs in a request another of its songs failed in: the request shows as
@@ -617,6 +656,7 @@ class SongFetcher {
     }
     const prowlarr = new ProwlarrAPI(getSettings().backfill.prowlarr);
     const found = new Map<string, ProwlarrRelease>();
+    let searchError: unknown;
     for (const term of [
       `${fetch.artistName} ${fetch.albumTitle}`,
       fetch.albumTitle,
@@ -635,13 +675,19 @@ class SongFetcher {
           await getRepository(SongFetch).save(fetch);
           return;
         }
-        throw e;
+        // Prowlarr not answering in time is no answer: the other search
+        // may still find it.
+        searchError = e;
+        continue;
       }
       if (found.size >= MAX_OPEN) break;
     }
+    // Nothing found because a search failed: tried again soon, not counted
+    // as a search that found nothing.
+    if (!found.size && searchError) throw searchError;
 
-    const usable = [...found.values()]
-      .filter(
+    const usable = rankReleases(
+      [...found.values()].filter(
         (release) =>
           !!clientFor(release.protocol) &&
           release.size <= MAX_RELEASE_BYTES &&
@@ -649,14 +695,7 @@ class SongFetcher {
           !fetch.tried.includes(`hash:${release.infoHash?.toLowerCase()}`) &&
           namesAlbum(release.title, fetch.albumTitle, fetch.artistName)
       )
-      .sort(
-        (a, b) =>
-          // Torrents can download only the songs; then the best seeded.
-          Number(b.protocol === 'torrent') - Number(a.protocol === 'torrent') ||
-          (b.seeders ?? 0) - (a.seeders ?? 0) ||
-          a.size - b.size
-      )
-      .slice(0, MAX_OPEN);
+    ).slice(0, MAX_OPEN);
 
     let best:
       | {
@@ -665,10 +704,18 @@ class SongFetcher {
           hash: string | null;
         }
       | undefined;
+    // A Usenet post whose files are packed or renamed: they are only known
+    // once it is downloaded, when each song is found by its name.
+    let packedRelease: ProwlarrRelease | undefined;
     for (const release of usable) {
+      // Torrents nobody seems to share, only when nothing better was found.
+      if (releaseTier(release) === 2 && (best || packedRelease)) break;
       try {
         const { files, infoHash, packed } = await backfill.filesOf(release);
-        if (packed) continue;
+        if (packed) {
+          if (release.protocol === 'usenet') packedRelease ??= release;
+          continue;
+        }
         const picked = wanted.flatMap(({ song, track }) => {
           const file = fileForTrack(files, track.title, fetch.artistName);
           return file
@@ -700,6 +747,20 @@ class SongFetcher {
           errorMessage: message(e),
         });
       }
+    }
+
+    if (!best && packedRelease) {
+      best = {
+        release: packedRelease,
+        files: wanted.map(({ song, track }, index) => ({
+          index,
+          path: '',
+          size: 0,
+          recordingMbid: song.recordingMbid,
+          trackId: track.id,
+        })),
+        hash: null,
+      };
     }
 
     const needed = wanted.map((w) => w.song);
@@ -765,10 +826,14 @@ class SongFetcher {
         `No ${release.protocol === 'torrent' ? 'torrent' : 'Usenet'} client is chosen in Settings → Backfill.`
       );
     }
-    const running = await getRepository(SongFetch).count({
+    const downloading = await getRepository(SongFetch).find({
+      select: { id: true, stage: true, startedAt: true },
       where: { id: Not(fetch.id), status: 'downloading' },
     });
-    if (running >= getSettings().backfill.maxActiveJobs) {
+    const running = downloading.filter((other) =>
+      holdsSlot(other, this.watch.idleFor(other.id))
+    );
+    if (running.length >= getSettings().backfill.maxActiveJobs) {
       fetch.stage = 'Waiting for another song download to finish';
       await getRepository(SongFetch).save(fetch);
       return;
@@ -959,18 +1024,37 @@ class SongFetcher {
         await getRepository(SongFetch).save(fetch);
         return;
       }
-      // Lidarr reads the finished folder; each song's file by its name.
+      // Lidarr reads the finished folder; each song's file by the name it
+      // had in the NZB, or, when the post was packed or renamed, by the
+      // song's own name.
       const seen = await lidarr.getManualImport(
         lidarrPath(job.storage),
         fetch.lidarrArtistId!
       );
+      const unpacked = seen.map((item, index) => ({
+        index,
+        path: item.path,
+        // Lidarr not saying is no reason to pass a file over.
+        size: item.size ?? Number.MAX_SAFE_INTEGER,
+      }));
+      const tracks = fetch.files.some((file) => !file.path)
+        ? await this.tracksOf(lidarr, fetch)
+        : [];
       paths = new Map();
       for (const file of fetch.files) {
         const name = file.path.replace(/\\/g, '/').split('/').pop();
-        const match = seen.find(
-          (s) => s.path.replace(/\\/g, '/').split('/').pop() === name
-        );
-        if (match) paths.set(file.index, match.path);
+        const match =
+          (name &&
+            seen.find(
+              (s) => s.path.replace(/\\/g, '/').split('/').pop() === name
+            )?.path) ||
+          (!file.path &&
+            fileForTrack(
+              unpacked,
+              tracks.find((t) => t.id === file.trackId)?.title ?? '',
+              fetch.artistName
+            )?.path);
+        if (match) paths.set(file.index, match);
       }
     }
     await this.importFiles(fetch, songs, paths);

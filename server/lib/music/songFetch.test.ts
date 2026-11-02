@@ -1,4 +1,5 @@
 import QBittorrentAPI from '@server/api/downloadclients/qbittorrent';
+import SabnzbdAPI from '@server/api/downloadclients/sabnzbd';
 import { MusicBrainz } from '@server/api/musicbrainz';
 import type { MbArtist, MbRecording } from '@server/api/musicbrainz/interfaces';
 import type { ProwlarrRelease } from '@server/api/prowlarr';
@@ -28,7 +29,10 @@ import {
 } from '@server/lib/music/albumRelease';
 import { completeMusicRequests } from '@server/lib/music/completion';
 import { songStandings } from '@server/lib/music/requestSongs';
-import songFetcher from '@server/lib/music/songFetch';
+import songFetcher, {
+  holdsSlot,
+  rankReleases,
+} from '@server/lib/music/songFetch';
 import { Permission } from '@server/lib/permissions';
 import {
   BACKFILL_DEFAULTS,
@@ -943,6 +947,174 @@ describe('taking a song from its album', () => {
     );
   });
 
+  /** A Usenet client for Backfill, and a post of the album on Usenet. */
+  const useUsenet = (packed: boolean) => {
+    const settings = getSettings();
+    settings.backfill = { ...settings.backfill, usenetClientId: 2 };
+    settings.downloadClients = [
+      ...settings.downloadClients,
+      {
+        id: 2,
+        name: 'SABnzbd',
+        type: 'sabnzbd',
+        hostname: 'sabnzbd',
+        port: 8080,
+        useSsl: false,
+        urlBase: '',
+        apiKey: 'k',
+        username: '',
+        password: '',
+      },
+    ];
+    lidarr.remotePathMappings.push({
+      host: 'sabnzbd',
+      remotePath: '/downloads/',
+      localPath: '/data/',
+    });
+    const folder = '/data/complete/Glasswing - Static Garden';
+    lidarr.folders.set(folder, [
+      { path: `${folder}/01 - Opening.flac`, size: 30 * MB },
+      { path: `${folder}/02 - Lantern Song.flac`, size: 40 * MB },
+    ]);
+    const usenet: ProwlarrRelease = {
+      ...RELEASE,
+      guid: 'https://nzb/sg',
+      indexer: 'NZBgeek',
+      indexerId: 12,
+      protocol: 'usenet',
+      seeders: undefined,
+    };
+    const opened: string[] = [];
+    mock.method(backfill, 'filesOf', async (release: ProwlarrRelease) => {
+      opened.push(release.guid);
+      if (release.protocol === 'usenet' && packed) {
+        return { files: [], infoHash: null, packed: 'archives' };
+      }
+      return {
+        files: INFO.files.map((f, index) => ({
+          index,
+          path: [INFO.name, ...f.path].join('/'),
+          size: f.length,
+        })),
+        infoHash: release.protocol === 'usenet' ? null : HASH,
+      };
+    });
+    mock.method(
+      ProwlarrAPI.prototype,
+      'fetchRelease',
+      async (release: ProwlarrRelease) =>
+        release.protocol === 'usenet'
+          ? { kind: 'nzb', data: Buffer.from('<nzb/>') }
+          : { kind: 'torrent', data: TORRENT }
+    );
+    mock.method(SabnzbdAPI.prototype, 'addNzb', async () => 'nzo-1');
+    mock.method(SabnzbdAPI.prototype, 'getJob', async () => ({
+      place: 'history',
+      status: done ? 'Completed' : 'Downloading',
+      percentage: done ? 100 : 40,
+      size: RELEASE.size,
+      sizeLeft: 0,
+      storage: '/downloads/complete/Glasswing - Static Garden',
+    }));
+    mock.method(SabnzbdAPI.prototype, 'deleteJob', async () => undefined);
+    return { usenet, opened };
+  };
+
+  /** The files handed to Lidarr's manual import. */
+  const importedPaths = () =>
+    (
+      lidarr.calls.find(
+        (c) =>
+          c.method === 'POST' &&
+          c.path === '/api/v1/command' &&
+          c.body?.name === 'ManualImport'
+      )?.body?.files as { path: string; trackIds: number[] }[]
+    ).map((f) => [f.path, f.trackIds]);
+
+  it('takes the song from Usenet rather than a torrent nobody shares', async () => {
+    const { usenet, opened } = useUsenet(false);
+    const unshared = {
+      ...RELEASE,
+      guid: 'https://indexer/dead',
+      seeders: 0,
+    };
+    found = [unshared, usenet];
+    await requestSongs([LANTERN]);
+    await startFetching();
+
+    let fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(fetch.release?.protocol, 'usenet');
+    // The unshared torrent's file list, slow to come, isn't even asked for.
+    assert.deepEqual(opened, [usenet.guid]);
+
+    done = true;
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'importing');
+    assert.deepEqual(importedPaths(), [
+      [
+        '/data/complete/Glasswing - Static Garden/02 - Lantern Song.flac',
+        [502],
+      ],
+    ]);
+  });
+
+  it('takes the song from a packed Usenet post, finding it once unpacked', async () => {
+    const { usenet } = useUsenet(true);
+    found = [usenet];
+    await requestSongs([LANTERN]);
+    await startFetching();
+
+    let fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(fetch.release?.guid, usenet.guid);
+
+    done = true;
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'importing');
+    assert.deepEqual(importedPaths(), [
+      [
+        '/data/complete/Glasswing - Static Garden/02 - Lantern Song.flac',
+        [502],
+      ],
+    ]);
+  });
+
+  it('still takes a torrent nobody seems to share when it is all there is', async () => {
+    found = [{ ...RELEASE, seeders: 0 }];
+    await requestSongs([LANTERN]);
+    await startFetching();
+    const fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(fetch.release?.protocol, 'torrent');
+  });
+
+  it('searches again soon when Prowlarr doesn’t answer, without counting it', async () => {
+    let failing = 2;
+    mock.method(ProwlarrAPI.prototype, 'search', async () => {
+      if (failing > 0) {
+        failing--;
+        throw new Error('timeout of 90000ms exceeded');
+      }
+      return found;
+    });
+    await requestSongs([LANTERN]);
+    await startFetching();
+
+    let fetch = await fetchOf();
+    assert.equal(fetch.status, 'searching');
+    assert.equal(fetch.searches ?? 0, 0);
+    assert.equal(fetch.searchAgainAt, null);
+
+    // One search answering is enough.
+    failing = 1;
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+  });
+
   it('waits for a download slot without searching again', async () => {
     getSettings().backfill = { ...getSettings().backfill, maxActiveJobs: 0 };
     await requestSongs([LANTERN]);
@@ -981,6 +1153,64 @@ describe('taking a song from its album', () => {
     await assert.rejects(requestSongs([LANTERN]), InvalidMusicRequestError);
     await songFetcher.tick();
     assert.equal(await getRepository(SongFetch).count(), 0);
+  });
+});
+
+describe('choosing a release of an album', () => {
+  it('opens shared torrents, then Usenet, then torrents nobody shares', () => {
+    const release = (
+      guid: string,
+      protocol: 'torrent' | 'usenet',
+      seeders?: number
+    ): ProwlarrRelease => ({ ...RELEASE, guid, protocol, seeders });
+    assert.deepEqual(
+      rankReleases([
+        release('dead', 'torrent', 0),
+        release('nzb', 'usenet'),
+        release('few', 'torrent', 2),
+        release('many', 'torrent', 40),
+        release('unknown', 'torrent'),
+      ]).map((r) => r.guid),
+      ['many', 'few', 'unknown', 'nzb', 'dead']
+    );
+  });
+
+  it('lets a download that brings nothing stop holding up the next song', () => {
+    const now = Date.now();
+    const minutes = (n: number) => n * 60_000;
+    assert.equal(
+      holdsSlot(
+        { stage: 'Downloading, 40%', startedAt: null },
+        minutes(2),
+        now
+      ),
+      true
+    );
+    assert.equal(
+      holdsSlot(
+        { stage: 'Downloading, 40%', startedAt: null },
+        minutes(20),
+        now
+      ),
+      false
+    );
+    const choosing = 'Choosing the songs’ files';
+    assert.equal(
+      holdsSlot(
+        { stage: choosing, startedAt: new Date(now - minutes(5)) },
+        0,
+        now
+      ),
+      true
+    );
+    assert.equal(
+      holdsSlot(
+        { stage: choosing, startedAt: new Date(now - minutes(20)) },
+        0,
+        now
+      ),
+      false
+    );
   });
 });
 

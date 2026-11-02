@@ -86,6 +86,15 @@ export class TorrentWatch {
    */
   private starts = new Map<number, { at: number | null; whole: boolean }>();
 
+  /**
+   * How long it has gained nothing it could finish with, as last checked;
+   * 0 before its first check.
+   */
+  public idleFor(id: number, now = Date.now()): number {
+    const seen = this.gains.get(id);
+    return seen ? now - seen.at : 0;
+  }
+
   public forget(id: number): void {
     this.gains.delete(id);
     this.paces.delete(id);

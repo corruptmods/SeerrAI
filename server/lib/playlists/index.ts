@@ -11,6 +11,7 @@ import {
   QuotaRestrictedError,
   RequestPermissionError,
 } from '@server/entity/MediaRequest';
+import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
 import { songNamed } from '@server/lib/music/charts';
 import {
@@ -142,12 +143,13 @@ class Playlists {
       (song.state === 'requested' || song.state === 'approval') &&
       song.requestId
     ) {
-      // Its request was deleted: asked for afresh.
-      if (
-        !(await getRepository(MediaRequest).exist({
-          where: { id: song.requestId },
-        }))
-      ) {
+      // Its request was deleted, or was someone else's that the song only
+      // followed: asked for afresh, in the owner's name.
+      const request = await getRepository(MediaRequest).findOne({
+        where: { id: song.requestId },
+        relations: { requestedBy: true },
+      });
+      if (!request || request.requestedBy?.id !== song.requestForId) {
         await getRepository(MediaListSong).update(song.id, {
           state: 'matched',
           requestId: null,
@@ -487,6 +489,41 @@ class Playlists {
     }
   }
 
+  /**
+   * Songs already here or on their way: one on its way in someone else's
+   * request follows that request (and is asked for afresh should it be
+   * declined); the rest are here.
+   */
+  private async markCovered(songs: MediaListSong[]): Promise<void> {
+    if (!songs.length) return;
+    const open = await getRepository(SongRequest).find({
+      select: { id: true, recordingMbid: true, status: true },
+      where: {
+        recordingMbid: In(songs.map((s) => s.recordingMbid as string)),
+        status: In([MediaRequestStatus.PENDING, MediaRequestStatus.APPROVED]),
+        request: { status: Not(MediaRequestStatus.DECLINED) },
+      },
+      relations: { request: true },
+    });
+    const here: MediaListSong[] = [];
+    for (const song of songs) {
+      const by = open.find((o) => o.recordingMbid === song.recordingMbid);
+      if (by) {
+        await this.mark(
+          [song],
+          by.request.status === MediaRequestStatus.PENDING
+            ? 'approval'
+            : 'requested',
+          null,
+          by.request.id
+        );
+      } else {
+        here.push(song);
+      }
+    }
+    await this.mark(here, 'here');
+  }
+
   private async sendGroup(
     user: User,
     artistMbid: string,
@@ -510,13 +547,12 @@ class Playlists {
         request.id
       );
       // The rest were here already, or on their way.
-      await this.mark(
-        songs.filter((s) => !asked.has(s.recordingMbid as string)),
-        'here'
+      await this.markCovered(
+        songs.filter((s) => !asked.has(s.recordingMbid as string))
       );
     } catch (e) {
       if (e instanceof NoAlbumsAvailableError) {
-        await this.mark(songs, 'here');
+        await this.markCovered(songs);
       } else if (e instanceof QuotaRestrictedError) {
         await this.mark(songs, 'waiting', 'limit');
       } else if (e instanceof RequestPermissionError) {
@@ -527,10 +563,12 @@ class Playlists {
         e instanceof UnrequestableSongError ||
         e instanceof BlocklistedMediaError
       ) {
-        // One song spoils the group: each is asked for on its own.
+        // One song spoils the group: it is found by halves, the rest asked
+        // for in as few requests as that leaves.
         if (songs.length > 1) {
-          for (const song of songs) {
-            await this.sendGroup(user, artistMbid, [song], needsApproval);
+          const half = Math.ceil(songs.length / 2);
+          for (const part of [songs.slice(0, half), songs.slice(half)]) {
+            await this.sendGroup(user, artistMbid, part, needsApproval);
           }
         } else {
           await this.mark(songs, 'failed', e.message.slice(0, 250));

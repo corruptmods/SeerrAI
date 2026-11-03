@@ -104,6 +104,7 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
         select: {
           id: true,
           status: true,
+          requestedBy: { id: true },
           songs: {
             id: true,
             recordingMbid: true,
@@ -114,7 +115,7 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
             sourceAlbumTitle: true,
           },
         },
-        relations: { songs: true },
+        relations: { songs: true, requestedBy: true },
         where: { id: In(requestIds) },
       })
     : [];
@@ -122,10 +123,15 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
   // fails the request, not the others in it, still on their way.
   const statusOf = (song: MediaListSong) => {
     const request = requests.find((r) => r.id === song.requestId);
-    return (
+    const status =
       request?.songs?.find((s) => s.recordingMbid === song.recordingMbid)
-        ?.status ?? request?.status
-    );
+        ?.status ?? request?.status;
+    // Someone else's request it only followed, declined: not got, so Try
+    // again asks for it in the owner's name.
+    return status === MediaRequestStatus.DECLINED &&
+      request?.requestedBy?.id !== song.requestForId
+      ? MediaRequestStatus.FAILED
+      : status;
   };
   const progress = await songProgress(
     requests.flatMap((request) => request.songs ?? [])

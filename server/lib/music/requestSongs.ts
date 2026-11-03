@@ -5,6 +5,7 @@ import {
   MediaType,
 } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import AlbumRequest from '@server/entity/AlbumRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import SongRequest from '@server/entity/SongRequest';
 import type { SongRelease, SongVersion } from '@server/lib/music/songs';
@@ -207,6 +208,49 @@ export const songsCovered = async (
             ? MediaStatus.AVAILABLE
             : status,
       });
+    }
+  }
+
+  // An album asked for whole brings every song on it, though its row may
+  // still say partly here (a song of it was taken before).
+  const open = versions.filter((version) => !covered.has(version.mbId));
+  const openGroups = [
+    ...new Set(
+      open.flatMap((version) =>
+        version.releaseGroups.map((group) => group.mbId)
+      )
+    ),
+  ];
+  if (openGroups.length) {
+    const wanted = await getRepository(AlbumRequest).find({
+      select: { id: true, albumMbid: true, status: true, title: true },
+      where: {
+        albumMbid: In(openGroups),
+        status: In(ASKED),
+        request: {
+          type: MediaType.MUSIC,
+          status: In([MediaRequestStatus.PENDING, MediaRequestStatus.APPROVED]),
+        },
+      },
+      relations: { request: true },
+    });
+    for (const version of open) {
+      const album = wanted
+        .filter((a) =>
+          version.releaseGroups.some((group) => group.mbId === a.albumMbid)
+        )
+        .sort((a, b) => b.status - a.status)[0];
+      if (album) {
+        covered.set(version.mbId, {
+          by: 'album',
+          albumMbid: album.albumMbid,
+          albumTitle: album.title,
+          status:
+            album.status === MediaRequestStatus.APPROVED
+              ? MediaStatus.PROCESSING
+              : MediaStatus.PENDING,
+        });
+      }
     }
   }
   return covered;

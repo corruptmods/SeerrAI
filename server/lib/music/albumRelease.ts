@@ -68,7 +68,15 @@ export const namesAlbum = (
   const t = ` ${words(name)} `;
   const a = words(album);
   const by = words(artist);
-  if (a.length < 2 || !timesIn(t, a)) return false;
+  // A name of signs or one letter ("÷", "+", "x"): its own characters,
+  // apart from any word, by the artist.
+  if (a.length < 2) {
+    const sign = normalizeTitle(album).trim();
+    if (!sign || !by) return false;
+    const raw = ` ${normalizeTitle(name).replace(/[\s\-–_.()[\]]+/g, ' ')} `;
+    return raw.includes(` ${sign} `) && timesIn(t, by) > 0;
+  }
+  if (!timesIn(t, a)) return false;
   // The artist's own name may say one (a band called Live).
   if (otherVersion(t, ` ${a} ${by} `)) return false;
   if (by === 'various artists') {

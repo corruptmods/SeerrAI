@@ -1083,6 +1083,20 @@ describe('requesting songs', () => {
     assert.equal(request.songs[0].status, MediaRequestStatus.FAILED);
   });
 
+  it('is refused while the release it is on is asked for whole', async () => {
+    const whole = await requestMusic({ albums: [STATIC_GARDEN] });
+    assert.equal(whole.status, 201);
+    // Partly here already: a song of it was taken before.
+    await getRepository(MusicAlbum).update(
+      { mbId: STATIC_GARDEN },
+      { status: MediaStatus.PARTIALLY_AVAILABLE }
+    );
+    await actAs(Permission.REQUEST, 'second@x');
+    const song = await requestSongs([ALBUM_TAKE]);
+    assert.equal(song.status, 409);
+    assert.match(message(song), /already here or on its way/);
+  });
+
   it('when retried, sends only what it still lacks', async () => {
     lidarr.lookupAlbums.set(SINGLE, {
       id: 0,

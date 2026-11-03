@@ -21,6 +21,7 @@ import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
 import backfill from '@server/lib/backfill/engine';
 import { IndexerLimitReached } from '@server/lib/backfill/indexerLimit';
+import { readNzb } from '@server/lib/backfill/nzb';
 import cacheManager from '@server/lib/cache';
 import downloadTracker from '@server/lib/downloadtracker';
 import {
@@ -924,6 +925,71 @@ describe('taking a song from its album', () => {
     assert.deepEqual(again.recordings, [OPENING]);
   });
 
+  it('takes a song Lidarr’s edition lacks from the artist’s next album with it', async () => {
+    const LATER = '9d1f3a27-6b84-4c05-8e2a-3f7c1b9d4e61';
+    mock.method(MusicBrainz.prototype, 'getRecording', async (id: string) => {
+      const base = RECORDINGS[id];
+      if (id !== OPENING || !base) return base ?? null;
+      return {
+        ...base,
+        releases: [
+          ...(base.releases ?? []),
+          {
+            id: 'r-later',
+            title: 'Harbour Lights',
+            status: 'Official',
+            date: '2003-01-01',
+            'artist-credit': base['artist-credit'],
+            'release-group': {
+              id: LATER,
+              title: 'Harbour Lights',
+              'primary-type': 'Album',
+              'secondary-types': [],
+            },
+          },
+        ],
+      } as MbRecording;
+    });
+    lidarr.tracksOnAdd.set(STATIC_GARDEN, [
+      {
+        id: 502,
+        title: 'Lantern Song',
+        foreignRecordingId: LANTERN,
+        hasFile: false,
+      },
+    ]);
+    await requestSongs([LANTERN, OPENING]);
+    await startFetching();
+
+    const opening = await getRepository(SongRequest).findOneByOrFail({
+      recordingMbid: OPENING,
+    });
+    assert.equal(opening.status, MediaRequestStatus.APPROVED, 'not failed');
+    assert.equal(opening.sourceAlbumMbid, LATER);
+    assert.equal(opening.sourceAlbumTitle, 'Harbour Lights');
+    const first = await getRepository(SongFetch).findOneByOrFail({
+      albumMbid: STATIC_GARDEN,
+    });
+    assert.deepEqual(first.recordings, [LANTERN]);
+  });
+
+  it('searches again on its own schedule for a song the chosen release lacks', async () => {
+    // Only Lantern Song is in the release opened.
+    mock.method(backfill, 'filesOf', async () => ({
+      files: [{ index: 0, path: 'A/02 - Lantern Song.flac', size: 40 * MB }],
+      infoHash: HASH,
+    }));
+    await requestSongs([LANTERN, OPENING]);
+    await startFetching();
+    const fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.deepEqual(fetch.recordings, [LANTERN]);
+    const opening = await getRepository(SongRequest).findOneByOrFail({
+      recordingMbid: OPENING,
+    });
+    assert.equal(opening.status, MediaRequestStatus.APPROVED, 'not failed');
+  });
+
   it('picks the songs’ files once the client answers again', async () => {
     const qbit = QBittorrentAPI.prototype;
     const getFiles = qbit.getFiles;
@@ -1115,6 +1181,46 @@ describe('taking a song from its album', () => {
     } finally {
       mock.timers.reset();
     }
+  });
+
+  it('downloads only the song from a Usenet post, and moves it in', async () => {
+    const { usenet } = useUsenet(false);
+    const file = (subject: string, bytes: number) =>
+      `<file poster="p" date="1" subject="${subject}"><segments><segment bytes="${bytes}" number="1">x@y</segment></segments></file>`;
+    const nzb = `<?xml version="1.0"?><nzb>${[
+      file('&quot;01 - Opening.flac&quot; yEnc', 30 * MB),
+      file('&quot;02 - Lantern Song.flac&quot; yEnc', 40 * MB),
+    ].join('')}</nzb>`;
+    mock.method(ProwlarrAPI.prototype, 'fetchRelease', async () => ({
+      kind: 'nzb',
+      data: Buffer.from(nzb),
+    }));
+    mock.method(backfill, 'filesOf', async () => ({
+      files: [
+        { index: 0, path: '01 - Opening.flac', size: 30 * MB },
+        { index: 1, path: '02 - Lantern Song.flac', size: 40 * MB },
+      ],
+      infoHash: null,
+    }));
+    const sent: string[] = [];
+    mock.method(SabnzbdAPI.prototype, 'addNzb', async (data: Buffer) => {
+      sent.push(data.toString('utf8'));
+      return 'nzo-1';
+    });
+    found = [usenet];
+    await requestSongs([LANTERN]);
+    await startFetching();
+    assert.deepEqual(
+      readNzb(sent[0]).files.map((f) => f.name),
+      ['02 - Lantern Song.flac']
+    );
+
+    done = true;
+    await songFetcher.tick();
+    const command = lidarr.calls.find(
+      (c) => c.method === 'POST' && c.body?.name === 'ManualImport'
+    );
+    assert.equal(command?.body?.importMode, 'move');
   });
 
   it('prefers what Lidarr’s delay profile prefers', async () => {
@@ -1592,6 +1698,18 @@ describe('reading a release of an album', () => {
       namesAlbum('Live - Throwing Copper (1994)', 'Throwing Copper', 'Live'),
       true
     );
+  });
+
+  it('knows an album named with a sign', () => {
+    assert.equal(
+      namesAlbum('Glasswing - ÷ (2017) [FLAC]', '÷', 'Glasswing'),
+      true
+    );
+    assert.equal(
+      namesAlbum('Glasswing - Static Garden (2017)', '÷', 'Glasswing'),
+      false
+    );
+    assert.equal(namesAlbum('Other - ÷ (2017)', '÷', 'Glasswing'), false);
   });
 
   it('knows a self-titled album from the artist’s other albums', () => {

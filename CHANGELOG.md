@@ -24,6 +24,18 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - A live take only on a live single can be requested.
 
+- A song on an album someone has asked for whole is no longer asked for again, and downloaded twice.
+
+- A song Lidarr's edition of its album lacks is taken from the artist's next album with it, instead of failing; a song missing from the release chosen for others of its album is searched for again on its own schedule, instead of failing at once; an album named with a sign ("÷") can be found.
+
+- A Usenet post's song is downloaded on its own, as a torrent's is, and moved into the library: the rest of the album is no longer downloaded and left in the client's finished folder, which SABnzbd never empties.
+
+- Playlists: one song that can't be asked for no longer splits its artist's other songs into a request each; a song already asked for by someone else follows that request, and is asked for afresh should it be declined; when Lidarr can't take a playlist's requests, their failures are told together, as the playlist's other failures are.
+
+- A music request is no longer marked failed when the music sync added its album in Lidarr at the same moment.
+
+- Node's own warnings are written to the server's log, with where they came from.
+
 - Retrying a music request sends Lidarr only what it still lacks: albums that came, or were taken off it, are no longer monitored and searched again.
 
 - An indexer waiting out its limit, or Prowlarr not answering, has the search tried again in a few minutes instead of every minute.

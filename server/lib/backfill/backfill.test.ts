@@ -11,7 +11,12 @@ import {
   readNumbers,
   releaseTags,
 } from '@server/lib/backfill/naming';
-import { packingOf, parseNzb, readNzb } from '@server/lib/backfill/nzb';
+import {
+  nzbWith,
+  packingOf,
+  parseNzb,
+  readNzb,
+} from '@server/lib/backfill/nzb';
 import type { PlanEntry } from '@server/lib/backfill/plan';
 import {
   decide,
@@ -342,6 +347,27 @@ describe('Backfill: torrents and NZBs', () => {
         ],
         unnamedBytes: 0,
       }),
+      undefined
+    );
+  });
+
+  it('keeps only the files asked for, and its head', () => {
+    const file = (subject: string, bytes: number) =>
+      `<file poster="p" date="1" subject="${subject}"><groups><group>a.b.music</group></groups><segments><segment bytes="${bytes}" number="1">x@y</segment></segments></file>`;
+    const nzb = `<?xml version="1.0"?><nzb><head><meta type="title">Album</meta></head>${[
+      file('[1/3] - &quot;01 - Opening.flac&quot; yEnc (1/1)', 30),
+      file('[2/3] - &quot;02 - Lantern Song.flac&quot; yEnc (1/1)', 40),
+      file('[3/3] - &quot;album.par2&quot; yEnc (1/1)', 1),
+    ].join('')}</nzb>`;
+    const only = nzbWith(nzb, (f) => f.index === 1)!;
+    assert.deepEqual(
+      readNzb(only).files.map((f) => f.name),
+      ['02 - Lantern Song.flac']
+    );
+    assert.match(only, /<head><meta type="title">Album<\/meta><\/head>/);
+    assert.match(only, /<\/nzb>$/);
+    assert.equal(
+      nzbWith(nzb, () => false),
       undefined
     );
   });

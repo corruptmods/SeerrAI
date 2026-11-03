@@ -7,7 +7,10 @@ import type {
 import { MediaRequestStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import { MediaList, MediaListSong } from '@server/entity/MediaList';
-import { MediaRequest } from '@server/entity/MediaRequest';
+import {
+  InvalidMusicRequestError,
+  MediaRequest,
+} from '@server/entity/MediaRequest';
 import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
 import notificationManager from '@server/lib/notifications';
@@ -499,6 +502,91 @@ describe('a linked playlist', () => {
     });
     assert.notEqual(now.requestId, lantern.requestId);
     assert.equal((await songsOf(list))['Lantern Song'], 'approval');
+  });
+
+  it('asks for the rest together when one song of an artist can’t be', async () => {
+    const list = await makePlaylist();
+    const ids = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'];
+    await getRepository(MediaListSong).save(
+      ids.map(
+        (id, position) =>
+          new MediaListSong({
+            listId: list.id,
+            sourceId: id,
+            position,
+            title: id,
+            artistName: 'Glasswing',
+            state: 'matched',
+            recordingMbid: `a1b2c3d4-0000-4000-8000-0000000000${position}0`,
+            artistMbid: ARTIST,
+            requestForId: user.id,
+          })
+      )
+    );
+    const bad = `a1b2c3d4-0000-4000-8000-000000000030`;
+    const asked: string[][] = [];
+    mock.method(
+      MediaRequest,
+      'requestMusic',
+      async (body: { songs: string[] }) => {
+        if (body.songs.includes(bad)) {
+          throw new InvalidMusicRequestError('only on compilations');
+        }
+        asked.push(body.songs);
+        return Object.assign(new MediaRequest(), {
+          id: asked.length,
+          songs: body.songs.map((recordingMbid) => ({ recordingMbid })),
+        });
+      }
+    );
+    playlists.kick();
+    await playlists.settled();
+    assert.ok(asked.length <= 3, `${asked.length} requests`);
+    assert.equal(asked.flat().length, 7);
+    const states = await getRepository(MediaListSong).find({
+      where: { listId: list.id },
+    });
+    assert.equal(states.filter((s) => s.state === 'failed').length, 1);
+  });
+
+  it('follows someone else’s request for a song, and asks afresh if it’s declined', async () => {
+    const other = await getRepository(User).save(
+      new User({
+        email: `other-${Math.random()}@test.local`,
+        avatar: '',
+        permissions: Permission.REQUEST,
+      })
+    );
+    const theirs = await MediaRequest.requestMusic(
+      { artistMbid: ARTIST, songs: [NIGHT_SWIM] },
+      other
+    );
+    const list = await linked();
+    assert.equal((await songsOf(list))['Night Swim'], 'approval');
+    const swim = await getRepository(MediaListSong).findOneByOrFail({
+      listId: list.id,
+      title: 'Night Swim',
+    });
+    assert.equal(swim.requestId, theirs.id);
+    // Theirs, not this playlist's, to be told about.
+    assert.equal((await playlistOfRequests([theirs.id])).has(theirs.id), false);
+
+    // Declined, as an admin declining it does: its songs with it.
+    const declined = await getRepository(MediaRequest).findOneByOrFail({
+      id: theirs.id,
+    });
+    declined.status = MediaRequestStatus.DECLINED;
+    await getRepository(MediaRequest).save(declined);
+    assert.equal((await songsOf(list))['Night Swim'], 'notGot');
+    await playlists.retry(
+      await getRepository(MediaListSong).findOneByOrFail({ id: swim.id })
+    );
+    await playlists.settled();
+    const now = await getRepository(MediaListSong).findOneByOrFail({
+      id: swim.id,
+    });
+    assert.notEqual(now.requestId, theirs.id);
+    assert.equal((await songsOf(list))['Night Swim'], 'approval');
   });
 
   it('says why when songs can’t be asked for one at a time', async () => {

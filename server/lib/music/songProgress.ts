@@ -4,6 +4,7 @@ import SongFetch from '@server/entity/SongFetch';
 import type SongRequest from '@server/entity/SongRequest';
 import downloadTracker from '@server/lib/downloadtracker';
 import { ACTIVE } from '@server/lib/music/songFetch';
+import { SEARCHING_SOON } from '@server/lib/music/songFetchWaits';
 import { In } from 'typeorm';
 
 /*
@@ -110,7 +111,12 @@ export const songProgress = async (
           percent: null,
         }
       );
-    } else if (fetch.searchAgainAt && fetch.searchAgainAt > now) {
+    } else if (
+      fetch.searchAgainAt &&
+      fetch.searchAgainAt > now &&
+      // Waiting minutes for Prowlarr or an indexer to answer is searching.
+      !fetch.stage?.startsWith(SEARCHING_SOON)
+    ) {
       progress.set(song.recordingMbid, {
         step: 'waiting',
         release,

@@ -270,14 +270,14 @@ const asAlbum = (group: SongRelease): number =>
       : 0;
 
 /**
- * The album a version only on albums is taken from: the artist's own (as
+ * The albums a version can be taken from, best first: the artist's own (as
  * Lidarr adds albums by their artist), a studio album before a soundtrack
  * or remix album, a compilation or live album only when nothing else has
  * it, the earliest first. Never part of a DJ mix.
  */
-export const albumFor = (
+export const albumsFor = (
   version: Pick<SongVersion, 'releaseGroups'>
-): SongRelease | null =>
+): SongRelease[] =>
   version.releaseGroups
     .filter(
       (group) =>
@@ -289,7 +289,12 @@ export const albumFor = (
       (a, b) =>
         asAlbum(a) - asAlbum(b) ||
         (a.date || '9999').localeCompare(b.date || '9999')
-    )[0] ?? null;
+    );
+
+/** The album a version only on albums is taken from: the best of those. */
+export const albumFor = (
+  version: Pick<SongVersion, 'releaseGroups'>
+): SongRelease | null => albumsFor(version)[0] ?? null;
 
 /**
  * Recordings found for what was typed, as songs: each artist's versions

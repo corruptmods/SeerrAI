@@ -11,6 +11,7 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
+import notificationReconciler from '@server/lib/notificationReconciler';
 import { Notification } from '@server/lib/notifications';
 import { getSettings } from '@server/lib/settings';
 import { MediaRequestSubscriber } from '@server/subscriber/MediaRequestSubscriber';
@@ -195,6 +196,49 @@ describe('sending a music request to Lidarr', () => {
     });
     assert.equal(album.lidarrAlbumId, lidarr.albums[0].id);
     assert.equal(await statusOf(request.id), MediaRequestStatus.APPROVED);
+  });
+
+  it('is sent again, not failed, when the music sync added the album meanwhile', async () => {
+    lidarr.lookupAlbums.set(STATIC_GARDEN, lookedUpAlbum(STATIC_GARDEN, 'OK'));
+    const request = await approvedRequest([
+      { mbId: STATIC_GARDEN, title: 'Static Garden' },
+    ]);
+    lidarr.once.set('POST /api/v1/album', {
+      status: 400,
+      body: [
+        {
+          propertyName: 'ForeignAlbumId',
+          errorMessage: 'This album has already been added.',
+        },
+      ],
+      // The sync's own add lands first.
+      before: () => {
+        lidarr.artists.push({
+          id: 21,
+          artistName: 'Glasswing',
+          foreignArtistId: ARTIST,
+          monitored: true,
+          qualityProfileId: 1,
+          metadataProfileId: 1,
+          tags: [],
+        } as never);
+        lidarr.albums.push({
+          id: 31,
+          title: 'Static Garden',
+          foreignAlbumId: STATIC_GARDEN,
+          artistId: 21,
+          monitored: true,
+        } as never);
+      },
+    });
+
+    await subscriber.dispatchToLidarr(request, lidarr.settings());
+
+    assert.equal(await statusOf(request.id), MediaRequestStatus.APPROVED);
+    const album = await getRepository(MusicAlbum).findOneByOrFail({
+      mbId: STATIC_GARDEN,
+    });
+    assert.equal(album.lidarrAlbumId, 31);
   });
 
   it('adds a new artist with exactly the albums asked for to monitor', async () => {
@@ -637,14 +681,20 @@ describe('when a music request is approved', () => {
     );
     for (
       let i = 0;
-      i < 100 && !notified.includes(Notification.MEDIA_FAILED);
+      i < 100 && (await statusOf(request.id)) !== MediaRequestStatus.FAILED;
       i++
     ) {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
-
-    assert.ok(notified.includes(Notification.MEDIA_FAILED));
     assert.equal(await statusOf(request.id), MediaRequestStatus.FAILED);
+
+    // Told within minutes, by the notification reconciler, and once.
+    await notificationReconciler.run();
+    await notificationReconciler.run();
+    assert.deepEqual(
+      notified.filter((type) => type === Notification.MEDIA_FAILED),
+      [Notification.MEDIA_FAILED]
+    );
     assert.equal(
       await getRepository(MediaRequest).countBy({ type: MediaType.MUSIC }),
       1

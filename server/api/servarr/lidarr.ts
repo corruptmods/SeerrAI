@@ -319,13 +319,18 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
    * Imports files into the tracks given, as Lidarr's manual import does;
    * answers the command's id. Copies, so the download can be removed after.
    */
+  /**
+   * Imports these files: copied (a torrent still seeding), moved (nothing
+   * left to keep), or as Lidarr decides for a download of its own.
+   */
   public manualImport = async (
+    importMode: 'copy' | 'move' | 'auto',
     files: LidarrManualImportFile[]
   ): Promise<number> => {
     try {
       const response = await this.axios.post<{ id: number }>('/command', {
         name: 'ManualImport',
-        importMode: 'copy',
+        importMode,
         files,
       });
       return response.data.id;

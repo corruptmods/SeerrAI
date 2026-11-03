@@ -82,6 +82,23 @@ process.on('unhandledRejection', (reason) => {
   });
 });
 
+// Node's own warnings (a deprecation in a library, a listener leak) go to
+// the server's log too, with where they came from, so they can be read in
+// Settings → Logs rather than only in the container's output. Each is told
+// once a run, however often it comes.
+const warningsTold = new Set<string>();
+process.on('warning', (warning) => {
+  const key = `${warning.name}:${warning.message}`;
+  if (warningsTold.has(key)) return;
+  warningsTold.add(key);
+  logger.warn(`Node warning: ${warning.message}`, {
+    label: 'Server',
+    warning: warning.name,
+    code: (warning as Error & { code?: string }).code,
+    stack: warning.stack,
+  });
+});
+
 if (!appDataPermissions()) {
   logger.error(
     'Something went wrong while checking config folder! Please ensure the config folder is set up properly.\nhttps://docs.seerr.dev/getting-started'

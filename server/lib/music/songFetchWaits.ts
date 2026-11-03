@@ -2,6 +2,9 @@ import { getRepository } from '@server/datasource';
 import SongFetch from '@server/entity/SongFetch';
 import { MoreThan } from 'typeorm';
 
+/** What a fetch waiting for an answer, not for its next search, shows. */
+export const SEARCHING_SOON = 'Searching again soon';
+
 /*
  * Songs taken from albums whose search found nothing wait hours to look
  * again (lib/music/songFetch). A playlist's page says how many albums of
@@ -13,7 +16,7 @@ const waitingFor = async (recordings: string[], now: Date) => {
   if (!recordings.length) return [];
   const wanted = new Set(recordings);
   const waiting = await getRepository(SongFetch).find({
-    select: { id: true, recordings: true, searches: true },
+    select: { id: true, recordings: true, searches: true, stage: true },
     where: { status: 'searching', searchAgainAt: MoreThan(now) },
   });
   return waiting.filter((fetch) =>
@@ -40,7 +43,10 @@ export const searchAgainNow = async (
   for (const fetch of waiting) {
     await getRepository(SongFetch).update(fetch.id, {
       searchAgainAt: null,
-      searches: Math.max(0, (fetch.searches ?? 0) - 1),
+      // A wait for an answer (Prowlarr, a resting indexer) was no search.
+      searches: fetch.stage?.startsWith(SEARCHING_SOON)
+        ? (fetch.searches ?? 0)
+        : Math.max(0, (fetch.searches ?? 0) - 1),
     });
   }
   return waiting.length;

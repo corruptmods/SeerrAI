@@ -89,6 +89,51 @@ export const readNzb = (data: Buffer | string): NzbContents => {
   return { files, unnamedBytes };
 };
 
+/**
+ * The NZB with only some of its named files, as `readNzb` numbers them:
+ * so the client downloads just those, as a torrent's other files are
+ * skipped. Its head is kept. Undefined when none would be left.
+ */
+export const nzbWith = (
+  data: Buffer | string,
+  keep: (file: NzbFile) => boolean
+): string | undefined => {
+  const xml = typeof data === 'string' ? data : data.toString('utf8');
+  const lower = xml.toLowerCase();
+  const kept: string[] = [];
+  let first = -1;
+  let last = -1;
+  let named = 0;
+  let seen = 0;
+  let at = 0;
+  while (seen < MAX_FILES) {
+    const start = lower.indexOf('<file', at);
+    if (start === -1) break;
+    const tagEnd = lower.indexOf('>', start);
+    const end = lower.indexOf('</file>', start);
+    if (tagEnd === -1 || end === -1) break;
+    at = end + 7;
+    if (first === -1) first = start;
+    last = at;
+    seen++;
+    const subject = xml
+      .slice(start, tagEnd)
+      .match(/subject\s*=\s*"([^"]*)"/i)?.[1];
+    const name = subject ? nameFromSubject(decode(subject)) : undefined;
+    if (!name) continue;
+    let size = 0;
+    for (const segment of xml
+      .slice(tagEnd, end)
+      .matchAll(/bytes\s*=\s*"(\d+)"/gi)) {
+      size += Number(segment[1]);
+    }
+    if (keep({ index: named, name, size })) kept.push(xml.slice(start, at));
+    named++;
+  }
+  if (!kept.length || first === -1) return undefined;
+  return `${xml.slice(0, first)}${kept.join('\n')}${xml.slice(last)}`;
+};
+
 export const parseNzb = (data: Buffer | string): NzbFile[] =>
   readNzb(data).files;
 

@@ -169,7 +169,9 @@ class BlockedImports {
       }
     }
     if (!picked.length) return;
+    // Lidarr's own download: copied or moved as Lidarr would.
     await api.manualImport(
+      'auto',
       picked.map((file) => ({
         path: file.path,
         artistId: item.artistId,

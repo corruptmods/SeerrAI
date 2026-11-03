@@ -54,6 +54,11 @@ export interface FakeLidarr {
   queue: Record<string, unknown>[];
   /** How every command it was given ended. */
   commandStatus: string;
+  /**
+   * Answers given once instead, by method and path ("POST /api/v1/album"),
+   * after running what `before` does (another's change landing meanwhile).
+   */
+  once: Map<string, { status: number; body: unknown; before?: () => void }>;
   /** What Lidarr finds in a folder for manual import, by folder. */
   folders: Map<string, { path: string; size?: number }[]>;
   /** Whether a manual import takes its files (or refuses them all). */
@@ -91,6 +96,7 @@ export const createFakeLidarr = (): FakeLidarr => {
     folders: new Map(),
     queue: [],
     commandStatus: 'completed',
+    once: new Map(),
     delayProfiles: [
       {
         id: 1,
@@ -141,6 +147,7 @@ export const createFakeLidarr = (): FakeLidarr => {
       fake.folders = new Map();
       fake.queue = [];
       fake.commandStatus = 'completed';
+      fake.once = new Map();
       fake.delayProfiles = [
         {
           id: 1,
@@ -354,8 +361,14 @@ export const createFakeLidarr = (): FakeLidarr => {
         body: raw ? JSON.parse(raw) : undefined,
       };
       fake.calls.push(call);
-      const [status, data] =
-        fake.down || fake.failing.has(call.path)
+      const once = fake.once.get(`${call.method} ${call.path}`);
+      if (once) {
+        fake.once.delete(`${call.method} ${call.path}`);
+        once.before?.();
+      }
+      const [status, data] = once
+        ? [once.status, once.body]
+        : fake.down || fake.failing.has(call.path)
           ? [500, { message: 'Lidarr is down' }]
           : answer(call);
       res.writeHead(status, { 'Content-Type': 'application/json' });

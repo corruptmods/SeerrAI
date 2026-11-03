@@ -2,7 +2,7 @@ import { albumCoverUrl } from '@server/api/coverartarchive';
 import { MediaRequestStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import { MediaListSong } from '@server/entity/MediaList';
-import type { MediaRequest } from '@server/entity/MediaRequest';
+import { MediaRequest } from '@server/entity/MediaRequest';
 import SongRequest from '@server/entity/SongRequest';
 import { claimDelivery } from '@server/lib/notificationDelivery';
 import notificationManager, { Notification } from '@server/lib/notifications';
@@ -29,13 +29,30 @@ export const playlistOfRequests = async (
 ): Promise<Map<number, number>> => {
   if (!requestIds.length) return new Map();
   const songs = await getRepository(MediaListSong).find({
-    select: { listId: true, requestId: true },
+    select: { listId: true, requestId: true, requestForId: true },
     where: { requestId: In(requestIds) },
     order: { id: 'ASC' },
   });
+  // Made from the playlist: in its owner's name. A song may follow someone
+  // else's request for it, which is theirs to be told of.
+  const requesters = new Map(
+    (
+      await getRepository(MediaRequest).find({
+        select: { id: true, requestedBy: { id: true } },
+        relations: { requestedBy: true },
+        where: {
+          id: In([...new Set(songs.map((song) => song.requestId as number))]),
+        },
+      })
+    ).map((request) => [request.id, request.requestedBy?.id])
+  );
   const lists = new Map<number, number>();
   for (const song of songs) {
-    if (song.requestId && !lists.has(song.requestId)) {
+    if (
+      song.requestId &&
+      !lists.has(song.requestId) &&
+      requesters.get(song.requestId) === song.requestForId
+    ) {
       lists.set(song.requestId, song.listId);
     }
   }

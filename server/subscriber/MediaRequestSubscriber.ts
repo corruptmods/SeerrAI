@@ -41,6 +41,7 @@ import { getSettings } from '@server/lib/settings';
 import { sonarrRouting } from '@server/lib/sonarrRouting';
 import logger from '@server/logger';
 import { withNestedTransaction } from '@server/utils/nestedTransaction';
+import { isAxiosError } from 'axios';
 import { isEqual, truncate } from 'lodash';
 import type {
   EntityManager,
@@ -312,6 +313,23 @@ const reconcileMonitoringAfterRemoval = async (
  * has committed, by the database connection that save runs on.
  */
 const lidarrSendsAfterCommit = new WeakMap<QueryRunner, (() => void)[]>();
+
+/**
+ * Whether Lidarr refused to add an artist or album because it has it now:
+ * its own words, in the body of its answer.
+ */
+const addedMeanwhile = (e: unknown): boolean => {
+  for (let at: unknown = e; at; at = (at as { cause?: unknown }).cause) {
+    if (
+      isAxiosError(at) &&
+      /already (been )?(added|exists)/i.test(JSON.stringify(at.response?.data))
+    ) {
+      return true;
+    }
+    if (!(at instanceof Error)) break;
+  }
+  return false;
+};
 
 /** A request's albums and songs still to come: not done, not declined. */
 const OPEN_PARTS = [
@@ -1268,7 +1286,8 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
    */
   public async dispatchToLidarr(
     entity: MediaRequest,
-    lidarrSettings: LidarrSettings
+    lidarrSettings: LidarrSettings,
+    again = false
   ): Promise<void> {
     const lidarr = lidarrApi(lidarrSettings);
     const search = !lidarrSettings.preventSearch;
@@ -1436,6 +1455,11 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         mediaId: entity.media.id,
       });
     } catch (e) {
+      // Added meanwhile by the music sync, which also adds what requests
+      // ask for: sent again, it finds them there.
+      if (!again && addedMeanwhile(e)) {
+        return this.dispatchToLidarr(entity, lidarrSettings, true);
+      }
       const reason =
         e instanceof LidarrLookupError
           ? e.message
@@ -1445,13 +1469,10 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       await markUndispatchable(entity, reason);
       await this.failSongsThroughSingles(entity);
 
-      if (
-        media &&
-        entity.status === MediaRequestStatus.FAILED &&
-        (await claimDelivery(entity.id, Notification.MEDIA_FAILED))
-      ) {
-        MediaRequest.sendNotification(entity, media, Notification.MEDIA_FAILED);
-      }
+      // Told by the notification reconciler, within minutes: a playlist's
+      // requests together once they settle, any other on its own. Told
+      // here, a playlist's would go one by one, as the playlist may not
+      // have noted the request as its own yet.
     }
   }
 

@@ -1,4 +1,5 @@
 import { torrentClientFor, usenetClientFor } from '@server/api/downloadclients';
+import { musicBrainz } from '@server/api/musicbrainz';
 import type { FetchedRelease, ProwlarrRelease } from '@server/api/prowlarr';
 import ProwlarrAPI, { AUDIO_CATEGORIES } from '@server/api/prowlarr';
 import type LidarrAPI from '@server/api/servarr/lidarr';
@@ -28,6 +29,7 @@ import {
   PROWLARR,
   indexerLimits,
 } from '@server/lib/backfill/indexerLimit';
+import { nzbWith } from '@server/lib/backfill/nzb';
 import { mapRemotePath } from '@server/lib/backfill/paths';
 import { torrentStage } from '@server/lib/backfill/progress';
 import type { TorrentReading } from '@server/lib/backfill/watchdog';
@@ -42,8 +44,9 @@ import {
 import { refreshArtists } from '@server/lib/music/availability';
 import singleFallback from '@server/lib/music/singleFallback';
 import { clientFor, songFetchProblem } from '@server/lib/music/songFetchReady';
+import { SEARCHING_SOON } from '@server/lib/music/songFetchWaits';
 import { releaseForSongs } from '@server/lib/music/songRelease';
-import { normalizeTitle } from '@server/lib/music/songs';
+import { albumsFor, normalizeTitle, toVersion } from '@server/lib/music/songs';
 import { markUndispatchable } from '@server/lib/requestDispatch';
 import type {
   DownloadClientSettings,
@@ -525,12 +528,15 @@ class SongFetcher {
       await getRepository(SongFetch).save(fetch);
       return;
     }
+    // Not on the edition Lidarr has (another can't be imported into while
+    // it has files of this one): taken from the artist's next album with
+    // it, if there is one.
     const unknown = songs.filter((song) => !trackOf(tracks, song));
     if (unknown.length) {
-      await this.failSongs(
+      await this.toNextAlbum(
+        fetch,
         unknown,
-        `Lidarr’s ${fetch.albumTitle} has no “${unknown[0].title}”.`,
-        fetch
+        `Lidarr’s ${fetch.albumTitle} has no “${unknown[0].title}”.`
       );
     }
     // Already on file: the scans will find it here.
@@ -902,16 +908,20 @@ class SongFetcher {
       await this.end(fetch, 'failed', 'No release with the songs was found.');
       return;
     }
-    const missed = needed.filter(
-      (song) =>
-        !best!.files.some((file) => file.recordingMbid === song.recordingMbid)
+    // Not in the release chosen for the others: searched for again on their
+    // own, on the usual schedule, once this download is done.
+    const missed = new Set(
+      needed
+        .filter(
+          (song) =>
+            !best!.files.some(
+              (file) => file.recordingMbid === song.recordingMbid
+            )
+        )
+        .map((song) => song.recordingMbid)
     );
-    if (missed.length) {
-      await this.failSongs(
-        missed,
-        `No release of ${fetch.albumTitle} had “${missed[0].title}”.`,
-        fetch
-      );
+    if (missed.size) {
+      fetch.recordings = fetch.recordings.filter((id) => !missed.has(id));
     }
 
     const { release } = best;
@@ -932,12 +942,55 @@ class SongFetcher {
   }
 
   /**
+   * Songs this album can't bring moved to the artist's next album with the
+   * same recording, in the order albums are chosen in (so never back to
+   * one tried), to be taken from it; failed when none is left.
+   */
+  private async toNextAlbum(
+    fetch: SongFetch,
+    songs: SongRequest[],
+    reason: string
+  ): Promise<void> {
+    const failing: SongRequest[] = [];
+    for (const song of songs) {
+      const recording = await musicBrainz()
+        .getRecording(song.recordingMbid, 'background')
+        .catch(() => null);
+      const version = recording ? toVersion(recording) : null;
+      const albums = version ? albumsFor(version) : [];
+      const at = albums.findIndex((album) => album.mbId === fetch.albumMbid);
+      const next = albums[at + 1];
+      if (!next || next.mbId === fetch.albumMbid) {
+        failing.push(song);
+        continue;
+      }
+      await getRepository(SongRequest).update(song.id, {
+        sourceAlbumMbid: next.mbId,
+        sourceAlbumTitle: next.title,
+      });
+      fetch.recordings = fetch.recordings.filter(
+        (id) => id !== song.recordingMbid
+      );
+      logger.info('Taking a song from another album with it', {
+        label: LABEL,
+        song: song.title,
+        from: fetch.albumTitle,
+        album: next.title,
+      });
+    }
+    if (failing.length) await this.failSongs(failing, reason, fetch);
+    await getRepository(SongFetch).update(fetch.id, {
+      recordings: fetch.recordings,
+    });
+  }
+
+  /**
    * Searched again in a few minutes, the search not counted: Prowlarr or an
    * indexer couldn't answer, which says nothing of whether it's there.
    */
   private async searchSoon(fetch: SongFetch, why: string): Promise<void> {
     fetch.searchAgainAt = new Date(Date.now() + SEARCH_SOON_MS);
-    fetch.stage = `Searching again soon: ${why}`.slice(0, 250);
+    fetch.stage = `${SEARCHING_SOON}: ${why}`.slice(0, 250);
     await getRepository(SongFetch).save(fetch);
   }
 
@@ -1006,8 +1059,15 @@ class SongFetcher {
       fetch.stage = CHOOSING;
     } else {
       if (fetched.kind !== 'nzb') throw new ReleaseProblem('Expected an NZB.');
+      // Only the songs' files, when the post names them: the rest of the
+      // album isn't downloaded, nor left behind (the client never deletes
+      // what it finished).
+      const chosen = new Set(fetch.files.map((file) => file.index));
+      const only = fetch.files.every((file) => file.path)
+        ? nzbWith(fetched.data, (file) => chosen.has(file.index))
+        : undefined;
       fetch.downloadId = await usenetClientFor(client).addNzb(
-        fetched.data,
+        only ? Buffer.from(only, 'utf8') : fetched.data,
         release.title,
         category
       );
@@ -1303,7 +1363,10 @@ class SongFetcher {
         if (item.quality) qualities.set(item.path, item.quality);
       }
     }
+    // A torrent's files stay for it to seed; a Usenet download's song is
+    // moved out, leaving nothing behind.
     fetch.commandId = await lidarr.manualImport(
+      fetch.release?.protocol === 'torrent' ? 'copy' : 'move',
       ready.map((file) => {
         const path = paths.get(file.index)!;
         return {

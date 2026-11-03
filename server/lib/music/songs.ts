@@ -137,6 +137,34 @@ export const normalizeTitle = (title: string): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
+/**
+ * Words that make a recording, or a release, another take of a song than
+ * the one it is known by: live, acoustic or on piano, a remix or another
+ * mix, an instrumental, a karaoke or tribute copy, a demo, a re-recording,
+ * a sped-up copy, a Dolby Atmos or 360 mix. A radio edit, a single version
+ * or a remaster is the same take. As a pattern, for words as `takeWords`
+ * leaves them: lower case, punctuation as single spaces.
+ */
+export const OTHER_TAKE_WORDS = String.raw`live|acoustic|unplugged|piano|sessions?|orchestral|lullaby|remix|remixes|remixed|(?:club|extended|dub) mix|(?<!(?:radio|single|album|original|main|mono|stereo) )mix(?:es)?|instrumentals?|karaoke|a cappella|acapella|tribute|demos?|outtakes?|rehearsal|re recorded|rerecorded|\w+ s version|sped up|slowed|nightcore|8 bit|alternate (?:take|version|mix)|take \d+|dolby atmos|atmos|360 reality audio|spatial audio|binaural|surround`;
+
+const OTHER_TAKES = new RegExp(String.raw`\b(?:${OTHER_TAKE_WORDS})\b`, 'g');
+
+/** Words only: punctuation and brackets as spaces, case and accents aside. */
+export const takeWords = (text: string): string =>
+  normalizeTitle(text)
+    .replace(/&/g, ' and ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+/**
+ * Whether `name` is another take than `title` asks for: it names one
+ * `title` doesn't ("Song (acoustic)" for "Song"; not for "Song (Acoustic)").
+ */
+export const otherTake = (name: string, title: string): boolean => {
+  const own = new Set(takeWords(title).match(OTHER_TAKES) ?? []);
+  return (takeWords(name).match(OTHER_TAKES) ?? []).some((w) => !own.has(w));
+};
+
 const usable = (release: MbRecordingRelease): boolean =>
   !!release['release-group']?.id &&
   !UNUSABLE_STATUS.has((release.status ?? '').toLowerCase());

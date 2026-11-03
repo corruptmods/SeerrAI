@@ -34,6 +34,9 @@ patchedDependencies:
   deepmerge@4.3.1:
     hash: 8b24c5687756903b90a540d8715e2f5ca0dced2aa5f92f4a1a7d36c6a2237b10
     path: patches/deepmerge@4.3.1.patch
+  typeorm@0.3.31:
+    hash: 1ad1fd9a1ddfaafb2e7922a6c45a089f5bdb733c0d4eb5c0bf2a8beff150b023
+    path: patches/typeorm@0.3.31.patch
 
 importers:
 
@@ -95,7 +98,7 @@ importers:
         version: 1.8.2
       connect-typeorm:
         specifier: 2.0.0
-        version: 2.0.0(typeorm@0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(sqlite3@6.0.1)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.23))(@types/node@22.19.0)(typescript@5.4.5)))
+        version: 2.0.0(typeorm@0.3.31(patch_hash=1ad1fd9a1ddfaafb2e7922a6c45a089f5bdb733c0d4eb5c0bf2a8beff150b023)(babel-plugin-macros@3.1.0)(pg@8.23.0)(sqlite3@6.0.1)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.23))(@types/node@22.19.0)(typescript@5.4.5)))
       cookie-parser:
         specifier: 1.4.7
         version: 1.4.7
@@ -248,7 +251,7 @@ importers:
         version: 2.6.1
       typeorm:
         specifier: 0.3.31
-        version: 0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(sqlite3@6.0.1)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.23))(@types/node@22.19.0)(typescript@5.4.5))
+        version: 0.3.31(patch_hash=1ad1fd9a1ddfaafb2e7922a6c45a089f5bdb733c0d4eb5c0bf2a8beff150b023)(babel-plugin-macros@3.1.0)(pg@8.23.0)(sqlite3@6.0.1)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.23))(@types/node@22.19.0)(typescript@5.4.5))
       ua-parser-js:
         specifier: ^2.0.10
         version: 2.0.10
@@ -11738,13 +11741,13 @@ snapshots:
 
   concat-map@0.0.1: {}
 
-  connect-typeorm@2.0.0(typeorm@0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(sqlite3@6.0.1)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.23))(@types/node@22.19.0)(typescript@5.4.5))):
+  connect-typeorm@2.0.0(typeorm@0.3.31(patch_hash=1ad1fd9a1ddfaafb2e7922a6c45a089f5bdb733c0d4eb5c0bf2a8beff150b023)(babel-plugin-macros@3.1.0)(pg@8.23.0)(sqlite3@6.0.1)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.23))(@types/node@22.19.0)(typescript@5.4.5))):
     dependencies:
       '@types/debug': 0.0.31
       '@types/express-session': 1.18.2
       debug: 4.4.3(supports-color@5.5.0)
       express-session: 1.19.0
-      typeorm: 0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(sqlite3@6.0.1)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.23))(@types/node@22.19.0)(typescript@5.4.5))
+      typeorm: 0.3.31(patch_hash=1ad1fd9a1ddfaafb2e7922a6c45a089f5bdb733c0d4eb5c0bf2a8beff150b023)(babel-plugin-macros@3.1.0)(pg@8.23.0)(sqlite3@6.0.1)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.23))(@types/node@22.19.0)(typescript@5.4.5))
     transitivePeerDependencies:
       - supports-color
 
@@ -16592,7 +16595,7 @@ snapshots:
       possible-typed-array-names: 1.1.0
       reflect.getprototypeof: 1.0.10
 
-  typeorm@0.3.31(babel-plugin-macros@3.1.0)(pg@8.23.0)(sqlite3@6.0.1)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.23))(@types/node@22.19.0)(typescript@5.4.5)):
+  typeorm@0.3.31(patch_hash=1ad1fd9a1ddfaafb2e7922a6c45a089f5bdb733c0d4eb5c0bf2a8beff150b023)(babel-plugin-macros@3.1.0)(pg@8.23.0)(sqlite3@6.0.1)(ts-node@10.9.2(@swc/core@1.6.5(@swc/helpers@0.5.23))(@types/node@22.19.0)(typescript@5.4.5)):
     dependencies:
       '@sqltools/formatter': 1.2.5
       ansis: 4.4.0

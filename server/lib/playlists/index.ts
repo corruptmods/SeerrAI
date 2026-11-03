@@ -20,7 +20,7 @@ import {
 } from '@server/lib/music/requestSongs';
 import { songFetchProblem } from '@server/lib/music/songFetchReady';
 import type { Song, SongVersion } from '@server/lib/music/songs';
-import { albumFor, singleFor } from '@server/lib/music/songs';
+import { albumFor, otherTake, singleFor } from '@server/lib/music/songs';
 import { releaseDelivery } from '@server/lib/notificationDelivery';
 import { Notification } from '@server/lib/notifications';
 import type { PlaylistLink, SourceSong } from '@server/lib/playlists/sources';
@@ -72,14 +72,21 @@ const fetchable = (version: SongVersion): boolean =>
 
 /**
  * The version of a song a playlist means: nearest its length, else best
- * known; among those that can be requested, when any can.
+ * known; among those that can be requested, when any can. Never a take the
+ * playlist's title doesn't name (live, acoustic, a remix…): one can be
+ * nearer its length than the song itself. None when there are only those.
  */
 export const versionFor = (
   song: Song,
-  length: number | null | undefined
+  length: number | null | undefined,
+  title: string
 ): SongVersion | undefined => {
-  const requestable = song.versions.filter(fetchable);
-  const versions = requestable.length ? requestable : song.versions;
+  const same = song.versions.filter(
+    (v) => !otherTake(`${v.title} ${v.version ?? ''}`, title)
+  );
+  if (!same.length) return undefined;
+  const requestable = same.filter(fetchable);
+  const versions = requestable.length ? requestable : same;
   if (length) {
     const near = versions
       .filter(
@@ -91,9 +98,6 @@ export const versionFor = (
           Math.abs((a.length ?? 0) - length) -
           Math.abs((b.length ?? 0) - length)
       );
-    // Among those near enough, the best known (first in MusicBrainz's
-    // order) unless another is much nearer: a radio edit and the album
-    // version can be seconds apart.
     if (near.length) return near[0];
   }
   return versions[0];
@@ -134,9 +138,10 @@ class Playlists {
   }
 
   /**
-   * Tries a song once more, now: one MusicBrainz didn't know, or that
-   * couldn't be requested, is looked for again; one whose request failed
-   * (its album couldn't be got) has its request tried again.
+   * Tries a song once more, now: one MusicBrainz didn't know, that couldn't
+   * be requested, or whose request was deleted, is looked for again; one
+   * whose request failed (its album couldn't be got) has its request tried
+   * again.
    */
   public async retry(song: MediaListSong): Promise<void> {
     if (
@@ -144,14 +149,15 @@ class Playlists {
       song.requestId
     ) {
       // Its request was deleted, or was someone else's that the song only
-      // followed: asked for afresh, in the owner's name.
+      // followed: looked up again and asked for afresh, in the owner's name.
+      // What it was matched to may be why it was deleted.
       const request = await getRepository(MediaRequest).findOne({
         where: { id: song.requestId },
         relations: { requestedBy: true },
       });
       if (!request || request.requestedBy?.id !== song.requestForId) {
         await getRepository(MediaListSong).update(song.id, {
-          state: 'matched',
+          state: 'matching',
           requestId: null,
           problem: null,
         });
@@ -351,7 +357,7 @@ class Playlists {
       let found: Song | null;
       try {
         found = await songNamed(song.title, song.artistName, (s) =>
-          versionFor(s, song.length)
+          versionFor(s, song.length, song.title)
         );
       } catch (e) {
         // MusicBrainz is unreachable: tried again on the next pass.
@@ -361,7 +367,9 @@ class Playlists {
         });
         return false;
       }
-      const version = found ? versionFor(found, song.length) : undefined;
+      const version = found
+        ? versionFor(found, song.length, song.title)
+        : undefined;
       // Only while it is still being found: taken off the playlist
       // meanwhile, it stays off.
       await repo.update(

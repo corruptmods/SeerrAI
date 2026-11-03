@@ -4,6 +4,7 @@ import type {
 } from '@server/api/musicbrainz/interfaces';
 import {
   groupSongs,
+  otherTake,
   singleFor,
   splitTitle,
   toVersion,
@@ -112,6 +113,46 @@ describe('versionLabel', () => {
       'Club Mix · live'
     );
     assert.equal(versionLabel(recording('Lantern Song', [])), null);
+  });
+});
+
+describe('otherTake', () => {
+  it('is a take the title doesn’t name', () => {
+    for (const name of [
+      'Lantern Song (acoustic)',
+      'Lantern Song live, 2013-05-31: Pier Hall',
+      'Lantern Song Live from the Pier Hall',
+      'Lantern Song The Piano Sessions',
+      'Lantern Song Harbour mix',
+      'Lantern Song 360 Reality Audio mix',
+      'Lantern Song (Dolby Atmos)',
+      'Lantern Song (sped up)',
+      'Lantern Song (Glasswing’s Version)',
+    ]) {
+      assert.equal(otherTake(name, 'Lantern Song'), true, name);
+    }
+  });
+
+  it('is the same take for an edit, a remaster or what the title names', () => {
+    for (const name of [
+      'Lantern Song',
+      'Lantern Song radio edit',
+      'Lantern Song single version',
+      'Lantern Song (2015 remaster)',
+      'Lantern Song explicit',
+    ]) {
+      assert.equal(otherTake(name, 'Lantern Song'), false, name);
+    }
+    assert.equal(
+      otherTake('Lantern Song (acoustic)', 'Lantern Song (Acoustic)'),
+      false
+    );
+    assert.equal(
+      otherTake('Lantern Song (remix)', 'Lantern Song [Remix]'),
+      false
+    );
+    // A word that is the song's own.
+    assert.equal(otherTake('Live Wire', 'Live Wire'), false);
   });
 });
 

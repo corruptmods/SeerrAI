@@ -16,6 +16,12 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- Playlists: a song is no longer matched to a live, acoustic, piano or remixed take, or a Dolby Atmos or 360 mix, unless its title says so; such a take could be nearer the playlist's length than the song itself. A song with only such takes on MusicBrainz is shown as not found. Try again on a song whose request was deleted looks it up again.
+
+- A song taken from an album is no longer taken from a Dolby Atmos, 360 Reality Audio, piano, session or other mix of it.
+
+- The database warning "Calling client.query() when the client is already executing a query" on Postgres is gone: the database library sent some queries side by side on one connection, and now sends them one after another.
+
 - A song taken from an album is only taken from a release of that album by that artist, and only from that song's own file. Live, remixed, instrumental, karaoke, tribute and re-recorded releases and files no longer count, nor another album of the artist's for a self-titled one, nor a whole album in one file; a title track is found by its own name, and two songs never share a file. A Usenet post's file list is now read before downloading it, as a torrent's is. A download Lidarr holds back is imported by Seerr AI only when Lidarr held it for missing tracks and it is named as the single.
 
 - Songs no longer get stuck: a song whose single Lidarr has part of, or took an edition of without it, is taken by Seerr AI; a single handed over no longer counts as on its way, so its other songs can be asked for; Lidarr's search for a single is asked for once, an hour apart when it couldn't run, and its songs are handed over only once Lidarr's queue would show a grab. A song asked for while its album downloads waits for that download instead of starting a second. A Usenet download the client keeps paused is given up like a stalled torrent. Lidarr not answering during an import no longer fails the songs, nor finishes a song on a single that is here. A song is no longer marked here by another take of the same name. Songs coming through singles fail with their request when Lidarr can't take it, so they can be tried again.

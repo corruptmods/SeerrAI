@@ -1,0 +1,32 @@
+diff --git a/driver/postgres/PostgresQueryRunner.js b/driver/postgres/PostgresQueryRunner.js
+index 30abd4c31a61c9debe661dff290f60007ac6865f..229753b6a33cc070658f9be0a2dc05316eb08b84 100644
+--- a/driver/postgres/PostgresQueryRunner.js
++++ b/driver/postgres/PostgresQueryRunner.js
+@@ -35,6 +35,18 @@ class PostgresQueryRunner extends BaseQueryRunner_1.BaseQueryRunner {
+         this.connection = driver.connection;
+         this.mode = mode;
+         this.broadcaster = new Broadcaster_1.Broadcaster(this);
++        this.clientIdle = Promise.resolve();
++    }
++    /**
++     * Runs a query on the client once the one before it has finished. pg
++     * 8.19 deprecates queueing queries on a busy client (pg 9 refuses it),
++     * and TypeORM runs a query runner's relation and persistence queries
++     * side by side.
++     */
++    whenClientIdle(run) {
++        const result = this.clientIdle.then(run, run);
++        this.clientIdle = result.then(() => undefined, () => undefined);
++        return result;
+     }
+     // -------------------------------------------------------------------------
+     // Public Methods
+@@ -178,7 +190,7 @@ class PostgresQueryRunner extends BaseQueryRunner_1.BaseQueryRunner {
+         const broadcasterResult = new BroadcasterResult_1.BroadcasterResult();
+         try {
+             const queryStartTime = Date.now();
+-            const raw = await databaseConnection.query(query, parameters);
++            const raw = await this.whenClientIdle(() => databaseConnection.query(query, parameters));
+             // log slow queries if maxQueryExecution time is set
+             const maxQueryExecutionTime = this.driver.options.maxQueryExecutionTime;
+             const queryEndTime = Date.now();

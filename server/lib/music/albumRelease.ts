@@ -1,4 +1,8 @@
-import { normalizeTitle } from '@server/lib/music/songs';
+import {
+  OTHER_TAKE_WORDS,
+  normalizeTitle,
+  takeWords,
+} from '@server/lib/music/songs';
 
 /*
  * Reading a release of an album, to take songs from it: whether its name
@@ -12,20 +16,18 @@ const AUDIO = /\.(flac|mp3|m4a|aac|ogg|oga|opus|wav|aiff?|alac|ape|wv|wma)$/i;
 
 export const isAudio = (path: string): boolean => AUDIO.test(path);
 
-/** Words only: punctuation and brackets as spaces, case and accents aside. */
-const words = (text: string): string =>
-  normalizeTitle(text)
-    .replace(/&/g, ' and ')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim();
+const words = takeWords;
 
 /**
  * Words that make a release, or a file, another version of what it names:
- * a live or acoustic take, a remix, an instrumental, a karaoke or tribute
- * copy, a re-recording. A remaster or a deluxe edition is the same take.
+ * another take of its songs (live, acoustic, a remix, a Dolby Atmos mix…),
+ * or a radio edit, which is no album. A remaster or a deluxe edition is the
+ * same take.
  */
-const VERSIONS =
-  /\b(live|acoustic|unplugged|remix|remixes|remixed|instrumental|instrumentals|karaoke|a cappella|acapella|tribute|demo|demos|outtake|outtakes|rehearsal|re recorded|rerecorded|\w+ s version|sped up|slowed|nightcore|8 bit|lullaby versions?|piano versions?|orchestral versions?|(club|extended|dub|radio|instrumental) mix|radio edit|take \d+|alternate (take|version|mix))\b/g;
+const VERSIONS = new RegExp(
+  String.raw`\b(?:${OTHER_TAKE_WORDS}|radio edit|radio mix)\b`,
+  'g'
+);
 
 /** The version words in a name. */
 const versionsIn = (text: string): Set<string> =>

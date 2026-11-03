@@ -50,6 +50,7 @@ const ARTIST = '3c9e5f21-8d47-4b6a-a1e3-5f7d2c90b844';
 const LANTERN = 'a1b2c3d4-0002-4000-8000-000000000002';
 const LANTERN_ALBUM = 'a1b2c3d4-0009-4000-8000-000000000009';
 const NIGHT_SWIM = 'a1b2c3d4-0007-4000-8000-000000000007';
+const WRONG_TAKE = 'a1b2c3d4-0008-4000-8000-000000000008';
 const LANTERN_SINGLE = '6b2e9c41-7d38-3f05-a6e1-0c4d8b7f2a93';
 const NIGHT_SWIM_SINGLE = '3e9a7c15-2d84-4f60-a1b3-c5d7e9f02468';
 const PLAYLIST_ID = '0aB1cD2eF3gH4iJ5kL6mN7';
@@ -303,9 +304,50 @@ describe('a playlist link', () => {
         { mbId: LANTERN, length: 214_000 },
       ],
     } as Parameters<typeof versionFor>[0];
-    assert.equal(versionFor(song, 214_500)?.mbId, LANTERN);
-    assert.equal(versionFor(song, 300_000)?.mbId, LANTERN_ALBUM);
-    assert.equal(versionFor(song, null)?.mbId, LANTERN_ALBUM);
+    assert.equal(versionFor(song, 214_500, 'Lantern Song')?.mbId, LANTERN);
+    assert.equal(
+      versionFor(song, 300_000, 'Lantern Song')?.mbId,
+      LANTERN_ALBUM
+    );
+    assert.equal(versionFor(song, null, 'Lantern Song')?.mbId, LANTERN_ALBUM);
+  });
+
+  it('never picks a take the playlist’s title doesn’t name', () => {
+    const version = (
+      mbId: string,
+      title: string,
+      length: number,
+      label?: string
+    ) => ({
+      mbId,
+      title,
+      version: label ?? null,
+      length,
+    });
+    const song = {
+      key: 'k',
+      title: 'Lantern Song',
+      artistMbid: ARTIST,
+      artistName: 'Glasswing',
+      versions: [
+        // Nearest the playlist's length, but acoustic or live.
+        version(LANTERN, 'Lantern Song (acoustic)', 193_234, 'acoustic'),
+        version(NIGHT_SWIM, 'Lantern Song', 193_400, 'live, 2019: Pier Hall'),
+        version(LANTERN_ALBUM, 'Lantern Song', 193_000),
+      ],
+    } as unknown as Parameters<typeof versionFor>[0];
+    assert.equal(
+      versionFor(song, 193_467, 'Lantern Song')?.mbId,
+      LANTERN_ALBUM
+    );
+    // Named by the title, it is the one.
+    assert.equal(
+      versionFor(song, 193_467, 'Lantern Song (Acoustic)')?.mbId,
+      LANTERN
+    );
+    // Only other takes: none, rather than one the playlist doesn't hold.
+    const onlyLive = { ...song, versions: song.versions.slice(1, 2) };
+    assert.equal(versionFor(onlyLive, 193_467, 'Lantern Song'), undefined);
   });
 
   it('picks a version that can be requested over one only on others’ compilations', () => {
@@ -340,7 +382,10 @@ describe('a playlist link', () => {
         },
       ],
     } as unknown as Parameters<typeof versionFor>[0];
-    assert.equal(versionFor(song, 223_000)?.mbId, LANTERN_ALBUM);
+    assert.equal(
+      versionFor(song, 223_000, 'Lantern Song')?.mbId,
+      LANTERN_ALBUM
+    );
   });
 });
 
@@ -485,12 +530,15 @@ describe('a linked playlist', () => {
       listId: list.id,
       title: 'Lantern Song',
     });
-    // As an admin deleting it does.
+    // As an admin deleting it does, it being of the wrong take.
     await getRepository(MediaRequest).remove(
       await getRepository(MediaRequest).findOneByOrFail({
         id: lantern.requestId!,
       })
     );
+    await getRepository(MediaListSong).update(lantern.id, {
+      recordingMbid: WRONG_TAKE,
+    });
     assert.equal((await songsOf(list))['Lantern Song'], 'notGot');
 
     await playlists.retry(
@@ -501,6 +549,8 @@ describe('a linked playlist', () => {
       id: lantern.id,
     });
     assert.notEqual(now.requestId, lantern.requestId);
+    // Looked up again, not asked for as it was.
+    assert.equal(now.recordingMbid, LANTERN);
     assert.equal((await songsOf(list))['Lantern Song'], 'approval');
   });
 

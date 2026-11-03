@@ -1677,6 +1677,10 @@ describe('reading a release of an album', () => {
       'Glasswing - Static Garden (Instrumentals)',
       'Sing Like Glasswing - Static Garden (Karaoke Version)',
       'Glasswing - Static Garden (Glasswing’s Version)',
+      'Glasswing - Static Garden (2005) [Dolby Atmos]',
+      'Glasswing - Static Garden (360 Reality Audio) FLAC',
+      'Glasswing - Static Garden (Harbour Mix) (2020) FLAC',
+      'Glasswing - Static Garden: The Piano Sessions',
     ]) {
       assert.equal(
         namesAlbum(title, 'Static Garden', 'Glasswing'),
@@ -1684,11 +1688,28 @@ describe('reading a release of an album', () => {
         title
       );
     }
+    // A remaster is the same take.
+    assert.equal(
+      namesAlbum(
+        'Glasswing - Static Garden (Remastered 2015) [FLAC]',
+        'Static Garden',
+        'Glasswing'
+      ),
+      true
+    );
     // A version the album itself is.
     assert.equal(
       namesAlbum(
         'Glasswing - Live at the Pier (2010) FLAC',
         'Live at the Pier',
+        'Glasswing'
+      ),
+      true
+    );
+    assert.equal(
+      namesAlbum(
+        'Glasswing - Static Garden (Harbour Mix) (2020) FLAC',
+        'Static Garden (Harbour Mix)',
         'Glasswing'
       ),
       true

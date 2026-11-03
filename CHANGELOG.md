@@ -16,6 +16,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- A song asked for again starts within a minute or so, instead of waiting behind every album due a search (after an update, all of them): setting up albums, starting downloads and imports now come before searches.
+
 - A song whose title has an apostrophe ("Ain't", "It's", "O'Clock") is found in a download that drops it ("Aint"), as many do, and so is an album whose release is named that way. Such songs failed with "None of the songs were in the finished download".
 
 - A song Lidarr's edition of its album lacks, with no other album to take it from, is taken from its own single instead of failing.

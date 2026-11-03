@@ -219,6 +219,24 @@ export const trackOf = (
   );
 };
 
+/**
+ * Fetches in the order a tick moves them along: what is quick first
+ * (setting an album up in Lidarr, starting a chosen release, following a
+ * download or an import), then searches, which take a minute or more each
+ * and all come due at once after an update. Oldest first within each.
+ */
+export const quickestFirst = <
+  T extends Pick<SongFetch, 'id' | 'status' | 'release' | 'files'>,
+>(
+  fetches: T[]
+): T[] => {
+  const searches = (fetch: T) =>
+    fetch.status === 'searching' && !(fetch.release && fetch.files.length);
+  return [...fetches].sort(
+    (a, b) => Number(searches(a)) - Number(searches(b)) || a.id - b.id
+  );
+};
+
 class SongFetcher {
   private ticking = false;
 
@@ -247,7 +265,7 @@ class SongFetcher {
         where: { status: In(ACTIVE) },
         order: { id: 'ASC' },
       });
-      for (const fetch of fetches) {
+      for (const fetch of quickestFirst(fetches)) {
         try {
           await this.advance(fetch);
           this.troubleSince.delete(fetch.id);

@@ -34,6 +34,7 @@ import { songStandings } from '@server/lib/music/requestSongs';
 import songFetcher, {
   delayProfileFor,
   holdsSlot,
+  quickestFirst,
   rankReleases,
 } from '@server/lib/music/songFetch';
 import {
@@ -1631,6 +1632,26 @@ describe('choosing a release of an album', () => {
       ),
       false
     );
+  });
+});
+
+describe('the order fetches move along in', () => {
+  it('takes quick steps before searches, oldest first', () => {
+    const fetch = (id: number, status: string, chosen = false) => ({
+      id,
+      status,
+      release: chosen ? { title: 'Static Garden' } : null,
+      files: chosen ? [{ index: 0 }] : [],
+    });
+    const order = quickestFirst([
+      fetch(1, 'searching'),
+      fetch(2, 'searching', true),
+      fetch(3, 'queued'),
+      fetch(4, 'searching'),
+      fetch(5, 'downloading'),
+      fetch(6, 'importing'),
+    ] as unknown as Parameters<typeof quickestFirst>[0]).map((f) => f.id);
+    assert.deepEqual(order, [2, 3, 5, 6, 1, 4]);
   });
 });
 

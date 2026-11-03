@@ -21,20 +21,25 @@ const words = (text: string): string =>
 
 /**
  * Whether a release's name is this album of this artist: it names the
- * album, and the artist too (a compilation of many may say "VA" instead).
+ * album, and the artist too. Only an album of Various Artists may go by
+ * "VA" instead: another artist's song on a compilation is not their album.
+ * A Usenet post of one file names that file in quotes ("Album \"03 - Song.mp3\""),
+ * which is not the album's name.
  */
 export const namesAlbum = (
   title: string,
   album: string,
   artist: string
 ): boolean => {
-  const t = ` ${words(title)} `;
+  const name = title.replace(/(?:"|%22)[^"]*?(?:"|%22)/g, ' ');
+  const t = ` ${words(name)} `;
   const a = words(album);
   const by = words(artist);
   return (
     a.length >= 2 &&
     t.includes(` ${a} `) &&
-    (t.includes(` ${by} `) || /\b(va|various artists)\b/.test(t))
+    (t.includes(` ${by} `) ||
+      (by === 'various artists' && /\b(va|various artists)\b/.test(t)))
   );
 };
 

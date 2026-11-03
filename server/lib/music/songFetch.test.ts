@@ -1406,6 +1406,44 @@ describe('reading a release of an album', () => {
     );
   });
 
+  it('is not fooled by a compilation, or by the file a post is of', () => {
+    // Another artist's song with the title's word in it, on a compilation.
+    assert.equal(
+      namesAlbum(
+        'Various Artists - 2011 - Road Hits "22-other_singer-thank_you_for_lantern_nights.mp3"',
+        'Lantern',
+        'Glasswing'
+      ),
+      false
+    );
+    assert.equal(
+      namesAlbum('VA - Road Hits - Lantern Mix (2CD)', 'Lantern', 'Glasswing'),
+      false
+    );
+    // A post of one file of another album, the file named for the album.
+    assert.equal(
+      namesAlbum(
+        'Glasswing - 2010 - Live at the Pier (2CD) %22101-glasswing-static_garden.mp3%22',
+        'Static Garden',
+        'Glasswing'
+      ),
+      false
+    );
+    assert.equal(
+      namesAlbum(
+        'Glasswing - Static Garden (1997) "01 - Opening.flac"',
+        'Static Garden',
+        'Glasswing'
+      ),
+      true
+    );
+    // An album of Various Artists still goes by VA.
+    assert.equal(
+      namesAlbum('VA - Road Hits (2011) MP3', 'Road Hits', 'Various Artists'),
+      true
+    );
+  });
+
   it('finds the song’s file by its name, not a longer one holding it', () => {
     const files = [
       {

@@ -13,18 +13,17 @@ import { In, IsNull, Not } from 'typeorm';
 /*
  * A song is fetched through its single when it had one, as Lidarr fetches
  * any album. Older singles are seldom posted on their own (Usenet has the
- * albums), so Lidarr often finds no release at all. Then the song is taken
- * from one of the artist's albums with it instead (lib/music/songFetch), at
- * once: Lidarr is asked to search for the single, and when that search
- * ends with nothing grabbed, the song moves to the album.
+ * albums), so Lidarr often finds no release at all. Then Seerr takes the
+ * song itself (lib/music/songFetch), at once: Lidarr is asked to search for
+ * the single once, and when that search ends with nothing grabbed, the song
+ * is taken from one of the artist's albums with it, or else from the single,
+ * Seerr's own searches looking again on their schedule.
  */
 
 const LABEL = 'Song Fetch';
 
 /** Searches started a minute, so many singles don't flood the indexers. */
 const SEARCHES_AT_ONCE = 3;
-/** A song on no album of the artist's isn't looked up again for this long. */
-const NO_ALBUM_AGAIN_MS = 6 * 60 * 60_000;
 
 /** Lidarr's states for a command that is over. */
 const OVER = ['completed', 'failed', 'aborted', 'cancelled', 'orphaned'];
@@ -38,14 +37,18 @@ interface Single {
 class SingleFallback {
   /** The search started for each single, by server and Lidarr album. */
   private searches = new Map<string, number>();
-  /** Songs on no album of the artist's, and when that was found. */
-  private noAlbum = new Map<string, number>();
+  /**
+   * Singles Lidarr's search found nothing for whose songs aren't handed on
+   * yet (MusicBrainz didn't answer): not searched for again.
+   */
+  private searched = new Set<string>();
 
-  /** Moves songs whose single Lidarr couldn't find to an album. */
-  public async run(now = Date.now()): Promise<void> {
+  /** Hands songs whose single Lidarr couldn't find to Seerr's song fetch. */
+  public async run(): Promise<void> {
     const singles = await this.waiting();
     if (!singles.length) {
       this.searches.clear();
+      this.searched.clear();
       return;
     }
     const queues = new Map<number, Set<number>>();
@@ -71,6 +74,10 @@ class SingleFallback {
         const album = await api.getAlbum(single.lidarrAlbumId);
         if ((album.statistics?.trackFileCount ?? 0) > 0) continue;
 
+        if (this.searched.has(key)) {
+          if (await this.handOn(api, single)) this.searched.delete(key);
+          continue;
+        }
         const commandId = this.searches.get(key);
         if (commandId === undefined) {
           if (started >= SEARCHES_AT_ONCE) continue;
@@ -90,7 +97,8 @@ class SingleFallback {
         if (command?.status !== 'completed') continue;
         // Grabbed by the search just over: it's on its way.
         if (await inQueue(single, true)) continue;
-        await this.toAlbums(api, single, now);
+        this.searched.add(key);
+        if (await this.handOn(api, single)) this.searched.delete(key);
       } catch (e) {
         logger.debug('Could not check a single Lidarr is looking for', {
           label: LABEL,
@@ -101,6 +109,9 @@ class SingleFallback {
     }
     for (const key of this.searches.keys()) {
       if (!live.has(key)) this.searches.delete(key);
+    }
+    for (const key of this.searched) {
+      if (!live.has(key)) this.searched.delete(key);
     }
   }
 
@@ -159,52 +170,52 @@ class SingleFallback {
   }
 
   /**
-   * Each of the single's songs onto the artist's album with that very
-   * recording, for the song to be taken from it; and Lidarr no longer
-   * looks for the single, unless a song stays on it.
+   * Each of the single's songs to Seerr's song fetch: taken from the
+   * artist's album with that very recording, or from the single itself when
+   * no album has it. Lidarr no longer looks for the single. False while a
+   * song's recording couldn't be looked up, for it to be tried again.
    */
-  private async toAlbums(
-    api: LidarrAPI,
-    single: Single,
-    now: number
-  ): Promise<void> {
-    let staying = 0;
+  private async handOn(api: LidarrAPI, single: Single): Promise<boolean> {
+    let left = 0;
     for (const song of single.songs) {
-      const seen = this.noAlbum.get(song.recordingMbid);
-      if (seen !== undefined && now - seen < NO_ALBUM_AGAIN_MS) {
-        staying++;
+      let recording;
+      try {
+        recording = await musicBrainz().getRecording(
+          song.recordingMbid,
+          'background'
+        );
+      } catch (e) {
+        left++;
+        logger.debug('Could not look up a song Lidarr found no single for', {
+          label: LABEL,
+          song: song.title,
+          errorMessage: e instanceof Error ? e.message : String(e),
+        });
         continue;
       }
-      const recording = await musicBrainz().getRecording(
-        song.recordingMbid,
-        'background'
-      );
       const version = recording ? toVersion(recording) : null;
       const album = version ? albumFor(version) : null;
-      if (!album) {
-        this.noAlbum.set(song.recordingMbid, now);
-        staying++;
-        continue;
-      }
       await getRepository(SongRequest).update(song.id, {
         singleMbid: null,
         singleTitle: null,
-        sourceAlbumMbid: album.mbId,
-        sourceAlbumTitle: album.title,
+        sourceAlbumMbid: album?.mbId ?? song.singleMbid,
+        sourceAlbumTitle: album?.title ?? song.singleTitle,
       });
       logger.info(
-        'Lidarr found no release of the single; taking the song from an album',
+        album
+          ? 'Lidarr found no release of the single; taking the song from an album'
+          : 'Lidarr found no release of the single; Seerr is looking for it instead',
         {
           label: LABEL,
           song: song.title,
           single: song.singleTitle,
-          album: album.title,
+          ...(album ? { album: album.title } : {}),
         }
       );
     }
-    if (!staying) {
-      await api.monitorAlbums([single.lidarrAlbumId], false);
-    }
+    if (left) return false;
+    await api.monitorAlbums([single.lidarrAlbumId], false);
+    return true;
   }
 }
 

@@ -24,8 +24,9 @@ import {
 
 /*
  * A song asked for through its single, when Lidarr's search for the single
- * grabs nothing: it moves to the artist's album with the same recording, to
- * be taken from it, and Lidarr stops looking for the single.
+ * grabs nothing: Seerr takes it from the artist's album with the same
+ * recording, or from the single itself, and Lidarr stops looking for the
+ * single.
  */
 
 setupTestDb();
@@ -184,16 +185,46 @@ describe('a single Lidarr finds nothing for', () => {
     assert.equal(now.singleMbid, SINGLE);
   });
 
-  it('stays on its single when no album of the artist’s has the song', async () => {
+  it('has Seerr take it from the single when no album has the song', async () => {
     onAlbum = false;
     const song = await requestSong();
     await singleFallback.run();
     await singleFallback.run();
+    await singleFallback.run();
+    assert.equal(searches(), 1, 'Lidarr is asked only once');
     const now = await getRepository(SongRequest).findOneByOrFail({
       id: song.id,
     });
-    assert.equal(now.singleMbid, SINGLE);
-    assert.equal(unmonitored(), false);
+    assert.equal(now.singleMbid, null);
+    assert.equal(now.sourceAlbumMbid, SINGLE);
+    assert.equal(now.sourceAlbumTitle, 'Lantern Song');
+    assert.equal(unmonitored(), true);
+  });
+
+  it('is not searched again while MusicBrainz doesn’t answer', async () => {
+    const song = await requestSong();
+    mock.restoreAll();
+    const lookup = mock.method(
+      MusicBrainz.prototype,
+      'getRecording',
+      async () => {
+        throw new Error('MusicBrainz is down');
+      }
+    );
+    await singleFallback.run();
+    await singleFallback.run();
+    await singleFallback.run();
+    assert.equal(searches(), 1);
+    let now = await getRepository(SongRequest).findOneByOrFail({
+      id: song.id,
+    });
+    assert.equal(now.singleMbid, SINGLE, 'kept until it is looked up');
+
+    lookup.mock.mockImplementation(async () => recording());
+    await singleFallback.run();
+    now = await getRepository(SongRequest).findOneByOrFail({ id: song.id });
+    assert.equal(now.sourceAlbumMbid, ALBUM);
+    assert.equal(searches(), 1);
   });
 
   it('is left alone where Lidarr is told not to search', async () => {

@@ -6,13 +6,15 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### New
 
-- **A song whose single Lidarr can't find is taken from an album instead**: older singles are seldom posted on their own, while their albums are. As soon as Lidarr's search for the single grabs nothing, the song is taken from the artist's album with the same recording, through Backfill, and Lidarr stops looking for the single. Songs already waiting move over on update, a few singles a minute.
+- **A song whose single Lidarr can't find is taken from an album instead**: older singles are seldom posted on their own, while their albums are. As soon as Lidarr's search for the single grabs nothing, the song is taken from the artist's album with the same recording, through Backfill, and Lidarr stops looking for the single. A song on no album is looked for by Seerr AI itself, from the single, searched again on the same schedule as albums. Songs already waiting move over on update, a few singles a minute.
 
 - **Songs from singles Lidarr holds back are imported**: a single's download with just the song stops in Lidarr's queue with "Has missing tracks" when the single's edition also has a radio edit or an instrumental. Seerr AI now imports the requested song on its own, into its track. Health lists the downloads Lidarr still won't import, with its reason.
 
 - **Search again now** on a playlist's page: albums of its songs that found nothing yet, waiting hours to be searched again, are searched straight away.
 
 ### Fixed
+
+- A song taken from an album no longer fails when its download turns out not to have it: the next release is tried. A Usenet download that renamed its files has the song found by its name.
 
 - Taking a song from an album asks only Prowlarr's indexers that carry music and aren't paused, instead of waiting on every indexer, so searches take seconds rather than a minute or more. An album that found nothing is searched again after 1, 3, 6, 12 and 24 hours, one more try than before over the same two days.
 

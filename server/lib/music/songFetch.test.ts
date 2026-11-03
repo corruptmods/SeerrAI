@@ -1114,6 +1114,65 @@ describe('taking a song from its album', () => {
     ]);
   });
 
+  it('finds the song by its name when the download renamed its files', async () => {
+    const { usenet } = useUsenet(false);
+    // Posted under other names than the files have once downloaded.
+    mock.method(backfill, 'filesOf', async () => ({
+      files: [
+        {
+          index: 0,
+          path: 'Glasswing - Static Garden - 01 - Opening.flac',
+          size: 30 * MB,
+        },
+        {
+          index: 1,
+          path: 'Glasswing - Static Garden - 02 - Lantern Song.flac',
+          size: 40 * MB,
+        },
+      ],
+      infoHash: null,
+    }));
+    found = [usenet];
+    await requestSongs([LANTERN]);
+    await startFetching();
+    assert.equal((await fetchOf()).status, 'downloading');
+
+    done = true;
+    await songFetcher.tick();
+    const fetch = await fetchOf();
+    assert.equal(fetch.status, 'importing');
+    assert.deepEqual(importedPaths(), [
+      [
+        '/data/complete/Glasswing - Static Garden/02 - Lantern Song.flac',
+        [502],
+      ],
+    ]);
+  });
+
+  it('tries another release when the download turns out not to have the song', async () => {
+    const { usenet } = useUsenet(true);
+    const other = { ...usenet, guid: 'https://nzb/sg-2' };
+    found = [usenet, other];
+    lidarr.folders.set('/data/complete/Glasswing - Static Garden', [
+      {
+        path: '/data/complete/Glasswing - Static Garden/01 - Opening.flac',
+        size: 30 * MB,
+      },
+    ]);
+    await requestSongs([LANTERN]);
+    await startFetching();
+    done = true;
+    await songFetcher.tick();
+
+    const fetch = await fetchOf();
+    assert.equal(fetch.status, 'searching');
+    assert.deepEqual(fetch.tried, [usenet.guid]);
+    const song = await getRepository(SongRequest).findOneByOrFail({
+      recordingMbid: LANTERN,
+    });
+    assert.equal(song.status, MediaRequestStatus.APPROVED, 'not failed');
+  });
+
   it('still takes a torrent nobody seems to share when it is all there is', async () => {
     found = [{ ...RELEASE, seeders: 0 }];
     await requestSongs([LANTERN]);

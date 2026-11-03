@@ -1094,8 +1094,8 @@ class SongFetcher {
         return;
       }
       // Lidarr reads the finished folder; each song's file by the name it
-      // had in the NZB, or, when the post was packed or renamed, by the
-      // song's own name.
+      // had in the NZB, or, when the post was packed, renamed or its names
+      // scrambled, by the song's own name.
       const seen = await lidarr.getManualImport(
         lidarrPath(job.storage),
         fetch.lidarrArtistId!
@@ -1106,23 +1106,23 @@ class SongFetcher {
         // Lidarr not saying is no reason to pass a file over.
         size: item.size ?? Number.MAX_SAFE_INTEGER,
       }));
-      const tracks = fetch.files.some((file) => !file.path)
-        ? await this.tracksOf(lidarr, fetch)
-        : [];
+      const baseName = (path: string) =>
+        path.replace(/\\/g, '/').split('/').pop();
+      let tracks: LidarrTrack[] | undefined;
       paths = new Map();
       for (const file of fetch.files) {
-        const name = file.path.replace(/\\/g, '/').split('/').pop();
-        const match =
-          (name &&
-            seen.find(
-              (s) => s.path.replace(/\\/g, '/').split('/').pop() === name
-            )?.path) ||
-          (!file.path &&
-            fileForTrack(
-              unpacked,
-              tracks.find((t) => t.id === file.trackId)?.title ?? '',
-              fetch.artistName
-            )?.path);
+        const name = baseName(file.path);
+        let match = name
+          ? seen.find((s) => baseName(s.path) === name)?.path
+          : undefined;
+        if (!match) {
+          tracks ??= await this.tracksOf(lidarr, fetch);
+          match = fileForTrack(
+            unpacked,
+            tracks.find((t) => t.id === file.trackId)?.title ?? '',
+            fetch.artistName
+          )?.path;
+        }
         if (match) paths.set(file.index, match);
       }
     }
@@ -1210,6 +1210,13 @@ class SongFetcher {
     const ready = fetch.files.filter(
       (file) => paths.has(file.index) && isAudio(paths.get(file.index)!)
     );
+    // A download with none of the songs in it is the release's fault: the
+    // next release is tried.
+    if (!ready.length) {
+      throw new ReleaseProblem(
+        'None of the songs were in the finished download.'
+      );
+    }
     // Of those it was downloading.
     const lost = songs.filter(
       (song) =>
@@ -1222,11 +1229,6 @@ class SongFetcher {
         `“${lost[0].title}” was not in the finished download.`,
         fetch
       );
-    }
-    if (!ready.length) {
-      await this.removeDownload(fetch).catch(() => undefined);
-      await this.end(fetch, 'failed', 'Nothing in the download to import.');
-      return;
     }
     // Each file's quality as Lidarr reads it, for its own folder.
     const qualities = new Map<string, LidarrQualityModel>();

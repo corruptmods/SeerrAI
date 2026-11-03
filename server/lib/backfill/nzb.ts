@@ -93,12 +93,14 @@ export const parseNzb = (data: Buffer | string): NzbFile[] =>
   readNzb(data).files;
 
 const VIDEO = /\.(mkv|mp4|avi|m4v|ts|wmv)$/i;
+/** Songs, which a music post names as a film's post names its videos. */
+const AUDIO = /\.(flac|mp3|m4a|aac|ogg|oga|opus|wav|aiff?|alac|ape|wv|wma)$/i;
 const ARCHIVE = /\.(rar|r\d{2}|7z|zip|\d{3})$/i;
 /** What a post carries beside its videos: repair data, notes, subtitles. */
 const SIDECAR = /\.(par2|nfo|sfv|srr|nzb|txt|jpe?g|png|srt|sub|idx|ass|ssa)$/i;
 
 /**
- * Why an NZB's videos can't be listed before it is downloaded, if they
+ * Why an NZB's videos (or songs) can't be listed before it is downloaded, if they
  * can't: they are inside archives, or their names are scrambled (most of
  * the post is files with no name, or none a video or archive would have,
  * and only its PAR2 repair files are named; the Usenet client puts the
@@ -108,7 +110,9 @@ export const packingOf = ({
   files,
   unnamedBytes,
 }: NzbContents): 'archives' | 'scrambled' | undefined => {
-  if (files.some((file) => VIDEO.test(file.name))) return undefined;
+  if (files.some((file) => VIDEO.test(file.name) || AUDIO.test(file.name))) {
+    return undefined;
+  }
   if (files.some((file) => ARCHIVE.test(file.name))) return 'archives';
   const total = files.reduce((sum, f) => sum + f.size, unnamedBytes);
   const unknown = files

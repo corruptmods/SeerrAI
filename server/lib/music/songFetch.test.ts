@@ -20,6 +20,7 @@ import SongFetch from '@server/entity/SongFetch';
 import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
 import backfill from '@server/lib/backfill/engine';
+import { IndexerLimitReached } from '@server/lib/backfill/indexerLimit';
 import cacheManager from '@server/lib/cache';
 import downloadTracker from '@server/lib/downloadtracker';
 import {
@@ -1197,13 +1198,62 @@ describe('taking a song from its album', () => {
     let fetch = await fetchOf();
     assert.equal(fetch.status, 'searching');
     assert.equal(fetch.searches ?? 0, 0);
-    assert.equal(fetch.searchAgainAt, null);
+    // Minutes, not the next minute, and not the hours of nothing found.
+    const wait = (fetch.searchAgainAt?.getTime() ?? 0) - Date.now();
+    assert.ok(wait > 5 * 60_000 && wait <= 10 * 60_000, String(wait));
+    const asked = searches();
+    await songFetcher.tick();
+    assert.equal(searches(), asked, 'not asked again straight away');
 
     // One search answering is enough.
     failing = 1;
+    await getRepository(SongFetch).update(fetch.id, { searchAgainAt: null });
     await songFetcher.tick();
     fetch = await fetchOf();
     assert.equal(fetch.status, 'downloading');
+  });
+
+  it('passes over an indexer waiting out its limit, and waits minutes when that is all', async () => {
+    const resting = {
+      ...RELEASE,
+      guid: 'https://resting/sg',
+      indexer: 'Resting',
+      indexerId: 9,
+      infoHash: undefined,
+      seeders: 500,
+    };
+    const opened: string[] = [];
+    const filesOf = backfill.filesOf.bind(backfill);
+    mock.method(backfill, 'filesOf', async (release: ProwlarrRelease) => {
+      opened.push(release.guid);
+      if (release.indexerId === 9) {
+        throw new IndexerLimitReached(
+          'Resting',
+          'download',
+          new Date(Date.now() + 3_600_000),
+          1,
+          false
+        );
+      }
+      return filesOf(release);
+    });
+    found = [resting, RELEASE];
+    await requestSongs([LANTERN]);
+    await startFetching();
+    let fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(fetch.release?.guid, RELEASE.guid);
+    assert.deepEqual(opened.slice(0, 2), [resting.guid, RELEASE.guid]);
+
+    // Only the resting one has it: searched again in minutes, not counted.
+    await getRepository(SongFetch).clear();
+    found = [resting];
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'searching');
+    assert.equal(fetch.searches ?? 0, 0);
+    const wait = (fetch.searchAgainAt?.getTime() ?? 0) - Date.now();
+    assert.ok(wait > 5 * 60_000 && wait <= 10 * 60_000, String(wait));
   });
 
   it('asks only Prowlarr’s indexers with music that are answering', async () => {
@@ -1462,5 +1512,93 @@ describe('reading a release of an album', () => {
       songsOfFile('CD1/1-03 Lantern Song.flac', 'Glasswing')[0],
       'lantern song'
     );
+  });
+
+  it('takes no other version of the album for it', () => {
+    for (const title of [
+      'Glasswing - Static Garden (Live at the Pier) [FLAC]',
+      'Glasswing - Static Garden (Remixed) MP3',
+      'Glasswing - Static Garden (Instrumentals)',
+      'Sing Like Glasswing - Static Garden (Karaoke Version)',
+      'Glasswing - Static Garden (Glasswing’s Version)',
+    ]) {
+      assert.equal(
+        namesAlbum(title, 'Static Garden', 'Glasswing'),
+        false,
+        title
+      );
+    }
+    // A version the album itself is.
+    assert.equal(
+      namesAlbum(
+        'Glasswing - Live at the Pier (2010) FLAC',
+        'Live at the Pier',
+        'Glasswing'
+      ),
+      true
+    );
+    // A band whose name is such a word.
+    assert.equal(
+      namesAlbum('Live - Throwing Copper (1994)', 'Throwing Copper', 'Live'),
+      true
+    );
+  });
+
+  it('knows a self-titled album from the artist’s other albums', () => {
+    assert.equal(
+      namesAlbum('Glasswing - Static Garden (1997)', 'Glasswing', 'Glasswing'),
+      false
+    );
+    assert.equal(
+      namesAlbum('Glasswing - Glasswing (1995) FLAC', 'Glasswing', 'Glasswing'),
+      true
+    );
+  });
+
+  it('takes no other version of the song, and the title track by its title', () => {
+    const live = [
+      { index: 0, path: 'A/02 - Lantern Song (Live).flac', size: 40 * MB },
+      {
+        index: 1,
+        path: 'A/03 - Lantern Song (2011 Remaster).flac',
+        size: 40 * MB,
+      },
+      { index: 2, path: 'A/04 - Lantern Song - Take 37.flac', size: 40 * MB },
+    ];
+    assert.equal(fileForTrack(live, 'Lantern Song', 'Glasswing')?.index, 1);
+    assert.equal(
+      fileForTrack(live.slice(0, 1), 'Lantern Song', 'Glasswing'),
+      undefined
+    );
+    assert.equal(
+      fileForTrack(live, 'Lantern Song (Live)', 'Glasswing')?.index,
+      0
+    );
+
+    const named = [
+      {
+        index: 0,
+        path: 'Glasswing - Static Garden - 01 - Opening.flac',
+        size: 30 * MB,
+      },
+      {
+        index: 1,
+        path: 'Glasswing - Static Garden - 02 - Static Garden.flac',
+        size: 40 * MB,
+      },
+    ];
+    assert.equal(fileForTrack(named, 'Static Garden', 'Glasswing')?.index, 1);
+    assert.equal(
+      fileForTrack(named.slice(0, 1), 'Static Garden', 'Glasswing'),
+      undefined
+    );
+  });
+
+  it('passes over a whole album in one file', () => {
+    const image = [
+      { index: 0, path: 'A/Glasswing - Lantern Song.flac', size: 400 * MB },
+      { index: 1, path: 'A/Glasswing - Lantern Song.cue', size: 1000 },
+    ];
+    assert.equal(fileForTrack(image, 'Lantern Song', 'Glasswing'), undefined);
   });
 });

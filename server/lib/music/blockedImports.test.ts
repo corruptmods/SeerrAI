@@ -174,4 +174,25 @@ describe('a download Lidarr held back', () => {
     await blockedImports.run();
     assert.equal(imports().length, 0, 'the song isn’t in it');
   });
+
+  it('is left alone when it may not be the single', async () => {
+    await requestSong();
+    lidarr.queue = [
+      held({
+        downloadId: 'HASH3',
+        statusMessages: [
+          {
+            title: 'Lantern Song.mp3',
+            messages: ['Album match is not close enough: 60% vs 80%'],
+          },
+        ],
+      }),
+      held({
+        downloadId: 'HASH4',
+        title: 'Various Artists - Road Hits (2011) [MP3]',
+      }),
+    ];
+    await blockedImports.run();
+    assert.equal(imports().length, 0);
+  });
 });

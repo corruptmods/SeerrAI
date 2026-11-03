@@ -16,6 +16,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- A song taken from an album is only taken from a release of that album by that artist, and only from that song's own file. Live, remixed, instrumental, karaoke, tribute and re-recorded releases and files no longer count, nor another album of the artist's for a self-titled one, nor a whole album in one file; a title track is found by its own name, and two songs never share a file. A Usenet post's file list is now read before downloading it, as a torrent's is. A download Lidarr holds back is imported by Seerr AI only when Lidarr held it for missing tracks and it is named as the single.
+
+- An indexer waiting out its limit, or Prowlarr not answering, has the search tried again in a few minutes instead of every minute.
+
 - A song taken from an album no longer fails when its download turns out not to have it: the next release is tried. A Usenet download that renamed its files has the song found by its name.
 
 - Taking a song from an album asks only Prowlarr's indexers that carry music and aren't paused, instead of waiting on every indexer, so searches take seconds rather than a minute or more. An album that found nothing is searched again after 1, 3, 6, 12 and 24 hours, one more try than before over the same two days.

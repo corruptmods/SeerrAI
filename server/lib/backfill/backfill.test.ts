@@ -331,6 +331,19 @@ describe('Backfill: torrents and NZBs', () => {
       }),
       'archives'
     );
+    // An album's post names its songs.
+    assert.equal(
+      packingOf({
+        files: [
+          { index: 0, name: '01 - Opening.flac', size: 30_000_000 },
+          { index: 1, name: '02 - Lantern Song.flac', size: 40_000_000 },
+          { index: 2, name: 'album.par2', size: 1 },
+          { index: 3, name: 'album.nfo', size: 1 },
+        ],
+        unnamedBytes: 0,
+      }),
+      undefined
+    );
   });
 
   it('spots a post with scrambled names, which names only its repair files', () => {

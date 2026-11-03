@@ -138,6 +138,8 @@ const LOOKUP_GIVE_UP_MS = 7 * 24 * 60 * 60_000;
  * given up on only after about two days of finding nothing.
  */
 const SEARCH_AGAIN_MS = [1, 3, 6, 12, 24].map((hours) => hours * 60 * 60_000);
+/** How soon a search Prowlarr or an indexer couldn't answer is tried again. */
+const SEARCH_SOON_MS = 10 * 60_000;
 /** What a fetch waiting to look again shows. */
 const SEARCHING_AGAIN = 'Nothing found yet; looking again later';
 /** How long a fetch may keep stumbling on errors before it gives up. */
@@ -765,7 +767,13 @@ class SongFetcher {
 
     // Nothing usable while a search failed: it may have been there. Tried
     // again soon, not counted as a search that found nothing.
-    if (!usable.length && searchError) throw searchError;
+    if (!usable.length && searchError) {
+      await this.searchSoon(
+        fetch,
+        `Prowlarr didn’t answer: ${message(searchError)}`
+      );
+      return;
+    }
 
     let best:
       | {
@@ -777,6 +785,9 @@ class SongFetcher {
     // A Usenet post whose files are packed or renamed: they are only known
     // once it is downloaded, when each song is found by its name.
     let packedRelease: ProwlarrRelease | undefined;
+    // An indexer waiting out its download limit: its releases are passed
+    // over this time, and the others opened.
+    let limited: IndexerLimitReached | undefined;
     for (const release of usable) {
       // Torrents nobody seems to share, only when nothing better was found.
       if (releaseTier(release, prefer) === 2 && (best || packedRelease)) break;
@@ -786,30 +797,32 @@ class SongFetcher {
           if (release.protocol === 'usenet') packedRelease ??= release;
           continue;
         }
-        const picked = wanted.flatMap(({ song, track }) => {
-          const file = fileForTrack(files, track.title, fetch.artistName);
-          return file
-            ? [
-                {
-                  index: file.index,
-                  path: file.path,
-                  size: file.size,
-                  recordingMbid: song.recordingMbid,
-                  trackId: track.id,
-                },
-              ]
-            : [];
-        });
+        // Each file is one song: never two tracks from the same file.
+        const picked: SongFetchFile[] = [];
+        for (const { song, track } of wanted) {
+          const file = fileForTrack(
+            files.filter((f) => !picked.some((p) => p.index === f.index)),
+            track.title,
+            fetch.artistName
+          );
+          if (file) {
+            picked.push({
+              index: file.index,
+              path: file.path,
+              size: file.size,
+              recordingMbid: song.recordingMbid,
+              trackId: track.id,
+            });
+          }
+        }
         if (picked.length > (best?.files.length ?? 0)) {
           best = { release, files: picked, hash: infoHash };
         }
         if (picked.length === wanted.length) break;
       } catch (e) {
-        // The indexer's download limit: waits, rather than failing songs.
         if (e instanceof IndexerLimitReached) {
-          fetch.stage = e.message;
-          await getRepository(SongFetch).save(fetch);
-          return;
+          limited ??= e;
+          continue;
         }
         logger.debug('Could not read a release of an album', {
           label: LABEL,
@@ -834,6 +847,12 @@ class SongFetcher {
     }
 
     const needed = wanted.map((w) => w.song);
+    // What a resting indexer has may be it: looked at again soon, not
+    // counted as a search that found nothing.
+    if (!best && limited) {
+      await this.searchSoon(fetch, limited.message);
+      return;
+    }
     if (!best) {
       const wait = SEARCH_AGAIN_MS[fetch.searches ?? 0];
       if (wait !== undefined) {
@@ -885,6 +904,16 @@ class SongFetcher {
     };
     fetch.files = best.files;
     await this.start(fetch);
+  }
+
+  /**
+   * Searched again in a few minutes, the search not counted: Prowlarr or an
+   * indexer couldn't answer, which says nothing of whether it's there.
+   */
+  private async searchSoon(fetch: SongFetch, why: string): Promise<void> {
+    fetch.searchAgainAt = new Date(Date.now() + SEARCH_SOON_MS);
+    fetch.stage = `Searching again soon: ${why}`.slice(0, 250);
+    await getRepository(SongFetch).save(fetch);
   }
 
   /** Adds the release to Backfill's download client. */
@@ -1118,8 +1147,9 @@ class SongFetcher {
           : undefined;
         if (!match) {
           tracks ??= await this.tracksOf(lidarr, fetch);
+          const taken = new Set(paths.values());
           match = fileForTrack(
-            unpacked,
+            unpacked.filter((u) => !taken.has(u.path)),
             tracks.find((t) => t.id === file.trackId)?.title ?? '',
             fetch.artistName
           )?.path;

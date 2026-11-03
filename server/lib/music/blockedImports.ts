@@ -7,7 +7,7 @@ import { MediaRequestStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import SongRequest from '@server/entity/SongRequest';
 import { lidarrApi } from '@server/lib/music/access';
-import { fileForTrack } from '@server/lib/music/albumRelease';
+import { fileForTrack, namesAlbum } from '@server/lib/music/albumRelease';
 import { trackOf } from '@server/lib/music/songFetch';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -27,6 +27,13 @@ const LABEL = 'Music Imports';
 
 /** Lidarr's states for a finished download it hasn't imported. */
 export const HELD_BACK = ['importBlocked', 'importFailed'];
+
+/**
+ * Lidarr's word for the one reason handled here: the download has fewer
+ * tracks than the edition. Any other ("album match is not close enough",
+ * "unknown artist") may mean it isn't the single at all.
+ */
+const MISSING_TRACKS = /missing tracks/i;
 
 /** A download already handled isn't tried again for this long. */
 const TRY_AGAIN_MS = 60 * 60_000;
@@ -75,7 +82,9 @@ class BlockedImports {
   }
 
   private async server(api: LidarrAPI, now: number): Promise<void> {
-    const held = (await api.getMusicQueue()).filter(heldBack);
+    const held = (await api.getMusicQueue())
+      .filter(heldBack)
+      .filter((item) => MISSING_TRACKS.test(heldBackReason(item)));
     if (!held.length) return;
     const albums = [
       ...new Set(
@@ -127,6 +136,10 @@ class BlockedImports {
     const release =
       album.releases?.find((r) => r.monitored) ?? album.releases?.[0];
     if (!release) return;
+    const artist =
+      item.artist?.artistName ?? songs[0].request?.media?.foreignTitle ?? '';
+    // Only a download named as this single of this artist.
+    if (!namesAlbum(item.title, album.title, artist)) return;
     const files = found.map((file, index) => ({
       index,
       path: file.path,
@@ -134,8 +147,6 @@ class BlockedImports {
       size: file.size ?? Number.MAX_SAFE_INTEGER,
       quality: file.quality,
     }));
-    const artist =
-      item.artist?.artistName ?? songs[0].request?.media?.foreignTitle ?? '';
     const picked: {
       path: string;
       trackId: number;

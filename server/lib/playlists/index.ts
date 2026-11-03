@@ -1,4 +1,4 @@
-import { MediaRequestStatus } from '@server/constants/media';
+import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import type { PlaylistSongState } from '@server/entity/MediaList';
 import { MediaList, MediaListSong } from '@server/entity/MediaList';
@@ -142,7 +142,26 @@ class Playlists {
       (song.state === 'requested' || song.state === 'approval') &&
       song.requestId
     ) {
+      // Its request was deleted: asked for afresh.
+      if (
+        !(await getRepository(MediaRequest).exist({
+          where: { id: song.requestId },
+        }))
+      ) {
+        await getRepository(MediaListSong).update(song.id, {
+          state: 'matched',
+          requestId: null,
+          problem: null,
+        });
+        this.kick();
+        return;
+      }
       await this.retryRequest(song.requestId);
+      return;
+    }
+    // Held back by a setting: asked for again, if it now allows.
+    if (song.state === 'waiting') {
+      this.kick();
       return;
     }
     if (song.state !== 'unmatched' && song.state !== 'failed') return;
@@ -162,6 +181,13 @@ class Playlists {
         relations: { requestedBy: true, modifiedBy: true },
       });
       if (request?.status !== MediaRequestStatus.FAILED) return;
+      // As Retry on the request: never one of something blocklisted.
+      if (
+        request.media?.status === MediaStatus.BLOCKLISTED ||
+        request.media?.status4k === MediaStatus.BLOCKLISTED
+      ) {
+        return;
+      }
       // Told once; a second failure after this is told again.
       await releaseDelivery(request.id, Notification.MEDIA_FAILED);
       // Approving it again takes its failed songs up again.
@@ -334,8 +360,10 @@ class Playlists {
         return false;
       }
       const version = found ? versionFor(found, song.length) : undefined;
+      // Only while it is still being found: taken off the playlist
+      // meanwhile, it stays off.
       await repo.update(
-        song.id,
+        { id: song.id, state: 'matching' },
         version
           ? {
               state: 'matched',
@@ -353,10 +381,24 @@ class Playlists {
   /** Requests matched songs, for each person, as their limit and settings allow. */
   private async requestWaiting(): Promise<void> {
     const repo = getRepository(MediaListSong);
-    const waiting = await repo.find({
+    let waiting = await repo.find({
       where: { state: In(['matched', 'waiting']) },
       order: { listId: 'ASC', position: 'ASC' },
     });
+    // A big import waiting for an admin goes as one batch: none of a
+    // playlist's songs is asked for while others of it are still being
+    // found, or each pass of them would be too few to need approval.
+    if (getSettings().music.playlists.overLimit === 'approve') {
+      const finding = new Set(
+        (
+          await repo.find({
+            select: { listId: true },
+            where: { state: 'matching' },
+          })
+        ).map((song) => song.listId)
+      );
+      waiting = waiting.filter((song) => !finding.has(song.listId));
+    }
     const byUser = new Map<number, MediaListSong[]>();
     for (const song of waiting) {
       if (!song.requestForId) continue;

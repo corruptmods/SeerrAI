@@ -14,6 +14,7 @@ import { isAuthenticated } from '@server/middleware/auth';
 import { perUserRateLimit } from '@server/middleware/perUserRateLimit';
 import type { Request } from 'express';
 import { Router } from 'express';
+import { In } from 'typeorm';
 
 const playlistRoutes = Router();
 
@@ -143,6 +144,13 @@ playlistRoutes.post<{ listId: string; songId: string }>(
     if (!access) {
       return next(NOT_FOUND);
     }
+    // Its songs are asked for in the owner's name.
+    if (!access.isOwner) {
+      return next({
+        status: 403,
+        message: 'Only the playlist’s owner can try its songs again.',
+      });
+    }
     const song = await getRepository(MediaListSong).findOne({
       where: { id: Number(req.params.songId), listId: access.list.id },
     });
@@ -167,9 +175,19 @@ playlistRoutes.post<{ listId: string }>(
     if (!access) {
       return next(NOT_FOUND);
     }
+    if (!access.isOwner) {
+      return next({
+        status: 403,
+        message: 'Only the playlist’s owner can search for its songs again.',
+      });
+    }
+    // Requested, or approved by an admin after waiting for it.
     const songs = await getRepository(MediaListSong).find({
       select: { recordingMbid: true },
-      where: { listId: access.list.id, state: 'requested' },
+      where: {
+        listId: access.list.id,
+        state: In(['requested', 'approval']),
+      },
     });
     const albums = await searchAgainNow(
       songs.flatMap((song) => (song.recordingMbid ? [song.recordingMbid] : []))

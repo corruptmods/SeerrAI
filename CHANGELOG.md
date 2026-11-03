@@ -20,6 +20,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - Songs no longer get stuck: a song whose single Lidarr has part of, or took an edition of without it, is taken by Seerr AI; a single handed over no longer counts as on its way, so its other songs can be asked for; Lidarr's search for a single is asked for once, an hour apart when it couldn't run, and its songs are handed over only once Lidarr's queue would show a grab. A song asked for while its album downloads waits for that download instead of starting a second. A Usenet download the client keeps paused is given up like a stalled torrent. Lidarr not answering during an import no longer fails the songs, nor finishes a song on a single that is here. A song is no longer marked here by another take of the same name. Songs coming through singles fail with their request when Lidarr can't take it, so they can be tried again.
 
+- Playlists: a big import waiting for an admin goes as one batch again (it was asked for 40 songs at a time, each too few to need approval); a song taken off while it was being found stays off; Try again and Search again now are the owner's, and Try again leaves a blocklisted artist's request alone; songs an admin approved are searched again with Search again now too; a song whose request was deleted can be tried again; a song held back because songs can't be asked for one at a time says so.
+
+- A live take only on a live single can be requested.
+
 - An indexer waiting out its limit, or Prowlarr not answering, has the search tried again in a few minutes instead of every minute.
 
 - A song taken from an album no longer fails when its download turns out not to have it: the next release is tried. A Usenet download that renamed its files has the song found by its name.

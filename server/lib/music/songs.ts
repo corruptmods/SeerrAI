@@ -249,8 +249,10 @@ export const singleFor = (
       (group) =>
         group.byArtist &&
         (group.primaryType === 'Single' || group.primaryType === 'EP') &&
+        // A live single holds this very recording too: a live take only
+        // on one is fetched through it, a plain single first.
         !group.secondaryTypes.some((type) =>
-          ['Compilation', 'DJ-mix', 'Live'].includes(type)
+          ['Compilation', 'DJ-mix'].includes(type)
         )
     )
     .sort(

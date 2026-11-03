@@ -267,6 +267,24 @@ describe('singleFor', () => {
     assert.equal(singleFor(version)?.mbId, 's1');
   });
 
+  it('takes a live single for a live take only on one', () => {
+    const version = toVersion(
+      recording('Lantern Song', [
+        {
+          ...release('l1', 'Lantern Song (Live)', {
+            type: 'Single',
+            secondary: ['Live'],
+          }),
+          'artist-credit': [
+            { name: 'Glasswing', artist: { id: ARTIST, name: 'X' } },
+          ],
+        },
+      ])
+    );
+    assert.ok(version);
+    assert.equal(singleFor(version)?.mbId, 'l1');
+  });
+
   it('is none for a version only on albums and compilations', () => {
     const version = toVersion(
       recording('Lantern Song', [

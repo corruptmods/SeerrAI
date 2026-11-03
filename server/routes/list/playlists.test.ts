@@ -1,6 +1,10 @@
 import { MusicBrainz } from '@server/api/musicbrainz';
 import { getRepository } from '@server/datasource';
-import { MediaList, MediaListSong } from '@server/entity/MediaList';
+import {
+  MediaList,
+  MediaListMember,
+  MediaListSong,
+} from '@server/entity/MediaList';
 import { User } from '@server/entity/User';
 import { Permission } from '@server/lib/permissions';
 import playlists from '@server/lib/playlists';
@@ -189,5 +193,47 @@ describe('linking a playlist', () => {
     // Someone else has tries of their own.
     actingAs = someone(777_002);
     assert.equal((await link(999_999)).status, 404);
+  });
+});
+
+describe('a playlist shared with someone', () => {
+  it('is only tried again, or searched again, by its owner', async () => {
+    const list = await makePlaylist();
+    const song = await getRepository(MediaListSong).save(
+      new MediaListSong({
+        listId: list.id,
+        sourceId: 'trk1',
+        position: 1,
+        title: 'Lantern Song',
+        artistName: 'Glasswing',
+        state: 'failed',
+        requestForId: user.id,
+      })
+    );
+    const member = await getRepository(User).save(
+      new User({
+        email: `member-${Math.random()}@test.local`,
+        avatar: '',
+        permissions: Permission.REQUEST,
+      })
+    );
+    await getRepository(MediaListMember).save(
+      Object.assign(new MediaListMember(), {
+        listId: list.id,
+        userId: member.id,
+      })
+    );
+    actingAs = member;
+    const post = (path: string) =>
+      fetch(`http://127.0.0.1:${port}/api/v1/list/${list.id}/${path}`, {
+        method: 'POST',
+      });
+    assert.equal((await post(`song/${song.id}/retry`)).status, 403);
+    assert.equal((await post('search-again')).status, 403);
+    assert.equal(
+      (await getRepository(MediaListSong).findOneByOrFail({ id: song.id }))
+        .state,
+      'failed'
+    );
   });
 });

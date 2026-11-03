@@ -413,6 +413,103 @@ describe('a linked playlist', () => {
     assert.equal(request.songs.length, 2, 'not held back by the limit');
   });
 
+  it('asks for none of a big import while some of it is still being found', async () => {
+    const settings = getSettings();
+    settings.music.playlists = { overLimit: 'approve', approveOver: 1 };
+    await getRepository(User).update(user.id, {
+      permissions: Permission.REQUEST | Permission.AUTO_APPROVE,
+    });
+    user = await getRepository(User).findOneByOrFail({ id: user.id });
+    // MusicBrainz stops answering partway through the import.
+    let answering = false;
+    const search = MusicBrainz.prototype.searchRecordings;
+    mock.method(
+      MusicBrainz.prototype,
+      'searchRecordings',
+      async function (this: MusicBrainz, ...args: unknown[]) {
+        if (!answering && args[0] === 'Night Swim') {
+          throw new Error('MusicBrainz is busy');
+        }
+        return (search as (...a: unknown[]) => unknown).apply(this, args);
+      }
+    );
+    const list = await linked();
+    assert.equal(await getRepository(MediaRequest).count(), 0, 'none yet');
+    assert.equal((await songsOf(list))['Lantern Song'], 'queued');
+
+    answering = true;
+    playlists.kick();
+    await playlists.settled();
+    const requests = await getRepository(MediaRequest).find();
+    assert.equal(requests.length, 1, 'one batch');
+    assert.equal(requests[0].status, MediaRequestStatus.PENDING);
+    assert.equal(requests[0].songs.length, 2);
+  });
+
+  it('keeps a song taken off while it was being found off', async () => {
+    const list = await makePlaylist();
+    mock.method(
+      MusicBrainz.prototype,
+      'searchRecordings',
+      async (title: string) => {
+        // Taken off the playlist while MusicBrainz is being asked.
+        await getRepository(MediaListSong).update(
+          { listId: list.id, title },
+          { state: 'removed' }
+        );
+        const found = RECORDINGS.filter(
+          (r) => r.title.toLowerCase() === title.toLowerCase()
+        );
+        return { count: found.length, offset: 0, recordings: found };
+      }
+    );
+    await playlists.link(
+      list,
+      `https://open.spotify.com/playlist/${PLAYLIST_ID}`,
+      user
+    );
+    await playlists.settled();
+    const states = await getRepository(MediaListSong).find({
+      where: { listId: list.id },
+    });
+    assert.ok(states.every((s) => s.state === 'removed'));
+    assert.equal(await getRepository(MediaRequest).count(), 0);
+  });
+
+  it('asks again for a song whose request was deleted, when tried again', async () => {
+    const list = await linked();
+    const lantern = await getRepository(MediaListSong).findOneByOrFail({
+      listId: list.id,
+      title: 'Lantern Song',
+    });
+    // As an admin deleting it does.
+    await getRepository(MediaRequest).remove(
+      await getRepository(MediaRequest).findOneByOrFail({
+        id: lantern.requestId!,
+      })
+    );
+    assert.equal((await songsOf(list))['Lantern Song'], 'notGot');
+
+    await playlists.retry(
+      await getRepository(MediaListSong).findOneByOrFail({ id: lantern.id })
+    );
+    await playlists.settled();
+    const now = await getRepository(MediaListSong).findOneByOrFail({
+      id: lantern.id,
+    });
+    assert.notEqual(now.requestId, lantern.requestId);
+    assert.equal((await songsOf(list))['Lantern Song'], 'approval');
+  });
+
+  it('says why when songs can’t be asked for one at a time', async () => {
+    getSettings().music.songRequests = false;
+    const list = await linked();
+    const view = await playlistView(list);
+    const lantern = view.songs.find((s) => s.title === 'Lantern Song')!;
+    assert.equal(lantern.state, 'failed');
+    assert.match(lantern.problem ?? '', /one at a time/);
+  });
+
   it('brings in only new songs when read again, and not ones taken off', async () => {
     const list = await linked();
     const taken = await getRepository(MediaListSong).findOneByOrFail({

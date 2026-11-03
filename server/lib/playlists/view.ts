@@ -61,10 +61,18 @@ const shownState = (
 ): PlaylistSongShown => {
   if (song.state === 'matched') return 'queued';
   if (song.state === 'waiting') {
-    return song.problem === 'limit' ? 'limit' : 'queued';
+    // Held back by more than a limit (song requests turned off): said so.
+    return song.problem === 'limit'
+      ? 'limit'
+      : song.problem
+        ? 'failed'
+        : 'queued';
   }
   if (song.state === 'requested' || song.state === 'approval') {
     switch (requestStatus) {
+      // Its request was deleted: Try again asks for it afresh.
+      case undefined:
+        return song.requestId ? 'notGot' : 'requested';
       case MediaRequestStatus.PENDING:
         return 'approval';
       case MediaRequestStatus.DECLINED:
@@ -124,7 +132,11 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
   );
   const waitingToSearch = await albumsWaitingToSearch(
     songs
-      .filter((song) => song.state === 'requested' && song.recordingMbid)
+      .filter(
+        (song) =>
+          (song.state === 'requested' || song.state === 'approval') &&
+          song.recordingMbid
+      )
       .map((song) => song.recordingMbid!)
   );
   return {
@@ -143,7 +155,11 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
       recordingMbid: song.recordingMbid ?? null,
       albumMbid: song.albumMbid ?? null,
       state: shownState(song, song.requestId ? statusOf(song) : undefined),
-      problem: song.state === 'failed' ? (song.problem ?? null) : null,
+      problem:
+        song.state === 'failed' ||
+        (song.state === 'waiting' && song.problem && song.problem !== 'limit')
+          ? (song.problem ?? null)
+          : null,
       progress:
         song.requestId && song.recordingMbid
           ? (progress.get(song.recordingMbid) ?? null)

@@ -51,6 +51,7 @@ import type {
 } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
+import { isAxiosError } from 'axios';
 import { In, IsNull, Not } from 'typeorm';
 
 /*
@@ -286,6 +287,30 @@ class SongFetcher {
       byAlbum.set(key, [...(byAlbum.get(key) ?? []), song]);
     }
     for (const [albumMbid, list] of byAlbum) {
+      // One fetch at a time for an album: a second would download it again,
+      // or take the first's download for a release that failed. One that
+      // hasn't chosen a release yet takes the new songs; one downloading
+      // finishes first.
+      const under = active.find(
+        (fetch) => fetch.albumMbid === albumMbid && fetch.status !== 'done'
+      );
+      if (under) {
+        if (
+          under.status === 'queued' ||
+          (under.status === 'searching' && !under.release)
+        ) {
+          under.recordings = [
+            ...new Set([
+              ...under.recordings,
+              ...list.map((song) => song.recordingMbid),
+            ]),
+          ];
+          await getRepository(SongFetch).update(under.id, {
+            recordings: under.recordings,
+          });
+        }
+        continue;
+      }
       const { request } = list[0];
       const media = request.media;
       const server = this.lidarrOf(request.serverId);
@@ -1106,11 +1131,17 @@ class SongFetcher {
       if (job.place !== 'history') {
         fetch.stage = `Downloading, ${Math.floor(job.percentage)}%`;
         const size = fetch.release?.size || 1;
-        this.sizes.set(fetch.id, {
-          size,
-          left: size * (1 - Math.min(100, job.percentage) / 100),
+        const left = size * (1 - Math.min(100, job.percentage) / 100);
+        this.sizes.set(fetch.id, { size, left });
+        // Waiting its turn in the client's queue is no stall; paused (by
+        // its duplicate check, or for lack of space) is, and gives up its
+        // slot, then its release, as a stalled torrent does.
+        await this.stalled(fetch, {
+          have: size - left,
+          left,
+          held: /^(queued|propagating|grabbing|fetching)$/i.test(job.status),
+          incomplete: false,
         });
-        await getRepository(SongFetch).save(fetch);
         return;
       }
       if (/^failed$/i.test(job.status)) {
@@ -1303,14 +1334,22 @@ class SongFetcher {
   ): Promise<void> {
     const lidarr = this.lidarr(fetch);
     if (fetch.commandId) {
+      // Lidarr not answering says nothing of the import: asked again next
+      // time, as one still running is, until it's given up on. A command
+      // Lidarr no longer knows (it restarted) is over.
       const command = await lidarr
         .getCommand(fetch.commandId)
-        .catch(() => null);
-      const over =
-        !command ||
-        ['completed', 'failed', 'aborted', 'cancelled', 'orphaned'].includes(
-          command.status
+        .catch((e: Error) =>
+          isAxiosError(e.cause) && e.cause.response?.status === 404
+            ? null
+            : undefined
         );
+      const over =
+        command === null ||
+        (!!command &&
+          ['completed', 'failed', 'aborted', 'cancelled', 'orphaned'].includes(
+            command.status
+          ));
       if (!over && Date.now() - fetch.updatedAt.getTime() < IMPORT_GIVE_UP_MS) {
         return;
       }

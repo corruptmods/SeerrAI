@@ -52,6 +52,8 @@ export interface FakeLidarr {
   }[];
   /** What Lidarr is downloading, as its queue lists it. */
   queue: Record<string, unknown>[];
+  /** How every command it was given ended. */
+  commandStatus: string;
   /** What Lidarr finds in a folder for manual import, by folder. */
   folders: Map<string, { path: string; size?: number }[]>;
   /** Whether a manual import takes its files (or refuses them all). */
@@ -88,6 +90,7 @@ export const createFakeLidarr = (): FakeLidarr => {
     remotePathMappings: [],
     folders: new Map(),
     queue: [],
+    commandStatus: 'completed',
     delayProfiles: [
       {
         id: 1,
@@ -137,6 +140,7 @@ export const createFakeLidarr = (): FakeLidarr => {
       fake.remotePathMappings = [];
       fake.folders = new Map();
       fake.queue = [];
+      fake.commandStatus = 'completed';
       fake.delayProfiles = [
         {
           id: 1,
@@ -296,7 +300,10 @@ export const createFakeLidarr = (): FakeLidarr => {
       return [201, { id: 1, ...body }];
     }
     if (method === 'GET' && path.startsWith('/api/v1/command/')) {
-      return [200, { id: Number(path.split('/').pop()), status: 'completed' }];
+      return [
+        200,
+        { id: Number(path.split('/').pop()), status: fake.commandStatus },
+      ];
     }
     if (method === 'GET' && path === '/api/v1/remotepathmapping') {
       return [200, fake.remotePathMappings];

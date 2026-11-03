@@ -635,6 +635,29 @@ describe('taking a song from its album', () => {
     );
   });
 
+  it('takes a song asked for while its album downloads once that is done', async () => {
+    await requestSongs([LANTERN]);
+    await startFetching();
+    const first = await fetchOf();
+    assert.equal(first.status, 'downloading');
+
+    // Asked for mid-download: no second fetch of the album meanwhile.
+    await requestSongs([OPENING]);
+    await songFetcher.tick();
+    assert.equal(await getRepository(SongFetch).count(), 1);
+    assert.equal((await fetchOf()).id, first.id);
+
+    done = true;
+    await songFetcher.tick();
+    await songFetcher.tick();
+    await songFetcher.tick();
+    const fetches = await getRepository(SongFetch).find({
+      order: { id: 'ASC' },
+    });
+    assert.equal(fetches.length, 2);
+    assert.deepEqual(fetches[1].recordings, [OPENING]);
+  });
+
   it('takes two songs of one album in one download', async () => {
     await requestSongs([LANTERN]);
     await requestSongs([OPENING]);
@@ -1065,6 +1088,33 @@ describe('taking a song from its album', () => {
         [502],
       ],
     ]);
+  });
+
+  it('gives up a Usenet download the client keeps paused, as a stalled torrent', async () => {
+    getSettings().backfill = { ...getSettings().backfill, stallHours: 1 };
+    const { usenet } = useUsenet(false);
+    found = [usenet];
+    await requestSongs([LANTERN]);
+    await startFetching();
+    mock.method(SabnzbdAPI.prototype, 'getJob', async () => ({
+      place: 'queue',
+      status: 'Paused',
+      percentage: 40,
+      size: RELEASE.size,
+      sizeLeft: RELEASE.size * 0.6,
+    }));
+    mock.timers.enable({ apis: ['Date'], now: Date.now() });
+    try {
+      await songFetcher.tick();
+      assert.equal((await fetchOf()).status, 'downloading');
+      mock.timers.tick(2 * 60 * 60_000);
+      await songFetcher.tick();
+      const fetch = await fetchOf();
+      assert.equal(fetch.status, 'searching', 'another release is looked for');
+      assert.deepEqual(fetch.tried, [usenet.guid]);
+    } finally {
+      mock.timers.reset();
+    }
   });
 
   it('prefers what Lidarr’s delay profile prefers', async () => {

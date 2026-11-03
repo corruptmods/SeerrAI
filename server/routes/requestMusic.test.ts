@@ -1068,6 +1068,21 @@ describe('requesting songs', () => {
     );
   });
 
+  it('fails its song with it when Lidarr can’t take it, to be tried again', async () => {
+    const res = await requestSongs([RADIO_EDIT]);
+    const id = (res.body as { id: number }).id;
+    lidarr.down = true;
+    await actAs(Permission.MANAGE_REQUESTS, 'manager@x');
+    await call('POST', `/request/${id}/approve`);
+    await lidarr.waitFor(() => false);
+
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id },
+    });
+    assert.equal(request.status, MediaRequestStatus.FAILED);
+    assert.equal(request.songs[0].status, MediaRequestStatus.FAILED);
+  });
+
   it('when deleted, frees its single to be asked for again', async () => {
     const res = await requestSongs([RADIO_EDIT]);
     const id = (res.body as { id: number }).id;
@@ -1204,6 +1219,46 @@ describe('requesting songs', () => {
         'Lantern Song is here, but Lidarr took an edition without “Lantern Song (radio edit)”.',
       ]
     );
+  });
+
+  it('waits, rather than finishing, while Lidarr can’t say what it has', async () => {
+    const id = await songOnItsWay([RADIO_EDIT]);
+    await getRepository(MusicAlbum).update(
+      { mbId: SINGLE },
+      { status: MediaStatus.AVAILABLE }
+    );
+    lidarr.failing.add('/api/v1/track');
+    await completeMusicRequests([(await artistMedia()).id]);
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id },
+    });
+    assert.equal(request.songs[0].status, MediaRequestStatus.APPROVED);
+    assert.equal(availableSent().length, 0);
+  });
+
+  it('is not done by another take of the same name', async () => {
+    const id = await songOnItsWay([RADIO_EDIT]);
+    await getRepository(MusicAlbum).update(
+      { mbId: SINGLE },
+      { status: MediaStatus.AVAILABLE }
+    );
+    // Lidarr's edition has its own recording, named alike, a minute longer.
+    lidarr.tracks.set(7, [
+      {
+        id: 3,
+        albumId: 7,
+        title: 'Lantern Song (radio edit)',
+        foreignRecordingId: 'b9b0c1d2-0000-4000-8000-00000000live',
+        duration: 260_000,
+        hasFile: true,
+      },
+    ]);
+    await completeMusicRequests([(await artistMedia()).id]);
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id },
+    });
+    assert.notEqual(request.songs[0].status, MediaRequestStatus.COMPLETED);
+    assert.equal(availableSent().length, 0);
   });
 
   it('with its single partly here, is done once Lidarr has this very song', async () => {

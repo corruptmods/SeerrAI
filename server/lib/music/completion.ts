@@ -1,4 +1,5 @@
 import type LidarrAPI from '@server/api/servarr/lidarr';
+import type { LidarrTrack } from '@server/api/servarr/lidarr';
 import {
   MediaRequestStatus,
   MediaStatus,
@@ -11,6 +12,7 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import MusicAlbum from '@server/entity/MusicAlbum';
 import SongRequest from '@server/entity/SongRequest';
 import { lidarrApi } from '@server/lib/music/access';
+import { songFetchProblem } from '@server/lib/music/songFetchReady';
 import { normalizeTitle } from '@server/lib/music/songs';
 import {
   claimDelivery,
@@ -96,31 +98,41 @@ export const musicRequestAvailable = (
   );
 };
 
+/** How far a track's length may be from the song's and still be it. */
+const SAME_LENGTH_MS = 10_000;
+
 /**
  * Whether Lidarr has a file for this very song on what it came on: its
- * recording among the tracks, or else a track of its name. Undefined when
- * that can't be told: no Lidarr to ask, an error (asked again next scan),
- * or no file of the album at all, which a media server may list without
- * Lidarr ever having it.
+ * recording among the tracks, or else a track of its name and length (an
+ * edition whose recording ids differ; not a live take or an edit of the
+ * same name). Undefined when that can't be told: no Lidarr to ask, or no
+ * file of the album at all, which a media server may list without Lidarr
+ * ever having it. Null when Lidarr couldn't be asked: asked again next
+ * scan.
  */
 const songOnFile = async (
   song: SongRequest,
   lidarr: LidarrAPI | undefined,
   lidarrAlbumId: number | null | undefined
-): Promise<boolean | undefined> => {
+): Promise<boolean | undefined | null> => {
   if (!lidarr || !lidarrAlbumId) {
     return undefined;
   }
   try {
     const tracks = await lidarr.getTracks(lidarrAlbumId);
     const named = normalizeTitle(songName(song));
+    const sameLength = (t: LidarrTrack) =>
+      !song.length ||
+      !t.duration ||
+      Math.abs(t.duration - song.length) <= SAME_LENGTH_MS;
     const track =
       tracks.find((t) => t.foreignRecordingId === song.recordingMbid) ??
       tracks.find(
         (t) =>
-          normalizeTitle(t.title) === named ||
-          (!song.version &&
-            normalizeTitle(t.title) === normalizeTitle(song.title))
+          sameLength(t) &&
+          (normalizeTitle(t.title) === named ||
+            (!song.version &&
+              normalizeTitle(t.title) === normalizeTitle(song.title)))
       );
     if (track?.hasFile) return true;
     return tracks.some((t) => t.hasFile) ? false : undefined;
@@ -130,7 +142,7 @@ const songOnFile = async (
       lidarrAlbumId,
       errorMessage: e instanceof Error ? e.message : String(e),
     });
-    return undefined;
+    return null;
   }
 };
 
@@ -269,8 +281,18 @@ export const completeMusicRequests = async (
           songsFinished.push(song);
         } else if (row.status === MediaStatus.AVAILABLE) {
           const onFile = await songOnFile(song, lidarr, row.lidarrAlbumId);
-          if (onFile !== false) {
+          if (onFile === null) {
+            continue;
+          } else if (onFile !== false) {
             songsFinished.push(song);
+          } else if (
+            song.singleMbid &&
+            song.status === MediaRequestStatus.APPROVED &&
+            !songFetchProblem()
+          ) {
+            // Lidarr took an edition of its single without it: Seerr takes
+            // it from an album with it instead (lib/music/singleFallback).
+            continue;
           } else if (song.status !== MediaRequestStatus.FAILED) {
             songsMissing.push(song);
           }

@@ -1,7 +1,8 @@
 import { MusicBrainz } from '@server/api/musicbrainz';
 import type { MbRecording } from '@server/api/musicbrainz/interfaces';
-import { MediaRequestStatus } from '@server/constants/media';
+import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import MusicAlbum from '@server/entity/MusicAlbum';
 import SongRequest from '@server/entity/SongRequest';
 import singleFallback from '@server/lib/music/singleFallback';
 import { getSettings } from '@server/lib/settings';
@@ -132,8 +133,16 @@ after(() => {
 });
 
 let onAlbum: boolean;
+/** The fallback's own clock, moved on by hand. */
+let clock: number;
+const run = () => singleFallback.run(clock);
+/** Long enough after Lidarr's search for its queue to list a grab. */
+const settle = () => (clock += 3 * 60_000);
 
-beforeEach(() => {
+beforeEach(async () => {
+  // Nothing waiting: it forgets what it knew of earlier tests' singles.
+  await singleFallback.run();
+  clock = Date.now();
   lidarr.reset();
   onAlbum = true;
   getSettings().lidarr = [lidarr.settings()];
@@ -158,14 +167,20 @@ afterEach(() => {
 describe('a single Lidarr finds nothing for', () => {
   it('has its song taken from an album once Lidarr’s search grabs nothing', async () => {
     const song = await requestSong();
-    await singleFallback.run();
+    await run();
     assert.equal(searches(), 1, 'Lidarr is asked to search for it');
     let now = await getRepository(SongRequest).findOneByOrFail({
       id: song.id,
     });
     assert.equal(now.singleMbid, SINGLE, 'not before the search is over');
 
-    await singleFallback.run();
+    // Over, but Lidarr's queue may not list a grab yet.
+    await run();
+    now = await getRepository(SongRequest).findOneByOrFail({ id: song.id });
+    assert.equal(now.singleMbid, SINGLE, 'not before the queue would show it');
+
+    settle();
+    await run();
     now = await getRepository(SongRequest).findOneByOrFail({ id: song.id });
     assert.equal(now.singleMbid, null);
     assert.equal(now.sourceAlbumMbid, ALBUM);
@@ -173,11 +188,24 @@ describe('a single Lidarr finds nothing for', () => {
     assert.equal(unmonitored(), true, 'Lidarr stops looking for the single');
   });
 
+  it('is left to Lidarr when its search grabbed it after all', async () => {
+    const song = await requestSong();
+    await run();
+    await run();
+    lidarr.queue = [{ id: 1, albumId: 40, artistId: 7, title: 'x' }];
+    settle();
+    await run();
+    const now = await getRepository(SongRequest).findOneByOrFail({
+      id: song.id,
+    });
+    assert.equal(now.singleMbid, SINGLE);
+  });
+
   it('is left to Lidarr while a download for it is on its way', async () => {
     const song = await requestSong();
     lidarr.queue = [{ id: 1, albumId: 40, artistId: 7, title: 'x' }];
-    await singleFallback.run();
-    await singleFallback.run();
+    await run();
+    await run();
     assert.equal(searches(), 0);
     const now = await getRepository(SongRequest).findOneByOrFail({
       id: song.id,
@@ -188,9 +216,11 @@ describe('a single Lidarr finds nothing for', () => {
   it('has Seerr take it from the single when no album has the song', async () => {
     onAlbum = false;
     const song = await requestSong();
-    await singleFallback.run();
-    await singleFallback.run();
-    await singleFallback.run();
+    await run();
+    await run();
+    settle();
+    await run();
+    await run();
     assert.equal(searches(), 1, 'Lidarr is asked only once');
     const now = await getRepository(SongRequest).findOneByOrFail({
       id: song.id,
@@ -199,6 +229,43 @@ describe('a single Lidarr finds nothing for', () => {
     assert.equal(now.sourceAlbumMbid, SINGLE);
     assert.equal(now.sourceAlbumTitle, 'Lantern Song');
     assert.equal(unmonitored(), true);
+  });
+
+  it('frees the single for its other songs once its songs move on', async () => {
+    const song = await requestSong();
+    const request = await getRepository(SongRequest).findOneOrFail({
+      where: { id: song.id },
+      relations: { request: { media: true } },
+    });
+    await getRepository(MusicAlbum).save(
+      new MusicAlbum({
+        mediaId: request.request.media.id,
+        mbId: SINGLE,
+        title: 'Lantern Song',
+        secondaryTypes: [],
+        status: MediaStatus.PROCESSING,
+      })
+    );
+    await run();
+    await run();
+    settle();
+    await run();
+    const row = await getRepository(MusicAlbum).findOneByOrFail({
+      mbId: SINGLE,
+    });
+    assert.equal(row.status, MediaStatus.UNKNOWN);
+  });
+
+  it('is not searched again straight away when Lidarr’s search couldn’t run', async () => {
+    await requestSong();
+    lidarr.commandStatus = 'failed';
+    await run();
+    await run();
+    await run();
+    assert.equal(searches(), 1);
+    clock += 61 * 60_000;
+    await run();
+    assert.equal(searches(), 2, 'asked again an hour on');
   });
 
   it('is not searched again while MusicBrainz doesn’t answer', async () => {
@@ -211,9 +278,11 @@ describe('a single Lidarr finds nothing for', () => {
         throw new Error('MusicBrainz is down');
       }
     );
-    await singleFallback.run();
-    await singleFallback.run();
-    await singleFallback.run();
+    await run();
+    await run();
+    settle();
+    await run();
+    await run();
     assert.equal(searches(), 1);
     let now = await getRepository(SongRequest).findOneByOrFail({
       id: song.id,
@@ -221,7 +290,7 @@ describe('a single Lidarr finds nothing for', () => {
     assert.equal(now.singleMbid, SINGLE, 'kept until it is looked up');
 
     lookup.mock.mockImplementation(async () => recording());
-    await singleFallback.run();
+    await run();
     now = await getRepository(SongRequest).findOneByOrFail({ id: song.id });
     assert.equal(now.sourceAlbumMbid, ALBUM);
     assert.equal(searches(), 1);
@@ -230,9 +299,52 @@ describe('a single Lidarr finds nothing for', () => {
   it('is left alone where Lidarr is told not to search', async () => {
     getSettings().lidarr = [lidarr.settings({ preventSearch: true })];
     const song = await requestSong();
-    await singleFallback.run();
-    await singleFallback.run();
+    await run();
+    await run();
     assert.equal(searches(), 0);
+    const now = await getRepository(SongRequest).findOneByOrFail({
+      id: song.id,
+    });
+    assert.equal(now.singleMbid, SINGLE);
+  });
+});
+
+describe('a single Lidarr has part of', () => {
+  it('has Seerr take the song Lidarr has no file for, without a search', async () => {
+    const song = await requestSong();
+    lidarr.albums[0].statistics = { trackFileCount: 1, trackCount: 2 } as never;
+    lidarr.tracks.set(40, [
+      {
+        id: 601,
+        albumId: 40,
+        title: 'Lantern Song',
+        foreignRecordingId: LANTERN,
+        hasFile: false,
+      },
+      { id: 602, albumId: 40, title: 'Other Song', hasFile: true },
+    ]);
+    await run();
+    assert.equal(searches(), 0);
+    const now = await getRepository(SongRequest).findOneByOrFail({
+      id: song.id,
+    });
+    assert.equal(now.singleMbid, null);
+    assert.equal(now.sourceAlbumMbid, ALBUM);
+  });
+
+  it('leaves a song Lidarr has to the music scans', async () => {
+    const song = await requestSong();
+    lidarr.albums[0].statistics = { trackFileCount: 1, trackCount: 2 } as never;
+    lidarr.tracks.set(40, [
+      {
+        id: 601,
+        albumId: 40,
+        title: 'Lantern Song',
+        foreignRecordingId: LANTERN,
+        hasFile: true,
+      },
+    ]);
+    await run();
     const now = await getRepository(SongRequest).findOneByOrFail({
       id: song.id,
     });

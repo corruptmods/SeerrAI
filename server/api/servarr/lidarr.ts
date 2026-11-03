@@ -60,6 +60,8 @@ export interface LidarrTrack {
   title: string;
   /** The track's MusicBrainz recording id. */
   foreignRecordingId?: string;
+  /** Its length, in milliseconds. */
+  duration?: number;
   hasFile: boolean;
   trackFileId?: number;
 }

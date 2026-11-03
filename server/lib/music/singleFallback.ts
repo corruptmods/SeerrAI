@@ -1,9 +1,12 @@
 import { musicBrainz } from '@server/api/musicbrainz';
 import type LidarrAPI from '@server/api/servarr/lidarr';
-import { MediaRequestStatus } from '@server/constants/media';
+import { MediaRequestStatus, MediaStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
+import AlbumRequest from '@server/entity/AlbumRequest';
+import MusicAlbum from '@server/entity/MusicAlbum';
 import SongRequest from '@server/entity/SongRequest';
 import { lidarrApi } from '@server/lib/music/access';
+import { trackOf } from '@server/lib/music/songFetch';
 import { albumFor, toVersion } from '@server/lib/music/songs';
 import type { LidarrSettings } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
@@ -34,21 +37,32 @@ interface Single {
   songs: SongRequest[];
 }
 
+/**
+ * How long after Lidarr's search ends a grab may take to show in its
+ * queue: the songs aren't handed on before, or both would download them.
+ */
+const QUEUE_SETTLE_MS = 2 * 60_000;
+/** A search Lidarr couldn't run, or lost, is asked for again after this. */
+const SEARCH_RETRY_MS = 60 * 60_000;
+
+/** Where Lidarr's one search for a single stands. */
+interface Search {
+  commandId?: number;
+  /** When the search ended with nothing grabbed. */
+  endedAt?: number;
+  /** Not asked for again before then. */
+  retryAt?: number;
+}
+
 class SingleFallback {
-  /** The search started for each single, by server and Lidarr album. */
-  private searches = new Map<string, number>();
-  /**
-   * Singles Lidarr's search found nothing for whose songs aren't handed on
-   * yet (MusicBrainz didn't answer): not searched for again.
-   */
-  private searched = new Set<string>();
+  /** Lidarr's search for each single, by server and Lidarr album. */
+  private searches = new Map<string, Search>();
 
   /** Hands songs whose single Lidarr couldn't find to Seerr's song fetch. */
-  public async run(): Promise<void> {
+  public async run(now = Date.now()): Promise<void> {
     const singles = await this.waiting();
     if (!singles.length) {
       this.searches.clear();
-      this.searched.clear();
       return;
     }
     const queues = new Map<number, Set<number>>();
@@ -72,17 +86,38 @@ class SingleFallback {
           continue;
         }
         const album = await api.getAlbum(single.lidarrAlbumId);
-        if ((album.statistics?.trackFileCount ?? 0) > 0) continue;
-
-        if (this.searched.has(key)) {
-          if (await this.handOn(api, single)) this.searched.delete(key);
+        // Lidarr has part of the single: what it has waits for the scans,
+        // and what it hasn't it won't fetch, so Seerr takes it.
+        if ((album.statistics?.trackFileCount ?? 0) > 0) {
+          const tracks = await api.getTracks(album.id);
+          const missing = single.songs.filter(
+            (song) => !trackOf(tracks, song)?.hasFile
+          );
+          if (missing.length) {
+            await this.handOn(api, { ...single, songs: missing }, 'partly');
+          }
+          this.searches.delete(key);
           continue;
         }
-        const commandId = this.searches.get(key);
-        if (commandId === undefined) {
+
+        const search = this.searches.get(key) ?? {};
+        this.searches.set(key, search);
+        if (search.endedAt !== undefined) {
+          // Not handed on before Lidarr's queue could list a grab.
+          if (now - search.endedAt < QUEUE_SETTLE_MS) continue;
+          if (await inQueue(single, true)) {
+            this.searches.delete(key);
+            continue;
+          }
+          if (await this.handOn(api, single)) this.searches.delete(key);
+          continue;
+        }
+        if (search.commandId === undefined) {
+          if (search.retryAt !== undefined && now < search.retryAt) continue;
           if (started >= SEARCHES_AT_ONCE) continue;
           started++;
-          this.searches.set(key, await api.startAlbumSearch([album.id]));
+          search.commandId = await api.startAlbumSearch([album.id]);
+          search.retryAt = undefined;
           logger.info('Asked Lidarr to search for a single', {
             label: LABEL,
             single: single.songs[0].singleTitle,
@@ -90,15 +125,18 @@ class SingleFallback {
           });
           continue;
         }
-        const command = await api.getCommand(commandId).catch(() => null);
+        const command = await api
+          .getCommand(search.commandId)
+          .catch(() => null);
         if (command && !OVER.includes(command.status)) continue;
-        this.searches.delete(key);
-        // A search that couldn't run says nothing: searched again later.
-        if (command?.status !== 'completed') continue;
-        // Grabbed by the search just over: it's on its way.
-        if (await inQueue(single, true)) continue;
-        this.searched.add(key);
-        if (await this.handOn(api, single)) this.searched.delete(key);
+        search.commandId = undefined;
+        // A search that couldn't run, or that Lidarr no longer knows of
+        // (restarted), says nothing: asked for again later, not at once.
+        if (command?.status !== 'completed') {
+          search.retryAt = now + SEARCH_RETRY_MS;
+          continue;
+        }
+        search.endedAt = now;
       } catch (e) {
         logger.debug('Could not check a single Lidarr is looking for', {
           label: LABEL,
@@ -109,9 +147,6 @@ class SingleFallback {
     }
     for (const key of this.searches.keys()) {
       if (!live.has(key)) this.searches.delete(key);
-    }
-    for (const key of this.searched) {
-      if (!live.has(key)) this.searched.delete(key);
     }
   }
 
@@ -172,10 +207,17 @@ class SingleFallback {
   /**
    * Each of the single's songs to Seerr's song fetch: taken from the
    * artist's album with that very recording, or from the single itself when
-   * no album has it. Lidarr no longer looks for the single. False while a
-   * song's recording couldn't be looked up, for it to be tried again.
+   * no album has it. Lidarr no longer looks for the single, and a single
+   * nobody else is waiting for is no longer counted as on its way (it would
+   * keep its other songs from being asked for). False while a song's
+   * recording couldn't be looked up, for it to be tried again.
    */
-  private async handOn(api: LidarrAPI, single: Single): Promise<boolean> {
+  private async handOn(
+    api: LidarrAPI,
+    single: Single,
+    why: 'none' | 'partly' = 'none'
+  ): Promise<boolean> {
+    const singleMbid = single.songs[0]?.singleMbid;
     let left = 0;
     for (const song of single.songs) {
       let recording;
@@ -202,9 +244,11 @@ class SingleFallback {
         sourceAlbumTitle: album?.title ?? song.singleTitle,
       });
       logger.info(
-        album
-          ? 'Lidarr found no release of the single; taking the song from an album'
-          : 'Lidarr found no release of the single; Seerr is looking for it instead',
+        why === 'partly'
+          ? 'Lidarr has only part of the single; Seerr is taking the song'
+          : album
+            ? 'Lidarr found no release of the single; taking the song from an album'
+            : 'Lidarr found no release of the single; Seerr is looking for it instead',
         {
           label: LABEL,
           song: song.title,
@@ -215,7 +259,39 @@ class SingleFallback {
     }
     if (left) return false;
     await api.monitorAlbums([single.lidarrAlbumId], false);
+    if (singleMbid) await this.release(singleMbid);
     return true;
+  }
+
+  /**
+   * The single's row back to nobody having asked, when no other song or
+   * album request still waits for it and nothing of it is here.
+   */
+  private async release(singleMbid: string): Promise<void> {
+    const open = [MediaRequestStatus.PENDING, MediaRequestStatus.APPROVED];
+    const [songs, albums] = await Promise.all([
+      getRepository(SongRequest).count({
+        where: { singleMbid, status: In(open) },
+      }),
+      getRepository(AlbumRequest).count({
+        where: { albumMbid: singleMbid, status: In(open) },
+      }),
+    ]);
+    if (songs || albums) return;
+    const rows = await getRepository(MusicAlbum).find({
+      select: { id: true, trackFileCount: true },
+      where: {
+        mbId: singleMbid,
+        status: In([MediaStatus.PENDING, MediaStatus.PROCESSING]),
+      },
+    });
+    const free = rows.filter((row) => !row.trackFileCount);
+    if (free.length) {
+      await getRepository(MusicAlbum).update(
+        { id: In(free.map((row) => row.id)) },
+        { status: MediaStatus.UNKNOWN }
+      );
+    }
   }
 }
 

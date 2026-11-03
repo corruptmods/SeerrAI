@@ -1180,6 +1180,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         describeServerIssue(serverIssue),
         manager
       );
+      await this.failSongsThroughSingles(entity, manager);
       return;
     }
     const lidarrSettings =
@@ -1432,6 +1433,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
               e instanceof Error ? e.message : String(e)
             }`;
       await markUndispatchable(entity, reason);
+      await this.failSongsThroughSingles(entity);
 
       if (
         media &&
@@ -1441,6 +1443,28 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
         MediaRequest.sendNotification(entity, media, Notification.MEDIA_FAILED);
       }
     }
+  }
+
+  /**
+   * A request Lidarr couldn't take: its songs that were to come through
+   * their singles won't, so they fail with it (and can be tried again).
+   * Songs taken from albums are fetched by Seerr AI, and carry on.
+   */
+  private async failSongsThroughSingles(
+    entity: MediaRequest,
+    manager?: EntityManager
+  ): Promise<void> {
+    if (entity.status !== MediaRequestStatus.FAILED) return;
+    const songs = (entity.songs ?? []).filter(
+      (song) => !!song.singleMbid && song.status === MediaRequestStatus.APPROVED
+    );
+    if (!songs.length) return;
+    await (manager ?? getRepository(SongRequest).manager).update(
+      SongRequest,
+      { id: In(songs.map((song) => song.id)) },
+      { status: MediaRequestStatus.FAILED }
+    );
+    songs.forEach((song) => (song.status = MediaRequestStatus.FAILED));
   }
 
   /**

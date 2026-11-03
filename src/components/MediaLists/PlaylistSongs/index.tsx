@@ -11,6 +11,7 @@ import {
   LinkIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
+import type { SongProgress } from '@server/lib/music/songProgress';
 import type {
   PlaylistSongShown,
   PlaylistSongView,
@@ -54,7 +55,33 @@ const messages = defineMessages('components.MediaLists.PlaylistSongs', {
   searchAgain: 'Search again now',
   summary:
     '{requested} requested · {waiting} waiting · {finding} being found · {notFound} not found',
+  onItsWay:
+    'On their way: {downloading} downloading · {searching} being searched for · {later} to be searched again later',
+  stepSearching: 'Searching',
+  stepWaiting: 'Nothing found yet',
+  stepFound: 'Found',
+  stepDownloading: 'Downloading',
+  stepImporting: 'Importing',
+  progressSingle: 'Lidarr is searching for the single “{release}”',
+  progressPreparing: 'Getting “{release}” ready to search',
+  progressSearching: 'Searching for “{release}”',
+  progressWaiting: 'Nothing found on “{release}” yet. Searching again {time}.',
+  progressSlot: 'Found on “{release}”, waiting for a free download slot',
+  progressDownloading: 'Downloading from “{release}”, {percent}%',
+  progressDownloadingStarted: 'Downloading from “{release}”',
+  progressImporting: 'Importing from “{release}”',
 });
+
+/** The badge a song on its way shows instead of Requested. */
+const STEP_LABEL = {
+  single: 'stepSearching',
+  preparing: 'stepSearching',
+  searching: 'stepSearching',
+  waiting: 'stepWaiting',
+  slot: 'stepFound',
+  downloading: 'stepDownloading',
+  importing: 'stepImporting',
+} as const satisfies Record<SongProgress['step'], keyof typeof messages>;
 
 const BADGE: Record<
   PlaylistSongShown,
@@ -106,8 +133,52 @@ const PlaylistSongs = ({
   const count = (states: PlaylistSongShown[]) =>
     playlist.songs.filter((s) => states.includes(s.state)).length;
 
+  /** Where a song on its way is, in words. */
+  const progressText = (progress: SongProgress): string => {
+    const release = progress.release;
+    switch (progress.step) {
+      case 'single':
+        return intl.formatMessage(messages.progressSingle, { release });
+      case 'preparing':
+        return intl.formatMessage(messages.progressPreparing, { release });
+      case 'searching':
+        return intl.formatMessage(messages.progressSearching, { release });
+      case 'waiting':
+        return intl.formatMessage(messages.progressWaiting, {
+          release,
+          time: intl.formatDate(progress.searchAgainAt, {
+            weekday: 'short',
+            hour: 'numeric',
+            minute: '2-digit',
+          }),
+        });
+      case 'slot':
+        return intl.formatMessage(messages.progressSlot, { release });
+      case 'downloading':
+        return progress.percent === null
+          ? intl.formatMessage(messages.progressDownloadingStarted, {
+              release,
+            })
+          : intl.formatMessage(messages.progressDownloading, {
+              release,
+              percent: progress.percent,
+            });
+      case 'importing':
+        return intl.formatMessage(messages.progressImporting, { release });
+    }
+  };
+
+  const onItsWay = playlist.songs.filter(
+    (song) => song.state === 'requested' && song.progress
+  );
+  const steps = (wanted: SongProgress['step'][]) =>
+    onItsWay.filter((song) => wanted.includes(song.progress!.step)).length;
+
   const row = (song: PlaylistSongView) => {
-    const label = intl.formatMessage(messages[song.state]);
+    const progress = song.state === 'requested' ? song.progress : null;
+    const label = intl.formatMessage(
+      progress ? messages[STEP_LABEL[progress.step]] : messages[song.state]
+    );
     const tip =
       song.state === 'limit'
         ? intl.formatMessage(messages.limitTip)
@@ -149,6 +220,11 @@ const PlaylistSongs = ({
             )}
             {song.length ? ` · ${trackLength(song.length)}` : ''}
           </div>
+          {progress && (
+            <div className="mt-0.5 break-words text-xs text-muted">
+              {progressText(progress)}
+            </div>
+          )}
           {/* Why, in words: a tooltip can't be read on a phone. */}
           {(song.state === 'failed' || song.state === 'notGot') && tip && (
             <div className="mt-0.5 break-words text-xs text-red-300 light:text-danger-text">
@@ -164,7 +240,18 @@ const PlaylistSongs = ({
               </span>
             </Tooltip>
           ) : (
-            <Badge badgeType={BADGE[song.state]}>{label}</Badge>
+            <Badge
+              badgeType={
+                progress?.step === 'downloading' ||
+                progress?.step === 'importing'
+                  ? 'success'
+                  : progress?.step === 'waiting'
+                    ? 'warning'
+                    : BADGE[song.state]
+              }
+            >
+              {label}
+            </Badge>
           )}
           {(song.state === 'unmatched' ||
             song.state === 'failed' ||
@@ -260,6 +347,15 @@ const PlaylistSongs = ({
               notFound: notFound.length,
             })}
           </p>
+          {onItsWay.length > 0 && (
+            <p className="mb-3 text-xs text-muted">
+              {intl.formatMessage(messages.onItsWay, {
+                downloading: steps(['slot', 'downloading', 'importing']),
+                searching: steps(['single', 'preparing', 'searching']),
+                later: steps(['waiting']),
+              })}
+            </p>
+          )}
           {playlist.waitingToSearch > 0 && (
             <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted">
               <span>

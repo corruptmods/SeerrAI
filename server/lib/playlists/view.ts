@@ -7,6 +7,8 @@ import type { User } from '@server/entity/User';
 import { featureEnabled } from '@server/lib/features';
 import { musicReady } from '@server/lib/music/access';
 import { albumsWaitingToSearch } from '@server/lib/music/songFetchWaits';
+import type { SongProgress } from '@server/lib/music/songProgress';
+import { songProgress } from '@server/lib/music/songProgress';
 import { In, Not } from 'typeorm';
 
 /** Whether this person can have playlists: music is set up and on for them. */
@@ -35,6 +37,8 @@ export interface PlaylistSongView {
   albumMbid: string | null;
   state: PlaylistSongShown;
   problem: string | null;
+  /** Where a requested song is on its way, when Seerr can tell. */
+  progress: SongProgress | null;
 }
 
 export interface PlaylistView {
@@ -92,7 +96,15 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
         select: {
           id: true,
           status: true,
-          songs: { id: true, recordingMbid: true, status: true },
+          songs: {
+            id: true,
+            recordingMbid: true,
+            status: true,
+            singleMbid: true,
+            singleTitle: true,
+            sourceAlbumMbid: true,
+            sourceAlbumTitle: true,
+          },
         },
         relations: { songs: true },
         where: { id: In(requestIds) },
@@ -107,6 +119,9 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
         ?.status ?? request?.status
     );
   };
+  const progress = await songProgress(
+    requests.flatMap((request) => request.songs ?? [])
+  );
   const waitingToSearch = await albumsWaitingToSearch(
     songs
       .filter((song) => song.state === 'requested' && song.recordingMbid)
@@ -129,6 +144,10 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
       albumMbid: song.albumMbid ?? null,
       state: shownState(song, song.requestId ? statusOf(song) : undefined),
       problem: song.state === 'failed' ? (song.problem ?? null) : null,
+      progress:
+        song.requestId && song.recordingMbid
+          ? (progress.get(song.recordingMbid) ?? null)
+          : null,
     })),
   };
 };

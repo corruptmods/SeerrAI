@@ -755,6 +755,23 @@ class DownloadTracker {
       );
   }
 
+  /**
+   * A release's download, by its MusicBrainz release group: Lidarr's,
+   * Song Fetch's or Backfill's, whichever has it.
+   */
+  public getAlbumDownload(foreignAlbumId: string): DownloadingItem | undefined {
+    const forIt = (item: DownloadingItem) =>
+      item.album?.foreignAlbumId === foreignAlbumId;
+    const item =
+      Object.values(this.lidarrServers).flat().find(forIt) ??
+      this.songs.map((d) => d.item).find(forIt) ??
+      this.backfill
+        .filter((d) => d.kind === 'album')
+        .map((d) => d.item)
+        .find(forIt);
+    return item && this.withLive(item);
+  }
+
   public async resetDownloadTracker() {
     this.radarrServers = {};
     this.sonarrServers = {};

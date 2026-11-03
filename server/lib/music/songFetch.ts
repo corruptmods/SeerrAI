@@ -143,7 +143,8 @@ const SEARCHING_AGAIN = 'Nothing found yet; looking again later';
 /** How long a fetch may keep stumbling on errors before it gives up. */
 const STUMBLE_GIVE_UP_MS = 24 * 60 * 60_000;
 
-const ACTIVE: SongFetch['status'][] = [
+/** A fetch's statuses while it is under way. */
+export const ACTIVE: SongFetch['status'][] = [
   'queued',
   'searching',
   'downloading',

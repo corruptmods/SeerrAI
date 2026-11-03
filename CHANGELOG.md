@@ -10,6 +10,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - **Songs from singles Lidarr holds back are imported**: a single's download with just the song stops in Lidarr's queue with "Has missing tracks" when the single's edition also has a radio edit or an instrumental. Seerr AI now imports the requested song on its own, into its track. Health lists the downloads Lidarr still won't import, with its reason.
 
+- **A playlist's page says what's happening to each requested song**: Lidarr searching for its single, Seerr AI searching for its album, nothing found yet and when it's searched again, waiting for a download slot, downloading with how far along, or importing, instead of just Requested.
+
 - **Search again now** on a playlist's page: albums of its songs that found nothing yet, waiting hours to be searched again, are searched straight away.
 
 ### Fixed

@@ -2,7 +2,6 @@ import { MusicBrainz } from '@server/api/musicbrainz';
 import type { MbRecording } from '@server/api/musicbrainz/interfaces';
 import { MediaRequestStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
-import MusicAlbum from '@server/entity/MusicAlbum';
 import SongRequest from '@server/entity/SongRequest';
 import singleFallback from '@server/lib/music/singleFallback';
 import { getSettings } from '@server/lib/settings';
@@ -80,15 +79,15 @@ const recording = (onAlbum = true): MbRecording => {
 
 const requestSong = async () => {
   const { artist, requests } = await seedMusicFixtures();
-  await getRepository(MusicAlbum).save(
-    new MusicAlbum({
-      mediaId: artist.id,
-      mbId: SINGLE,
-      title: 'Lantern Song',
-      secondaryTypes: [],
-      lidarrAlbumId: 40,
-    })
-  );
+  lidarr.artists.push({
+    id: 7,
+    artistName: 'Glasswing',
+    foreignArtistId: artist.foreignId!,
+    monitored: true,
+    qualityProfileId: 1,
+    metadataProfileId: 1,
+    tags: [],
+  } as never);
   return getRepository(SongRequest).save(
     new SongRequest({
       request: requests[MediaRequestStatus.APPROVED],

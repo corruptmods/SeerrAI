@@ -2,7 +2,6 @@ import { musicBrainz } from '@server/api/musicbrainz';
 import type LidarrAPI from '@server/api/servarr/lidarr';
 import { MediaRequestStatus } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
-import MusicAlbum from '@server/entity/MusicAlbum';
 import SongRequest from '@server/entity/SongRequest';
 import { lidarrApi } from '@server/lib/music/access';
 import { albumFor, toVersion } from '@server/lib/music/songs';
@@ -77,6 +76,11 @@ class SingleFallback {
           if (started >= SEARCHES_AT_ONCE) continue;
           started++;
           this.searches.set(key, await api.startAlbumSearch([album.id]));
+          logger.info('Asked Lidarr to search for a single', {
+            label: LABEL,
+            single: single.songs[0].singleTitle,
+            songs: single.songs.length,
+          });
           continue;
         }
         const command = await api.getCommand(commandId).catch(() => null);
@@ -100,43 +104,54 @@ class SingleFallback {
     }
   }
 
-  /** Songs approved and on their way through singles Lidarr lists. */
+  /**
+   * Songs on their way through singles Lidarr lists, by single: Lidarr's
+   * own albums of each artist say which, the music scans needn't have
+   * caught up. A request one of whose songs failed still has the others
+   * on their way.
+   */
   private async waiting(): Promise<Single[]> {
     const songs = await getRepository(SongRequest).find({
       where: {
         status: MediaRequestStatus.APPROVED,
         singleMbid: Not(IsNull()),
-        request: { status: MediaRequestStatus.APPROVED },
+        request: {
+          status: In([MediaRequestStatus.APPROVED, MediaRequestStatus.FAILED]),
+        },
       },
       relations: { request: { media: true } },
     });
     if (!songs.length) return [];
-    const rows = await getRepository(MusicAlbum).find({
-      select: { id: true, mediaId: true, mbId: true, lidarrAlbumId: true },
-      where: {
-        mbId: In([...new Set(songs.map((song) => song.singleMbid!))]),
-        lidarrAlbumId: Not(IsNull()),
-      },
-    });
     const servers = getSettings().lidarr;
+    const albumsOf = new Map<string, Map<string, number>>();
     const singles = new Map<string, Single>();
     for (const song of songs) {
       const server =
         servers.find((s) => s.id === song.request.serverId) ??
         servers.find((s) => s.isDefault);
+      const artistMbid = song.request.media?.foreignId;
       // Searches are left alone where Lidarr is told not to search.
-      if (!server || server.preventSearch) continue;
-      const row = rows.find(
-        (r) =>
-          r.mbId === song.singleMbid && r.mediaId === song.request.media?.id
-      );
-      if (!row?.lidarrAlbumId) continue;
-      const key = `${server.id}:${row.lidarrAlbumId}`;
-      const single = singles.get(key) ?? {
-        server,
-        lidarrAlbumId: row.lidarrAlbumId,
-        songs: [],
-      };
+      if (!server || server.preventSearch || !artistMbid) continue;
+      const artistKey = `${server.id}:${artistMbid}`;
+      let albums = albumsOf.get(artistKey);
+      if (!albums) {
+        const api = lidarrApi(server);
+        const artist = await api.getArtistByMbid(artistMbid).catch(() => null);
+        albums = new Map(
+          artist
+            ? (await api.getAlbums({ artistId: artist.id })).map((album) => [
+                album.foreignAlbumId,
+                album.id,
+              ])
+            : []
+        );
+        albumsOf.set(artistKey, albums);
+      }
+      const lidarrAlbumId = albums.get(song.singleMbid!);
+      // Not listed by Lidarr yet: its request is still being sent.
+      if (lidarrAlbumId === undefined) continue;
+      const key = `${server.id}:${lidarrAlbumId}`;
+      const single = singles.get(key) ?? { server, lidarrAlbumId, songs: [] };
       single.songs.push(song);
       singles.set(key, single);
     }

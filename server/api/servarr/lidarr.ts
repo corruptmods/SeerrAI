@@ -465,6 +465,20 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
     }
   };
 
+  /** Has Lidarr search for these albums; answers the command's id. */
+  public startAlbumSearch = async (albumIds: number[]): Promise<number> => {
+    try {
+      return (
+        await this.axios.post<{ id: number }>('/command', {
+          name: 'AlbumSearch',
+          albumIds,
+        })
+      ).data.id;
+    } catch (e) {
+      this.fail('search for albums', e);
+    }
+  };
+
   public searchAlbums = async (albumIds: number[]): Promise<void> => {
     if (!albumIds.length) {
       return;

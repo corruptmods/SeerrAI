@@ -40,6 +40,7 @@ import {
   namesAlbum,
 } from '@server/lib/music/albumRelease';
 import { refreshArtists } from '@server/lib/music/availability';
+import singleFallback from '@server/lib/music/singleFallback';
 import { clientFor, songFetchProblem } from '@server/lib/music/songFetchReady';
 import { releaseForSongs } from '@server/lib/music/songRelease';
 import { normalizeTitle } from '@server/lib/music/songs';
@@ -219,6 +220,14 @@ class SongFetcher {
     if (this.ticking || !musicReady() || songFetchProblem()) return;
     this.ticking = true;
     try {
+      // Songs whose single Lidarr found nothing for join those taken from
+      // albums, before those are planned.
+      await singleFallback.run().catch((e) =>
+        logger.warn('Could not check singles Lidarr is looking for', {
+          label: LABEL,
+          errorMessage: message(e),
+        })
+      );
       await this.plan();
       await this.linkFinished();
       await this.correctFinished();

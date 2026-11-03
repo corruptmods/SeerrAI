@@ -46,7 +46,12 @@ import singleFallback from '@server/lib/music/singleFallback';
 import { clientFor, songFetchProblem } from '@server/lib/music/songFetchReady';
 import { SEARCHING_SOON } from '@server/lib/music/songFetchWaits';
 import { releaseForSongs } from '@server/lib/music/songRelease';
-import { albumsFor, normalizeTitle, toVersion } from '@server/lib/music/songs';
+import {
+  albumsFor,
+  normalizeTitle,
+  singleFor,
+  toVersion,
+} from '@server/lib/music/songs';
 import { markUndispatchable } from '@server/lib/requestDispatch';
 import type {
   DownloadClientSettings,
@@ -530,7 +535,7 @@ class SongFetcher {
     }
     // Not on the edition Lidarr has (another can't be imported into while
     // it has files of this one): taken from the artist's next album with
-    // it, if there is one.
+    // it, else its single, if there is one.
     const unknown = songs.filter((song) => !trackOf(tracks, song));
     if (unknown.length) {
       await this.toNextAlbum(
@@ -958,8 +963,13 @@ class SongFetcher {
         .catch(() => null);
       const version = recording ? toVersion(recording) : null;
       const albums = version ? albumsFor(version) : [];
+      const single = version ? singleFor(version) : null;
       const at = albums.findIndex((album) => album.mbId === fetch.albumMbid);
-      const next = albums[at + 1];
+      // After the last album with it, its own single; after that, nothing.
+      const next =
+        single?.mbId === fetch.albumMbid
+          ? undefined
+          : (albums[at + 1] ?? (at >= 0 ? single : undefined));
       if (!next || next.mbId === fetch.albumMbid) {
         failing.push(song);
         continue;

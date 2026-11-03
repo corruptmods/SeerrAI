@@ -128,6 +128,7 @@ describe('otherTake', () => {
       'Lantern Song (Dolby Atmos)',
       'Lantern Song (sped up)',
       'Lantern Song (Glasswing’s Version)',
+      'Lantern Song (Glasswings Version)',
     ]) {
       assert.equal(otherTake(name, 'Lantern Song'), true, name);
     }
@@ -140,6 +141,7 @@ describe('otherTake', () => {
       'Lantern Song single version',
       'Lantern Song (2015 remaster)',
       'Lantern Song explicit',
+      'Lantern Song (This Version)',
     ]) {
       assert.equal(otherTake(name, 'Lantern Song'), false, name);
     }

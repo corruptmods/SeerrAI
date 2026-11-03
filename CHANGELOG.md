@@ -16,6 +16,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- A song whose title has an apostrophe ("Ain't", "It's", "O'Clock") is found in a download that drops it ("Aint"), as many do, and so is an album whose release is named that way. Such songs failed with "None of the songs were in the finished download".
+
+- A song Lidarr's edition of its album lacks, with no other album to take it from, is taken from its own single instead of failing.
+
 - Playlists: a song is no longer matched to a live, acoustic, piano or remixed take, or a Dolby Atmos or 360 mix, unless its title says so; such a take could be nearer the playlist's length than the song itself. A song with only such takes on MusicBrainz is shown as not found. Try again on a song whose request was deleted looks it up again.
 
 - A song taken from an album is no longer taken from a Dolby Atmos, 360 Reality Audio, piano, session or other mix of it.

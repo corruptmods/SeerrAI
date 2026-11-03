@@ -143,9 +143,11 @@ export const normalizeTitle = (title: string): string =>
  * mix, an instrumental, a karaoke or tribute copy, a demo, a re-recording,
  * a sped-up copy, a Dolby Atmos or 360 mix. A radio edit, a single version
  * or a remaster is the same take. As a pattern, for words as `takeWords`
- * leaves them: lower case, punctuation as single spaces.
+ * leaves them: lower case, punctuation as single spaces, an apostrophe
+ * as a space or dropped ("Artist's Version" as "artist s version" or
+ * "artists version").
  */
-export const OTHER_TAKE_WORDS = String.raw`live|acoustic|unplugged|piano|sessions?|orchestral|lullaby|remix|remixes|remixed|(?:club|extended|dub) mix|(?<!(?:radio|single|album|original|main|mono|stereo) )mix(?:es)?|instrumentals?|karaoke|a cappella|acapella|tribute|demos?|outtakes?|rehearsal|re recorded|rerecorded|\w+ s version|sped up|slowed|nightcore|8 bit|alternate (?:take|version|mix)|take \d+|dolby atmos|atmos|360 reality audio|spatial audio|binaural|surround`;
+export const OTHER_TAKE_WORDS = String.raw`live|acoustic|unplugged|piano|sessions?|orchestral|lullaby|remix|remixes|remixed|(?:club|extended|dub) mix|(?<!(?:radio|single|album|original|main|mono|stereo) )mix(?:es)?|instrumentals?|karaoke|a cappella|acapella|tribute|demos?|outtakes?|rehearsal|re recorded|rerecorded|(?!(?:this|his|its|hers|bonus|plus)\b)\w+(?: s|s) version|sped up|slowed|nightcore|8 bit|alternate (?:take|version|mix)|take \d+|dolby atmos|atmos|360 reality audio|spatial audio|binaural|surround`;
 
 const OTHER_TAKES = new RegExp(String.raw`\b(?:${OTHER_TAKE_WORDS})\b`, 'g');
 

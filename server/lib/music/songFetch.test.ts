@@ -973,6 +973,52 @@ describe('taking a song from its album', () => {
     assert.deepEqual(first.recordings, [LANTERN]);
   });
 
+  it('takes a song no edition of its albums has from its single', async () => {
+    const OWN_SINGLE = '4e8b2d61-9a37-4c15-b0f4-7d2e6a9c1b38';
+    // Asked for from the album; its single only known since.
+    let singleKnown = false;
+    mock.method(MusicBrainz.prototype, 'getRecording', async (id: string) => {
+      const base = RECORDINGS[id];
+      if (id !== OPENING || !base || !singleKnown) return base ?? null;
+      return {
+        ...base,
+        releases: [
+          ...(base.releases ?? []),
+          {
+            id: 'r-single',
+            title: 'Opening',
+            status: 'Official',
+            date: '1996-05-01',
+            'artist-credit': base['artist-credit'],
+            'release-group': {
+              id: OWN_SINGLE,
+              title: 'Opening',
+              'primary-type': 'Single',
+              'secondary-types': [],
+            },
+          },
+        ],
+      } as MbRecording;
+    });
+    lidarr.tracksOnAdd.set(STATIC_GARDEN, [
+      {
+        id: 502,
+        title: 'Lantern Song',
+        foreignRecordingId: LANTERN,
+        hasFile: false,
+      },
+    ]);
+    await requestSongs([LANTERN, OPENING]);
+    singleKnown = true;
+    await startFetching();
+
+    const opening = await getRepository(SongRequest).findOneByOrFail({
+      recordingMbid: OPENING,
+    });
+    assert.equal(opening.status, MediaRequestStatus.APPROVED, 'not failed');
+    assert.equal(opening.sourceAlbumMbid, OWN_SINGLE);
+  });
+
   it('searches again on its own schedule for a song the chosen release lacks', async () => {
     // Only Lantern Song is in the release opened.
     mock.method(backfill, 'filesOf', async () => ({
@@ -1667,6 +1713,50 @@ describe('reading a release of an album', () => {
     assert.deepEqual(
       songsOfFile('CD1/1-03 Lantern Song.flac', 'Glasswing')[0],
       'lantern song'
+    );
+  });
+
+  it('reads a name with its apostrophes dropped or spaced', () => {
+    const files = [
+      { index: 0, path: 'A/03-glasswing-dont_wait_up-grp.mp3', size: 9 * MB },
+      {
+        index: 1,
+        path: 'A/04-glasswing-its_half_past_static-grp.mp3',
+        size: 9 * MB,
+      },
+      {
+        index: 2,
+        path: 'A/05 - Glasswing - Ain t No Harbour.mp3',
+        size: 9 * MB,
+      },
+    ];
+    assert.equal(
+      fileForTrack(files, 'It’s Half Past Static', 'Glasswing')?.index,
+      1
+    );
+    assert.equal(fileForTrack(files, "Don't Wait Up", 'Glasswing')?.index, 0);
+    assert.equal(
+      fileForTrack(files, 'Ain’t No Harbour', 'Glasswing')?.index,
+      2
+    );
+    for (const title of [
+      'Glasswing - Aint No Harbour (2024) MP3',
+      'Glasswing - Ain t No Harbour [FLAC]',
+      'Glasswing - Ain’t No Harbour (2024)',
+    ]) {
+      assert.equal(
+        namesAlbum(title, 'Ain’t No Harbour', 'Glasswing'),
+        true,
+        title
+      );
+    }
+    assert.equal(
+      namesAlbum(
+        'Glasswing - Static Garden (Glasswings Version)',
+        'Static Garden',
+        'Glasswing'
+      ),
+      false
     );
   });
 

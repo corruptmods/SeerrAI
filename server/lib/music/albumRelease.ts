@@ -16,7 +16,16 @@ const AUDIO = /\.(flac|mp3|m4a|aac|ogg|oga|opus|wav|aiff?|alac|ape|wv|wma)$/i;
 
 export const isAudio = (path: string): boolean => AUDIO.test(path);
 
-const words = takeWords;
+/**
+ * A name as words, two ways: apostrophes as spaces ("It's" as "it s", as
+ * a title or a tagged file has it) and dropped ("its", as file and release
+ * names often have it). Names are compared each way, alike.
+ */
+type Form = (text: string) => string;
+const words: Form = takeWords;
+const joined: Form = (text) =>
+  takeWords(normalizeTitle(text).replace(/'/g, ''));
+const FORMS: Form[] = [words, joined];
 
 /**
  * Words that make a release, or a file, another version of what it names:
@@ -67,9 +76,18 @@ export const namesAlbum = (
   artist: string
 ): boolean => {
   const name = title.replace(/(?:"|%22)[^"]*?(?:"|%22)/g, ' ');
-  const t = ` ${words(name)} `;
-  const a = words(album);
-  const by = words(artist);
+  return FORMS.some((form) => namesAlbumAs(form, name, album, artist));
+};
+
+const namesAlbumAs = (
+  form: Form,
+  name: string,
+  album: string,
+  artist: string
+): boolean => {
+  const t = ` ${form(name)} `;
+  const a = form(album);
+  const by = form(artist);
   // A name of signs or one letter ("÷", "+", "x"): its own characters,
   // apart from any word, by the artist.
   if (a.length < 2) {
@@ -95,14 +113,14 @@ const nameOf = (path: string): string =>
  * The title of a file named in parts with its track number among them
  * ("Artist - Album - 03 - Song" is "song"), or '' for a name not so made.
  */
-const titleOfFile = (path: string): string => {
+const titleOfFile = (path: string, form: Form = words): string => {
   const parts = nameOf(path).split(/\s+-\s+/);
   let numbered = -1;
   parts.forEach((part, index) => {
     if (/^(\d{1,2}\s+)?[a-d]?\d{1,3}$/.test(words(part))) numbered = index;
   });
   return numbered >= 0 && numbered < parts.length - 1
-    ? words(parts.slice(numbered + 1).join(' - '))
+    ? form(parts.slice(numbered + 1).join(' - '))
     : '';
 };
 
@@ -113,12 +131,16 @@ const titleOfFile = (path: string): string => {
  * Problems"). A name in parts with the track number among them ("Artist -
  * Album - 03 - Song") is the part after the number, first.
  */
-export const songsOfFile = (path: string, artist: string): string[] => {
-  const by = words(artist);
+export const songsOfFile = (
+  path: string,
+  artist: string,
+  form: Form = words
+): string[] => {
+  const by = form(artist);
   const withoutArtist = (w: string) =>
     by && w.startsWith(`${by} `) ? w.slice(by.length + 1) : w;
-  const titled = titleOfFile(path);
-  const whole = words(nameOf(path));
+  const titled = titleOfFile(path, form);
+  const whole = form(nameOf(path));
   // A disc and track number in front: "1 03", "103", "03", "a1".
   const unnumbered = whole.replace(/^(\d{1,2}\s+)?[a-d]?\d{1,3}\s+/, '');
   return [
@@ -152,8 +174,7 @@ export const fileForTrack = <T extends ReleaseFile>(
   track: string,
   artist: string
 ): T | undefined => {
-  const want = words(track);
-  if (!want) return undefined;
+  if (!words(track)) return undefined;
   const base = (path: string) => path.replace(/\.[^./\\]+$/, '').toLowerCase();
   const sheets = new Set(
     files.filter((f) => /\.cue$/i.test(f.path)).map((f) => base(f.path))
@@ -161,40 +182,50 @@ export const fileForTrack = <T extends ReleaseFile>(
   const audio = files.filter(
     (f) => isAudio(f.path) && f.size >= 200 * 1024 && !sheets.has(base(f.path))
   );
-  const by = words(artist);
-  const named = audio.map((file) => {
-    const titled = titleOfFile(file.path);
+  // Each way of reading the names: the song, and what each file can be.
+  const readings = FORMS.map((form) => {
+    const by = form(artist);
     return {
-      file,
-      songs: songsOfFile(file.path, artist),
-      // What a name with its own title part can hold: that title only.
-      holding: titled
-        ? [
-            ...new Set([
-              titled,
-              by && titled.startsWith(`${by} `)
-                ? titled.slice(by.length + 1)
-                : titled,
-            ]),
-          ]
-        : undefined,
+      want: form(track),
+      named: audio.map((file) => {
+        const titled = titleOfFile(file.path, form);
+        return {
+          file,
+          songs: songsOfFile(file.path, artist, form),
+          // What a name with its own title part can hold: that title only.
+          holding: titled
+            ? [
+                ...new Set([
+                  titled,
+                  by && titled.startsWith(`${by} `)
+                    ? titled.slice(by.length + 1)
+                    : titled,
+                ]),
+              ]
+            : undefined,
+        };
+      }),
     };
   });
-  const exact = named.filter((n) => n.songs.includes(want));
-  if (exact.length) return exact[0].file;
-  return named
-    .map((n) => ({
-      file: n.file,
-      length: Math.min(
-        ...(n.holding ?? n.songs)
-          .filter(
-            (song) =>
-              ` ${song} `.includes(` ${want} `) &&
-              !otherVersion(` ${song} `, ` ${want} `)
-          )
-          .map((song) => song.length)
-      ),
-    }))
+  for (const { want, named } of readings) {
+    const exact = named.find((n) => n.songs.includes(want));
+    if (exact) return exact.file;
+  }
+  return readings
+    .flatMap(({ want, named }) =>
+      named.map((n) => ({
+        file: n.file,
+        length: Math.min(
+          ...(n.holding ?? n.songs)
+            .filter(
+              (song) =>
+                ` ${song} `.includes(` ${want} `) &&
+                !otherVersion(` ${song} `, ` ${want} `)
+            )
+            .map((song) => song.length)
+        ),
+      }))
+    )
     .filter((n) => Number.isFinite(n.length))
     .sort((a, b) => a.length - b.length)[0]?.file;
 };

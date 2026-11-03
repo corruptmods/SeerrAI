@@ -1083,6 +1083,56 @@ describe('requesting songs', () => {
     assert.equal(request.songs[0].status, MediaRequestStatus.FAILED);
   });
 
+  it('when retried, sends only what it still lacks', async () => {
+    lidarr.lookupAlbums.set(SINGLE, {
+      id: 0,
+      title: 'Lantern Song',
+      foreignAlbumId: SINGLE,
+      artistId: 0,
+      monitored: false,
+      artist: {
+        id: 0,
+        artistName: 'Glasswing',
+        foreignArtistId: ARTIST,
+        monitored: false,
+        qualityProfileId: 0,
+        metadataProfileId: 0,
+        tags: [],
+      },
+    } as never);
+    const res = await requestMusic({
+      albums: [STATIC_GARDEN],
+      songs: [RADIO_EDIT],
+    });
+    const id = (res.body as { id: number }).id;
+    lidarr.down = true;
+    await actAs(Permission.MANAGE_REQUESTS, 'manager@x');
+    await call('POST', `/request/${id}/approve`);
+    await lidarr.waitFor(() => false);
+    // The album came anyway; the song's single didn't.
+    await getRepository(AlbumRequest).update(
+      { request: { id } },
+      { status: MediaRequestStatus.COMPLETED }
+    );
+
+    lidarr.down = false;
+    lidarr.calls = [];
+    assert.equal((await call('POST', `/request/${id}/retry`)).status, 200);
+    await lidarr.waitFor(
+      (c) => c.method === 'POST' && c.path === '/api/v1/album'
+    );
+    const sent = lidarr.calls.filter((c) => c.method === 'POST');
+    assert.deepEqual(
+      sent.map((c) => c.body?.foreignAlbumId),
+      [SINGLE],
+      'only the single, not the album that came'
+    );
+    const request = await getRepository(MediaRequest).findOneOrFail({
+      where: { id },
+    });
+    assert.equal(request.albums[0].status, MediaRequestStatus.COMPLETED);
+  });
+
   it('when deleted, frees its single to be asked for again', async () => {
     const res = await requestSongs([RADIO_EDIT]);
     const id = (res.body as { id: number }).id;

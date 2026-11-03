@@ -313,6 +313,13 @@ const reconcileMonitoringAfterRemoval = async (
  */
 const lidarrSendsAfterCommit = new WeakMap<QueryRunner, (() => void)[]>();
 
+/** A request's albums and songs still to come: not done, not declined. */
+const OPEN_PARTS = [
+  MediaRequestStatus.PENDING,
+  MediaRequestStatus.APPROVED,
+  MediaRequestStatus.FAILED,
+];
+
 @EventSubscriber()
 export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRequest> {
   /**
@@ -1156,7 +1163,7 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
     }
     // Songs go as the singles they are on; one only on albums is not sent
     // anywhere yet, and a request with nothing else to send stays approved.
-    if (!lidarrTargets(entity).length) {
+    if (!lidarrTargets(entity, OPEN_PARTS).length) {
       return;
     }
     if (await this.titleBlocklisted(entity, manager)) {
@@ -1265,8 +1272,11 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
   ): Promise<void> {
     const lidarr = lidarrApi(lidarrSettings);
     const search = !lidarrSettings.preventSearch;
-    // Its albums, and the singles its songs come on.
-    const wanted = lidarrTargets(entity).map((target) => target.mbId);
+    // Its albums, and the singles its songs come on, but for those done
+    // (retried, a request asks only for what it still lacks).
+    const wanted = lidarrTargets(entity, OPEN_PARTS).map(
+      (target) => target.mbId
+    );
     let media: Media | null = null;
 
     try {
@@ -1540,9 +1550,17 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
       songs.forEach((song) => (song.status = entity.status));
     }
 
-    const albums = entity.albums ?? [];
+    // Approved again (retried): what of it is done or declined stays so.
+    const albums = (entity.albums ?? []).filter(
+      (album) =>
+        entity.status !== MediaRequestStatus.APPROVED ||
+        OPEN_PARTS.includes(album.status)
+    );
     // Its albums' rows, and those of its songs' singles.
-    const mbIds = lidarrTargets(entity).map((target) => target.mbId);
+    const mbIds = lidarrTargets(
+      entity,
+      entity.status === MediaRequestStatus.APPROVED ? OPEN_PARTS : undefined
+    ).map((target) => target.mbId);
     if (!mbIds.length) {
       return;
     }

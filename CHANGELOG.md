@@ -24,6 +24,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - A live take only on a live single can be requested.
 
+- Retrying a music request sends Lidarr only what it still lacks: albums that came, or were taken off it, are no longer monitored and searched again.
+
 - An indexer waiting out its limit, or Prowlarr not answering, has the search tried again in a few minutes instead of every minute.
 
 - A song taken from an album no longer fails when its download turns out not to have it: the next release is tried. A Usenet download that renamed its files has the song found by its name.

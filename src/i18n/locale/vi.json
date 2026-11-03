@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, other {# sự cố}}",
   "components.Settings.SettingsHealth.media": "Tựa",
   "components.Settings.SettingsHealth.missingTvdb": "Phim bộ được yêu cầu không có TVDB id",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Bản tải về mà Lidarr không nhập",
   "components.Settings.SettingsHealth.neverSent": "Đã phê duyệt nhưng chưa bao giờ được gửi đến Radarr hoặc Sonarr",
   "components.Settings.SettingsHealth.next": "Tiếp",
   "components.Settings.SettingsHealth.noServices": "Chưa có dịch vụ nào được kết nối.",

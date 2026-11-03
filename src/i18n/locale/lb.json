@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# Problem} other {# Problemer}}",
   "components.Settings.SettingsHealth.media": "Titelen",
   "components.Settings.SettingsHealth.missingTvdb": "Ugefrot Serien ouni TVDB-ID",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Downloads, déi Lidarr net importéiert",
   "components.Settings.SettingsHealth.neverSent": "Guttgeheescht, mä ni u Radarr oder Sonarr geschéckt",
   "components.Settings.SettingsHealth.next": "Weider",
   "components.Settings.SettingsHealth.noServices": "Nach keng Servicer verbonnen.",

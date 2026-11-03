@@ -2893,6 +2893,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# issue} other {# issues}}",
   "components.Settings.SettingsHealth.media": "Titles",
   "components.Settings.SettingsHealth.missingTvdb": "Requested series with no TVDB id",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Downloads Lidarr won’t import",
   "components.Settings.SettingsHealth.musicNoRelease": "Requested albums with no release found after a week",
   "components.Settings.SettingsHealth.musicNotOnServer": "Albums in Lidarr, not on your media server after a day",
   "components.Settings.SettingsHealth.neverSent": "Approved but never sent to Radarr or Sonarr",

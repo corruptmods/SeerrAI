@@ -13,6 +13,7 @@ import matchWatch from '@server/lib/matchWatch';
 import type { MediaServerKind } from '@server/lib/mediaServers';
 import { connectedServers, serverName } from '@server/lib/mediaServers';
 import { musicReady } from '@server/lib/music/access';
+import blockedImports from '@server/lib/music/blockedImports';
 import songFetcher from '@server/lib/music/songFetch';
 import notificationReconciler from '@server/lib/notificationReconciler';
 import playlists from '@server/lib/playlists';
@@ -234,7 +235,9 @@ const musicJobs = (): ScheduledJob[] => {
           logger.debug('Starting scheduled job: Music Sync', {
             label: 'Jobs',
           });
-          return musicSync.run();
+          // Then what Lidarr downloaded but won't import, for songs asked
+          // for (lib/music/blockedImports).
+          return musicSync.run().finally(() => blockedImports.run());
         })
       ),
       running: () => musicSync.status().running,

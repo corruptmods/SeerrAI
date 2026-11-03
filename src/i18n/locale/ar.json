@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, zero {لا مشاكل} one {مشكلة واحدة} two {مشكلتان} few {# مشاكل} many {# مشكلة} other {# مشكلة}}",
   "components.Settings.SettingsHealth.media": "العناوين",
   "components.Settings.SettingsHealth.missingTvdb": "مسلسلات مطلوبة بلا معرّف TVDB",
+  "components.Settings.SettingsHealth.musicImportBlocked": "تنزيلات لا يستوردها Lidarr",
   "components.Settings.SettingsHealth.neverSent": "تمت الموافقة عليها لكنها لم تُرسل قط إلى Radarr أو Sonarr",
   "components.Settings.SettingsHealth.next": "التالي",
   "components.Settings.SettingsHealth.noServices": "لا توجد خدمات متصلة بعد.",

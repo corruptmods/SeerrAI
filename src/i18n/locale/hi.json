@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# समस्या} other {# समस्याएँ}}",
   "components.Settings.SettingsHealth.media": "शीर्षक",
   "components.Settings.SettingsHealth.missingTvdb": "अनुरोधित शृंखलाएँ जिनकी कोई TVDB id नहीं है",
+  "components.Settings.SettingsHealth.musicImportBlocked": "डाउनलोड जिन्हें Lidarr इम्पोर्ट नहीं करता",
   "components.Settings.SettingsHealth.neverSent": "मंज़ूर हुए पर Radarr या Sonarr को कभी नहीं भेजे गए",
   "components.Settings.SettingsHealth.next": "अगला",
   "components.Settings.SettingsHealth.noServices": "अभी कोई सेवा जुड़ी नहीं है।",

@@ -3133,6 +3133,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# arazo} other {# arazo}}",
   "components.Settings.SettingsHealth.media": "Izenburuak",
   "components.Settings.SettingsHealth.missingTvdb": "TVDB IDrik gabeko telesail eskatuak",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Lidarr-ek inportatzen ez dituen deskargak",
   "components.Settings.SettingsHealth.neverSent": "Onartuta baina inoiz ez Radarr-era edo Sonarr-era bidalita",
   "components.Settings.SettingsHealth.next": "Hurrengoa",
   "components.Settings.SettingsHealth.noServices": "Oraindik ez dago zerbitzurik konektatuta.",

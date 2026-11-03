@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# problem} few {# problema} other {# problema}}",
   "components.Settings.SettingsHealth.media": "Naslovi",
   "components.Settings.SettingsHealth.missingTvdb": "Zatražene serije bez TVDB id-a",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Preuzimanja koja Lidarr ne uvozi",
   "components.Settings.SettingsHealth.neverSent": "Odobreno, ali nikada poslato u Radarr ili Sonarr",
   "components.Settings.SettingsHealth.next": "Sledeća",
   "components.Settings.SettingsHealth.noServices": "Još nijedan servis nije povezan.",

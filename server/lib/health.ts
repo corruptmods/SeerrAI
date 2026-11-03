@@ -46,6 +46,7 @@ import {
 } from '@server/lib/mediaServers';
 import { lidarrApi, musicReady } from '@server/lib/music/access';
 import { lidarrOnly } from '@server/lib/music/availability';
+import { heldBack, heldBackReason } from '@server/lib/music/blockedImports';
 import { canFix, fixingOn } from '@server/lib/plexFixMatch';
 import type { PlexMatchProblem } from '@server/lib/plexMatchCheck';
 import plexMatchCheck, { problemKey } from '@server/lib/plexMatchCheck';
@@ -1343,8 +1344,45 @@ const musicNoRelease = async (page: Page): Promise<HealthCheck> => {
 const musicOn = () => featureEnabled('music') && musicReady();
 
 /** The music checks, while music is on. */
+/**
+ * Finished downloads Lidarr won't import, most often a single missing
+ * tracks of its edition. Those with a requested song are imported by Seerr
+ * AI (lib/music/blockedImports); what's left needs a manual import.
+ */
+const musicImportBlocked = async (page: Page): Promise<HealthCheck> => {
+  const held: HealthItem[] = [];
+  for (const server of getSettings().lidarr) {
+    // A Lidarr not answering is the services check's to say.
+    const queue = await lidarrApi(server)
+      .getMusicQueue()
+      .catch(() => []);
+    for (const item of queue.filter(heldBack)) {
+      held.push({
+        title: item.album
+          ? albumTitle(item.album.title, item.artist?.artistName)
+          : item.title,
+        detail: [heldBackReason(item), `${server.name}: Activity → Queue`]
+          .filter(Boolean)
+          .join(' · '),
+        href: item.album?.foreignAlbumId
+          ? `/music/album/${item.album.foreignAlbumId}`
+          : undefined,
+      });
+    }
+  }
+  return {
+    id: 'musicImportBlocked',
+    group: 'media',
+    status: held.length > 0 ? 'warning' : 'ok',
+    count: held.length,
+    items: held.slice(page.skip, page.skip + page.take),
+  };
+};
+
 const musicChecks = (page: Page): Promise<HealthCheck>[] =>
-  musicOn() ? [musicNotOnServer(page), musicNoRelease(page)] : [];
+  musicOn()
+    ? [musicNotOnServer(page), musicNoRelease(page), musicImportBlocked(page)]
+    : [];
 
 /** Sonarr needs a TVDB id; without one a series request cannot be sent. */
 const missingTvdb = (page: Page): Promise<HealthCheck> =>
@@ -1964,6 +2002,10 @@ const PAGED = new Map<string, OneCheck>([
   [
     'musicNoRelease',
     async (page) => (musicOn() ? musicNoRelease(page) : undefined),
+  ],
+  [
+    'musicImportBlocked',
+    async (page) => (musicOn() ? musicImportBlocked(page) : undefined),
   ],
   ['missingTvdb', missingTvdb],
   ['collectionGaps', async (page) => collectionGapsCheck(page)],

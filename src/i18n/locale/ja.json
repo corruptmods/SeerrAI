@@ -3126,6 +3126,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, other {#件の問題}}",
   "components.Settings.SettingsHealth.media": "作品",
   "components.Settings.SettingsHealth.missingTvdb": "TVDB ID のないリクエスト済みシリーズ",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Lidarrが取り込まないダウンロード",
   "components.Settings.SettingsHealth.neverSent": "承認済みだが Radarr や Sonarr に送られていない",
   "components.Settings.SettingsHealth.next": "次へ",
   "components.Settings.SettingsHealth.noServices": "まだサービスが接続されていません。",

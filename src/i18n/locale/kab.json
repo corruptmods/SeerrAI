@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# n ugur} other {# n wuguren}}",
   "components.Settings.SettingsHealth.media": "Izwal",
   "components.Settings.SettingsHealth.missingTvdb": "Tisnasliwin yettwasutren war asulay TVDB",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Isidar ur yettkecmen ara ɣer Lidarr",
   "components.Settings.SettingsHealth.neverSent": "Yettwaqbel maca werǧin yettwazen ɣer Radarr neɣ Sonarr",
   "components.Settings.SettingsHealth.next": "Ɣer zdat",
   "components.Settings.SettingsHealth.noServices": "Ulac imeẓla yeqqnen akka tura.",

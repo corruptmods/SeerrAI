@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, other {문제 #개}}",
   "components.Settings.SettingsHealth.media": "작품",
   "components.Settings.SettingsHealth.missingTvdb": "TVDB ID가 없는 요청된 시리즈",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Lidarr가 가져오지 않는 다운로드",
   "components.Settings.SettingsHealth.neverSent": "승인되었지만 Radarr나 Sonarr로 보내지지 않음",
   "components.Settings.SettingsHealth.next": "다음",
   "components.Settings.SettingsHealth.noServices": "아직 연결된 서비스가 없습니다.",

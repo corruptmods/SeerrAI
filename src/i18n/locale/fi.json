@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# ongelma} other {# ongelmaa}}",
   "components.Settings.SettingsHealth.media": "Nimikkeet",
   "components.Settings.SettingsHealth.missingTvdb": "Pyydetyt sarjat ilman TVDB-tunnusta",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Lataukset, joita Lidarr ei tuo",
   "components.Settings.SettingsHealth.neverSent": "Hyväksytty, mutta ei koskaan lähetetty Radarriin tai Sonarriin",
   "components.Settings.SettingsHealth.next": "Seuraava",
   "components.Settings.SettingsHealth.noServices": "Palveluita ei ole vielä yhdistetty.",

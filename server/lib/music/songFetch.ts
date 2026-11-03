@@ -185,7 +185,7 @@ const clientById = (id: number | null): DownloadClientSettings => {
 };
 
 /** A song's track in Lidarr's album: its recording, else its title. */
-const trackOf = (
+export const trackOf = (
   tracks: LidarrTrack[],
   song: Pick<SongRequest, 'recordingMbid' | 'title' | 'version'>
 ): LidarrTrack | undefined => {

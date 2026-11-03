@@ -3142,6 +3142,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# probléma} other {# probléma}}",
   "components.Settings.SettingsHealth.media": "Címek",
   "components.Settings.SettingsHealth.missingTvdb": "Kért sorozatok TVDB-azonosító nélkül",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Letöltések, amelyeket a Lidarr nem importál",
   "components.Settings.SettingsHealth.neverSent": "Jóváhagyva, de soha nem került a Radarrhoz vagy a Sonarrhoz",
   "components.Settings.SettingsHealth.next": "Következő",
   "components.Settings.SettingsHealth.noServices": "Még nincs csatlakoztatott szolgáltatás.",

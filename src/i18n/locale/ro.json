@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# problemă} few {# probleme} other {# de probleme}}",
   "components.Settings.SettingsHealth.media": "Titluri",
   "components.Settings.SettingsHealth.missingTvdb": "Seriale solicitate fără ID TVDB",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Descărcări pe care Lidarr nu le importă",
   "components.Settings.SettingsHealth.neverSent": "Aprobate, dar netrimise niciodată la Radarr sau Sonarr",
   "components.Settings.SettingsHealth.next": "Înainte",
   "components.Settings.SettingsHealth.noServices": "Niciun serviciu nu este conectat încă.",

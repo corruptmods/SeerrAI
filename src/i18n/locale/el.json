@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# πρόβλημα} other {# προβλήματα}}",
   "components.Settings.SettingsHealth.media": "Τίτλοι",
   "components.Settings.SettingsHealth.missingTvdb": "Σειρές που ζητήθηκαν χωρίς TVDB id",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Λήψεις που το Lidarr δεν εισάγει",
   "components.Settings.SettingsHealth.neverSent": "Εγκρίθηκαν αλλά δεν στάλθηκαν ποτέ στο Radarr ή στο Sonarr",
   "components.Settings.SettingsHealth.next": "Επόμενη",
   "components.Settings.SettingsHealth.noServices": "Δεν έχουν συνδεθεί υπηρεσίες ακόμα.",

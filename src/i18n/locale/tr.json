@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# sorun} other {# sorun}}",
   "components.Settings.SettingsHealth.media": "Yapımlar",
   "components.Settings.SettingsHealth.missingTvdb": "TVDB kimliği olmayan talep edilmiş diziler",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Lidarr’ın içe aktarmadığı indirmeler",
   "components.Settings.SettingsHealth.neverSent": "Onaylandı ama Radarr veya Sonarr’a hiç gönderilmedi",
   "components.Settings.SettingsHealth.next": "Sonraki",
   "components.Settings.SettingsHealth.noServices": "Henüz bağlı hizmet yok.",

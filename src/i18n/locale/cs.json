@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# problém} few {# problémy} many {# problému} other {# problémů}}",
   "components.Settings.SettingsHealth.media": "Tituly",
   "components.Settings.SettingsHealth.missingTvdb": "Zažádané seriály bez TVDB id",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Stažené soubory, které Lidarr neimportuje",
   "components.Settings.SettingsHealth.neverSent": "Schváleno, ale nikdy neodesláno do Radarr nebo Sonarr",
   "components.Settings.SettingsHealth.next": "Další",
   "components.Settings.SettingsHealth.noServices": "Zatím nejsou připojené žádné služby.",

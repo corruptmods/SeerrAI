@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# Problem} other {# Probleme}}",
   "components.Settings.SettingsHealth.media": "Titel",
   "components.Settings.SettingsHealth.missingTvdb": "Angefragte Serien ohne TVDB-ID",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Downloads, die Lidarr nicht importiert",
   "components.Settings.SettingsHealth.neverSent": "Genehmigt, aber nie an Radarr oder Sonarr gesendet",
   "components.Settings.SettingsHealth.next": "Weiter",
   "components.Settings.SettingsHealth.noServices": "Noch keine Dienste verbunden.",

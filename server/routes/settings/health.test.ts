@@ -104,6 +104,8 @@ let rootFolders: unknown[] = [];
 // The fake Prowlarr's indexers and their failures.
 let indexers: unknown[] = [];
 let indexerStatus: unknown[] = [];
+// The fake Lidarr's download queue.
+let lidarrQueue: unknown[] = [];
 // The fake Bazarr's status page and providers.
 let bazarrHealth: unknown[] = [];
 let bazarrProviders: unknown[] = [];
@@ -128,6 +130,15 @@ const fake = http.createServer((req, res) => {
     ['/api/v3/rootfolder', rootFolders],
     ['/api/v1/health', []],
     ['/api/v1/indexerstatus', indexerStatus],
+    [
+      '/api/v1/queue',
+      {
+        page: 1,
+        pageSize: lidarrQueue.length,
+        totalRecords: lidarrQueue.length,
+        records: lidarrQueue,
+      },
+    ],
     ['/api/v1/indexer', indexers],
     ['/api/system/status', { data: { bazarr_version: '1.5.3' } }],
     ['/api/system/health', { data: bazarrHealth }],
@@ -2198,12 +2209,61 @@ describe('music', () => {
     }
   });
 
+  it('lists downloads Lidarr won’t import, with its reason', async () => {
+    try {
+      lidarrQueue = [
+        {
+          id: 1,
+          title: 'Glasswing - Fog B (Single) [MP3]',
+          downloadId: 'H1',
+          trackedDownloadStatus: 'warning',
+          trackedDownloadState: 'importBlocked',
+          outputPath: '/data/torrents/music/Fog B',
+          artistId: 7,
+          albumId: 40,
+          artist: { id: 7, artistName: 'Glasswing', foreignArtistId: ARTIST },
+          album: { id: 40, title: 'Fog B', foreignAlbumId: album(1) },
+          statusMessages: [
+            { title: 'Fog B.mp3', messages: ['Has missing tracks'] },
+          ],
+        },
+        // Still downloading: nothing wrong yet.
+        {
+          id: 2,
+          title: 'Glasswing - Fog C',
+          downloadId: 'H2',
+          trackedDownloadStatus: 'ok',
+          trackedDownloadState: 'downloading',
+          artistId: 7,
+          albumId: 41,
+        },
+      ];
+      const check = byId(await health(), 'musicImportBlocked');
+      assert.equal(check.status, 'warning');
+      assert.equal(check.count, 1);
+      assert.match(check.items[0].title, /Fog B/);
+      assert.equal(
+        check.items[0].detail,
+        'Has missing tracks · Lidarr: Activity → Queue'
+      );
+      assert.equal(check.items[0].href, `/music/album/${album(1)}`);
+    } finally {
+      lidarrQueue = [];
+      resetSettings();
+    }
+  });
+
   it('is left off the page while music is off for everyone', async () => {
     try {
       await seed([{ mbId: album(1), title: 'Fog B', lidarrAlbumId: 71 }]);
       getSettings().main.disabledFeatures = ['music'];
       const ids = (await health()).map((c) => c.id);
-      for (const id of ['musicbrainz', 'musicNotOnServer', 'musicNoRelease']) {
+      for (const id of [
+        'musicbrainz',
+        'musicNotOnServer',
+        'musicNoRelease',
+        'musicImportBlocked',
+      ]) {
         assert.ok(!ids.includes(id), id);
       }
     } finally {

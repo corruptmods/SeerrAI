@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, other {# 个问题}}",
   "components.Settings.SettingsHealth.media": "作品",
   "components.Settings.SettingsHealth.missingTvdb": "没有 TVDB ID 的已请求电视节目",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Lidarr 未导入的下载",
   "components.Settings.SettingsHealth.neverSent": "已批准但从未发送到 Radarr 或 Sonarr",
   "components.Settings.SettingsHealth.next": "下一页",
   "components.Settings.SettingsHealth.noServices": "尚未连接任何服务。",

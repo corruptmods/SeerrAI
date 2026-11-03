@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# problem} other {# probleme}}",
   "components.Settings.SettingsHealth.media": "Titujt",
   "components.Settings.SettingsHealth.missingTvdb": "Seriale të kërkuara pa ID TVDB",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Shkarkime që Lidarr nuk i importon",
   "components.Settings.SettingsHealth.neverSent": "Të miratuara, por kurrë të dërguara te Radarr ose Sonarr",
   "components.Settings.SettingsHealth.next": "Tjetra",
   "components.Settings.SettingsHealth.noServices": "Ende nuk është lidhur asnjë shërbim.",

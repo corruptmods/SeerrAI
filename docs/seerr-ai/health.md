@@ -10,7 +10,7 @@
 - **Backfill**: titles it couldn't search, packs waiting for approval, downloads that failed this week, Download Check findings and admin agent conversations waiting for you, and what Download Check and the agent did this week.
 - **Requests**: failed, approved but never sent, waiting on approval for over a week, and requests no longer linked to a title (with a button to remove them).
 - **Titles**: processing for over a week (with **Search now** for each and **Search all**, which searches a season missing entirely as one), series requests with no TVDB id, folders a server matched to the wrong title, collections partly in the library.
-- **Music** (once Lidarr is added): albums no server lists after a day, requested albums with no release after a week (with **Search now**), and whether MusicBrainz is answering. See [Music](./music.md#keeping-track).
+- **Music** (once Lidarr is added): albums no server lists after a day, requested albums with no release after a week (with **Search now**), downloads Lidarr won't import (with Lidarr's reason, most often a single missing tracks of its edition), and whether MusicBrainz is answering. A requested song in such a download is imported on its own, so what's listed is what needs a manual import in Lidarr. See [Music](./music.md#keeping-track).
 - **Users**: expired Plex sign-ins.
 - **Resources**: Seerr AI's own CPU and memory over the last hour or day.
 

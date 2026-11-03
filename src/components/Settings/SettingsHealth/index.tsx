@@ -77,6 +77,7 @@ const messages = defineMessages('components.Settings.SettingsHealth', {
   stuckProcessing: 'Processing for over a week',
   musicNotOnServer: 'Albums in Lidarr, not on your media server after a day',
   musicNoRelease: 'Requested albums with no release found after a week',
+  musicImportBlocked: 'Downloads Lidarr won’t import',
   missingTvdb: 'Requested series with no TVDB id',
   collectionGaps: 'Collections partly in your library',
   plexMatches: 'Folders matched to another title',

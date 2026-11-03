@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# problema} few {# problemos} many {# problemos} other {# problemų}}",
   "components.Settings.SettingsHealth.media": "Pavadinimai",
   "components.Settings.SettingsHealth.missingTvdb": "Rezervuoti serialai be TVDB ID",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Atsisiuntimai, kurių Lidarr neimportuoja",
   "components.Settings.SettingsHealth.neverSent": "Patvirtinta, bet niekada neišsiųsta į Radarr ar Sonarr",
   "components.Settings.SettingsHealth.next": "Kitas",
   "components.Settings.SettingsHealth.noServices": "Dar neprijungta jokia paslauga.",

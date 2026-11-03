@@ -98,6 +98,8 @@ export interface LidarrManualImportFile {
   quality: LidarrQualityModel;
   indexerFlags: 0;
   disableReleaseSwitching: boolean;
+  /** The queue item it comes from, which the import then finishes. */
+  downloadId?: string;
 }
 
 export interface LidarrAlbum {
@@ -167,6 +169,10 @@ export interface LidarrAddArtistOptions extends LidarrArtistOptions {
 export interface LidarrQueueAppend {
   artistId: number;
   albumId: number;
+  /** Where the finished download is, in Lidarr's own paths. */
+  outputPath?: string;
+  /** Why Lidarr hasn't imported it, file by file. */
+  statusMessages?: { title: string; messages: string[] }[];
   artist?: Pick<LidarrArtist, 'id' | 'artistName' | 'foreignArtistId'>;
   album?: Pick<LidarrAlbum, 'id' | 'title' | 'foreignAlbumId'>;
 }

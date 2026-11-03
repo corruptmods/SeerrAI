@@ -3139,6 +3139,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# проблема} few {# проблемы} many {# проблем} other {# проблемы}}",
   "components.Settings.SettingsHealth.media": "Названия",
   "components.Settings.SettingsHealth.missingTvdb": "Запрошенные сериалы без TVDB ID",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Загрузки, которые Lidarr не импортирует",
   "components.Settings.SettingsHealth.neverSent": "Одобрены, но так и не отправлены в Radarr или Sonarr",
   "components.Settings.SettingsHealth.next": "Далее",
   "components.Settings.SettingsHealth.noServices": "Сервисы пока не подключены.",

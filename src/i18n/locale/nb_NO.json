@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# problem} other {# problemer}}",
   "components.Settings.SettingsHealth.media": "Titler",
   "components.Settings.SettingsHealth.missingTvdb": "Forespurte serier uten TVDB-ID",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Nedlastinger Lidarr ikke vil importere",
   "components.Settings.SettingsHealth.neverSent": "Godkjent, men aldri sendt til Radarr eller Sonarr",
   "components.Settings.SettingsHealth.next": "Neste",
   "components.Settings.SettingsHealth.noServices": "Ingen tjenester er tilkoblet ennå.",

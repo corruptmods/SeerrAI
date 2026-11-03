@@ -50,6 +50,8 @@ export interface FakeLidarr {
     order: number;
     tags: number[];
   }[];
+  /** What Lidarr is downloading, as its queue lists it. */
+  queue: Record<string, unknown>[];
   /** What Lidarr finds in a folder for manual import, by folder. */
   folders: Map<string, { path: string; size?: number }[]>;
   /** Whether a manual import takes its files (or refuses them all). */
@@ -85,6 +87,7 @@ export const createFakeLidarr = (): FakeLidarr => {
     releaseTracks: new Map(),
     remotePathMappings: [],
     folders: new Map(),
+    queue: [],
     delayProfiles: [
       {
         id: 1,
@@ -133,6 +136,7 @@ export const createFakeLidarr = (): FakeLidarr => {
       fake.releaseTracks = new Map();
       fake.remotePathMappings = [];
       fake.folders = new Map();
+      fake.queue = [];
       fake.delayProfiles = [
         {
           id: 1,
@@ -296,6 +300,17 @@ export const createFakeLidarr = (): FakeLidarr => {
     }
     if (method === 'GET' && path === '/api/v1/remotepathmapping') {
       return [200, fake.remotePathMappings];
+    }
+    if (method === 'GET' && path === '/api/v1/queue') {
+      return [
+        200,
+        {
+          page: 1,
+          pageSize: fake.queue.length,
+          totalRecords: fake.queue.length,
+          records: fake.queue,
+        },
+      ];
     }
     if (method === 'GET' && path === '/api/v1/delayprofile') {
       return [200, fake.delayProfiles];

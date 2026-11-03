@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {בעיה אחת} other {# בעיות}}",
   "components.Settings.SettingsHealth.media": "כותרים",
   "components.Settings.SettingsHealth.missingTvdb": "סדרות שהתבקשו בלי מזהה TVDB",
+  "components.Settings.SettingsHealth.musicImportBlocked": "הורדות ש-Lidarr לא מייבא",
   "components.Settings.SettingsHealth.neverSent": "אושרו אבל אף פעם לא נשלחו ל-Radarr או ל-Sonarr",
   "components.Settings.SettingsHealth.next": "הבא",
   "components.Settings.SettingsHealth.noServices": "עדיין לא מחוברים שירותים.",

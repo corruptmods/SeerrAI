@@ -3125,6 +3125,7 @@
   "components.Settings.SettingsHealth.issues": "{count, plural, one {# probleem} other {# probleemi}}",
   "components.Settings.SettingsHealth.media": "Teosed",
   "components.Settings.SettingsHealth.missingTvdb": "Taotletud sarjad ilma TVDB ID-ta",
+  "components.Settings.SettingsHealth.musicImportBlocked": "Allalaadimised, mida Lidarr ei impordi",
   "components.Settings.SettingsHealth.neverSent": "Kinnitatud, kuid kunagi Radarrisse või Sonarrisse saatmata",
   "components.Settings.SettingsHealth.next": "Järgmine",
   "components.Settings.SettingsHealth.noServices": "Ühtegi teenust pole veel ühendatud.",

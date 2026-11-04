@@ -140,8 +140,9 @@ const loadLocaleData = async (
 type NextAppComponentType = typeof App;
 type MessagesType = Record<string, string>;
 
-interface ExtendedAppProps extends AppProps {
-  user: User;
+/** What the server gives the app with the first page of a visit. */
+interface FirstPageProps {
+  user?: User;
   messages: MessagesType;
   locale: AvailableLocale;
   currentSettings: PublicSettingsResponse;
@@ -151,29 +152,44 @@ interface ExtendedAppProps extends AppProps {
   seasonDay?: string;
 }
 
+/**
+ * A move to another page in the browser brings only that page's props (see
+ * getInitialProps): the app goes on with what its first page gave it.
+ */
+type ExtendedAppProps = AppProps & Partial<FirstPageProps>;
+
 // Every API request carries the build this page is running, so the server
 // can recognise a client stranded on an old build (see /api/v1/status).
 axios.defaults.headers.common['X-Seerr-Build'] =
   process.env.commitTag ?? 'local';
-// And which tab or window it is, so one tab's music search never drops
-// another's as typed past.
 if (typeof window !== 'undefined') {
+  // And which tab or window it is, so one tab's music search never drops
+  // another's as typed past.
   axios.defaults.headers.common['X-Seerr-Tab'] = Math.random()
     .toString(36)
     .slice(2, 12);
+  // A browser without Intl.Locale gets it as the app starts.
+  void polyfillIntl();
 }
 
 const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
   Component,
   pageProps,
   router,
-  user,
-  messages,
-  locale,
-  currentSettings,
-  deviceAppearance,
-  seasonDay,
+  ...given
 }: ExtendedAppProps) => {
+  // Kept from the first page for the whole visit. The signed-in user and the
+  // settings are only where the app starts: its own copies of them are kept
+  // fresh from there.
+  const [firstPage] = useState(given as FirstPageProps);
+  const {
+    user,
+    messages,
+    locale,
+    currentSettings,
+    deviceAppearance,
+    seasonDay,
+  } = firstPage;
   let component: React.ReactNode;
   const [loadedMessages, setMessages] = useState<MessagesType>(messages);
   const [currentLocale, setLocale] = useState<AvailableLocale>(locale);
@@ -329,6 +345,17 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
 };
 
 CoreApp.getInitialProps = async (initialProps) => {
+  // A move to another page in the browser: the app already has what its
+  // first page brought (see CoreApp). Making it again here gave the app a
+  // signed-out, unconfigured copy whenever its own checks were still on
+  // their way, so the session was taken as ended or the settings as unset
+  // (posters no longer through Seerr AI, music and AI hidden) for the rest
+  // of the visit; and it loaded the English strings on the first move, for
+  // nothing.
+  if (typeof window !== 'undefined') {
+    return App.getInitialProps(initialProps);
+  }
+
   const { ctx, router } = initialProps;
   let user: User | undefined = undefined;
   let currentSettings: PublicSettingsResponse = {

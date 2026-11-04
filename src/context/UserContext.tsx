@@ -7,7 +7,8 @@ import { useRouter } from 'next/dist/client/router';
 import { useEffect, useRef } from 'react';
 
 interface UserContextProps {
-  initialUser: User;
+  /** Who the first page was made for: no one, on the sign-in pages. */
+  initialUser?: User;
   children?: React.ReactNode;
 }
 

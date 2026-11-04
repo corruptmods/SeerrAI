@@ -62,6 +62,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - Changing a series request to no seasons answers that seasons are missing, instead of an error.
 
+- Opening a page soon after Seerr AI loads, on a slow connection, no longer sends you through the sign-in page or loses your settings for the rest of the visit. Before, posters then came straight from TMDB instead of through Seerr AI, music and AI were hidden, and the tab's title was blank. The first page you open from another also no longer downloads the English strings, which Seerr AI already has.
+
 - Songs coming from Soulseek carry on when slskd restarts: what slskd hadn't finished is asked of the same sharer again, into the same folder, instead of that sharer being passed over. While slskd isn't answering, songs only Soulseek might have are looked for again every half hour, without counting it as a search that found nothing.
 
 - A playlist song matched by its ISRC to a recording MusicBrainz has only on others' compilations ("Now That's…") is matched to the artist's own single or album with the song instead, when that one is as long, so it can be requested. Songs that failed with "only on compilations" are matched again on update.

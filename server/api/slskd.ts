@@ -58,6 +58,8 @@ export interface SlskdTransfer {
   bytesTransferred: number;
   placeInQueue?: number | null;
   exception?: string | null;
+  /** The batch it was asked for in; none when slskd asked for it itself. */
+  batchId?: string | null;
 }
 
 export interface SlskdBatch {
@@ -91,6 +93,16 @@ const newer = (current: string, wanted: readonly number[]): boolean => {
   }
   return true;
 };
+
+/**
+ * Whether slskd ended the transfer because it was shutting down. Once it is
+ * back, slskd asks for the file again itself, but outside its batch and
+ * into its usual downloads folder.
+ */
+export const endedByRestart = (transfer: SlskdTransfer) =>
+  transferIs(transfer, 'Completed') &&
+  !transferIs(transfer, 'Succeeded') &&
+  transfer.exception === 'Application shut down';
 
 /** Whether this slskd can download in batches. */
 export const slskdNewEnough = (version: string): boolean =>
@@ -223,6 +235,17 @@ class SlskdAPI extends ExternalAPI {
       { validateStatus: (s) => s === 200 || s === 404 }
     );
     return res.status === 404 ? null : res.data;
+  }
+
+  /** Every download slskd has of one sharer's, of any batch or none. */
+  public async getDownloadsFrom(username: string): Promise<SlskdTransfer[]> {
+    const res = await this.axios.get<{
+      directories?: { files?: SlskdTransfer[] | null }[] | null;
+    }>(`/transfers/downloads/${encodeURIComponent(username)}`, {
+      validateStatus: (s) => s === 200 || s === 404,
+    });
+    if (res.status === 404) return [];
+    return (res.data.directories ?? []).flatMap((d) => d.files ?? []);
   }
 
   /** Stops a transfer and forgets it. */

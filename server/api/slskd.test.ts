@@ -54,6 +54,16 @@ before(async () => {
     if (req.method === 'GET' && path.endsWith('/responses')) {
       return json(200, [ANSWER]);
     }
+    if (req.method === 'GET' && path === '/transfers/downloads/collector') {
+      // slskd groups a sharer's downloads by folder.
+      return json(200, {
+        username: 'collector',
+        directories: [
+          { directory: 'a', files: [{ id: 't-1', filename: 'a\\1.flac' }] },
+          { directory: 'b', files: [{ id: 't-2', filename: 'b\\2.flac' }] },
+        ],
+      });
+    }
     if (req.method === 'DELETE') return json(204);
     return json(404);
   });
@@ -97,5 +107,19 @@ describe('a Soulseek search', () => {
       'GET /searches/:id/responses',
       'DELETE /searches/:id',
     ]);
+  });
+});
+
+describe('a sharer’s downloads', () => {
+  it('are every transfer of theirs, from each folder', async () => {
+    const downloads = await slskd.getDownloadsFrom('collector');
+    assert.deepEqual(
+      downloads.map((d) => d.id),
+      ['t-1', 't-2']
+    );
+  });
+
+  it('are none when slskd has none of theirs', async () => {
+    assert.deepEqual(await slskd.getDownloadsFrom('someone-else'), []);
   });
 });

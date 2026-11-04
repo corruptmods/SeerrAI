@@ -2408,6 +2408,97 @@ describe('taking a song from Soulseek', () => {
     assert.match(after.stage ?? '', /two hours in the sharer’s queue/);
   });
 
+  it('asks the sharer again into the same folder when slskd restarts', async () => {
+    await requestSongs([LANTERN]);
+    await startFetching();
+    const folder = asked[0].folder;
+    // slskd ended the transfer as it shut down, and asked for the file
+    // again itself once back, outside the batch.
+    const batches: Record<string, SlskdTransfer> = {
+      'batch-1': {
+        id: 't-1',
+        username: 'collector',
+        filename: SHARED,
+        size: 40 * MB,
+        state: 'Completed, Errored',
+        bytesTransferred: 10 * MB,
+        exception: 'Application shut down',
+      },
+    };
+    mock.method(SlskdAPI.prototype, 'getBatch', async (id: string) =>
+      batches[id]
+        ? { id, username: 'collector', transfers: [batches[id]] }
+        : null
+    );
+    mock.method(SlskdAPI.prototype, 'getDownloadsFrom', async () => [
+      batches['batch-1'],
+      {
+        id: 't-own',
+        username: 'collector',
+        filename: SHARED,
+        size: 40 * MB,
+        state: 'Queued, Remotely',
+        bytesTransferred: 0,
+        batchId: null,
+      },
+    ]);
+    mock.method(
+      SlskdAPI.prototype,
+      'download',
+      async (username: string, files: { filename: string }[], to: string) => {
+        asked.push({
+          username,
+          files: files.map((f) => f.filename),
+          folder: to,
+        });
+        return 'batch-2';
+      }
+    );
+    await songFetcher.tick();
+    let fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(fetch.stage, 'Asked for on Soulseek again: slskd restarted');
+    assert.equal(fetch.downloadId, 'batch-1,batch-2');
+    assert.ok(!fetch.tried.includes('soulseek:collector'));
+    // slskd's own copy, headed for the wrong folder, is stopped.
+    assert.deepEqual(removedTransfers, ['t-own']);
+    assert.deepEqual(asked.at(-1), {
+      username: 'collector',
+      files: [SHARED],
+      folder,
+    });
+
+    batches['batch-2'] = {
+      id: 't-2',
+      username: 'collector',
+      filename: SHARED,
+      size: 40 * MB,
+      state: 'Completed, Succeeded',
+      bytesTransferred: 40 * MB,
+      batchId: 'batch-2',
+    };
+    lidarr.folders.set(`/data/soulseek/complete/${folder}`, [
+      { path: `/data/soulseek/complete/${folder}/02 - Lantern Song.flac` },
+    ]);
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'importing');
+  });
+
+  it('looks again soon, not counting a search, while slskd is down', async () => {
+    mock.method(SlskdAPI.prototype, 'search', async () => {
+      throw new Error('connect ECONNREFUSED');
+    });
+    await requestSongs([LANTERN]);
+    await startFetching();
+    const fetch = await fetchOf();
+    assert.equal(fetch.status, 'searching');
+    assert.equal(fetch.searches ?? 0, 0);
+    assert.match(fetch.stage ?? '', /slskd isn’t answering/);
+    const wait = (fetch.searchAgainAt?.getTime() ?? 0) - Date.now();
+    assert.ok(wait > 20 * 60_000 && wait <= 30 * 60_000);
+  });
+
   it('is not searched until it is set up', async () => {
     getSettings().music.soulseek = { url: '', apiKey: '', downloadsPath: '' };
     await requestSongs([LANTERN]);

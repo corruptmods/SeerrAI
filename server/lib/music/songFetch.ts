@@ -10,8 +10,12 @@ import type {
   LidarrQualityModel,
   LidarrTrack,
 } from '@server/api/servarr/lidarr';
-import type { SlskdResponse } from '@server/api/slskd';
-import SlskdAPI, { SlskdRefused, transferIs } from '@server/api/slskd';
+import type { SlskdResponse, SlskdTransfer } from '@server/api/slskd';
+import SlskdAPI, {
+  SlskdRefused,
+  endedByRestart,
+  transferIs,
+} from '@server/api/slskd';
 import {
   MediaRequestStatus,
   MediaStatus,
@@ -196,8 +200,15 @@ const MAX_SOULSEEK_TRIES = 5;
 const MAX_SOULSEEK_SEARCHES = 3;
 /** How long a sharer's queue is waited in before another is tried. */
 const SOULSEEK_QUEUE_GIVE_UP_MS = 2 * 60 * 60_000;
+/** Times a sharer is asked again after slskd restarts mid-download. */
+const MAX_SOULSEEK_RESUMES = 5;
+/** How soon songs are looked for again while slskd isn't answering. */
+const SOULSEEK_DOWN_WAIT_MS = 30 * 60_000;
 /** Where slskd puts songs' files, under its downloads folder. */
 const SOULSEEK_FOLDER = 'seerr-ai';
+/** The slskd batches a Soulseek fetch's files were asked for in, oldest first. */
+const soulseekBatches = (fetch: SongFetch): string[] =>
+  (fetch.downloadId ?? '').split(',').filter(Boolean);
 /** What `tried` holds for a Soulseek sharer. */
 const sharerKey = (username: string) => `soulseek:${username}`;
 /** Bigger than any album the songs are worth. */
@@ -948,8 +959,11 @@ class SongFetcher {
     // Nothing named for the album has the songs: a Soulseek sharer may,
     // file by file.
     let shared: { release: FetchRelease; files: SongFetchFile[] } | undefined;
+    let soulseekDown = false;
     if (!best && !packedRelease && !limited) {
-      shared = await this.fromSoulseek(fetch, wanted);
+      const sharing = await this.fromSoulseek(fetch, wanted);
+      soulseekDown = sharing === 'unreachable';
+      shared = sharing === 'unreachable' ? undefined : sharing;
     }
 
     // Nor a sharer: a pack of the artist's own releases may (their
@@ -991,6 +1005,16 @@ class SongFetcher {
     // counted as a search that found nothing.
     if (!best && !shared && limited) {
       await this.searchSoon(fetch, limited.message);
+      return;
+    }
+    // Nor is slskd being down a search that found nothing: Soulseek may
+    // have the songs once it is back.
+    if (!best && !shared && soulseekDown) {
+      await this.searchSoon(
+        fetch,
+        'slskd isn’t answering',
+        SOULSEEK_DOWN_WAIT_MS
+      );
       return;
     }
     if (!best && !shared && opened.length) {
@@ -1067,12 +1091,17 @@ class SongFetcher {
    * searched for by artist and title (the first few of an album's), and of
    * the sharers with a file named as one, the best (see soulseekSongs). A
    * sharer tried already is passed over, and Soulseek altogether after a
-   * few. slskd not answering is no reason to stop: the rest is looked at.
+   * few. slskd not answering is no reason to stop: the rest is looked at,
+   * and 'unreachable' told when it couldn't be searched at all.
    */
   private async fromSoulseek(
     fetch: SongFetch,
     wanted: { song: SongRequest; track: LidarrTrack }[]
-  ): Promise<{ release: FetchRelease; files: SongFetchFile[] } | undefined> {
+  ): Promise<
+    | { release: FetchRelease; files: SongFetchFile[] }
+    | 'unreachable'
+    | undefined
+  > {
     const soulseek = soulseekOf(getSettings().music);
     if (!soulseek) return undefined;
     const tried = new Set(
@@ -1094,6 +1123,7 @@ class SongFetcher {
           fetchId: fetch.id,
           errorMessage: message(e),
         });
+        if (!answers.length) return 'unreachable';
         break;
       }
     }
@@ -1359,8 +1389,12 @@ class SongFetcher {
    * Searched again in a few minutes, the search not counted: Prowlarr or an
    * indexer couldn't answer, which says nothing of whether it's there.
    */
-  private async searchSoon(fetch: SongFetch, why: string): Promise<void> {
-    fetch.searchAgainAt = new Date(Date.now() + SEARCH_SOON_MS);
+  private async searchSoon(
+    fetch: SongFetch,
+    why: string,
+    wait = SEARCH_SOON_MS
+  ): Promise<void> {
+    fetch.searchAgainAt = new Date(Date.now() + wait);
     fetch.stage = `${SEARCHING_SOON}: ${why}`.slice(0, 250);
     await getRepository(SongFetch).save(fetch);
   }
@@ -1682,13 +1716,16 @@ class SongFetcher {
         'Soulseek is no longer set up in Settings → Services.'
       );
     }
-    const batch = await new SlskdAPI(soulseek).getBatch(fetch.downloadId!);
-    const transfers = batch?.transfers ?? [];
+    const slskd = new SlskdAPI(soulseek);
+    const transfers = await this.soulseekTransfers(slskd, fetch);
     if (!transfers.length) {
       throw new ReleaseProblem('slskd no longer has the download.');
     }
     const failed = transfers.find(
-      (t) => transferIs(t, 'Completed') && !transferIs(t, 'Succeeded')
+      (t) =>
+        transferIs(t, 'Completed') &&
+        !transferIs(t, 'Succeeded') &&
+        !endedByRestart(t)
     );
     if (failed) {
       throw new ReleaseProblem(
@@ -1696,6 +1733,11 @@ class SongFetcher {
           failed.exception ? ` (${failed.exception})` : ''
         }`
       );
+    }
+    const cutShort = transfers.filter(endedByRestart);
+    if (cutShort.length) {
+      await this.resumeSoulseek(slskd, fetch, cutShort);
+      return;
     }
     if (!transfers.every((t) => transferIs(t, 'Succeeded'))) {
       const all = transfers.reduce((n, t) => n + t.size, 0) || 1;
@@ -1760,6 +1802,75 @@ class SongFetcher {
       if (match) paths.set(file.index, match);
     }
     await this.importFiles(fetch, songs, paths);
+  }
+
+  /**
+   * Each song's file as slskd has it: its transfer in the latest of the
+   * fetch's batches to hold it (each restart of slskd's adds one).
+   */
+  private async soulseekTransfers(
+    slskd: SlskdAPI,
+    fetch: SongFetch
+  ): Promise<SlskdTransfer[]> {
+    const byFile = new Map<string, SlskdTransfer>();
+    for (const id of soulseekBatches(fetch)) {
+      const batch = await slskd.getBatch(id);
+      for (const transfer of batch?.transfers ?? []) {
+        byFile.set(transfer.filename, transfer);
+      }
+    }
+    return [...byFile.values()];
+  }
+
+  /**
+   * slskd restarted mid-download: what it hadn't finished is asked of the
+   * same sharer again, into the same folder. slskd asks for those files
+   * again itself once it is back, but into its usual downloads folder,
+   * where Lidarr isn't looking: those are stopped first.
+   */
+  private async resumeSoulseek(
+    slskd: SlskdAPI,
+    fetch: SongFetch,
+    cutShort: SlskdTransfer[]
+  ): Promise<void> {
+    const release = fetch.release!;
+    const batches = soulseekBatches(fetch);
+    if (batches.length > MAX_SOULSEEK_RESUMES) {
+      throw new ReleaseProblem(
+        'slskd restarted too many times during the download.'
+      );
+    }
+    const files = new Set(cutShort.map((t) => t.filename));
+    for (const own of await slskd.getDownloadsFrom(release.username!)) {
+      if (
+        files.has(own.filename) &&
+        !batches.includes(own.batchId ?? '') &&
+        !transferIs(own, 'Completed')
+      ) {
+        await slskd.removeTransfer(own.username, own.id);
+      }
+    }
+    let batch: string;
+    try {
+      batch = await slskd.download(
+        release.username!,
+        cutShort.map((t) => ({ filename: t.filename, size: t.size })),
+        release.folder!
+      );
+    } catch (e) {
+      if (e instanceof SlskdRefused) throw new ReleaseProblem(e.message);
+      throw e;
+    }
+    fetch.downloadId = [...batches, batch].join(',');
+    fetch.stage = 'Asked for on Soulseek again: slskd restarted';
+    // Its place in the sharer's queue starts afresh.
+    fetch.startedAt = new Date();
+    await getRepository(SongFetch).save(fetch);
+    logger.info('slskd restarted; asked the sharer again', {
+      label: LABEL,
+      fetchId: fetch.id,
+      songs: cutShort.length,
+    });
   }
 
   /**
@@ -2077,9 +2188,11 @@ class SongFetcher {
       if (!fetch.downloadId || !soulseek) return;
       // What Lidarr didn't move goes with the folder.
       const slskd = new SlskdAPI(soulseek);
-      const batch = await slskd.getBatch(fetch.downloadId);
-      for (const transfer of batch?.transfers ?? []) {
-        await slskd.removeTransfer(transfer.username, transfer.id);
+      for (const id of soulseekBatches(fetch)) {
+        const batch = await slskd.getBatch(id);
+        for (const transfer of batch?.transfers ?? []) {
+          await slskd.removeTransfer(transfer.username, transfer.id);
+        }
       }
       if (fetch.release.folder) {
         await slskd.removeDownloadFolder(fetch.release.folder);

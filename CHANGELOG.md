@@ -36,6 +36,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- Songs coming from Soulseek carry on when slskd restarts: what slskd hadn't finished is asked of the same sharer again, into the same folder, instead of that sharer being passed over. While slskd isn't answering, songs only Soulseek might have are looked for again every half hour, without counting it as a search that found nothing.
+
 - A playlist song matched by its ISRC to a recording MusicBrainz has only on others' compilations ("Now That's…") is matched to the artist's own single or album with the song instead, when that one is as long, so it can be requested. Songs that failed with "only on compilations" are matched again on update.
 
 - A music video posted under a single's name ("[1080p]", "x264") is no longer downloaded for a song, and a bootleg, rework, mash-up or clean edit of a song is no longer taken for it.

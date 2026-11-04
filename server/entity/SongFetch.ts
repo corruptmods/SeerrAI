@@ -110,7 +110,10 @@ class SongFetch {
   @Column({ type: 'int', nullable: true })
   public clientId: number | null;
 
-  /** The torrent's hash, or the Usenet client's job id. */
+  /**
+   * The torrent's hash, or the Usenet client's job id; for Soulseek, the
+   * slskd batches asked for, comma-separated.
+   */
   @Column({ type: 'varchar', nullable: true })
   public downloadId: string | null;
 

@@ -69,6 +69,7 @@ If there's no default server, Retry says so: add one in **Settings → Services*
 
 - **One season or one episode:** each season has **Request Season**, and each episode **Request**. In the request window, open a season to pick episodes. Sonarr monitors everything any request asked for.
 - **Which episodes are here:** each episode shows whether it's in the library (from Sonarr every five minutes).
+- **Which are on their way:** an episode being downloaded, by Sonarr, Backfill or the admin agent, shows Queued, Downloading with how far along, or Importing in place of Requested, and the season's list updates by itself while any are on their way.
 - **New seasons as they premiere:** **Get New Seasons** on a series page, or **Also get new seasons as they premiere** in the request window. Each new season is requested within a day of airing, as a normal request. It ends by itself when a finished series has nothing left. Once anyone follows a series, the button shows on for everyone, since its new seasons come regardless. Only the follower, or someone who manages requests, can stop it; a manager's tap stops it for everyone, and its tip names who follows. Switch: `newSeasons`.
 
 ## Anime

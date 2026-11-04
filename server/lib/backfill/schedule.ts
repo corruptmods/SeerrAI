@@ -145,3 +145,29 @@ export const pickSearches = (
     )
     .slice(0, settings.searchesPerScan);
 };
+
+/**
+ * The films and series asked for since `since`, approved and still open,
+ * by TMDB id: those to search right after their arr finds nothing.
+ */
+export const freshRequests = async (
+  since: number
+): Promise<{ movie: Set<number>; tv: Set<number> }> => {
+  const rows = await getRepository(MediaRequest)
+    .createQueryBuilder('request')
+    .innerJoin('request.media', 'media')
+    .select('media.tmdbId', 'tmdbId')
+    .addSelect('media.mediaType', 'mediaType')
+    .where('request.status = :status', {
+      status: MediaRequestStatus.APPROVED,
+    })
+    .andWhere('request.is4k = :is4k', { is4k: false })
+    .andWhere('request.createdAt >= :since', { since: new Date(since) })
+    .getRawMany<{ tmdbId: number | string; mediaType: MediaType }>();
+  const fresh = { movie: new Set<number>(), tv: new Set<number>() };
+  for (const row of rows) {
+    if (row.mediaType === MediaType.MOVIE) fresh.movie.add(Number(row.tmdbId));
+    if (row.mediaType === MediaType.TV) fresh.tv.add(Number(row.tmdbId));
+  }
+  return fresh;
+};

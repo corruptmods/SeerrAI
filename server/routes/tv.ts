@@ -3,6 +3,7 @@ import IMDBGraphQL from '@server/api/rating/imdbGraphql';
 import RottenTomatoes from '@server/api/rating/rottentomatoes';
 import type { RatingResponse } from '@server/api/ratings';
 import TheMovieDb from '@server/api/themoviedb';
+import type { DownloadStage } from '@server/constants/downloads';
 import {
   MediaRequestStatus,
   MediaStatus,
@@ -14,6 +15,7 @@ import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import { Watchlist } from '@server/entity/Watchlist';
 import { detectAnime } from '@server/lib/animeDecision';
+import downloadTracker from '@server/lib/downloadtracker';
 import { featureEnabled } from '@server/lib/features';
 import {
   SeriesFinishedError,
@@ -32,6 +34,20 @@ import type { SeasonRequestCoverage } from '@server/models/Tv';
 import { mapSeasonWithEpisodes, mapTvDetails } from '@server/models/Tv';
 import { Router } from 'express';
 import { In } from 'typeorm';
+
+/** Which of an episode's downloads to show: the furthest along. */
+const STAGE_ORDER: Record<DownloadStage, number> = {
+  failed: 0,
+  needsAttention: 1,
+  waiting: 2,
+  paused: 3,
+  queued: 4,
+  stalled: 5,
+  downloading: 6,
+  finishing: 7,
+  importing: 8,
+  imported: 9,
+};
 
 const tvRoutes = Router();
 
@@ -175,9 +191,45 @@ tvRoutes.get('/:id/season/:seasonNumber', async (req, res, next) => {
       }
     }
 
-    return res
-      .status(200)
-      .json(mapSeasonWithEpisodes(season, availability, requested));
+    const mapped = mapSeasonWithEpisodes(season, availability, requested);
+    // What is downloading now, from Sonarr's queue and Backfill's own.
+    if (media) {
+      const progress = [
+        ...(media.serviceId != null && media.externalServiceId != null
+          ? downloadTracker.getSeriesProgress(
+              media.serviceId,
+              media.externalServiceId
+            )
+          : []),
+        ...(media.serviceId4k != null && media.externalServiceId4k != null
+          ? downloadTracker.getSeriesProgress(
+              media.serviceId4k,
+              media.externalServiceId4k
+            )
+          : []),
+      ];
+      for (const episode of mapped.episodes) {
+        const items = progress.filter(
+          (item) =>
+            item.episode?.seasonNumber === mapped.seasonNumber &&
+            item.episode.episodeNumber === episode.episodeNumber
+        );
+        if (!items.length) continue;
+        const furthest = items.reduce((best, item) =>
+          (STAGE_ORDER[item.stage] ?? 0) > (STAGE_ORDER[best.stage] ?? 0) ||
+          (item.stage === best.stage && item.sizeLeft < best.sizeLeft)
+            ? item
+            : best
+        );
+        episode.download = {
+          stage: furthest.stage,
+          size: furthest.size,
+          sizeLeft: furthest.sizeLeft,
+        };
+      }
+    }
+
+    return res.status(200).json(mapped);
   } catch (e) {
     logger.debug('Something went wrong retrieving season', {
       label: 'API',

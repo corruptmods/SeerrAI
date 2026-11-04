@@ -10,6 +10,7 @@ import Media from '@server/entity/Media';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import SeasonRequest from '@server/entity/SeasonRequest';
 import { User } from '@server/entity/User';
+import downloadTracker from '@server/lib/downloadtracker';
 import { Permission } from '@server/lib/permissions';
 import tvRoutes from '@server/routes/tv';
 import { setupTestDb } from '@server/test/db';
@@ -73,7 +74,12 @@ let requester: User;
 
 const season = async (n: number) =>
   new Promise<
-    { episodeNumber: number; requested?: boolean; requested4k?: boolean }[]
+    {
+      episodeNumber: number;
+      requested?: boolean;
+      requested4k?: boolean;
+      download?: { stage: string; size: number; sizeLeft: number };
+    }[]
   >((resolve, reject) => {
     http
       .get(
@@ -215,5 +221,56 @@ describe('episodes already requested, on the season endpoint', () => {
     );
     await request(media, MediaRequestStatus.PENDING, 1, [1], true);
     assert.equal(flags(await season(1)), '1:-4 2:-- 3:-- 4:--');
+  });
+});
+
+describe('episodes on their way, on the season endpoint', () => {
+  it('says how far Backfill’s download of an episode has got', async () => {
+    await getRepository(Media).save(
+      new Media({
+        tmdbId: TV_ID,
+        mediaType: MediaType.TV,
+        status: MediaStatus.PROCESSING,
+        serviceId: 0,
+        externalServiceId: 77,
+      })
+    );
+    const item = (episodeNumber: number, stage: 'downloading' | 'queued') => ({
+      mediaType: MediaType.TV,
+      externalId: 77,
+      size: 1000,
+      sizeLeft: stage === 'queued' ? 1000 : 400,
+      status: stage,
+      stage,
+      timeLeft: '',
+      title: 'Harbour Lights S01',
+      downloadId: `job-${episodeNumber}`,
+      episode: {
+        id: 500 + episodeNumber,
+        seasonNumber: 1,
+        episodeNumber,
+        absoluteEpisodeNumber: episodeNumber,
+      },
+    });
+    downloadTracker.setBackfillDownloads([
+      { kind: 'series', serverId: 0, jobId: 1, item: item(2, 'downloading') },
+      { kind: 'series', serverId: 0, jobId: 2, item: item(2, 'queued') },
+      { kind: 'series', serverId: 0, jobId: 1, item: item(3, 'queued') },
+    ]);
+    try {
+      const episodes = await season(1);
+      assert.deepEqual(
+        episodes.map((e) => [e.episodeNumber, e.download ?? null]),
+        [
+          [1, null],
+          // Two downloads of it: the one furthest along.
+          [2, { stage: 'downloading', size: 1000, sizeLeft: 400 }],
+          [3, { stage: 'queued', size: 1000, sizeLeft: 1000 }],
+          [4, null],
+        ]
+      );
+    } finally {
+      downloadTracker.setBackfillDownloads([]);
+    }
   });
 });

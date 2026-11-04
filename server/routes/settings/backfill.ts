@@ -48,6 +48,7 @@ const body = z.object({
     .int()
     .min(1)
     .max(24 * 30),
+  searchAfterArr: z.boolean().default(false),
   includeCutoffUnmet: z.boolean(),
   includeSpecials: z.boolean(),
   searchesPerScan: z.coerce.number().int().min(1).max(50),
@@ -58,6 +59,8 @@ const body = z.object({
     maxSizeGb: z.coerce.number().min(1).max(10000),
   }),
   maxActiveJobs: z.coerce.number().int().min(1).max(10),
+  maxMovieJobs: z.coerce.number().int().min(1).max(10).default(2),
+  maxMusicJobs: z.coerce.number().int().min(1).max(10).default(2),
   minFreeSpaceGb: z.coerce.number().min(0).max(100000),
   stallHours: z.coerce.number().int().min(0).max(720),
   slowHours: z.coerce.number().int().min(0).max(2160).default(72),

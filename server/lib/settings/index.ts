@@ -229,6 +229,11 @@ export interface BackfillSettings {
   includeMusic: boolean;
   /** Hours since Sonarr's or Radarr's last search before a title is stuck. */
   stuckAfterHours: number;
+  /**
+   * Titles asked for lately are searched as soon as Sonarr, Radarr or
+   * Lidarr has searched and found nothing, rather than after Stuck After.
+   */
+  searchAfterArr: boolean;
   /** Treat episodes below the profile's cutoff as gaps too. */
   includeCutoffUnmet: boolean;
   includeSpecials: boolean;
@@ -241,7 +246,12 @@ export interface BackfillSettings {
     minScore: number;
     maxSizeGb: number;
   };
+  /** Series downloads at once, per client. */
   maxActiveJobs: number;
+  /** Movie downloads at once, per client. */
+  maxMovieJobs: number;
+  /** Album and song downloads at once, per client. */
+  maxMusicJobs: number;
   /** New downloads wait while the title's disk has less free than this. */
   minFreeSpaceGb: number;
   /**
@@ -335,12 +345,15 @@ export const BACKFILL_DEFAULTS: BackfillSettings = {
   includeMovies: true,
   includeMusic: true,
   stuckAfterHours: 24,
+  searchAfterArr: false,
   includeCutoffUnmet: false,
   includeSpecials: false,
   searchesPerScan: 5,
   researchAfterDays: 7,
   autoApprove: { enabled: false, minScore: 700, maxSizeGb: 25 },
   maxActiveJobs: 2,
+  maxMovieJobs: 2,
+  maxMusicJobs: 2,
   minFreeSpaceGb: 200,
   stallHours: 12,
   slowHours: 72,

@@ -70,6 +70,7 @@ Lidarr sometimes takes days to learn about a new album. Seerr AI keeps trying fo
 
 - **The Manage panel** (the cog on an artist's page) shows what Lidarr is downloading, every request (approve, decline, edit, delete), and the history. Admins also get **Open in Lidarr**, **Search Lidarr for Missing Albums** and **Clear Data** (removes Seerr AI's own record; Lidarr is left alone).
 - **Health** checks Lidarr, lists albums Lidarr has that no server lists after a day, requested albums with no release after a week (with **Search now**), and whether MusicBrainz is answering.
+- **How Fast Songs Move** (Settings → Music) lists each limit songs are held to, beside how much of it is in use now: playlist songs matched 40 at a time until none are left (those that match nothing are tried again after 7 days), Lidarr single searches up to 3 a minute, album searches waiting 1, 3, 6, 12 and 24 hours after each that finds nothing, song downloads at once (Backfill's music limit), and Soulseek's 3 songs searched and 5 sharers tried.
 - **Music Sync** runs every five minutes and a minute after Lidarr imports; **Music Full Scan** reads every music library and all of Lidarr nightly (03:40).
 - **Webhooks** get `media_type` `music`, the artist's MusicBrainz id as `media_mbid`, the albums as `music_albums`, the songs as `music_songs`, and `media_tmdbid` 0.
 

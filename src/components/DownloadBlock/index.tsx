@@ -8,6 +8,7 @@ import type {
   DownloadStep,
   DownloadingItem,
 } from '@server/lib/downloadtracker';
+import type { IntlShape } from 'react-intl';
 import { FormattedRelativeTime, useIntl } from 'react-intl';
 
 const messages = defineMessages('components.DownloadBlock', {
@@ -92,6 +93,15 @@ const STAGES: Record<
   failed: { label: 'failed', detail: 'failedDetail', badge: 'danger' },
   imported: { label: 'imported', detail: 'importedDetail', badge: 'success' },
 };
+
+/** A download's stage as a badge says it, and the badge's colour. */
+export const stageBadge = (
+  intl: IntlShape,
+  stage: DownloadStage
+): { label: string; badgeType: (typeof STAGES)[DownloadStage]['badge'] } => ({
+  label: intl.formatMessage(messages[STAGES[stage].label]),
+  badgeType: STAGES[stage].badge,
+});
 
 /**
  * What the download client says it is doing, when Seerr reads it directly:

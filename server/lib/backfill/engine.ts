@@ -87,6 +87,7 @@ import type { RadarrMovieDetail } from '@server/lib/backfill/radarr';
 import BackfillRadarr from '@server/lib/backfill/radarr';
 import {
   albumsAskedSince,
+  freshRequests,
   pickSearches,
   requestedSince,
 } from '@server/lib/backfill/schedule';
@@ -343,6 +344,16 @@ const before = (date: string | undefined, when: number) =>
 const SEARCH_ALL_PAUSE_MS = 30_000;
 /** Searches failing for want of Prowlarr in a row before giving up. */
 const SEARCH_ALL_FAILURES_TO_STOP = 3;
+/**
+ * With Search Right After on: how long after Sonarr's, Radarr's or
+ * Lidarr's own search a requested title still missing, with nothing in
+ * their queue, counts as not found.
+ */
+const ARR_SETTLE_MS = 20 * 60_000;
+/** How often requested titles are looked at for that. */
+const QUICK_SCAN_EVERY_MS = 15 * 60_000;
+/** Requests newer than this are searched right after; older wait their turn. */
+const FRESH_REQUEST_MS = 3 * 24 * 60 * 60_000;
 
 interface SearchAllProgress {
   total: number;
@@ -372,6 +383,8 @@ const KICK_EVERY_MS = 30_000;
 
 class Backfill {
   private scanning = false;
+  /** When requested titles were last looked at for Search Right After. */
+  private quickScannedAt = 0;
   /**
    * The scan under way, if any. Cancelling it ends that scan and its
    * searches only: a search started later, by an admin or the next scan,
@@ -875,7 +888,17 @@ class Backfill {
   public async scan({
     everything = false,
     searches = true,
-  }: { everything?: boolean; searches?: boolean } = {}): Promise<void> {
+    quick = false,
+  }: {
+    everything?: boolean;
+    searches?: boolean;
+    /**
+     * Search Right After: titles asked for lately that Sonarr, Radarr or
+     * Lidarr has searched for and not found are searched now, and nothing
+     * else is.
+     */
+    quick?: boolean;
+  } = {}): Promise<void> {
     if (this.scanning || !this.readiness().ready) {
       return;
     }
@@ -889,6 +912,12 @@ class Backfill {
       const stuckBefore = everything
         ? Date.now()
         : Date.now() - settings.stuckAfterHours * 3_600_000;
+      // Searched by the arr a little while ago is enough for a title just
+      // asked for, when it is to be searched right after.
+      const askedBefore = Date.now() - ARR_SETTLE_MS;
+      const freshlyAsked = quick
+        ? await freshRequests(Date.now() - FRESH_REQUEST_MS)
+        : { movie: new Set<number>(), tv: new Set<number>() };
       for (const server of this.distinct(getSettings().sonarr)) {
         if (run.cancelled) return;
         const sonarr = BackfillSonarr.forServer(server);
@@ -928,11 +957,15 @@ class Backfill {
               : 0;
             // Searched a while ago and still missing; or never searched at
             // all (added without a search), aired and in Sonarr a while.
+            const after =
+              record.series.tmdbId && freshlyAsked.tv.has(record.series.tmdbId)
+                ? Math.max(stuckBefore, askedBefore)
+                : stuckBefore;
             if (
               searched
-                ? searched < stuckBefore
-                : before(record.airDateUtc, stuckBefore) &&
-                  before(record.series.added, stuckBefore)
+                ? searched < after
+                : before(record.airDateUtc, after) &&
+                  before(record.series.added, after)
             ) {
               entry.stuck++;
             }
@@ -1006,7 +1039,14 @@ class Backfill {
         for (const server of this.distinct(getSettings().radarr)) {
           if (run.cancelled) return;
           // One Radarr down must not stop the series being searched.
-          await this.scanMovies(server, stuckBefore, run).catch((e) =>
+          await this.scanMovies(
+            server,
+            (tmdbId) =>
+              tmdbId && freshlyAsked.movie.has(tmdbId)
+                ? Math.max(stuckBefore, askedBefore)
+                : stuckBefore,
+            run
+          ).catch((e) =>
             logger.error('Backfill could not read Radarr', {
               label: LABEL,
               server: server.name,
@@ -1018,7 +1058,11 @@ class Backfill {
       if (settings.includeMusic && musicReady()) {
         for (const server of this.distinct(getSettings().lidarr)) {
           if (run.cancelled) return;
-          await this.scanAlbums(server, stuckBefore, run).catch((e) =>
+          await this.scanAlbums(
+            server,
+            quick ? Math.max(stuckBefore, askedBefore) : stuckBefore,
+            run
+          ).catch((e) =>
             logger.error('Backfill could not read Lidarr', {
               label: LABEL,
               server: server.name,
@@ -1038,7 +1082,29 @@ class Backfill {
           { status: 'none', kind: In(kinds) },
         ],
       });
-      const toSearch = pickSearches(due, await requestedSince(due), settings);
+      const requested = await requestedSince(due);
+      const toSearch = quick
+        ? // Only what was asked for lately and Backfill hasn't searched yet.
+          pickSearches(
+            due.filter(
+              (row) =>
+                !row.lastSearchedAt &&
+                (requested.get(row.id)?.getTime() ?? 0) >=
+                  Date.now() - FRESH_REQUEST_MS
+            ),
+            requested,
+            settings
+          )
+        : pickSearches(due, requested, settings);
+      if (quick && toSearch.length) {
+        logger.info(
+          'Searching titles Sonarr, Radarr or Lidarr found nothing for',
+          {
+            label: LABEL,
+            titles: toSearch.map((row) => row.title),
+          }
+        );
+      }
       let prowlarrFailed = 0;
       for (const row of toSearch) {
         if (run.cancelled) return;
@@ -1149,7 +1215,7 @@ class Backfill {
    */
   private async scanMovies(
     server: RadarrSettings,
-    stuckBefore: number,
+    stuckBeforeFor: (tmdbId?: number | null) => number,
     run: { cancelled: boolean }
   ) {
     const settings = getSettings().backfill;
@@ -1179,6 +1245,7 @@ class Backfill {
       const searched = entry.movie.lastSearchTime
         ? new Date(entry.movie.lastSearchTime).getTime()
         : 0;
+      const stuckBefore = stuckBeforeFor(entry.movie.tmdbId);
       // Searched a while ago and still missing, or never searched at all
       // and in Radarr a while.
       const stuck =
@@ -2624,25 +2691,39 @@ class Backfill {
       await this.waitOutLimit(job, waiting, candidate.indexerId);
       return;
     }
+    const row = await getRepository(BackfillSeries).findOneOrFail({
+      where: { id: job.seriesId },
+    });
     // The limit is per client: torrents and Usenet do not share bandwidth,
-    // and an import is Sonarr's or Radarr's work, not a download.
+    // and an import is Sonarr's or Radarr's work, not a download. Series,
+    // movies and music each have their own.
+    const limit =
+      row.kind === 'movie'
+        ? settings.maxMovieJobs
+        : row.kind === 'album'
+          ? settings.maxMusicJobs
+          : settings.maxActiveJobs;
     const running = await jobs.count({
       where: {
         id: Not(job.id),
         status: 'downloading',
         protocol: job.protocol,
+        series: { kind: row.kind },
       },
     });
-    if (running >= settings.maxActiveJobs) {
-      job.stage = `Waiting for one of ${settings.maxActiveJobs} running ${
+    if (running >= limit) {
+      job.stage = `Waiting for one of ${limit} running ${
         job.protocol === 'torrent' ? 'torrent' : 'Usenet'
+      } ${
+        row.kind === 'movie'
+          ? 'movie'
+          : row.kind === 'album'
+            ? 'music'
+            : 'series'
       } downloads to finish`;
       await jobs.save(job);
       return;
     }
-    const row = await getRepository(BackfillSeries).findOneOrFail({
-      where: { id: job.seriesId },
-    });
     const arr = this.arrFor(row);
     const path = await this.pathOf(row);
     const roots = await arr.getRootFoldersNow();
@@ -2879,6 +2960,15 @@ class Backfill {
   public async tick(): Promise<void> {
     if (this.ticking) return;
     this.ticking = true;
+    // Search Right After: requested titles the arrs found nothing for.
+    if (
+      getSettings().backfill.searchAfterArr &&
+      Date.now() - this.quickScannedAt >= QUICK_SCAN_EVERY_MS &&
+      !this.scanning
+    ) {
+      this.quickScannedAt = Date.now();
+      void this.scan({ quick: true });
+    }
     let settle!: () => void;
     this.ticked = new Promise<void>((resolve) => (settle = resolve));
     try {

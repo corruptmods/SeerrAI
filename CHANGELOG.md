@@ -30,7 +30,15 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - **Web push has every notification**: approvals, declines, issues and the rest can be turned on in your own settings. What you had stays as it was.
 
+- **Backfill can search right after Sonarr, Radarr or Lidarr finds nothing**: a title requested in the last 3 days is searched about 20 minutes after their own search comes up empty, instead of a day or more later. Off to start, in Settings → Backfill.
+
 ### Changed
+
+- **A series' episodes show their downloads as they happen**: an episode marked Requested shows Queued, Downloading with how far along, or Importing while Sonarr, Backfill or the admin agent brings it, and updates by itself.
+
+- **Settings → Music shows how fast songs move**: each limit songs are held to (playlist songs matched 40 at a time, single searches 3 a minute, the waits between album searches, download slots, Soulseek's tries) beside how much of it is in use now.
+
+- **Backfill's downloads at once are set apart** for series, movies and music, each starting at what the one limit was.
 
 - **Discord, in your notification settings**, shows the kinds an admin turned off for everyone greyed, instead of leaving them out.
 

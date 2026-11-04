@@ -44,6 +44,9 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
   includeMusic: 'Music too',
   includeMusicTip: 'Also follow albums Lidarr couldn’t find.',
   stuckAfterHours: 'Hours since Sonarr’s or Radarr’s last search',
+  searchAfterArr: 'Search right after Sonarr, Radarr or Lidarr finds nothing',
+  searchAfterArrTip:
+    'Titles requested in the last 3 days are searched about 20 minutes after their own search comes up empty, instead of waiting for the hours above and the next scan. Each is searched once this way.',
   includeCutoffUnmet: 'Treat files below the cutoff as gaps',
   includeCutoffUnmetTip: 'Off: packs that only upgrade files aren’t offered.',
   includeSpecials: 'Include specials (season 0)',
@@ -59,9 +62,12 @@ const messages = defineMessages('components.Settings.SettingsBackfill', {
   minScore: 'Minimum score',
   maxSizeGb: 'Largest download (GB)',
   safety: 'Limits',
-  maxActiveJobs: 'Downloads running at once, per client',
+  maxActiveJobs: 'Series downloads running at once, per client',
   maxActiveJobsTip:
     'Counted for torrents and Usenet apart. A download being imported does not count.',
+  maxMovieJobs: 'Movie downloads running at once, per client',
+  maxMusicJobs: 'Music downloads running at once, per client',
+  maxMusicJobsTip: 'Albums, and songs taken from albums.',
   stallHours: 'Give up on a torrent after this many hours without progress',
   stallHoursTip:
     'Also when part of it is on no one’s computer for that long, so it can’t finish. Paused or queued time doesn’t count. 0 waits forever.',
@@ -174,6 +180,7 @@ const SettingsBackfill = () => {
               includeMovies: values.includeMovies,
               includeMusic: values.includeMusic,
               stuckAfterHours: Number(values.stuckAfterHours),
+              searchAfterArr: values.searchAfterArr,
               includeCutoffUnmet: values.includeCutoffUnmet,
               includeSpecials: values.includeSpecials,
               searchesPerScan: Number(values.searchesPerScan),
@@ -184,6 +191,8 @@ const SettingsBackfill = () => {
                 maxSizeGb: Number(values.autoApprove.maxSizeGb),
               },
               maxActiveJobs: Number(values.maxActiveJobs),
+              maxMovieJobs: Number(values.maxMovieJobs),
+              maxMusicJobs: Number(values.maxMusicJobs),
               minFreeSpaceGb: Number(values.minFreeSpaceGb),
               stallHours: Number(values.stallHours),
               slowHours: Number(values.slowHours),
@@ -359,6 +368,17 @@ const SettingsBackfill = () => {
                   </div>
                 )
               )}
+              <div className="form-row">
+                <label htmlFor="searchAfterArr" className="checkbox-label">
+                  {intl.formatMessage(messages.searchAfterArr)}
+                  <span className="label-tip">
+                    {intl.formatMessage(messages.searchAfterArrTip)}
+                  </span>
+                </label>
+                <div className="form-input-area">
+                  {checkbox('searchAfterArr', values.searchAfterArr)}
+                </div>
+              </div>
               <div className="form-row">
                 <label htmlFor="includeMovies" className="checkbox-label">
                   {intl.formatMessage(messages.includeMovies)}
@@ -564,6 +584,16 @@ const SettingsBackfill = () => {
                       messages.maxActiveJobs,
                       messages.maxActiveJobsTip,
                     ],
+                    ['maxMovieJobs', messages.maxMovieJobs, undefined],
+                    ...(musicReady
+                      ? ([
+                          [
+                            'maxMusicJobs',
+                            messages.maxMusicJobs,
+                            messages.maxMusicJobsTip,
+                          ],
+                        ] as const)
+                      : []),
                     ['minFreeSpaceGb', messages.minFreeSpaceGb, undefined],
                     ['stallHours', messages.stallHours, messages.stallHoursTip],
                     ['slowHours', messages.slowHours, messages.slowHoursTip],

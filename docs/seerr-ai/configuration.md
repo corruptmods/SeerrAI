@@ -52,6 +52,7 @@ Once something on a settings page is changed, **Save** floats at the bottom of t
 | Download Check | Off |
 | Movies too | On |
 | Stuck after (since Sonarr's or Radarr's last search) | 24 hours |
+| Search right after Sonarr, Radarr or Lidarr finds nothing | Off |
 | Treat files below the cutoff as gaps | Off |
 | Category | `backfill` |
 | Approve some packs automatically | Off (minimum score 700, largest 25 GB) |
@@ -59,7 +60,7 @@ Once something on a settings page is changed, **Save** floats at the bottom of t
 | *Advanced:* titles searched per scan | 5 |
 | *Advanced:* days before searching a title again | 7 |
 | *Advanced:* include specials | Off |
-| *Advanced:* downloads at once, per client | 2 |
+| *Advanced:* series / movie / music downloads at once, per client | 2 / 2 / 2 |
 | *Advanced:* keep free on the disk | 200 GB |
 | *Advanced:* give up on a torrent with no progress | 12 hours (0 never) |
 | *Advanced:* days to keep finished downloads | 90 (0 forever) |

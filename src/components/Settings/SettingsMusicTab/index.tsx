@@ -16,6 +16,7 @@ import MusicSources, {
   musicSourceValues,
   messages as sourceMessages,
 } from '@app/components/Settings/SettingsMusic';
+import SongPace from '@app/components/Settings/SettingsMusicTab/SongPace';
 import useSettings from '@app/hooks/useSettings';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
@@ -266,6 +267,8 @@ const SettingsMusicTab = () => {
         </p>
       </div>
       {on && <MusicSettingsForm />}
+
+      {on && currentSettings.musicReady && <SongPace />}
 
       {on && currentSettings.musicReady && (
         <>

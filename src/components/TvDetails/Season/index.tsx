@@ -4,6 +4,7 @@ import Button from '@app/components/Common/Button';
 import CachedImage from '@app/components/Common/CachedImage';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import StatusBadgeMini from '@app/components/Common/StatusBadgeMini';
+import { stageBadge } from '@app/components/DownloadBlock';
 import {
   EpisodeSubtitlePanel,
   EpisodeSubtitleTag,
@@ -12,7 +13,7 @@ import {
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { MediaStatus } from '@server/constants/media';
-import type { SeasonWithEpisodes } from '@server/models/Tv';
+import type { EpisodeDownload, SeasonWithEpisodes } from '@server/models/Tv';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
@@ -26,6 +27,25 @@ const messages = defineMessages('components.TvDetails.Season', {
   missing:
     '{count, plural, one {# episode is} other {# episodes are}} not in the library yet.',
 });
+
+/** An episode on its way: its download's stage, and how far it has got. */
+const DownloadPill = ({ download }: { download: EpisodeDownload }) => {
+  const intl = useIntl();
+  const { label, badgeType } = stageBadge(intl, download.stage);
+  const done =
+    download.size > 0
+      ? Math.min(1, Math.max(0, 1 - download.sizeLeft / download.size))
+      : 0;
+  return (
+    <Badge badgeType={badgeType}>
+      {download.stage === 'downloading' || download.stage === 'stalled'
+        ? `${label} · ${intl.formatNumber(Math.floor(done * 100) / 100, {
+            style: 'percent',
+          })}`
+        : label}
+    </Badge>
+  );
+};
 
 type SeasonProps = {
   seasonNumber: number;
@@ -44,7 +64,18 @@ const Season = ({
 }: SeasonProps) => {
   const intl = useIntl();
   const { data, error } = useSWR<SeasonWithEpisodes>(
-    `/api/v1/tv/${tvId}/season/${seasonNumber}`
+    `/api/v1/tv/${tvId}/season/${seasonNumber}`,
+    {
+      // While anything is on its way, it is looked at again, so a download
+      // starting, moving along and finishing shows as it happens.
+      refreshInterval: (latest) =>
+        latest?.episodes.some(
+          (episode) =>
+            episode.download || (episode.requested && !episode.available)
+        )
+          ? 15_000
+          : 0,
+    }
   );
   // The episode whose subtitles are open under it.
   const [subtitlesOpen, setSubtitlesOpen] = useState<number | null>(null);
@@ -114,12 +145,19 @@ const Season = ({
                           )}
                         </div>
                       )}
-                      {episode.requested && !episode.available && (
+                      {episode.download && !episode.available ? (
                         <div className="flex items-center">
-                          <Badge badgeType="primary">
-                            {intl.formatMessage(messages.requested)}
-                          </Badge>
+                          <DownloadPill download={episode.download} />
                         </div>
+                      ) : (
+                        episode.requested &&
+                        !episode.available && (
+                          <div className="flex items-center">
+                            <Badge badgeType="primary">
+                              {intl.formatMessage(messages.requested)}
+                            </Badge>
+                          </div>
+                        )
                       )}
                       <EpisodeSubtitleTag
                         tvId={tvId}

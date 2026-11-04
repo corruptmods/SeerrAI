@@ -261,6 +261,9 @@ components:
           description: Albums Lidarr cannot find are followed too, once music is set up.
         stuckAfterHours:
           type: number
+        searchAfterArr:
+          type: boolean
+          description: Titles requested in the last 3 days are searched about 20 minutes after Sonarr, Radarr or Lidarr finds nothing for them.
         includeCutoffUnmet:
           type: boolean
         includeSpecials:
@@ -280,6 +283,13 @@ components:
               type: number
         maxActiveJobs:
           type: number
+          description: Series downloads at once, per client.
+        maxMovieJobs:
+          type: number
+          description: Movie downloads at once, per client.
+        maxMusicJobs:
+          type: number
+          description: Album and song downloads at once, per client.
         minFreeSpaceGb:
           type: number
         stallHours:
@@ -9223,6 +9233,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MusicSettings'
+  /settings/music/pace:
+    get:
+      summary: 'How fast songs move'
+      description: 'Each limit songs are held to (playlist matching, single and album searches, downloads, Soulseek), and how much of it is in use now.'
+      tags:
+        - settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  matching:
+                    type: object
+                  singles:
+                    type: object
+                  albums:
+                    type: object
+                  downloads:
+                    type: object
+                  soulseek:
+                    type: object
   /settings/music/soulseek:
     get:
       summary: "Soulseek's connection, through slskd, without its API key"

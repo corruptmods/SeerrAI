@@ -1,10 +1,18 @@
 import QBittorrentAPI from '@server/api/downloadclients/qbittorrent';
 import type { ProwlarrRelease } from '@server/api/prowlarr';
 import ProwlarrAPI from '@server/api/prowlarr';
+import {
+  MediaRequestStatus,
+  MediaStatus,
+  MediaType,
+} from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import BackfillCandidate from '@server/entity/BackfillCandidate';
 import BackfillJob from '@server/entity/BackfillJob';
 import BackfillSeries from '@server/entity/BackfillSeries';
+import Media from '@server/entity/Media';
+import { MediaRequest } from '@server/entity/MediaRequest';
+import { User } from '@server/entity/User';
 import backfill, { MAX_FAILED_PER_DAY } from '@server/lib/backfill/engine';
 import { mentionsShow, sameShow } from '@server/lib/backfill/matcher';
 import type { MovieContext } from '@server/lib/backfill/movies';
@@ -21,6 +29,7 @@ import type {
 } from '@server/lib/backfill/sonarr';
 import BackfillSonarr from '@server/lib/backfill/sonarr';
 import notificationManager from '@server/lib/notifications';
+import { Permission } from '@server/lib/permissions';
 import type { RadarrSettings, SonarrSettings } from '@server/lib/settings';
 import { BACKFILL_DEFAULTS, getSettings } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
@@ -548,6 +557,61 @@ describe('Backfill for movies: from Radarr’s wanted list to the library', () =
     );
   });
 
+  it('holds movies to their own limit on downloads at once, not the series’', async () => {
+    const settings = getSettings();
+    settings.backfill = {
+      ...settings.backfill,
+      maxActiveJobs: 1,
+      maxMovieJobs: 1,
+    };
+    await backfill.scan();
+    const row = await getRepository(BackfillSeries).findOneOrFail({
+      where: { kind: 'movie', arrId: 55 },
+    });
+    const candidate = await getRepository(BackfillCandidate).findOneOrFail({
+      where: { seriesId: row.id },
+    });
+    const jobs = getRepository(BackfillJob);
+    // A series download running takes none of the movies' room.
+    const series = await getRepository(BackfillSeries).save(
+      new BackfillSeries({
+        kind: 'series',
+        serverId: 0,
+        arrId: 900,
+        title: 'Harbour Lights',
+        status: 'found',
+        searchTerms: [],
+      })
+    );
+    await jobs.save(
+      new BackfillJob({
+        seriesId: series.id,
+        title: 'Harbour Lights S01',
+        status: 'downloading',
+        mode: 'missing',
+        protocol: 'torrent',
+        clientId: 1,
+        files: [],
+      })
+    );
+    const job = await backfill.approve(candidate.id, { mode: 'missing' });
+    assert.equal(
+      (await jobs.findOneOrFail({ where: { id: job.id } })).status,
+      'downloading'
+    );
+
+    // With none allowed for movies, it waits, saying for what.
+    await jobs.update(job.id, { status: 'queued' });
+    settings.backfill = { ...settings.backfill, maxMovieJobs: 0 };
+    await backfill.tick();
+    const waiting = await jobs.findOneOrFail({ where: { id: job.id } });
+    assert.equal(waiting.status, 'queued');
+    assert.equal(
+      waiting.stage,
+      'Waiting for one of 0 running torrent movie downloads to finish'
+    );
+  });
+
   it('never takes a torrent nobody seeds by itself, but takes it when it is seeded', async () => {
     getSettings().backfill = {
       ...getSettings().backfill,
@@ -842,6 +906,74 @@ describe('Backfill for movies: from Radarr’s wanted list to the library', () =
       where: { kind: 'movie', arrId: 55 },
     });
     assert.equal(row.status, 'found');
+  });
+
+  describe('searching right after Radarr finds nothing', () => {
+    const minute = 60 * 1000;
+    const askFor = async () => {
+      const user = await getRepository(User).save(
+        new User({
+          email: `asker-${Math.random()}@test.local`,
+          avatar: '',
+          permissions: Permission.REQUEST,
+        })
+      );
+      const media = await getRepository(Media).save(
+        new Media({
+          tmdbId: SECRETS.tmdbId!,
+          mediaType: MediaType.MOVIE,
+          status: MediaStatus.PROCESSING,
+        })
+      );
+      // As approved, without the hooks that would send it to Radarr.
+      await getRepository(MediaRequest)
+        .createQueryBuilder()
+        .insert()
+        .values({
+          type: MediaType.MOVIE,
+          media,
+          requestedBy: user,
+          status: MediaRequestStatus.APPROVED,
+          is4k: false,
+        })
+        .callListeners(false)
+        .execute();
+    };
+
+    it('searches a movie just asked for once Radarr’s own search has had a while', async () => {
+      await askFor();
+      // Radarr searched a moment ago: it may still grab something.
+      movie = {
+        ...SECRETS,
+        lastSearchTime: new Date(Date.now() - 5 * minute).toISOString(),
+      };
+      await backfill.scan({ quick: true });
+      assert.equal(await getRepository(BackfillSeries).count(), 0);
+
+      movie = {
+        ...SECRETS,
+        lastSearchTime: new Date(Date.now() - 30 * minute).toISOString(),
+      };
+      await backfill.scan({ quick: true });
+      const row = await getRepository(BackfillSeries).findOneOrFail({
+        where: { kind: 'movie', arrId: 55 },
+      });
+      assert.equal(row.status, 'found');
+    });
+
+    it('leaves a movie nobody asked for to the usual scan', async () => {
+      movie = {
+        ...SECRETS,
+        lastSearchTime: new Date(Date.now() - 48 * 60 * minute).toISOString(),
+      };
+      await backfill.scan({ quick: true });
+      const row = await getRepository(BackfillSeries).findOneOrFail({
+        where: { kind: 'movie', arrId: 55 },
+      });
+      // Followed, but not searched until a scan's turn comes.
+      assert.equal(row.status, 'stuck');
+      assert.equal(row.lastSearchedAt, null);
+    });
   });
 
   describe('searching everything stuck', () => {

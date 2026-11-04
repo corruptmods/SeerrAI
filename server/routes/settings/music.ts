@@ -1,5 +1,6 @@
 import SlskdAPI, { slskdNewEnough } from '@server/api/slskd';
 import { defaultLidarr, lidarrApi } from '@server/lib/music/access';
+import { songPace } from '@server/lib/music/songPace';
 import type { MusicSettings, SoulseekSettings } from '@server/lib/settings';
 import {
   MUSICBRAINZ_URL,
@@ -195,6 +196,15 @@ const checkSoulseek = async (
 const withKey = (body: z.infer<typeof soulseekBody>): SoulseekSettings => ({
   ...body,
   apiKey: body.apiKey || getSettings().music.soulseek?.apiKey || '',
+});
+
+/** How fast songs move: each limit, and how much of it is in use. */
+musicSettingsRoutes.get('/pace', async (_req, res, next) => {
+  try {
+    res.status(200).json(await songPace());
+  } catch (e) {
+    next({ status: 500, message: e.message });
+  }
 });
 
 musicSettingsRoutes.get('/soulseek', (_req, res) => {

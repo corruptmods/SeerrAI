@@ -1754,7 +1754,7 @@ describe('taking a song from its album', () => {
   });
 
   it('waits for a download slot without searching again', async () => {
-    getSettings().backfill = { ...getSettings().backfill, maxActiveJobs: 0 };
+    getSettings().backfill = { ...getSettings().backfill, maxMusicJobs: 0 };
     await requestSongs([LANTERN]);
     await startFetching();
     let fetch = await fetchOf();
@@ -1766,7 +1766,7 @@ describe('taking a song from its album', () => {
     await songFetcher.tick();
     assert.equal(searches(), searched, 'the release chosen is kept');
 
-    getSettings().backfill = { ...getSettings().backfill, maxActiveJobs: 1 };
+    getSettings().backfill = { ...getSettings().backfill, maxMusicJobs: 1 };
     await songFetcher.tick();
     fetch = await fetchOf();
     assert.equal(fetch.status, 'downloading');

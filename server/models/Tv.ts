@@ -6,6 +6,7 @@ import type {
   TmdbTvRatingResult,
   TmdbTvSeasonResult,
 } from '@server/api/themoviedb/interfaces';
+import type { DownloadStage } from '@server/constants/downloads';
 import type Media from '@server/entity/Media';
 import type { Video } from './Movie';
 import type {
@@ -26,6 +27,13 @@ import {
   mapWatchProviders,
 } from './common';
 
+/** How far an episode's download has got. */
+export interface EpisodeDownload {
+  stage: DownloadStage;
+  size: number;
+  sizeLeft: number;
+}
+
 interface Episode {
   id: number;
   /** Per-episode availability, when episode tracking has populated it. */
@@ -34,6 +42,11 @@ interface Episode {
   /** Covered by a pending or approved request, for itself or its season. */
   requested?: boolean;
   requested4k?: boolean;
+  /**
+   * On its way now: Sonarr's download of it, or Backfill's (the admin
+   * agent's go through Backfill), furthest along of any.
+   */
+  download?: EpisodeDownload;
   name: string;
   airDate: string | null;
   episodeNumber: number;

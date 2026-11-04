@@ -226,7 +226,9 @@ const LOOKUP_GIVE_UP_MS = 7 * 24 * 60 * 60_000;
  * each search that found none: indexers come and go, so the songs are
  * given up on only after about two days of finding nothing.
  */
-export const SEARCH_AGAIN_MS = [1, 3, 6, 12, 24].map((hours) => hours * 60 * 60_000);
+export const SEARCH_AGAIN_MS = [1, 3, 6, 12, 24].map(
+  (hours) => hours * 60 * 60_000
+);
 /** How soon a search Prowlarr or an indexer couldn't answer is tried again. */
 const SEARCH_SOON_MS = 10 * 60_000;
 /** What a fetch waiting to look again shows. */
@@ -1419,7 +1421,7 @@ class SongFetcher {
     const running = downloading.filter((other) =>
       holdsSlot(other, this.watch.idleFor(other.id))
     );
-    if (running.length >= getSettings().backfill.maxActiveJobs) {
+    if (running.length >= getSettings().backfill.maxMusicJobs) {
       fetch.stage = WAITING_FOR_SLOT;
       await getRepository(SongFetch).save(fetch);
       return;

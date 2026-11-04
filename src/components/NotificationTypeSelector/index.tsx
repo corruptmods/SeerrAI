@@ -475,7 +475,8 @@ const NotificationTypeSelector = ({
     ).flatMap((type) =>
       hasNotificationType(type.value, enabledTypes)
         ? [type]
-        : channel
+        : // Nothing on at all is a service not set up, which says so.
+          channel && enabledTypes
           ? [{ ...type, turnedOff: true }]
           : []
     );

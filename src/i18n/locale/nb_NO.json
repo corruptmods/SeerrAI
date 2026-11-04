@@ -28,6 +28,7 @@
   "components.RequestCard.seasons": "{seasonCount, plural, one {Sesong} other {Sesonger}}",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {Sesong} other {Sesonger}}",
   "components.RequestList.requests": "Forespørsler",
+  "components.RequestList.searchRequests": "Søk i forespørsler",
   "components.RequestModal.cancel": "Avbryt Forespørsel",
   "components.RequestModal.numberofepisodes": "Antall episoder",
   "components.RequestModal.pendingrequest": "Ventende forespørsel",

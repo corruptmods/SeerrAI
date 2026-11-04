@@ -521,6 +521,7 @@
   "components.RequestList.RequestItem.tvdbid": "TheTVDB ID",
   "components.RequestList.RequestItem.unknowntitle": "Tundmatu pealkiri",
   "components.RequestList.requests": "Taotlused",
+  "components.RequestList.searchRequests": "Otsi taotlusi",
   "components.RequestList.showallrequests": "Näita kõiki taotlusi",
   "components.RequestList.sortAdded": "Uusimad ees",
   "components.RequestList.sortDirection": "Vaheta sorteerimise suunda",

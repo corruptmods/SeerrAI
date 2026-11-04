@@ -349,6 +349,7 @@
   "components.RequestList.RequestItem.tvdbid": "TheTVDB-ID",
   "components.RequestList.RequestItem.unknowntitle": "Unbekannter Titel",
   "components.RequestList.requests": "Anfragen",
+  "components.RequestList.searchRequests": "Anfragen durchsuchen",
   "components.RequestList.showallrequests": "Alle Anfragen anzeigen",
   "components.RequestList.sortAdded": "Zuletzt angefragt",
   "components.RequestList.sortModified": "Zuletzt geändert",

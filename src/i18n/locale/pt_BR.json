@@ -140,6 +140,7 @@
   "components.RequestModal.numberofepisodes": "# de Episódeos",
   "components.RequestModal.cancel": "Cancelar Solicitação",
   "components.RequestList.requests": "Solicitações",
+  "components.RequestList.searchRequests": "Buscar pedidos",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {Temporada} other {Temporadas}}",
   "components.Setup.continue": "Continuar",
   "components.Setup.configureservices": "Configurar Serviços",

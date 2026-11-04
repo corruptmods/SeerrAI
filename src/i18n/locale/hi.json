@@ -482,6 +482,7 @@
   "components.RequestList.RequestItem.tvdbid": "TheTVDB ID",
   "components.RequestList.RequestItem.unknowntitle": "अज्ञात शीर्षक",
   "components.RequestList.requests": "अनुरोध",
+  "components.RequestList.searchRequests": "अनुरोध खोजें",
   "components.RequestList.showallrequests": "सभी अनुरोध दिखाएँ",
   "components.RequestList.sortAdded": "सबसे नए",
   "components.RequestList.sortDirection": "क्रम की दिशा बदलें",

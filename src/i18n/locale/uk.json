@@ -348,6 +348,7 @@
   "components.RequestList.RequestItem.tvdbid": "TheTVDB ID",
   "components.RequestList.RequestItem.unknowntitle": "Невідома назва",
   "components.RequestList.requests": "Запити",
+  "components.RequestList.searchRequests": "Пошук запитів",
   "components.RequestList.showallrequests": "Показати всі запити",
   "components.RequestList.sortAdded": "За датою",
   "components.RequestList.sortModified": "Остання зміна",

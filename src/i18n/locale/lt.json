@@ -207,6 +207,7 @@
   "components.RequestModal.requesterror": "Kažkas nepavyko teikiant rezervaciją.",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {Sezonas} other {Sezonai}}",
   "components.RequestList.requests": "Rezervacijos",
+  "components.RequestList.searchRequests": "Ieškoti užklausų",
   "components.RequestList.sortAdded": "Naujausi",
   "components.RequestList.sortModified": "Seniausi",
   "components.RequestModal.alreadyrequested": "Jau rezervuotas",

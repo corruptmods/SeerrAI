@@ -25,6 +25,7 @@
   "components.RequestModal.numberofepisodes": "Nº di episodi",
   "components.RequestModal.cancel": "Cancella la richiesta",
   "components.RequestList.requests": "Richieste",
+  "components.RequestList.searchRequests": "Cerca richieste",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {Stagione} other {Stagioni}}",
   "components.RequestCard.seasons": "{seasonCount, plural, one {Stagione} other {Stagioni}}",
   "components.RequestBlock.seasons": "{seasonCount, plural, one {Stagione} other {Stagioni}}",

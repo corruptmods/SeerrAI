@@ -90,6 +90,7 @@
   "components.RequestList.RequestItem.requesteddate": "Anmodet",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {Sæson} other {Sæsoner}}",
   "components.RequestList.requests": "Anmodninger",
+  "components.RequestList.searchRequests": "Søg i anmodninger",
   "components.ResetPassword.resetpassword": "Nulstil din adgangskode",
   "components.PermissionEdit.users": "Administrere brugere",
   "components.PermissionEdit.usersDescription": "Kan administrere brugere, undtagen administratorer. Kan ikke tildele Administrator.",

@@ -430,6 +430,7 @@
   "components.RequestList.RequestItem.mediaerror": "Nie znaleziono: {mediaType}",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {sezon} other {sezony}}",
   "components.RequestList.requests": "Prośby",
+  "components.RequestList.searchRequests": "Szukaj próśb",
   "components.RequestModal.AdvancedRequester.requestas": "Poproś jako",
   "components.RequestModal.QuotaDisplay.requestsremaining": "{remaining, plural, =0 {Brak} other {<strong>#</strong>}} {type} {remaining, plural, one {żądanie} other {żądań}} pozostało",
   "components.RequestModal.QuotaDisplay.requiredquota": "Potrzebujesz jeszcze co najmniej <strong>{seasons}</strong> {seasons, plural, one {prośby o sezon} few {próśb o sezony} many {próśb o sezony} other {prośby o sezony}}, by poprosić o ten serial.",

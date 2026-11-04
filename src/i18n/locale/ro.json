@@ -511,6 +511,7 @@
   "components.RequestList.RequestItem.tvdbid": "ID TheTVDB",
   "components.RequestList.RequestItem.unknowntitle": "Titlu Necunoscut",
   "components.RequestList.requests": "Solicitări",
+  "components.RequestList.searchRequests": "Caută cereri",
   "components.RequestList.showallrequests": "Afișează toate Solicitările",
   "components.RequestList.sortAdded": "Recente",
   "components.RequestList.sortModified": "Ultima Modificare",

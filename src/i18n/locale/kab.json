@@ -1633,6 +1633,7 @@
   "components.RequestList.RequestItem.tvdbid": "Asulay TheTVDB",
   "components.RequestList.RequestItem.unknowntitle": "Azwel arussin",
   "components.RequestList.requests": "Isuturen",
+  "components.RequestList.searchRequests": "Nadi isutar",
   "components.RequestList.showallrequests": "Sken-d akk isuturen",
   "components.RequestList.sortAdded": "Imaynuten",
   "components.RequestModal.QuotaDisplay.season": "tallit",

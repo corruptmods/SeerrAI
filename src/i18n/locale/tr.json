@@ -436,6 +436,7 @@
   "components.RequestList.RequestItem.tvdbid": "TheTVDB Kimliği",
   "components.RequestList.RequestItem.unknowntitle": "Bilinmeyen Başlık",
   "components.RequestList.requests": "Talepler",
+  "components.RequestList.searchRequests": "İsteklerde ara",
   "components.RequestList.showallrequests": "Tüm Talepleri Göster",
   "components.RequestList.sortAdded": "En Son",
   "components.RequestModal.AdvancedRequester.advancedoptions": "Gelişmiş",

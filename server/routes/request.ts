@@ -1,6 +1,7 @@
 import { MusicBrainzBusyError } from '@server/api/musicbrainz';
 import RadarrAPI from '@server/api/servarr/radarr';
 import SonarrAPI from '@server/api/servarr/sonarr';
+import TheMovieDb from '@server/api/themoviedb';
 import { REQUEST_BATCH_LIMIT } from '@server/constants/lists';
 import {
   DECLINE_REASON_MAX_LENGTH,
@@ -132,6 +133,74 @@ const requestTypesFor = (user?: User): MediaType[] =>
   musicFor(user)
     ? [...VIDEO_MEDIA_TYPES, MediaType.MUSIC]
     : [...VIDEO_MEDIA_TYPES];
+
+/** Pages of TMDB's search read for a request search. */
+const SEARCH_PAGES = 2;
+
+/**
+ * The titles a request search finds: films and series by TMDB's search of
+ * the words (their titles aren't kept with the requests), and music
+ * requests by their artist, album or song, as kept. TMDB not answering
+ * leaves films and series out, not the music.
+ */
+const searchedRequests = async (
+  text: string,
+  types: MediaType[]
+): Promise<{ movies: number[]; series: number[]; music: number[] }> => {
+  const found = {
+    movies: [] as number[],
+    series: [] as number[],
+    music: [] as number[],
+  };
+  if (types.some((type) => type === MediaType.MOVIE || type === MediaType.TV)) {
+    const tmdb = new TheMovieDb();
+    for (let page = 1; page <= SEARCH_PAGES; page++) {
+      const answer = await tmdb
+        .searchMulti({ query: text, page })
+        .catch((e: unknown) => {
+          logger.debug('TMDB could not be searched for requests', {
+            label: 'Media Request',
+            errorMessage: e instanceof Error ? e.message : String(e),
+          });
+          return undefined;
+        });
+      for (const result of answer?.results ?? []) {
+        if (result.media_type === 'movie') found.movies.push(result.id);
+        if (result.media_type === 'tv') found.series.push(result.id);
+      }
+      if (!answer || page >= (answer.total_pages ?? 1)) break;
+    }
+  }
+  // Words, as LIKE reads them: its own wildcards taken out.
+  const words = text
+    .toLowerCase()
+    .replace(/[%_\\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (types.includes(MediaType.MUSIC) && words) {
+    const like = `%${words}%`;
+    const rows = await getRepository(MediaRequest)
+      .createQueryBuilder('request')
+      .leftJoin('request.media', 'media')
+      .leftJoin('request.albums', 'albums')
+      .leftJoin('request.songs', 'songs')
+      .select('request.id', 'id')
+      .distinct(true)
+      .where('request.type = :music', { music: MediaType.MUSIC })
+      .andWhere(
+        new Brackets((match) =>
+          match
+            .where('LOWER(media.foreignTitle) LIKE :like', { like })
+            .orWhere('LOWER(albums.title) LIKE :like', { like })
+            .orWhere('LOWER(songs.title) LIKE :like', { like })
+        )
+      )
+      .limit(5000)
+      .getRawMany<{ id: number }>();
+    found.music = rows.map((row) => Number(row.id));
+  }
+  return found;
+};
 
 requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
   '/',
@@ -327,6 +396,39 @@ requestRoutes.get<Record<string, unknown>, RequestResultsResponse>(
       query = query.andWhere('request.type IN (:...mediaTypes)', {
         mediaTypes: mediaTypes.length ? mediaTypes : listedTypes,
       });
+
+      // Only the titles the words find.
+      const search = String(req.query.search ?? '')
+        .trim()
+        .slice(0, 100);
+      if (search) {
+        const found = await searchedRequests(
+          search,
+          mediaTypes.length ? mediaTypes : listedTypes
+        );
+        query = query.andWhere(
+          new Brackets((match) => {
+            match.where('1 = 0');
+            if (found.movies.length) {
+              match.orWhere(
+                '(request.type = :movie AND media.tmdbId IN (:...searchedMovies))',
+                { movie: MediaType.MOVIE, searchedMovies: found.movies }
+              );
+            }
+            if (found.series.length) {
+              match.orWhere(
+                '(request.type = :tv AND media.tmdbId IN (:...searchedSeries))',
+                { tv: MediaType.TV, searchedSeries: found.series }
+              );
+            }
+            if (found.music.length) {
+              match.orWhere('request.id IN (:...searchedMusic)', {
+                searchedMusic: found.music,
+              });
+            }
+          })
+        );
+      }
 
       // A playlist import's many requests, as one each.
       const playlists =

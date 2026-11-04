@@ -99,5 +99,5 @@ People who can manage the blocklist can blocklist a title nobody has requested, 
 - **Who watched:** admins see who watched a title, and how far (Plex needs Tautulli). Switch: `whoWatched`.
 - **Collections:** a collection page says how much you have and offers **Request the missing N**.
 - **Notify me when available:** for a title someone else requested.
-- **Requests page:** filter by several statuses, types and people at once.
+- **Requests page:** filter by several statuses, types and people at once, and search by title: films and series as TMDB finds the words, music by its artist, album or song.
 - **Also add to a list:** the request window can put the title on one of your watch lists.

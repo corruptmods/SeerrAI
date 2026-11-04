@@ -711,6 +711,7 @@
   "components.RequestList.sortAdded": "最新",
   "components.RequestList.showallrequests": "查看所有请求",
   "components.RequestList.requests": "请求",
+  "components.RequestList.searchRequests": "搜索请求",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, other {季}}",
   "components.RequestList.RequestItem.requesteddate": "请求日期",
   "components.RequestList.RequestItem.requested": "请求者",

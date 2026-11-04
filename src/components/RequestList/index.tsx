@@ -21,6 +21,7 @@ import {
   ChevronRightIcon,
   CircleStackIcon,
   FunnelIcon,
+  MagnifyingGlassIcon,
   UserIcon,
 } from '@heroicons/react/24/solid';
 import { MediaType } from '@server/constants/media';
@@ -40,6 +41,7 @@ const messages = defineMessages('components.RequestList', {
   sortAdded: 'Most Recent',
   sortModified: 'Last Modified',
   sortDirection: 'Toggle Sort Direction',
+  searchRequests: 'Search requests',
   unableToConnect: 'Can’t reach {services}, so some details may be missing.',
 });
 
@@ -76,6 +78,9 @@ const RequestList = () => {
   const [currentSortDirection, setCurrentSortDirection] =
     useState<SortDirection>('desc');
   const [currentPageSize, setCurrentPageSize] = useState<number>(10);
+  // What's typed, and the words searched once typing pauses.
+  const [searchText, setSearchText] = useState('');
+  const [search, setSearch] = useState('');
 
   const page = router.query.page ? Number(router.query.page) : 1;
   const pageIndex = page - 1;
@@ -104,6 +109,18 @@ const RequestList = () => {
     results: { id: number; displayName: string }[];
   }>(canFilterByUser ? '/api/v1/user?take=100&sort=displayname' : null);
 
+  useEffect(() => {
+    const words = searchText.trim();
+    if (words === search) return;
+    const timer = setTimeout(() => {
+      setSearch(words);
+      // New words start from the first page.
+      if (router.query.page && router.query.page !== '1') resetPage();
+    }, 350);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchText]);
+
   const {
     data,
     error,
@@ -122,7 +139,9 @@ const RequestList = () => {
             canFilterByUser && currentRequestedBy.length
             ? `&requestedBy=${encodeURIComponent(currentRequestedBy.join(','))}`
             : ''
-    }`
+    }${search ? `&search=${encodeURIComponent(search)}` : ''}`,
+    // The list stays while the next search loads, and the box keeps focus.
+    { keepPreviousData: true }
   );
   // Every card's estimate in one call, rather than one per card.
   const etaFor = useRequestEtas(
@@ -262,6 +281,19 @@ const RequestList = () => {
           {intl.formatMessage(messages.requests)}
         </Header>
         <div className="mt-2 flex flex-grow flex-col sm:flex-row lg:flex-grow-0">
+          <div className="mb-2 flex flex-grow sm:mb-0 sm:mr-2 lg:flex-grow-0">
+            <span className="inline-flex cursor-default items-center rounded-l-md border border-r-0 border-gray-500 bg-gray-800 px-3 text-sm text-gray-100">
+              <MagnifyingGlassIcon className="h-6 w-6" />
+            </span>
+            <input
+              type="search"
+              aria-label={intl.formatMessage(messages.searchRequests)}
+              placeholder={intl.formatMessage(messages.searchRequests)}
+              className="rounded-r-only lg:w-56"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+            />
+          </div>
           <div className="mb-2 flex flex-grow sm:mb-0 sm:mr-2 lg:flex-grow-0">
             <MultiSelectFilter
               icon={<CircleStackIcon className="h-6 w-6" />}

@@ -191,6 +191,7 @@
   "components.RequestList.sortAdded": "Πιο πρόσφατα",
   "components.RequestList.showallrequests": "Εμφάνιση Όλων των Αιτημάτων",
   "components.RequestList.requests": "Αιτήματα",
+  "components.RequestList.searchRequests": "Αναζήτηση αιτημάτων",
   "components.RequestList.RequestItem.requested": "Ζητήθηκε",
   "components.RequestList.RequestItem.modified": "Τροποποιήθηκε",
   "components.RequestList.RequestItem.mediaerror": "{mediaType} Δε βρέθηκε",

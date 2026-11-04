@@ -514,6 +514,7 @@
   "components.RequestList.RequestItem.tvdbid": "מזהה TheTVDB",
   "components.RequestList.RequestItem.unknowntitle": "כותרת לא ידועה",
   "components.RequestList.requests": "בקשות",
+  "components.RequestList.searchRequests": "חיפוש בקשות",
   "components.RequestList.showallrequests": "הצגת כל הבקשות",
   "components.RequestList.sortAdded": "הכי עדכני",
   "components.RequestList.sortDirection": "החלפת כיוון מיון",

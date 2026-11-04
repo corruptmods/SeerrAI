@@ -28,6 +28,7 @@
   "components.RequestCard.seasons": "{seasonCount, plural, one {Сезон} other {Сезоны}}",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {Сезон} other {Сезоны}}",
   "components.RequestList.requests": "Запросы",
+  "components.RequestList.searchRequests": "Поиск по запросам",
   "components.RequestModal.cancel": "Отменить запрос",
   "components.RequestModal.numberofepisodes": "# эпизодов",
   "components.RequestModal.pendingrequest": "Ожидающий запрос",

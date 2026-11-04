@@ -272,6 +272,7 @@
   "components.RequestList.RequestItem.requested": "Kërkuar",
   "components.RequestList.RequestItem.requesteddate": "Kërkuar",
   "components.RequestList.requests": "Kërkesat",
+  "components.RequestList.searchRequests": "Kërko kërkesat",
   "components.RequestList.showallrequests": "Shfaq të gjitha kërkesat",
   "components.RequestList.sortAdded": "Më të fundit",
   "components.RequestList.sortModified": "Modifikuar së Fundmi",

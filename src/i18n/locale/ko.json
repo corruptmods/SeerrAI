@@ -229,6 +229,7 @@
   "components.RequestList.RequestItem.tvdbid": "TheTVDB ID",
   "components.RequestList.RequestItem.unknowntitle": "알 수 없는 제목",
   "components.RequestList.requests": "요청",
+  "components.RequestList.searchRequests": "요청 검색",
   "components.RequestList.showallrequests": "모든 요청 표시",
   "components.RequestModal.AdvancedRequester.rootfolder": "루트 폴더",
   "components.RequestModal.QuotaDisplay.season": "시즌",

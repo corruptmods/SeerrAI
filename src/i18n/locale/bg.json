@@ -220,6 +220,7 @@
   "components.Settings.Notifications.sendSilently": "Изпращане безшумно",
   "components.ResetPassword.validationpasswordmatch": "Паролите трябва да съвпадат",
   "components.RequestList.requests": "Заявки",
+  "components.RequestList.searchRequests": "Търсене в заявките",
   "components.RequestModal.QuotaDisplay.season": "сезон",
   "components.PermissionEdit.managerequests": "Управление на заявки",
   "components.ResetPassword.emailresetlink": "Връзка за възстановяване на имейл",

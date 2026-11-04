@@ -93,6 +93,7 @@
   "components.RequestList.sortAdded": "Data do Pedido",
   "components.RequestList.showallrequests": "Mostrar Todos os Pedidos",
   "components.RequestList.requests": "Pedidos",
+  "components.RequestList.searchRequests": "Pesquisar pedidos",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {Temporada} other {Temporadas}}",
   "components.RequestList.RequestItem.failedretry": "Ocorreu um erro ao voltar a tentar o pedido.",
   "components.RequestCard.seasons": "{seasonCount, plural, one {Temporada} other {Temporadas}}",

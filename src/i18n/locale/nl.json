@@ -28,6 +28,7 @@
   "components.RequestCard.seasons": "{seasonCount, plural, one {Seizoen} other {Seizoenen}}",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {Seizoen} other {Seizoenen}}",
   "components.RequestList.requests": "Aanvragen",
+  "components.RequestList.searchRequests": "Verzoeken zoeken",
   "components.RequestModal.cancel": "Aanvraag annuleren",
   "components.RequestModal.numberofepisodes": "Aantal afleveringen",
   "components.RequestModal.pendingrequest": "Aanvraag in behandeling",

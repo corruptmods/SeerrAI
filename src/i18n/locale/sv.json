@@ -123,6 +123,7 @@
   "components.RequestModal.numberofepisodes": "Antal avsnitt",
   "components.RequestModal.cancel": "Avbryt förfrågan",
   "components.RequestList.requests": "Förfrågningar",
+  "components.RequestList.searchRequests": "Sök förfrågningar",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {säsong} other {säsonger}}",
   "components.RequestCard.seasons": "{seasonCount, plural, one {säsong} other {säsonger}}",
   "components.RequestBlock.seasons": "{seasonCount, plural, one {säsong} other {säsonger}}",

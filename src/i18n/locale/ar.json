@@ -305,6 +305,7 @@
   "components.RequestList.RequestItem.requesteddate": "تم طلبه",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {موسم} other {مواسم}}",
   "components.RequestList.requests": "الطلبات",
+  "components.RequestList.searchRequests": "ابحث في الطلبات",
   "components.RequestList.showallrequests": "رؤية جميع الطلبات",
   "components.RequestList.sortAdded": "الأحدث",
   "components.RequestList.sortModified": "أخر تعديل",

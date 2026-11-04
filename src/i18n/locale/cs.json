@@ -207,6 +207,7 @@
   "components.RequestModal.AdvancedRequester.tags": "Štítky",
   "components.RequestModal.AdvancedRequester.advancedoptions": "Pokročilé",
   "components.RequestList.requests": "Žádosti",
+  "components.RequestList.searchRequests": "Hledat žádosti",
   "components.RequestList.RequestItem.requesteddate": "Zažádáno",
   "components.RequestList.RequestItem.requested": "Zažádáno",
   "components.RequestList.RequestItem.modified": "Upraveno",

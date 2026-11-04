@@ -1055,6 +1055,7 @@
   "components.RequestList.RequestItem.tvdbid": "TheTVDB ID",
   "components.RequestList.RequestItem.unknowntitle": "Tựa không rõ",
   "components.RequestList.requests": "Yêu cầu",
+  "components.RequestList.searchRequests": "Tìm yêu cầu",
   "components.RequestList.showallrequests": "Hiện tất cả yêu cầu",
   "components.RequestList.sortAdded": "Mới nhất",
   "components.RequestList.sortDirection": "Đảo chiều sắp xếp",

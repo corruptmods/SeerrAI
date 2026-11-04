@@ -52,6 +52,7 @@
   "components.MovieDetails.revenue": "Recaptació",
   "components.RequestCard.seasons": "{seasonCount, plural, one {Temporada} other {Temporades}}",
   "components.RequestList.requests": "Sol·licituds",
+  "components.RequestList.searchRequests": "Cerca sol·licituds",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {Temporada} other {Temporades}}",
   "components.RequestList.RequestItem.modifieduserdate": "{date} per {user}",
   "components.RequestList.RequestItem.modified": "Modificat",

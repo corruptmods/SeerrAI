@@ -140,6 +140,7 @@
   "components.RequestCard.seasons": "{seasonCount, plural, one {Saison} other {Saisons}}",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {Saison} other {Saisons}}",
   "components.RequestList.requests": "Demandes",
+  "components.RequestList.searchRequests": "Rechercher des demandes",
   "components.RequestModal.cancel": "Annuler la demande",
   "components.RequestModal.numberofepisodes": "Nombre d'épisodes",
   "components.RequestModal.pendingrequest": "Demande en attente",

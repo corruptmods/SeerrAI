@@ -1171,6 +1171,7 @@
   "components.RequestList.RequestItem.tvdbid": "ID TheTVDB",
   "components.RequestList.RequestItem.unknowntitle": "Neznan naslov",
   "components.RequestList.requests": "Zahteve",
+  "components.RequestList.searchRequests": "Iskanje zahtev",
   "components.RequestList.showallrequests": "Prikaži vse zahteve",
   "components.RequestList.sortAdded": "Najnovejše",
   "components.RequestList.sortDirection": "Obrni smer razvrščanja",

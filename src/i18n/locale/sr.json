@@ -164,6 +164,7 @@
   "components.RequestModal.numberofepisodes": "# broj epizoda",
   "components.RequestModal.cancel": "Otkaži zahtev",
   "components.RequestList.requests": "Zahtevi",
+  "components.RequestList.searchRequests": "Pretraži zahteve",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {Sezona} other {Sezona}}",
   "components.RequestCard.seasons": "{seasonCount, plural, one {Sezona} other {Sezone}}",
   "components.RequestBlock.seasons": "{seasonCount, plural, one {Sezona} other {Sezone}}",

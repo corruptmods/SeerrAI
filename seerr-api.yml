@@ -15498,6 +15498,15 @@ paths:
           schema:
             type: string
             enum: [group]
+        - in: query
+          name: search
+          description: >-
+            Only requests whose title holds these words: a film or series as
+            TMDB finds it, or music by its artist, album or song.
+          schema:
+            type: string
+            maxLength: 100
+            example: lantern
       responses:
         '200':
           description: Requests returned

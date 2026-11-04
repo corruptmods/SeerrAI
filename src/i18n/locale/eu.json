@@ -188,6 +188,7 @@
   "components.ManageSlideOver.downloadstatus": "Deskargaren egoera",
   "components.PermissionEdit.admin": "Administratzailea",
   "components.RequestList.requests": "Eskaerak",
+  "components.RequestList.searchRequests": "Bilatu eskaerak",
   "components.RequestModal.AdvancedRequester.tags": "Etiketak",
   "components.RequestModal.QuotaDisplay.season": "denboraldia",
   "components.Search.search": "Bilatu",

@@ -5,6 +5,7 @@
   "components.RequestList.sortAdded": "Kérés dátuma",
   "components.RequestList.showallrequests": "Összes kérés mutatása",
   "components.RequestList.requests": "Kérések",
+  "components.RequestList.searchRequests": "Kérések keresése",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, one {Évad} other {Évad}}",
   "components.RequestList.RequestItem.failedretry": "Hiba történt a kérés újbóli próbálásakor.",
   "components.RequestCard.seasons": "{seasonCount, plural, one {Évad} other {Évad}}",

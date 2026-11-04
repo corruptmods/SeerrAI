@@ -1316,6 +1316,7 @@
   "components.TvDetails.Season.somethingwentwrong": "Pri načítavaní údajov o sérii sa niečo pokazilo.",
   "components.TvDetails.episodeRuntimeMinutes": "{runtime} min",
   "components.RequestList.requests": "Žiadosti",
+  "components.RequestList.searchRequests": "Hľadať žiadosti",
   "components.TvDetails.watchlistDeleted": "Titul <strong>{title}</strong> bol úspešne odstránený zo zoznamu na pozretie!",
   "components.TvDetails.watchlistError": "Niečo sa pokazilo. Skúste to znova.",
   "components.TvDetails.watchlistSuccess": "Titul <strong>{title}</strong> bol úspešne pridaný do zoznamu na pozretie!",

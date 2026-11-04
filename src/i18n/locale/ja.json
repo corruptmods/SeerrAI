@@ -28,6 +28,7 @@
   "components.RequestCard.seasons": "{seasonCount, plural, other {シーズン}}",
   "components.RequestList.RequestItem.seasons": "{seasonCount, plural, other {シーズン}}",
   "components.RequestList.requests": "リクエスト",
+  "components.RequestList.searchRequests": "リクエストを検索",
   "components.RequestModal.cancel": "キャンセルリクエスト",
   "components.RequestModal.numberofepisodes": "エピソード数",
   "components.RequestModal.pendingrequest": "保留中のリクエスト",

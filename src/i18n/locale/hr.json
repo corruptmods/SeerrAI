@@ -591,6 +591,7 @@
   "components.RequestCard.mediaerror": "{mediaType} nije pronađen",
   "components.RequestList.RequestItem.requested": "Zatraženo",
   "components.RequestList.requests": "Zahtjevi",
+  "components.RequestList.searchRequests": "Pretraži zahtjeve",
   "components.RequestList.showallrequests": "Prikaži sve zahtjeve",
   "components.RequestList.sortModified": "Zadnja promjena",
   "components.RequestModal.AdvancedRequester.advancedoptions": "Napredno",

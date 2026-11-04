@@ -1491,6 +1491,7 @@
   "components.RequestButton.decline4krequests": "{requestCount, plural, one {4K-Ufro ofleenen} other {{requestCount} 4K-Ufroen ofleenen}}",
   "components.RequestList.RequestItem.unknowntitle": "Onbekannten Titel",
   "components.RequestList.requests": "Ufroen",
+  "components.RequestList.searchRequests": "Ufroen duerchsichen",
   "components.RequestList.showallrequests": "All Ufroe weisen",
   "components.RequestList.sortAdded": "Neiste",
   "components.RequestList.sortDirection": "Sortéierrichtung wiesselen",

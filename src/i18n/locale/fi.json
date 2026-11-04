@@ -489,6 +489,7 @@
   "components.RequestList.RequestItem.tvdbid": "TheTVDB ID",
   "components.RequestList.RequestItem.unknowntitle": "Tuntematon nimike",
   "components.RequestList.requests": "Pyynnöt",
+  "components.RequestList.searchRequests": "Hae pyyntöjä",
   "components.RequestList.showallrequests": "Näytä kaikki pyynnöt",
   "components.RequestList.sortAdded": "Uusin",
   "components.RequestList.sortModified": "Viimeksi muokattu",

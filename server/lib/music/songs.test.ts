@@ -129,6 +129,9 @@ describe('otherTake', () => {
       'Lantern Song (sped up)',
       'Lantern Song (Glasswing’s Version)',
       'Lantern Song (Glasswings Version)',
+      'Lantern Song (Harbour Lights Bootleg)',
+      'Lantern Song (Static Garden Rework)',
+      'Lantern Song (Mash-Up)',
     ]) {
       assert.equal(otherTake(name, 'Lantern Song'), true, name);
     }

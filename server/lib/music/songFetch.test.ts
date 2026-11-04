@@ -1925,6 +1925,18 @@ describe('reading a release of an album', () => {
       namesAlbum('Other Band - Static Garden', 'Static Garden', 'Glasswing'),
       false
     );
+    // A music video under the single's name.
+    for (const video of [
+      'Glasswing - Lantern Song [1080p]',
+      'Glasswing-Lantern_Song-720p-x264-2014',
+      'Glasswing - Lantern Song (Official Music Video) HEVC',
+    ]) {
+      assert.equal(
+        namesAlbum(video, 'Lantern Song', 'Glasswing'),
+        false,
+        video
+      );
+    }
   });
 
   it('is not fooled by a compilation, or by the file a post is of', () => {

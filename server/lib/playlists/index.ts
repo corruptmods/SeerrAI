@@ -383,6 +383,27 @@ class Playlists {
           found = await songByIsrc(catalog.isrc, song.artistName, pick);
           if (found && !pick(found)) found = null;
         }
+        // A code MusicBrainz has only on others' compilations (a playlist
+        // takes songs from "Now That's…"): the artist's own recording of
+        // it, found by name, when one as long can be requested.
+        const byCode = found && pick(found);
+        if (
+          byCode &&
+          !fetchable(byCode) &&
+          !byCode.releaseGroups.some((group) => group.byArtist)
+        ) {
+          const named = await songNamed(song.title, song.artistName, pick);
+          const own = named && pick(named);
+          if (
+            own &&
+            fetchable(own) &&
+            (!song.length ||
+              (own.length != null &&
+                Math.abs(own.length - song.length) <= LENGTH_SLACK_MS))
+          ) {
+            found = named;
+          }
+        }
         found ??= await songNamed(song.title, song.artistName, pick);
       } catch (e) {
         // MusicBrainz is unreachable: tried again on the next pass.

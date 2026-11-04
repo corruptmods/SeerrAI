@@ -30,11 +30,11 @@ const FORMS: Form[] = [words, joined];
 /**
  * Words that make a release, or a file, another version of what it names:
  * another take of its songs (live, acoustic, a remix, a Dolby Atmos mix…),
- * or a radio edit, which is no album. A remaster or a deluxe edition is the
- * same take.
+ * a radio edit, which is no album, or a music video ("[1080p]", "x264").
+ * A remaster or a deluxe edition is the same take.
  */
 const VERSIONS = new RegExp(
-  String.raw`\b(?:${OTHER_TAKE_WORDS}|radio edit|radio mix)\b`,
+  String.raw`\b(?:${OTHER_TAKE_WORDS}|radio edit|radio mix|(?:480|576|720|1080|1440|2160)[pi]|[xh] ?26[45]|hevc|music video|mvid|dvdrip)\b`,
   'g'
 );
 

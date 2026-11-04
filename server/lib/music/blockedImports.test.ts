@@ -213,6 +213,13 @@ describe('a download Lidarr held back', () => {
     lidarr.folders.set(FOLDER, file('Lantern Song', '00:05:02.0'));
     lidarr.queue = [tooFar('HASH6')];
     await blockedImports.run();
+    // A bootleg remix is another take, however long.
+    lidarr.folders.set(
+      FOLDER,
+      file('Lantern Song (Harbour Lights Bootleg)', '00:03:22.0')
+    );
+    lidarr.queue = [tooFar('HASH8')];
+    await blockedImports.run();
     assert.equal(imports().length, 0);
 
     // As long as the track, and the same take: it is the song.

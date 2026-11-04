@@ -922,6 +922,69 @@ describe('a song Deezer lists', () => {
     assert.equal(lantern.isrc, null);
   });
 
+  it('is matched to the artist’s own recording when its ISRC is only on others’ compilations', async () => {
+    deezerLists({ 'Lantern Song': listing(11, 'Lantern Song', 215, 501) });
+    const various = [
+      {
+        name: 'Various Artists',
+        artist: {
+          id: '89ad4ac3-39f7-470e-963a-56509c546377',
+          name: 'Various Artists',
+        },
+      },
+    ];
+    // The code is on a recording MusicBrainz has only on a compilation of
+    // others' songs, which can't be requested.
+    mock.method(MusicBrainz.prototype, 'searchRecordingsByIsrc', async () => ({
+      count: 1,
+      offset: 0,
+      recordings: [
+        {
+          id: ISRC_TAKE,
+          title: 'Lantern Song',
+          length: 214_000,
+          'artist-credit': credit,
+          releases: [
+            {
+              ...onRelease(HARBOUR, 'Harbour Lights Hits', 'Album'),
+              'artist-credit': various,
+              'release-group': {
+                id: HARBOUR,
+                title: 'Harbour Lights Hits',
+                'primary-type': 'Album',
+                'secondary-types': ['Compilation'],
+              },
+            },
+          ],
+        },
+      ],
+    }));
+    let list = await linked();
+    // The artist's own, on their single, as long as the playlist's.
+    assert.equal(
+      (await songNamed(list, 'Lantern Song')).recordingMbid,
+      LANTERN
+    );
+
+    // Their own is another length, so not this take: the code's stays.
+    mock.method(
+      MusicBrainz.prototype,
+      'searchRecordings',
+      async (title: string) => {
+        const found = RECORDINGS.filter(
+          (r) =>
+            r.id !== LANTERN && r.title.toLowerCase() === title.toLowerCase()
+        );
+        return { count: found.length, offset: 0, recordings: found };
+      }
+    );
+    list = await linked();
+    assert.equal(
+      (await songNamed(list, 'Lantern Song')).recordingMbid,
+      ISRC_TAKE
+    );
+  });
+
   it('offers adding to MusicBrainz a song it doesn’t have', async () => {
     deezerLists({ 'Unheard Tune': listing(12, 'Unheard Tune', 100, 777) });
     mock.method(MusicBrainz.prototype, 'searchRecordingsByIsrc', async () => ({

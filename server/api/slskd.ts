@@ -113,16 +113,24 @@ class SlskdAPI extends ExternalAPI {
 
   /**
    * Searches Soulseek and waits for the answers: every sharer's matching
-   * files, unlocked ones only. The search is cleared from slskd after.
+   * files, unlocked ones only. A search still running when the wait is
+   * over is stopped, and slskd given a moment to finish it, before it is
+   * cleared from slskd: one cleared while running fails in slskd.
    */
-  public async search(text: string): Promise<SlskdResponse[]> {
+  public async search(
+    text: string,
+    timing: { searchMs: number; pollMs: number } = {
+      searchMs: SEARCH_MS,
+      pollMs: POLL_MS,
+    }
+  ): Promise<SlskdResponse[]> {
     const id = randomUUID();
     const res = await this.axios.post<SlskdSearch>(
       '/searches',
       {
         id,
         searchText: text,
-        searchTimeout: SEARCH_MS,
+        searchTimeout: timing.searchMs,
         responseLimit: 100,
         fileLimit: 10_000,
         filterResponses: true,
@@ -140,11 +148,24 @@ class SlskdAPI extends ExternalAPI {
       throw new Error(`slskd could not search (${res.status}).`);
     }
     try {
-      const until = Date.now() + SEARCH_MS + 15_000;
+      // slskd's timeout counts from the last answer, so a popular search
+      // runs on: it is stopped once it has had twice its time.
+      let until = Date.now() + timing.searchMs * 2;
+      let stopped = false;
       for (;;) {
-        await wait(POLL_MS);
+        await wait(timing.pollMs);
         const search = await this.get<SlskdSearch>(`/searches/${id}`, {}, 0);
-        if (transferIs(search, 'Completed') || Date.now() > until) break;
+        if (transferIs(search, 'Completed')) break;
+        if (Date.now() > until) {
+          if (stopped) break;
+          await this.axios
+            .put(`/searches/${id}`, undefined, {
+              validateStatus: (s) => s < 300 || s === 304 || s === 404,
+            })
+            .catch(() => undefined);
+          stopped = true;
+          until = Date.now() + timing.pollMs * 4;
+        }
       }
       const responses = await this.get<SlskdResponse[]>(
         `/searches/${id}/responses`,

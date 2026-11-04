@@ -1,7 +1,7 @@
 import { albumCoverUrl } from '@server/api/coverartarchive';
 import { MediaRequestStatus, MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
-import { MediaListSong } from '@server/entity/MediaList';
+import { MediaList, MediaListSong } from '@server/entity/MediaList';
 import { MediaRequest } from '@server/entity/MediaRequest';
 import SongRequest from '@server/entity/SongRequest';
 import { claimDelivery } from '@server/lib/notificationDelivery';
@@ -109,6 +109,17 @@ export const notifyPlaylistFailures = async (
         `${songName(song)} — ${song.request.media?.foreignTitle ?? ''}`.trim()
       );
       const first = claimed[0];
+      const owner = first.requesterMuted ? undefined : first.requestedBy;
+      const image = songs[0]?.albumMbid
+        ? albumCoverUrl(songs[0].albumMbid)
+        : undefined;
+      const message = truncate(names.join(', '), {
+        length: 500,
+        separator: /,? /,
+        omission: '…',
+      });
+      // Admins and channels as a failed request; the owner by Playlist
+      // Updates, which they choose apart from failed requests.
       notificationManager.sendNotification(Notification.MEDIA_FAILED, {
         ...mediaEvent(Notification.MEDIA_FAILED, MediaType.MUSIC, false),
         // The playlist's own name stays on its page.
@@ -117,22 +128,37 @@ export const notifyPlaylistFailures = async (
             ? `${count} ${count === 1 ? 'song' : 'songs'}`
             : `${claimed.length} ${claimed.length === 1 ? 'request' : 'requests'}`
         }`,
-        message: truncate(names.join(', '), {
-          length: 500,
-          separator: /,? /,
-          omission: '…',
-        }),
-        image: songs[0]?.albumMbid
-          ? albumCoverUrl(songs[0].albumMbid)
-          : undefined,
+        message,
+        image,
         media: first.media,
         request: first,
         notifyAdmin: true,
         notifySystem: true,
-        notifyUser: first.requesterMuted ? undefined : first.requestedBy,
+        // Named so they aren't sent the admins' copy as well.
+        notifyUser: owner,
+        holdUser: true,
         actionUrl: `/lists/${listId}`,
         extra: count ? [{ name: 'Failed Songs', value: String(count) }] : [],
       });
+      if (owner) {
+        const list = await getRepository(MediaList).findOne({
+          select: { id: true, name: true },
+          where: { id: listId },
+        });
+        const what = count
+          ? `${count} ${count === 1 ? 'song' : 'songs'}`
+          : `${claimed.length} ${claimed.length === 1 ? 'request' : 'requests'}`;
+        notificationManager.sendNotification(Notification.PLAYLIST_UPDATE, {
+          subject: `${list?.name ?? 'Your playlist'}: ${what} couldn’t be got`,
+          message,
+          image,
+          notifyAdmin: false,
+          notifySystem: false,
+          notifyUser: owner,
+          actionUrl: `/lists/${listId}`,
+          actionUrlTitle: 'View Playlist',
+        });
+      }
     } catch (e) {
       logger.error('Could not tell a playlist’s failed songs', {
         label: 'Notifications',

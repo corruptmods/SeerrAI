@@ -24,7 +24,7 @@ import { songFetchProblem } from '@server/lib/music/songFetchReady';
 import type { Song, SongVersion } from '@server/lib/music/songs';
 import { albumFor, otherTake, singleFor } from '@server/lib/music/songs';
 import { releaseDelivery } from '@server/lib/notificationDelivery';
-import { Notification } from '@server/lib/notifications';
+import notificationManager, { Notification } from '@server/lib/notifications';
 import type { PlaylistLink, SourceSong } from '@server/lib/playlists/sources';
 import {
   PlaylistSourceError,
@@ -51,7 +51,7 @@ import { In, IsNull, LessThan, Not } from 'typeorm';
 
 const LABEL = 'Playlists';
 /** Songs matched in one go before the requests are made. */
-const MATCH_PER_PASS = 40;
+export const MATCH_PER_PASS = 40;
 /** How often a linked playlist is read again. */
 const READ_EVERY_MS = 23 * 60 * 60_000;
 /**
@@ -59,7 +59,7 @@ const READ_EVERY_MS = 23 * 60 * 60_000;
  * again: music is added there all the time, though a song only on Spotify
  * or YouTube may never be.
  */
-const UNMATCHED_RETRY_MS = 7 * 24 * 60 * 60_000;
+export const UNMATCHED_RETRY_MS = 7 * 24 * 60 * 60_000;
 /** How close a version's length must be to the playlist's to be it. */
 const LENGTH_SLACK_MS = 8000;
 
@@ -307,12 +307,14 @@ class Playlists {
           });
         }
       } catch (e) {
+        const problem = (
+          e instanceof PlaylistSourceError ? e.message : 'It could not be read.'
+        ).slice(0, 250);
         await getRepository(MediaList).update(list.id, {
-          sourceProblem: (e instanceof PlaylistSourceError
-            ? e.message
-            : 'It could not be read.'
-          ).slice(0, 250),
+          sourceProblem: problem,
         });
+        // Told once, as it starts: it is read again each day until it can be.
+        if (!list.sourceProblem) await tellUnreadable(list, problem);
       }
     }
     this.kick();
@@ -643,4 +645,29 @@ class Playlists {
 }
 
 const playlists = new Playlists();
+/** Tells a playlist's owner its service can no longer be read. */
+const tellUnreadable = async (list: MediaList, problem: string) => {
+  try {
+    const owner = await getRepository(User).findOne({
+      where: { id: list.ownerId },
+    });
+    if (!owner) return;
+    notificationManager.sendNotification(Notification.PLAYLIST_UPDATE, {
+      subject: `${list.name}: its playlist can’t be read`,
+      message: `${problem} New songs on it aren’t requested until it can be.`,
+      notifyAdmin: false,
+      notifySystem: false,
+      notifyUser: owner,
+      actionUrl: `/lists/${list.id}`,
+      actionUrlTitle: 'View Playlist',
+    });
+  } catch (e) {
+    logger.error('Could not tell a playlist can’t be read', {
+      label: LABEL,
+      listId: list.id,
+      errorMessage: describe(e),
+    });
+  }
+};
+
 export default playlists;

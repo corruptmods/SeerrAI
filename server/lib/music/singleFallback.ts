@@ -26,7 +26,7 @@ import { In, IsNull, Not } from 'typeorm';
 const LABEL = 'Song Fetch';
 
 /** Searches started a minute, so many singles don't flood the indexers. */
-const SEARCHES_AT_ONCE = 3;
+export const SEARCHES_AT_ONCE = 3;
 
 /** Lidarr's states for a command that is over. */
 const OVER = ['completed', 'failed', 'aborted', 'cancelled', 'orphaned'];

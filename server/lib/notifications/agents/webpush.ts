@@ -14,7 +14,12 @@ import { NotificationAgentKey, getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import type { AvailableLocale } from '@server/types/languages';
 import webpush from 'web-push';
-import { Notification, shouldSendAdminNotification } from '..';
+import {
+  hasNotificationType,
+  Notification,
+  shouldSendAdminNotification,
+  WEB_PUSH_STARTING_TYPES,
+} from '..';
 import type { NotificationAgent, NotificationPayload } from './agent';
 import { BaseAgent } from './agent';
 
@@ -86,11 +91,9 @@ interface WebPushError extends Error {
 /**
  * Decides whether a user should receive a web push notification of this type.
  *
- * A user with no settings row at all defaults to enabled. A user who has a
- * settings row but has never touched the web push types resolves to a bitmask
- * of 0, which would silently opt them out of everything — including the
- * availability notification they registered their device for. Treat that
- * untouched state as enabled too; an explicit non-zero mask is still honoured.
+ * Someone who has never chosen their web push types gets the starting ones
+ * (WEB_PUSH_STARTING_TYPES), the availability notification they signed
+ * their device up for among them; a choice they saved is honoured.
  */
 export const wantsWebPush = (
   user: User | undefined,
@@ -103,24 +106,32 @@ export const wantsWebPush = (
   }
 
   const settings = user?.settings;
+  const configured = settings?.notificationTypes[NotificationAgentKey.WEBPUSH];
 
-  if (!settings) {
-    return true;
-  }
-
-  const configured = settings.notificationTypes[NotificationAgentKey.WEBPUSH];
-
-  if (configured === undefined || configured === null) {
-    return true;
+  if (!settings || configured === undefined || configured === null) {
+    return hasNotificationType(type, WEB_PUSH_STARTING_TYPES);
   }
 
   return settings.hasNotificationType(NotificationAgentKey.WEBPUSH, type);
 };
 
+/** What web push sends; each person picks theirs in their own settings. */
 const WEB_PUSH_NOTIFICATION_TYPES: number[] = [
+  Notification.MEDIA_PENDING,
+  Notification.MEDIA_APPROVED,
+  Notification.MEDIA_AUTO_APPROVED,
+  Notification.MEDIA_AUTO_REQUESTED,
+  Notification.MEDIA_DECLINED,
   Notification.MEDIA_AVAILABLE,
   Notification.MEDIA_FAILED,
+  Notification.REQUEST_FAILED,
+  Notification.ISSUE_CREATED,
+  Notification.ISSUE_COMMENT,
+  Notification.ISSUE_RESOLVED,
+  Notification.ISSUE_REOPENED,
   Notification.LIST_ACTIVITY,
+  Notification.PLAYLIST_UPDATE,
+  Notification.LEAVING_SOON,
   Notification.PLEX_REAUTH,
   Notification.BACKFILL,
   Notification.HEALTH,
@@ -196,6 +207,8 @@ class WebPushAgent
       case Notification.BACKFILL:
       case Notification.HEALTH:
       case Notification.WRONG_MATCH:
+      case Notification.PLAYLIST_UPDATE:
+      case Notification.LEAVING_SOON:
         message = payload.message;
         break;
       case Notification.MEDIA_AUTO_REQUESTED:
@@ -243,6 +256,7 @@ class WebPushAgent
         break;
       }
       case Notification.MEDIA_FAILED:
+      case Notification.REQUEST_FAILED:
         message = intl.formatMessage(messages.failed, {
           quality,
           mediaType,
@@ -320,7 +334,11 @@ class WebPushAgent
       message = intl.formatMessage(messages.downloadedBody, {
         title: payload.subject,
       });
-    } else if (type === Notification.MEDIA_FAILED && payload.subject) {
+    } else if (
+      (type === Notification.MEDIA_FAILED ||
+        type === Notification.REQUEST_FAILED) &&
+      payload.subject
+    ) {
       subject = intl.formatMessage(
         kind === MediaType.TV
           ? messages.failedTitleTv
@@ -371,9 +389,7 @@ class WebPushAgent
     type: Notification,
     payload: NotificationPayload
   ): Promise<boolean> {
-    // Web push is scoped to availability and failure notifications only. Test
-    // notifications are allowed through so the agent can still be verified
-    // from the settings page.
+    // Types web push has no words for are left out.
     if (!WEB_PUSH_NOTIFICATION_TYPES.includes(type)) {
       return true;
     }

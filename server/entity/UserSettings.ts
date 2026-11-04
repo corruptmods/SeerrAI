@@ -1,7 +1,11 @@
 import type { Appearance } from '@server/constants/theme';
 import { cleanAppearance } from '@server/constants/theme';
 import type { NotificationAgentTypes } from '@server/interfaces/api/userSettingsInterfaces';
-import { hasNotificationType, Notification } from '@server/lib/notifications';
+import {
+  hasNotificationType,
+  Notification,
+  WEB_PUSH_STARTING_TYPES,
+} from '@server/lib/notifications';
 import { NotificationAgentKey } from '@server/lib/settings';
 import {
   Column,
@@ -188,7 +192,7 @@ export class UserSettings {
           slack: 0,
           telegram: 0,
           webhook: 0,
-          webpush: ALL_NOTIFICATIONS,
+          webpush: WEB_PUSH_STARTING_TYPES,
         };
         if (!value) {
           return defaultTypes;
@@ -208,7 +212,7 @@ export class UserSettings {
         }
 
         if (values.webpush == null) {
-          values.webpush = ALL_NOTIFICATIONS;
+          values.webpush = WEB_PUSH_STARTING_TYPES;
         }
 
         return values;

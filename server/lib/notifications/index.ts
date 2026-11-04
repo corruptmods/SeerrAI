@@ -41,7 +41,39 @@ export enum Notification {
    * title, or not at all (lib/matchWatch). Admins only; told once.
    */
   WRONG_MATCH = 131072,
+  /**
+   * A playlist the person imported had songs that couldn't be got, or can
+   * no longer be read from its service. Only ever theirs; never a channel.
+   */
+  PLAYLIST_UPDATE = 262144,
+  /**
+   * The person's own request failed. Admins and channels are told of it as
+   * MEDIA_FAILED; this is the requester's copy, theirs to turn off.
+   */
+  REQUEST_FAILED = 524288,
+  /**
+   * Something the person requested is about to be deleted by Maintainerr,
+   * told once for each deletion date. Only ever theirs; never a channel.
+   */
+  LEAVING_SOON = 1048576,
 }
+
+/**
+ * What web push sends someone who hasn't chosen: availability, failures and
+ * what is theirs alone. Approvals, declines and issues are theirs to turn on.
+ */
+export const WEB_PUSH_STARTING_TYPES =
+  Notification.MEDIA_AVAILABLE |
+  Notification.MEDIA_FAILED |
+  Notification.REQUEST_FAILED |
+  Notification.LIST_ACTIVITY |
+  Notification.PLAYLIST_UPDATE |
+  Notification.LEAVING_SOON |
+  Notification.PLEX_REAUTH |
+  Notification.BACKFILL |
+  Notification.HEALTH |
+  Notification.WRONG_MATCH |
+  Notification.TEST_NOTIFICATION;
 
 export const hasNotificationType = (
   types: Notification | Notification[],
@@ -208,6 +240,25 @@ class NotificationManager {
       label: 'Notifications',
       subject: payload.subject,
     });
+
+    // A failure is the requester's own Request Failed, which they choose
+    // apart from the copies admins and channels get.
+    if (
+      type === Notification.MEDIA_FAILED &&
+      payload.notifyUser &&
+      !payload.holdUser &&
+      !payload.digest
+    ) {
+      if (payload.notifySystem || payload.notifyAdmin) {
+        this.deliver(type, { ...payload, holdUser: true });
+      }
+      this.deliver(Notification.REQUEST_FAILED, {
+        ...payload,
+        notifySystem: false,
+        notifyAdmin: false,
+      });
+      return;
+    }
 
     // A decline that came with a reason goes on its own too: the reason was
     // written for that request, and a summary of several would lose it.

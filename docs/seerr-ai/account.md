@@ -49,6 +49,11 @@ What Seerr AI adds:
 - **Series still airing**: you're told once everything that had aired when you asked is here.
 - **When it should arrive**: approval notifications say when.
 - **List Activity**: changes on a watch list shared with you.
+- **Request Failed**: one of your own requests failed. Admins choose this apart from **Request Processing Failed**, which is about everyone else's.
+- **Playlist Updates**: songs from a playlist you imported couldn't be got, or the playlist can no longer be read from its service.
+- **Leaving Soon**: something you requested is about to be deleted by Maintainerr, with how many days are left. You're told once for each date; a title kept and set to go later is told again.
+- **Web Push** has every kind. Until you choose, it sends what it always has: availability, failures and what's only yours. Approvals, declines and issues are yours to turn on.
+- On **Discord**, kinds the admin turned off for everyone are shown greyed, so you can see what's missing.
 - **Declined with a reason**: the reason is in the notification.
 - Admins also get **Backfill**, **Health** and **Wrong Match**.
 

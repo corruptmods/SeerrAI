@@ -124,6 +124,8 @@ class EmailAgent
       type === Notification.BACKFILL ||
       type === Notification.HEALTH ||
       type === Notification.WRONG_MATCH ||
+      type === Notification.PLAYLIST_UPDATE ||
+      type === Notification.LEAVING_SOON ||
       payload.digest
     ) {
       return {
@@ -199,6 +201,7 @@ class EmailAgent
           );
           break;
         case Notification.MEDIA_FAILED:
+        case Notification.REQUEST_FAILED:
           body = intl.formatMessage(
             is4k ? messages.failedRequest4k : messages.failedRequest,
             {

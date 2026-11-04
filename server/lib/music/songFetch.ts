@@ -144,10 +144,12 @@ export const rankReleases = (
       a.size - b.size
   );
 
+/** What a fetch waiting for a song download slot shows. */
+export const WAITING_FOR_SLOT = 'Waiting for another song download to finish';
 /** Results opened for their file lists, best first. */
-const MAX_OPEN = 5;
+export const MAX_OPEN = 5;
 /** Packs of an artist's releases read in one search, when nothing names the album. */
-const MAX_CATALOGS = 3;
+export const MAX_CATALOGS = 3;
 
 /** A release as a fetch keeps it. */
 type FetchRelease = NonNullable<SongFetch['release']>;
@@ -195,9 +197,9 @@ const IDLE_SLOT_MS = 15 * 60_000;
 /** Releases tried before the songs are given up on. */
 const MAX_TRIES = 3;
 /** Soulseek sharers tried before Soulseek is passed over for the songs. */
-const MAX_SOULSEEK_TRIES = 5;
+export const MAX_SOULSEEK_TRIES = 5;
 /** Songs of an album Soulseek is searched for each time, one at a time. */
-const MAX_SOULSEEK_SEARCHES = 3;
+export const MAX_SOULSEEK_SEARCHES = 3;
 /** How long a sharer's queue is waited in before another is tried. */
 const SOULSEEK_QUEUE_GIVE_UP_MS = 2 * 60 * 60_000;
 /** Times a sharer is asked again after slskd restarts mid-download. */
@@ -224,7 +226,7 @@ const LOOKUP_GIVE_UP_MS = 7 * 24 * 60 * 60_000;
  * each search that found none: indexers come and go, so the songs are
  * given up on only after about two days of finding nothing.
  */
-const SEARCH_AGAIN_MS = [1, 3, 6, 12, 24].map((hours) => hours * 60 * 60_000);
+export const SEARCH_AGAIN_MS = [1, 3, 6, 12, 24].map((hours) => hours * 60 * 60_000);
 /** How soon a search Prowlarr or an indexer couldn't answer is tried again. */
 const SEARCH_SOON_MS = 10 * 60_000;
 /** What a fetch waiting to look again shows. */
@@ -1418,7 +1420,7 @@ class SongFetcher {
       holdsSlot(other, this.watch.idleFor(other.id))
     );
     if (running.length >= getSettings().backfill.maxActiveJobs) {
-      fetch.stage = 'Waiting for another song download to finish';
+      fetch.stage = WAITING_FOR_SLOT;
       await getRepository(SongFetch).save(fetch);
       return;
     }

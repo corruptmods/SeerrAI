@@ -25,6 +25,7 @@ import {
   notifyPlaylistFailures,
   playlistOfRequests,
 } from '@server/lib/playlists/failureNotices';
+import { tellLeavingSoon } from '@server/lib/leavingSoonNotices';
 import logger from '@server/logger';
 import { In } from 'typeorm';
 
@@ -209,6 +210,8 @@ class NotificationReconciler {
       await this.reconcileFailed();
       await this.reconcileAvailable();
       await this.reconcileCaughtUp();
+      // Every half hour or so: what Maintainerr is about to delete.
+      await tellLeavingSoon();
     } catch (e) {
       logger.error('Notification reconcile failed', {
         label: 'Notifications',

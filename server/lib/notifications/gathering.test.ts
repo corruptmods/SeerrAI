@@ -322,3 +322,35 @@ describe('what a gathered "ready" says', () => {
     );
   });
 });
+
+describe('a failed request', () => {
+  it('is the requester’s Request Failed, apart from the admins’ and channels’ copy', () => {
+    notificationManager.sendNotification(
+      Notification.MEDIA_FAILED,
+      available('Zelvara (2021)')
+    );
+    assert.deepEqual(
+      sent.map((s) => [
+        Notification[s.type],
+        !!s.payload.holdUser,
+        s.payload.notifySystem,
+        s.payload.notifyAdmin,
+      ]),
+      [
+        ['MEDIA_FAILED', true, true, true],
+        ['REQUEST_FAILED', false, false, false],
+      ]
+    );
+  });
+
+  it('with no one to tell but admins goes as it is', () => {
+    notificationManager.sendNotification(Notification.MEDIA_FAILED, {
+      ...available('Zelvara (2021)'),
+      notifyUser: undefined,
+    });
+    assert.deepEqual(
+      sent.map((s) => Notification[s.type]),
+      ['MEDIA_FAILED']
+    );
+  });
+});

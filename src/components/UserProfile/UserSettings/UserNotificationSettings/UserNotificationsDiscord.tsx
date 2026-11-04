@@ -225,6 +225,7 @@ const UserNotificationsDiscord = () => {
             <NotificationTypeSelector
               user={user}
               enabledTypes={data?.discordEnabledTypes ?? 0}
+              channel
               currentTypes={values.types}
               onUpdate={(newTypes) => {
                 setFieldValue('types', newTypes);

@@ -142,6 +142,7 @@ class PushoverAgent
           priority = 1;
           break;
         case Notification.MEDIA_FAILED:
+        case Notification.REQUEST_FAILED:
           status = intl.formatMessage(globalMessages.failed);
           priority = 1;
           break;

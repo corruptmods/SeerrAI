@@ -15,7 +15,7 @@ import {
 } from '@server/entity/MediaRequest';
 import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
-import notificationManager from '@server/lib/notifications';
+import notificationManager, { Notification } from '@server/lib/notifications';
 import { Permission } from '@server/lib/permissions';
 import playlists, { versionFor } from '@server/lib/playlists';
 import {
@@ -773,13 +773,19 @@ describe('a playlist’s songs that couldn’t be got', () => {
     });
     const listOf = await playlistOfRequests(failed.map((r) => r.id));
     assert.equal(listOf.get(request.id), list.id);
-    const told: { subject: string; actionUrl?: string; message?: string }[] =
-      [];
+    const told: {
+      type: Notification;
+      subject: string;
+      actionUrl?: string;
+      message?: string;
+      holdUser?: boolean;
+      notifyAdmin?: boolean;
+    }[] = [];
     mock.method(
       notificationManager,
       'sendNotification',
-      (_type: unknown, payload: (typeof told)[number]) => {
-        told.push(payload);
+      (type: Notification, payload: Omit<(typeof told)[number], 'type'>) => {
+        told.push({ type, ...payload });
       }
     );
     const failedAt = new Date(failed[0].updatedAt).getTime();
@@ -788,15 +794,66 @@ describe('a playlist’s songs that couldn’t be got', () => {
     await notifyPlaylistFailures(failed, listOf, failedAt + 60_000);
     assert.equal(told.length, 0);
 
-    // Settled: one, for the playlist, naming the song that failed.
+    // Settled: one for admins and channels, naming the song that failed,
+    // and the owner's own, by Playlist Updates.
     await notifyPlaylistFailures(failed, listOf, failedAt + QUIET_MS);
-    assert.equal(told.length, 1);
-    assert.equal(told[0].subject, 'Playlist import — 1 song');
-    assert.equal(told[0].message, 'Lantern Song (radio edit) — Glasswing');
-    assert.equal(told[0].actionUrl, `/lists/${list.id}`);
+    assert.equal(told.length, 2);
+    const [admins, owner] = told;
+    assert.equal(admins.type, Notification.MEDIA_FAILED);
+    assert.equal(admins.holdUser, true);
+    assert.equal(admins.subject, 'Playlist import — 1 song');
+    assert.equal(admins.message, 'Lantern Song (radio edit) — Glasswing');
+    assert.equal(admins.actionUrl, `/lists/${list.id}`);
+    assert.equal(owner.type, Notification.PLAYLIST_UPDATE);
+    assert.equal(owner.notifyAdmin, false);
+    assert.equal(owner.subject, `${list.name}: 1 song couldn’t be got`);
+    assert.equal(owner.message, 'Lantern Song (radio edit) — Glasswing');
+    assert.equal(owner.actionUrl, `/lists/${list.id}`);
 
     // Told once.
     await notifyPlaylistFailures(failed, listOf, failedAt + LONGEST_MS);
+    assert.equal(told.length, 2);
+  });
+});
+
+describe('a linked playlist that can’t be read', () => {
+  it('is told to its owner once, as it starts', async () => {
+    const list = await linked();
+    await getRepository(MediaList).update(list.id, {
+      sourceReadAt: new Date(Date.now() - 2 * 24 * 60 * 60_000),
+    });
+    const told: { type: Notification; subject: string; userId?: number }[] = [];
+    mock.method(
+      notificationManager,
+      'sendNotification',
+      (
+        type: Notification,
+        payload: { subject: string; notifyUser?: { id: number } }
+      ) => {
+        told.push({
+          type,
+          subject: payload.subject,
+          userId: payload.notifyUser?.id,
+        });
+      }
+    );
+    mock.method(axios, 'get', async () => {
+      throw new Error('Request failed with status code 404');
+    });
+
+    await playlists.sync();
+    await playlists.settled();
+    assert.deepEqual(told, [
+      {
+        type: Notification.PLAYLIST_UPDATE,
+        subject: `${list.name}: its playlist can’t be read`,
+        userId: user.id,
+      },
+    ]);
+
+    // Still unreadable the next time: not told again.
+    await playlists.sync();
+    await playlists.settled();
     assert.equal(told.length, 1);
   });
 });

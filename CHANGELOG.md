@@ -26,7 +26,13 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - **Search again now** on a playlist's page: albums of its songs that found nothing yet, waiting hours to be searched again, are searched straight away.
 
+- **More notifications you choose yourself**: **Request Failed** (your own requests, apart from the failures admins hear about), **Playlist Updates** (songs from your imported playlist that couldn't be got, or a playlist that can no longer be read) and **Leaving Soon** (something you requested that Maintainerr is about to delete). Each is on for whoever already got the notifications they come from.
+
+- **Web push has every notification**: approvals, declines, issues and the rest can be turned on in your own settings. What you had stays as it was.
+
 ### Changed
+
+- **Discord, in your notification settings**, shows the kinds an admin turned off for everyone greyed, instead of leaving them out.
 
 - **Settings → Services**: Prowlarr, Soulseek and Trakt are tiles with Edit and Delete, like the other services, and every service is listed first, one after another. The anime settings and Anime Check sit together in a section of their own below.
 

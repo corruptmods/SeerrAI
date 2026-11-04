@@ -27,8 +27,16 @@ const messages = defineMessages('components.NotificationTypeSelector', {
   usermediaavailableDescription: 'When your requests become available.',
   mediafailed: 'Request Processing Failed',
   mediafailedDescription: 'When requests can’t be added to Radarr or Sonarr.',
-  usermediafailedDescription:
-    'When requests can’t be added to Radarr or Sonarr.',
+  usermediafailedDescription: 'When other users’ requests fail.',
+  requestFailed: 'Request Failed',
+  requestFailedDescription: 'When a request of yours fails.',
+  playlistUpdate: 'Playlist Updates',
+  playlistUpdateDescription:
+    'When songs from a playlist you imported can’t be got, or the playlist can no longer be read.',
+  leavingSoon: 'Leaving Soon',
+  leavingSoonDescription:
+    'When something you requested is about to be deleted.',
+  turnedOff: 'Turned off for everyone in Settings → Notifications.',
   mediadeclined: 'Request Declined',
   mediadeclinedDescription: 'When requests are declined.',
   usermediadeclinedDescription: 'When your requests are declined.',
@@ -112,11 +120,28 @@ export enum Notification {
   BACKFILL = 32768,
   HEALTH = 65536,
   WRONG_MATCH = 131072,
+  PLAYLIST_UPDATE = 262144,
+  REQUEST_FAILED = 524288,
+  LEAVING_SOON = 1048576,
 }
 
 export const ALL_NOTIFICATIONS = Object.values(Notification)
   .filter((v) => !isNaN(Number(v)))
   .reduce((a, v) => a + Number(v), 0);
+
+/** What web push sends someone who hasn't chosen (as the server does). */
+export const WEB_PUSH_STARTING_TYPES =
+  Notification.MEDIA_AVAILABLE |
+  Notification.MEDIA_FAILED |
+  Notification.REQUEST_FAILED |
+  Notification.LIST_ACTIVITY |
+  Notification.PLAYLIST_UPDATE |
+  Notification.LEAVING_SOON |
+  Notification.PLEX_REAUTH |
+  Notification.BACKFILL |
+  Notification.HEALTH |
+  Notification.WRONG_MATCH |
+  Notification.TEST_NOTIFICATION;
 
 export interface NotificationItem {
   id: string;
@@ -126,6 +151,10 @@ export interface NotificationItem {
   hasNotifyUser: boolean;
   children?: NotificationItem[];
   hidden?: boolean;
+  /** Only ever the person's own, never sent to a shared channel. */
+  personal?: boolean;
+  /** Shown, but turned off for everyone by the admin. */
+  turnedOff?: boolean;
 }
 
 interface NotificationTypeSelectorProps {
@@ -134,6 +163,12 @@ interface NotificationTypeSelectorProps {
   currentTypes: number;
   onUpdate: (newTypes: number) => void;
   error?: string;
+  /**
+   * The person is told in a shared channel (Discord): their own types,
+   * which never reach a channel, are left out, and those the admin turned
+   * off are shown greyed rather than hidden.
+   */
+  channel?: boolean;
 }
 
 const NotificationTypeSelector = ({
@@ -142,6 +177,7 @@ const NotificationTypeSelector = ({
   currentTypes,
   onUpdate,
   error,
+  channel = false,
 }: NotificationTypeSelectorProps) => {
   const intl = useIntl();
   const settings = useSettings();
@@ -278,6 +314,25 @@ const NotificationTypeSelector = ({
         // Only ever sent to the people a list is shared with, through their
         // own settings: a channel never gets it.
         hidden: !user,
+        personal: true,
+      },
+      {
+        id: 'playlist-update',
+        name: intl.formatMessage(messages.playlistUpdate),
+        description: intl.formatMessage(messages.playlistUpdateDescription),
+        value: Notification.PLAYLIST_UPDATE,
+        hasNotifyUser: true,
+        hidden: !user,
+        personal: true,
+      },
+      {
+        id: 'leaving-soon',
+        name: intl.formatMessage(messages.leavingSoon),
+        description: intl.formatMessage(messages.leavingSoonDescription),
+        value: Notification.LEAVING_SOON,
+        hasNotifyUser: true,
+        hidden: !user,
+        personal: true,
       },
       {
         id: 'media-available',
@@ -301,6 +356,15 @@ const NotificationTypeSelector = ({
         value: Notification.MEDIA_FAILED,
         hidden: user && !hasPermission(Permission.MANAGE_REQUESTS),
         hasNotifyUser: false,
+      },
+      {
+        id: 'request-failed',
+        name: intl.formatMessage(messages.requestFailed),
+        description: intl.formatMessage(messages.requestFailedDescription),
+        value: Notification.REQUEST_FAILED,
+        hasNotifyUser: true,
+        hidden: !user,
+        personal: true,
       },
       {
         id: 'issue-created',
@@ -405,19 +469,39 @@ const NotificationTypeSelector = ({
       },
     ];
 
-    const filteredTypes = types.filter(
-      (type) => !type.hidden && hasNotificationType(type.value, enabledTypes)
+    const shown = types.filter((type) => !type.hidden);
+    const filteredTypes = (
+      channel ? shown.filter((type) => !type.personal) : shown
+    ).flatMap((type) =>
+      hasNotificationType(type.value, enabledTypes)
+        ? [type]
+        : channel
+          ? [{ ...type, turnedOff: true }]
+          : []
     );
 
-    const newAllowedTypes = filteredTypes.reduce((a, v) => a + v.value, 0);
+    const newAllowedTypes = filteredTypes
+      .filter((type) => !type.turnedOff)
+      .reduce((a, v) => a + v.value, 0);
     if (newAllowedTypes !== allowedTypes) {
       setAllowedTypes(newAllowedTypes);
     }
 
-    return user
-      ? sortBy(filteredTypes, 'hasNotifyUser', 'DESC')
-      : filteredTypes;
-  }, [user, hasPermission, settings, intl, allowedTypes, enabledTypes]);
+    // What the admin turned off goes last, after what can be chosen.
+    return sortBy(
+      filteredTypes,
+      (type) => (type.turnedOff ? 1 : 0),
+      ...(user ? [(type: NotificationItem) => type.hasNotifyUser] : [])
+    );
+  }, [
+    user,
+    hasPermission,
+    settings,
+    intl,
+    allowedTypes,
+    enabledTypes,
+    channel,
+  ]);
 
   if (!availableTypes.length) {
     return null;
@@ -438,6 +522,7 @@ const NotificationTypeSelector = ({
                 option={type}
                 currentTypes={currentTypes}
                 onUpdate={onUpdate}
+                turnedOffNote={intl.formatMessage(messages.turnedOff)}
               />
             ))}
           </div>

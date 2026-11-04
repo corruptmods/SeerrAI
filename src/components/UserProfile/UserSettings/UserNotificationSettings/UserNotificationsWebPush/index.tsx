@@ -3,8 +3,7 @@ import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
 import SaveBar from '@app/components/Common/SaveBar';
 import NotificationTypeSelector, {
-  ALL_NOTIFICATIONS,
-  Notification,
+  WEB_PUSH_STARTING_TYPES,
 } from '@app/components/NotificationTypeSelector';
 import DeviceItem from '@app/components/UserProfile/UserSettings/UserNotificationSettings/UserNotificationsWebPush/DeviceItem';
 import useSettings from '@app/hooks/useSettings';
@@ -242,7 +241,7 @@ const UserWebPushSettings = () => {
     <>
       <Formik
         initialValues={{
-          types: data?.notificationTypes.webpush ?? ALL_NOTIFICATIONS,
+          types: data?.notificationTypes.webpush ?? WEB_PUSH_STARTING_TYPES,
         }}
         enableReinitialize
         onSubmit={async (values) => {
@@ -290,14 +289,6 @@ const UserWebPushSettings = () => {
             <Form className="section">
               <NotificationTypeSelector
                 user={user}
-                enabledTypes={
-                  Notification.MEDIA_AVAILABLE |
-                  Notification.MEDIA_FAILED |
-                  Notification.LIST_ACTIVITY |
-                  Notification.BACKFILL |
-                  Notification.HEALTH |
-                  Notification.WRONG_MATCH
-                }
                 currentTypes={values.types}
                 onUpdate={(newTypes) => {
                   setFieldValue('types', newTypes);

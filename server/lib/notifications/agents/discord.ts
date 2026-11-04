@@ -137,6 +137,7 @@ class DiscordAgent
           status = intl.formatMessage(globalMessages.declined);
           break;
         case Notification.MEDIA_FAILED:
+        case Notification.REQUEST_FAILED:
           color = EmbedColors.RED;
           status = intl.formatMessage(globalMessages.failed);
           break;

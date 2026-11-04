@@ -32,6 +32,7 @@ import { requestAvailableEvent } from '@server/lib/notifications/eventTitles';
 import { radarrRouting } from '@server/lib/radarrRouting';
 import { markUndispatchable } from '@server/lib/requestDispatch';
 import {
+  chosenServerFor,
   describeServerIssue,
   requestServerIssue,
 } from '@server/lib/requestServers';
@@ -627,9 +628,10 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           entity.serverId >= 0 &&
           radarrSettings?.id !== entity.serverId
         ) {
-          radarrSettings = settings.radarr.find(
-            (radarr) => radarr.id === entity.serverId
-          );
+          // Of its 4K kind: requestServerIssue has made sure there is one.
+          radarrSettings = chosenServerFor(entity, settings) as
+            | typeof radarrSettings
+            | undefined;
           logger.info(
             `Request has an override server: ${radarrSettings?.name}`,
             {
@@ -907,9 +909,10 @@ export class MediaRequestSubscriber implements EntitySubscriberInterface<MediaRe
           entity.serverId >= 0 &&
           sonarrSettings?.id !== entity.serverId
         ) {
-          sonarrSettings = settings.sonarr.find(
-            (sonarr) => sonarr.id === entity.serverId
-          );
+          // Of its 4K kind: requestServerIssue has made sure there is one.
+          sonarrSettings = chosenServerFor(entity, settings) as
+            | typeof sonarrSettings
+            | undefined;
           logger.info(
             `Request has an override server: ${sonarrSettings?.name}`,
             {

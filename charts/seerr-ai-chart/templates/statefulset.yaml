@@ -5,6 +5,11 @@ metadata:
   labels:
     {{- include "seerr.labels" . | nindent 4 }}
 spec:
+  {{- $replicas := int .Values.replicaCount }}
+  {{- if or (lt $replicas 0) (gt $replicas 1) }}
+  {{- fail "replicaCount must be 0 or 1: Seerr AI keeps its database in one volume and runs as one pod" }}
+  {{- end }}
+  replicas: {{ $replicas }}
   serviceName: {{ include "seerr.fullname" . }}
   selector:
     matchLabels:

@@ -30,7 +30,10 @@ import overrideRules from '@server/lib/overrideRules';
 import { Permission } from '@server/lib/permissions';
 import { expectedOnApproval } from '@server/lib/requestEta';
 import type { RequestServerIssue } from '@server/lib/requestServers';
-import { requestServerIssue } from '@server/lib/requestServers';
+import {
+  chosenServerFor,
+  requestServerIssue,
+} from '@server/lib/requestServers';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { DbAwareColumn, resolveDbType } from '@server/utils/DbColumnHelper';
@@ -890,11 +893,14 @@ export class MediaRequest {
         : toSeriesTypeFor(requestBody.mediaType, requestBody.seriesType);
     // Rules belong to a server, so they are matched against the one the
     // request goes to: the server chosen with it, or else the default one.
-    const chosenServerId = (
-      requestBody.mediaType === MediaType.MOVIE
-        ? settings.radarr
-        : settings.sonarr
-    ).find((server) => server.id === requestBody.serverId)?.id;
+    const chosenServerId = chosenServerFor(
+      {
+        type: requestBody.mediaType,
+        serverId: requestBody.serverId,
+        is4k: requestBody.is4k,
+      },
+      settings
+    )?.id;
     const ruleResult = await overrideRules({
       mediaType: requestBody.mediaType,
       is4k: requestBody.is4k || false,

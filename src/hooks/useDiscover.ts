@@ -1,6 +1,7 @@
 import useTitleChanged, { pageHolds } from '@app/hooks/useTitleChanged';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
+import { START_PAGES, listProgress } from '@app/utils/discoverPages';
 import { MediaStatus } from '@server/constants/media';
 import { useEffect } from 'react';
 import { useIntl } from 'react-intl';
@@ -103,7 +104,6 @@ const useDiscover = <
       return `${endpoint}?${finalQueryString}`;
     },
     {
-      initialSize: 3,
       revalidateFirstPage: false,
       dedupingInterval: 30000,
       revalidateOnFocus: false,
@@ -122,16 +122,12 @@ const useDiscover = <
   const resultIds = new Set<string>();
 
   const isLoadingInitialData = !data && !error;
-  const isLoadingMore =
+  const loadingPages =
     isLoadingInitialData ||
     (size > 0 &&
       !!data &&
       typeof data[size - 1] === 'undefined' &&
       isValidating);
-
-  const fetchMore = () => {
-    setSize(size + 1);
-  };
 
   let titles = (data ?? []).reduce((a, v) => {
     // A page without its list is passed over, as in MediaSlider.
@@ -185,28 +181,35 @@ const useDiscover = <
     });
   }
 
-  const lastPage = data?.[data.length - 1];
-  const onLastPage = !!data && !!lastPage && data.length >= lastPage.totalPages;
-  const isEmpty =
-    !isLoadingInitialData &&
-    titles?.length === 0 &&
-    (!shortPages || onLastPage);
-  const isReachingEnd = shortPages
-    ? isEmpty || onLastPage
-    : isEmpty ||
-      // No page past the last one the server counts is ever asked for. A page
-      // can hold more than 20 (search adds collections to each), so the
-      // counts below alone could leave this waiting for a page never asked.
-      (!!data && !!lastPage && data.length >= lastPage.totalPages) ||
-      (!!data && (data[data?.length - 1]?.results.length ?? 0) < 20) ||
-      (!!data && (data[data?.length - 1]?.totalResults ?? 0) <= size * 20) ||
-      (!!data && (data[data?.length - 1]?.totalResults ?? 0) < 41);
+  const { starting, isEmpty, isReachingEnd } = listProgress({
+    pages: data,
+    loadingFirst: isLoadingInitialData,
+    size,
+    titlesShown: titles.length,
+    shortPages,
+  });
+
+  // The first page is shown; the rest the list starts with are asked for.
+  useEffect(() => {
+    if (starting && size < START_PAGES) {
+      setSize(START_PAGES);
+    }
+  }, [starting, size, setSize]);
+
+  // Those pages count as loading more, so scrolling waits for them rather
+  // than asking for the second page a second time.
+  const isLoadingMore = loadingPages || (starting && !error);
+
+  const fetchMore = () => {
+    setSize(starting ? Math.max(size, START_PAGES) : size + 1);
+  };
 
   // Too few titles to scroll by: the next page is asked for straight away,
   // as scrolling could never ask for it (a few pages at most).
   useEffect(() => {
     if (
       shortPages &&
+      !starting &&
       !isReachingEnd &&
       !isLoadingMore &&
       !error &&
@@ -217,6 +220,7 @@ const useDiscover = <
     }
   }, [
     shortPages,
+    starting,
     isReachingEnd,
     isLoadingMore,
     error,

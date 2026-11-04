@@ -55,10 +55,10 @@ const MediaSlider = ({
         extraParams ? `&${extraParams}` : ''
       }`;
     },
-    {
-      initialSize: 2,
-      revalidateFirstPage: false,
-    }
+    // One page first, so its posters show as soon as it arrives; the next,
+    // for the card that leads to the rest, is asked for then (below). Asked
+    // for together, neither shows until both are in.
+    { revalidateFirstPage: false }
   );
 
   // After a request from one of these cards, reload only the pages that
@@ -104,10 +104,13 @@ const MediaSlider = ({
   }
 
   useEffect(() => {
+    // One page more at a time, once the last one asked for is in.
     if (
+      !!data &&
+      data.length >= size &&
       titles.length < 24 &&
       size < 5 &&
-      (data?.[0]?.totalResults ?? 0) > size * 20
+      (data[0]?.totalResults ?? 0) > size * 20
     ) {
       setSize(size + 1);
     }

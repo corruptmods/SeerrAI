@@ -91,35 +91,69 @@ export const defaultServerFor = (
 };
 
 /**
- * Whether the server a server id names still exists, among those of the
- * request's kind. Ids are only unique within a kind.
+ * Whether a server can be chosen for a request: why not, or nothing when it
+ * can. It must be one of the request's kind and take its kind of request: a
+ * 4K Radarr or Sonarr only 4K ones, and the others none, so choosing a
+ * server never gets anyone round the 4K permissions. With no server of the
+ * kind at all, the id means nothing and anything goes (see above).
  */
-export const serverExists = (
-  type: MediaType,
-  serverId: number,
+export const chosenServerProblem = (
+  request: RoutedRequest,
   settings: Settings = getSettings()
-): boolean => {
-  const service = serviceFor(type);
-  return (
-    !!service &&
-    serversFor(service, settings).some((server) => server.id === serverId)
-  );
+): 'unknown' | 'only4k' | 'not4k' | undefined => {
+  const service = serviceFor(request.type);
+  const chosen = chosenServer(request);
+  if (!service || chosen === undefined) {
+    return undefined;
+  }
+  const servers = serversFor(service, settings);
+  if (!servers.length) {
+    return undefined;
+  }
+  const server = servers.find((candidate) => candidate.id === chosen);
+  if (!server) {
+    return 'unknown';
+  }
+  if (sameTier(service, server, !!request.is4k)) {
+    return undefined;
+  }
+  return request.is4k ? 'not4k' : 'only4k';
 };
 
-/** Whether any server of the kind a request goes to is set up. */
-export const hasServersFor = (
-  type: MediaType,
+/** What the person choosing a server is told when it can't be chosen. */
+export const CHOSEN_SERVER_MESSAGES: Record<
+  NonNullable<ReturnType<typeof chosenServerProblem>>,
+  string
+> = {
+  unknown: 'That server no longer exists. Choose another.',
+  only4k: 'That server takes only 4K requests. Choose another.',
+  not4k: 'That server doesn’t take 4K requests. Choose a 4K server.',
+};
+
+/**
+ * The server chosen for a request, when it is one the request can go to:
+ * of its kind, and 4K if the request is (see chosenServerProblem).
+ */
+export const chosenServerFor = (
+  request: RoutedRequest,
   settings: Settings = getSettings()
-): boolean => {
-  const service = serviceFor(type);
-  return !!service && serversFor(service, settings).length > 0;
+): DVRSettings | LidarrSettings | undefined => {
+  const service = serviceFor(request.type);
+  const chosen = chosenServer(request);
+  return service && chosen !== undefined
+    ? serversFor(service, settings).find(
+        (server) =>
+          server.id === chosen && sameTier(service, server, !!request.is4k)
+      )
+    : undefined;
 };
 
 /**
  * Why a request has no server to go to, or nothing when it has one: the one
  * chosen for it, else the default of its kind. As the request is sent:
- * a chosen server is found by its id alone, the default must match 4K.
- * Nothing either when there is no server of its kind at all (see above).
+ * either must match 4K, so a chosen server of the other kind counts as gone
+ * (only a request made before that was checked can have one). Nothing
+ * either when there is no server of its kind at all (see above).
  */
 export const requestServerIssue = (
   request: RoutedRequest,
@@ -135,7 +169,7 @@ export const requestServerIssue = (
   }
   const chosen = chosenServer(request);
 
-  if (chosen !== undefined && servers.some((server) => server.id === chosen)) {
+  if (chosen !== undefined && chosenServerFor(request, settings)) {
     return undefined;
   }
   const fallback = defaultServerFor(request, settings);

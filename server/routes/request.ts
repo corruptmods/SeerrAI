@@ -55,10 +55,10 @@ import {
 import { defaultRegion, estimateRequest } from '@server/lib/requestEta';
 import { requestMissing } from '@server/lib/requestMissing';
 import {
+  CHOSEN_SERVER_MESSAGES,
+  chosenServerProblem,
   defaultServerFor,
-  hasServersFor,
   requestServerIssue,
-  serverExists,
   serviceName,
 } from '@server/lib/requestServers';
 import { getSettings } from '@server/lib/settings';
@@ -631,10 +631,22 @@ requestRoutes.post<never, MediaRequest, MediaRequestBody>(
       if (!getSettings().main.partialRequestsEnabled) {
         delete req.body.episodes;
       }
+      const advanced = mayChooseAdvancedOptions(req.user);
+      const serverProblem = advanced
+        ? chosenServerProblem({
+            type: req.body.mediaType,
+            serverId: req.body.serverId,
+            is4k: req.body.is4k,
+          })
+        : undefined;
+      if (serverProblem) {
+        return next({
+          status: 400,
+          message: CHOSEN_SERVER_MESSAGES[serverProblem],
+        });
+      }
       const request = await MediaRequest.request(
-        mayChooseAdvancedOptions(req.user)
-          ? req.body
-          : withoutAdvancedOptions(req.body),
+        advanced ? req.body : withoutAdvancedOptions(req.body),
         req.user
       );
 
@@ -677,10 +689,21 @@ requestRoutes.post<never, MediaRequest, MusicRequestBody>(
           message: 'You must be logged in to request media.',
         });
       }
+      const advanced = mayChooseAdvancedOptions(req.user);
+      const serverProblem = advanced
+        ? chosenServerProblem({
+            type: MediaType.MUSIC,
+            serverId: req.body.serverId,
+          })
+        : undefined;
+      if (serverProblem) {
+        return next({
+          status: 400,
+          message: CHOSEN_SERVER_MESSAGES[serverProblem],
+        });
+      }
       const request = await MediaRequest.requestMusic(
-        mayChooseAdvancedOptions(req.user)
-          ? req.body
-          : musicWithoutAdvancedOptions(req.body),
+        advanced ? req.body : musicWithoutAdvancedOptions(req.body),
         req.user
       );
 
@@ -1318,22 +1341,23 @@ requestRoutes.put<{ requestId: string }>(
           });
         }
 
-        // A server it does not already have must exist. The one it has is
-        // kept even if it was removed, so changing seasons still works;
-        // Retry then sends it to the default server. With no server of its
-        // kind at all (requests fulfilled by hand), the id means nothing
-        // and is kept as given, as before.
-        if (
-          req.body.serverId !== undefined &&
-          req.body.serverId !== null &&
-          req.body.serverId >= 0 &&
-          req.body.serverId !== request.serverId &&
-          hasServersFor(request.type) &&
-          !serverExists(request.type, req.body.serverId)
-        ) {
+        // A server it does not already have must exist, and take its kind
+        // of request (4K or not). The one it has is kept even if it was
+        // removed, so changing seasons still works; Retry then sends it to
+        // the default server. With no server of its kind at all (requests
+        // fulfilled by hand), the id means nothing and is kept as given.
+        const serverProblem =
+          req.body.serverId !== request.serverId
+            ? chosenServerProblem({
+                type: request.type,
+                serverId: req.body.serverId,
+                is4k: request.is4k,
+              })
+            : undefined;
+        if (serverProblem) {
           return next({
             status: 400,
-            message: 'That server no longer exists. Choose another.',
+            message: CHOSEN_SERVER_MESSAGES[serverProblem],
           });
         }
 
@@ -1434,9 +1458,11 @@ requestRoutes.put<{ requestId: string }>(
             const requestedSeasons = req.body.seasons as number[] | undefined;
 
             if (!requestedSeasons || requestedSeasons.length === 0) {
-              throw new Error(
-                'Missing seasons. If you want to cancel a series request, use the DELETE method.'
-              );
+              return next({
+                status: 400,
+                message:
+                  'Missing seasons. If you want to cancel a series request, use the DELETE method.',
+              });
             }
 
             // Same key as create, so an edit cannot claim a season that a new

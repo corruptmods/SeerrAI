@@ -443,6 +443,16 @@ describe('POST /request/music', () => {
     assert.equal(request.rootFolder, '/flac');
   });
 
+  it('refuses a Lidarr server that is gone', async () => {
+    await actAs(Permission.REQUEST + Permission.REQUEST_ADVANCED, 'adv@x');
+    const res = await requestMusic({
+      albums: [STATIC_GARDEN],
+      serverId: 404,
+    });
+    assert.equal(res.status, 400);
+    assert.match((res.body as { message: string }).message, /no longer exists/);
+  });
+
   it('is refused while music is off or not set up', async () => {
     getSettings().main.disabledFeatures = ['music'];
     assert.equal((await requestMusic({ albums: [STATIC_GARDEN] })).status, 403);

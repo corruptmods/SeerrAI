@@ -63,7 +63,7 @@ A Helm chart, signed like the images, installs Seerr AI on Kubernetes:
 helm install seerr-ai oci://ghcr.io/corruptmods/seerr-ai-chart
 ```
 
-It runs one pod (a StatefulSet: the database is in its `config` volume, 5 Gi to start), reached through its service on port 80, or an ingress or Gateway API route you turn on. Set the time zone, or a PostgreSQL database, with `extraEnv` (`TZ`, `DB_TYPE`, `DB_HOST` and so on, as above). Every setting is in the [chart's README](../../charts/seerr-ai-chart/README.md). To check a chart before installing it:
+It runs one pod (a StatefulSet: the database is in its `config` volume, 5 Gi to start; `replicaCount: 0` stops it and keeps the volume), reached through its service on port 80, or an ingress or Gateway API route you turn on. Set the time zone, or a PostgreSQL database, with `extraEnv` (`TZ`, `DB_TYPE`, `DB_HOST` and so on, as above). Every setting is in the [chart's README](../../charts/seerr-ai-chart/README.md). To check a chart before installing it:
 
 ```bash
 cosign verify ghcr.io/corruptmods/seerr-ai-chart:1.1.0 \

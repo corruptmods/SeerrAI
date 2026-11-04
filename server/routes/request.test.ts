@@ -360,6 +360,28 @@ describe('PUT /request/:requestId (movie)', () => {
     assert.strictEqual(saved.rootFolder, '/updated/movies');
   });
 
+  it('refuses to move a request to a 4K server', async () => {
+    configureRadarr([
+      { id: 1, isDefault: true, is4k: false },
+      { id: 2, isDefault: true, is4k: true },
+    ]);
+    const mediaRequest = await seedRequest();
+
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const res = await agent.put(`/request/${mediaRequest.id}`).send({
+      mediaType: MediaType.MOVIE,
+      serverId: 2,
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.match(res.body.message, /only 4K requests/);
+    const saved = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: mediaRequest.id },
+    });
+    assert.strictEqual(saved.serverId, null);
+    getSettings().radarr = [];
+  });
+
   it('refuses to modify a request that is no longer pending', async () => {
     const requestRepo = getRepository(MediaRequest);
     const mediaRequest = await seedRequest(MediaRequestStatus.APPROVED);
@@ -454,6 +476,24 @@ async function seedTvRequest(
 }
 
 describe('PUT /request/:requestId (tv)', () => {
+  it('answers 400, changing nothing, when no seasons are left', async () => {
+    const owner = await seedUser('admin@seerr.dev');
+    const mediaRequest = await seedTvRequest(owner, [1, 2]);
+
+    const agent = await loginAs('admin@seerr.dev', 'test1234');
+    const res = await agent.put(`/request/${mediaRequest.id}`).send({
+      mediaType: MediaType.TV,
+      seasons: [],
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.match(res.body.message, /Missing seasons/);
+    const saved = await getRepository(MediaRequest).findOneOrFail({
+      where: { id: mediaRequest.id },
+    });
+    assert.strictEqual(saved.seasons.length, 2);
+  });
+
   it('does not add a season held by another request', async () => {
     const requestRepo = getRepository(MediaRequest);
 
@@ -1441,7 +1481,7 @@ describe('POST /request, override rules for the chosen server', () => {
     assert.strictEqual(res.body.rootFolder, null);
   });
 
-  it("uses the default Radarr server's rule when the chosen one is gone", async () => {
+  it('refuses a Radarr server that is gone, rather than a request that would fail', async () => {
     configureRadarr([{ id: 1, isDefault: true, is4k: false }]);
     getSettings().sonarr = [];
     await friendWithRuleFor({
@@ -1456,8 +1496,90 @@ describe('POST /request, override rules for the chosen server', () => {
       serverId: 7,
     });
 
+    assert.strictEqual(res.status, 400);
+    assert.match(res.body.message, /no longer exists/);
+    assert.strictEqual(
+      await getRepository(MediaRequest).count({
+        where: { media: { tmdbId: 88023 } },
+      }),
+      0
+    );
+  });
+
+  it('refuses a 4K Radarr server for a request that is not 4K', async () => {
+    configureRadarr([
+      { id: 1, isDefault: true, is4k: false },
+      { id: 2, isDefault: true, is4k: true },
+    ]);
+    getSettings().sonarr = [];
+    await friendWithRuleFor({ radarrServiceId: 2, rootFolder: '/4k/movies' });
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.post('/request').send({
+      mediaType: MediaType.MOVIE,
+      mediaId: 88024,
+      serverId: 2,
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.match(res.body.message, /only 4K requests/);
+  });
+
+  it('refuses a Sonarr server that is not 4K for a 4K request', async () => {
+    configureSonarr([
+      { id: 1, isDefault: true, is4k: false },
+      { id: 2, isDefault: true, is4k: true },
+    ]);
+    getSettings().radarr = [];
+    await friendWithRuleFor({ sonarrServiceId: 1, rootFolder: '/tv' });
+    const userRepo = getRepository(User);
+    const friend = await userRepo.findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+    friend.permissions |= Permission.REQUEST_4K;
+    await userRepo.save(friend);
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.post('/request').send({
+      mediaType: MediaType.TV,
+      mediaId: 88025,
+      seasons: [1],
+      is4k: true,
+      serverId: 1,
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.match(res.body.message, /Choose a 4K server/);
+  });
+
+  it('never lets someone without the advanced options choose a server', async () => {
+    configureRadarr([
+      { id: 1, isDefault: true, is4k: false },
+      { id: 2, isDefault: true, is4k: true },
+    ]);
+    getSettings().sonarr = [];
+    const userRepo = getRepository(User);
+    const friend = await userRepo.findOneOrFail({
+      where: { email: 'friend@seerr.dev' },
+    });
+    friend.permissions = Permission.REQUEST;
+    await userRepo.save(friend);
+
+    const agent = await loginAs('friend@seerr.dev', 'test1234');
+    const res = await agent.post('/request').send({
+      mediaType: MediaType.MOVIE,
+      mediaId: 88026,
+      serverId: 2,
+      profileId: 99,
+      rootFolder: '/elsewhere',
+      tags: [5],
+    });
+
     assert.strictEqual(res.status, 201);
-    assert.strictEqual(res.body.rootFolder, '/default/movies');
+    assert.strictEqual(res.body.serverId, null);
+    assert.strictEqual(res.body.profileId, null);
+    assert.strictEqual(res.body.rootFolder, null);
+    assert.strictEqual(res.body.is4k, false);
   });
 
   it('applies the rule for the Sonarr server a series is sent to', async () => {

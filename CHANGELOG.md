@@ -36,6 +36,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Changed
 
+- **Posters show sooner**: Discover and the home page rows show their first page of posters as soon as it arrives, and load the next pages after, instead of waiting for all of them first.
+
+- **Helm chart**: `replicaCount` can be set to 0 to stop Seerr AI and keep its volume, to move or restore it. It can't be more than 1.
+
 - **A series' episodes show their downloads as they happen**: an episode marked Requested shows Queued, Downloading with how far along, or Importing while Sonarr, Backfill or the admin agent brings it, and updates by itself.
 
 - **Settings → Music shows how fast songs move**: each limit songs are held to (playlist songs matched 40 at a time, single searches 3 a minute, the waits between album searches, download slots, Soulseek's tries) beside how much of it is in use now.
@@ -51,6 +55,12 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 - **A playlist's page** shows its link, its song counts and the songs on their way as cards, with a bar of how many are downloading, being searched for and waiting to be searched again.
 
 ### Fixed
+
+- A request can't be sent to a 4K server unless it's a 4K request, or the other way round, even through the API. Choosing a server that's been removed is refused at once, instead of the request failing later.
+
+- Discover keeps loading as you scroll past a page that TMDB sends with fewer than 20 titles.
+
+- Changing a series request to no seasons answers that seasons are missing, instead of an error.
 
 - Songs coming from Soulseek carry on when slskd restarts: what slskd hadn't finished is asked of the same sharer again, into the same folder, instead of that sharer being passed over. While slskd isn't answering, songs only Soulseek might have are looked for again every half hour, without counting it as a search that found nothing.
 

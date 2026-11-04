@@ -1,6 +1,6 @@
 # seerr-ai-chart
 
-![Version: 1.1.0](https://img.shields.io/badge/Version-1.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 2.4.0](https://img.shields.io/badge/AppVersion-2.4.0-informational?style=flat-square)
+![Version: 1.2.0](https://img.shields.io/badge/Version-1.2.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 2.4.0](https://img.shields.io/badge/AppVersion-2.4.0-informational?style=flat-square)
 
 Seerr AI helm chart for Kubernetes
 
@@ -28,7 +28,7 @@ helm install seerr-ai oci://ghcr.io/corruptmods/seerr-ai-chart
 
 Then reach it through its service (port 80, `service.port`), an `ingress` or a `route` (below), and follow the setup. Settings, the database and the image cache live in the `config` volume (5 Gi to start; raise `config.persistence.size` for a big library). More in the [install guide](https://github.com/corruptmods/SeerrAI/blob/main/docs/seerr-ai/install.md#kubernetes).
 
-Seerr AI keeps its database in that volume, so it runs as one pod: a StatefulSet, with no replica count.
+Seerr AI keeps its database in that volume, so it runs as one pod: a StatefulSet. `replicaCount` is 1, or 0 to stop it while keeping the volume (to move or restore it, say); anything else is refused.
 
 ## Values
 
@@ -73,6 +73,7 @@ Seerr AI keeps its database in that volume, so it runs as one pod: a StatefulSet
 | probes.livenessProbe | object | `{"initialDelaySeconds":20,"periodSeconds":15,"timeoutSeconds":3}` | Configure liveness probe |
 | probes.readinessProbe | object | `{"initialDelaySeconds":60,"periodSeconds":15,"timeoutSeconds":3}` | Configure readiness probe |
 | probes.startupProbe | string | `nil` | Configure startup probe |
+| replicaCount | int | `1` | 1 to run Seerr AI, or 0 to stop it and keep its volume (to move or restore it, say). Never more: it runs as one pod. |
 | resources | object | `{}` |  |
 | route.main.additionalRules | list | `[]` |  |
 | route.main.annotations | object | `{}` |  |

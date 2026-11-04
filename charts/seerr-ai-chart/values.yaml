@@ -6,6 +6,9 @@ image:
   tag: ''
   sha: ''
 
+# -- 1 to run Seerr AI, or 0 to stop it and keep its volume (to move or restore it, say). Never more: it runs as one pod.
+replicaCount: 1
+
 imagePullSecrets: []
 nameOverride: ''
 fullnameOverride: ''

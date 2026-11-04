@@ -23,7 +23,7 @@ export type SongFetchStatus =
 export interface SongFetchFile {
   /** The file's index in the torrent or NZB; the client's, once added. */
   index: number;
-  /** Its path inside the release. */
+  /** Its path inside the release (for Soulseek, as the sharer names it). */
   path: string;
   size: number;
   recordingMbid: string;
@@ -85,18 +85,22 @@ class SongFetch {
   @Column({ type: 'int', nullable: true })
   public lidarrReleaseId: number | null;
 
-  /** The release taken, as Prowlarr found it. */
+  /** The release taken, as Prowlarr found it, or a Soulseek sharer's files. */
   @Column({ type: 'simple-json', nullable: true })
   public release: {
     guid: string;
     title: string;
     indexer: string;
     indexerId: number;
-    protocol: 'torrent' | 'usenet';
+    protocol: 'torrent' | 'usenet' | 'soulseek';
     size: number;
     downloadUrl?: string;
     magnetUrl?: string;
     infoHash?: string;
+    /** The Soulseek sharer the files come from. */
+    username?: string;
+    /** Where slskd puts them, under its downloads folder. */
+    folder?: string;
   } | null;
 
   @Column({ type: 'simple-json', default: '[]' })

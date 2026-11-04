@@ -122,6 +122,7 @@ export const musicDefaults = (): MusicSettings => ({
   songsFromAlbums: true,
   songQuota: { quotaLimit: 0, quotaDays: 7 },
   playlists: { overLimit: 'wait', approveOver: 25 },
+  soulseek: { url: '', apiKey: '', downloadsPath: '' },
   search: {},
 });
 
@@ -540,9 +541,32 @@ export interface MusicSettings {
   songQuota: { quotaLimit: number; quotaDays: number };
   /** Songs a linked playlist brings in (Lists). */
   playlists: PlaylistImportSettings;
+  /**
+   * Soulseek, through slskd: where a song taken from an album is looked for
+   * when no release of it is on the indexers (Settings → Services).
+   */
+  soulseek?: SoulseekSettings;
   /** How music is searched (Settings → Music). */
   search: MusicSearchSettings;
 }
+
+/** slskd's connection. Unused until all three are set. */
+export interface SoulseekSettings {
+  /** slskd's address ("http://192.168.1.5:5030"); blank for none. */
+  url: string;
+  /** Its API key, with the ReadWrite role. Never sent back. */
+  apiKey: string;
+  /** Where slskd's finished downloads are, as Lidarr sees the folder. */
+  downloadsPath: string;
+}
+
+/** Soulseek, when it is set up. */
+export const soulseekOf = (
+  music: Pick<MusicSettings, 'soulseek'>
+): SoulseekSettings | undefined =>
+  music.soulseek?.url && music.soulseek.apiKey && music.soulseek.downloadsPath
+    ? music.soulseek
+    : undefined;
 
 /**
  * What happens when a playlist brings in more songs than its person may

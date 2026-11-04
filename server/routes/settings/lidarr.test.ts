@@ -1,3 +1,4 @@
+import SlskdAPI from '@server/api/slskd';
 import { getRepository } from '@server/datasource';
 import { User } from '@server/entity/User';
 import cacheManager from '@server/lib/cache';
@@ -13,7 +14,15 @@ import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import http from 'node:http';
 import path from 'node:path';
-import { after, afterEach, before, beforeEach, describe, it } from 'node:test';
+import {
+  after,
+  afterEach,
+  before,
+  beforeEach,
+  describe,
+  it,
+  mock,
+} from 'node:test';
 
 /*
  * Lidarr's settings (Settings → Services), music's own settings (Settings
@@ -54,6 +63,13 @@ const lidarr = http.createServer((req, res) => {
       { id: 5, path: '/music', freeSpace: 10, totalSpace: 20 },
     ],
     '/api/v1/tag': [{ id: 7, label: 'music' }],
+    // The folders Lidarr sees: only slskd's downloads, among the data's.
+    '/api/v1/filesystem': {
+      directories:
+        url.searchParams.get('path') === '/data/soulseek/'
+          ? [{ path: '/data/soulseek/complete/' }]
+          : [],
+    },
     '/api/v1/artist':
       url.searchParams.get('mbId') === ARTIST
         ? [
@@ -544,5 +560,99 @@ describe('the request window’s Lidarr', () => {
     });
     assert.equal((await call('GET', '/service/lidarr')).status, 403);
     assert.equal((await call('GET', '/service/lidarr/0')).status, 403);
+  });
+});
+
+describe('Soulseek', () => {
+  let answer: () => Promise<unknown>;
+
+  beforeEach(() => {
+    answer = async () => ({
+      version: { current: '0.26.2' },
+      server: { isLoggedIn: true },
+    });
+    mock.method(SlskdAPI.prototype, 'getApplication', () => answer());
+  });
+
+  afterEach(() => mock.restoreAll());
+
+  const slskd = {
+    url: 'http://192.168.1.5:5030/',
+    apiKey: 'a-key-long-enough-for-slskd',
+    downloadsPath: '/data/soulseek/complete/',
+  };
+
+  it('is saved once slskd answers and Lidarr sees its downloads, keeping its key', async () => {
+    await call('POST', '/settings/lidarr', server());
+    const saved = await call('PUT', '/settings/music/soulseek', slskd);
+    assert.equal(saved.status, 200);
+    assert.deepEqual(saved.body, {
+      url: 'http://192.168.1.5:5030',
+      downloadsPath: '/data/soulseek/complete',
+      hasApiKey: true,
+    });
+    assert.equal(
+      getSettings().music.soulseek?.apiKey,
+      'a-key-long-enough-for-slskd'
+    );
+    // Saved again without the key: the key stays. Settings → Music saved:
+    // Soulseek stays.
+    await call('PUT', '/settings/music/soulseek', { ...slskd, apiKey: '' });
+    await call('POST', '/settings/music', { listenBrainz: true });
+    assert.equal(
+      getSettings().music.soulseek?.apiKey,
+      'a-key-long-enough-for-slskd'
+    );
+    assert.equal(
+      (await call('GET', '/settings/music/soulseek')).body['hasApiKey'],
+      true
+    );
+
+    // A blank address removes it.
+    await call('PUT', '/settings/music/soulseek', { url: '' });
+    assert.deepEqual(getSettings().music.soulseek, {
+      url: '',
+      apiKey: '',
+      downloadsPath: '',
+    });
+  });
+
+  it('is refused when slskd doesn’t answer, is too old, or Lidarr can’t see the folder', async () => {
+    const refused = async (body: object, why: RegExp) => {
+      const res = await call('PUT', '/settings/music/soulseek', body);
+      assert.equal(res.status, 400);
+      assert.match(res.body['message'], why);
+      assert.equal(getSettings().music.soulseek?.url, '');
+    };
+    answer = async () => {
+      throw new Error('connect ECONNREFUSED');
+    };
+    await refused(slskd, /didn’t answer/);
+    answer = async () => ({
+      version: { current: '0.25.1' },
+      server: { isLoggedIn: true },
+    });
+    await refused(slskd, /0\.26 or newer/);
+    answer = async () => ({
+      version: { current: '0.26.2' },
+      server: { isLoggedIn: true },
+    });
+    await call('POST', '/settings/lidarr', server());
+    await refused(
+      { ...slskd, downloadsPath: '/downloads/soulseek' },
+      /Lidarr doesn’t see \/downloads\/soulseek/
+    );
+    await refused({ ...slskd, apiKey: '' }, /API key/);
+    await refused({ ...slskd, downloadsPath: 'soulseek' }, /full path/);
+  });
+
+  it('is tested: its version, and whether it is signed in', async () => {
+    answer = async () => ({
+      version: { current: '0.26.2' },
+      server: { isLoggedIn: false },
+    });
+    const tested = await call('POST', '/settings/music/soulseek/test', slskd);
+    assert.equal(tested.status, 200);
+    assert.deepEqual(tested.body, { version: '0.26.2', signedIn: false });
   });
 });

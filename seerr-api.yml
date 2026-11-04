@@ -2398,6 +2398,9 @@ components:
           type: string
         listenBrainz:
           type: boolean
+        deezer:
+          type: boolean
+          description: Playlist songs are looked up on Deezer for their ISRC, and the album of one MusicBrainz lacks.
         maxAlbumsPerRequest:
           type: number
           example: 100
@@ -2415,6 +2418,30 @@ components:
           type: boolean
         search:
           $ref: '#/components/schemas/MusicSearchSettings'
+    SoulseekSettings:
+      type: object
+      properties:
+        url:
+          type: string
+          example: http://192.168.1.5:5030
+        downloadsPath:
+          type: string
+          description: Where slskd's finished downloads are, as Lidarr sees the folder.
+          example: /data/soulseek/complete
+        hasApiKey:
+          type: boolean
+    SoulseekInput:
+      type: object
+      properties:
+        url:
+          type: string
+          description: slskd's address. Blank removes Soulseek.
+        apiKey:
+          type: string
+          description: An slskd API key with the ReadWrite role. Blank keeps the saved one.
+        downloadsPath:
+          type: string
+          description: Where slskd's finished downloads are, as Lidarr sees the folder.
     PlaylistImports:
       type: object
       description: What happens when a playlist brings in more songs than its person may request.
@@ -9162,6 +9189,9 @@ paths:
                 listenBrainz:
                   type: boolean
                   description: New releases and what is popular, for Discover.
+                deezer:
+                  type: boolean
+                  description: Playlist songs looked up on Deezer for their ISRC. Left as it is when not sent.
                 theAudioDbApiKey:
                   type: string
                 removeTheAudioDbApiKey:
@@ -9193,6 +9223,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MusicSettings'
+  /settings/music/soulseek:
+    get:
+      summary: "Soulseek's connection, through slskd, without its API key"
+      tags:
+        - settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoulseekSettings'
+    put:
+      summary: "Save Soulseek's connection"
+      description: 'Saved once slskd answers, is 0.26 or newer, and the default Lidarr sees the downloads folder. A blank API key keeps the saved one; a blank address removes Soulseek.'
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SoulseekInput'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SoulseekSettings'
+  /settings/music/soulseek/test:
+    post:
+      summary: 'Test a Soulseek connection'
+      description: 'What slskd says of itself: its version, and whether it is signed in to Soulseek. Checks the downloads folder as saving does. A blank API key uses the saved one.'
+      tags:
+        - settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SoulseekInput'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                    example: 0.26.2
+                  signedIn:
+                    type: boolean
   /settings/public:
     get:
       summary: Get public settings

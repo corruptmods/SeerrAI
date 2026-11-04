@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios';
 import ServarrBase from './base';
 
 /*
@@ -179,14 +180,38 @@ export interface LidarrQueueAppend {
   album?: Pick<LidarrAlbum, 'id' | 'title' | 'foreignAlbumId'>;
 }
 
+/**
+ * Why Lidarr refused, in its words: the validation errors it answers a
+ * 400 with ("This album has already been added"), or its message.
+ */
+export const lidarrSaid = (e: unknown): string | undefined => {
+  const data = isAxiosError(e) ? e.response?.data : undefined;
+  const said = Array.isArray(data)
+    ? data
+        .map((item: { errorMessage?: unknown }) =>
+          typeof item?.errorMessage === 'string' ? item.errorMessage : ''
+        )
+        .filter(Boolean)
+        .join('; ')
+    : typeof data === 'object' && data && 'message' in data
+      ? String((data as { message: unknown }).message ?? '')
+      : typeof data === 'string'
+        ? data
+        : '';
+  return said.trim().slice(0, 200) || undefined;
+};
+
 class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
   constructor({ url, apiKey }: { url: string; apiKey: string }) {
     super({ url, apiKey, cacheName: 'lidarr', apiName: 'Lidarr' });
   }
 
   private fail(action: string, e: unknown): never {
+    const said = lidarrSaid(e);
     throw new Error(
-      `[Lidarr] Failed to ${action}: ${e instanceof Error ? e.message : e}`,
+      `[Lidarr] Failed to ${action}: ${e instanceof Error ? e.message : e}${
+        said ? ` (${said})` : ''
+      }`,
       { cause: e }
     );
   }
@@ -366,6 +391,30 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
       ).data;
     } catch (e) {
       this.fail('read the remote path mappings', e);
+    }
+  };
+
+  /**
+   * Whether Lidarr sees this folder: it is among its parent's. (Lidarr's
+   * file browser answers a missing folder with an empty one.)
+   */
+  public folderExists = async (path: string): Promise<boolean> => {
+    const folder = path.replace(/[\\/]+$/, '');
+    if (!folder) return true;
+    const sep = folder.includes('\\') && !folder.includes('/') ? '\\' : '/';
+    const parent = folder.slice(0, folder.lastIndexOf(sep) + 1) || sep;
+    try {
+      const listing = (
+        await this.axios.get<{ directories?: { path: string }[] }>(
+          '/filesystem',
+          { params: { path: parent, includeFiles: false } }
+        )
+      ).data;
+      return (listing.directories ?? []).some(
+        (d) => d.path.replace(/[\\/]+$/, '') === folder
+      );
+    } catch (e) {
+      this.fail('read the folder', e);
     }
   };
 

@@ -10,6 +10,8 @@ import type {
   LidarrQualityModel,
   LidarrTrack,
 } from '@server/api/servarr/lidarr';
+import type { SlskdResponse } from '@server/api/slskd';
+import SlskdAPI, { SlskdRefused, transferIs } from '@server/api/slskd';
 import {
   MediaRequestStatus,
   MediaStatus,
@@ -58,13 +60,18 @@ import {
   singleFor,
   toVersion,
 } from '@server/lib/music/songs';
+import {
+  chooseSharer,
+  mergeResponses,
+  soulseekQuery,
+} from '@server/lib/music/soulseekSongs';
 import { owner } from '@server/lib/owner';
 import { markUndispatchable } from '@server/lib/requestDispatch';
 import type {
   DownloadClientSettings,
   LidarrSettings,
 } from '@server/lib/settings';
-import { getSettings } from '@server/lib/settings';
+import { getSettings, soulseekOf } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAxiosError } from 'axios';
 import { In, IsNull, Not } from 'typeorm';
@@ -77,9 +84,12 @@ import { In, IsNull, Not } from 'typeorm';
  *    monitored), and the album too, unmonitored, so Lidarr lists its
  *    tracks and never goes looking for the rest.
  * 2. A release of the album is searched for through Backfill's Prowlarr:
- *    one whose name is the album's, with a file for each song.
- * 3. It goes to Backfill's download client; a torrent with only the songs'
- *    files picked.
+ *    one whose name is the album's, with a file for each song. With none,
+ *    Soulseek (Settings → Services) is searched for each song, then a pack
+ *    of the artist's releases, then what Backfill's second opinion names.
+ * 3. It goes to Backfill's download client (a torrent with only the songs'
+ *    files picked), or the songs' files alone are asked of a Soulseek
+ *    sharer through slskd.
  * 4. Lidarr's manual import takes just those files into their tracks.
  * 5. The download is removed. The music scans then see the songs here, and
  *    the requests are done (lib/music/completion).
@@ -135,6 +145,9 @@ const MAX_OPEN = 5;
 /** Packs of an artist's releases read in one search, when nothing names the album. */
 const MAX_CATALOGS = 3;
 
+/** A release as a fetch keeps it. */
+type FetchRelease = NonNullable<SongFetch['release']>;
+
 /** A release chosen for songs, with each song's file in it. */
 interface ChosenRelease {
   release: ProwlarrRelease;
@@ -177,6 +190,16 @@ const pickSongs = <T extends { index: number; path: string; size: number }>(
 const IDLE_SLOT_MS = 15 * 60_000;
 /** Releases tried before the songs are given up on. */
 const MAX_TRIES = 3;
+/** Soulseek sharers tried before Soulseek is passed over for the songs. */
+const MAX_SOULSEEK_TRIES = 5;
+/** Songs of an album Soulseek is searched for each time, one at a time. */
+const MAX_SOULSEEK_SEARCHES = 3;
+/** How long a sharer's queue is waited in before another is tried. */
+const SOULSEEK_QUEUE_GIVE_UP_MS = 2 * 60 * 60_000;
+/** Where slskd puts songs' files, under its downloads folder. */
+const SOULSEEK_FOLDER = 'seerr-ai';
+/** What `tried` holds for a Soulseek sharer. */
+const sharerKey = (username: string) => `soulseek:${username}`;
 /** Bigger than any album the songs are worth. */
 const MAX_RELEASE_BYTES = 4 * 1024 ** 3;
 /** How long the swarm may take to send a magnet's file list. */
@@ -918,10 +941,17 @@ class SongFetcher {
       }
     }
 
-    // Nothing named for the album has the songs: a pack of the artist's own
-    // releases may (their discography, a collection), as smaller artists
-    // are mostly shared. Only the songs' files are taken from it.
+    // Nothing named for the album has the songs: a Soulseek sharer may,
+    // file by file.
+    let shared: { release: FetchRelease; files: SongFetchFile[] } | undefined;
     if (!best && !packedRelease && !limited) {
+      shared = await this.fromSoulseek(fetch, wanted);
+    }
+
+    // Nor a sharer: a pack of the artist's own releases may (their
+    // discography, a collection), as smaller artists are mostly shared.
+    // Only the songs' files are taken from it.
+    if (!best && !shared && !packedRelease && !limited) {
       const catalog = await this.fromCatalog(
         fetch,
         wanted,
@@ -938,7 +968,7 @@ class SongFetcher {
       best = catalog;
     }
 
-    if (!best && packedRelease) {
+    if (!best && !shared && packedRelease) {
       best = {
         release: packedRelease,
         files: wanted.map(({ song, track }, index) => ({
@@ -955,11 +985,11 @@ class SongFetcher {
     const needed = wanted.map((w) => w.song);
     // What a resting indexer has may be it: looked at again soon, not
     // counted as a search that found nothing.
-    if (!best && limited) {
+    if (!best && !shared && limited) {
       await this.searchSoon(fetch, limited.message);
       return;
     }
-    if (!best && opened.length) {
+    if (!best && !shared && opened.length) {
       logger.info('No release found has the songs by name', {
         label: LABEL,
         fetchId: fetch.id,
@@ -968,7 +998,7 @@ class SongFetcher {
         releases: opened.slice(0, 5),
       });
     }
-    if (!best) {
+    if (!best && !shared) {
       const wait = SEARCH_AGAIN_MS[fetch.searches ?? 0];
       if (wait !== undefined) {
         fetch.searches = (fetch.searches ?? 0) + 1;
@@ -992,15 +1022,14 @@ class SongFetcher {
       await this.end(fetch, 'failed', 'No release with the songs was found.');
       return;
     }
+    const files = shared?.files ?? best!.files;
     // Not in the release chosen for the others: searched for again on their
     // own, on the usual schedule, once this download is done.
     const missed = new Set(
       needed
         .filter(
           (song) =>
-            !best!.files.some(
-              (file) => file.recordingMbid === song.recordingMbid
-            )
+            !files.some((file) => file.recordingMbid === song.recordingMbid)
         )
         .map((song) => song.recordingMbid)
     );
@@ -1008,21 +1037,99 @@ class SongFetcher {
       fetch.recordings = fetch.recordings.filter((id) => !missed.has(id));
     }
 
-    const { release } = best;
     fetch.searchAgainAt = null;
-    fetch.release = {
-      guid: release.guid,
-      title: release.title,
-      indexer: release.indexer,
-      indexerId: release.indexerId,
-      protocol: release.protocol,
-      size: release.size,
-      downloadUrl: release.downloadUrl,
-      magnetUrl: release.magnetUrl,
-      infoHash: best.hash ?? release.infoHash?.toLowerCase(),
-    };
-    fetch.files = best.files;
+    if (shared) {
+      fetch.release = shared.release;
+    } else {
+      const { release, hash } = best!;
+      fetch.release = {
+        guid: release.guid,
+        title: release.title,
+        indexer: release.indexer,
+        indexerId: release.indexerId,
+        protocol: release.protocol,
+        size: release.size,
+        downloadUrl: release.downloadUrl,
+        magnetUrl: release.magnetUrl,
+        infoHash: hash ?? release.infoHash?.toLowerCase(),
+      };
+    }
+    fetch.files = files;
     await this.start(fetch);
+  }
+
+  /**
+   * The songs from a Soulseek sharer, when Soulseek is set up: each song
+   * searched for by artist and title (the first few of an album's), and of
+   * the sharers with a file named as one, the best (see soulseekSongs). A
+   * sharer tried already is passed over, and Soulseek altogether after a
+   * few. slskd not answering is no reason to stop: the rest is looked at.
+   */
+  private async fromSoulseek(
+    fetch: SongFetch,
+    wanted: { song: SongRequest; track: LidarrTrack }[]
+  ): Promise<{ release: FetchRelease; files: SongFetchFile[] } | undefined> {
+    const soulseek = soulseekOf(getSettings().music);
+    if (!soulseek) return undefined;
+    const tried = new Set(
+      fetch.tried
+        .filter((key) => key.startsWith(sharerKey('')))
+        .map((key) => key.slice(sharerKey('').length))
+    );
+    if (tried.size >= MAX_SOULSEEK_TRIES) return undefined;
+    const api = new SlskdAPI(soulseek);
+    const answers: SlskdResponse[][] = [];
+    for (const { track } of wanted.slice(0, MAX_SOULSEEK_SEARCHES)) {
+      try {
+        answers.push(
+          await api.search(soulseekQuery(fetch.artistName, track.title))
+        );
+      } catch (e) {
+        logger.debug('Could not search Soulseek', {
+          label: LABEL,
+          fetchId: fetch.id,
+          errorMessage: message(e),
+        });
+        break;
+      }
+    }
+    if (!answers.length) return undefined;
+    const choice = chooseSharer(
+      mergeResponses(answers),
+      wanted,
+      fetch.albumTitle,
+      fetch.artistName,
+      tried
+    );
+    if (!choice) {
+      logger.info('No Soulseek sharer has the songs by name', {
+        label: LABEL,
+        fetchId: fetch.id,
+        album: fetch.albumTitle,
+        songs: wanted.map((w) => w.track.title),
+      });
+      return undefined;
+    }
+    logger.info('Taking songs from a Soulseek sharer', {
+      label: LABEL,
+      fetchId: fetch.id,
+      album: fetch.albumTitle,
+      folder: choice.folder,
+      songs: choice.files.length,
+    });
+    const folders = choice.folder.replace(/\\/g, '/').split('/');
+    return {
+      release: {
+        guid: sharerKey(choice.username),
+        title: folders.slice(-2).join(' / ') || choice.folder,
+        indexer: 'Soulseek',
+        indexerId: 0,
+        protocol: 'soulseek',
+        size: choice.files.reduce((n, f) => n + f.size, 0),
+        username: choice.username,
+      },
+      files: choice.files,
+    };
   }
 
   /**
@@ -1257,8 +1364,10 @@ class SongFetcher {
   /** Adds the release to Backfill's download client. */
   private async start(fetch: SongFetch): Promise<void> {
     const release = fetch.release!;
-    const client = clientFor(release.protocol);
-    if (!client) {
+    // Soulseek's files come through slskd, not a download client.
+    const client =
+      release.protocol === 'soulseek' ? undefined : clientFor(release.protocol);
+    if (release.protocol !== 'soulseek' && !client) {
       throw new Error(
         `No ${release.protocol === 'torrent' ? 'torrent' : 'Usenet'} client is chosen in Settings → Backfill.`
       );
@@ -1275,6 +1384,11 @@ class SongFetcher {
       await getRepository(SongFetch).save(fetch);
       return;
     }
+    if (release.protocol === 'soulseek' || !client) {
+      await this.startSoulseek(fetch);
+      return;
+    }
+    const protocol = release.protocol;
     const category = getSettings().backfill.category;
     let fetched: FetchedRelease;
     try {
@@ -1284,6 +1398,7 @@ class SongFetcher {
         () =>
           new ProwlarrAPI(getSettings().backfill.prowlarr).fetchRelease({
             ...release,
+            protocol,
             infoHash: release.infoHash,
           })
       );
@@ -1341,6 +1456,38 @@ class SongFetcher {
     }
   }
 
+  /**
+   * Asks the sharer for the songs' files, through slskd, into a folder of
+   * their own under slskd's downloads. A sharer offline, or turning them
+   * down, is the release's fault: the next is tried.
+   */
+  private async startSoulseek(fetch: SongFetch): Promise<void> {
+    const release = fetch.release!;
+    const soulseek = soulseekOf(getSettings().music);
+    if (!soulseek || !release.username) {
+      throw new ReleaseProblem(
+        'Soulseek is no longer set up in Settings → Services.'
+      );
+    }
+    const folder = `${SOULSEEK_FOLDER}/song-${fetch.id}-${Date.now().toString(36)}`;
+    try {
+      fetch.downloadId = await new SlskdAPI(soulseek).download(
+        release.username,
+        fetch.files.map((file) => ({ filename: file.path, size: file.size })),
+        folder
+      );
+    } catch (e) {
+      if (e instanceof SlskdRefused) throw new ReleaseProblem(e.message);
+      throw e;
+    }
+    fetch.release = { ...release, folder };
+    fetch.clientId = null;
+    fetch.status = 'downloading';
+    fetch.stage = 'Asked for on Soulseek';
+    fetch.startedAt = new Date();
+    await getRepository(SongFetch).save(fetch);
+  }
+
   /** Skips every file of the torrent but the songs', then starts it. */
   private async pickFiles(fetch: SongFetch): Promise<boolean> {
     const torrents = torrentClientFor(clientById(fetch.clientId));
@@ -1377,6 +1524,10 @@ class SongFetcher {
   private async follow(fetch: SongFetch, songs: SongRequest[]): Promise<void> {
     if (!fetch.downloadId) {
       await this.start(fetch);
+      return;
+    }
+    if (fetch.release?.protocol === 'soulseek') {
+      await this.followSoulseek(fetch, songs);
       return;
     }
     const client = clientById(fetch.clientId);
@@ -1507,6 +1658,102 @@ class SongFetcher {
         }
         if (match) paths.set(file.index, match);
       }
+    }
+    await this.importFiles(fetch, songs, paths);
+  }
+
+  /**
+   * Follows a Soulseek download. Waiting in the sharer's queue is no stall,
+   * up to a couple of hours; then, or once a file fails, the next sharer is
+   * tried. Once every file is in, Lidarr reads the folder and imports them.
+   */
+  private async followSoulseek(
+    fetch: SongFetch,
+    songs: SongRequest[]
+  ): Promise<void> {
+    const release = fetch.release!;
+    const soulseek = soulseekOf(getSettings().music);
+    if (!soulseek) {
+      throw new ReleaseProblem(
+        'Soulseek is no longer set up in Settings → Services.'
+      );
+    }
+    const batch = await new SlskdAPI(soulseek).getBatch(fetch.downloadId!);
+    const transfers = batch?.transfers ?? [];
+    if (!transfers.length) {
+      throw new ReleaseProblem('slskd no longer has the download.');
+    }
+    const failed = transfers.find(
+      (t) => transferIs(t, 'Completed') && !transferIs(t, 'Succeeded')
+    );
+    if (failed) {
+      throw new ReleaseProblem(
+        `Soulseek: ${failed.state.replace(/^Completed,\s*/, '')}${
+          failed.exception ? ` (${failed.exception})` : ''
+        }`
+      );
+    }
+    if (!transfers.every((t) => transferIs(t, 'Succeeded'))) {
+      const all = transfers.reduce((n, t) => n + t.size, 0) || 1;
+      const have = transfers.reduce(
+        (n, t) => n + Math.min(t.bytesTransferred ?? 0, t.size),
+        0
+      );
+      const queued =
+        have === 0 && transfers.some((t) => transferIs(t, 'Queued'));
+      if (
+        queued &&
+        fetch.startedAt &&
+        Date.now() - fetch.startedAt.getTime() > SOULSEEK_QUEUE_GIVE_UP_MS
+      ) {
+        throw new ReleaseProblem(
+          'Waited over two hours in the sharer’s queue on Soulseek.'
+        );
+      }
+      const place = transfers.find((t) => t.placeInQueue)?.placeInQueue;
+      fetch.stage = queued
+        ? `Waiting in a Soulseek queue${place ? `, place ${place}` : ''}`
+        : `Downloading from Soulseek, ${Math.floor((have / all) * 100)}%`;
+      this.sizes.set(fetch.id, { size: all, left: all - have });
+      await this.stalled(fetch, {
+        have,
+        left: all - have,
+        held: queued,
+        incomplete: false,
+      });
+      return;
+    }
+    // In: Lidarr reads the folder, each song's file by its name, else by
+    // the song's own name (slskd may have made the name safe for disk).
+    const lidarr = this.lidarr(fetch);
+    const root = soulseek.downloadsPath.replace(/[\\/]+$/, '');
+    const sep = root.includes('\\') && !root.includes('/') ? '\\' : '/';
+    const folder = `${root}${sep}${(release.folder ?? '').replace(/\//g, sep)}`;
+    const seen = await lidarr.getManualImport(folder, fetch.lidarrArtistId!);
+    const listed = seen.map((item, index) => ({
+      index,
+      path: item.path,
+      size: item.size ?? Number.MAX_SAFE_INTEGER,
+    }));
+    const baseName = (path: string) =>
+      path.replace(/\\/g, '/').split('/').pop() ?? '';
+    let tracks: LidarrTrack[] | undefined;
+    const paths = new Map<number, string>();
+    for (const file of fetch.files) {
+      const taken = new Set(paths.values());
+      const rest = listed.filter((l) => !taken.has(l.path));
+      let match = rest.find(
+        (l) => baseName(l.path) === baseName(file.path)
+      )?.path;
+      if (!match) {
+        tracks ??= await this.tracksOf(lidarr, fetch);
+        match = fileForTrack(
+          rest,
+          tracks.find((t) => t.id === file.trackId)?.title ?? '',
+          fetch.artistName
+        )?.path;
+      }
+      if (match) paths.set(file.index, match);
     }
     await this.importFiles(fetch, songs, paths);
   }
@@ -1765,9 +2012,11 @@ class SongFetcher {
         fetchId: fetch.id,
         errorMessage: message(e),
       });
+      // Soulseek's sharers are counted apart (fromSoulseek).
       if (
-        fetch.tried.filter((key) => !key.startsWith('hash:')).length >=
-        MAX_TRIES
+        fetch.tried.filter(
+          (key) => !key.startsWith('hash:') && !key.startsWith(sharerKey(''))
+        ).length >= MAX_TRIES
       ) {
         const songs = await this.songsOf(fetch);
         await this.failSongs(
@@ -1818,6 +2067,20 @@ class SongFetcher {
   private troubleSince = new Map<number, number>();
 
   private async removeDownload(fetch: SongFetch): Promise<void> {
+    if (fetch.release?.protocol === 'soulseek') {
+      const soulseek = soulseekOf(getSettings().music);
+      if (!fetch.downloadId || !soulseek) return;
+      // What Lidarr didn't move goes with the folder.
+      const slskd = new SlskdAPI(soulseek);
+      const batch = await slskd.getBatch(fetch.downloadId);
+      for (const transfer of batch?.transfers ?? []) {
+        await slskd.removeTransfer(transfer.username, transfer.id);
+      }
+      if (fetch.release.folder) {
+        await slskd.removeDownloadFolder(fetch.release.folder);
+      }
+      return;
+    }
     if (!fetch.downloadId || fetch.clientId == null) return;
     const client = clientById(fetch.clientId);
     if (fetch.release?.protocol === 'torrent') {

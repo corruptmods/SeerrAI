@@ -4,6 +4,8 @@ import { MusicBrainz } from '@server/api/musicbrainz';
 import type { MbArtist, MbRecording } from '@server/api/musicbrainz/interfaces';
 import type { ProwlarrRelease } from '@server/api/prowlarr';
 import ProwlarrAPI from '@server/api/prowlarr';
+import type { SlskdResponse, SlskdTransfer } from '@server/api/slskd';
+import SlskdAPI, { SlskdRefused } from '@server/api/slskd';
 import {
   MediaRequestStatus,
   MediaStatus,
@@ -2137,5 +2139,195 @@ describe('reading a release of an album', () => {
       { index: 1, path: 'A/Glasswing - Lantern Song.cue', size: 1000 },
     ];
     assert.equal(fileForTrack(image, 'Lantern Song', 'Glasswing'), undefined);
+  });
+});
+
+describe('taking a song from Soulseek', () => {
+  const SHARED =
+    'Music\\Glasswing\\1997 - Static Garden\\02 - Lantern Song.flac';
+  const sharer = (
+    username: string,
+    files: string[],
+    more: Partial<SlskdResponse> = {}
+  ): SlskdResponse => ({
+    username,
+    files: files.map((filename) => ({ filename, size: 40 * MB, length: 200 })),
+    hasFreeUploadSlot: true,
+    queueLength: 0,
+    uploadSpeed: 1_000_000,
+    ...more,
+  });
+  let answers: SlskdResponse[];
+  let searched: string[];
+  let asked: { username: string; files: string[]; folder: string }[];
+  let state: SlskdTransfer['state'];
+  let removedTransfers: string[];
+  let removedFolders: string[];
+
+  beforeEach(() => {
+    getSettings().music.soulseek = {
+      url: 'http://slskd:5030',
+      apiKey: 'k',
+      downloadsPath: '/data/soulseek/complete',
+    };
+    // Prowlarr has no release of the album, nor of the artist's.
+    found = [];
+    answers = [
+      sharer('lantern-fan', [
+        'Music\\Glasswing\\2010 - Live at the Pier\\02 - Lantern Song.flac',
+      ]),
+      sharer('collector', [
+        SHARED,
+        'Music\\Glasswing\\1997 - Static Garden\\cover.jpg',
+      ]),
+    ];
+    searched = [];
+    asked = [];
+    state = 'Queued, Remotely';
+    removedTransfers = [];
+    removedFolders = [];
+    mock.method(SlskdAPI.prototype, 'search', async (text: string) => {
+      searched.push(text);
+      return answers;
+    });
+    mock.method(
+      SlskdAPI.prototype,
+      'download',
+      async (
+        username: string,
+        files: { filename: string }[],
+        folder: string
+      ) => {
+        if (username === 'offline-one') {
+          throw new SlskdRefused('offline-one is offline on Soulseek.');
+        }
+        asked.push({ username, files: files.map((f) => f.filename), folder });
+        return 'batch-1';
+      }
+    );
+    mock.method(SlskdAPI.prototype, 'getBatch', async () => ({
+      id: 'batch-1',
+      username: asked.at(-1)?.username ?? '',
+      transfers: [
+        {
+          id: 't-1',
+          username: asked.at(-1)?.username ?? '',
+          filename: SHARED,
+          size: 40 * MB,
+          state,
+          bytesTransferred: state.startsWith('Completed') ? 40 * MB : 0,
+          placeInQueue: state.startsWith('Queued') ? 3 : null,
+        },
+      ],
+    }));
+    mock.method(
+      SlskdAPI.prototype,
+      'removeTransfer',
+      async (_user: string, id: string) => {
+        removedTransfers.push(id);
+      }
+    );
+    mock.method(
+      SlskdAPI.prototype,
+      'removeDownloadFolder',
+      async (folder: string) => {
+        removedFolders.push(folder);
+      }
+    );
+  });
+
+  it('asks a sharer for only the song’s file, and Lidarr moves it in', async () => {
+    await requestSongs([LANTERN]);
+    await startFetching();
+
+    assert.deepEqual(searched, ['glasswing lantern song']);
+    let fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(fetch.release?.protocol, 'soulseek');
+    // The album's own take, not the live album's.
+    assert.deepEqual(
+      asked.map((a) => [a.username, a.files]),
+      [['collector', [SHARED]]]
+    );
+    const folder = asked[0].folder;
+    assert.match(folder, /^seerr-ai\/song-\d+-/);
+
+    // Waiting in the sharer's queue.
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(fetch.stage, 'Waiting in a Soulseek queue, place 3');
+
+    state = 'Completed, Succeeded';
+    lidarr.folders.set(`/data/soulseek/complete/${folder}`, [
+      { path: `/data/soulseek/complete/${folder}/02 - Lantern Song.flac` },
+    ]);
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'importing');
+    const imported = lidarr.calls.find(
+      (c) =>
+        c.method === 'POST' &&
+        c.path === '/api/v1/command' &&
+        c.body?.name === 'ManualImport'
+    );
+    assert.equal(imported?.body?.importMode, 'move');
+    assert.deepEqual(
+      (imported?.body?.files as { path: string; trackIds: number[] }[]).map(
+        (f) => [f.path, f.trackIds]
+      ),
+      [[`/data/soulseek/complete/${folder}/02 - Lantern Song.flac`, [502]]]
+    );
+
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'done');
+    assert.deepEqual(removedTransfers, ['t-1']);
+    assert.deepEqual(removedFolders, [folder]);
+  });
+
+  it('tries the next sharer when one is offline or a file fails', async () => {
+    answers = [
+      sharer('offline-one', [SHARED], { queueLength: 0 }),
+      sharer('collector', [SHARED], { queueLength: 5 }),
+    ];
+    await requestSongs([LANTERN]);
+    await startFetching();
+    // The first is offline: the next search passes over them.
+    let fetch = await fetchOf();
+    assert.ok(fetch.tried.includes('soulseek:offline-one'));
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(asked.at(-1)?.username, 'collector');
+
+    state = 'Completed, Rejected';
+    await songFetcher.tick();
+    fetch = await fetchOf();
+    assert.equal(fetch.status, 'searching');
+    assert.match(fetch.stage ?? '', /Soulseek: Rejected/);
+    assert.ok(fetch.tried.includes('soulseek:collector'));
+    assert.deepEqual(removedTransfers, ['t-1']);
+  });
+
+  it('gives up on a sharer’s queue after two hours', async () => {
+    await requestSongs([LANTERN]);
+    await startFetching();
+    const fetch = await fetchOf();
+    await getRepository(SongFetch).update(fetch.id, {
+      startedAt: new Date(Date.now() - 3 * 60 * 60_000),
+    });
+    await songFetcher.tick();
+    const after = await fetchOf();
+    assert.equal(after.status, 'searching');
+    assert.match(after.stage ?? '', /two hours in the sharer’s queue/);
+  });
+
+  it('is not searched until it is set up', async () => {
+    getSettings().music.soulseek = { url: '', apiKey: '', downloadsPath: '' };
+    await requestSongs([LANTERN]);
+    await startFetching();
+    assert.deepEqual(searched, []);
+    assert.equal((await fetchOf()).release, null);
   });
 });

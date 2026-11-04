@@ -14,6 +14,7 @@ import SettingsDownloadClients from '@app/components/Settings/SettingsDownloadCl
 import SettingsLidarr from '@app/components/Settings/SettingsLidarr';
 import SettingsMaintainerr from '@app/components/Settings/SettingsMaintainerr';
 import SettingsProwlarr from '@app/components/Settings/SettingsProwlarr';
+import SettingsSoulseek from '@app/components/Settings/SettingsSoulseek';
 import SettingsTautulli from '@app/components/Settings/SettingsTautulli';
 import SettingsTrakt from '@app/components/Settings/SettingsTrakt';
 import SonarrModal from '@app/components/Settings/SonarrModal';
@@ -444,6 +445,8 @@ const SettingsServices = () => {
       <SettingsMaintainerr />
       <SettingsProwlarr />
       <SettingsDownloadClients />
+      {/* Soulseek is for songs taken from albums: offered once music is. */}
+      {settings.currentSettings.musicReady && <SettingsSoulseek />}
       <SettingsBazarr />
       <SettingsTrakt />
       {/* Tautulli reads Plex's watch history, so it is offered while Plex is

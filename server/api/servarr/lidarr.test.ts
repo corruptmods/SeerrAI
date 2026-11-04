@@ -2,6 +2,7 @@ import type { LidarrAlbum, LidarrArtist } from '@server/api/servarr/lidarr';
 import LidarrAPI from '@server/api/servarr/lidarr';
 import cacheManager from '@server/lib/cache';
 import type { AxiosInstance } from 'axios';
+import { AxiosError, AxiosHeaders } from 'axios';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
 
@@ -220,5 +221,50 @@ describe('LidarrAPI', () => {
       lidarr.getArtists(),
       /\[Lidarr\] Failed to retrieve artists: connect ECONNREFUSED/
     );
+  });
+});
+
+describe('what Lidarr says when it refuses', () => {
+  const refused = (data: unknown) => {
+    const lidarr = buildLidarr();
+    mock.method(getAxios(lidarr), 'post', async () => {
+      throw new AxiosError(
+        'Request failed with status code 400',
+        '400',
+        undefined,
+        undefined,
+        {
+          status: 400,
+          statusText: 'Bad Request',
+          data,
+          headers: {},
+          config: { headers: new AxiosHeaders() },
+        }
+      );
+    });
+    return lidarr.addAlbum(album, { artist, searchForNewAlbum: false });
+  };
+
+  it('is in the error: its validation errors, or its message', async () => {
+    await assert.rejects(
+      refused([
+        {
+          propertyName: 'ForeignAlbumId',
+          errorMessage: 'This album has already been added.',
+        },
+      ]),
+      {
+        message:
+          '[Lidarr] Failed to add album: Request failed with status code 400 (This album has already been added.)',
+      }
+    );
+    await assert.rejects(refused({ message: 'Artist not found' }), {
+      message:
+        '[Lidarr] Failed to add album: Request failed with status code 400 (Artist not found)',
+    });
+    await assert.rejects(refused(''), {
+      message:
+        '[Lidarr] Failed to add album: Request failed with status code 400',
+    });
   });
 });

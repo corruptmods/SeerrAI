@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "管理代理程式",
   "components.Common.FeatureSwitches.aiAgentTip": "自行或在管理員要求時，找出 Backfill 找不到的內容。傳送標題、集數清單和發行名稱",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill AI 輔助判斷",
-  "components.Common.FeatureSwitches.aiBackfillTip": "歸類名稱不清的資源包檔案，供管理員檢查。傳送影集、集數標題和檔名",
+  "components.Common.FeatureSwitches.aiBackfillTip": "為名稱不清楚的合集檔案分配位置，供管理員檢查，並指出可能包含其他方式都找不到的歌曲的發行版。傳送劇集和歌曲名稱、劇集標題以及發行版和檔案名稱",
   "components.Common.FeatureSwitches.aiChat": "AI 搜尋",
   "components.Common.FeatureSwitches.aiChatTip": "搜尋框旁的 AI 按鈕：描述您想要的內容。傳送您的訊息與最近觀看的作品",
   "components.Common.FeatureSwitches.aiDeletionReview": "檢查刪除項目",

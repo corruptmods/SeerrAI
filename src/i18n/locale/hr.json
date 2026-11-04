@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Administratorski agent",
   "components.Common.FeatureSwitches.aiAgentTip": "Pronalazi ono što Backfill ne može, sam ili na zahtjev administratora. Šalje naslove, popise epizoda i nazive izdanja",
   "components.Common.FeatureSwitches.aiBackfill": "Drugo mišljenje za Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Raspoređuje datoteke paketa s nejasnim nazivima da ih administrator provjeri. Šalje seriju, nazive epizoda i nazive datoteka",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Raspoređuje datoteke paketa nejasnih naziva da ih administrator provjeri i navodi izdanja koja vjerojatno sadrže pjesmu koju ništa drugo ne pronalazi. Šalje naslove serija i pjesama, naslove epizoda te nazive izdanja i datoteka",
   "components.Common.FeatureSwitches.aiChat": "AI pretraživanje",
   "components.Common.FeatureSwitches.aiChatTip": "Gumb AI pokraj pretrage: opišite što želite. Šalje vašu poruku i nedavno gledane naslove",
   "components.Common.FeatureSwitches.aiDeletionReview": "Pregled brisanja",

@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Агент адміністратора",
   "components.Common.FeatureSwitches.aiAgentTip": "Знаходить те, чого не знайшов Backfill, сам або на прохання адміністратора. Надсилає назви, списки серій і назви релізів",
   "components.Common.FeatureSwitches.aiBackfill": "Друга думка для Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Розставляє файли паків із незрозумілими назвами для перевірки адміністратором. Надсилає серіал, назви серій і назви файлів",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Розподіляє файли з паків із нечіткими назвами для перевірки адміністратором і називає релізи, у яких, імовірно, є пісня, яку більше ніщо не знаходить. Надсилає назви серіалів і пісень, назви епізодів, а також назви релізів і файлів",
   "components.Common.FeatureSwitches.aiChat": "ШІ-пошук",
   "components.Common.FeatureSwitches.aiChatTip": "Кнопка ШІ поруч із пошуком: опишіть, що хочете. Надсилає ваше повідомлення й нещодавно переглянуте",
   "components.Common.FeatureSwitches.aiDeletionReview": "Перевірка видалень",

@@ -8,6 +8,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - **A song whose single Lidarr can't find is taken from an album instead**: older singles are seldom posted on their own, while their albums are. As soon as Lidarr's search for the single grabs nothing, the song is taken from the artist's album with the same recording, through Backfill, and Lidarr stops looking for the single. A song on no album is looked for by Seerr AI itself, from the single, searched again on the same schedule as albums. Songs already waiting move over on update, a few singles a minute.
 
+- **Songs from an artist's discography or collection**: when no release is named for a song's album or single, a pack of the artist's own releases ("Discography", "Collection", "20 Singles") is opened, and the song is taken from its album's folder there, never a live or remixed one's.
+
+- **Backfill's second opinion names where a song might be**: with it on, when nothing names the album and no pack has the song, the model is shown releases the artist's name finds and names up to three likely to hold it as recorded, such as the album a single is on. It only says where to look: the song is still only taken from a file named as it, never another version.
+
 - **Songs from singles Lidarr holds back are imported**: a single's download with just the song stops in Lidarr's queue with "Has missing tracks" when the single's edition also has a radio edit or an instrumental. Seerr AI now imports the requested song on its own, into its track. Health lists the downloads Lidarr still won't import, with its reason.
 
 - **A playlist's page says what's happening to each requested song**: Lidarr searching for its single, Seerr AI searching for its album, nothing found yet and when it's searched again, waiting for a download slot, downloading with how far along, or importing, instead of just Requested.

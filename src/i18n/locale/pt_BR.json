@@ -2277,7 +2277,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Agente de administração",
   "components.Common.FeatureSwitches.aiAgentTip": "Acha o que o Backfill não acha, sozinho ou quando um administrador pede. Envia títulos, listas de episódios e nomes de lançamentos",
   "components.Common.FeatureSwitches.aiBackfill": "Segunda opinião do Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Posiciona arquivos de pacotes com nomes confusos, para um administrador conferir. Envia a série, os títulos dos episódios e os nomes dos arquivos",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Posiciona arquivos de pacotes com nomes pouco claros, para um administrador conferir, e indica os lançamentos que provavelmente têm uma música que nada mais encontra. Envia títulos de séries e músicas, títulos de episódios e nomes de lançamentos e arquivos",
   "components.Common.FeatureSwitches.aiChat": "Pesquisa com IA",
   "components.Common.FeatureSwitches.aiChatTip": "O botão de IA ao lado da busca: descreva o que quer. Envia sua mensagem e os títulos assistidos recentemente",
   "components.Common.FeatureSwitches.aiDeletionReview": "Revisar exclusões",

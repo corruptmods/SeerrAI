@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Agent διαχειριστή",
   "components.Common.FeatureSwitches.aiAgentTip": "Βρίσκει ό,τι δεν μπορεί το Backfill, μόνο του ή όταν ζητήσει διαχειριστής. Στέλνει τίτλους, λίστες επεισοδίων και ονόματα εκδόσεων",
   "components.Common.FeatureSwitches.aiBackfill": "Δεύτερη γνώμη Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Τοποθετεί αρχεία πακέτων με ασαφή ονόματα, για έλεγχο από διαχειριστή. Στέλνει τη σειρά, τίτλους επεισοδίων και ονόματα αρχείων",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Τοποθετεί αρχεία πακέτων με ασαφή ονόματα, για έλεγχο από διαχειριστή, και ονομάζει τις κυκλοφορίες που πιθανότατα περιέχουν ένα τραγούδι που τίποτε άλλο δεν βρίσκει. Στέλνει τίτλους σειρών και τραγουδιών, τίτλους επεισοδίων και ονόματα κυκλοφοριών και αρχείων",
   "components.Common.FeatureSwitches.aiChat": "Αναζήτηση AI",
   "components.Common.FeatureSwitches.aiChatTip": "Το κουμπί AI δίπλα στην αναζήτηση: περιγράψτε τι θέλετε. Στέλνει το μήνυμά σας και τίτλους που είδατε πρόσφατα",
   "components.Common.FeatureSwitches.aiDeletionReview": "Έλεγχος διαγραφών",

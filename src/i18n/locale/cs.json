@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Agent správce",
   "components.Common.FeatureSwitches.aiAgentTip": "Najde, co Backfill nenajde, sám nebo na pokyn správce. Odesílá tituly, seznamy dílů a názvy vydání",
   "components.Common.FeatureSwitches.aiBackfill": "Druhý názor pro Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Zařazuje soubory balíčků s nejasnými názvy ke kontrole správcem. Odesílá seriál, názvy dílů a názvy souborů",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Přiřazuje soubory z balíčků s nejasnými názvy ke kontrole administrátorem a jmenuje vydání, která nejspíš obsahují skladbu, kterou nic jiného nenajde. Odesílá názvy seriálů a skladeb, názvy epizod a názvy vydání a souborů",
   "components.Common.FeatureSwitches.aiChat": "Hledání s AI",
   "components.Common.FeatureSwitches.aiChatTip": "Tlačítko AI u vyhledávání: popište, co chcete. Odesílá vaši zprávu a nedávno sledované tituly",
   "components.Common.FeatureSwitches.aiDeletionReview": "Kontrola mazání",

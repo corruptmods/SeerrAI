@@ -2313,7 +2313,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Admin-agent",
   "components.Common.FeatureSwitches.aiAgentTip": "Finder det, Backfill ikke kan, af sig selv eller når en administrator beder om det. Sender titler, afsnitslister og udgivelsesnavne",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill: ekstra vurdering",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Placerer pakkefiler med uklare navne, så en administrator kan tjekke dem. Sender serien, afsnitstitler og filnavne",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Placerer pakkefiler med uklare navne, så en administrator kan tjekke dem, og nævner de udgivelser, der sandsynligvis har en sang, intet andet finder. Sender serie- og sangtitler, afsnitstitler og udgivelses- og filnavne",
   "components.Common.FeatureSwitches.aiChat": "AI-søgning",
   "components.Common.FeatureSwitches.aiChatTip": "AI-knappen ved søgefeltet: beskriv, hvad du vil have. Sender din besked og titler, du har set for nylig",
   "components.Common.FeatureSwitches.aiDeletionReview": "Gennemgå sletninger",

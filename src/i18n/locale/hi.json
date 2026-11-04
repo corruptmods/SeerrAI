@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "एडमिन एजेंट",
   "components.Common.FeatureSwitches.aiAgentTip": "वह ढूँढता है जो Backfill नहीं ढूँढ पाता, खुद या एडमिन के कहने पर। टाइटल, एपिसोड सूचियाँ और रिलीज़ नाम भेजता है",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill दूसरी राय",
-  "components.Common.FeatureSwitches.aiBackfillTip": "अस्पष्ट नामों वाली पैक फ़ाइलें रखता है, एडमिन के जाँचने के लिए। शृंखला, एपिसोड टाइटल और फ़ाइल नाम भेजता है",
+  "components.Common.FeatureSwitches.aiBackfillTip": "अस्पष्ट नामों वाली पैक फ़ाइलों को व्यवस्थित करता है, ताकि कोई एडमिन जाँच सके, और उन रिलीज़ के नाम बताता है जिनमें ऐसा गाना होने की संभावना है जिसे और कुछ नहीं ढूँढ पाता। सीरीज़ और गानों के शीर्षक, एपिसोड के शीर्षक, और रिलीज़ व फ़ाइलों के नाम भेजता है",
   "components.Common.FeatureSwitches.aiChat": "AI खोज",
   "components.Common.FeatureSwitches.aiChatTip": "खोज बॉक्स के पास AI बटन: बताएँ कि आपको क्या चाहिए। आपका संदेश और हाल में देखे टाइटल भेजता है",
   "components.Common.FeatureSwitches.aiDeletionReview": "हटाए जाने वालों की जाँच",

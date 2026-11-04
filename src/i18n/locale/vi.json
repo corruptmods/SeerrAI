@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Trợ lý quản trị",
   "components.Common.FeatureSwitches.aiAgentTip": "Tìm những gì Backfill không tìm được, tự động hoặc khi quản trị viên yêu cầu. Gửi tên tựa, danh sách tập và tên bản phát hành",
   "components.Common.FeatureSwitches.aiBackfill": "Ý kiến thứ hai cho Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Sắp xếp tệp trong gói có tên không rõ để quản trị viên kiểm tra. Gửi phim bộ, tên tập và tên tệp",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Sắp xếp các tệp trong gói có tên không rõ ràng để quản trị viên kiểm tra, và chỉ ra những bản phát hành có khả năng chứa một bài hát mà không cách nào khác tìm thấy. Gửi tên phim bộ và bài hát, tên tập, tên bản phát hành và tên tệp",
   "components.Common.FeatureSwitches.aiChat": "Tìm kiếm AI",
   "components.Common.FeatureSwitches.aiChatTip": "Nút AI cạnh ô tìm kiếm: mô tả thứ bạn muốn. Gửi tin nhắn của bạn và các tựa xem gần đây",
   "components.Common.FeatureSwitches.aiDeletionReview": "Xem xét các mục sẽ xóa",

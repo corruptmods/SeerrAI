@@ -2312,7 +2312,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Agent d’administration",
   "components.Common.FeatureSwitches.aiAgentTip": "Trouve ce que Backfill ne trouve pas, seul ou à la demande d’un admin. Envoie les titres, les listes d’épisodes et les noms de release",
   "components.Common.FeatureSwitches.aiBackfill": "Second avis Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Place les fichiers de pack aux noms peu clairs, pour vérification par un admin. Envoie la série, les titres d’épisodes et les noms de fichiers",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Place les fichiers de pack aux noms peu clairs, pour vérification par un admin, et désigne les sorties susceptibles de contenir une chanson que rien d’autre ne trouve. Envoie les titres de séries et de chansons, les titres d’épisodes et les noms de sorties et de fichiers",
   "components.Common.FeatureSwitches.aiChat": "Recherche IA",
   "components.Common.FeatureSwitches.aiChatTip": "Le bouton IA près de la recherche : décrivez ce que vous voulez. Envoie votre message et les titres vus récemment",
   "components.Common.FeatureSwitches.aiDeletionReview": "Vérifier les suppressions",

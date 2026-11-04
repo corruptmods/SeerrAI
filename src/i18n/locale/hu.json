@@ -2310,7 +2310,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Adminügynök",
   "components.Common.FeatureSwitches.aiAgentTip": "Megtalálja, amit a Backfill nem, magától vagy egy admin kérésére. Címeket, epizódlistákat és kiadásneveket küld",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill második vélemény",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Elhelyezi a nem egyértelmű nevű csomagfájlokat, admin ellenőrzésére. A sorozatot, epizódcímeket és fájlneveket küld",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Elhelyezi a nem egyértelmű nevű csomagfájlokat, hogy egy rendszergazda ellenőrizze őket, és megnevezi azokat a kiadásokat, amelyekben valószínűleg benne van egy dal, amit semmi más nem talál meg. Elküldi a sorozatok és dalok címét, az epizódok címét, valamint a kiadások és fájlok nevét",
   "components.Common.FeatureSwitches.aiChat": "MI-keresés",
   "components.Common.FeatureSwitches.aiChatTip": "MI-gomb a keresőmező mellett: írja le, mit szeretne. Az üzenetét és a nemrég nézett címeket küldi",
   "components.Common.FeatureSwitches.aiDeletionReview": "Törlések ellenőrzése",

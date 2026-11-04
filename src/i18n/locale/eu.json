@@ -2299,7 +2299,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Administratzaile-agentea",
   "components.Common.FeatureSwitches.aiAgentTip": "Backfill-ek ezin duena aurkitzen du, bere kabuz edo administratzaile batek eskatzean. Izenburuak, atal-zerrendak eta argitalpen-izenak bidaltzen ditu",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill-en bigarren iritzia",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Izen argirik gabeko pakete-fitxategiak kokatzen ditu, administratzaile batek egiazta ditzan. Telesaila, atalen izenburuak eta fitxategi-izenak bidaltzen ditu",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Izen argiak ez dituzten paketeetako fitxategiak kokatzen ditu, administratzaile batek egiaztatzeko, eta beste ezerk aurkitzen ez duen abesti bat ziurrenik duten argitalpenak izendatzen ditu. Telesail eta abestien izenburuak, atalen izenburuak eta argitalpen eta fitxategien izenak bidaltzen ditu",
   "components.Common.FeatureSwitches.aiChat": "AA bilaketa",
   "components.Common.FeatureSwitches.aiChatTip": "Bilaketaren ondoko AA botoia: deskribatu zer nahi duzun. Zure mezua eta duela gutxi ikusitako tituluak bidaltzen ditu",
   "components.Common.FeatureSwitches.aiDeletionReview": "Berrikusi ezabaketak",

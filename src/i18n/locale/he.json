@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "סוכן הניהול",
   "components.Common.FeatureSwitches.aiAgentTip": "מוצא את מה ש-Backfill לא מצליח, בעצמו או כשמנהל מבקש. שולח כותרים, רשימות פרקים ושמות גרסאות",
   "components.Common.FeatureSwitches.aiBackfill": "חוות דעת שנייה ל-Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "משבץ קבצי חבילות עם שמות לא ברורים, לבדיקת מנהל. שולח את הסדרה, שמות פרקים ושמות קבצים",
+  "components.Common.FeatureSwitches.aiBackfillTip": "משבץ קובצי חבילות בעלי שמות לא ברורים, לבדיקת מנהל, ומציין את ההוצאות שסביר שמכילות שיר ששום דבר אחר לא מוצא. שולח שמות סדרות ושירים, שמות פרקים ושמות הוצאות וקבצים",
   "components.Common.FeatureSwitches.aiChat": "חיפוש AI",
   "components.Common.FeatureSwitches.aiChatTip": "כפתור ה-AI ליד החיפוש: תאר מה אתה רוצה. שולח את ההודעה שלך וכותרים שצפית בהם לאחרונה",
   "components.Common.FeatureSwitches.aiDeletionReview": "בדיקת מחיקות",

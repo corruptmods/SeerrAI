@@ -69,7 +69,7 @@ const messages = defineMessages('components.Common.FeatureSwitches', {
     'Explains log entries in plain English (admins). Keys, tokens and emails are removed first',
   aiBackfill: 'Backfill Second Opinion',
   aiBackfillTip:
-    'Places pack files with unclear names, for an admin to check. Sends the series, episode titles and file names',
+    'Places pack files with unclear names, for an admin to check, and names the releases likely to hold a song nothing else finds. Sends series and song titles, episode titles, and release and file names',
   aiAgent: 'Admin Agent',
   aiAgentTip:
     'Finds what Backfill can’t, on its own or when an admin asks. Sends titles, episode lists and release names',

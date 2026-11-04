@@ -38,20 +38,27 @@ import downloadTracker from '@server/lib/downloadtracker';
 import { lidarrApi, musicReady } from '@server/lib/music/access';
 import {
   fileForTrack,
+  fileInCatalog,
   isAudio,
   namesAlbum,
+  namesArtist,
+  namesCatalog,
+  namesOtherVersion,
 } from '@server/lib/music/albumRelease';
 import { refreshArtists } from '@server/lib/music/availability';
 import singleFallback from '@server/lib/music/singleFallback';
 import { clientFor, songFetchProblem } from '@server/lib/music/songFetchReady';
 import { SEARCHING_SOON } from '@server/lib/music/songFetchWaits';
 import { releaseForSongs } from '@server/lib/music/songRelease';
+import type { SongSourceAnswer } from '@server/lib/music/songSources';
+import { aiSongSources } from '@server/lib/music/songSources';
 import {
   albumsFor,
   normalizeTitle,
   singleFor,
   toVersion,
 } from '@server/lib/music/songs';
+import { owner } from '@server/lib/owner';
 import { markUndispatchable } from '@server/lib/requestDispatch';
 import type {
   DownloadClientSettings,
@@ -125,6 +132,43 @@ export const rankReleases = (
 
 /** Results opened for their file lists, best first. */
 const MAX_OPEN = 5;
+/** Packs of an artist's releases read in one search, when nothing names the album. */
+const MAX_CATALOGS = 3;
+
+/** A release chosen for songs, with each song's file in it. */
+interface ChosenRelease {
+  release: ProwlarrRelease;
+  files: SongFetchFile[];
+  hash: string | null;
+}
+
+/**
+ * Each wanted song's file in a release, as `find` finds it: each file one
+ * song, never two tracks from the same file.
+ */
+const pickSongs = <T extends { index: number; path: string; size: number }>(
+  files: T[],
+  wanted: { song: SongRequest; track: LidarrTrack }[],
+  find: (rest: T[], track: LidarrTrack) => T | undefined
+): SongFetchFile[] => {
+  const picked: SongFetchFile[] = [];
+  for (const { song, track } of wanted) {
+    const file = find(
+      files.filter((f) => !picked.some((p) => p.index === f.index)),
+      track
+    );
+    if (file) {
+      picked.push({
+        index: file.index,
+        path: file.path,
+        size: file.size,
+        recordingMbid: song.recordingMbid,
+        trackId: track.id,
+      });
+    }
+  }
+  return picked;
+};
 /**
  * A download that has brought nothing for this long stops holding one of
  * the song download slots, so the next song can start meanwhile; it is
@@ -842,6 +886,8 @@ class SongFetcher {
     // An indexer waiting out its download limit: its releases are passed
     // over this time, and the others opened.
     let limited: IndexerLimitReached | undefined;
+    // The releases whose files were read, for the log when none has them.
+    const opened: string[] = [];
     for (const release of usable) {
       // Torrents nobody seems to share, only when nothing better was found.
       if (releaseTier(release, prefer) === 2 && (best || packedRelease)) break;
@@ -851,24 +897,10 @@ class SongFetcher {
           if (release.protocol === 'usenet') packedRelease ??= release;
           continue;
         }
-        // Each file is one song: never two tracks from the same file.
-        const picked: SongFetchFile[] = [];
-        for (const { song, track } of wanted) {
-          const file = fileForTrack(
-            files.filter((f) => !picked.some((p) => p.index === f.index)),
-            track.title,
-            fetch.artistName
-          );
-          if (file) {
-            picked.push({
-              index: file.index,
-              path: file.path,
-              size: file.size,
-              recordingMbid: song.recordingMbid,
-              trackId: track.id,
-            });
-          }
-        }
+        opened.push(release.title);
+        const picked = pickSongs(files, wanted, (rest, track) =>
+          fileForTrack(rest, track.title, fetch.artistName)
+        );
         if (picked.length > (best?.files.length ?? 0)) {
           best = { release, files: picked, hash: infoHash };
         }
@@ -884,6 +916,26 @@ class SongFetcher {
           errorMessage: message(e),
         });
       }
+    }
+
+    // Nothing named for the album has the songs: a pack of the artist's own
+    // releases may (their discography, a collection), as smaller artists
+    // are mostly shared. Only the songs' files are taken from it.
+    if (!best && !packedRelease && !limited) {
+      const catalog = await this.fromCatalog(
+        fetch,
+        wanted,
+        prowlarr,
+        indexerIds,
+        profile,
+        prefer,
+        opened
+      );
+      if (catalog === 'limited') {
+        await this.searchSoon(fetch, 'An indexer is waiting out its limit');
+        return;
+      }
+      best = catalog;
     }
 
     if (!best && packedRelease) {
@@ -906,6 +958,15 @@ class SongFetcher {
     if (!best && limited) {
       await this.searchSoon(fetch, limited.message);
       return;
+    }
+    if (!best && opened.length) {
+      logger.info('No release found has the songs by name', {
+        label: LABEL,
+        fetchId: fetch.id,
+        album: fetch.albumTitle,
+        songs: wanted.map((w) => w.track.title),
+        releases: opened.slice(0, 5),
+      });
     }
     if (!best) {
       const wait = SEARCH_AGAIN_MS[fetch.searches ?? 0];
@@ -962,6 +1023,177 @@ class SongFetcher {
     };
     fetch.files = best.files;
     await this.start(fetch);
+  }
+
+  /**
+   * Songs from the artist's other releases, found by searching for the
+   * artist's name, as Lidarr's profile allows: first a pack of their own
+   * releases (a discography, a collection); else, with Backfill's second
+   * opinion on, the releases the model names as holding them (the album a
+   * single is on). Each release's files are read and the songs found in it
+   * by name, the album's folder first. Packed Usenet posts are passed over:
+   * the whole release would be downloaded.
+   */
+  private async fromCatalog(
+    fetch: SongFetch,
+    wanted: { song: SongRequest; track: LidarrTrack }[],
+    prowlarr: ProwlarrAPI,
+    indexerIds: number[] | undefined,
+    profile: LidarrDelayProfile | undefined,
+    prefer: LidarrDelayProfile['preferredProtocol'],
+    opened: string[]
+  ): Promise<ChosenRelease | 'limited' | undefined> {
+    let releases: ProwlarrRelease[];
+    try {
+      releases = await indexerLimits.guard(PROWLARR, 'search', () =>
+        prowlarr.search(fetch.artistName, {
+          categories: AUDIO_CATEGORIES,
+          indexerIds,
+        })
+      );
+    } catch (e) {
+      if (e instanceof IndexerLimitReached) return 'limited';
+      logger.debug('Could not search for the artist’s releases', {
+        label: LABEL,
+        fetchId: fetch.id,
+        errorMessage: message(e),
+      });
+      return undefined;
+    }
+    const allowed = rankReleases(
+      releases.filter(
+        (release) =>
+          !!clientFor(release.protocol) &&
+          (release.protocol === 'torrent'
+            ? profile?.enableTorrent !== false
+            : profile?.enableUsenet !== false) &&
+          !fetch.tried.includes(release.guid) &&
+          !fetch.tried.includes(`hash:${release.infoHash?.toLowerCase()}`) &&
+          namesArtist(release.title, fetch.artistName)
+      ),
+      prefer
+    );
+    const packs = allowed.filter((release) =>
+      namesCatalog(release.title, fetch.artistName)
+    );
+    const fromPack = await this.readReleases(
+      fetch,
+      wanted,
+      packs.slice(0, MAX_CATALOGS),
+      prefer,
+      opened
+    );
+    if (fromPack.best) {
+      logger.info('Taking songs from a pack of the artist’s releases', {
+        label: LABEL,
+        fetchId: fetch.id,
+        album: fetch.albumTitle,
+        release: fromPack.best.release.title,
+        songs: fromPack.best.files.length,
+      });
+      return fromPack.best;
+    }
+
+    const ask = aiSongSources(await owner());
+    const others = allowed.filter(
+      (release) =>
+        !packs.includes(release) &&
+        !opened.includes(release.title) &&
+        release.size <= MAX_RELEASE_BYTES &&
+        // Its files may be named just as the songs (a live album's are).
+        !namesOtherVersion(
+          release.title,
+          fetch.albumTitle,
+          fetch.artistName,
+          ...wanted.map((w) => w.track.title)
+        )
+    );
+    if (!ask || !others.length) {
+      return fromPack.limited ? 'limited' : undefined;
+    }
+    let named: SongSourceAnswer;
+    try {
+      named = await ask({
+        artist: fetch.artistName,
+        songs: wanted.map((w) => w.track.title),
+        album: fetch.albumTitle,
+        releases: others,
+      });
+    } catch (e) {
+      logger.debug(
+        'Backfill’s second opinion could not say where the songs are',
+        {
+          label: LABEL,
+          fetchId: fetch.id,
+          errorMessage: message(e),
+        }
+      );
+      return fromPack.limited ? 'limited' : undefined;
+    }
+    const fromNamed = await this.readReleases(
+      fetch,
+      wanted,
+      named.releases,
+      prefer,
+      opened
+    );
+    if (fromNamed.best) {
+      logger.info(
+        'Taking songs from a release Backfill’s second opinion named',
+        {
+          label: LABEL,
+          fetchId: fetch.id,
+          album: fetch.albumTitle,
+          release: fromNamed.best.release.title,
+          why: named.why,
+          songs: fromNamed.best.files.length,
+        }
+      );
+      return fromNamed.best;
+    }
+    return fromPack.limited || fromNamed.limited ? 'limited' : undefined;
+  }
+
+  /**
+   * The release of these with the most of the songs, each found in it by
+   * name (the album's folder first, never another version's), the best
+   * shared first; a torrent nobody shares only when nothing else has them.
+   */
+  private async readReleases(
+    fetch: SongFetch,
+    wanted: { song: SongRequest; track: LidarrTrack }[],
+    releases: ProwlarrRelease[],
+    prefer: LidarrDelayProfile['preferredProtocol'],
+    opened: string[]
+  ): Promise<{ best?: ChosenRelease; limited: boolean }> {
+    let best: ChosenRelease | undefined;
+    let limited = false;
+    for (const release of releases) {
+      if (releaseTier(release, prefer) === 2 && best) break;
+      try {
+        const { files, infoHash, packed } = await backfill.filesOf(release);
+        if (packed) continue;
+        opened.push(release.title);
+        const picked = pickSongs(files, wanted, (rest, track) =>
+          fileInCatalog(rest, track.title, fetch.albumTitle, fetch.artistName)
+        );
+        if (picked.length > (best?.files.length ?? 0)) {
+          best = { release, files: picked, hash: infoHash };
+        }
+        if (picked.length === wanted.length) break;
+      } catch (e) {
+        if (e instanceof IndexerLimitReached) {
+          limited = true;
+          continue;
+        }
+        logger.debug('Could not read a release of the artist’s', {
+          label: LABEL,
+          release: release.title,
+          errorMessage: message(e),
+        });
+      }
+    }
+    return { best, limited };
   }
 
   /**

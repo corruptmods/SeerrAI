@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Admin-agent",
   "components.Common.FeatureSwitches.aiAgentTip": "Finner det Backfill ikke finner, på egen hånd eller når en administrator ber om det. Sender titler, episodelister og utgivelsesnavn",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill second opinion",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Plasserer pakkefiler med uklare navn, slik at en administrator kan sjekke dem. Sender serien, episodetitler og filnavn",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Plasserer pakkefiler med uklare navn, så en administrator kan sjekke dem, og nevner utgivelsene som trolig har en sang ingenting annet finner. Sender serie- og sangtitler, episodetitler og utgivelses- og filnavn",
   "components.Common.FeatureSwitches.aiChat": "AI-søk",
   "components.Common.FeatureSwitches.aiChatTip": "AI-knappen ved søkefeltet: beskriv hva du vil ha. Sender meldingen din og nylig sette titler",
   "components.Common.FeatureSwitches.aiDeletionReview": "Gjennomgå slettinger",

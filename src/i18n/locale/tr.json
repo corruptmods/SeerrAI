@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Yönetici Ajanı",
   "components.Common.FeatureSwitches.aiAgentTip": "Backfill’in bulamadığını kendi başına veya bir yönetici istediğinde bulur. Yapım adlarını, bölüm listelerini ve sürüm adlarını gönderir",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill İkinci Görüş",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Adı belirsiz paket dosyalarını bir yöneticinin kontrolü için yerleştirir. Diziyi, bölüm adlarını ve dosya adlarını gönderir",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Adı belirsiz paket dosyalarını bir yöneticinin kontrol etmesi için yerleştirir ve başka hiçbir şeyin bulamadığı bir şarkıyı büyük olasılıkla içeren yayınları adlandırır. Dizi ve şarkı adlarını, bölüm adlarını, yayın ve dosya adlarını gönderir",
   "components.Common.FeatureSwitches.aiChat": "Yapay Zekâ Araması",
   "components.Common.FeatureSwitches.aiChatTip": "Arama kutusunun yanındaki yapay zekâ düğmesi: ne istediğinizi anlatın. Mesajınızı ve son izlenenleri gönderir",
   "components.Common.FeatureSwitches.aiDeletionReview": "Silinecekleri İncele",

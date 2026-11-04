@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Skrbniški agent",
   "components.Common.FeatureSwitches.aiAgentTip": "Najde, česar Backfill ne more, sam ali na zahtevo skrbnika. Pošlje naslove, sezname epizod in imena izdaj",
   "components.Common.FeatureSwitches.aiBackfill": "Drugo mnenje za Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Razporedi datoteke paketov z nejasnimi imeni, da jih skrbnik preveri. Pošlje serijo, naslove epizod in imena datotek",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Razporedi datoteke paketov z nejasnimi imeni, da jih preveri skrbnik, in navede izdaje, ki verjetno vsebujejo skladbo, ki je nič drugega ne najde. Pošlje naslove serij in skladb, naslove epizod ter imena izdaj in datotek",
   "components.Common.FeatureSwitches.aiChat": "Iskanje z UI",
   "components.Common.FeatureSwitches.aiChatTip": "Gumb UI ob iskalnem polju: opišite, kaj želite. Pošlje vaše sporočilo in nedavno gledane naslove",
   "components.Common.FeatureSwitches.aiDeletionReview": "Pregled izbrisov",

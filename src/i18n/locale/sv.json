@@ -2313,7 +2313,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Adminagent",
   "components.Common.FeatureSwitches.aiAgentTip": "Hittar det Backfill inte hittar, på egen hand eller när en administratör ber om det. Skickar titlar, avsnittslistor och utgåvenamn",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill – andra bedömning",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Placerar paketfiler med otydliga namn, för en administratör att kontrollera. Skickar serien, avsnittstitlarna och filnamnen",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Placerar paketfiler med otydliga namn så att en administratör kan kontrollera dem, och nämner de utgåvor som troligen har en låt som inget annat hittar. Skickar serie- och låttitlar, avsnittstitlar samt utgåve- och filnamn",
   "components.Common.FeatureSwitches.aiChat": "AI-sökning",
   "components.Common.FeatureSwitches.aiChatTip": "AI-knappen vid sökrutan: beskriv vad du vill ha. Skickar ditt meddelande och nyligen sedda titlar",
   "components.Common.FeatureSwitches.aiDeletionReview": "Granska borttagningar",

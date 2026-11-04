@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "관리자 에이전트",
   "components.Common.FeatureSwitches.aiAgentTip": "Backfill이 못 찾는 것을 스스로 또는 관리자 요청으로 찾습니다. 제목, 에피소드 목록, 릴리스 이름을 전송",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill AI 추가 판단",
-  "components.Common.FeatureSwitches.aiBackfillTip": "이름이 불분명한 팩 파일을 배치해 관리자가 확인하게 합니다. 시리즈, 에피소드 제목, 파일 이름을 전송",
+  "components.Common.FeatureSwitches.aiBackfillTip": "이름이 불분명한 팩 파일을 배치해 관리자가 확인하게 하고, 다른 방법으로는 찾지 못하는 곡이 들어 있을 만한 릴리스를 알려 줍니다. 시리즈와 곡 제목, 에피소드 제목, 릴리스와 파일 이름을 보냅니다",
   "components.Common.FeatureSwitches.aiChat": "AI 검색",
   "components.Common.FeatureSwitches.aiChatTip": "검색창 옆 AI 버튼: 원하는 것을 설명하세요. 메시지와 최근 시청한 작품을 전송",
   "components.Common.FeatureSwitches.aiDeletionReview": "삭제 검토",

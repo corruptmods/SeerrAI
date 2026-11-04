@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Admin-Agent",
   "components.Common.FeatureSwitches.aiAgentTip": "Findet, was Backfill nicht findet, selbstständig oder auf Wunsch eines Admins. Sendet Titel, Folgenlisten und Release-Namen",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill-Zweitmeinung",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Ordnet Paketdateien mit unklaren Namen zu, zur Prüfung durch einen Admin. Sendet Serie, Folgentitel und Dateinamen",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Ordnet Paketdateien mit unklaren Namen zu, zur Prüfung durch einen Admin, und nennt die Veröffentlichungen, die wahrscheinlich einen Song enthalten, den sonst nichts findet. Sendet Serien- und Songtitel, Folgentitel sowie Veröffentlichungs- und Dateinamen",
   "components.Common.FeatureSwitches.aiChat": "KI-Suche",
   "components.Common.FeatureSwitches.aiChatTip": "Der KI-Knopf neben der Suche: Beschreib, was du willst. Sendet deine Nachricht und kürzlich gesehene Titel",
   "components.Common.FeatureSwitches.aiDeletionReview": "Löschungen prüfen",

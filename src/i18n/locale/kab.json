@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Amɛiwen n unedbal",
   "components.Common.FeatureSwitches.aiAgentTip": "Ad d-yaf ayen ur d-yufi ara Backfill, i yiman-is neɣ mi ara t-isuter unedbal. Yettazen izwal, tibdarin n yisegmenten d yismawen n tuffɣiwin",
   "components.Common.FeatureSwitches.aiBackfill": "Tamuɣli tis snat n Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Yesrusu ifuyla n tkemmusin s yismawen ur nban ara, akken ad ten-isenqed unedbal. Yettazen tasnasla, izwal n yisegmenten d yismawen n yifuyla",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Yesrusu ifuyla n tkemmusin s yismawen ur nban ara, akken ad ten-isenqed unedbal, yerna yettsemmi tiẓrigin ideg yezmer ad tili tezlit ur yufi wayen nniḍen. Yettazen izwal n tsenslatin d tezlatin, izwal n yisegmenten d yismawen n tiẓrigin d yifuyla",
   "components.Common.FeatureSwitches.aiChat": "Anadi s AI",
   "components.Common.FeatureSwitches.aiChatTip": "Taqeffalt AI ɣer tama n unadi: glem ayen tebɣiḍ. Yettazen izen-ik d yizwal i twalaḍ melmi kan",
   "components.Common.FeatureSwitches.aiDeletionReview": "Senqed tukksiwin",

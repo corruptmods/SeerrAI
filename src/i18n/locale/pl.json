@@ -2310,7 +2310,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Agent administratora",
   "components.Common.FeatureSwitches.aiAgentTip": "Znajduje to, czego nie znajdzie Backfill, sam lub na prośbę administratora. Wysyła tytuły, listy odcinków i nazwy wydań",
   "components.Common.FeatureSwitches.aiBackfill": "Druga opinia dla Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Przypisuje pliki paczek o niejasnych nazwach do sprawdzenia przez administratora. Wysyła serial, tytuły odcinków i nazwy plików",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Przypisuje pliki z paczek o niejasnych nazwach do sprawdzenia przez administratora i wskazuje wydania, które prawdopodobnie zawierają utwór, którego nic innego nie znajduje. Wysyła tytuły seriali i utworów, tytuły odcinków oraz nazwy wydań i plików",
   "components.Common.FeatureSwitches.aiChat": "Wyszukiwanie AI",
   "components.Common.FeatureSwitches.aiChatTip": "Przycisk AI obok wyszukiwarki: opisz, czego chcesz. Wysyła twoją wiadomość i niedawno obejrzane tytuły",
   "components.Common.FeatureSwitches.aiDeletionReview": "Przegląd usunięć",

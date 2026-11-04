@@ -19,6 +19,7 @@ import MusicAlbum from '@server/entity/MusicAlbum';
 import SongFetch from '@server/entity/SongFetch';
 import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
+import { clearAiCache } from '@server/lib/ai';
 import backfill from '@server/lib/backfill/engine';
 import { IndexerLimitReached } from '@server/lib/backfill/indexerLimit';
 import { readNzb } from '@server/lib/backfill/nzb';
@@ -26,7 +27,9 @@ import cacheManager from '@server/lib/cache';
 import downloadTracker from '@server/lib/downloadtracker';
 import {
   fileForTrack,
+  fileInCatalog,
   namesAlbum,
+  namesCatalog,
   songsOfFile,
 } from '@server/lib/music/albumRelease';
 import { completeMusicRequests } from '@server/lib/music/completion';
@@ -49,6 +52,7 @@ import {
 } from '@server/lib/settings';
 import { setupTestDb } from '@server/test/db';
 import { createFakeLidarr } from '@server/test/fakeLidarr';
+import axios from 'axios';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
@@ -1020,6 +1024,174 @@ describe('taking a song from its album', () => {
     assert.equal(opening.sourceAlbumMbid, OWN_SINGLE);
   });
 
+  it('takes a song from a pack of the artist’s releases when nothing names the album', async () => {
+    const PACK: ProwlarrRelease = {
+      ...RELEASE,
+      guid: 'https://indexer/pack',
+      title: 'Glasswing - Discography 1995-2020 (4 Albums + 9 Singles) FLAC',
+      size: 900 * MB,
+    };
+    const terms: string[] = [];
+    mock.method(ProwlarrAPI.prototype, 'search', async (term: string) => {
+      terms.push(term);
+      return term === 'Glasswing' ? [PACK] : [];
+    });
+    mock.method(backfill, 'filesOf', async () => ({
+      files: [
+        {
+          index: 0,
+          path: 'Glasswing - Discography/2010 - Live at the Pier/02 - Lantern Song.flac',
+          size: 30 * MB,
+        },
+        {
+          index: 1,
+          path: 'Glasswing - Discography/1997 - Static Garden/02 - Lantern Song.flac',
+          size: 40 * MB,
+        },
+        { index: 2, path: 'Glasswing - Discography/cover.jpg', size: 1 * MB },
+      ],
+      infoHash: HASH,
+    }));
+    await requestSongs([LANTERN]);
+    await startFetching();
+
+    assert.ok(terms.includes('Glasswing'), 'the artist searched for');
+    const fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(fetch.release?.guid, PACK.guid);
+    // Only the song, from the album's own folder: not the live album's.
+    assert.deepEqual(
+      fetch.files.map((f) => f.index),
+      [1]
+    );
+  });
+
+  describe('with Backfill’s second opinion', () => {
+    const ALBUM_RELEASE: ProwlarrRelease = {
+      ...RELEASE,
+      guid: 'https://indexer/hl',
+      title: 'Glasswing - Harbour Lights (2003) FLAC',
+      size: 300 * MB,
+    };
+    const LIVE_RELEASE: ProwlarrRelease = {
+      ...RELEASE,
+      guid: 'https://indexer/live',
+      title: 'Glasswing - Live at the Pier (2010) FLAC',
+      size: 400 * MB,
+    };
+    let prompts: string[];
+    let answer: { d: number[]; w: string };
+
+    beforeEach(() => {
+      clearAiCache();
+      prompts = [];
+      answer = { d: [1], w: 'Lantern Song is on Harbour Lights' };
+      mock.method(ProwlarrAPI.prototype, 'search', async (term: string) =>
+        term === 'Glasswing' ? [ALBUM_RELEASE, LIVE_RELEASE] : []
+      );
+      mock.method(backfill, 'filesOf', async () => ({
+        files: [
+          {
+            index: 0,
+            path: 'Glasswing - Harbour Lights/01 - Opening.flac',
+            size: 30 * MB,
+          },
+          {
+            index: 1,
+            path: 'Glasswing - Harbour Lights/02 - Lantern Song.flac',
+            size: 40 * MB,
+          },
+        ],
+        infoHash: HASH,
+      }));
+      // The model, stubbed at its HTTP call.
+      mock.method(
+        axios,
+        'post',
+        async (_url: string, body: { messages: { content: string }[] }) => {
+          prompts.push(body.messages[0].content);
+          return {
+            data: {
+              content: [{ type: 'text', text: JSON.stringify(answer) }],
+              usage: { input_tokens: 10, output_tokens: 5 },
+            },
+          };
+        }
+      );
+      getSettings().ai = {
+        enabled: true,
+        provider: 'anthropic',
+        apiKey: 'test-key',
+        baseUrl: '',
+        model: 'claude-test',
+        featureModels: {},
+        dailyLimit: 0,
+      };
+    });
+
+    afterEach(() => {
+      getSettings().ai = { ...getSettings().ai, enabled: false };
+    });
+
+    it('takes a song from a release the model names as holding it', async () => {
+      await requestSongs([LANTERN]);
+      await startFetching();
+
+      assert.equal(prompts.length, 1, 'asked once');
+      assert.match(prompts[0], /Songs: "Lantern Song"/);
+      assert.match(
+        prompts[0],
+        /^1\. Glasswing - Harbour Lights \(2003\) FLAC/m
+      );
+      // A live album is never offered, nor Prowlarr's links.
+      assert.ok(!prompts[0].includes('Live at the Pier'));
+      assert.ok(!prompts[0].includes('download'));
+      const fetch = await fetchOf();
+      assert.equal(fetch.status, 'downloading');
+      assert.equal(fetch.release?.guid, ALBUM_RELEASE.guid);
+      assert.deepEqual(
+        fetch.files.map((f) => f.index),
+        [1]
+      );
+    });
+
+    it('takes nothing the model names when no file is named as the song', async () => {
+      mock.method(backfill, 'filesOf', async () => ({
+        files: [
+          { index: 0, path: 'HL/01 - Opening.flac', size: 30 * MB },
+          { index: 1, path: 'HL/02 - Track 2.flac', size: 40 * MB },
+        ],
+        infoHash: HASH,
+      }));
+      await requestSongs([LANTERN]);
+      await startFetching();
+      const fetch = await fetchOf();
+      assert.equal(fetch.status, 'searching');
+      assert.equal(fetch.release, null);
+      assert.equal(fetch.searches, 1);
+    });
+
+    it('is not asked while it is turned off', async () => {
+      getSettings().ai = { ...getSettings().ai, enabled: false };
+      await requestSongs([LANTERN]);
+      await startFetching();
+      assert.equal(prompts.length, 0);
+      assert.equal((await fetchOf()).status, 'searching');
+    });
+  });
+
+  it('opens no pack of the artist’s releases when a release names the album', async () => {
+    const terms: string[] = [];
+    mock.method(ProwlarrAPI.prototype, 'search', async (term: string) => {
+      terms.push(term);
+      return found;
+    });
+    await requestSongs([LANTERN]);
+    await startFetching();
+    assert.equal((await fetchOf()).status, 'downloading');
+    assert.ok(!terms.includes('Glasswing'));
+  });
+
   it('searches again on its own schedule for a song the chosen release lacks', async () => {
     // Only Lantern Song is in the release opened.
     mock.method(backfill, 'filesOf', async () => ({
@@ -1498,7 +1670,8 @@ describe('taking a song from its album', () => {
     assert.equal(await albumsWaitingToSearch([LANTERN]), 0);
     const searched = searches();
     await songFetcher.tick();
-    assert.equal(searches(), searched + 2, 'both its searches, now');
+    // Both of the album's, and the artist's for packs of their releases.
+    assert.equal(searches(), searched + 3, 'its searches, now');
     fetch = await fetchOf();
     // Found nothing again: waits as long as the first time did.
     assert.equal(fetch.searches, 1);
@@ -1778,6 +1951,70 @@ describe('reading a release of an album', () => {
         'Glasswing'
       ),
       false
+    );
+  });
+
+  it('knows a pack of the artist’s own releases', () => {
+    for (const title of [
+      'Glasswing - Discography 2011 - 2021 (1 Album + 20 Singles) MP3, 320 kbps',
+      '(Country) Glasswing - Collection: 25 Releases (2012-2023), MP3',
+      'Glasswing - 7 Albums (1995-2020) FLAC',
+    ]) {
+      assert.equal(namesCatalog(title, 'Glasswing'), true, title);
+    }
+    for (const title of [
+      // Another artist's, featuring them.
+      'Other Band (with Glasswing) - Discography - 1991 - 2023',
+      // An album, not a pack.
+      'Glasswing - Static Garden (1997) [FLAC]',
+      'VA - Road Hits Collection (2011)',
+    ]) {
+      assert.equal(namesCatalog(title, 'Glasswing'), false, title);
+    }
+    assert.equal(
+      namesCatalog('VA - Road Hits Collection (2011)', 'Various Artists'),
+      false
+    );
+  });
+
+  it('takes a song from the album’s folder of a pack, never a live album’s', () => {
+    const files = [
+      {
+        index: 0,
+        path: 'P/2010 - Live at the Pier/02 - Lantern Song.mp3',
+        size: 9 * MB,
+      },
+      {
+        index: 1,
+        path: 'P/Singles/2014 - Lantern Song/01 - Lantern Song.mp3',
+        size: 9 * MB,
+      },
+      {
+        index: 2,
+        path: 'P/1997 - Static Garden/02 - Lantern Song.mp3',
+        size: 9 * MB,
+      },
+    ];
+    assert.equal(
+      fileInCatalog(files, 'Lantern Song', 'Static Garden', 'Glasswing')?.index,
+      2
+    );
+    // Without the album's folder: any other, but the live album's.
+    const other = fileInCatalog(
+      files.slice(0, 2),
+      'Lantern Song',
+      'Harbour Lights',
+      'Glasswing'
+    );
+    assert.equal(other?.index, 1);
+    assert.equal(
+      fileInCatalog(
+        files.slice(0, 1),
+        'Lantern Song',
+        'Static Garden',
+        'Glasswing'
+      ),
+      undefined
     );
   });
 

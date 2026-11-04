@@ -2276,7 +2276,7 @@
   "components.Common.FeatureSwitches.aiAgent": "管理エージェント",
   "components.Common.FeatureSwitches.aiAgentTip": "Backfill が見つけられないものを、自動または管理者の依頼で探します。タイトル、エピソード一覧、リリース名を送信",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill のAI再確認",
-  "components.Common.FeatureSwitches.aiBackfillTip": "名前があいまいなパックのファイルを割り当て、管理者が確認します。シリーズ、エピソード名、ファイル名を送信",
+  "components.Common.FeatureSwitches.aiBackfillTip": "名前があいまいなパックのファイルを割り当てて管理者が確認し、ほかでは見つからない曲が入っていそうなリリースを挙げます。シリーズ名、曲名、エピソード名、リリース名、ファイル名を送信",
   "components.Common.FeatureSwitches.aiChat": "AI検索",
   "components.Common.FeatureSwitches.aiChatTip": "検索欄の横の AI ボタン: 欲しいものを入力します。メッセージと最近見たタイトルを送信",
   "components.Common.FeatureSwitches.aiDeletionReview": "削除の確認",

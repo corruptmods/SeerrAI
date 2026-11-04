@@ -2310,7 +2310,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Beheeragent",
   "components.Common.FeatureSwitches.aiAgentTip": "Vindt wat Backfill niet vindt, uit zichzelf of als een beheerder het vraagt. Stuurt titels, afleveringslijsten en releasenamen",
   "components.Common.FeatureSwitches.aiBackfill": "Tweede mening voor Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Plaatst packbestanden met onduidelijke namen, zodat een beheerder ze kan controleren. Stuurt de serie, afleveringstitels en bestandsnamen",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Plaatst pakketbestanden met onduidelijke namen, zodat een beheerder ze controleert, en noemt de releases die waarschijnlijk een nummer bevatten dat niets anders vindt. Stuurt serie- en nummertitels, afleveringstitels en release- en bestandsnamen",
   "components.Common.FeatureSwitches.aiChat": "AI-zoeken",
   "components.Common.FeatureSwitches.aiChatTip": "De AI-knop naast het zoekveld: beschrijf wat je wilt. Stuurt je bericht en recent bekeken titels",
   "components.Common.FeatureSwitches.aiDeletionReview": "Verwijderingen nakijken",

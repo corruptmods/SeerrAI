@@ -105,6 +105,79 @@ const namesAlbumAs = (
   return a === by ? timesIn(t, a) >= 2 : timesIn(t, by) > 0;
 };
 
+/** What a pack of everything an artist put out is called, after their name. */
+const CATALOG =
+  /\b(discography|discografia|diskografie|collection|anthology|singles|complete (albums|works|discography|collection)|\d+ (albums?|releases|singles|eps))\b/;
+
+/**
+ * Whether a release's name is a pack of the artist's own releases: their
+ * discography or a collection, named for them first ("Artist - Discography
+ * 2011-2021", "(Country) Artist - Collection: 25 Releases"), not another
+ * artist's that features them, nor Various Artists'.
+ */
+export const namesCatalog = (title: string, artist: string): boolean => {
+  // Tags in front of the name: "(Country)", "[TR24][OF]".
+  const name = title
+    .replace(/(?:"|%22)[^"]*?(?:"|%22)/g, ' ')
+    .replace(/^\s*(?:[([][^)\]]*[)\]]\s*)+/, '');
+  return FORMS.some((form) => {
+    const t = form(name);
+    const by = form(artist);
+    if (!by || by === 'various artists' || !t.startsWith(`${by} `)) {
+      return false;
+    }
+    return CATALOG.test(t.slice(by.length));
+  });
+};
+
+/**
+ * Whether a release's name says it is another version than `own` names (a
+ * live album, a remix album, a karaoke copy), its quoted file names aside.
+ */
+export const namesOtherVersion = (title: string, ...own: string[]): boolean =>
+  otherVersion(
+    ` ${words(title.replace(/(?:"|%22)[^"]*?(?:"|%22)/g, ' '))} `,
+    ` ${own.map(words).join(' ')} `
+  );
+
+/** Whether a release's name names the artist, as whole words. */
+export const namesArtist = (title: string, artist: string): boolean =>
+  FORMS.some((form) => {
+    const by = form(artist);
+    return !!by && timesIn(` ${form(title)} `, by) > 0;
+  });
+
+/** The folders a file is in, as one name. */
+const foldersOf = (path: string): string =>
+  path.replace(/\\/g, '/').split('/').slice(0, -1).join(' ');
+
+/**
+ * The song's file in a pack of the artist's releases: from the album's own
+ * folder when the pack has one, else from wherever it is named so. Never
+ * from a folder of another version than the album (a live album's "03 -
+ * Song.mp3" is named just as the song).
+ */
+export const fileInCatalog = <T extends ReleaseFile>(
+  files: T[],
+  track: string,
+  album: string,
+  artist: string
+): T | undefined => {
+  const own = ` ${words(album)} ${words(artist)} ${words(track)} `;
+  const usable = files.filter(
+    (file) => !otherVersion(` ${words(foldersOf(file.path))} `, own)
+  );
+  const inAlbum = usable.filter((file) =>
+    FORMS.some((form) =>
+      ` ${form(foldersOf(file.path))} `.includes(` ${form(album)} `)
+    )
+  );
+  return (
+    (inAlbum.length ? fileForTrack(inAlbum, track, artist) : undefined) ??
+    fileForTrack(usable, track, artist)
+  );
+};
+
 /** A file's name without its folder or extension. */
 const nameOf = (path: string): string =>
   (path.replace(/\\/g, '/').split('/').pop() ?? path).replace(AUDIO, '');

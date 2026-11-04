@@ -2295,7 +2295,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Agent d'administració",
   "components.Common.FeatureSwitches.aiAgentTip": "Troba el que Backfill no pot, pel seu compte o quan ho demana un administrador. Envia títols, llistes d’episodis i noms de versions",
   "components.Common.FeatureSwitches.aiBackfill": "Segona opinió de Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Col·loca fitxers de paquets amb noms poc clars perquè un administrador els revisi. Envia la sèrie, els títols d’episodis i els noms de fitxers",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Col·loca fitxers de paquets amb noms poc clars, perquè un administrador els revisi, i indica els llançaments que probablement contenen una cançó que res més no troba. Envia títols de sèries i cançons, títols d’episodis i noms de llançaments i fitxers",
   "components.Common.FeatureSwitches.aiChat": "Cerca amb IA",
   "components.Common.FeatureSwitches.aiChatTip": "El botó d’IA al costat de la cerca: descriviu què voleu. Envia el vostre missatge i els títols vistos fa poc",
   "components.Common.FeatureSwitches.aiDeletionReview": "Revisa les supressions",

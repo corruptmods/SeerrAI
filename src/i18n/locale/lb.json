@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Admin-Agent",
   "components.Common.FeatureSwitches.aiAgentTip": "Fënnt, wat Backfill net fënnt, eleng oder wann en Admin freet. Schéckt Titelen, Episodelëschten a Release-Nimm",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill: zweet Meenung",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Ordent Fichiere vu Päck mat onkloren Nimm zou, fir datt en Admin se kontrolléiert. Schéckt d’Serie, Episodentitelen a Fichiersnimm",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Verdeelt Pak-Fichiere mat onkloren Nimm, fir datt en Admin se kontrolléiert, a nennt d’Verëffentlechungen, déi wahrscheinlech e Lidd enthalen, dat soss näischt fënnt. Schéckt Serien- a Liddertitelen, Episodentitelen a Verëffentlechungs- a Fichiersnimm",
   "components.Common.FeatureSwitches.aiChat": "KI-Sich",
   "components.Common.FeatureSwitches.aiChatTip": "De KI-Knäppchen nieft der Sich: beschreift, wat Dir wëllt. Schéckt Äre Message a viru Kuerzem gekuckten Titelen",
   "components.Common.FeatureSwitches.aiDeletionReview": "Läschungen iwwerpréiwen",

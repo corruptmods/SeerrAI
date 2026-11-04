@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Agent de administrare",
   "components.Common.FeatureSwitches.aiAgentTip": "Găsește ce nu poate Backfill, singur sau la cererea unui administrator. Trimite titluri, liste de episoade și nume de lansări",
   "components.Common.FeatureSwitches.aiBackfill": "A doua opinie pentru Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Plasează fișierele din pachete cu nume neclare, pentru verificare de către un administrator. Trimite serialul, titlurile episoadelor și numele fișierelor",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Plasează fișierele din pachete cu nume neclare, pentru verificare de către un administrator, și numește lansările care probabil conțin o melodie pe care nimic altceva nu o găsește. Trimite titluri de seriale și melodii, titluri de episoade și nume de lansări și fișiere",
   "components.Common.FeatureSwitches.aiChat": "Căutare AI",
   "components.Common.FeatureSwitches.aiChatTip": "Butonul AI de lângă căutare: descrieți ce vreți. Trimite mesajul dumneavoastră și titlurile văzute recent",
   "components.Common.FeatureSwitches.aiDeletionReview": "Verificarea ștergerilor",

@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "وكيل المشرف",
   "components.Common.FeatureSwitches.aiAgentTip": "يجد ما لا يجده Backfill، بنفسه أو عند طلب مشرف. يرسل العناوين وقوائم الحلقات وأسماء الإصدارات",
   "components.Common.FeatureSwitches.aiBackfill": "رأي ثانٍ لـ Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "يوزّع ملفات الحزم ذات الأسماء غير الواضحة ليتحقق منها مشرف. يرسل المسلسل وعناوين الحلقات وأسماء الملفات",
+  "components.Common.FeatureSwitches.aiBackfillTip": "يضع ملفات الحزم ذات الأسماء غير الواضحة ليتحقق منها مسؤول، ويسمّي الإصدارات التي يُرجَّح أن تحتوي أغنية لا يجدها شيء آخر. يرسل عناوين المسلسلات والأغاني وعناوين الحلقات وأسماء الإصدارات والملفات",
   "components.Common.FeatureSwitches.aiChat": "البحث بالذكاء الاصطناعي",
   "components.Common.FeatureSwitches.aiChatTip": "زر الذكاء الاصطناعي بجانب البحث: صف ما تريد. يرسل رسالتك والعناوين التي شاهدتها مؤخرًا",
   "components.Common.FeatureSwitches.aiDeletionReview": "مراجعة الحذف",

@@ -2307,7 +2307,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Агент администратора",
   "components.Common.FeatureSwitches.aiAgentTip": "Находит то, что не нашёл Backfill, сам или по просьбе администратора. Отправляет названия, списки серий и имена релизов",
   "components.Common.FeatureSwitches.aiBackfill": "Второе мнение для Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Расставляет файлы паков с неясными именами для проверки администратором. Отправляет сериал, названия серий и имена файлов",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Распределяет файлы из паков с неясными названиями для проверки администратором и называет релизы, в которых, вероятно, есть песня, которую больше ничто не находит. Отправляет названия сериалов и песен, названия эпизодов, а также названия релизов и файлов",
   "components.Common.FeatureSwitches.aiChat": "ИИ-поиск",
   "components.Common.FeatureSwitches.aiChatTip": "Кнопка ИИ рядом с поиском: опишите, что хотите. Отправляет ваше сообщение и недавно просмотренное",
   "components.Common.FeatureSwitches.aiDeletionReview": "Проверка удалений",

@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Agjenti i administratorit",
   "components.Common.FeatureSwitches.aiAgentTip": "Gjen atë që Backfill nuk gjen, vetë ose kur e kërkon një administrator. Dërgon tituj, lista episodesh dhe emra publikimesh",
   "components.Common.FeatureSwitches.aiBackfill": "Mendimi i dytë për Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Vendos skedarët e paketave me emra të paqartë, që t’i kontrollojë një administrator. Dërgon serinë, titujt e episodeve dhe emrat e skedarëve",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Vendos skedarët e paketave me emra të paqartë, që t’i kontrollojë një administrator, dhe emërton botimet që ka gjasa të përmbajnë një këngë që asgjë tjetër nuk e gjen. Dërgon titujt e serialeve dhe të këngëve, titujt e episodeve dhe emrat e botimeve e të skedarëve",
   "components.Common.FeatureSwitches.aiChat": "Kërkim me AI",
   "components.Common.FeatureSwitches.aiChatTip": "Butoni AI pranë kërkimit: përshkruani çfarë doni. Dërgon mesazhin tuaj dhe titujt e parë së fundi",
   "components.Common.FeatureSwitches.aiDeletionReview": "Rishiko fshirjet",

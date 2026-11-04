@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Administratoriaus agentas",
   "components.Common.FeatureSwitches.aiAgentTip": "Randa, ko Backfill neranda, savarankiškai arba administratoriui paprašius. Siunčia pavadinimus, serijų sąrašus ir leidimų pavadinimus",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill antroji nuomonė",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Priskiria neaiškiai pavadintus paketo failus, kad administratorius patikrintų. Siunčia serialą, serijų pavadinimus ir failų vardus",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Priskiria neaiškiais pavadinimais pavadintus paketų failus, kad juos patikrintų administratorius, ir nurodo leidimus, kuriuose tikriausiai yra daina, kurios niekas kitas neranda. Siunčia serialų ir dainų pavadinimus, epizodų pavadinimus bei leidimų ir failų pavadinimus",
   "components.Common.FeatureSwitches.aiChat": "DI paieška",
   "components.Common.FeatureSwitches.aiChatTip": "DI mygtukas prie paieškos: aprašykite, ko norite. Siunčia jūsų žinutę ir neseniai žiūrėtus pavadinimus",
   "components.Common.FeatureSwitches.aiDeletionReview": "Trynimų peržiūra",

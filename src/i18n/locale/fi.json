@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Ylläpitoagentti",
   "components.Common.FeatureSwitches.aiAgentTip": "Löytää sen, mitä Backfill ei löydä, omatoimisesti tai ylläpitäjän pyynnöstä. Lähettää nimikkeet, jaksolistat ja julkaisujen nimet",
   "components.Common.FeatureSwitches.aiBackfill": "Backfillin toinen mielipide",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Sijoittaa epäselvästi nimetyt pakettitiedostot ylläpitäjän tarkistettaviksi. Lähettää sarjan, jaksojen nimet ja tiedostonimet",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Sijoittaa epäselvästi nimetyt pakettitiedostot ylläpitäjän tarkistettaviksi ja nimeää julkaisut, joissa on todennäköisesti kappale, jota mikään muu ei löydä. Lähettää sarjojen ja kappaleiden nimet, jaksojen nimet sekä julkaisujen ja tiedostojen nimet",
   "components.Common.FeatureSwitches.aiChat": "Tekoälyhaku",
   "components.Common.FeatureSwitches.aiChatTip": "Tekoälypainike hakukentän vieressä: kuvaile, mitä haluat. Lähettää viestisi ja äskettäin katsotut nimikkeet",
   "components.Common.FeatureSwitches.aiDeletionReview": "Tarkista poistot",

@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Agente amministratore",
   "components.Common.FeatureSwitches.aiAgentTip": "Trova ciò che Backfill non trova, da solo o su richiesta di un amministratore. Invia titoli, elenchi di episodi e nomi delle release",
   "components.Common.FeatureSwitches.aiBackfill": "Secondo parere per Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Colloca i file dei pacchetti con nomi poco chiari, per il controllo di un amministratore. Invia la serie, i titoli degli episodi e i nomi dei file",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Assegna i file dei pacchetti con nomi poco chiari, perché un admin li controlli, e indica le uscite che probabilmente contengono un brano che nient’altro trova. Invia titoli di serie e brani, titoli degli episodi e nomi di uscite e file",
   "components.Common.FeatureSwitches.aiChat": "Ricerca IA",
   "components.Common.FeatureSwitches.aiChatTip": "Il pulsante IA accanto alla ricerca: descrivi cosa vuoi. Invia il tuo messaggio e i titoli visti di recente",
   "components.Common.FeatureSwitches.aiDeletionReview": "Controlla le eliminazioni",

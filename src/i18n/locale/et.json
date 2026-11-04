@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Haldusagent",
   "components.Common.FeatureSwitches.aiAgentTip": "Leiab, mida Backfill ei leia, omal algatusel või administraatori palvel. Saadab pealkirjad, osade loendid ja väljalaskenimed",
   "components.Common.FeatureSwitches.aiBackfill": "Backfilli teine arvamus",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Paigutab ebaselgete nimedega paketifailid administraatori kontrolliks. Saadab sarja, osade pealkirjad ja failinimed",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Paigutab ebaselgete nimedega paketifailid administraatorile kontrollimiseks ja nimetab väljaanded, milles on tõenäoliselt lugu, mida miski muu ei leia. Saadab sarjade ja lugude pealkirjad, osade pealkirjad ning väljaannete ja failide nimed",
   "components.Common.FeatureSwitches.aiChat": "AI-otsing",
   "components.Common.FeatureSwitches.aiChatTip": "Tehisaru nupp otsingukasti kõrval: kirjelda, mida tahad. Saadab sinu sõnumi ja hiljuti vaadatud pealkirjad",
   "components.Common.FeatureSwitches.aiDeletionReview": "Kustutuste ülevaatus",

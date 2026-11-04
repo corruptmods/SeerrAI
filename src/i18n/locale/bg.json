@@ -2272,7 +2272,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Администраторски агент",
   "components.Common.FeatureSwitches.aiAgentTip": "Намира това, което Backfill не може, сам или по молба на администратор. Изпраща заглавия, списъци с епизоди и имена на издания",
   "components.Common.FeatureSwitches.aiBackfill": "Второ мнение за Backfill",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Разпределя файлове от пакети с неясни имена за проверка от администратор. Изпраща сериала, имената на епизодите и файловете",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Разпределя файлове от пакети с неясни имена, за проверка от администратор, и посочва изданията, в които вероятно има песен, която нищо друго не намира. Изпраща заглавия на сериали и песни, заглавия на епизоди и имена на издания и файлове",
   "components.Common.FeatureSwitches.aiChat": "AI търсене",
   "components.Common.FeatureSwitches.aiChatTip": "Бутонът AI до търсенето: опишете какво искате. Изпраща съобщението Ви и наскоро гледани заглавия",
   "components.Common.FeatureSwitches.aiDeletionReview": "Преглед на изтриванията",

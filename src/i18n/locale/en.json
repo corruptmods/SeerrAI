@@ -632,7 +632,7 @@
   "components.Common.FeatureSwitches.aiAgent": "Admin Agent",
   "components.Common.FeatureSwitches.aiAgentTip": "Finds what Backfill can’t, on its own or when an admin asks. Sends titles, episode lists and release names",
   "components.Common.FeatureSwitches.aiBackfill": "Backfill Second Opinion",
-  "components.Common.FeatureSwitches.aiBackfillTip": "Places pack files with unclear names, for an admin to check. Sends the series, episode titles and file names",
+  "components.Common.FeatureSwitches.aiBackfillTip": "Places pack files with unclear names, for an admin to check, and names the releases likely to hold a song nothing else finds. Sends series and song titles, episode titles, and release and file names",
   "components.Common.FeatureSwitches.aiChat": "AI Search",
   "components.Common.FeatureSwitches.aiChatTip": "The AI button by the search box: describe what you want. Sends your message and recently watched titles",
   "components.Common.FeatureSwitches.aiDeletionReview": "Review Deletions",

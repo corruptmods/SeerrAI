@@ -37,6 +37,18 @@ const isDismissed = (userId: number): boolean => {
   return Date.now() - dismissedAt < DISMISS_DAYS * 24 * 60 * 60 * 1000;
 };
 
+/**
+ * Not asked again for a while: dismissed here, or turned off in their own
+ * web push settings, which says as much.
+ */
+export const dismissPushOptIn = (userId: number) => {
+  try {
+    localStorage.setItem(dismissKey(userId), String(Date.now()));
+  } catch {
+    // Storage unavailable (private browsing): not kept past this page.
+  }
+};
+
 const PushOptInBanner = () => {
   const intl = useIntl();
   const { user } = useUser();
@@ -50,15 +62,18 @@ const PushOptInBanner = () => {
     setDismissed(userId ? isDismissed(userId) : undefined);
   }, [userId]);
 
+  // Turning it off in web push settings dismisses this too, on that page.
+  useEffect(() => {
+    if (userId && state === 'prompt' && isDismissed(userId)) {
+      setDismissed(true);
+    }
+  }, [userId, state]);
+
   const handleDismiss = useCallback(() => {
     if (!userId) {
       return;
     }
-    try {
-      localStorage.setItem(dismissKey(userId), String(Date.now()));
-    } catch {
-      // Dismissed for this visit only.
-    }
+    dismissPushOptIn(userId);
     setDismissed(true);
   }, [userId]);
 

@@ -62,6 +62,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - Changing a series request to no seasons answers that seasons are missing, instead of an error.
 
+- Web push settings could offer **Enable web push** on a device already getting notifications. It's now a checkbox at the top, ticked when this device gets them. Turning it off no longer brings up the banner asking to turn it on, and someone else's settings have no switch, as it would be your own device's.
+
 - Opening a page soon after Seerr AI loads, on a slow connection, no longer sends you through the sign-in page or loses your settings for the rest of the visit. Before, posters then came straight from TMDB instead of through Seerr AI, music and AI were hidden, and the tab's title was blank. The first page you open from another also no longer downloads the English strings, which Seerr AI already has.
 
 - Songs coming from Soulseek carry on when slskd restarts: what slskd hadn't finished is asked of the same sharer again, into the same folder, instead of that sharer being passed over. While slskd isn't answering, songs only Soulseek might have are looked for again every half hour, without counting it as a search that found nothing.

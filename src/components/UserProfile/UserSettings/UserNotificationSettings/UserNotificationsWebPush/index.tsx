@@ -5,30 +5,23 @@ import SaveBar from '@app/components/Common/SaveBar';
 import NotificationTypeSelector, {
   WEB_PUSH_STARTING_TYPES,
 } from '@app/components/NotificationTypeSelector';
+import { dismissPushOptIn } from '@app/components/PushOptIn/PushOptInBanner';
+import { pushOptInMessages } from '@app/components/PushOptIn/PushOptInContent';
 import DeviceItem from '@app/components/UserProfile/UserSettings/UserNotificationSettings/UserNotificationsWebPush/DeviceItem';
-import useSettings from '@app/hooks/useSettings';
+import type { PushDeviceState } from '@app/hooks/usePushDeviceState';
+import usePushDeviceState from '@app/hooks/usePushDeviceState';
 import useToasts from '@app/hooks/useToasts';
 import { useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import {
-  getPushOptIn,
-  getPushSubscription,
-  setPushOptIn,
-  unsubscribeToPushNotifications,
-  verifyAndResubscribePushSubscription,
-  verifyPushSubscription,
-} from '@app/utils/pushSubscriptionHelpers';
+import { getPushSubscription } from '@app/utils/pushSubscriptionHelpers';
 import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
-import {
-  CloudArrowDownIcon,
-  CloudArrowUpIcon,
-} from '@heroicons/react/24/solid';
 import type { UserSettingsNotificationsResponse } from '@server/interfaces/api/userSettingsInterfaces';
 import axios from 'axios';
 import { Form, Formik } from 'formik';
 import { useRouter } from 'next/router';
 import { useEffect, useMemo, useState } from 'react';
+import type { MessageDescriptor } from 'react-intl';
 import { useIntl } from 'react-intl';
 import useSWR, { mutate } from 'swr';
 
@@ -38,7 +31,8 @@ const messages = defineMessages(
     webpushsettingssaved: 'Web push notification settings saved successfully!',
     webpushsettingsfailed: 'Web push notification settings failed to save.',
     enablewebpush: 'Enable web push',
-    disablewebpush: 'Disable web push',
+    thisdevice:
+      'For this device only. Your other devices are under Manage Devices.',
     managedevices: 'Manage Devices',
     type: 'type',
     created: 'Created',
@@ -54,14 +48,29 @@ const messages = defineMessages(
   }
 );
 
+/** Why this device can't be switched on or off here, when it can't. */
+const UNAVAILABLE: Partial<Record<PushDeviceState, MessageDescriptor>> = {
+  denied: pushOptInMessages.denieddescription,
+  'blocked-by-browser': pushOptInMessages.blockeddescription,
+  'needs-install': pushOptInMessages.installdescription,
+  webview: pushOptInMessages.webviewdescription,
+  unsupported: pushOptInMessages.unsupporteddescription,
+};
+
 const UserWebPushSettings = () => {
   const intl = useIntl();
   const { addToast } = useToasts();
   const router = useRouter();
   const { user } = useUser({ id: Number(router.query.userId) });
-  const { currentSettings } = useSettings();
-  const [webPushEnabled, setWebPushEnabled] = useState(false);
+  const { user: signedIn } = useUser();
+  const device = usePushDeviceState();
+  const [switching, setSwitching] = useState(false);
   const [subEndpoint, setSubEndpoint] = useState<string | null>(null);
+  // This device is the signed-in person's to switch: on someone else's
+  // settings, only their devices are listed. Nor is there one while web
+  // push is off for everyone.
+  const showSwitch =
+    !!user && user.id === signedIn?.id && device.state !== 'disabled';
   const {
     data,
     error,
@@ -81,84 +90,32 @@ const UserWebPushSettings = () => {
     revalidateOnMount: true,
   });
 
-  // Subscribes to the push manager
-  // Will only add to the database if subscribing for the first time
-  const enablePushNotifications = async () => {
-    try {
-      const isSubscribed = await verifyAndResubscribePushSubscription(
-        user?.id,
-        currentSettings
-      );
-
-      if (isSubscribed) {
-        setPushOptIn(user?.id, true);
-        setWebPushEnabled(true);
-        addToast(intl.formatMessage(messages.webpushhasbeenenabled), {
-          appearance: 'success',
-          autoDismiss: true,
-        });
-      } else {
-        throw new Error('Subscription failed');
-      }
-    } catch {
-      addToast(intl.formatMessage(messages.enablingwebpusherror), {
-        appearance: 'error',
-        autoDismiss: true,
-      });
-    } finally {
-      revalidateDevices();
+  // Takes effect at once, as the browser asks for its permission on the
+  // click itself.
+  const switchThisDevice = async (on: boolean) => {
+    if (!user) {
+      return;
     }
-  };
-
-  // Unsubscribes from the push manager
-  // Deletes/disables corresponding push subscription from database
-  const disablePushNotifications = async (endpoint?: string) => {
-    try {
-      // Only touch the browser subscription if it actually belongs to
-      // this user. Otherwise we'd silently kill a sibling user's working
-      // subscription if they happened to be using the same browser.
-      const ownsBrowserSubscription = await verifyPushSubscription(
-        user?.id,
-        currentSettings
-      );
-
-      let unsubscribedEndpoint: string | null = null;
-      if (ownsBrowserSubscription) {
-        unsubscribedEndpoint = await unsubscribeToPushNotifications(
-          user?.id,
-          endpoint
-        );
-      }
-
-      setPushOptIn(user?.id, false);
-      setWebPushEnabled(false);
-
-      // Only delete the current browser's subscription, not all devices
-      const endpointToDelete = unsubscribedEndpoint || subEndpoint || endpoint;
-      if (endpointToDelete && ownsBrowserSubscription) {
-        try {
-          await axios.delete(
-            `/api/v1/user/${user?.id}/pushSubscription/${encodeURIComponent(
-              endpointToDelete
-            )}`
-          );
-        } catch {
-          // Ignore deletion failures - backend cleanup is best effort
-        }
-      }
-
-      addToast(intl.formatMessage(messages.webpushhasbeendisabled), {
-        autoDismiss: true,
-        appearance: 'success',
-      });
-    } catch {
-      addToast(intl.formatMessage(messages.disablingwebpusherror), {
-        autoDismiss: true,
-        appearance: 'error',
-      });
-    } finally {
-      revalidateDevices();
+    setSwitching(true);
+    if (!on) {
+      // Before, so the banner asking to turn it on doesn't come up instead.
+      dismissPushOptIn(user.id);
     }
+    const done = on ? await device.subscribe() : await device.unsubscribe();
+    setSwitching(false);
+
+    addToast(
+      intl.formatMessage(
+        done
+          ? on
+            ? messages.webpushhasbeenenabled
+            : messages.webpushhasbeendisabled
+          : on
+            ? messages.enablingwebpusherror
+            : messages.disablingwebpusherror
+      ),
+      { appearance: done ? 'success' : 'error', autoDismiss: true }
+    );
   };
 
   const deletePushSubscriptionFromBackend = async (endpoint: string) => {
@@ -183,36 +140,23 @@ const UserWebPushSettings = () => {
     }
   };
 
+  // This browser's subscription, to mark its device in the list.
   useEffect(() => {
-    const verifyWebPush = async () => {
-      const isEnabled = await verifyPushSubscription(user?.id, currentSettings);
-
-      setWebPushEnabled(isEnabled);
-      if (getPushOptIn(user?.id) === null) {
-        setPushOptIn(user?.id, isEnabled);
-      }
-    };
-
-    if (user?.id) {
-      verifyWebPush();
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      return;
     }
-  }, [user?.id, currentSettings]);
-
-  useEffect(() => {
-    const getSubscriptionEndpoint = async () => {
-      if ('serviceWorker' in navigator && 'PushManager' in window) {
-        const { subscription } = await getPushSubscription();
-
-        if (subscription) {
-          setSubEndpoint(subscription.endpoint);
-        } else {
-          setSubEndpoint(null);
+    let current = true;
+    getPushSubscription()
+      .then(({ subscription }) => {
+        if (current) {
+          setSubEndpoint(subscription?.endpoint ?? null);
         }
-      }
+      })
+      .catch(() => undefined);
+    return () => {
+      current = false;
     };
-
-    getSubscriptionEndpoint();
-  }, [webPushEnabled]);
+  }, [device.state]);
 
   const sortedDevices = useMemo(() => {
     if (!dataDevices || !subEndpoint) {
@@ -287,6 +231,31 @@ const UserWebPushSettings = () => {
         }) => {
           return (
             <Form className="section">
+              {showSwitch && (
+                <div className="form-row">
+                  <label htmlFor="thisDevice" className="checkbox-label">
+                    {intl.formatMessage(messages.enablewebpush)}
+                    <span className="label-tip">
+                      {intl.formatMessage(
+                        UNAVAILABLE[device.state] ?? messages.thisdevice
+                      )}
+                    </span>
+                  </label>
+                  <div className="form-input-area">
+                    <input
+                      type="checkbox"
+                      id="thisDevice"
+                      checked={device.state === 'registered'}
+                      disabled={
+                        switching ||
+                        (device.state !== 'registered' &&
+                          device.state !== 'prompt')
+                      }
+                      onChange={(e) => switchThisDevice(e.target.checked)}
+                    />
+                  </div>
+                </div>
+              )}
               <NotificationTypeSelector
                 user={user}
                 currentTypes={values.types}
@@ -302,28 +271,6 @@ const UserWebPushSettings = () => {
               />
               <SaveBar>
                 <div className="flex justify-end">
-                  <span className="ml-3 inline-flex rounded-md shadow-sm">
-                    <Button
-                      buttonType={`${webPushEnabled ? 'danger' : 'primary'}`}
-                      type="button"
-                      onClick={() =>
-                        webPushEnabled
-                          ? disablePushNotifications()
-                          : enablePushNotifications()
-                      }
-                    >
-                      {webPushEnabled ? (
-                        <CloudArrowDownIcon />
-                      ) : (
-                        <CloudArrowUpIcon />
-                      )}
-                      <span>
-                        {webPushEnabled
-                          ? intl.formatMessage(messages.disablewebpush)
-                          : intl.formatMessage(messages.enablewebpush)}
-                      </span>
-                    </Button>
-                  </span>
                   <span className="ml-3 inline-flex rounded-md shadow-sm">
                     <Button
                       buttonType="primary"

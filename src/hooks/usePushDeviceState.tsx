@@ -13,6 +13,7 @@ import {
   setPushOptIn,
   subscribeToPushNotifications,
 } from '@app/utils/pushSubscriptionHelpers';
+import axios from 'axios';
 import type React from 'react';
 import {
   createContext,
@@ -41,6 +42,8 @@ interface PushSubscriptionRecord {
 interface UsePushDeviceState {
   state: PushDeviceState;
   subscribe: () => Promise<boolean>;
+  /** Stops notifications to this device for the person signed in. */
+  unsubscribe: () => Promise<boolean>;
   revalidate: () => void;
 }
 
@@ -191,7 +194,46 @@ const usePushDeviceStateInternal = (): UsePushDeviceState => {
     }
   }, [user?.id, currentSettings, mutate]);
 
-  return { state, subscribe, revalidate: mutate };
+  const unsubscribe = useCallback(async () => {
+    if (!user?.id) {
+      return false;
+    }
+
+    try {
+      const { subscription } = await getPushSubscription();
+      const endpoint = subscription?.endpoint;
+
+      // Only theirs: a subscription someone else left here is let go of when
+      // the device state is worked out (above), not taken from the server
+      // under this person's name.
+      if (
+        subscription &&
+        endpoint &&
+        (devices ?? []).some((device) => device.endpoint === endpoint)
+      ) {
+        await subscription.unsubscribe();
+        try {
+          await axios.delete(
+            `/api/v1/user/${user.id}/pushSubscription/${encodeURIComponent(
+              endpoint
+            )}`
+          );
+        } catch {
+          // The server drops it anyway, once the push service says it's gone.
+        }
+      }
+
+      // Remembered, so the device isn't subscribed again by itself.
+      setPushOptIn(user.id, false);
+      await mutate();
+      setState('prompt');
+      return true;
+    } catch {
+      return false;
+    }
+  }, [user?.id, devices, mutate]);
+
+  return { state, subscribe, unsubscribe, revalidate: mutate };
 };
 
 const PushDeviceContext = createContext<UsePushDeviceState | null>(null);

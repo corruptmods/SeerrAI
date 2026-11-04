@@ -73,7 +73,21 @@ export interface LidarrManualImportItem {
   name?: string;
   size?: number;
   quality?: LidarrQualityModel;
+  /** What the file's own tags say: its title, and its length ("00:03:41.5"). */
+  audioTags?: { title?: string; duration?: string };
 }
+
+/** A length as Lidarr writes it ("00:03:41.5", "1.02:03:04"), in ms. */
+export const lidarrDuration = (text: string | undefined): number | null => {
+  const parts = text?.match(/^(?:(\d+)\.)?(\d+):(\d+):(\d+(?:\.\d+)?)$/);
+  if (!parts) return null;
+  const [, days, hours, minutes, seconds] = parts;
+  return Math.round(
+    (((Number(days ?? 0) * 24 + Number(hours)) * 60 + Number(minutes)) * 60 +
+      Number(seconds)) *
+      1000
+  );
+};
 
 /** Which protocol Lidarr prefers, for the artists with its tags. */
 export interface LidarrDelayProfile {
@@ -280,6 +294,23 @@ class LidarrAPI extends ServarrBase<LidarrQueueAppend> {
       return response.data;
     } catch (e) {
       this.fail('retrieve albums', e);
+    }
+  };
+
+  /**
+   * The album Lidarr has with this MusicBrainz id, under whichever of its
+   * artists (a duet is kept under the artist credited first).
+   */
+  public findAlbum = async (
+    albumMbid: string
+  ): Promise<LidarrAlbum | undefined> => {
+    try {
+      const response = await this.axios.get<LidarrAlbum[]>('/album', {
+        params: { foreignAlbumId: albumMbid },
+      });
+      return response.data.find((a) => a.foreignAlbumId === albumMbid);
+    } catch (e) {
+      this.fail('retrieve the album', e);
     }
   };
 

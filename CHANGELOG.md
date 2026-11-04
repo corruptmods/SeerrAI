@@ -26,6 +26,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Fixed
 
+- A requested song whose single's download Lidarr holds back because its tags are too far from the edition ("album match is not close enough": a featured artist in the tags, another year or country) is imported on its own, as one missing tracks already was. Only when the download is named as the single, and the file is named as the song and, by its own tags, is the same take and as long as the track. When one can't be imported, the log says why.
+
+- A song whose album Lidarr already has under another artist (a duet, kept under the singer credited first) is taken into that album, instead of failing again and again with "This album has already been added".
+
 - When Lidarr refuses something (adding an album, say), the log says why, in Lidarr's words, not only "status code 400".
 
 - A song asked for again starts within a minute or so, instead of waiting behind every album due a search (after an update, all of them): setting up albums, starting downloads and imports now come before searches.

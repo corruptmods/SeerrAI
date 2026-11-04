@@ -175,16 +175,63 @@ describe('a download Lidarr held back', () => {
     assert.equal(imports().length, 0, 'the song isn’t in it');
   });
 
-  it('is left alone when it may not be the single', async () => {
+  it('is imported when only its tags are too far, the file being the song by its own tags', async () => {
+    await requestSong();
+    lidarr.tracks.set(40, [
+      {
+        id: 601,
+        albumId: 40,
+        title: 'Lantern Song',
+        duration: 200_000,
+        hasFile: false,
+      },
+    ]);
+    const tooFar = (downloadId: string) =>
+      held({
+        downloadId,
+        statusMessages: [
+          {
+            title: 'Lantern Song.mp3',
+            messages: [
+              'Album match is not close enough: 77.7 % vs 80 % [artist, country, label]',
+            ],
+          },
+        ],
+      });
+    const file = (title: string, duration: string) => [
+      {
+        path: `${FOLDER}/01 Lantern Song.mp3`,
+        size: 8 * MB,
+        audioTags: { title, duration },
+      },
+    ];
+
+    // Tagged as another take, or far longer: not the song.
+    lidarr.folders.set(FOLDER, file('Lantern Song (Live)', '00:03:21.0'));
+    lidarr.queue = [tooFar('HASH5')];
+    await blockedImports.run();
+    lidarr.folders.set(FOLDER, file('Lantern Song', '00:05:02.0'));
+    lidarr.queue = [tooFar('HASH6')];
+    await blockedImports.run();
+    assert.equal(imports().length, 0);
+
+    // As long as the track, and the same take: it is the song.
+    lidarr.folders.set(FOLDER, file('Lantern Song', '00:03:21.4'));
+    lidarr.queue = [tooFar('HASH7')];
+    await blockedImports.run();
+    assert.deepEqual(
+      imports().map((f) => [f.trackIds, f.downloadId]),
+      [[[601], 'HASH7']]
+    );
+  });
+
+  it('is left alone when it isn’t named as the single, or for another reason', async () => {
     await requestSong();
     lidarr.queue = [
       held({
         downloadId: 'HASH3',
         statusMessages: [
-          {
-            title: 'Lantern Song.mp3',
-            messages: ['Album match is not close enough: 60% vs 80%'],
-          },
+          { title: 'Lantern Song.mp3', messages: ['Not an upgrade'] },
         ],
       }),
       held({

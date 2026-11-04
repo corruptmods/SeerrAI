@@ -580,9 +580,13 @@ class SongFetcher {
     fetch.lidarrArtistId = artist.id;
     await this.linkArtist(songs[0].request, server, artist);
 
-    let album: LidarrAlbum | undefined = (
-      await lidarr.getAlbums({ artistId: artist.id })
-    ).find((a) => a.foreignAlbumId === fetch.albumMbid);
+    let album: LidarrAlbum | undefined =
+      (await lidarr.getAlbums({ artistId: artist.id })).find(
+        (a) => a.foreignAlbumId === fetch.albumMbid
+      ) ??
+      // Under another of Lidarr's artists: a duet is kept under the one
+      // credited first. Lidarr keeps each album once, so it is used there.
+      (await lidarr.findAlbum(fetch.albumMbid));
     if (!album) {
       const found = await lidarr.lookupAlbum(fetch.albumMbid);
       if (!found) {
@@ -1878,7 +1882,8 @@ class SongFetcher {
         const path = paths.get(file.index)!;
         return {
           path,
-          artistId: fetch.lidarrArtistId!,
+          // The album's own artist, who may be another than the song's.
+          artistId: album.artistId || fetch.lidarrArtistId!,
           albumId: fetch.lidarrAlbumId!,
           albumReleaseId: release.id,
           trackIds: [file.trackId],

@@ -475,6 +475,79 @@ describe('taking a song from its album', () => {
     assert.equal(standing.get(LANTERN)?.status, MediaStatus.AVAILABLE);
   });
 
+  it('takes the song into the album Lidarr keeps under another of its artists', async () => {
+    // A duet: Lidarr has the album under the artist credited first, and
+    // won't add it again ("This album has already been added").
+    lidarr.artists.push({
+      id: 900,
+      artistName: 'Harbour Lights',
+      foreignArtistId: 'b1a2c3d4-0900-4000-8000-000000000900',
+      monitored: true,
+      qualityProfileId: 1,
+      metadataProfileId: 1,
+      tags: [],
+    });
+    lidarr.albums.push({
+      id: 901,
+      title: 'Static Garden',
+      foreignAlbumId: STATIC_GARDEN,
+      artistId: 900,
+      monitored: true,
+      releases: [
+        {
+          id: 9,
+          albumId: 901,
+          foreignReleaseId: 'r-static',
+          title: 'Static Garden',
+          monitored: true,
+        },
+      ],
+    });
+    lidarr.tracks.set(901, [
+      {
+        id: 501,
+        albumId: 901,
+        title: 'Opening',
+        foreignRecordingId: OPENING,
+        hasFile: false,
+      },
+      {
+        id: 502,
+        albumId: 901,
+        title: 'Lantern Song',
+        foreignRecordingId: LANTERN,
+        hasFile: false,
+      },
+    ]);
+    await requestSongs([LANTERN]);
+    await startFetching();
+    const fetch = await fetchOf();
+    assert.equal(fetch.status, 'downloading');
+    assert.equal(fetch.lidarrAlbumId, 901);
+    assert.equal(
+      lidarr.calls.some(
+        (c) => c.method === 'POST' && c.path === '/api/v1/album'
+      ),
+      false
+    );
+
+    done = true;
+    await songFetcher.tick();
+    const imported = lidarr.calls.find(
+      (c) =>
+        c.method === 'POST' &&
+        c.path === '/api/v1/command' &&
+        c.body?.name === 'ManualImport'
+    );
+    // Into the album's own artist, as Lidarr files it.
+    assert.deepEqual(
+      (imported?.body?.files as { artistId: number; albumId: number }[]).map(
+        (f) => [f.artistId, f.albumId]
+      ),
+      [[900, 901]]
+    );
+  });
+
   it('shows its download on the album and the song, as Lidarr’s are', async () => {
     await requestSongs([LANTERN]);
     await startFetching();

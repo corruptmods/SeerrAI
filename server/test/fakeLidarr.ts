@@ -210,7 +210,9 @@ export const createFakeLidarr = (): FakeLidarr => {
         200,
         fake.albums.filter(
           (album) =>
-            !query.artistId || album.artistId === Number(query.artistId)
+            (!query.artistId || album.artistId === Number(query.artistId)) &&
+            (!query.foreignAlbumId ||
+              album.foreignAlbumId === query.foreignAlbumId)
         ),
       ];
     }
@@ -247,6 +249,18 @@ export const createFakeLidarr = (): FakeLidarr => {
         return [
           400,
           [{ propertyName: 'Artist.ForeignArtistId', errorMessage: 'empty' }],
+        ];
+      }
+      // Lidarr keeps each album once, under one artist.
+      if (fake.albums.some((a) => a.foreignAlbumId === given.foreignAlbumId)) {
+        return [
+          400,
+          [
+            {
+              propertyName: 'ForeignAlbumId',
+              errorMessage: 'This album has already been added.',
+            },
+          ],
         ];
       }
       let artist = fake.artists.find((a) => a.id === given.artist.id);

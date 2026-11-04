@@ -36,6 +36,8 @@ interface ServerInstanceProps {
   logo?: React.ReactNode;
   /** Another service's detail line, in place of the active profile. */
   detail?: { label: string; value: string };
+  /** What the address line shows, for a service with no host and port of its own. */
+  address?: string;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -52,6 +54,7 @@ const ServerInstance = ({
   isSSL = false,
   isSonarr = false,
   externalUrl,
+  address,
   onEdit,
   onDelete,
 }: ServerInstanceProps) => {
@@ -98,12 +101,12 @@ const ServerInstance = ({
               {intl.formatMessage(messages.address)}
             </span>
             <a
-              href={internalUrl}
+              href={address ? serviceUrl : internalUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="transition duration-300 hover:text-strong hover:underline"
             >
-              {internalUrl}
+              {address ?? internalUrl}
             </a>
           </p>
           <p className="mt-1 break-words text-sm leading-5 text-gray-300">

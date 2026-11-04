@@ -28,13 +28,17 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### Changed
 
-- **Settings → Services**: Prowlarr and Soulseek are tiles with Edit and Delete, like the other services, and every service is listed first, one after another. The anime settings and Anime Check sit together in a section of their own below.
+- **Settings → Services**: Prowlarr, Soulseek and Trakt are tiles with Edit and Delete, like the other services, and every service is listed first, one after another. The anime settings and Anime Check sit together in a section of their own below.
+
+- **Lists**: a playlist's card turns over its album covers as a watch list's turns over its posters, and watch lists and playlists are shown in sections of their own.
+
+- **A playlist's page** shows its link, its song counts and the songs on their way as cards, with a bar of how many are downloading, being searched for and waiting to be searched again.
 
 ### Fixed
 
 - A playlist song matched by its ISRC to a recording MusicBrainz has only on others' compilations ("Now That's…") is matched to the artist's own single or album with the song instead, when that one is as long, so it can be requested. Songs that failed with "only on compilations" are matched again on update.
 
-- A music video posted under a single's name ("[1080p]", "x264") is no longer downloaded for a song, and a bootleg, rework or mash-up of a song is no longer taken for it.
+- A music video posted under a single's name ("[1080p]", "x264") is no longer downloaded for a song, and a bootleg, rework, mash-up or clean edit of a song is no longer taken for it.
 
 - A Soulseek search still running when Seerr AI is done waiting is stopped before it's cleared, so slskd no longer logs errors for it.
 

@@ -57,10 +57,11 @@ const messages = defineMessages('components.MediaLists.PlaylistSongs', {
   waitingToSearch:
     'Albums with nothing found yet, to be searched again later: {count}',
   searchAgain: 'Search again now',
-  summary:
-    '{requested} requested · {waiting} waiting · {finding} being found · {notFound} not found',
-  onItsWay:
-    'On their way: {downloading} downloading · {searching} being searched for · {later} to be searched again later',
+  statWaiting: 'Waiting',
+  statFinding: 'Being found',
+  onTheirWay: 'On their way',
+  beingSearched: 'Being searched for',
+  searchedLater: 'Searched again later',
   stepSearching: 'Searching',
   stepWaiting: 'Nothing found yet',
   stepFound: 'Found',
@@ -299,36 +300,90 @@ const PlaylistSongs = ({
     );
   };
 
+  // The songs on their way, by step: their share of the bar, and its key.
+  const way = [
+    {
+      key: 'downloading',
+      count: steps(['slot', 'downloading', 'importing']),
+      label: messages.stepDownloading,
+      bar: 'bg-green-500',
+    },
+    {
+      key: 'searching',
+      count: steps(['single', 'preparing', 'searching']),
+      label: messages.beingSearched,
+      bar: 'bg-indigo-500',
+    },
+    {
+      key: 'later',
+      count: steps(['waiting']),
+      label: messages.searchedLater,
+      bar: 'bg-yellow-500',
+    },
+  ];
+  const stats = [
+    {
+      key: 'requested',
+      count: count(['requested', 'approval', 'here']),
+      label: messages.requested,
+      tone: 'text-strong',
+    },
+    {
+      key: 'waiting',
+      count: count(['limit', 'queued']),
+      label: messages.statWaiting,
+      tone: 'text-strong',
+    },
+    {
+      key: 'finding',
+      count: count(['matching']),
+      label: messages.statFinding,
+      tone: 'text-strong',
+    },
+    {
+      key: 'notFound',
+      count: notFound.length,
+      label: messages.unmatched,
+      tone: notFound.length
+        ? 'text-red-400 light:text-danger-text'
+        : 'text-strong',
+    },
+  ];
+
   return (
     <div>
       {playlist.sourceUrl ? (
-        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted">
-          <LinkIcon className="h-4 w-4 flex-none" />
-          <a
-            href={playlist.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="hover:underline"
-          >
-            {intl.formatMessage(messages.linkedTo, {
-              name: playlist.sourceName ?? '',
-              service: SERVICE_NAMES[playlist.sourceService ?? ''] ?? '',
-            })}
-          </a>
-          {playlist.sourceReadAt && (
-            <span>
-              {intl.formatMessage(messages.readAt, {
-                time: intl.formatRelativeTime(
-                  Math.round(
-                    (new Date(playlist.sourceReadAt).getTime() - Date.now()) /
-                      3_600_000
-                  ),
-                  'hours',
-                  { numeric: 'auto' }
-                ),
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-subtle bg-surface px-4 py-3">
+          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-gray-700/60">
+            <LinkIcon className="h-4 w-4 text-gray-300" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <a
+              href={playlist.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="block break-words font-semibold text-strong hover:underline"
+            >
+              {intl.formatMessage(messages.linkedTo, {
+                name: playlist.sourceName ?? '',
+                service: SERVICE_NAMES[playlist.sourceService ?? ''] ?? '',
               })}
-            </span>
-          )}
+            </a>
+            {playlist.sourceReadAt && (
+              <span className="text-xs text-muted">
+                {intl.formatMessage(messages.readAt, {
+                  time: intl.formatRelativeTime(
+                    Math.round(
+                      (new Date(playlist.sourceReadAt).getTime() - Date.now()) /
+                        3_600_000
+                    ),
+                    'hours',
+                    { numeric: 'auto' }
+                  ),
+                })}
+              </span>
+            )}
+          </div>
           {isOwner && (
             <Button buttonSize="sm" onClick={onUnlink}>
               {intl.formatMessage(messages.unlink)}
@@ -356,34 +411,83 @@ const PlaylistSongs = ({
         <p className="text-muted">{intl.formatMessage(messages.empty)}</p>
       ) : (
         <>
-          <p className="mb-3 text-xs text-muted">
-            {intl.formatMessage(messages.summary, {
-              requested: count(['requested', 'approval', 'here']),
-              waiting: count(['limit', 'queued']),
-              finding: count(['matching']),
-              notFound: notFound.length,
-            })}
-          </p>
-          {onItsWay.length > 0 && (
-            <p className="mb-3 text-xs text-muted">
-              {intl.formatMessage(messages.onItsWay, {
-                downloading: steps(['slot', 'downloading', 'importing']),
-                searching: steps(['single', 'preparing', 'searching']),
-                later: steps(['waiting']),
-              })}
-            </p>
-          )}
-          {playlist.waitingToSearch > 0 && (
-            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted">
-              <span>
-                {intl.formatMessage(messages.waitingToSearch, {
-                  count: playlist.waitingToSearch,
-                })}
-              </span>
-              <Button buttonSize="sm" onClick={onSearchAgain}>
-                <ArrowPathIcon />
-                <span>{intl.formatMessage(messages.searchAgain)}</span>
-              </Button>
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {stats.map((stat) => (
+              <div
+                key={stat.key}
+                className="rounded-lg border border-subtle bg-surface px-4 py-3"
+              >
+                <div className={`text-2xl font-bold ${stat.tone}`}>
+                  {intl.formatNumber(stat.count)}
+                </div>
+                <div className="text-xs text-muted">
+                  {intl.formatMessage(stat.label)}
+                </div>
+              </div>
+            ))}
+          </div>
+          {(onItsWay.length > 0 || playlist.waitingToSearch > 0) && (
+            <div className="mb-6 rounded-lg border border-subtle bg-surface px-4 py-3">
+              {onItsWay.length > 0 && (
+                <>
+                  <div className="mb-2 flex items-baseline justify-between gap-3">
+                    <span className="text-sm font-semibold text-strong">
+                      {intl.formatMessage(messages.onTheirWay)}
+                    </span>
+                    <span className="text-xs text-muted">
+                      {intl.formatNumber(onItsWay.length)}
+                    </span>
+                  </div>
+                  <div className="flex h-2 overflow-hidden rounded-full bg-gray-700">
+                    {way
+                      .filter((part) => part.count)
+                      .map((part) => (
+                        <div
+                          key={part.key}
+                          className={part.bar}
+                          style={{
+                            width: `${(part.count / onItsWay.length) * 100}%`,
+                          }}
+                        />
+                      ))}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+                    {way.map((part) => (
+                      <span
+                        key={part.key}
+                        className="flex items-center gap-1.5"
+                      >
+                        <span
+                          className={`inline-block h-2 w-2 rounded-full ${part.bar}`}
+                        />
+                        {intl.formatMessage(part.label)}{' '}
+                        <span className="font-semibold text-strong">
+                          {intl.formatNumber(part.count)}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+              {playlist.waitingToSearch > 0 && (
+                <div
+                  className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-sm text-muted ${
+                    onItsWay.length > 0
+                      ? 'mt-3 border-t border-subtle pt-3'
+                      : ''
+                  }`}
+                >
+                  <span>
+                    {intl.formatMessage(messages.waitingToSearch, {
+                      count: playlist.waitingToSearch,
+                    })}
+                  </span>
+                  <Button buttonSize="sm" onClick={onSearchAgain}>
+                    <ArrowPathIcon />
+                    <span>{intl.formatMessage(messages.searchAgain)}</span>
+                  </Button>
+                </div>
+              )}
             </div>
           )}
           <ul className="mb-8 space-y-1">{found.map(row)}</ul>

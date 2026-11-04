@@ -68,25 +68,34 @@ const mixed = <T,>(items: T[], seed: number): T[] => {
 };
 
 /**
- * One tile of a card's mosaic. It opens on a poster already in place, part
+ * One tile of a card's mosaic. It opens on a picture already in place, part
  * way through its time, so a page of cards looks as if it had been running
  * a while: no fade in on arrival, and tiles turning over at their own
- * moments rather than together. Each new poster fades in over the one
- * before, which stays put underneath until it is covered.
+ * moments rather than together. Each new picture fades in over the one
+ * before, which stays put underneath until it is covered. A watch list's
+ * tiles show posters, a playlist's album covers.
  */
-const RotatingTile = ({
-  posters,
+const RotatingTile = <T,>({
+  items,
   seed,
+  slide,
 }: {
-  posters: { tmdbId: number; posterPath?: string | null }[];
+  items: T[];
   seed: number;
+  /** One picture of the tile, drawn with the class and style given. */
+  slide: (
+    item: T,
+    className: string,
+    style: React.CSSProperties,
+    key: number
+  ) => React.ReactNode;
 }) => {
-  const count = posters.length;
-  // Where this tile starts in its posters, and how far into the first
-  // poster's time it already is.
+  const count = items.length;
+  // Where this tile starts in its pictures, and how far into the first
+  // one's time it already is.
   const first = Math.floor(fraction(seed) * count);
   const phase = fraction(seed + 0.5);
-  // The poster shown and the one under it, by how many turns in each is.
+  // The picture shown and the one under it, by how many turns in each is.
   const [shown, setShown] = useState([0]);
 
   useEffect(() => {
@@ -122,29 +131,34 @@ const RotatingTile = ({
 
   return (
     <div className="list-mosaic-tile">
-      {shown.map((step) => (
-        <PosterBackground
-          key={step}
-          // Every poster after the first fades in; the class never changes
-          // on a poster once shown, so its drift is never restarted.
-          className={
-            step > 0 ? 'list-poster-slide entering' : 'list-poster-slide'
-          }
-          posterPath={posters[(first + step) % count].posterPath}
-          size={LIST_POSTER_SIZE}
-          style={{
+      {shown.map((step) =>
+        slide(
+          items[(first + step) % count],
+          // Every picture after the first fades in; the class never changes
+          // on one once shown, so its drift is never restarted.
+          step > 0 ? 'list-poster-slide entering' : 'list-poster-slide',
+          {
             animationDuration: `${CROSSFADE_SECONDS}s, ${
               SECONDS_PER_POSTER + CROSSFADE_SECONDS
             }s`,
-            // The first poster is part way through its slow drift already.
+            // The first picture is part way through its slow drift already.
             animationDelay:
               step === 0
                 ? `0s, -${(phase * SECONDS_PER_POSTER).toFixed(2)}s`
                 : '0s, 0s',
-          }}
-        />
-      ))}
+          },
+          step
+        )
+      )}
     </div>
+  );
+};
+
+/** Each tile's own share of the pictures, so no two tiles show the same one. */
+const shares = <T,>(items: T[]): T[][] => {
+  const tileCount = Math.min(items.length, TILE_COUNT);
+  return Array.from({ length: tileCount }, (_, tile) =>
+    items.filter((_, i) => i % tileCount === tile)
   );
 };
 
@@ -164,22 +178,17 @@ const ListCard = ({
   const intl = useIntl();
   const { currentSettings } = useSettings();
   const playlist = kind === 'music';
-  // A playlist's covers, as a still grid: up to as many tiles as posters.
-  const coverTiles = covers.slice(0, TILE_COUNT);
-  // A new start each visit: which posters each tile shows, and where in
+  // A new start each visit: which pictures each tile shows, and where in
   // them it begins. The same while the page stays open.
   const [visit] = useState(() => Math.floor(Math.random() * 1_000_000));
-  const posters = mixed(
-    previews.filter((p) => p.posterPath),
-    visit + index
+  // Each tile walks its own share, starting at a different place in it.
+  const posterTiles = shares(
+    mixed(
+      previews.filter((p) => p.posterPath),
+      visit + index
+    )
   );
-
-  const tileCount = Math.min(posters.length, TILE_COUNT);
-  // Each tile walks its own share of the posters, so no two tiles show the
-  // same one, and each starts at a different place in it.
-  const tiles = Array.from({ length: tileCount }, (_, tile) =>
-    posters.filter((_, i) => i % tileCount === tile)
-  );
+  const coverTiles = shares(mixed(covers, visit + index));
 
   return (
     <Link
@@ -191,30 +200,49 @@ const ListCard = ({
           className="list-mosaic"
           style={{ '--list-tiles': coverTiles.length } as React.CSSProperties}
         >
-          {coverTiles.map((albumMbid) => (
-            <div key={albumMbid} className="list-mosaic-tile">
-              <MusicImage
-                src={albumCoverUrl(albumMbid, !!currentSettings.cacheImages)}
-                fallback="album"
-                sizes="12rem"
-              />
-            </div>
+          {coverTiles.map((tileCovers, tileIndex) => (
+            <RotatingTile
+              key={`tile-${tileIndex}`}
+              items={tileCovers}
+              seed={visit + index * TILE_COUNT + tileIndex}
+              slide={(albumMbid, className, style, key) => (
+                <div key={key} className={className} style={style}>
+                  <MusicImage
+                    src={albumCoverUrl(
+                      albumMbid,
+                      !!currentSettings.cacheImages
+                    )}
+                    fallback="album"
+                    sizes="12rem"
+                  />
+                </div>
+              )}
+            />
           ))}
         </div>
       ) : playlist ? (
         <div className="absolute inset-0 flex items-center justify-center">
           <MusicalNoteIcon className="h-10 w-10 text-gray-600" />
         </div>
-      ) : posters.length > 0 ? (
+      ) : posterTiles.length > 0 ? (
         <div
           className="list-mosaic"
-          style={{ '--list-tiles': tileCount } as React.CSSProperties}
+          style={{ '--list-tiles': posterTiles.length } as React.CSSProperties}
         >
-          {tiles.map((tilePosters, tileIndex) => (
+          {posterTiles.map((tilePosters, tileIndex) => (
             <RotatingTile
               key={`tile-${tileIndex}`}
-              posters={tilePosters}
+              items={tilePosters}
               seed={visit + index * TILE_COUNT + tileIndex}
+              slide={(poster, className, style, key) => (
+                <PosterBackground
+                  key={key}
+                  className={className}
+                  posterPath={poster.posterPath}
+                  size={LIST_POSTER_SIZE}
+                  style={style}
+                />
+              )}
             />
           ))}
         </div>

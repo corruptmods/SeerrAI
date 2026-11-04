@@ -8,7 +8,11 @@ import useFeature from '@app/hooks/useFeature';
 import useToasts from '@app/hooks/useToasts';
 import { useUser } from '@app/hooks/useUser';
 import defineMessages from '@app/utils/defineMessages';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import {
+  FilmIcon,
+  MusicalNoteIcon,
+  PlusIcon,
+} from '@heroicons/react/24/outline';
 import axios from 'axios';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
@@ -25,6 +29,8 @@ const messages = defineMessages('components.MediaLists', {
     'You have no lists yet. Create a watch list for films and series, or a playlist for songs.',
   emptyWatch: 'You have no lists yet. Create one to start collecting titles.',
   createfailed: 'Could not create the list: {detail}',
+  watchLists: 'Watch Lists',
+  playlists: 'Playlists',
 });
 
 interface ListSummary {
@@ -98,6 +104,14 @@ const MediaLists = () => {
     return <ListCardsSkeleton />;
   }
 
+  // Watch lists, then playlists, each in its section.
+  const sections = (['watch', 'music'] as const)
+    .map((kind) => ({
+      kind,
+      lists: (lists ?? []).filter((list) => (list.kind ?? 'watch') === kind),
+    }))
+    .filter((section) => section.lists.length);
+
   return (
     <>
       {sharing && (
@@ -165,25 +179,51 @@ const MediaLists = () => {
       </div>
 
       {lists?.length ? (
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {lists.map((list, index) => (
-            <li key={`list-${list.id}`}>
-              <ListCard
-                id={list.id}
-                index={index}
-                isOwner={list.isOwner}
-                itemCount={list.itemCount}
-                watchedCount={list.watchedCount}
-                memberCount={list.memberCount}
-                name={list.name}
-                owner={list.owner}
-                previews={list.previews ?? []}
-                kind={list.kind ?? 'watch'}
-                covers={list.covers ?? []}
-              />
-            </li>
+        <div className="space-y-10">
+          {sections.map((section) => (
+            <section key={section.kind}>
+              {/* Headed only when both kinds are there, apart. */}
+              {sections.length > 1 && (
+                <h2 className="mb-4 flex items-center gap-2 border-b border-subtle pb-2 text-xl font-bold text-strong">
+                  {section.kind === 'music' ? (
+                    <MusicalNoteIcon className="h-5 w-5 text-muted" />
+                  ) : (
+                    <FilmIcon className="h-5 w-5 text-muted" />
+                  )}
+                  <span>
+                    {intl.formatMessage(
+                      section.kind === 'music'
+                        ? messages.playlists
+                        : messages.watchLists
+                    )}
+                  </span>
+                  <span className="text-sm font-normal text-muted">
+                    {section.lists.length}
+                  </span>
+                </h2>
+              )}
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {section.lists.map((list) => (
+                  <li key={`list-${list.id}`}>
+                    <ListCard
+                      id={list.id}
+                      index={lists.indexOf(list)}
+                      isOwner={list.isOwner}
+                      itemCount={list.itemCount}
+                      watchedCount={list.watchedCount}
+                      memberCount={list.memberCount}
+                      name={list.name}
+                      owner={list.owner}
+                      previews={list.previews ?? []}
+                      kind={list.kind ?? 'watch'}
+                      covers={list.covers ?? []}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       ) : (
         <p className="text-muted">
           {intl.formatMessage(musicOn ? messages.empty : messages.emptyWatch)}

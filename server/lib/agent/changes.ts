@@ -29,6 +29,8 @@ import { getSettings } from '@server/lib/settings';
 
 export type ChangeKind =
   | 'replace'
+  /** A grab outside Sonarr's or Radarr's size limits, through grab too. */
+  | 'oversizeGrab'
   | 'blockGroup'
   | 'unblockGroup'
   | 'markFailed'
@@ -89,7 +91,7 @@ const whereDeletedGo = async (api: FixRadarr | FixSonarr, app: string) => {
 // ---- describing ------------------------------------------------------------
 
 export interface ChangeInput {
-  kind: Exclude<ChangeKind, 'replace' | 'replaceSeason'>;
+  kind: Exclude<ChangeKind, 'replace' | 'oversizeGrab' | 'replaceSeason'>;
   title?: TitleRef;
   name?: string;
   group?: string;
@@ -515,7 +517,8 @@ export const applyChange = async (change: ProposedChange): Promise<string> => {
       return `Moved it to ${String(params.profileName)}${params.search ? ' and started a search' : ''}.`;
     }
     case 'replace':
-      throw new ChangeError('Replacing is done by the agent’s grab.');
+    case 'oversizeGrab':
+      throw new ChangeError('Downloading is done by the agent’s grab.');
     case 'replaceSeason': {
       const outcome = await applySeasonChange(change);
       if (!outcome.ok) throw new ChangeError(outcome.message);

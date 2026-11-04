@@ -41,6 +41,7 @@ import { baseName, canonicalName, isVideo } from '@server/lib/backfill/naming';
 import type { PlanEntry } from '@server/lib/backfill/plan';
 import { summarize } from '@server/lib/backfill/plan';
 import type { RadarrMovieDetail } from '@server/lib/backfill/radarr';
+import { sizeNote } from '@server/lib/backfill/sizeLimits';
 import { blockedGroupOf } from '@server/lib/blockedGroups';
 import { getSettings } from '@server/lib/settings';
 import { In } from 'typeorm';
@@ -73,6 +74,7 @@ const grabInput = z.object({
   certain: z.boolean().optional(),
   whole: z.boolean().optional(),
   replace: z.boolean().optional(),
+  over_size: z.boolean().optional(),
 });
 
 export type GrabInput = z.infer<typeof grabInput>;
@@ -901,7 +903,8 @@ const commitGrab = async (
  */
 const replaceProposal = (
   prepared: PreparedGrab,
-  args: GrabInput
+  args: GrabInput,
+  sizes?: string
 ): ProposedChange => {
   const { title, known, name, plan, targets, bytes } = prepared;
   const replaced = plan.filter((e) => e.action === 'upgrade');
@@ -924,6 +927,35 @@ const replaceProposal = (
       `Downloads "${known.title}" (${sizeOf(bytes)}, ${known.indexer}) through Backfill, only the files chosen.`,
       `For: ${targets.slice(0, 12).join('; ')}${targets.length > 12 ? ` and ${targets.length - 12} more` : ''}.`,
       `${app} imports each new file over the one there; until it has, the old file stays and can still be played.`,
+      ...(sizes ? [`${sizes}.`] : []),
+      ...(prepared.doubts.length
+        ? [`Doubts the agent waved through: ${prepared.doubts.join(' ')}`]
+        : []),
+      `Why: ${args.reason}`,
+    ],
+    params: { grab: { ...args, certain: true } },
+  };
+};
+
+/**
+ * A grab outside Sonarr's or Radarr's size limits, the best the agent
+ * found, for an admin to take or turn down. On approval it is checked
+ * again from scratch and started.
+ */
+const oversizeProposal = (
+  prepared: PreparedGrab,
+  args: GrabInput,
+  sizes: string
+): ProposedChange => {
+  const { title, known, name, targets, bytes } = prepared;
+  return {
+    kind: 'oversizeGrab',
+    headline: `Download ${name}, outside the size limits`,
+    title,
+    details: [
+      `Downloads "${known.title}" (${sizeOf(bytes)}, ${known.indexer}) through Backfill, only the files chosen.`,
+      `For: ${targets.slice(0, 12).join('; ')}${targets.length > 12 ? ` and ${targets.length - 12} more` : ''}.`,
+      `${sizes}. No release within the limits had the files.`,
       ...(prepared.doubts.length
         ? [`Doubts the agent waved through: ${prepared.doubts.join(' ')}`]
         : []),
@@ -976,6 +1008,11 @@ export const grab: AgentTool = {
         description:
           'For a Usenet post packed in archives or with scrambled names (release_files says so) whose name is exactly one missing episode or the movie: takes it whole. Give one file entry, index 0, with the season and episode.',
       },
+      over_size: {
+        type: 'boolean',
+        description:
+          "Only after grab said the release is outside Sonarr's or Radarr's size limits, and you found no release within them with the files: asks the admin to approve this one. Nothing starts until they do.",
+      },
       replace: {
         type: 'boolean',
         description:
@@ -992,14 +1029,29 @@ export const grab: AgentTool = {
         `Not started. Look again: ${prepared.doubts.slice(0, 8).join(' ')} Check the file names against the episode titles (and the release against the show). If you are sure it is right, call grab again with certain: true; if not, choose another release, or ask the admin.`
       );
     }
+    // Sonarr's and Radarr's size limits hold: outside them is the admin's
+    // call. Limits that cannot be read are no reason not to go on.
+    const outside = await backfill
+      .sizeProblemsFor(prepared.title, prepared.plan)
+      .catch(() => []);
+    const note = sizeNote(outside);
     if (prepared.plan.some((e) => e.action === 'upgrade')) {
       if (prepared.extend) {
         throw new ToolError(
           `Backfill job #${prepared.extend.id} is downloading this release now; files can be replaced from it once that is done.`
         );
       }
-      state.propose(replaceProposal(prepared, args));
+      state.propose(replaceProposal(prepared, args, note));
       return "Not started yet: replacing files needs the admin's approval, and they have been asked. Stop here; you hear what they decided next.";
+    }
+    if (note) {
+      if (!args.over_size) {
+        throw new ToolError(
+          `Not started. ${note}. Look for a release within the limits first. Only when none has the files, call grab again with over_size: true to ask the admin to approve this one.`
+        );
+      }
+      state.propose(oversizeProposal(prepared, args, note));
+      return "Not started yet: it is outside the size limits, so the admin's approval is needed, and they have been asked. Stop here; you hear what they decided next.";
     }
     return commitGrab(state, prepared, 'AI agent');
   },

@@ -1492,6 +1492,11 @@ describe('Backfill: stalled downloads, and the AI second opinion end to end', ()
       ...((parsed[title] as object) ?? {}),
     }));
     mock.method(BackfillSonarr.prototype, 'getEpisodeFiles', async () => []);
+    mock.method(
+      BackfillSonarr.prototype,
+      'getQualityDefinitions',
+      async () => []
+    );
     mock.method(BackfillSonarr.prototype, 'getQualityProfile', async () => ({
       id: 13,
       name: 'Anime 1080p',

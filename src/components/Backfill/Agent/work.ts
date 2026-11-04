@@ -75,6 +75,8 @@ export const changeIcon = (action: ActionKind): ChangeIcon => {
       return 'profile';
     case 'replace':
       return 'replace';
+    case 'oversizeGrab':
+      return 'download';
     default:
       return 'done';
   }

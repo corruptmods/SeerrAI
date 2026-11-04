@@ -429,6 +429,7 @@ beforeEach(() => {
   mock.method(radarr, 'getMovieDetail', async () => movie);
   mock.method(radarr, 'getMovieFile', async () => null);
   mock.method(radarr, 'getQualityProfile', async () => PROFILE);
+  mock.method(radarr, 'getQualityDefinitions', async () => []);
   mock.method(radarr, 'parse', async (title: string) => parse(title));
   mock.method(radarr, 'getRootFoldersNow', async () => [
     { path: '/movies', freeSpace: 50 * 1024 * GB },
@@ -610,6 +611,81 @@ describe('Backfill for movies: from Radarr’s wanted list to the library', () =
       waiting.stage,
       'Waiting for one of 0 running torrent movie downloads to finish'
     );
+  });
+
+  it('holds to Radarr’s size limits: outside them is only offered, never taken by itself', async () => {
+    getSettings().backfill = {
+      ...getSettings().backfill,
+      autoApprove: { enabled: true, minScore: -10_000, maxSizeGb: 100 },
+    };
+    // A 100-minute film: Bluray-1080p may be 10 MB a minute, about 1 GB;
+    // the release's file is 2 GB.
+    movie = { ...SECRETS, runtime: 100 };
+    mock.method(BackfillRadarr.prototype, 'getQualityDefinitions', async () => [
+      { quality: { id: 7, name: 'Bluray-1080p' }, minSize: 2, maxSize: 10 },
+    ]);
+    await backfill.scan();
+    const row = await getRepository(BackfillSeries).findOneOrFail({
+      where: { kind: 'movie', arrId: 55 },
+    });
+    while (backfill.isSearching(row.id)) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal(await getRepository(BackfillJob).count(), 0, 'not taken');
+    const offered = await getRepository(BackfillCandidate).findOneOrFail({
+      where: { seriesId: row.id },
+    });
+    assert.equal(offered.status, 'ready', 'the best there is, for an admin');
+    assert.equal(offered.summary?.outsideSize, 1);
+    assert.equal(
+      offered.reason,
+      "Outside the size limits: 2.0 GB is over Radarr's Bluray-1080p limit of 1.0 GB"
+    );
+
+    // Another release within them turns up: that one is offered, and taken.
+    mock.method(ProwlarrAPI.prototype, 'search', async () => [
+      RELEASE,
+      {
+        ...RELEASE,
+        guid: 'small',
+        title: 'Milo Thistle and the Vault of Echoes (2002) 1080p BluRay x265',
+        size: GB / 2,
+        infoHash: undefined,
+        downloadUrl: 'http://indexer/small.torrent',
+      },
+    ]);
+    mock.method(
+      ProwlarrAPI.prototype,
+      'fetchRelease',
+      async (r: ProwlarrRelease) =>
+        r.guid === 'small'
+          ? {
+              kind: 'torrent',
+              data: ben({
+                announce: 'udp://tracker',
+                info: {
+                  name: 'Milo Thistle and the Vault of Echoes (2002)',
+                  'piece length': 4194304,
+                  pieces: Buffer.alloc(20),
+                  files: [
+                    {
+                      length: GB / 2,
+                      path: [
+                        'Milo Thistle and the Vault of Echoes (2002) 1080p.mkv',
+                      ],
+                    },
+                  ],
+                },
+              }),
+            }
+          : { kind: 'torrent', data: TORRENT }
+    );
+    await backfill.search(row.id);
+    const all = await getRepository(BackfillCandidate).find({
+      where: { seriesId: row.id },
+    });
+    const big = all.find((c) => c.guid === RELEASE.guid);
+    assert.equal(big?.status, 'rejected', 'passed over for one within them');
   });
 
   it('never takes a torrent nobody seeds by itself, but takes it when it is seeded', async () => {
@@ -1182,6 +1258,7 @@ describe('Backfill: searching for what a series is missing', () => {
     ]);
     mock.method(sonarr, 'getEpisodeFiles', async () => []);
     mock.method(sonarr, 'getQualityProfile', async () => PROFILE);
+    mock.method(sonarr, 'getQualityDefinitions', async () => []);
     mock.method(sonarr, 'parse', async (title: string) => ({ title }));
     const queries: string[] = [];
     mock.method(ProwlarrAPI.prototype, 'search', async (query: string) => {
@@ -1280,6 +1357,7 @@ describe('Backfill: searching for what a series is missing', () => {
     ]);
     mock.method(sonarr, 'getEpisodeFiles', async () => []);
     mock.method(sonarr, 'getQualityProfile', async () => PROFILE);
+    mock.method(sonarr, 'getQualityDefinitions', async () => []);
     mock.method(sonarr, 'parse', async (title: string) => ({ title }));
     const queries: string[] = [];
     mock.method(ProwlarrAPI.prototype, 'search', async (query: string) => {

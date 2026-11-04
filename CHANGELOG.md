@@ -6,6 +6,8 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 ### New
 
+- **Backfill and the admin agent hold to Sonarr's and Radarr's size limits**: a file over (or under) its quality's size for its runtime is passed over when a release within the limits has it. When none does, the best is offered for you to approve or skip, never taken by itself; the agent asks the same way.
+
 - **Search on the Requests page**: a search box beside the filters finds requests by title (films and series as TMDB finds the words, music by artist, album or song), with the filters still applied.
 
 - **A song whose single Lidarr can't find is taken from an album instead**: older singles are seldom posted on their own, while their albums are. As soon as Lidarr's search for the single grabs nothing, the song is taken from the artist's album with the same recording, through Backfill, and Lidarr stops looking for the single. A song on no album is looked for by Seerr AI itself, from the single, searched again on the same schedule as albums. Songs already waiting move over on update, a few singles a minute.

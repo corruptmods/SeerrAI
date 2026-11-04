@@ -83,6 +83,14 @@ export interface PlanSummary {
   multi?: number;
   /** Why the second opinion could not be asked, when it could not. */
   aiNote?: string;
+  /**
+   * Files to be taken that are outside Sonarr's or Radarr's size limits:
+   * such a pack is offered only when nothing within them is, and never
+   * taken without an admin.
+   */
+  outsideSize?: number;
+  /** What is outside the limits, in words. */
+  sizeNote?: string;
 }
 
 /** A profile's qualities in order, lowest first, a group counting once. */

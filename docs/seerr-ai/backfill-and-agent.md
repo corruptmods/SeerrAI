@@ -13,6 +13,8 @@ Sonarr and Radarr search their indexers and give up quietly when nothing matches
 4. It offers the packs that fill what is missing, with a score and a plan for each file, and sends a **Backfill** notification; tap it to review Torrents with seeders come first. One its indexer says nobody seeds is listed after them and never approved by itself, and a torrent whose swarm has never had all of what's wanted is given up within its first hour, since an indexer's count of seeders is often old.
 5. When a pack is approved, it downloads only the chosen files to its own category, imports them through Sonarr or Radarr, and cleans up. Torrents aren't seeded afterwards.
 
+**Size limits**: each file is checked against Sonarr's or Radarr's size limits for its quality (the profile's own in Sonarr v5, otherwise Settings → Quality in Sonarr or Radarr), by the title's runtime, a file of several episodes allowed that many times one's. A pack outside them is passed over when another within them is found. When none is, the best is offered with what is outside, for you to approve or skip; it is never approved automatically or taken to replace a failed download. The admin agent asks for your approval the same way before a grab outside the limits.
+
 Approval can be **Missing episodes only** (recommended), or **Missing and upgrades**, which replaces files on disk and asks you to type the title's name to confirm.
 
 ### Music

@@ -83,6 +83,16 @@ export interface SonarrProfileItem {
   quality?: { id: number; name: string };
   items?: SonarrProfileItem[];
   allowed: boolean;
+  /** Sonarr v5: sizes in MB a minute, per quality, in the profile. */
+  minSize?: number | null;
+  maxSize?: number | null;
+}
+
+/** Sizes in MB a minute for a quality (Radarr, and Sonarr before v5). */
+export interface QualityDefinition {
+  quality: { id: number; name: string };
+  minSize?: number | null;
+  maxSize?: number | null;
 }
 
 export interface SonarrQualityProfile {
@@ -254,6 +264,13 @@ class BackfillSonarr extends SonarrAPI {
     const { data } = await this.axios.get<SonarrEpisodeFile[]>('/episodefile', {
       params: { seriesId },
     });
+    return Array.isArray(data) ? data : [];
+  }
+
+  public async getQualityDefinitions(): Promise<QualityDefinition[]> {
+    const { data } = await this.axios.get<QualityDefinition[]>(
+      '/qualitydefinition'
+    );
     return Array.isArray(data) ? data : [];
   }
 

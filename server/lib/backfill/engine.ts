@@ -93,7 +93,17 @@ import {
 } from '@server/lib/backfill/schedule';
 import type { OpinionRequest } from '@server/lib/backfill/secondOpinion';
 import { aiSecondOpinion } from '@server/lib/backfill/secondOpinion';
-import type { SonarrCommand, SonarrEpisode } from '@server/lib/backfill/sonarr';
+import type { SizeProblem } from '@server/lib/backfill/sizeLimits';
+import {
+  limitsOf,
+  sizeNote,
+  sizeProblems,
+} from '@server/lib/backfill/sizeLimits';
+import type {
+  SonarrCommand,
+  SonarrEpisode,
+  SonarrQualityProfile,
+} from '@server/lib/backfill/sonarr';
 import BackfillSonarr, { commandFinished } from '@server/lib/backfill/sonarr';
 import { TorrentWatch, swarmLacks } from '@server/lib/backfill/watchdog';
 import { blockedGroupOf, blockedGroups } from '@server/lib/blockedGroups';
@@ -253,6 +263,8 @@ interface Target {
     packTitle: string,
     secondOpinion?: SeriesContext['secondOpinion']
   ): Promise<{ plan: PlanEntry[]; summary: PlanSummary }>;
+  /** The files to be taken that are outside the app's size limits. */
+  sizeCheck?(plan: PlanEntry[]): SizeProblem[];
 }
 
 const appOf = (kind: BackfillKind) =>
@@ -827,6 +839,33 @@ class Backfill {
     const server = getSettings().radarr.find((s) => s.id === serverId);
     if (!server) throw new Error('That Radarr server is no longer set up.');
     return BackfillRadarr.forServer(server);
+  }
+
+  /**
+   * The files of a plan for a series or movie that are outside Sonarr's
+   * or Radarr's size limits for it, as the admin agent asks before a grab.
+   */
+  public async sizeProblemsFor(
+    title: { kind: BackfillKind; serverId: number; arrId: number },
+    plan: PlanEntry[]
+  ): Promise<SizeProblem[]> {
+    if (title.kind === 'movie') {
+      const radarr = this.radarrFor(title.serverId);
+      const movie = await radarr.getMovieDetail(title.arrId);
+      const profile = await radarr.getQualityProfile(movie.qualityProfileId);
+      return (await this.sizeChecker(radarr, profile, movie.runtime, 'Radarr'))(
+        plan
+      );
+    }
+    if (title.kind === 'series') {
+      const sonarr = this.sonarrFor(title.serverId);
+      const series = await sonarr.getSeriesDetail(title.arrId);
+      const profile = await sonarr.getQualityProfile(series.qualityProfileId);
+      return (
+        await this.sizeChecker(sonarr, profile, series.runtime, 'Sonarr')
+      )(plan);
+    }
+    return [];
   }
 
   public lidarrFor(serverId: number): BackfillLidarr {
@@ -1655,6 +1694,12 @@ class Backfill {
           };
         },
         judge: (files, packTitle) => judgeMoviePack(files, packTitle, ctx),
+        sizeCheck: await this.sizeChecker(
+          ctx.radarr,
+          ctx.profile,
+          ctx.movie.runtime,
+          'Radarr'
+        ),
       };
     }
     const ctx = await this.context(row);
@@ -1733,7 +1778,28 @@ class Backfill {
       },
       judge: (files, packTitle, secondOpinion) =>
         judgePack(files, packTitle, { ...ctx, secondOpinion }),
+      sizeCheck: await this.sizeChecker(
+        ctx.sonarr,
+        ctx.profile,
+        ctx.series.runtime,
+        'Sonarr'
+      ),
     };
+  }
+
+  /**
+   * Checks a plan's files against the app's size limits for the title's
+   * profile. Limits that cannot be read are no reason not to search.
+   */
+  private async sizeChecker(
+    arr: BackfillSonarr | BackfillRadarr,
+    profile: SonarrQualityProfile,
+    runtime: number | undefined,
+    app: 'Sonarr' | 'Radarr'
+  ): Promise<(plan: PlanEntry[]) => SizeProblem[]> {
+    const definitions = await arr.getQualityDefinitions().catch(() => []);
+    const limits = limitsOf(profile, definitions);
+    return (plan) => sizeProblems(plan, limits, runtime, app);
   }
 
   /** Starts a search and returns at once; the page follows its status. */
@@ -1901,7 +1967,14 @@ class Backfill {
               secondOpinion
             );
             candidate.plan = plan;
-            candidate.summary = { ...summary, sonarrSeesTitle: sees };
+            const outside = target.sizeCheck?.(plan) ?? [];
+            candidate.summary = {
+              ...summary,
+              sonarrSeesTitle: sees,
+              ...(outside.length
+                ? { outsideSize: outside.length, sizeNote: sizeNote(outside) }
+                : {}),
+            };
             const useful =
               summary.fill > 0 ||
               (summary.upgrade > 0 &&
@@ -1947,6 +2020,17 @@ class Backfill {
       for (const c of results) {
         const held = c.status === 'ready' ? startFailed(c) : undefined;
         if (held) c.reason = held;
+      }
+      // Sonarr's and Radarr's size limits hold: a pack outside them is
+      // passed over when another within them is found, and otherwise
+      // offered for an admin to take or skip, never taken by itself.
+      const withinLimits = results.some(
+        (c) => c.status === 'ready' && !c.summary?.outsideSize
+      );
+      for (const c of results) {
+        if (c.status !== 'ready' || !c.summary?.outsideSize) continue;
+        if (withinLimits) c.status = 'rejected';
+        c.reason ??= c.summary.sizeNote ?? null;
       }
       await candidates.save(results);
 
@@ -3495,6 +3579,8 @@ class Backfill {
     return (
       pack.summary.fill > 0 &&
       !unseeded(pack) &&
+      // Outside the size limits is an admin's call.
+      !pack.summary.outsideSize &&
       pack.summary.replaces === 0 &&
       pack.summary.score >= auto.minScore &&
       pack.summary.fillBytes <= auto.maxSizeGb * 1024 ** 3 &&

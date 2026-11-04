@@ -1259,7 +1259,7 @@ class Agent {
     const lines: string[] = [];
     for (const change of decision.changes) {
       try {
-        if (change.kind === 'replace') {
+        if (change.kind === 'replace' || change.kind === 'oversizeGrab') {
           // The grab records itself, as any download it starts.
           const said = await startApprovedGrab(
             state,

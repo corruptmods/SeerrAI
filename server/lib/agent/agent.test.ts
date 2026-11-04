@@ -361,6 +361,11 @@ beforeEach(async () => {
     'getSeriesQueueEpisodes',
     async () => []
   );
+  mock.method(
+    BackfillSonarr.prototype,
+    'getQualityDefinitions',
+    async () => []
+  );
   mock.method(BackfillSonarr.prototype, 'getQualityProfile', async () => ({
     id: 11,
     name: 'HD',
@@ -2388,6 +2393,7 @@ describe('the admin agent and movies', () => {
     mock.method(radarr, 'getMovieDetail', async () => MOVIE);
     mock.method(radarr, 'getMovieFile', async () => null);
     mock.method(radarr, 'getMovieQueueCount', async () => 0);
+    mock.method(radarr, 'getQualityDefinitions', async () => []);
     mock.method(radarr, 'getQualityProfile', async () => ({
       id: 6,
       name: 'HD',
@@ -2458,6 +2464,54 @@ describe('the admin agent and movies', () => {
       job.files.map((f) => f.episodeIds),
       [[MOVIE.id]]
     );
+  });
+
+  it('asks the admin before taking a movie outside Radarr’s size limits', async () => {
+    // 100 minutes at no more than 2 MB a minute: the 900 MB file is over.
+    mock.method(BackfillRadarr.prototype, 'getMovieDetail', async () => ({
+      ...MOVIE,
+      runtime: 100,
+    }));
+    mock.method(BackfillRadarr.prototype, 'getQualityDefinitions', async () => [
+      { quality: { id: 3, name: 'WEBDL-1080p' }, minSize: 0, maxSize: 2 },
+    ]);
+    const grabIt = (extra: Record<string, unknown> = {}) =>
+      toolUse('grab', {
+        title: 'movie:0:3831',
+        release: 'r1',
+        files: [{ index: 0 }],
+        reason: 'The one file is the movie',
+        ...extra,
+      });
+    script = [
+      () =>
+        toolUse('search_indexers', {
+          query: 'Bramwell the Goat Little Goat of Terrors',
+          kind: 'movie',
+        }),
+      () => toolUse('release_files', { release: 'r1' }),
+      () => grabIt(),
+      (body) => {
+        assert.match(
+          lastResult(body).content,
+          /outside the size limits.*over Radarr's WEBDL-1080p limit.*over_size: true/is
+        );
+        return grabIt({ over_size: true });
+      },
+    ];
+    const run = await agent.ask('Get Little Goat of Terrors', await admin());
+    const waiting = await waitForRun(run.id, ['waiting']);
+    const proposal = (
+      waiting.memory as {
+        proposal?: { changes: { kind: string; headline: string }[] };
+      }
+    ).proposal;
+    assert.equal(proposal?.changes[0].kind, 'oversizeGrab');
+    assert.match(
+      proposal?.changes[0].headline ?? '',
+      /outside the size limits/
+    );
+    assert.equal(await getRepository(BackfillJob).count(), 0, 'not started');
   });
 
   it('still turns a movie down once Radarr has a file for it', async () => {

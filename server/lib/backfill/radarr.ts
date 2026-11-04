@@ -1,6 +1,7 @@
 import RadarrAPI from '@server/api/servarr/radarr';
 import type {
   ArrSearchRelease,
+  QualityDefinition,
   SonarrCommand,
   SonarrLanguage,
   SonarrQuality,
@@ -36,6 +37,8 @@ export interface RadarrMovieDetail {
   alternateTitles?: { title: string }[];
   images?: { coverType: string; remoteUrl?: string; url?: string }[];
   originalLanguage?: { id: number; name: string };
+  /** In minutes. */
+  runtime?: number;
 }
 
 export interface RadarrMovieFile {
@@ -103,6 +106,13 @@ class BackfillRadarr extends RadarrAPI {
       params: { movieId },
     });
     return Array.isArray(data) ? (data[0] ?? null) : null;
+  }
+
+  public async getQualityDefinitions(): Promise<QualityDefinition[]> {
+    const { data } = await this.axios.get<QualityDefinition[]>(
+      '/qualitydefinition'
+    );
+    return Array.isArray(data) ? data : [];
   }
 
   public async getQualityProfile(id: number): Promise<SonarrQualityProfile> {

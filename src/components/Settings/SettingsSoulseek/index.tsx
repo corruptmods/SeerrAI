@@ -1,13 +1,16 @@
+import SlskdLogo from '@app/assets/services/slskd.svg';
 import Button from '@app/components/Common/Button';
 import LoadingSpinner from '@app/components/Common/LoadingSpinner';
-import SaveBar from '@app/components/Common/SaveBar';
-import SensitiveInput from '@app/components/Common/SensitiveInput';
+import Modal from '@app/components/Common/Modal';
+import ServerInstance from '@app/components/Settings/ServerInstance';
+import type { ShownSoulseek } from '@app/components/Settings/SoulseekModal';
+import SoulseekModal from '@app/components/Settings/SoulseekModal';
 import useToasts from '@app/hooks/useToasts';
 import globalMessages from '@app/i18n/globalMessages';
 import defineMessages from '@app/utils/defineMessages';
-import { ArrowDownOnSquareIcon, BeakerIcon } from '@heroicons/react/24/outline';
+import { Transition } from '@headlessui/react';
+import { PlusIcon } from '@heroicons/react/24/solid';
 import axios from 'axios';
-import { Field, Form, Formik } from 'formik';
 import { useState } from 'react';
 import { useIntl } from 'react-intl';
 import useSWR from 'swr';
@@ -16,48 +19,57 @@ const messages = defineMessages('components.Settings.SettingsSoulseek', {
   soulseek: 'Soulseek',
   description:
     'A song taken from an album is looked for on Soulseek, through slskd, when no release of its album or single is on the indexers. Only the song’s file is downloaded, and Lidarr imports it. Needs slskd 0.26 or newer.',
-  url: 'slskd Address',
-  urlTip:
-    'For example http://192.168.1.5:5030. Leave blank to not use Soulseek.',
-  apiKey: 'API Key',
-  apiKeyTip: 'An slskd API key with the ReadWrite role.',
-  apiKeySaved: 'Saved; leave blank to keep it',
-  downloadsPath: 'Downloads Folder, as Lidarr Sees It',
-  downloadsPathTip:
-    'Where slskd puts finished downloads, as the path Lidarr sees, for example /data/soulseek/complete. Lidarr imports the songs from there.',
-  test: 'Test',
-  testing: 'Testing…',
-  testOk: 'slskd {version} answered and is signed in to Soulseek.',
-  testNotSignedIn:
-    'slskd {version} answered, but isn’t signed in to Soulseek yet.',
-  testFailed: 'Could not reach slskd.',
-  saved: 'Soulseek saved.',
-  saveFailed: 'Could not save Soulseek: {reason}',
+  addSoulseek: 'Add Soulseek',
+  downloads: 'Downloads',
+  deleteSoulseek: 'Disconnect Soulseek',
+  deleteSoulseekConfirm:
+    'Disconnect Soulseek? Songs are no longer looked for there until it is added again.',
+  deleteFailed: 'Could not disconnect Soulseek.',
 });
 
-interface SoulseekShown {
-  url: string;
-  downloadsPath: string;
-  hasApiKey: boolean;
-}
+/** Where slskd is, as the tile shows it. */
+const addressOf = (url: string) => {
+  try {
+    const parsed = new URL(url);
+    const isSSL = parsed.protocol === 'https:';
+    return {
+      hostname: parsed.hostname,
+      port: Number(parsed.port) || (isSSL ? 443 : 80),
+      isSSL,
+    };
+  } catch {
+    return { hostname: url, port: 5030, isSSL: false };
+  }
+};
 
-const problemOf = (e: unknown): string | undefined =>
-  axios.isAxiosError(e) && e.response?.data?.message
-    ? String(e.response.data.message)
-    : undefined;
-
-/**
- * Soulseek, through slskd, among the services: tested before it is saved,
- * and saved only once Lidarr sees its downloads folder.
+/*
+ * Soulseek, through slskd, laid out like the other services: its tile with
+ * Edit and Delete once it is set up, a dashed tile to add it before.
  */
 const SettingsSoulseek = () => {
   const intl = useIntl();
   const { addToast } = useToasts();
-  const { data, mutate } = useSWR<SoulseekShown>(
+  const { data, error, mutate } = useSWR<ShownSoulseek>(
     '/api/v1/settings/music/soulseek'
   );
-  const [test, setTest] = useState<{ ok: boolean; text: string }>();
-  const [testing, setTesting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const configured = !!data?.url && !!data.hasApiKey;
+
+  // A blank address takes Soulseek out.
+  const disconnect = async () => {
+    try {
+      await axios.put('/api/v1/settings/music/soulseek', { url: '' });
+      void mutate();
+    } catch {
+      addToast(intl.formatMessage(messages.deleteFailed), {
+        appearance: 'error',
+        autoDismiss: true,
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <>
@@ -67,178 +79,70 @@ const SettingsSoulseek = () => {
           {intl.formatMessage(messages.description)}
         </p>
       </div>
+      {editing && (
+        <SoulseekModal
+          soulseek={configured ? (data ?? null) : null}
+          onClose={() => setEditing(false)}
+          onSave={() => {
+            void mutate();
+            setEditing(false);
+          }}
+        />
+      )}
+      <Transition
+        as="div"
+        show={deleting}
+        enter="transition-opacity ease-in-out duration-300"
+        enterFrom="opacity-0"
+        enterTo="opacity-100"
+        leave="transition-opacity ease-in-out duration-300"
+        leaveFrom="opacity-100"
+        leaveTo="opacity-0"
+      >
+        <Modal
+          okText={intl.formatMessage(globalMessages.delete)}
+          okButtonType="danger"
+          onOk={() => disconnect()}
+          onCancel={() => setDeleting(false)}
+          title={intl.formatMessage(messages.deleteSoulseek)}
+        >
+          {intl.formatMessage(messages.deleteSoulseekConfirm)}
+        </Modal>
+      </Transition>
       <div className="section">
-        {!data ? (
-          <LoadingSpinner />
-        ) : (
-          <Formik
-            initialValues={{
-              url: data.url,
-              apiKey: '',
-              downloadsPath: data.downloadsPath,
-            }}
-            enableReinitialize
-            onSubmit={async (values, { resetForm }) => {
-              try {
-                const { data: saved } = await axios.put<SoulseekShown>(
-                  '/api/v1/settings/music/soulseek',
-                  values
-                );
-                await mutate(saved);
-                resetForm({
-                  values: {
-                    url: saved.url,
-                    apiKey: '',
-                    downloadsPath: saved.downloadsPath,
-                  },
-                });
-                addToast(intl.formatMessage(messages.saved), {
-                  appearance: 'success',
-                  autoDismiss: true,
-                });
-              } catch (e) {
-                addToast(
-                  intl.formatMessage(messages.saveFailed, {
-                    reason:
-                      problemOf(e) ?? intl.formatMessage(messages.testFailed),
-                  }),
-                  { appearance: 'error', autoDismiss: true }
-                );
-              }
-            }}
-          >
-            {({ values, isSubmitting }) => {
-              const runTest = async () => {
-                setTesting(true);
-                setTest(undefined);
-                try {
-                  const { data: answer } = await axios.post<{
-                    version: string;
-                    signedIn: boolean;
-                  }>('/api/v1/settings/music/soulseek/test', values);
-                  setTest({
-                    ok: answer.signedIn,
-                    text: intl.formatMessage(
-                      answer.signedIn
-                        ? messages.testOk
-                        : messages.testNotSignedIn,
-                      { version: answer.version }
-                    ),
-                  });
-                } catch (e) {
-                  setTest({
-                    ok: false,
-                    text:
-                      problemOf(e) ?? intl.formatMessage(messages.testFailed),
-                  });
-                } finally {
-                  setTesting(false);
+        {!data && !error && <LoadingSpinner />}
+        {data && !error && (
+          <ul className="grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
+            {configured ? (
+              <ServerInstance
+                name="Soulseek"
+                {...addressOf(data.url)}
+                externalUrl={data.url}
+                logo={
+                  <SlskdLogo className="service-logo h-10 w-10 flex-shrink-0" />
                 }
-              };
-              return (
-                <Form>
-                  <div className="form-row">
-                    <label htmlFor="soulseek-url" className="text-label">
-                      {intl.formatMessage(messages.url)}
-                      <span className="label-tip">
-                        {intl.formatMessage(messages.urlTip)}
-                      </span>
-                    </label>
-                    <div className="form-input-area">
-                      <div className="form-input-field">
-                        <Field
-                          id="soulseek-url"
-                          name="url"
-                          type="text"
-                          inputMode="url"
-                          placeholder="http://192.168.1.5:5030"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="form-row">
-                    <label htmlFor="soulseek-apikey" className="text-label">
-                      {intl.formatMessage(messages.apiKey)}
-                      <span className="label-tip">
-                        {intl.formatMessage(
-                          data.hasApiKey
-                            ? messages.apiKeySaved
-                            : messages.apiKeyTip
-                        )}
-                      </span>
-                    </label>
-                    <div className="form-input-area">
-                      <div className="form-input-field">
-                        <SensitiveInput
-                          as="field"
-                          id="soulseek-apikey"
-                          name="apiKey"
-                          autoComplete="off"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="form-row">
-                    <label htmlFor="soulseek-downloads" className="text-label">
-                      {intl.formatMessage(messages.downloadsPath)}
-                      <span className="label-tip">
-                        {intl.formatMessage(messages.downloadsPathTip)}
-                      </span>
-                    </label>
-                    <div className="form-input-area">
-                      <div className="form-input-field">
-                        <Field
-                          id="soulseek-downloads"
-                          name="downloadsPath"
-                          type="text"
-                          placeholder="/data/soulseek/complete"
-                        />
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-3">
-                        <Button
-                          buttonType="warning"
-                          buttonSize="sm"
-                          type="button"
-                          disabled={testing || !values.url}
-                          onClick={runTest}
-                        >
-                          <BeakerIcon />
-                          <span>
-                            {intl.formatMessage(
-                              testing ? messages.testing : messages.test
-                            )}
-                          </span>
-                        </Button>
-                        {test && (
-                          <span
-                            className={`text-sm ${test.ok ? 'text-green-400' : 'text-red-400'}`}
-                          >
-                            {test.text}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <SaveBar>
-                    <div className="flex justify-end">
-                      <Button
-                        buttonType="primary"
-                        type="submit"
-                        disabled={isSubmitting}
-                      >
-                        <ArrowDownOnSquareIcon />
-                        <span>
-                          {isSubmitting
-                            ? intl.formatMessage(globalMessages.saving)
-                            : intl.formatMessage(globalMessages.save)}
-                        </span>
-                      </Button>
-                    </div>
-                  </SaveBar>
-                </Form>
-              );
-            }}
-          </Formik>
+                detail={{
+                  label: intl.formatMessage(messages.downloads),
+                  value: data.downloadsPath,
+                }}
+                onEdit={() => setEditing(true)}
+                onDelete={() => setDeleting(true)}
+              />
+            ) : (
+              <li className="col-span-1 h-32 rounded-lg border-2 border-dashed border-gray-400 shadow sm:h-44">
+                <div className="flex h-full w-full items-center justify-center">
+                  <Button
+                    buttonType="ghost"
+                    className="mb-3 mt-3"
+                    onClick={() => setEditing(true)}
+                  >
+                    <PlusIcon />
+                    <span>{intl.formatMessage(messages.addSoulseek)}</span>
+                  </Button>
+                </div>
+              </li>
+            )}
+          </ul>
         )}
       </div>
     </>

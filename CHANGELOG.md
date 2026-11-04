@@ -26,7 +26,17 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - **Search again now** on a playlist's page: albums of its songs that found nothing yet, waiting hours to be searched again, are searched straight away.
 
+### Changed
+
+- **Settings → Services**: Prowlarr and Soulseek are tiles with Edit and Delete, like the other services, and every service is listed first, one after another. The anime settings and Anime Check sit together in a section of their own below.
+
 ### Fixed
+
+- A playlist song matched by its ISRC to a recording MusicBrainz has only on others' compilations ("Now That's…") is matched to the artist's own single or album with the song instead, when that one is as long, so it can be requested. Songs that failed with "only on compilations" are matched again on update.
+
+- A music video posted under a single's name ("[1080p]", "x264") is no longer downloaded for a song, and a bootleg, rework or mash-up of a song is no longer taken for it.
+
+- A Soulseek search still running when Seerr AI is done waiting is stopped before it's cleared, so slskd no longer logs errors for it.
 
 - A requested song whose single's download Lidarr holds back because its tags are too far from the edition ("album match is not close enough": a featured artist in the tags, another year or country) is imported on its own, as one missing tracks already was. Only when the download is named as the single, and the file is named as the song and, by its own tags, is the same take and as long as the track. When one can't be imported, the log says why.
 

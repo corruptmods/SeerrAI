@@ -386,6 +386,19 @@ const SettingsServices = () => {
         )}
       </div>
       <SettingsLidarr />
+      {/* Every service, one after another, before the rules that use them. */}
+      <SettingsMaintainerr />
+      <SettingsProwlarr />
+      <SettingsDownloadClients />
+      {/* Soulseek is for songs taken from albums: offered once music is. */}
+      {settings.currentSettings.musicReady && <SettingsSoulseek />}
+      <SettingsBazarr />
+      <SettingsTrakt />
+      {/* Tautulli reads Plex's watch history, so it is offered while Plex is
+          connected. */}
+      {settings.currentSettings.mediaServers.some(
+        (server) => server.kind === 'plex'
+      ) && <SettingsTautulli />}
       <div className="mb-6 mt-10">
         <h3 className="heading">
           {intl.formatMessage(messages.overrideRules)}
@@ -426,8 +439,12 @@ const SettingsServices = () => {
           </li>
         </ul>
       </div>
-      <AnimeSettings />
-      {!!sonarrData?.length && <AnimeCheck />}
+      {/* Anime in a section of its own: what counts as anime, then the
+          check of Sonarr and Radarr against it. */}
+      <div className="mt-10 max-w-6xl rounded-lg p-4 ring-1 ring-gray-700 sm:p-6 [&>*:first-child]:mt-0">
+        <AnimeSettings />
+        {!!sonarrData?.length && <AnimeCheck />}
+      </div>
       {overrideRuleModal.open && radarrData && sonarrData && (
         <OverrideRuleModal
           rule={overrideRuleModal.rule}
@@ -442,18 +459,6 @@ const SettingsServices = () => {
           sonarrServices={sonarrData}
         />
       )}
-      <SettingsMaintainerr />
-      <SettingsProwlarr />
-      <SettingsDownloadClients />
-      {/* Soulseek is for songs taken from albums: offered once music is. */}
-      {settings.currentSettings.musicReady && <SettingsSoulseek />}
-      <SettingsBazarr />
-      <SettingsTrakt />
-      {/* Tautulli reads Plex's watch history, so it is offered while Plex is
-          connected. */}
-      {settings.currentSettings.mediaServers.some(
-        (server) => server.kind === 'plex'
-      ) && <SettingsTautulli />}
     </>
   );
 };

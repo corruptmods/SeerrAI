@@ -1,3 +1,4 @@
+import type { CatalogSong } from '@server/lib/music/catalogSong';
 import { DbAwareColumn, resolveDbType } from '@server/utils/DbColumnHelper';
 import {
   Column,
@@ -219,6 +220,17 @@ export class MediaListSong {
   /** The album it is best known from, for its cover. */
   @Column({ type: 'varchar', nullable: true })
   public albumMbid?: string | null;
+
+  /** The recording's ISRC, as Deezer lists the song, when it does. */
+  @Column({ type: 'varchar', nullable: true })
+  public isrc?: string | null;
+
+  /**
+   * The song as Deezer lists it, when it does: its album and track, for
+   * adding to MusicBrainz a song MusicBrainz doesn't have.
+   */
+  @Column({ type: 'simple-json', nullable: true })
+  public catalog?: CatalogSong | null;
 
   @Column({ type: 'varchar', default: 'matching' })
   public state: PlaylistSongState;

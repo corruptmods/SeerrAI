@@ -115,6 +115,7 @@ export const musicDefaults = (): MusicSettings => ({
   musicbrainzUrl: MUSICBRAINZ_URL,
   contactEmail: '',
   listenBrainz: true,
+  deezer: true,
   theAudioDbApiKey: '',
   maxAlbumsPerRequest: 100,
   songRequests: true,
@@ -515,6 +516,11 @@ export interface MusicSettings {
   contactEmail: string;
   /** New releases and what is popular, for Discover, from ListenBrainz. */
   listenBrainz: boolean;
+  /**
+   * Deezer, for playlist songs' ISRCs, to match them on MusicBrainz by, and
+   * the albums of those MusicBrainz lacks. On unless turned off.
+   */
+  deezer?: boolean;
   /** TheAudioDB, for artist pictures Lidarr has none of. Never sent back. */
   theAudioDbApiKey: string;
   /** The most albums one request may ask for. */

@@ -33,6 +33,7 @@ const musicBody = z.object({
     .default('')
     .refine((email) => !email || z.email().safeParse(email).success),
   listenBrainz: z.boolean().default(true),
+  deezer: z.boolean().optional(),
   theAudioDbApiKey: z.string().trim().default(''),
   removeTheAudioDbApiKey: z.boolean().default(false),
   maxAlbumsPerRequest: z.coerce.number().int().min(1).max(1000).default(100),
@@ -60,6 +61,7 @@ const shown = (music: MusicSettings) => ({
   musicbrainzUrl: music.musicbrainzUrl,
   contactEmail: music.contactEmail,
   listenBrainz: music.listenBrainz,
+  deezer: music.deezer !== false,
   maxAlbumsPerRequest: music.maxAlbumsPerRequest,
   songRequests: !!music.songRequests,
   songsFromAlbums: !!music.songsFromAlbums,
@@ -90,6 +92,7 @@ musicSettingsRoutes.post('/', async (req, res, next) => {
     musicbrainzUrl: body.musicbrainzUrl,
     contactEmail: body.contactEmail,
     listenBrainz: body.listenBrainz,
+    deezer: body.deezer ?? saved.deezer !== false,
     maxAlbumsPerRequest: body.maxAlbumsPerRequest,
     songRequests: body.songRequests ?? !!saved.songRequests,
     songsFromAlbums: body.songsFromAlbums ?? !!saved.songsFromAlbums,

@@ -282,6 +282,7 @@ describe('music settings', () => {
       musicbrainzUrl: 'http://192.168.1.5:5000',
       contactEmail: 'admin@example.com',
       listenBrainz: false,
+      deezer: true,
       maxAlbumsPerRequest: 50,
       songRequests: true,
       songsFromAlbums: true,
@@ -296,6 +297,12 @@ describe('music settings', () => {
     await call('POST', '/settings/music', { musicbrainzUrl: '' });
     assert.equal(getSettings().music.theAudioDbApiKey, 'secret');
     assert.equal(getSettings().music.musicbrainzUrl, 'https://musicbrainz.org');
+
+    // Deezer stays as it was unless sent.
+    await call('POST', '/settings/music', { deezer: false });
+    assert.equal(getSettings().music.deezer, false);
+    await call('POST', '/settings/music', { musicbrainzUrl: '' });
+    assert.equal(getSettings().music.deezer, false);
 
     await call('POST', '/settings/music', { removeTheAudioDbApiKey: true });
     assert.equal(getSettings().music.theAudioDbApiKey, '');

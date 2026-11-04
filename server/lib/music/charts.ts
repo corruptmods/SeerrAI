@@ -265,6 +265,35 @@ export const songNamed = async (
   return result;
 };
 
+/**
+ * A song by its recording's ISRC, as a store lists it: the artist's
+ * recordings on MusicBrainz with that code, the very take meant, or null
+ * when MusicBrainz has none of the artist's with it. Background work, as
+ * songNamed.
+ */
+export const songByIsrc = async (
+  isrc: string,
+  artistName: string,
+  pick: (song: Song) => SongVersion | undefined = (song) => song.versions[0]
+): Promise<Song | null> => {
+  const artist = await artistFor(artistName);
+  if (!artist) return null;
+  const found = await musicBrainz().searchRecordingsByIsrc(isrc, 'background');
+  const recordings = found.recordings ?? [];
+  const song = groupSongs(recordings, recordings[0]?.title ?? '', [artist.id], {
+    songs: 1,
+    versions: 25,
+  })[0];
+  if (!song) return null;
+  const picked = pick(song);
+  if (picked) {
+    await musicBrainz().keepRecordings(
+      recordings.filter((r) => r.id === picked.mbId)
+    );
+  }
+  return song;
+};
+
 /** The song on a chart, among its artist's recordings. */
 const matchSong = (entry: AppleChartEntry): Promise<Song | null> =>
   songNamed(entry.name, entry.artistName);

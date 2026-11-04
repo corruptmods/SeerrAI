@@ -18,6 +18,9 @@ export const messages = defineMessages('components.Settings.SettingsMusic', {
   listenBrainz: 'New and Popular Music',
   listenBrainzTip:
     'The New Music row on Discover, from ListenBrainz, and the Top Songs, Trending Songs, Top Albums and Top Artists rows, from Apple Music’s charts.',
+  deezer: 'Match Songs with Deezer',
+  deezerTip:
+    'Playlist songs are looked up on Deezer for their recording code (ISRC), which finds the very recording on MusicBrainz, and for the album of a song MusicBrainz doesn’t have, so it can be added there. Sends song titles and artists to Deezer.',
   theAudioDbApiKey: 'TheAudioDB API Key',
   theAudioDbApiKeyTip:
     'Optional. Pictures of artists Lidarr has none of come from TheAudioDB’s free key; a supporter account’s key is used instead when entered.',
@@ -55,6 +58,7 @@ export interface ShownMusicSettings {
   musicbrainzUrl: string;
   contactEmail: string;
   listenBrainz: boolean;
+  deezer: boolean;
   maxAlbumsPerRequest: number;
   songRequests: boolean;
   songsFromAlbums: boolean;
@@ -68,6 +72,7 @@ export interface MusicSourceValues {
   musicbrainzUrl: string;
   contactEmail: string;
   listenBrainz: boolean;
+  deezer: boolean;
   theAudioDbApiKey: string;
   removeTheAudioDbApiKey: boolean;
   maxAlbumsPerRequest: number | string;
@@ -89,6 +94,7 @@ export const musicSourceValues = (
       : data.musicbrainzUrl,
   contactEmail: data.contactEmail,
   listenBrainz: data.listenBrainz,
+  deezer: data.deezer !== false,
   theAudioDbApiKey: '',
   removeTheAudioDbApiKey: false,
   maxAlbumsPerRequest: data.maxAlbumsPerRequest,
@@ -202,6 +208,17 @@ const MusicSources = ({
         </label>
         <div className="form-input-area">
           <Field type="checkbox" id="listenBrainz" name="listenBrainz" />
+        </div>
+      </div>
+      <div className="form-row">
+        <label htmlFor="deezer" className="checkbox-label">
+          {intl.formatMessage(messages.deezer)}
+          <span className="label-tip">
+            {intl.formatMessage(messages.deezerTip)}
+          </span>
+        </label>
+        <div className="form-input-area">
+          <Field type="checkbox" id="deezer" name="deezer" />
         </div>
       </div>
       <div className="form-row">

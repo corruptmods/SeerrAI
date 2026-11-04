@@ -448,6 +448,27 @@ export class MusicBrainz extends ExternalAPI {
   }
 
   /**
+   * Recordings with this ISRC, the code the industry gives one recording:
+   * the very take a store lists, live and remixed ones apart. Not every
+   * recording on MusicBrainz has its code yet.
+   */
+  public searchRecordingsByIsrc(
+    isrc: string,
+    priority: MbPriority = 'interactive'
+  ): Promise<MbRecordingSearchResponse> {
+    const code = isrc.trim().toUpperCase();
+    if (!/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/.test(code)) {
+      return Promise.resolve({ count: 0, offset: 0, recordings: [] });
+    }
+    return this.searched(`search-isrc:${code}`, () =>
+      this.request<MbRecordingSearchResponse>(priority, '/ws/2/recording', {
+        query: `isrc:${code}`,
+        limit: 25,
+      })
+    );
+  }
+
+  /**
    * Keeps recordings a search found as if each was looked up: a recording's
    * lookup is the same search by its id, so the answer is the same. Asking
    * for a song found this way (a playlist's, a chart's) then needs no second

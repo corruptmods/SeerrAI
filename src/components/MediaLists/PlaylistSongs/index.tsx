@@ -7,6 +7,7 @@ import useSettings from '@app/hooks/useSettings';
 import defineMessages from '@app/utils/defineMessages';
 import {
   ArrowPathIcon,
+  ArrowTopRightOnSquareIcon,
   ExclamationTriangleIcon,
   LinkIcon,
   XMarkIcon,
@@ -49,6 +50,9 @@ const messages = defineMessages('components.MediaLists.PlaylistSongs', {
   notFoundIntro:
     'These can’t be requested yet: MusicBrainz, where songs are found for Lidarr, doesn’t know them. Songs released only on Spotify or YouTube often aren’t there. Each is looked for again every week, or now with Try again.',
   tryAgain: 'Try again',
+  addToMusicBrainz: 'Add to MusicBrainz',
+  addToMusicBrainzTip:
+    'Opens Harmony with its album filled in from Deezer, ready to add to MusicBrainz. Once it’s added, Try again to request it.',
   remove: 'Take off the playlist',
   waitingToSearch:
     'Albums with nothing found yet, to be searched again later: {count}',
@@ -224,6 +228,19 @@ const PlaylistSongs = ({
             <div className="mt-0.5 break-words text-xs text-muted">
               {progressText(progress)}
             </div>
+          )}
+          {song.addToMusicBrainz && (
+            <Tooltip content={intl.formatMessage(messages.addToMusicBrainzTip)}>
+              <a
+                href={song.addToMusicBrainz}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-0.5 inline-flex items-center gap-1 text-xs text-gray-400 hover:text-strong hover:underline"
+              >
+                {intl.formatMessage(messages.addToMusicBrainz)}
+                <ArrowTopRightOnSquareIcon className="h-3 w-3" />
+              </a>
+            </Tooltip>
           )}
           {/* Why, in words: a tooltip can't be read on a phone. */}
           {(song.state === 'failed' || song.state === 'notGot') && tip && (

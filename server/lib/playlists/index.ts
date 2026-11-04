@@ -13,7 +13,9 @@ import {
 } from '@server/entity/MediaRequest';
 import SongRequest from '@server/entity/SongRequest';
 import { User } from '@server/entity/User';
-import { songNamed } from '@server/lib/music/charts';
+import type { CatalogSong } from '@server/lib/music/catalogSong';
+import { catalogOn, catalogSong } from '@server/lib/music/catalogSong';
+import { songByIsrc, songNamed } from '@server/lib/music/charts';
 import {
   NotTheArtistsSongError,
   UnrequestableSongError,
@@ -36,13 +38,15 @@ import { In, IsNull, LessThan, Not } from 'typeorm';
 
 /*
  * Playlists linked to Spotify or Apple Music. Each song is matched to a
- * MusicBrainz recording (in the background, at MusicBrainz's pace) and
- * requested as a song for whoever linked the playlist, within their song
- * limit. What their limit can't take waits and is requested as it frees
- * up; or, with Settings → Music set to have admins approve big imports,
- * an import of more songs than allowed at once waits for an admin, as
- * requests that don't count against the limit. Linked playlists are read
- * again daily for songs added since. No AI is involved.
+ * MusicBrainz recording (in the background, at MusicBrainz's pace): by its
+ * ISRC, as Deezer lists the song, when MusicBrainz has the code, else by
+ * its title, artist and length. It is then requested as a song for whoever
+ * linked the playlist, within their song limit. What their limit can't
+ * take waits and is requested as it frees up; or, with Settings → Music
+ * set to have admins approve big imports, an import of more songs than
+ * allowed at once waits for an admin, as requests that don't count against
+ * the limit. Linked playlists are read again daily for songs added since.
+ * No AI is involved.
  */
 
 const LABEL = 'Playlists';
@@ -354,11 +358,32 @@ class Playlists {
       take: MATCH_PER_PASS + 1,
     });
     for (const song of songs.slice(0, MATCH_PER_PASS)) {
-      let found: Song | null;
+      const pick = (s: Song) => versionFor(s, song.length, song.title);
+      // The song as the stores list it, for its ISRC. Deezer not answering
+      // is no reason to wait: the song is matched by name meanwhile.
+      let catalog: CatalogSong | null | undefined;
+      if (catalogOn()) {
+        catalog = await catalogSong(
+          song.title,
+          song.artistName,
+          song.length
+        ).catch((e) => {
+          logger.debug('Could not look a playlist song up on Deezer', {
+            label: LABEL,
+            errorMessage: describe(e),
+          });
+          return undefined;
+        });
+      }
+      let found: Song | null = null;
       try {
-        found = await songNamed(song.title, song.artistName, (s) =>
-          versionFor(s, song.length, song.title)
-        );
+        // The very recording, when MusicBrainz has its code; a code on only
+        // another take of it (a live one, mislabelled) is passed over.
+        if (catalog?.isrc) {
+          found = await songByIsrc(catalog.isrc, song.artistName, pick);
+          if (found && !pick(found)) found = null;
+        }
+        found ??= await songNamed(song.title, song.artistName, pick);
       } catch (e) {
         // MusicBrainz is unreachable: tried again on the next pass.
         logger.debug('Could not match a playlist song', {
@@ -367,9 +392,12 @@ class Playlists {
         });
         return false;
       }
-      const version = found
-        ? versionFor(found, song.length, song.title)
-        : undefined;
+      const version = found ? pick(found) : undefined;
+      // Deezer's listing, when it was asked: kept as it last said.
+      const listed =
+        catalog === undefined
+          ? {}
+          : { isrc: catalog?.isrc ?? null, catalog: catalog ?? null };
       // Only while it is still being found: taken off the playlist
       // meanwhile, it stays off.
       await repo.update(
@@ -381,8 +409,9 @@ class Playlists {
               artistMbid: version.artistMbid,
               albumMbid: version.from?.mbId ?? null,
               problem: null,
+              ...listed,
             }
-          : { state: 'unmatched', problem: null }
+          : { state: 'unmatched', problem: null, ...listed }
       );
     }
     return songs.length > MATCH_PER_PASS;

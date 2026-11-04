@@ -1,3 +1,5 @@
+import type { DeezerTrack } from '@server/api/deezer';
+import DeezerAPI from '@server/api/deezer';
 import { MusicBrainz } from '@server/api/musicbrainz';
 import type {
   MbArtist,
@@ -202,6 +204,8 @@ beforeEach(async () => {
     async (id: string) => ({ id, name: 'Glasswing' }) as MbArtist
   );
   mock.method(MusicBrainz.prototype, 'keptArtistReleaseGroups', async () => []);
+  // Deezer lists none of them, unless a test says it does.
+  mock.method(DeezerAPI.prototype, 'searchTracks', async () => []);
 });
 
 afterEach(() => mock.restoreAll());
@@ -826,5 +830,133 @@ describe('a playlist’s requests in a row of requests', () => {
     const [seen] = await playlistRequestGroups(requests(), other, 10);
     assert.equal(seen.listId, list.id);
     assert.equal(seen.canOpen, false);
+  });
+});
+
+describe('a song Deezer lists', () => {
+  const ISRC_TAKE = 'a1b2c3d4-0010-4000-8000-000000000010';
+  const HARBOUR = '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5';
+  const ISRC = 'QZABC2600001';
+  const listing = (
+    id: number,
+    title: string,
+    seconds: number,
+    albumId: number
+  ): DeezerTrack => ({
+    id,
+    title,
+    title_short: title,
+    title_version: '',
+    duration: seconds,
+    artist: { id: 9, name: 'Glasswing' },
+    album: { id: albumId, title: 'Harbour Lights' },
+  });
+  const deezerLists = (tracks: Record<string, DeezerTrack>, isrc = ISRC) => {
+    mock.method(DeezerAPI.prototype, 'searchTracks', async (title: string) =>
+      tracks[title] ? [tracks[title]] : []
+    );
+    mock.method(DeezerAPI.prototype, 'getTrack', async (id: number) => {
+      const track = Object.values(tracks).find((t) => t.id === id);
+      return track ? { ...track, isrc, track_position: 3 } : null;
+    });
+  };
+  const songNamed = async (list: MediaList, title: string) =>
+    getRepository(MediaListSong).findOneByOrFail({ listId: list.id, title });
+
+  it('is matched to the recording its ISRC names, over one its name and length would pick', async () => {
+    deezerLists({ 'Lantern Song': listing(11, 'Lantern Song', 215, 501) });
+    // The radio edit is nearer the playlist's length; the code names the
+    // album's take, the one the store lists.
+    mock.method(
+      MusicBrainz.prototype,
+      'searchRecordingsByIsrc',
+      async (code: string) => ({
+        count: 1,
+        offset: 0,
+        recordings:
+          code === ISRC
+            ? [
+                {
+                  id: ISRC_TAKE,
+                  title: 'Lantern Song',
+                  length: 216_000,
+                  'artist-credit': credit,
+                  releases: [onRelease(HARBOUR, 'Harbour Lights', 'Album')],
+                },
+              ]
+            : [],
+      })
+    );
+    const list = await linked();
+    const lantern = await songNamed(list, 'Lantern Song');
+    assert.equal(lantern.recordingMbid, ISRC_TAKE);
+    assert.equal(lantern.isrc, ISRC);
+    assert.equal(lantern.catalog?.albumId, 501);
+    assert.equal(lantern.catalog?.trackNumber, 3);
+    // Deezer lists no other: those are matched by name, as before.
+    assert.equal(
+      (await songNamed(list, 'Night Swim')).recordingMbid,
+      NIGHT_SWIM
+    );
+  });
+
+  it('is matched by name when MusicBrainz has no recording with its ISRC, or Deezer can’t be asked', async () => {
+    deezerLists({ 'Lantern Song': listing(11, 'Lantern Song', 215, 501) });
+    mock.method(MusicBrainz.prototype, 'searchRecordingsByIsrc', async () => ({
+      count: 0,
+      offset: 0,
+      recordings: [],
+    }));
+    let list = await linked();
+    assert.equal(
+      (await songNamed(list, 'Lantern Song')).recordingMbid,
+      LANTERN
+    );
+
+    mock.method(DeezerAPI.prototype, 'searchTracks', async () => {
+      throw new Error('connect ECONNREFUSED');
+    });
+    list = await linked();
+    const lantern = await songNamed(list, 'Lantern Song');
+    assert.equal(lantern.recordingMbid, LANTERN);
+    assert.equal(lantern.isrc, null);
+  });
+
+  it('offers adding to MusicBrainz a song it doesn’t have', async () => {
+    deezerLists({ 'Unheard Tune': listing(12, 'Unheard Tune', 100, 777) });
+    mock.method(MusicBrainz.prototype, 'searchRecordingsByIsrc', async () => ({
+      count: 0,
+      offset: 0,
+      recordings: [],
+    }));
+    const list = await linked();
+    const shown = (await playlistView(list)).songs;
+    const unheard = shown.find((s) => s.title === 'Unheard Tune');
+    assert.equal(unheard?.state, 'unmatched');
+    assert.equal(
+      unheard?.addToMusicBrainz,
+      'https://harmony.pulsewidth.org.uk/release?deezer=777'
+    );
+    // Found, or not on Deezer either: nothing to add.
+    assert.ok(
+      shown
+        .filter((s) => s.title !== 'Unheard Tune')
+        .every((s) => s.addToMusicBrainz === null)
+    );
+  });
+
+  it('is not looked up with Deezer turned off', async () => {
+    getSettings().music.deezer = false;
+    const asked = mock.method(
+      DeezerAPI.prototype,
+      'searchTracks',
+      async () => []
+    );
+    const list = await linked();
+    assert.equal(asked.mock.callCount(), 0);
+    assert.equal(
+      (await songNamed(list, 'Lantern Song')).recordingMbid,
+      LANTERN
+    );
   });
 });

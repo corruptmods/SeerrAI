@@ -1,3 +1,4 @@
+import DeezerAPI from '@server/api/deezer';
 import { MusicBrainz } from '@server/api/musicbrainz';
 import { getRepository } from '@server/datasource';
 import {
@@ -120,12 +121,14 @@ beforeEach(async () => {
   );
   actingAs = user;
   pageReads = mock.method(axios, 'get', async () => ({ data: spotifyPage }));
-  // MusicBrainz knows no one: each song is left unmatched.
+  // MusicBrainz knows no one: each song is left unmatched. Deezer lists
+  // none of them.
   mock.method(MusicBrainz.prototype, 'searchArtists', async () => ({
     count: 0,
     offset: 0,
     artists: [],
   }));
+  mock.method(DeezerAPI.prototype, 'searchTracks', async () => []);
 });
 
 afterEach(async () => {

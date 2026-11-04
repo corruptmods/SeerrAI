@@ -6,6 +6,7 @@ import { MediaRequest } from '@server/entity/MediaRequest';
 import type { User } from '@server/entity/User';
 import { featureEnabled } from '@server/lib/features';
 import { musicReady } from '@server/lib/music/access';
+import { addToMusicBrainzUrl } from '@server/lib/music/catalogSong';
 import { albumsWaitingToSearch } from '@server/lib/music/songFetchWaits';
 import type { SongProgress } from '@server/lib/music/songProgress';
 import { songProgress } from '@server/lib/music/songProgress';
@@ -39,6 +40,11 @@ export interface PlaylistSongView {
   problem: string | null;
   /** Where a requested song is on its way, when Seerr can tell. */
   progress: SongProgress | null;
+  /**
+   * For a song MusicBrainz doesn't have, that Deezer does: Harmony, with
+   * MusicBrainz's form for adding its album filled in from Deezer's.
+   */
+  addToMusicBrainz: string | null;
 }
 
 export interface PlaylistView {
@@ -169,6 +175,10 @@ export const playlistView = async (list: MediaList): Promise<PlaylistView> => {
       progress:
         song.requestId && song.recordingMbid
           ? (progress.get(song.recordingMbid) ?? null)
+          : null,
+      addToMusicBrainz:
+        song.state === 'unmatched' && song.catalog?.albumId
+          ? addToMusicBrainzUrl(song.catalog.albumId)
           : null,
     })),
   };

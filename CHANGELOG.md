@@ -8,6 +8,10 @@ Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
 - **A song whose single Lidarr can't find is taken from an album instead**: older singles are seldom posted on their own, while their albums are. As soon as Lidarr's search for the single grabs nothing, the song is taken from the artist's album with the same recording, through Backfill, and Lidarr stops looking for the single. A song on no album is looked for by Seerr AI itself, from the single, searched again on the same schedule as albums. Songs already waiting move over on update, a few singles a minute.
 
+- **Playlist songs are matched by their recording code**: each song is looked up on Deezer for its ISRC, the code of the very recording, and matched on MusicBrainz by it when MusicBrainz has it, before matching by name and length. **Match Songs with Deezer** in Settings → Music turns it off.
+
+- **Add to MusicBrainz** on a playlist song MusicBrainz doesn't have, when Deezer lists it: opens Harmony with its album filled in from Deezer, to add to MusicBrainz from your own account. Once Lidarr knows it, Try again requests it.
+
 - **Songs from an artist's discography or collection**: when no release is named for a song's album or single, a pack of the artist's own releases ("Discography", "Collection", "20 Singles") is opened, and the song is taken from its album's folder there, never a live or remixed one's.
 
 - **Backfill's second opinion names where a song might be**: with it on, when nothing names the album and no pack has the song, the model is shown releases the artist's name finds and names up to three likely to hold it as recorded, such as the album a single is on. It only says where to look: the song is still only taken from a file named as it, never another version.

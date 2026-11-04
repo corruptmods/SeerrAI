@@ -2,124 +2,73 @@
 
 Newest first. The [guide](./docs/seerr-ai/README.md) explains each feature.
 
-## Coming next
+## 2.4.1 (4 November 2026)
+
+Songs Lidarr can't find taken from albums, discography packs and Soulseek, Backfill held to Sonarr's and Radarr's size limits, search on the Requests page, more notifications to choose, and posters that show sooner.
 
 ### New
 
 - **Backfill and the admin agent hold to Sonarr's and Radarr's size limits**: a file over (or under) its quality's size for its runtime is passed over when a release within the limits has it. When none does, the best is offered for you to approve or skip, never taken by itself; the agent asks the same way.
-
 - **Search on the Requests page**: a search box beside the filters finds requests by title (films and series as TMDB finds the words, music by artist, album or song), with the filters still applied.
-
 - **A song whose single Lidarr can't find is taken from an album instead**: older singles are seldom posted on their own, while their albums are. As soon as Lidarr's search for the single grabs nothing, the song is taken from the artist's album with the same recording, through Backfill, and Lidarr stops looking for the single. A song on no album is looked for by Seerr AI itself, from the single, searched again on the same schedule as albums. Songs already waiting move over on update, a few singles a minute.
-
 - **Soulseek, for songs no indexer has**: with slskd set up in Settings → Services → Soulseek, a song taken from an album whose album or single isn't on your indexers is searched for on Soulseek. Only the song's own file is asked of one sharer (never a live or remixed one, and as long as the track), and Lidarr imports it. A sharer offline, refusing or queueing it for over two hours is passed over for the next.
-
 - **Playlist songs are matched by their recording code**: each song is looked up on Deezer for its ISRC, the code of the very recording, and matched on MusicBrainz by it when MusicBrainz has it, before matching by name and length. **Match Songs with Deezer** in Settings → Music turns it off.
-
 - **Add to MusicBrainz** on a playlist song MusicBrainz doesn't have, when Deezer lists it: opens Harmony with its album filled in from Deezer, to add to MusicBrainz from your own account. Once Lidarr knows it, Try again requests it.
-
 - **Songs from an artist's discography or collection**: when no release is named for a song's album or single, a pack of the artist's own releases ("Discography", "Collection", "20 Singles") is opened, and the song is taken from its album's folder there, never a live or remixed one's.
-
 - **Backfill's second opinion names where a song might be**: with it on, when nothing names the album and no pack has the song, the model is shown releases the artist's name finds and names up to three likely to hold it as recorded, such as the album a single is on. It only says where to look: the song is still only taken from a file named as it, never another version.
-
 - **Songs from singles Lidarr holds back are imported**: a single's download with just the song stops in Lidarr's queue with "Has missing tracks" when the single's edition also has a radio edit or an instrumental. Seerr AI now imports the requested song on its own, into its track. Health lists the downloads Lidarr still won't import, with its reason.
-
 - **A playlist's page says what's happening to each requested song**: Lidarr searching for its single, Seerr AI searching for its album, nothing found yet and when it's searched again, waiting for a download slot, downloading with how far along, or importing, instead of just Requested.
-
 - **Search again now** on a playlist's page: albums of its songs that found nothing yet, waiting hours to be searched again, are searched straight away.
-
 - **More notifications you choose yourself**: **Request Failed** (your own requests, apart from the failures admins hear about), **Playlist Updates** (songs from your imported playlist that couldn't be got, or a playlist that can no longer be read) and **Leaving Soon** (something you requested that Maintainerr is about to delete). Each is on for whoever already got the notifications they come from.
-
 - **Web push has every notification**: approvals, declines, issues and the rest can be turned on in your own settings. What you had stays as it was.
-
 - **Backfill can search right after Sonarr, Radarr or Lidarr finds nothing**: a title requested in the last 3 days is searched about 20 minutes after their own search comes up empty, instead of a day or more later. Off to start, in Settings → Backfill.
 
 ### Changed
 
 - **Posters show sooner**: Discover and the home page rows show their first page of posters as soon as it arrives, and load the next pages after, instead of waiting for all of them first.
-
 - **Helm chart**: `replicaCount` can be set to 0 to stop Seerr AI and keep its volume, to move or restore it. It can't be more than 1.
-
 - **A series' episodes show their downloads as they happen**: an episode marked Requested shows Queued, Downloading with how far along, or Importing while Sonarr, Backfill or the admin agent brings it, and updates by itself.
-
 - **Settings → Music shows how fast songs move**: each limit songs are held to (playlist songs matched 40 at a time, single searches 3 a minute, the waits between album searches, download slots, Soulseek's tries) beside how much of it is in use now.
-
 - **Backfill's downloads at once are set apart** for series, movies and music, each starting at what the one limit was.
-
 - **Discord, in your notification settings**, shows the kinds an admin turned off for everyone greyed, instead of leaving them out.
-
 - **Settings → Services**: Prowlarr, Soulseek and Trakt are tiles with Edit and Delete, like the other services, and every service is listed first, one after another. The anime settings and Anime Check sit together in a section of their own below.
-
 - **Lists**: a playlist's card turns over its album covers as a watch list's turns over its posters, and watch lists and playlists are shown in sections of their own.
-
 - **A playlist's page** shows its link, its song counts and the songs on their way as cards, with a bar of how many are downloading, being searched for and waiting to be searched again.
 
 ### Fixed
 
 - A request can't be sent to a 4K server unless it's a 4K request, or the other way round, even through the API. Choosing a server that's been removed is refused at once, instead of the request failing later.
-
 - Discover keeps loading as you scroll past a page that TMDB sends with fewer than 20 titles.
-
 - Changing a series request to no seasons answers that seasons are missing, instead of an error.
-
 - Web push settings could offer **Enable web push** on a device already getting notifications. It's now a checkbox at the top, ticked when this device gets them. Turning it off no longer brings up the banner asking to turn it on, and someone else's settings have no switch, as it would be your own device's.
-
 - Opening a page soon after Seerr AI loads, on a slow connection, no longer sends you through the sign-in page or loses your settings for the rest of the visit. Before, posters then came straight from TMDB instead of through Seerr AI, music and AI were hidden, and the tab's title was blank. The first page you open from another also no longer downloads the English strings, which Seerr AI already has.
-
 - Songs coming from Soulseek carry on when slskd restarts: what slskd hadn't finished is asked of the same sharer again, into the same folder, instead of that sharer being passed over. While slskd isn't answering, songs only Soulseek might have are looked for again every half hour, without counting it as a search that found nothing.
-
 - A playlist song matched by its ISRC to a recording MusicBrainz has only on others' compilations ("Now That's…") is matched to the artist's own single or album with the song instead, when that one is as long, so it can be requested. Songs that failed with "only on compilations" are matched again on update.
-
 - A music video posted under a single's name ("[1080p]", "x264") is no longer downloaded for a song, and a bootleg, rework, mash-up or clean edit of a song is no longer taken for it.
-
 - A Soulseek search still running when Seerr AI is done waiting is stopped before it's cleared, so slskd no longer logs errors for it.
-
 - A requested song whose single's download Lidarr holds back because its tags are too far from the edition ("album match is not close enough": a featured artist in the tags, another year or country) is imported on its own, as one missing tracks already was. Only when the download is named as the single, and the file is named as the song and, by its own tags, is the same take and as long as the track. When one can't be imported, the log says why.
-
 - A song whose album Lidarr already has under another artist (a duet, kept under the singer credited first) is taken into that album, instead of failing again and again with "This album has already been added".
-
 - When Lidarr refuses something (adding an album, say), the log says why, in Lidarr's words, not only "status code 400".
-
 - A song asked for again starts within a minute or so, instead of waiting behind every album due a search (after an update, all of them): setting up albums, starting downloads and imports now come before searches.
-
 - A song whose title has an apostrophe ("Ain't", "It's", "O'Clock") is found in a download that drops it ("Aint"), as many do, and so is an album whose release is named that way. Such songs failed with "None of the songs were in the finished download".
-
 - A song Lidarr's edition of its album lacks, with no other album to take it from, is taken from its own single instead of failing.
-
 - Playlists: a song is no longer matched to a live, acoustic, piano or remixed take, or a Dolby Atmos or 360 mix, unless its title says so; such a take could be nearer the playlist's length than the song itself. A song with only such takes on MusicBrainz is shown as not found. Try again on a song whose request was deleted looks it up again.
-
 - A song taken from an album is no longer taken from a Dolby Atmos, 360 Reality Audio, piano, session or other mix of it.
-
 - The database warning "Calling client.query() when the client is already executing a query" on Postgres is gone: the database library sent some queries side by side on one connection, and now sends them one after another.
-
 - A song taken from an album is only taken from a release of that album by that artist, and only from that song's own file. Live, remixed, instrumental, karaoke, tribute and re-recorded releases and files no longer count, nor another album of the artist's for a self-titled one, nor a whole album in one file; a title track is found by its own name, and two songs never share a file. A Usenet post's file list is now read before downloading it, as a torrent's is. A download Lidarr holds back is imported by Seerr AI only when Lidarr held it for missing tracks and it is named as the single.
-
 - Songs no longer get stuck: a song whose single Lidarr has part of, or took an edition of without it, is taken by Seerr AI; a single handed over no longer counts as on its way, so its other songs can be asked for; Lidarr's search for a single is asked for once, an hour apart when it couldn't run, and its songs are handed over only once Lidarr's queue would show a grab. A song asked for while its album downloads waits for that download instead of starting a second. A Usenet download the client keeps paused is given up like a stalled torrent. Lidarr not answering during an import no longer fails the songs, nor finishes a song on a single that is here. A song is no longer marked here by another take of the same name. Songs coming through singles fail with their request when Lidarr can't take it, so they can be tried again.
-
 - Playlists: a big import waiting for an admin goes as one batch again (it was asked for 40 songs at a time, each too few to need approval); a song taken off while it was being found stays off; Try again and Search again now are the owner's, and Try again leaves a blocklisted artist's request alone; songs an admin approved are searched again with Search again now too; a song whose request was deleted can be tried again; a song held back because songs can't be asked for one at a time says so.
-
 - A live take only on a live single can be requested.
-
 - A song on an album someone has asked for whole is no longer asked for again, and downloaded twice.
-
 - A song Lidarr's edition of its album lacks is taken from the artist's next album with it, instead of failing; a song missing from the release chosen for others of its album is searched for again on its own schedule, instead of failing at once; an album named with a sign ("÷") can be found.
-
 - A Usenet post's song is downloaded on its own, as a torrent's is, and moved into the library: the rest of the album is no longer downloaded and left in the client's finished folder, which SABnzbd never empties.
-
 - Playlists: one song that can't be asked for no longer splits its artist's other songs into a request each; a song already asked for by someone else follows that request, and is asked for afresh should it be declined; when Lidarr can't take a playlist's requests, their failures are told together, as the playlist's other failures are.
-
 - A music request is no longer marked failed when the music sync added its album in Lidarr at the same moment.
-
 - Node's own warnings are written to the server's log, with where they came from.
-
 - Retrying a music request sends Lidarr only what it still lacks: albums that came, or were taken off it, are no longer monitored and searched again.
-
 - An indexer waiting out its limit, or Prowlarr not answering, has the search tried again in a few minutes instead of every minute.
-
 - A song taken from an album no longer fails when its download turns out not to have it: the next release is tried. A Usenet download that renamed its files has the song found by its name.
-
 - Taking a song from an album asks only Prowlarr's indexers that carry music and aren't paused, instead of waiting on every indexer, so searches take seconds rather than a minute or more. An album that found nothing is searched again after 1, 3, 6, 12 and 24 hours, one more try than before over the same two days.
-
 - A song taken from an album could sit for hours on a torrent nobody was sharing. It now goes by Lidarr's delay profile for the artist: the protocol it prefers first (Usenet, including packed posts, the song found once unpacked; or a torrent with seeders), then the other, and a torrent nobody shares only when there's nothing else. A download bringing nothing no longer holds up the songs behind it, and a search Prowlarr didn't answer is tried again soon instead of counting as nothing found. Albums waiting to be searched again are searched on update.
 
 ## 2.4.0 (2 November 2026)

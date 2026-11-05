@@ -30,8 +30,6 @@ export const TORRENT_CLIENT_TYPES: DownloadClientType[] = [
   'deluge',
   'rtorrent',
 ];
-export const USENET_CLIENT_TYPES: DownloadClientType[] = ['sabnzbd', 'nzbget'];
-
 export const isTorrentClient = (type: DownloadClientType): boolean =>
   TORRENT_CLIENT_TYPES.includes(type);
 

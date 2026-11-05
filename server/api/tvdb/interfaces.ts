@@ -148,12 +148,6 @@ export interface TvdbSeasonDetails {
   firstAired: string;
 }
 
-export interface TvdbEpisodeTranslation {
-  name: string;
-  overview: string;
-  language: string;
-}
-
 const TMDB_TO_TVDB_MAPPING: Record<string, string> & {
   [key in AvailableLocale]: string;
 } = {

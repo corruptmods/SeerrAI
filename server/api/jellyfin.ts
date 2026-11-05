@@ -24,23 +24,6 @@ export interface JellyfinUserResponse {
   PrimaryImageTag?: string;
 }
 
-export interface JellyfinDevice {
-  Id: string;
-  Name: string;
-  LastUserName: string;
-  AppName: string;
-  AppVersion: string;
-  LastUserId: string;
-  DateLastActivity: string;
-  Capabilities: Record<string, unknown>;
-}
-
-export interface JellyfinDevicesResponse {
-  Items: JellyfinDevice[];
-  TotalRecordCount: number;
-  StartIndex: number;
-}
-
 export interface JellyfinLoginResponse {
   User: JellyfinUserResponse;
   AccessToken: string;

@@ -1,11 +1,3 @@
-import type { PlexSettings } from '@server/lib/settings';
-
-export interface PlexStatus {
-  settings: PlexSettings;
-  status: number;
-  message: string;
-}
-
 export interface PlexConnection {
   protocol: string;
   address: string;

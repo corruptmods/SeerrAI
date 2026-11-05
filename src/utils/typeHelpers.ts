@@ -1,6 +1,5 @@
 export type Undefinable<T> = T | undefined;
 export type Nullable<T> = T | null;
-export type Maybe<T> = T | null | undefined;
 
 /**
  * Helps type objects with an arbitrary number of properties that are

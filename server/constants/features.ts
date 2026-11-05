@@ -52,9 +52,6 @@ export type AiFeature = (typeof AI_FEATURES)[number];
 export const isAiFeature = (value: unknown): value is AiFeature =>
   AI_FEATURES.includes(value as AiFeature);
 
-export const isFeature = (value: unknown): value is Feature =>
-  FEATURES.includes(value as Feature);
-
 /** On unless turned off everywhere or by this person. */
 export const featureOn = (
   feature: Feature,

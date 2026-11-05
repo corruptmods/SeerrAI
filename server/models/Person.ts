@@ -56,12 +56,6 @@ export interface PersonCreditCrew extends PersonCredit {
   job: string;
 }
 
-export interface CombinedCredit {
-  id: number;
-  cast: PersonCreditCast[];
-  crew: PersonCreditCrew[];
-}
-
 export const mapPersonDetails = (person: TmdbPersonDetails): PersonDetails => ({
   id: person.id,
   name: person.name,

@@ -57,9 +57,6 @@ const ARCHIVE = /\.(rar|r\d{2,3}|zip|7z|001|tar|tgz|gz|bz2|xz)$/i;
 /** A video this small is a sample or a stand-in, never a whole episode. */
 export const SAMPLE_BYTES = 50 * 1024 * 1024;
 
-/** A video at least this big is taken for the real thing at import. */
-export const REAL_VIDEO_BYTES = 100 * 1024 * 1024;
-
 const extensionOf = (name: string): string =>
   (/\.([a-z0-9]+)$/i.exec(name)?.[1] ?? '').toLowerCase();
 

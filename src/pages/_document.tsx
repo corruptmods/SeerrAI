@@ -123,6 +123,10 @@ class MyDocument extends Document<ThemedDocumentProps> {
 
   render(): JSX.Element {
     const { appearance, season } = this.props;
+    // The page has been rendered with its strings; the browser loads them
+    // as a file it keeps (_app's startStrings), so they aren't sent again
+    // in the page's data, about 400 KB of every page.
+    delete (this.props.__NEXT_DATA__.props as { messages?: unknown }).messages;
     // The look is in the page before anything is drawn: the attributes and
     // colours here, and the script for "Match my device" (utils/theme).
     return (

@@ -134,6 +134,19 @@ const loadLocaleData = async (
   return imported.default ?? imported;
 };
 
+/**
+ * In the browser, the first page's strings, loaded before the app starts so
+ * it starts in that language. They come as one of the build's files, which
+ * the browser and the service worker keep, instead of in every page's HTML
+ * (about 400 KB). If they can't be loaded, the app starts in English.
+ */
+const startStrings: MessagesType | undefined =
+  typeof window === 'undefined'
+    ? undefined
+    : await loadLocaleData(
+        (window.__NEXT_DATA__?.props?.locale as AvailableLocale) ?? 'en'
+      ).catch(() => undefined);
+
 // Custom types so we can correctly type our GetInitialProps function
 // with our combined user prop
 // This is specific to _app.tsx. Other pages will not need to do this!
@@ -143,7 +156,12 @@ type MessagesType = Record<string, string>;
 /** What the server gives the app with the first page of a visit. */
 interface FirstPageProps {
   user?: User;
-  messages: MessagesType;
+  /**
+   * Its strings, for the server's render: they are taken out of the page
+   * itself (see _document), and the browser loads them as a file it keeps
+   * (startStrings, below).
+   */
+  messages?: MessagesType;
   locale: AvailableLocale;
   currentSettings: PublicSettingsResponse;
   /** The look kept on this device, for pages before anyone signs in. */
@@ -191,7 +209,9 @@ const CoreApp: Omit<NextAppComponentType, 'origGetInitialProps'> = ({
     seasonDay,
   } = firstPage;
   let component: React.ReactNode;
-  const [loadedMessages, setMessages] = useState<MessagesType>(messages);
+  const [loadedMessages, setMessages] = useState<MessagesType>(
+    messages ?? startStrings ?? {}
+  );
   const [currentLocale, setLocale] = useState<AvailableLocale>(locale);
 
   // The app is up: back to the page the installed app was on, if iOS

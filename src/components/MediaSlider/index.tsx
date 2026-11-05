@@ -2,6 +2,7 @@ import ShowMoreCard from '@app/components/MediaSlider/ShowMoreCard';
 import PersonCard from '@app/components/PersonCard';
 import Slider from '@app/components/Slider';
 import TitleCard from '@app/components/TitleCard';
+import { useNearObserver } from '@app/hooks/useNearScreen';
 import useSettings from '@app/hooks/useSettings';
 import useTitleChanged, { pageHolds } from '@app/hooks/useTitleChanged';
 import { useUser } from '@app/hooks/useUser';
@@ -15,6 +16,7 @@ import type {
 } from '@server/models/Search';
 import Link from 'next/link';
 import { useEffect } from 'react';
+import { useSWRConfig } from 'swr';
 import useSWRInfinite from 'swr/infinite';
 
 interface MixedResult {
@@ -45,15 +47,24 @@ const MediaSlider = ({
 }: MediaSliderProps) => {
   const settings = useSettings();
   const { hasPermission } = useUser();
+  const pageUrl = (page: number) =>
+    `${url}?page=${page}${extraParams ? `&${extraParams}` : ''}`;
+  // A row is fetched once it comes near the screen, so the rows at the top
+  // of a page (and their posters) aren't kept waiting behind ones further
+  // down. One already fetched, as on going back to the page, shows at once.
+  const { ref: rowRef, near } = useNearObserver();
+  const { cache } = useSWRConfig();
+  const wanted = near || cache.get(pageUrl(1))?.data !== undefined;
   const { data, error, setSize, size, mutate } = useSWRInfinite<MixedResult>(
     (pageIndex: number, previousPageData: MixedResult | null) => {
-      if (previousPageData && pageIndex + 1 > previousPageData.totalPages) {
+      if (
+        !wanted ||
+        (previousPageData && pageIndex + 1 > previousPageData.totalPages)
+      ) {
         return null;
       }
 
-      return `${url}?page=${pageIndex + 1}${
-        extraParams ? `&${extraParams}` : ''
-      }`;
+      return pageUrl(pageIndex + 1);
     },
     // One page first, so its posters show as soon as it arrives; the next,
     // for the card that leads to the rest, is asked for then (below). Asked
@@ -122,7 +133,9 @@ const MediaSlider = ({
     }
   }, [titles, setSize, size, data, onNewTitles]);
 
-  if (hideWhenEmpty && (data?.[0].results ?? []).length === 0) {
+  // Hidden once it's known to be empty: until it has been fetched, the row
+  // is kept, to see when it comes near.
+  if (hideWhenEmpty && data && (data[0]?.results ?? []).length === 0) {
     return null;
   }
 
@@ -202,7 +215,7 @@ const MediaSlider = ({
   }
 
   return (
-    <div>
+    <div ref={rowRef}>
       <div className="slider-header">
         {linkUrl ? (
           <Link href={linkUrl} className="slider-title min-w-0 pr-16">

@@ -132,7 +132,7 @@ const SettingsLogs = () => {
     return <ErrorPage statusCode={500} />;
   }
 
-  const hasNextPage = data?.pageInfo.pages ?? 0 > pageIndex + 1;
+  const hasNextPage = (data?.pageInfo.pages ?? 0) > pageIndex + 1;
   const hasPrevPage = pageIndex > 0;
 
   return (

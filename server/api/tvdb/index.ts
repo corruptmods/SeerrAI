@@ -359,7 +359,7 @@ class Tvdb extends ExternalAPI implements TvShowProvider {
         translation === Tvdb.DEFAULT_LANGUAGE
     );
 
-    if (!availableTranslation) {
+    if (!availableTranslation.length) {
       return this.getSeasonWithOriginalLanguage(
         tvdbId,
         tvId,

@@ -169,8 +169,10 @@ class PGPEncryptor extends Transform {
 export const openpgpEncrypt = (options: EncryptorOptions) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function (mail: any, callback: () => unknown): void {
+    // No keys: send unencrypted.
     if (!options.encryptionKeys.length) {
       setImmediate(callback);
+      return;
     }
     mail.message.transform(
       () =>
